@@ -66,7 +66,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           .rule(_.htlcMinimumMsat <= 200000L, "Their htlcMinimumMsat too high")
           .rule(_.toSelfDelay <= cmd.localParams.toSelfDelay * 2, "Their toSelfDelay is too high")
           .rule(_.maxHtlcValueInFlightMsat > UInt64(LNParams.maxHtlcValue.amount / 5), "Their maxHtlcValueInFlightMsat is too low")
-          .rule(_.channelReserveSatoshis.toDouble / cmd.fundingAmountSat > LNParams.maxReserveToFundingRatio, "Their reserve is too high")
+          .rule(_.channelReserveSatoshis.toDouble / cmd.fundingAmountSat < LNParams.maxReserveToFundingRatio, "Their reserve is too high")
           .rule(_.maxAcceptedHtlcs > 0, "They can accept too few incoming HTLCs")
           .rule(_.dustLimitSatoshis >= 546L, "Their dust limit is too low")
 

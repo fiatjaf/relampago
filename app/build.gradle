@@ -9,7 +9,7 @@ android {
         applicationId "com.lightning.wallet"
         versionName "0.01"
         minSdkVersion 16
-        versionCode 1
+        versionCode 2
     }
 
     buildTypes {
