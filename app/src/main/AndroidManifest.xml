@@ -64,10 +64,10 @@
         <activity android:launchMode="singleTask" android:name="WalletRestoreActivity"
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
-        <activity android:launchMode="singleInstance" android:name="BtcActivity"
+        <activity android:launchMode="singleTask" android:name="BtcActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
-        <activity android:launchMode="singleInstance" android:name="LNActivity"
+        <activity android:launchMode="singleTask" android:name="LNActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
         <activity android:launchMode="singleTask" android:name="EmergencyActivity"

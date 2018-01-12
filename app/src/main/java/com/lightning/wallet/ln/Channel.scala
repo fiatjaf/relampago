@@ -1,5 +1,7 @@
 package com.lightning.wallet.ln
 
+import octopus.dsl._
+import octopus.syntax._
 import com.softwaremill.quicklens._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Channel._
@@ -59,15 +61,18 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT)
         if accept.temporaryChannelId == cmd.temporaryChannelId =>
 
-        val tooHighMinDepth = accept.minimumDepth > 6L
-        val tooHighHtlcMinimumMsat = accept.htlcMinimumMsat > 2500000L
-        val tooHighMineDelay = accept.toSelfDelay > cmd.localParams.toSelfDelay * 2
-        val wrongAcceptedHtlcs = accept.maxAcceptedHtlcs < 1 | accept.maxAcceptedHtlcs > 483
-        val wrongDustLimit = accept.dustLimitSatoshis > 250000L | accept.dustLimitSatoshis < 546L
-        val tooSmallHtlcValueInFlight = accept.maxHtlcValueInFlightMsat < UInt64(LNParams.maxHtlcValue.amount / 10)
-        val exceedsReserve = accept.channelReserveSatoshis.toDouble / cmd.fundingAmountSat > LNParams.maxReserveToFundingRatio
-        val nope = tooHighMinDepth | wrongAcceptedHtlcs | tooHighHtlcMinimumMsat | wrongDustLimit | tooHighMineDelay | exceedsReserve
-        if (nope | tooSmallHtlcValueInFlight) BECOME(wait, CLOSING) else BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
+        val acceptChannelValidator = Validator[AcceptChannel]
+          .rule(_.minimumDepth <= 6L, "Their minimumDepth is too high")
+          .rule(_.htlcMinimumMsat <= 200000L, "Their htlcMinimumMsat too high")
+          .rule(_.toSelfDelay <= cmd.localParams.toSelfDelay * 2, "Their toSelfDelay is too high")
+          .rule(_.maxHtlcValueInFlightMsat > UInt64(LNParams.maxHtlcValue.amount / 5), "Their maxHtlcValueInFlightMsat is too low")
+          .rule(_.channelReserveSatoshis.toDouble / cmd.fundingAmountSat > LNParams.maxReserveToFundingRatio, "Their reserve is too high")
+          .rule(_.maxAcceptedHtlcs > 0, "They can accept too few incoming HTLCs")
+          .rule(_.dustLimitSatoshis >= 546L, "Their dust limit is too low")
+
+        val result = accept.validate(acceptChannelValidator)
+        if (result.isValid) BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING) else BECOME(wait, CLOSING)
+        if (!result.isValid) Tools.log(result.toFieldErrMapping map { case _ \ error => s"- $error" } mkString "\n")
 
 
       // They have accepted our proposal, now let them sign a first commit tx
