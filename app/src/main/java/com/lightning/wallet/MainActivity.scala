@@ -61,7 +61,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   lazy val mainPassKeysType = findViewById(R.id.mainPassKeysType).asInstanceOf[SegmentedGroup]
   lazy val mainPassCheck = findViewById(R.id.mainPassCheck).asInstanceOf[Button]
   lazy val mainPassData = findViewById(R.id.mainPassData).asInstanceOf[EditText]
-  lazy val greet = me clickableTextField findViewById(R.id.mainGreetings)
 
   lazy val views =
     findViewById(R.id.mainChoice) ::
@@ -70,6 +69,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
   def INIT(state: Bundle) = {
     wrap(me initNfc state)(me setContentView R.layout.activity_main)
+    me clickableTextField findViewById(R.id.mainGreetings)
+
     mainPassKeysType setOnCheckedChangeListener new OnCheckedChangeListener {
       def onCheckedChanged(fancyRadioGroupView: RadioGroup, newInputKeyType: Int) = {
         app.prefs.edit.putBoolean(AbstractKit.PASS_INPUT, newInputKeyType == typePass).commit
