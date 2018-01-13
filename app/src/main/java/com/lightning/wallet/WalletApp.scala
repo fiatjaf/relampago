@@ -239,6 +239,7 @@ class WalletApp extends Application { me =>
       wallet addTransactionConfidenceEventListener ChannelManager.chainEventsListener
       wallet addCoinsSentEventListener ChannelManager.chainEventsListener
       wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
+      wallet.allowSpendingUnconfirmedTransactions
       wallet.watchMode = true
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)

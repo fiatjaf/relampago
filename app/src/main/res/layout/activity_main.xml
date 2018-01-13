@@ -56,7 +56,7 @@
             <RadioButton
                 android:textSize="16sp"
                 android:id="@+id/typePass"
-                android:text="@string/key_pass"
+                android:text="@string/key_alph"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 style="@style/RadioButton"/>
@@ -64,7 +64,7 @@
             <RadioButton
                 android:textSize="16sp"
                 android:id="@+id/typePIN"
-                android:text="@string/key_pin"
+                android:text="@string/key_num"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 style="@style/RadioButton"/>

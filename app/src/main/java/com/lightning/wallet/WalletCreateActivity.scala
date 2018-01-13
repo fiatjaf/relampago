@@ -16,7 +16,6 @@ import android.os.Bundle
 class WalletCreateActivity extends TimerActivity with ViewSwitch { me =>
   lazy val createWallet = findViewById(R.id.createWallet).asInstanceOf[Button]
   lazy val createPass = findViewById(R.id.createPass).asInstanceOf[EditText]
-  lazy val info = me clickableTextField findViewById(R.id.mnemonicInfo)
 
   lazy val views =
     findViewById(R.id.createInfo) ::
@@ -24,6 +23,8 @@ class WalletCreateActivity extends TimerActivity with ViewSwitch { me =>
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_create)
+    me clickableTextField findViewById(R.id.mnemonicInfo)
+
     createPass addTextChangedListener new TextChangedWatcher {
       override def onTextChanged(s: CharSequence, st: Int, n: Int, af: Int) =
         if (s.length >= 6) wrap(createWallet setEnabled true)(createWallet setText wallet_create)

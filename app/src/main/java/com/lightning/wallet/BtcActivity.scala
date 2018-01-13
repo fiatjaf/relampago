@@ -162,9 +162,9 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
       }
   }
 
-  def updTitle = coin2MSat(app.kit.currentBalance) match { case msat =>
-    val text = if (msat.amount < 1) walletEmpty else denom withSign msat
-    animateTitle(text)
+  def updTitle = animateTitle {
+    val msat = coin2MSat(app.kit.currentBalance)
+    if (msat.amount < 1) walletEmpty else denom withSign msat
   }
 
   def notifySubTitle(sub: String, infoType: Int) = {
