@@ -434,9 +434,9 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
       app.TransData.value = null
   }
 
-  def goBitcoin(top: View) = me goTo classOf[BtcActivity]
-  def goQR(top: View) = me goTo classOf[ScanActivity]
   def goReceive(top: View) = makePaymentRequest.run
+  def goQR(top: View) = me goTo classOf[ScanActivity]
+  def goBitcoin(top: View) = me goTo classOf[BtcActivity]
 
   def toggle(v: View) = {
     // Expand or collapse all txs

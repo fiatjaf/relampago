@@ -91,7 +91,7 @@
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
     <string name="amount_hint_fin"><![CDATA[Amount in Finney%1$s]]></string>
 
-    <string name="dialog_address_absent">Clipboard does not contain an Address</string>
+    <string name="dialog_clipboard_absent">Clipboard does not contain anything useful</string>
     <string name="dialog_address_wrong">Bitcoin address is required</string>
     <string name="dialog_sum_empty">Please provide an amount</string>
     <string name="dialog_sum_small">Amount is too small</string>

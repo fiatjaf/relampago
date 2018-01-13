@@ -554,8 +554,10 @@ class BtcManager(val man: RateManager) { me =>
   def getAddress = addressData.getTag.asInstanceOf[Address]
 
   addressPaste setOnClickListener new OnClickListener {
-    def onClick(button: View) = try setAddress(app getTo app.getBuffer)
-      catch { case _: Throwable => app toast dialog_address_absent }
+    def onClick(button: View) = app.getBufferTry map app.getTo match {
+      case Success(validBitcoinAddress) => setAddress(validBitcoinAddress)
+      case _ => app toast dialog_clipboard_absent
+    }
   }
 
   def setAddress(adr: Address) = {

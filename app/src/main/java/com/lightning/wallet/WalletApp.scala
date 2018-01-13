@@ -27,6 +27,7 @@ import com.google.protobuf.ByteString
 import scala.collection.mutable
 import android.widget.Toast
 import android.os.Bundle
+import scala.util.Try
 import java.io.File
 
 import com.lightning.wallet.ln.wire.{Init, LightningMessage, NodeAnnouncement}
@@ -67,7 +68,7 @@ class WalletApp extends Application { me =>
   def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => true case _ => false }
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-  def getBuffer = clipboardManager.getPrimaryClip.getItemAt(0).getText.toString
+  def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
   def getTo(base58: String) = Address.fromBase58(params, base58)
 
   Utils.appReference = me
