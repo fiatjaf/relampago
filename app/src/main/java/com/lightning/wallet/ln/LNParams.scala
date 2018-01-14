@@ -75,7 +75,7 @@ object LNParams { me =>
 
   def makeLocalParams(reserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (n <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: n :: Nil)
-    LocalParams(UInt64(Long.MaxValue), reserve, toSelfDelay = 144, maxAcceptedHtlcs = 3, fund.privateKey, revoke.privateKey,
+    LocalParams(UInt64(Long.MaxValue), reserve, toSelfDelay = 144, maxAcceptedHtlcs = 25, fund.privateKey, revoke.privateKey,
       pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey, sha256(sha.privateKey.toBin), isFunder = true)
   }
 }
