@@ -85,7 +85,7 @@
     <!-- dialogs -->
     <string name="spend_address_tip">Paste Bitcoin address\nfrom clipboard</string>
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
-    <string name="amount_hint_can_receive"><![CDATA[<br><small><a href=http://lightning-wallet.com/using-lightning-wallet.html>can receive</a> %1$s</small>]]></string>
+    <string name="amount_hint_can_receive"><![CDATA[<br><small><a href=http://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>can receive</a> %1$s</small>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>min channel capacity %1$s<br>max channel capacity %2$s<br>can send %3$s</small>]]></string>
     <string name="amount_hint_sat"><![CDATA[Amount in Satoshi%1$s]]></string>
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
