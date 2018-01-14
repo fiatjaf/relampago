@@ -26,7 +26,6 @@
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_create">New Bitcoin Wallet</string>
     <string name="wallet_restore">Restore Wallet</string>
-    <string name="wallet_empty">Wallet is empty</string>
 
     <array name="denoms">
         <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 BTC</small></font>]]></item>
@@ -156,6 +155,7 @@
     <string name="err_ln_fulfilled">Failed because this payment is already fulfilled</string>
 
     <string name="err_ln_cant_ask">Can\'t ask for payments right now because a funding Bitcoin transaction has not got 6 confirmations yet</string>
+    <string name="err_ln_not_enough_funds"><![CDATA[Not enough funds<br>for a payment channel<br><br>balance %1$s<br>min required %2$s<br><br>Bitcoin wallet should contain more funds in order to proceed with this]]></string>
     <string name="err_ln_fee_overflow"><![CDATA[Failed because this payment combined with Bitcoin <a href=http://lightning-wallet.com/using-lightning-wallet.html#commit-transaction-fee>commit transaction</a> fee exceeds your unspendable channel reserve<br><br>reserve %1$s<br>sending %2$s<br>missing %3$s]]></string>
     <string name="err_transaction_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>

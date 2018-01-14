@@ -125,7 +125,6 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   lazy val feeIncoming = getString(txs_fee_incoming)
   lazy val feeDetails = getString(txs_fee_details)
   lazy val feeAbsent = getString(txs_fee_absent)
-  lazy val walletEmpty = getString(wallet_empty)
 
   lazy val adapter = new CutAdapter[TxWrap](96, R.layout.frag_tx_btc_line) {
     // BTC line has a wider timestamp section because there is no payment info
@@ -163,8 +162,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   }
 
   def updTitle = animateTitle {
-    val msat = coin2MSat(app.kit.currentBalance)
-    if (msat.amount < 1) walletEmpty else denom withSign msat
+    denom withSign app.kit.currentBalance
   }
 
   def notifySubTitle(sub: String, infoType: Int) = {
@@ -290,11 +288,11 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     case uri: BitcoinURI =>
       app.TransData.value = null
       val amt: TryMSat = Try(uri.getAmount)
-      sendBtcTxPopup.set(amt, uri.getAddress)
+      sendBtcPopup.set(amt, uri.getAddress)
 
     case adr: Address =>
       app.TransData.value = null
-      sendBtcTxPopup setAddress adr
+      sendBtcPopup setAddress adr
 
     case unusable =>
       app.TransData.value = null
@@ -312,7 +310,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
 
   def goQR(top: View) = me goTo classOf[ScanActivity]
   def goLN(top: View) = me goTo classOf[LNActivity]
-  def goPay(top: View) = sendBtcTxPopup
+  def goPay(top: View) = sendBtcPopup
 
   def toggle(v: View) = {
     // Expand or collapse all txs
@@ -323,7 +321,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     adapter.notifyDataSetChanged
   }
 
-  def sendBtcTxPopup: BtcManager = {
+  def sendBtcPopup: BtcManager = {
     val content = getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
     val alert = mkForm(negPosBld(dialog_cancel, dialog_next), me getString action_bitcoin_send, content)
     val rateManager = new RateManager(getString(amount_hint_wallet).format(denom withSign app.kit.currentBalance), content)
@@ -337,14 +335,15 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
       case ok @ Success(ms) =>
         val processor = new TxProcessor {
           val pay = AddrData(ms, spendManager.getAddress)
+
           override def processTx(pass: String, feePerKb: Coin) = {
             add(me getString tx_announcing, Informer.BTCEVENT).flash.run
             <(app.kit blockingSend makeTx(pass, feePerKb), onTxFail)(none)
           }
 
           override def onTxFail(err: Throwable) =
-            mkForm(mkChoiceDialog(me delayUI sendBtcTxPopup.set(ok, pay.address), none,
-              dialog_ok, dialog_cancel), title = null, messageWhenMakingTx apply err)
+            mkForm(mkChoiceDialog(me delayUI sendBtcPopup.set(ok, pay.address), none,
+              dialog_ok, dialog_cancel), messageWhenMakingTx(err), null)
         }
 
         // Initiate the spending sequence

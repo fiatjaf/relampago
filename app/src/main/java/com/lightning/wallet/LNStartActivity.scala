@@ -164,15 +164,14 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
   // UI utilities
 
   def askForFunding(chan: Channel, their: Init) = {
-    val minUserCapacity: MilliSatoshi = RatesSaver.rates.feeLive
     val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
     val alert = mkForm(negPosBld(dialog_cancel, dialog_next), getString(ln_ops_start_fund_title).html, content)
-    val rateManager = new RateManager(getString(amount_hint_newchan).format(denom withSign minUserCapacity,
+    val rateManager = new RateManager(getString(amount_hint_newchan).format(denom withSign RatesSaver.rates.feeLive,
       denom withSign LNParams.maxChannelCapacity, denom withSign app.kit.currentBalance), content)
 
     def askAttempt = rateManager.result match {
       case Failure(_) => app toast dialog_sum_empty
-      case Success(ms) if ms < minUserCapacity => app toast dialog_sum_small
+      case Success(ms) if ms < RatesSaver.rates.feeLive => app toast dialog_sum_small
       case Success(ms) if ms > LNParams.maxChannelCapacity => app toast dialog_sum_big
 
       case Success(ms) => rm(alert) {
@@ -206,7 +205,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
 
       def onTxFail(err: Throwable) =
         mkForm(mkChoiceDialog(me delayUI askForFeerate(chan, cmd, accept),
-          none, dialog_ok, dialog_cancel), null, messageWhenMakingTx apply err)
+          none, dialog_ok, dialog_cancel), messageWhenMakingTx(err), null)
     }
   }
 }

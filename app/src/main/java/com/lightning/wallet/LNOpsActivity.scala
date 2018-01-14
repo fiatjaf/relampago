@@ -3,9 +3,11 @@ package com.lightning.wallet
 import com.lightning.wallet.ln._
 import com.lightning.wallet.Utils._
 import com.lightning.wallet.R.string._
+import com.lightning.wallet.Denomination._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
 import com.lightning.wallet.ln.LNParams.DepthAndDead
+import com.lightning.wallet.lnutils.RatesSaver
 import com.lightning.wallet.ln.Tools.wrap
 import fr.acinq.bitcoin.Transaction
 import android.widget.Button
@@ -27,7 +29,14 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val amountStatus = getString(ln_ops_chan_amount_status)
   lazy val commitStatus = getString(ln_ops_chan_commit_status)
   def goBitcoin(view: View) = me exitTo classOf[BtcActivity]
-  def goStartChannel = me exitTo classOf[LNStartActivity]
+
+  def goStartChannel = {
+    val minRequired = RatesSaver.rates.feeLive multiply 2
+    lazy val required = sumIn.format(denom withSign minRequired)
+    lazy val balance = sumIn.format(denom withSign app.kit.currentBalance)
+    if (app.kit.currentBalance isGreaterThan minRequired) me exitTo classOf[LNStartActivity]
+    else mkForm(me negBld dialog_ok, getString(err_ln_not_enough_funds).format(balance, required).html, null)
+  }
 
   // We may scan a payment request while opening a channel, remove it here
   override def onResume = wrap(super.onResume) { app.TransData.value = null }
