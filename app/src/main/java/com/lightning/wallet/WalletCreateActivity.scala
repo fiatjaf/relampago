@@ -23,7 +23,7 @@ class WalletCreateActivity extends TimerActivity with ViewSwitch { me =>
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_create)
-    me clickableTextField findViewById(R.id.mnemonicInfo)
+    Utils clickableTextField findViewById(R.id.mnemonicInfo)
 
     createPass addTextChangedListener new TextChangedWatcher {
       override def onTextChanged(s: CharSequence, st: Int, n: Int, af: Int) =

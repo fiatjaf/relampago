@@ -23,11 +23,14 @@ import com.lightning.wallet.ln.LNParams.minDepth
 import com.lightning.wallet.ln.PaymentRequest
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
+import com.google.common.io.Files
 import java.text.SimpleDateFormat
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
+import java.io.File
+import java.util
 
 
 trait HumanTimeDisplay { me: TimerActivity =>
@@ -120,7 +123,7 @@ trait ListUpdater extends HumanTimeDisplay { me: TimerActivity =>
 
 class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me =>
   lazy val mnemonicWarn = findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
-  lazy val mnemonicInfo = me clickableTextField findViewById(R.id.mnemonicInfo)
+  lazy val mnemonicInfo = Utils clickableTextField findViewById(R.id.mnemonicInfo)
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
   lazy val feeIncoming = getString(txs_fee_incoming)
   lazy val feeDetails = getString(txs_fee_details)
@@ -151,7 +154,11 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   private[this] val lstTracker = new TxTracker {
     override def coinsSent(tx: Transaction) = me runOnUiThread tell(tx)
     override def coinsReceived(tx: Transaction) = me runOnUiThread tell(tx)
-    override def txConfirmed(tx: Transaction) = me runOnUiThread adapter.notifyDataSetChanged
+
+    override def txConfirmed(tx: Transaction) = {
+      me runOnUiThread adapter.notifyDataSetChanged
+      updTitle
+    }
 
     def tell(wrap: TxWrap) =
       if (!wrap.nativeValue.isZero) {
@@ -162,7 +169,12 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   }
 
   def updTitle = animateTitle {
-    denom withSign app.kit.currentBalance
+    val gap = app.kit.conf0Balance minus app.kit.conf1Balance
+    val conf0 = denom withSign app.kit.conf1Balance
+    val conf1 = denom formatted gap
+
+    if (gap.isZero) conf0
+    else s"$conf0 + $conf1"
   }
 
   def notifySubTitle(sub: String, infoType: Int) = {
@@ -179,7 +191,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     me startListUpdates adapter
 
     toolbar setOnClickListener onButtonTap {
-      showDenominationChooser(app.kit.currentBalance) { pos =>
+      showDenominationChooser(app.kit.conf1Balance) { pos =>
         app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
 
         denom = denoms apply pos
@@ -272,12 +284,36 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
 
   override def onOptionsItemSelected(menu: MenuItem) = runAnd(true) {
     if (menu.getItemId == R.id.actionBuyCoins) localBitcoinsAndGlidera
+    else if (menu.getItemId == R.id.exportSnapshot) exportSnapshot
     else if (menu.getItemId == R.id.actionSettings) mkSetsForm
   }
 
   override def onResume = wrap(super.onResume) {
     app.prefs.edit.putBoolean(AbstractKit.LANDING_LN, false).commit
     checkTransData
+  }
+
+  // TODO: remove for mainnet
+  def exportSnapshot = {
+    val dbFile = new File("/data/data/com.lightning.wallet/databases/lndata4.db")
+
+    val walletDestinationFile = FileOps shell s"$appName.wallet"
+    val chainDestinationFile = FileOps shell s"$appName.spvchain"
+    val dbDestinationFile = FileOps shell s"lndata4.db"
+
+    Files.write(Files toByteArray app.walletFile, walletDestinationFile)
+    Files.write(Files toByteArray app.chainFile, chainDestinationFile)
+    Files.write(Files toByteArray dbFile, dbDestinationFile)
+
+    val files = new util.ArrayList[Uri]
+
+    files.add(Uri fromFile walletDestinationFile)
+    files.add(Uri fromFile chainDestinationFile)
+    files.add(Uri fromFile dbDestinationFile)
+
+    val share = new Intent setAction Intent.ACTION_SEND_MULTIPLE setType "text/plain"
+    share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files)
+    me startActivity share
   }
 
   // DATA READING AND BUTTON ACTIONS
@@ -298,7 +334,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
       app.TransData.value = null
   }
 
-  private def localBitcoinsAndGlidera = {
+  def localBitcoinsAndGlidera = {
     val uri = Uri parse "https://testnet.manu.backend.hamburg/faucet"
     me startActivity new Intent(Intent.ACTION_VIEW, uri)
   }
@@ -324,7 +360,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   def sendBtcPopup: BtcManager = {
     val content = getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
     val alert = mkForm(negPosBld(dialog_cancel, dialog_next), me getString action_bitcoin_send, content)
-    val rateManager = new RateManager(getString(amount_hint_wallet).format(denom withSign app.kit.currentBalance), content)
+    val rateManager = new RateManager(getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance), content)
     val spendManager = new BtcManager(rateManager)
 
     def sendAttempt = rateManager.result match {

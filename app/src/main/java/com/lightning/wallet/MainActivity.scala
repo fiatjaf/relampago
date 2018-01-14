@@ -69,7 +69,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
   def INIT(state: Bundle) = {
     wrap(me initNfc state)(me setContentView R.layout.activity_main)
-    me clickableTextField findViewById(R.id.mainGreetings)
+    Utils clickableTextField findViewById(R.id.mainGreetings)
 
     mainPassKeysType setOnCheckedChangeListener new OnCheckedChangeListener {
       def onCheckedChanged(fancyRadioGroupView: RadioGroup, newInputKeyType: Int) = {

@@ -1,5 +1,6 @@
 <resources>
     <string name="lang">eng</string>
+    <string name="debug_export_snapshot">Export snapshot</string>
 
     <!-- stepper -->
     <string name="step_2"><![CDATA[<font color=#999999>Step 2 of 3: security</font><br><br>%1$s]]></string>
@@ -83,9 +84,9 @@
 
     <!-- dialogs -->
     <string name="spend_address_tip">Paste Bitcoin address\nfrom clipboard</string>
-    <string name="amount_hint_maxamount"><![CDATA[<br><small>max amount %1$s</small>]]></string>
-    <string name="amount_hint_wallet"><![CDATA[<br><small>wallet balance %1$s</small>]]></string>
-    <string name="amount_hint_newchan"><![CDATA[<br><small>min channel capacity %1$s<br>max channel capacity %2$s<br>wallet balance %3$s</small>]]></string>
+    <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
+    <string name="amount_hint_can_receive"><![CDATA[<br><small><a href=http://lightning-wallet.com/using-lightning-wallet.html>can receive</a> %1$s</small>]]></string>
+    <string name="amount_hint_newchan"><![CDATA[<br><small>min channel capacity %1$s<br>max channel capacity %2$s<br>can send %3$s</small>]]></string>
     <string name="amount_hint_sat"><![CDATA[Amount in Satoshi%1$s]]></string>
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
     <string name="amount_hint_fin"><![CDATA[Amount in Finney%1$s]]></string>
@@ -155,11 +156,11 @@
     <string name="err_ln_fulfilled">Failed because this payment is already fulfilled</string>
 
     <string name="err_ln_cant_ask">Can\'t ask for payments right now because a funding Bitcoin transaction has not got 6 confirmations yet</string>
-    <string name="err_ln_not_enough_funds"><![CDATA[Not enough funds<br>for a payment channel<br><br>balance %1$s<br>min required %2$s<br><br>Bitcoin wallet should contain more funds in order to proceed with this]]></string>
+    <string name="err_ln_not_enough_funds"><![CDATA[Not enough funds<br>for a payment channel<br><br>can send %1$s<br>min required %2$s<br><br>Bitcoin wallet should contain more funds in order to proceed with this]]></string>
     <string name="err_ln_fee_overflow"><![CDATA[Failed because this payment combined with Bitcoin <a href=http://lightning-wallet.com/using-lightning-wallet.html#commit-transaction-fee>commit transaction</a> fee exceeds your unspendable channel reserve<br><br>reserve %1$s<br>sending %2$s<br>missing %3$s]]></string>
+    <string name="err_not_enough_funds"><![CDATA[Not enough funds<br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br><br>Please note that Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
     <string name="err_transaction_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
-    <string name="err_not_enough_funds"><![CDATA[Not enough funds<br><br>balance %1$s<br>sending %2$s<br>missing %3$s]]></string>
     <string name="err_secret">Failed because passcode did not match. Please make sure you have provided a correct one</string>
     <string name="err_different_net">Failed because request contains an address that belongs to a different network</string>
     <string name="err_address">Failed because neither Bitcoin address nor Lightning payment request has been found</string>

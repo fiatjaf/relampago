@@ -18,7 +18,7 @@ import java.util.Date
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val lnOpsAction = findViewById(R.id.lnOpsAction).asInstanceOf[Button]
-  lazy val lnOpsDescription = me clickableTextField findViewById(R.id.lnOpsDescription)
+  lazy val lnOpsDescription = Utils clickableTextField findViewById(R.id.lnOpsDescription)
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
 
@@ -33,8 +33,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def goStartChannel = {
     val minRequired = RatesSaver.rates.feeLive multiply 2
     lazy val required = sumIn.format(denom withSign minRequired)
-    lazy val balance = sumIn.format(denom withSign app.kit.currentBalance)
-    if (app.kit.currentBalance isGreaterThan minRequired) me exitTo classOf[LNStartActivity]
+    lazy val balance = sumIn.format(denom withSign app.kit.conf1Balance)
+    if (app.kit.conf1Balance isGreaterThan minRequired) me exitTo classOf[LNStartActivity]
     else mkForm(me negBld dialog_ok, getString(err_ln_not_enough_funds).format(balance, required).html, null)
   }
 

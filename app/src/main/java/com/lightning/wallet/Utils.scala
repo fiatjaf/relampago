@@ -78,6 +78,12 @@ object Utils {
   def humanNode(nodeId: PublicKey, separator: String) = nodeId.toString
     .grouped(24).map(_ grouped 3 mkString "\u0020").mkString(separator)
 
+  def clickableTextField(view: View): TextView = {
+    val textView: TextView = view.asInstanceOf[TextView]
+    textView setMovementMethod LinkMovementMethod.getInstance
+    textView
+  }
+
   def currentRate: Try[Double] = Try(RatesSaver.rates exchange fiatName)
   def msatInFiat(msat: MilliSatoshi) = currentRate.map(perBtc => msat.amount * perBtc / btc2msatFactor)
   def humanFiat(prefix: String, ms: MilliSatoshi, div: String = "<br>"): String = msatInFiat(ms) match {
@@ -386,7 +392,7 @@ trait ToolbarActivity extends TimerActivity { me =>
       case notEnough: InsufficientMoneyException =>
         val sending = sumOut.format(denom withSign pay.cn)
         val missing = sumOut.format(denom withSign notEnough.missing)
-        val balance = sumIn.format(denom withSign app.kit.currentBalance)
+        val balance = sumIn.format(denom withSign app.kit.conf1Balance)
         getString(err_not_enough_funds).format(balance, sending, missing).html
 
       case _: KeyCrypterException => app getString err_secret
@@ -413,7 +419,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   // Basis for dialog forms
   def str2Tuple(textFieldData: CharSequence): (LinearLayout, TextView) = {
     val view = getLayoutInflater.inflate(R.layout.frag_top_tip, null).asInstanceOf[LinearLayout]
-    val titleTextField = me clickableTextField view.findViewById(R.id.actionTip)
+    val titleTextField = Utils clickableTextField view.findViewById(R.id.actionTip)
     titleTextField setText textFieldData
     view -> titleTextField
   }
@@ -484,12 +490,6 @@ trait TimerActivity extends AppCompatActivity { me =>
     def onClick(view: View) = me hideKeys run
   }
 
-  def clickableTextField(view: View): TextView = {
-    val textView: TextView = view.asInstanceOf[TextView]
-    textView setMovementMethod LinkMovementMethod.getInstance
-    textView
-  }
-
   def share(text: String): Unit = startActivity {
     val share = new Intent setAction Intent.ACTION_SEND setType "text/plain"
     share.putExtra(android.content.Intent.EXTRA_TEXT, text)
@@ -511,8 +511,8 @@ trait TimerActivity extends AppCompatActivity { me =>
 }
 
 class RateManager(extra: String, val content: View) { me =>
-  val hintDenom = content.findViewById(R.id.hintDenom).asInstanceOf[TextView]
   val satInput = content.findViewById(R.id.inputAmount).asInstanceOf[EditText]
+  val hintDenom = Utils clickableTextField content.findViewById(R.id.hintDenom)
   val fiatType = content.findViewById(R.id.fiatType).asInstanceOf[SegmentedGroup]
   val fiatInput = content.findViewById(R.id.fiatInputAmount).asInstanceOf[EditText]
   def result: TryMSat = Try(denom rawString2MSat satInput.getText.toString.noCommas)
@@ -587,7 +587,7 @@ case class AddrData(cn: Coin, address: Address) extends PayData {
   def destination = humanAddr(address)
 
   def sendRequest = {
-    val isAll = app.kit.currentBalance equals cn
+    val isAll = app.kit.conf1Balance equals cn
     if (isAll) SendRequest.emptyWallet(address)
     else SendRequest.to(address, cn)
   }

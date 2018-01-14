@@ -288,13 +288,13 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
       // we can not calculate an exact commitTx fee + HTLC fees in advance so just use a minChannelMargin
       // which also guarantees a user has some substantial amount to be refunded once a channel is exhausted
       val canSend0 = chan(c => c.localCommit.spec.toLocalMsat - c.remoteParams.channelReserveSatoshis * sat2msatFactor)
-      val canSend1 = canSend0.map(_ - broadcaster.ratePerKwSat * sat2msatFactor / 2).filter(0L<) getOrElse 0L
+      val canSend1 = canSend0.map(_ - broadcaster.ratePerKwSat * sat2msatFactor / 2) getOrElse 0L
       val maxMsat = MilliSatoshi apply math.min(canSend1, maxHtlcValue.amount)
 
       val title = getString(ln_send_title).format(me getDescription pr)
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), title.html, content)
-      val hint = getString(amount_hint_maxamount).format(denom withSign maxMsat)
+      val hint = getString(amount_hint_can_send).format(denom withSign maxMsat)
       val rateManager = new RateManager(hint, content)
 
       def sendAttempt = rateManager.result match {
@@ -320,8 +320,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
       // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve
       // peer's balance can't go below their unspendable channel reserve so it should be taken into account here
       val canReceive = chan(c => c.localCommit.spec.toRemoteMsat - c.localParams.channelReserveSat * sat2msatFactor)
-      val finalCanReceive = math.min(canReceive.filter(0L<) getOrElse 0L, maxHtlcValue.amount)
-      val maxMsat = MilliSatoshi(finalCanReceive)
+      val maxMsat = MilliSatoshi apply math.min(canReceive getOrElse 0L, maxHtlcValue.amount)
 
       chan(_.channelId.toString) foreach { chanIdKey =>
         StorageWrap get chanIdKey map to[ChannelUpdate] match {
@@ -331,7 +330,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
             val content = getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
             val inputDescription = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
             val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), me getString ln_receive, content)
-            val hint = getString(amount_hint_maxamount).format(denom withSign maxMsat)
+            val hint = getString(amount_hint_can_receive).format(denom withSign maxMsat)
             val rateManager = new RateManager(hint, content)
 
             def makeRequest(sum: Option[MilliSatoshi], r: BinaryData) = {

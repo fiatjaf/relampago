@@ -221,7 +221,8 @@ class WalletApp extends Application { me =>
     def blockingSend(tx: Transaction) = peerGroup.broadcastTransaction(tx, 1).broadcast.get.toString
     def watchFunding(cs: Commitments) = watchScripts(cs.commitInput.txOut.publicKeyScript :: Nil)
     def watchScripts(scripts: ScriptSeq) = wallet addWatchedScripts scripts.asJava
-    def currentBalance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE
+    def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE
+    def conf1Balance = wallet getBalance BalanceType.AVAILABLE_SPENDABLE
     def currentAddress = wallet currentAddress KeyPurpose.RECEIVE_FUNDS
     def shutDown = none
 
@@ -240,7 +241,6 @@ class WalletApp extends Application { me =>
       wallet addTransactionConfidenceEventListener ChannelManager.chainEventsListener
       wallet addCoinsSentEventListener ChannelManager.chainEventsListener
       wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
-      wallet.allowSpendingUnconfirmedTransactions
       wallet.watchMode = true
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)
