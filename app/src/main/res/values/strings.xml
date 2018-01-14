@@ -133,7 +133,7 @@
     <string name="txs_fee_absent"><![CDATA[<font color=#E31300>Outgoing transaction</font><br>%1$s<br><br>No fee]]></string>
     <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#1BA2E0>%1$s</font>]]></string>
-    <string name="txs_view_outside">View on BlockTrail</string>
+    <string name="txs_view_outside">View on SmartBit</string>
     <string name="txs_p2wsh">Payment Channel Funding</string>
 
     <array name="txs_confs">
@@ -213,14 +213,14 @@
     <string name="ln_ops_btc">Back to Bitcoin</string>
 
     <string name="ln_ops_chan_none"><a href='http://lightning-wallet.com/using-lightning-wallet.html#using-lightning-wallet'>Lightning Network</a> enables fast and secure off-chain Bitcoin transactions with a near zero fees\n\nUsing it requires you to open a <a href='http://lightning-wallet.com/using-lightning-wallet.html#payment-channel'>Payment Channel</a> with a peer of your choice and then fund it with Bitcoin transaction</string>
-    <string name="ln_ops_chan_opening"><![CDATA[Opening a Payment Channel&#8230;<br>Channel capacity is %1$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %2$s<br><br><a href=https://www.blocktrail.com/tBTC/tx/%3$s>Funding status</a><br>%4$s]]></string>
+    <string name="ln_ops_chan_opening"><![CDATA[Opening a Payment Channel&#8230;<br>Channel capacity is %1$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %2$s<br><br><a href=https://testnet.smartbit.com.au/%3$s>Funding status</a><br>%4$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[Closing a Payment Channel&#8230;<br>Waiting for peer\'s confirmation<br><br>Remaining channel balance will be refunded to your Bitcoin wallet]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet.html#forced-channel-closing>Forced channel closing</a><br>%1$s<br><br>%2$s]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[Closing a Payment Channel&#8230;<br>Remaining channel balance has been refunded to your Bitcoin wallet<br><br>%1$s]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Your pending refunds</font><br>]]></string>
-    <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://www.blocktrail.com/tBTC/tx/%1$s>Closing status</a><br>%2$s<br>%3$s fee]]></string>
+    <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://testnet.smartbit.com.au/tx/%1$s>Closing status</a><br>%2$s<br>%3$s fee]]></string>
 
     <string name="ln_ops_chan_unilateral_status_dead"><![CDATA[%1$s<br>= %2$s cancelled]]></string>
     <string name="ln_ops_chan_unilateral_status_done"><![CDATA[%1$s<br>= %2$s received]]></string>

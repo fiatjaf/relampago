@@ -220,8 +220,8 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
       lst addHeaderView detailsWrapper
 
       outside setOnClickListener onButtonTap {
-        val blocktrail = "https://www.blocktrail.com/tBTC/tx/"
-        val uri = Uri.parse(blocktrail + wrap.tx.getHashAsString)
+        val smartbit = "https://testnet.smartbit.com.au/tx/"
+        val uri = Uri.parse(smartbit + wrap.tx.getHashAsString)
         me startActivity new Intent(Intent.ACTION_VIEW, uri)
       }
 
