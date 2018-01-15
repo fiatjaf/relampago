@@ -103,12 +103,12 @@ class WalletApp extends Application { me =>
 
   object TransData {
     var value: Any = _
-    val lnRequest = "lightning:([a-zA-Z0-9]+)\\W*".r
+    val lnPrefix = "^(lnbc|lntb|LNBC|LNTB)\\w*".r
+    val lnLink = "lightning:([a-zA-Z0-9]+)\\W*".r
     def recordValue(rawText: String) = value = rawText match {
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
-      case raw if raw startsWith "lnbc" => PaymentRequest read raw
-      case raw if raw startsWith "lntb" => PaymentRequest read raw
-      case lnRequest(raw) => PaymentRequest read raw
+      case lnPrefix(_) => PaymentRequest read rawText.toLowerCase
+      case lnLink(body) => PaymentRequest read body
       case raw => getTo(raw)
     }
 
