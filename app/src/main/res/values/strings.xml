@@ -154,6 +154,7 @@
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
     <string name="err_ln_no_route">Failed because no route to recipient could be found</string>
     <string name="err_ln_fulfilled">Failed because this payment is already fulfilled</string>
+    <string name="err_ln_in_flight">Failed because this payment already in-flight</string>
 
     <string name="err_ln_cant_ask">Can\'t ask for payments right now because a funding Bitcoin transaction has not got 6 confirmations yet</string>
     <string name="err_ln_not_enough_funds"><![CDATA[Not enough funds<br>for a payment channel<br><br>can send %1$s<br>min required %2$s<br><br>Bitcoin wallet should contain more funds in order to proceed with this]]></string>

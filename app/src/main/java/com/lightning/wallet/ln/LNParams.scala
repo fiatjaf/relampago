@@ -86,6 +86,7 @@ object AddErrorCodes {
   val ERR_REMOTE_AMOUNT_LOW = err_ln_remote_amount_low
   val ERR_TOO_MANY_HTLC = err_ln_too_many
   val ERR_FULFILLED = err_ln_fulfilled
+  val ERR_IN_FLIGHT = err_ln_in_flight
   val ERR_OFFLINE = err_ln_offline
   val ERR_FAILED = err_ln_general
 }

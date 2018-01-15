@@ -330,8 +330,8 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
             val content = getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
             val inputDescription = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
             val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), me getString ln_receive, content)
-            val hint = getString(amount_hint_can_receive).format(denom withSign maxMsat)
-            val rateManager = new RateManager(hint, content)
+            val canReceiveHint = if (maxMsat.amount < 0L) coloredOut(maxMsat) else denom withSign maxMsat
+            val rateManager = new RateManager(getString(amount_hint_can_receive).format(canReceiveHint), content)
 
             def makeRequest(sum: MilliSatoshi, r: BinaryData) = {
               val extraRoute = Vector(update toHop chan.data.announce.nodeId)
