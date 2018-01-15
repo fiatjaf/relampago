@@ -4,14 +4,16 @@ import android.graphics._
 import com.lightning.wallet.Utils._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.Denomination._
-import java.io.{File, FileOutputStream}
 
+import java.io.{File, FileOutputStream}
+import android.os.{Bundle, Environment}
 import android.view.View.{GONE, VISIBLE}
 import android.nfc.{NdefMessage, NfcEvent}
 import android.text.{StaticLayout, TextPaint}
 import android.widget.{ImageButton, ImageView}
 import com.lightning.wallet.ln.Tools.{none, wrap}
 import com.google.zxing.{BarcodeFormat, EncodeHintType}
+
 import com.lightning.wallet.lnutils.ImplicitConversions.string2Ops
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import org.ndeftools.util.activity.NfcBeamWriterActivity
@@ -22,7 +24,6 @@ import com.google.zxing.qrcode.QRCodeWriter
 import android.graphics.Bitmap.createBitmap
 import org.ndeftools.wellknown.TextRecord
 import org.bitcoinj.core.Address
-import android.os.{Bundle, Environment}
 import android.content.Intent
 import org.ndeftools.Message
 import android.view.View
@@ -85,11 +86,9 @@ class RequestActivity extends NfcBeamWriterActivity with TimerActivity with View
     wrap(me setDetecting true)(me initNfc state)
 
     app.TransData.value match {
-      case pr: PaymentRequest =>
-        if (pr.amount.isEmpty) showInfo(drawBottom(getString(ln_qr_reusable).html), PaymentRequest write pr)
-        else showInfo(drawAll(denom withSign pr.amount.get, getString(ln_qr_disposable).html), PaymentRequest write pr)
-
-      case pay: AddrData => showInfo(drawAll(denom withSign pay.cn, Utils humanAddr pay.address), pay.link)
+      // Payment requests without amount are disabled for now
+      case pr: PaymentRequest => showInfo(drawAll(denom withSign pr.amount.get, getString(ln_qr_disposable).html), PaymentRequest write pr)
+      case payData: AddrData => showInfo(drawAll(denom withSign payData.cn, Utils humanAddr payData.address), payData.link)
       case address: Address => showInfo(drawBottom(Utils humanAddr address), address.toString)
       case _ => finish
     }

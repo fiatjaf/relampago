@@ -172,7 +172,6 @@
     <string name="nfc_enabled">NFC is on</string>
     <string name="nfc_settings">Enable NFC</string>
     <string name="nfc_error">Could not process an NFC message\nbecause it is malformed or empty</string>
-    <string name="ln_qr_reusable"><![CDATA[Reusable payment request<br>Pay whatever you want]]></string>
     <string name="ln_qr_disposable"><![CDATA[Request is valid for 6 hours<br>Do not reuse this QR code]]></string>
     <string name="nfc_payee_tip">This payment request can be sent by touching two devices back-to-back if the other device also supports NFC technology</string>
 

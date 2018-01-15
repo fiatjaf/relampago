@@ -333,9 +333,9 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
             val hint = getString(amount_hint_can_receive).format(denom withSign maxMsat)
             val rateManager = new RateManager(hint, content)
 
-            def makeRequest(sum: Option[MilliSatoshi], r: BinaryData) = {
+            def makeRequest(sum: MilliSatoshi, r: BinaryData) = {
               val extraRoute = Vector(update toHop chan.data.announce.nodeId)
-              val rpi = emptyRPI apply PaymentRequest(chainHash, sum, Crypto sha256 r,
+              val rpi = emptyRPI apply PaymentRequest(chainHash, Some(sum), Crypto sha256 r,
                 nodePrivateKey, inputDescription.getText.toString.trim, None, extraRoute)
 
               qr(rpi.pr)
@@ -346,13 +346,13 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
             }
 
             def recAttempt = rateManager.result match {
+              case Failure(_) => app toast dialog_sum_empty
               case Success(ms) if maxMsat < ms => app toast dialog_sum_big
               case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
 
-              case ms => rm(alert) {
-                // Request may contain no amount
+              case Success(ms) => rm(alert) {
                 notifySubTitle(me getString ln_pr_make, Informer.LNPAYMENT)
-                <(makeRequest(ms.toOption, random getBytes 32), onFail)(none)
+                <(makeRequest(ms, random getBytes 32), onFail)(none)
               }
             }
 

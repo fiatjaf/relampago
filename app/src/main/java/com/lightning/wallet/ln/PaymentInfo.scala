@@ -39,10 +39,6 @@ object PaymentInfo {
     val firstPayload = PerHopPayload(shortChannelId = 0L, amtToForward = rpi.firstMsat, firstExpiry)
     val start = (Vector(firstPayload), Vector.empty[PublicKey], rpi.firstMsat, firstExpiry)
 
-    println("--------------")
-    println("--------------")
-    for (r <- rpi.rd.routes) println(r)
-
     val (payloads, nodeIds, lastMsat, lastExpiry) = (start /: route.reverse) {
       case (loads, nodes, msat, expiry) \ Hop(nodeId, shortChannelId, delta, _, base, proportional) =>
         // Walk in reverse direction from receiver to sender and accumulate cltv deltas with fees
@@ -60,8 +56,8 @@ object PaymentInfo {
   val emptyRPI: PaymentRequest => RuntimePaymentInfo = pr => {
     val packet = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
     val rd = RoutingData(Vector.empty, Vector.empty, Set.empty, Set.empty, SecretsAndPacket(Vector.empty, packet), 0L, 0L)
-    val finalSum = pr.amount match { case Some(msat) => msat.amount case None => 0L }
-    RuntimePaymentInfo(rd, pr, finalSum)
+    // For now issuing payment requests without sum is disabled so some amount should always be there!
+    RuntimePaymentInfo(rd, pr, pr.amount.get.amount)
   }
 
   private def without(rs: Vector[PaymentRoute], fn: Hop => Boolean) = rs.filterNot(_ exists fn)
@@ -90,19 +86,12 @@ object PaymentInfo {
 
     parsed map {
       case ErrorPacket(nodeKey, _: Node) =>
-        println(s"-- Node")
         withoutNodes(Vector(nodeKey), rpi)
 
       case ErrorPacket(nodeKey, message: Update) =>
         val isHonest = Announcements.checkSig(message.update, nodeKey)
-        if (isHonest) {
-          println(s"-- $message")
-          withoutChannels(Vector(message.update.shortChannelId), rpi)
-        }
-        else {
-          println(s"-- $nodeKey")
-          withoutNodes(Vector(nodeKey), rpi)
-        }
+        if (isHonest) withoutChannels(Vector(message.update.shortChannelId), rpi)
+        else withoutNodes(Vector(nodeKey), rpi)
 
       case ErrorPacket(nodeKey, _) =>
         rpi.rd.usedRoute.collectFirst {
@@ -114,8 +103,6 @@ object PaymentInfo {
     } getOrElse {
       // Except for our channel and peer's channel
       val shortChanIds = rpi.rd.usedRoute.map(_.shortChannelId)
-
-      println(s"-- ${shortChanIds drop 1 dropRight 1}")
       withoutChannels(shortChanIds drop 1 dropRight 1, rpi)
     }
   }
@@ -138,7 +125,7 @@ object PaymentInfo {
       // Payment request may not have a zero final sum which means it's a donation and should not be checked for overflow
       case Success(info) if info.pr.amount.exists(add.amountMsat > _.amount * 2) => failHtlc(ss, IncorrectPaymentAmount, add)
       case Success(info) if info.pr.amount.exists(add.amountMsat < _.amount) => failHtlc(ss, IncorrectPaymentAmount, add)
-      case Success(info) if info.incoming == 1 => CMDFulfillHtlc(add.id, info.preimage)
+      case Success(info) if info.incoming == 1 && info.actualStatus != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
       case _ => failHtlc(ss, UnknownPaymentHash, add)
     }
 

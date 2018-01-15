@@ -144,8 +144,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
             val canNotProceed = reducedPaymentInfo canNotProceed chan.data.announce.nodeId
             val nope = canNotProceed || serverCallAttempts(htlc.add.paymentHash) > 8
 
-            println(s"nope: $nope")
-
             // Reset in case of manual retry later
             if (nope) serverCallAttempts(htlc.add.paymentHash) = 0
             else app.ChannelManager.getOutPaymentObs(reducedPaymentInfo)
