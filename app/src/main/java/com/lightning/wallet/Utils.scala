@@ -149,6 +149,7 @@ trait ToolbarActivity extends TimerActivity { me =>
     for (info <- infos if info.tag == tag) info.value = text
   }
 
+  def notifySubTitle(subtitle: String, infoType: Int)
   def showDenominationChooser(balance: MilliSatoshi)(change: Int => Unit) = {
     val denominations = for (den <- getResources getStringArray R.array.denoms) yield den.html
     val title = me getString fiat_set_denom format humanFiat(coloredIn(balance), balance)
@@ -183,9 +184,7 @@ trait ToolbarActivity extends TimerActivity { me =>
   }
 
   def doViewMnemonic(password: String) =
-    <(app.kit decryptSeed password, _ => app toast err_general) { seed =>
-      // Show current mnemonic and offer to encrypt it using current passcode
-
+    <(app.kit decryptSeed password, onFail) { seed =>
       val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
       lazy val dialog = mkChoiceDialog(none, warnUser, dialog_ok, dialog_export)
       lazy val alert = mkForm(dialog, getString(sets_noscreen).html, wordsText)
@@ -400,8 +399,6 @@ trait ToolbarActivity extends TimerActivity { me =>
       case _: Throwable => app getString err_general
     }
   }
-
-  def notifySubTitle(subtitle: String, infoType: Int)
 }
 
 trait TimerActivity extends AppCompatActivity { me =>
