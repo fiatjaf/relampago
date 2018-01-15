@@ -272,8 +272,8 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
         mkForm(bld = if (canRetryQR) bld else me negBld dialog_ok, title.html, detailsWrapper)
         paymentDetails setText s"$description<br><br>$humanIn".html
       } else {
-        val humanOut = humanFiat(coloredOut(info.firstSum), info.firstSum)
         val feeAmount = MilliSatoshi(info.rd.lastMsat - info.firstMsat)
+        val humanOut = humanFiat(coloredOut(info.firstSum), info.firstSum)
         val bld = mkChoiceDialog(none, pay(info.runtime), dialog_ok, dialog_retry)
         val title = humanFiat(getString(ln_outgoing_title).format(coloredOut(feeAmount), humanStatus), feeAmount)
         val title1 = if (info.actualStatus == WAITING) expiryTitle(info.rd.lastExpiry, title) else title

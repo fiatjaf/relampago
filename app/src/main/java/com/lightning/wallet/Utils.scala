@@ -66,6 +66,7 @@ object Utils {
   lazy val denoms = List(SatDenomination, FinDenomination, BtcDenomination)
   val coloredOut: MilliSatoshi => String = amt => sumOut.format(denom withSign amt)
   val coloredIn: MilliSatoshi => String = amt => sumIn.format(denom withSign amt)
+  val singleChoice = android.R.layout.select_dialog_singlechoice
 
   // Mapping from text to Android id integer
   val Seq(strDollar, strEuro, strYen, strYuan) = Seq("dollar", "euro", "yen", "yuan")
@@ -149,15 +150,15 @@ trait ToolbarActivity extends TimerActivity { me =>
   }
 
   def showDenominationChooser(balance: MilliSatoshi)(change: Int => Unit) = {
+    val denominations = for (den <- getResources getStringArray R.array.denoms) yield den.html
+    val title = me getString fiat_set_denom format humanFiat(coloredIn(balance), balance)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
     val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
 
-    val denominations = getResources.getStringArray(R.array.denoms).map(_.html)
-    val title = me getString fiat_set_denom format humanFiat(coloredIn(balance), balance)
-    val dialog = mkChoiceDialog(change(lst.getCheckedItemPosition), none, dialog_ok, dialog_cancel)
-    lst setAdapter new ArrayAdapter(me, android.R.layout.select_dialog_singlechoice, denominations)
+    lst setOnItemClickListener onTap(change)
+    lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    mkForm(dialog, title.html, form)
+    new Builder(me).setCustomTitle(title.html).setView(form).show
   }
 
   def animateTitle(nextText: String) = new Runnable { self =>
@@ -356,7 +357,7 @@ trait ToolbarActivity extends TimerActivity { me =>
           val feesOptions = Array(feeRisky.html, feeLive.html)
 
           // Prepare popup interface with fee options
-          val adp = new ArrayAdapter(me, android.R.layout.select_dialog_singlechoice, feesOptions)
+          val adp = new ArrayAdapter(me, singleChoice, feesOptions)
           val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
           val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
 
@@ -464,7 +465,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     INIT(savedInstanceState)
   }
 
-  override def onDestroy = wrap(super.onDestroy) { timer.cancel }
+  override def onDestroy = wrap(super.onDestroy)(timer.cancel)
   implicit def uiTask(process: => Runnable): TimerTask = new TimerTask { def run = me runOnUiThread process }
   implicit def str2View(res: CharSequence): LinearLayout = str2Tuple(res) match { case view \ _ => view }
 
