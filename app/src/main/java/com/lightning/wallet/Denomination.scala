@@ -43,7 +43,7 @@ object SatDenomination extends Denomination {
 }
 
 object FinDenomination extends Denomination {
-  val fmt = new DecimalFormat("###,###.####")
+  val fmt = new DecimalFormat("###,###.#######")
   val txt = app getString amount_hint_fin
   val factor = 10000000L
 
@@ -53,7 +53,7 @@ object FinDenomination extends Denomination {
 }
 
 object BtcDenomination extends Denomination {
-  val fmt = new DecimalFormat("##0.000#####")
+  val fmt = new DecimalFormat("##0.000########")
   val txt = app getString amount_hint_btc
   val factor = btc2msatFactor
 
