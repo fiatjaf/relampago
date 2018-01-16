@@ -170,8 +170,8 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
 
   def updTitle = animateTitle {
     val gap = app.kit.conf0Balance minus app.kit.conf1Balance
-    val conf0 = denom withSign app.kit.conf1Balance
-    val conf1 = denom formatted gap
+    val conf0 = denom.withSign(app.kit.conf1Balance)
+    val conf1 = denom.formatted(gap)
 
     if (gap.isZero) conf0
     else s"$conf0 + $conf1"

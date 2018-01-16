@@ -148,6 +148,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
 
         case show @ ShowDelayed(_ \ false \ _, _, fee, amt) if show.isPublishable =>
+          // This fails if input is spent by our peer, happens when we publish a revoked commit
           val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
           getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
 

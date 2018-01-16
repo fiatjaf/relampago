@@ -386,7 +386,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
         chan.data.announce.addresses.headOption.map(_.getHostString).orNull, nodePrivateKey.publicKey.toString,
         chan.data.announce.nodeId.toString, chan(_.channelId).get.toString).html)
 
-      // Show channel and peer details and ofer to close a given channel
+      // Show channel and peer details and ofer to cooperatively close a given channel
       lazy val dialog = mkChoiceDialog(none, rm(alert)(proceed), dialog_ok, ln_chan_close)
       lazy val alert: AlertDialog = mkForm(dialog, null, view)
       field setTextIsSelectable true
