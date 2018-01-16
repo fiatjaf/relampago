@@ -386,14 +386,14 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
         chan.data.announce.addresses.headOption.map(_.getHostString).orNull, nodePrivateKey.publicKey.toString,
         chan.data.announce.nodeId.toString, chan(_.channelId).get.toString).html)
 
-      // Show canncel and peer details and ofer to close a given channel
-      lazy val dlg = mkChoiceDialog(none, rm(alert)(proceed), dialog_ok, ln_chan_close)
-      lazy val alert: AlertDialog = mkForm(dlg, null, view)
+      // Show channel and peer details and ofer to close a given channel
+      lazy val dialog = mkChoiceDialog(none, rm(alert)(proceed), dialog_ok, ln_chan_close)
+      lazy val alert: AlertDialog = mkForm(dialog, null, view)
       field setTextIsSelectable true
       alert
 
-      def proceed = passWrap(me getString ln_chan_close) apply checkPassNotify { _ =>
-        // attempt to close all of the channels in case we have more than one active left
+      def proceed = passWrap(me getString ln_chan_close_details) apply checkPassNotify { _ =>
+        // attempt to close all of the channels in case we have more than one operational left
         for (chan <- app.ChannelManager.notClosing) chan process CMDShutdown
       }
     }

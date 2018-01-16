@@ -54,7 +54,7 @@
     <string name="restore_hint">Your BIP32 mnemonic code</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>%1$s<br>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br><br></small>Wallet settings]]></string>
+    <string name="read_settings"><![CDATA[<small>%1$s<br>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.01&#8211;4<br><br></small>Wallet settings]]></string>
     <string name="mnemonic_info"><![CDATA[<font color=#E31300>Mnemonic code is super important</font><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>Read about it</a> and be sure to save it<br><br>Properly secured mnemonic code protectes you from money loss]]></string>
     <string name="mnemonic_export_details"><![CDATA[Mnemonic code will be encrypted and exported using <strong>your current passcode</strong><br><br>You are strongly advised to read a <a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>related section</a> of wallet manual before proceeding with this]]></string>
     <string name="ln_recover_explain"><![CDATA[<small>Not sure what is this about?<br><a href=http://lightning-wallet.com/reimbursing-funds-locked-in-a-lost-payment-channel#reimbursing-funds-locked-in-a-lost-payment-channel>Read more</a> on what this is and when you might need it</small><br><br>Would you like to start a channel funds recovery?]]></string>
@@ -183,6 +183,7 @@
     <string name="ln_incoming_title"><![CDATA[<font color=#1BA2E0>Incoming payment</font><br>%1$s]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
     <string name="ln_expiry"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#stuck-payments>Expiry</a>]]></string>
+    <string name="ln_chan_close_details">Closing a channel will result in an on-chain Bitcoin transaction which would refund the remaining channel balance back to your Bitcoin wallet minus some miner fee.\n\nAlso, you won\'t be able to send Lightning payments until a new payment channel is established</string>
     <string name="ln_chan_info_details"><![CDATA[%1$s<br><small>%2$s</small><br><br>Your node ID<br><font color=#999999>%3$s</font><br><br>Peer node ID<br><font color=#999999>%4$s</font><br><br>Channel ID<br><font color=#999999>%5$s</font>]]></string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>
     <string name="ln_htlc_notification_title">Bring your wallet online</string>
