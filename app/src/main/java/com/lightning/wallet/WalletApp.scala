@@ -69,6 +69,7 @@ class WalletApp extends Application { me =>
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
+  def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
   def getTo(base58: String) = Address.fromBase58(params, base58)
 
   Utils.appReference = me
@@ -103,13 +104,11 @@ class WalletApp extends Application { me =>
 
   object TransData {
     var value: Any = _
-    val lnPrefix = "^(lnbc|lntb|LNBC|LNTB)\\w*".r
-    val lnLink = "lightning:([a-zA-Z0-9]+)\\W*".r
+    val lnLink = "(?i)(lightning:)?([a-zA-Z0-9]+)\\W*".r
     def recordValue(rawText: String) = value = rawText match {
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
-      case lnPrefix(_) => PaymentRequest read rawText.toLowerCase
-      case lnLink(body) => PaymentRequest read body
-      case raw => getTo(raw)
+      case lnLink(_, body) if notMixedCase(body) => PaymentRequest read body.toLowerCase
+      case _ => getTo(rawText)
     }
 
     def onFail(err: Int => Unit): PartialFunction[Throwable, Unit] = {

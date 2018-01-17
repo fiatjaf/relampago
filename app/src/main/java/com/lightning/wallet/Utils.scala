@@ -219,11 +219,6 @@ trait ToolbarActivity extends TimerActivity { me =>
       // by fetching encrypted static channel params from server
 
       rm(menu) {
-        lazy val dialog = mkChoiceDialog(proceed, none, dialog_ok, dialog_cancel)
-        mkForm(dialog, getString(ln_recover_explain).html, null)
-      }
-
-      def proceed = {
         val serverRequest = LNParams.cloud.connector getBackup LNParams.cloudId.toString
         val localCommitments = app.ChannelManager.all.flatMap(_ apply identity)
         add(app getString ln_notify_recovering, Informer.LNPAYMENT).flash.run

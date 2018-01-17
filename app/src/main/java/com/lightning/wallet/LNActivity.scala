@@ -31,6 +31,7 @@ import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import android.support.v4.view.MenuItemCompat
 import android.view.ViewGroup.LayoutParams
+import android.app.AlertDialog.Builder
 import com.lightning.wallet.Utils.app
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Address
@@ -367,8 +368,8 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
           case _ =>
             // Peer has not yet sent us a ChannelUpdate
-            // most likely because a funding tx is not deep enough
-            showForm(negBld(dialog_ok).setMessage(err_ln_cant_ask).create)
+            // most likely because a funding transaction is not deep enough
+            new Builder(me).setCustomTitle(me getString err_ln_cant_ask).show
         }
       }
     }

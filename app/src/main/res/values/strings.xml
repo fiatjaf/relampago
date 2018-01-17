@@ -57,7 +57,6 @@
     <string name="read_settings"><![CDATA[<small>%1$s<br>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.01&#8211;5<br><br></small>Wallet settings]]></string>
     <string name="mnemonic_info"><![CDATA[<font color=#E31300>Mnemonic code is super important</font><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>Read about it</a> and be sure to save it<br><br>Properly secured mnemonic code protectes you from money loss]]></string>
     <string name="mnemonic_export_details"><![CDATA[Mnemonic code will be encrypted and exported using <strong>your current passcode</strong><br><br>You are strongly advised to read a <a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>related section</a> of wallet manual before proceeding with this]]></string>
-    <string name="ln_recover_explain"><![CDATA[<small>Not sure what is this about?<br><a href=http://lightning-wallet.com/reimbursing-funds-locked-in-a-lost-payment-channel#reimbursing-funds-locked-in-a-lost-payment-channel>Read more</a> on what this is and when you might need it</small><br><br>Would you like to start a channel funds recovery?]]></string>
     <string name="buy_info"><![CDATA[<a href=https://localbitcoins.com/buy_bitcoins><strong>LocalBitcoins.com</strong></a><br>Available worldwide<br><br><a href=https://www.glidera.io/referral?client_id=86733e454669ce84ac3abd9bb2a1309c&buydestinationaddress=%1$s><strong>Glidera.io</strong></a><br>USA and Canada]]></string>
 
     <!-- menu and fab -->

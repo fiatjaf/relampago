@@ -79,9 +79,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
   val serverCallAttempts = mutable.Map.empty[BinaryData, Int] withDefaultValue 0
 
   override def onError = {
-    case _ \ CMDAddExcept(_, ERR_TOO_MANY_HTLC) =>
-      // Payment is either absent or in progress
-      // so don't mark it as failed here
+    case _ \ CMDAddExcept(_, ERR_IN_FLIGHT) =>
+      // Don't mark in-flight payments as failed
       uiNotify
 
     case (_, exc: CMDException) =>
