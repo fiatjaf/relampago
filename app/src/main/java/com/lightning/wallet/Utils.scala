@@ -346,9 +346,9 @@ trait ToolbarActivity extends TimerActivity { me =>
           val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
           val markedLivePerTxFee = sumOut format denom.withSign(livePerTxFee)
           val markedRiskyPerTxFee = sumOut format denom.withSign(riskyPerTxFee)
-          val feeLive = getString(fee_live) format humanFiat(markedLivePerTxFee, livePerTxFee, " ")
-          val feeRisky = getString(fee_risky) format humanFiat(markedRiskyPerTxFee, riskyPerTxFee, " ")
-          val feesOptions = Array(feeRisky.html, feeLive.html)
+          val txtFeeLive = getString(fee_live) format humanFiat(markedLivePerTxFee, livePerTxFee, " ")
+          val txtFeeRisky = getString(fee_risky) format humanFiat(markedRiskyPerTxFee, riskyPerTxFee, " ")
+          val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
           // Prepare popup interface with fee options
           val adp = new ArrayAdapter(me, singleChoice, feesOptions)

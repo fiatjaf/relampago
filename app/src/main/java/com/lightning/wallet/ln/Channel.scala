@@ -267,7 +267,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (norm: NormalData, CMDBestHeight(height), NORMAL | SYNC)
         // GUARD: close channel uncooperatively if outdated HTLC is large enough to be included in a commit tx
         // or if outdated HTLC is small and thus filtered out of commit tx but an additional period of 288 blocks has passed
-        if norm.commitments.localCommit.htlcTxsAndSigs.isEmpty && Commitments.hasOutdatedOutgoing(norm.commitments, height - 288)
+        if norm.commitments.localCommit.htlcTxsAndSigs.isEmpty && Commitments.hasOutdatedOutgoing(norm.commitments, height - 7 * 144)
           || norm.commitments.localCommit.htlcTxsAndSigs.nonEmpty && Commitments.hasOutdatedOutgoing(norm.commitments, height) =>
 
         startLocalCurrentClose(norm)
