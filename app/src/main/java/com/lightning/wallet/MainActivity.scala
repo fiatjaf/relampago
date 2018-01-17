@@ -117,29 +117,28 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
   // STARTUP LOGIC
 
-  def next: Unit =
-    (app.walletFile.exists, app.isAlive, LNParams.isSetUp) match {
-      // Find out what exactly should be done once user opens an app
-      // depends on both wallet app file existence and runtime objects
-      case (false, _, _) => setVis(View.VISIBLE, View.GONE, View.GONE)
-      case (true, true, true) => MainActivity.proceed.run
+  def next: Unit = (app.walletFile.exists, app.isAlive) match {
+    // Find out what exactly should be done once user opens an app
+    // depends on both wallet app file existence and runtime objects
+    case (false, _) => setVis(View.VISIBLE, View.GONE, View.GONE)
+    case (true, true) => MainActivity.proceed.run
 
-      case (true, false, _) =>
-        // Launch of a previously closed app
-        setVis(View.GONE, View.VISIBLE, View.GONE)
-        <<(MainActivity.prepareKit, throw _)(none)
-        updateInputType
+    case (true, false) =>
+      // Launch of a previously closed app
+      setVis(View.GONE, View.VISIBLE, View.GONE)
+      <<(MainActivity.prepareKit, throw _)(none)
+      updateInputType
 
-        mainPassCheck setOnClickListener onButtonTap {
-          // Lazy Future has already been initialized so check a pass after it's done
-          <<(MainActivity.prepareKit map setup, wrongPass)(_ => app.kit.startAsync)
-          setVis(View.GONE, View.GONE, View.VISIBLE)
-        }
+      mainPassCheck setOnClickListener onButtonTap {
+        // Lazy Future has already been initialized so check a pass after it's done
+        <<(MainActivity.prepareKit map setup, wrongPass)(_ => app.kit.startAsync)
+        setVis(View.GONE, View.GONE, View.VISIBLE)
+      }
 
-      // Just should not ever happen
-      // and when it does we just exit
-      case _ => System exit 0
-    }
+    // Just should not ever happen
+    // and when it does we just exit
+    case _ => System exit 0
+  }
 
   // MISC
 

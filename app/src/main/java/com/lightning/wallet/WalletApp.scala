@@ -65,7 +65,7 @@ class WalletApp extends Application { me =>
 
   def toast(code: Int): Unit = toast(me getString code)
   def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
-  def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => true case _ => false }
+  def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => db != null case _ => false }
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)

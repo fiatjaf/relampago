@@ -41,7 +41,6 @@ object LNParams { me =>
   lazy val broadcaster: Broadcaster = LocalBroadcaster
   lazy val bag = PaymentInfoWrap
 
-  def isSetUp: Boolean = db != null
   def setup(seed: BinaryData) = generate(seed) match { case master =>
     extendedCloudKey = derivePrivateKey(master, hardened(92) :: hardened(0) :: Nil)
     extendedNodeKey = derivePrivateKey(master, hardened(46) :: hardened(0) :: Nil)
