@@ -182,7 +182,7 @@
     <string name="ln_incoming_title"><![CDATA[<font color=#1BA2E0>Incoming payment</font><br>%1$s]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
     <string name="ln_expiry"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#stuck-payments>Expiry</a>]]></string>
-    <string name="ln_chan_close_details">Closing a channel will result in an on-chain Bitcoin transaction which would refund the remaining channel balance back to your Bitcoin wallet minus some miner fee.\n\nAlso, you won\'t be able to send Lightning payments until a new payment channel is established</string>
+    <string name="ln_chan_close_details">Closing a channel will result in an on-chain Bitcoin transaction which would refund the remaining Lightning balance back to your Bitcoin wallet minus some miner fee.\n\nAlso, you won\'t be able to send Lightning payments until a new payment channel is established</string>
     <string name="ln_chan_info_details"><![CDATA[%1$s<br><small>%2$s</small><br><br>Your node ID<br><font color=#999999>%3$s</font><br><br>Peer node ID<br><font color=#999999>%4$s</font><br><br>Channel ID<br><font color=#999999>%5$s</font>]]></string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>
     <string name="ln_htlc_notification_title">Bring your wallet online</string>
@@ -214,9 +214,9 @@
 
     <string name="ln_ops_chan_none"><a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a> enables fast and secure off-chain Bitcoin transactions with a near zero fees\n\nUsing it requires you to open a <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>Payment Channel</a> with a peer of your choice and then fund it with Bitcoin transaction</string>
     <string name="ln_ops_chan_opening"><![CDATA[Opening a Payment Channel&#8230;<br>Channel capacity is %1$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %2$s<br><br><a href=https://testnet.smartbit.com.au/tx/%3$s>Funding status</a><br>%4$s]]></string>
-    <string name="ln_ops_chan_negotiations"><![CDATA[Closing a Payment Channel&#8230;<br>Waiting for peer\'s confirmation<br><br>Remaining channel balance will be refunded to your Bitcoin wallet]]></string>
+    <string name="ln_ops_chan_negotiations"><![CDATA[Closing a Payment Channel&#8230;<br>Waiting for peer\'s confirmation<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a><br>%1$s<br><br>%2$s]]></string>
-    <string name="ln_ops_chan_bilateral_closing"><![CDATA[Closing a Payment Channel&#8230;<br>Remaining channel balance has been refunded to your Bitcoin wallet<br><br>%1$s]]></string>
+    <string name="ln_ops_chan_bilateral_closing"><![CDATA[Closing a Payment Channel&#8230;<br>Remaining Lightning balance has been refunded to your Bitcoin wallet<br><br>%1$s]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Your pending refunds</font><br>]]></string>
