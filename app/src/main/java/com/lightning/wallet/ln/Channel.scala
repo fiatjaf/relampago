@@ -7,7 +7,6 @@ import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.ln.AddErrorCodes._
-import com.lightning.wallet.ln.crypto.Sphinx.zeroes
 import java.util.concurrent.Executors
 import scala.collection.mutable
 import fr.acinq.eclair.UInt64
@@ -224,7 +223,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // Fail or fulfill incoming HTLCs
       case (norm: NormalData, CMDHTLCProcess, NORMAL) =>
-        val minExpiry = LNParams.broadcaster.currentHeight + 6L
+        val minExpiry = LNParams.broadcaster.currentHeight + 3L
         for (Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs)
           me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, minExpiry)
 
