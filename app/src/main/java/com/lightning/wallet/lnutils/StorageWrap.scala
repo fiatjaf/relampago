@@ -141,12 +141,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
           case None =>
             updateRouting(cutPaymentInfo)
             updateStatus(FAILURE, cutPaymentInfo.pr.paymentHash)
-            // Stop if extra channel is bad OR critical node is bad OR nothing is blacklisted
-            val canNotProceed = cutPaymentInfo canNotProceed chan.data.announce.nodeId
-            val nope = canNotProceed || serverCallAttempts(add.paymentHash) > 8
+            // Extra channel is bad OR critical node is bad OR nothing is blacklisted OR too many attempts
+            val stop = cutPaymentInfo.canNotProceed(chan) || serverCallAttempts(add.paymentHash) > 8
 
             // Reset in case of manual retry later
-            if (nope) serverCallAttempts(add.paymentHash) = 0
+            if (stop) serverCallAttempts(add.paymentHash) = 0
             else app.ChannelManager.getOutPaymentObs(cutPaymentInfo)
               .doOnSubscribe(serverCallAttempts(add.paymentHash) += 1)
               .foreach(_ map CMDPlainAddHtlc foreach chan.process, none)

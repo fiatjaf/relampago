@@ -267,26 +267,24 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
       if (info.incoming == 1) {
         val title = getString(ln_incoming_title).format(humanStatus)
         val humanIn = humanFiat(coloredIn(info.firstSum), info.firstSum)
-        val canRetryQR = info.actualStatus != SUCCESS && info.pr.isFresh
-        val bld = mkChoiceDialog(none, qr(info.pr), dialog_ok, dialog_retry)
-        val bld1 = if (canRetryQR) bld else me negBld dialog_ok
-
-        // Can show a QR again if payment request has not expired yet
         paymentDetails setText s"$description<br><br>$humanIn".html
-        mkForm(bld1, title.html, detailsWrapper)
+
+        // Can only show a QR again if this is not a success yet AND payment request has not expired yet
+        if (info.actualStatus == SUCCESS || !info.pr.isFresh) mkForm(me negBld dialog_ok, title.html, detailsWrapper)
+        else mkForm(mkChoiceDialog(none, qr(info.pr), dialog_ok, dialog_retry), title.html, detailsWrapper)
+
       } else {
         val feeAmount = MilliSatoshi(info.rd.lastMsat - info.firstMsat)
         val humanOut = humanFiat(coloredOut(info.firstSum), info.firstSum)
-        val bld = mkChoiceDialog(none, pay(info.runtime), dialog_ok, dialog_retry)
-        val bld1 = if (info.actualStatus != SUCCESS) bld else me negBld dialog_ok
-
-        // Will show title with expiry countdown if payment is in-flight
-        val title = humanFiat(getString(ln_outgoing_title).format(coloredOut(feeAmount), humanStatus), feeAmount)
-        val title1 = if (info.actualStatus == WAITING) expiryTitle(info.rd.lastExpiry, title) else title
-
-        // Can send this payment again if it's not a success yet
         paymentDetails setText s"$description<br><br>$humanOut".html
-        mkForm(bld1, title1.html, detailsWrapper)
+
+        // Will hide retry button if it's a success or can't proceed
+        // Will show title with expiry countdown if payment is in-flight
+        val hideRetry = info.actualStatus == SUCCESS || info.runtime.canNotProceed(chan)
+        val bld = if (hideRetry) me negBld dialog_ok else mkChoiceDialog(none, pay(info.runtime), dialog_ok, dialog_retry)
+        val baseTitle = humanFiat(getString(ln_outgoing_title).format(coloredOut(feeAmount), humanStatus), feeAmount)
+        val finalTitle = if (info.actualStatus == WAITING) expiryTitle(info.rd.lastExpiry, baseTitle) else baseTitle
+        mkForm(bld, finalTitle.html, detailsWrapper)
       }
     }
 
