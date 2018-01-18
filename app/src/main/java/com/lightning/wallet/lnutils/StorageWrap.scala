@@ -13,6 +13,7 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.Connector.CMDStart
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import com.lightning.wallet.helper.RichCursor
+import com.lightning.wallet.ln.Tools.none
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
 import scala.collection.mutable
@@ -120,16 +121,16 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
         vibrate(lnSettled)
       }
 
-      for (htlc \ some <- norm.commitments.localCommit.spec.failed) some match {
-        // A special case since only our peer can reject payments like this, leave failed
-        case _: UpdateFailMalformedHtlc => updateStatus(FAILURE, htlc.add.paymentHash)
+      for (Htlc(false, add) \ some <- norm.commitments.localCommit.spec.failed) some match {
+        // A special case since only our peer can reject payments like this, leave this failed
+        case _: UpdateFailMalformedHtlc => updateStatus(FAILURE, add.paymentHash)
 
         case fail: UpdateFailHtlc => for {
-          // Cut routes, add failed nodes and channels
-          paymentInfo <- getPaymentInfo(htlc.add.paymentHash)
-          reducedPaymentInfo = cutRoutes(fail)(paymentInfo.runtime)
-          // Try to use the rest of available local routes
-        } completeRPI(reducedPaymentInfo) match {
+          // Cut routes, add failed nodes and chans
+          paymentInfo <- getPaymentInfo(add.paymentHash)
+          cutPaymentInfo = cutRoutes(fail)(paymentInfo.runtime)
+          // Try to use the rest of available locally saved routes
+        } completeRPI(cutPaymentInfo) match {
 
           case Some(updatedPaymentInfo) =>
             // There are still routes left and we have just used one
@@ -138,16 +139,17 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
             chan process CMDPlainAddHtlc(updatedPaymentInfo)
 
           case None =>
-            updateRouting(reducedPaymentInfo)
-            updateStatus(FAILURE, reducedPaymentInfo.pr.paymentHash)
-            val canNotProceed = reducedPaymentInfo canNotProceed chan.data.announce.nodeId
-            val nope = canNotProceed || serverCallAttempts(htlc.add.paymentHash) > 8
+            updateRouting(cutPaymentInfo)
+            updateStatus(FAILURE, cutPaymentInfo.pr.paymentHash)
+            // Stop if extra channel is bad OR critical node is bad OR nothing is blacklisted
+            val canNotProceed = cutPaymentInfo canNotProceed chan.data.announce.nodeId
+            val nope = canNotProceed || serverCallAttempts(add.paymentHash) > 8
 
             // Reset in case of manual retry later
-            if (nope) serverCallAttempts(htlc.add.paymentHash) = 0
-            else app.ChannelManager.getOutPaymentObs(reducedPaymentInfo)
-              .doOnSubscribe(serverCallAttempts(htlc.add.paymentHash) += 1)
-              .foreach(_ map CMDPlainAddHtlc foreach chan.process, Tools.errlog)
+            if (nope) serverCallAttempts(add.paymentHash) = 0
+            else app.ChannelManager.getOutPaymentObs(cutPaymentInfo)
+              .doOnSubscribe(serverCallAttempts(add.paymentHash) += 1)
+              .foreach(_ map CMDPlainAddHtlc foreach chan.process, none)
         }
       }
 

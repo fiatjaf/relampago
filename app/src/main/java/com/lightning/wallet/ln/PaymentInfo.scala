@@ -93,6 +93,11 @@ object PaymentInfo {
         if (isHonest) withoutChannels(Vector(message.update.shortChannelId), rpi)
         else withoutNodes(Vector(nodeKey), rpi)
 
+      case ErrorPacket(nodeKey, _) if nodeKey == rpi.pr.nodeId =>
+        // Recipient sent an error, remove all routes and halt a search
+        // canNotProceed will return true since terminal node is bad
+        withoutNodes(Vector(nodeKey), rpi)
+
       case ErrorPacket(nodeKey, _) =>
         rpi.rd.usedRoute.collectFirst {
           case hop if hop.nodeId == nodeKey =>
@@ -155,7 +160,7 @@ case class RuntimePaymentInfo(rd: RoutingData, pr: PaymentRequest, firstMsat: Lo
     val extraHops = pr.routingInfo.flatMap(_.route).toSet
     val extraChans = extraHops.map(_.shortChannelId) & rd.badChans
     val extraNodes = extraHops.map(_.nodeId) + pr.nodeId + peerId & rd.badNodes
-    extraNodes.nonEmpty || extraChans.nonEmpty || rd.badNodes.isEmpty && rd.badChans.isEmpty
+    extraChans.nonEmpty || extraNodes.nonEmpty || rd.badNodes.isEmpty && rd.badChans.isEmpty
   }
 }
 
