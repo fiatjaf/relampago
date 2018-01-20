@@ -20,15 +20,14 @@ import scodec.Attempt
 
 
 object PaymentInfo {
-  // Used as placeholder for unresolved outgoing payments
-  val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
-  val FROMBLACKLISTED = "fromblacklisted"
-
   final val HIDDEN = 0
   final val WAITING = 1
   final val SUCCESS = 2
   final val FAILURE = 3
 
+  // Placeholder for unresolved outgoing payments
+  val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
+  val emptyRPI = (pr: PaymentRequest) => RuntimePaymentInfo(emptyRD, pr, pr.amount.get.amount)
   def buildOnion(nodes: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
     require(nodes.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
     makePacket(PrivateKey(random getBytes 32), nodes, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
@@ -53,11 +52,9 @@ object PaymentInfo {
       onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
   }
 
-  val emptyRPI: PaymentRequest => RuntimePaymentInfo = pr => {
+  def emptyRD = {
     val packet = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
-    val rd = RoutingData(Vector.empty, Vector.empty, Set.empty, Set.empty, SecretsAndPacket(Vector.empty, packet), 0L, 0L)
-    // For now issuing payment requests without sum is disabled so some amount should always be there!
-    RuntimePaymentInfo(rd, pr, pr.amount.get.amount)
+    RoutingData(Vector.empty, Vector.empty, Set.empty, Set.empty, SecretsAndPacket(Vector.empty, packet), 0L, 0L)
   }
 
   private def without(rs: Vector[PaymentRoute], fn: Hop => Boolean) = rs.filterNot(_ exists fn)
@@ -82,7 +79,7 @@ object PaymentInfo {
   def cutRoutes(fail: UpdateFailHtlc)(rpi: RuntimePaymentInfo) = {
     // Try to reduce remaining routes and also remember bad nodes and channels
     val parsed = Try apply parseErrorPacket(rpi.rd.onion.sharedSecrets, fail.reason)
-    Tools log parsed.toString
+    parsed.foreach(packet => Tools log packet.failureMessage.toString)
 
     parsed map {
       case ErrorPacket(nodeKey, _: Node) =>
@@ -147,18 +144,6 @@ case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv:
 case class RoutingData(routes: Vector[PaymentRoute], usedRoute: PaymentRoute, badNodes: Set[PublicKey],
                        badChans: Set[Long], onion: SecretsAndPacket, lastMsat: Long, lastExpiry: Long)
 
-case class RuntimePaymentInfo(rd: RoutingData, pr: PaymentRequest, firstMsat: Long) {
-  lazy val text = pr.description match { case Right(info) => info case _ => new String }
-  lazy val searchText = text + " " + pr.paymentHash.toString
-
-  def canNotProceed(chan: Channel) = {
-    val extraHops = pr.routingInfo.flatMap(_.route).toSet
-    val extraChans = extraHops.map(_.shortChannelId) & rd.badChans
-    val extraNodes = extraHops.map(_.nodeId) + pr.nodeId + chan.data.announce.nodeId & rd.badNodes
-    extraChans.nonEmpty || extraNodes.nonEmpty || rd.badNodes.isEmpty && rd.badChans.isEmpty
-  }
-}
-
 // This class is constructed directly from database
 // firstMsat is an amount I'm actually getting or an amount I'm paying without routing fees
 // incoming firstMsat is updated on fulfilling, outgoing firstMsat is updated on pay attempt
@@ -179,6 +164,18 @@ case class PaymentInfo(rawRd: String, rawPr: String, preimage: BinaryData, incom
   lazy val firstSum = MilliSatoshi(firstMsat)
   lazy val pr = to[PaymentRequest](rawPr)
   lazy val rd = to[RoutingData](rawRd)
+}
+
+case class RuntimePaymentInfo(rd: RoutingData, pr: PaymentRequest, firstMsat: Long) {
+  lazy val text = pr.description match { case Right(info) => info case _ => new String }
+  lazy val searchText = text + " " + pr.paymentHash.toString
+
+  def canNotProceed(chan: Channel) = {
+    val extraHops = pr.routingInfo.flatMap(_.route).toSet
+    val extraChans = extraHops.map(_.shortChannelId) & rd.badChans
+    val extraNodes = extraHops.map(_.nodeId) + pr.nodeId + chan.data.announce.nodeId & rd.badNodes
+    extraChans.nonEmpty || extraNodes.nonEmpty || rd.badNodes.isEmpty && rd.badChans.isEmpty
+  }
 }
 
 trait PaymentInfoBag { me =>

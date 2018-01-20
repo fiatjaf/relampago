@@ -133,14 +133,14 @@ class WalletApp extends Application { me =>
 
     val chainEventsListener = new TxTracker with BlocksListener {
       override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
-      // No matter how many blocks are left on start we only send a CMD once the last block has been processed
+      // No matter how many blocks are left on start, we only send a CMD once the last block has been processed
       def tellHeight(left: Int) = if (left < 1) for (chan <- all) chan process CMDBestHeight(broadcaster.currentHeight)
       override def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
       override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
 
       override def coinsSent(tx: Transaction) = {
-        // We always attempt to extract a preimage
-        // assuming any tx may contain it
+        // We always attempt to extract a payment preimage
+        // just assuming any incoming tx may contain it
 
         val spent = CMDSpent(tx)
         bag.extractPreimage(spent.tx)
@@ -149,20 +149,16 @@ class WalletApp extends Application { me =>
     }
 
     val socketEventsListener = new ConnectionListener {
-      override def onDisconnect(ann: NodeAnnouncement) = fromNode(notClosing, ann) match {
-        case affected if affected.isEmpty => Tools log s"Dropping connection to ${ann.nodeId}"
-        case affected => notifyAndReconnect(affected, ann)
-      }
-
       override def onOperational(ann: NodeAnnouncement, their: Init) = fromNode(notClosing, ann).foreach(_ process CMDOnline)
       override def onTerminalError(ann: NodeAnnouncement) = fromNode(notClosing, ann).foreach(_ process CMDShutdown)
       override def onMessage(lightningMessage: LightningMessage) = notClosing.foreach(_ process lightningMessage)
+      override def onDisconnect(ann: NodeAnnouncement) = reConnect(fromNode(notClosing, ann), ann)
     }
 
-    def notifyAndReconnect(chans: ChannelVec, ann: NodeAnnouncement) = {
+    def reConnect(cs: ChannelVec, ann: NodeAnnouncement) = if (cs.nonEmpty) {
       // Immediately inform affected channels and try to reconnect in 5 seconds
       Obs.just(ann).delay(5.seconds).subscribe(ConnectionManager.connectTo, none)
-      chans.foreach(_ process CMDOffline)
+      cs.foreach(_ process CMDOffline)
     }
 
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
@@ -255,8 +251,7 @@ class WalletApp extends Application { me =>
       ChannelManager.initConnect
       RatesSaver.saveObject
 
-      // Cloud has data as this point, check if it's empty
-      // it's needed to clear possible acts if there are any
+      // This is needed to clear possible leftover acts
       if (cloud.data.acts.nonEmpty) cloud doProcess CMDStart
     }
   }

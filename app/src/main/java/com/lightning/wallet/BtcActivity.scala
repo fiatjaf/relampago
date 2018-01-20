@@ -23,14 +23,11 @@ import com.lightning.wallet.ln.LNParams.minDepth
 import com.lightning.wallet.ln.PaymentRequest
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
-import com.google.common.io.Files
 import java.text.SimpleDateFormat
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
-import java.io.File
-import java.util
 
 
 trait HumanTimeDisplay { me: TimerActivity =>
@@ -67,7 +64,6 @@ trait HumanTimeDisplay { me: TimerActivity =>
 trait ListUpdater extends HumanTimeDisplay { me: TimerActivity =>
   lazy val allTxsWrapper = getLayoutInflater.inflate(R.layout.frag_txs_all, null)
   lazy val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
-  lazy val fab = findViewById(R.id.fab).asInstanceOf[com.github.clans.fab.FloatingActionMenu]
   lazy val list = findViewById(R.id.itemsList).asInstanceOf[ListView]
   private[this] var state = SCROLL_STATE_IDLE
   val minLinesNum = 4
@@ -193,9 +189,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     toolbar setOnClickListener onButtonTap {
       showDenominationChooser(app.kit.conf1Balance) { pos =>
         app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
-
-        denom = denoms apply pos
-        adapter.notifyDataSetChanged
+        wrap(adapter.notifyDataSetChanged) { denom = denoms apply pos }
         updTitle
       }
     }
@@ -284,36 +278,12 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
 
   override def onOptionsItemSelected(menu: MenuItem) = runAnd(true) {
     if (menu.getItemId == R.id.actionBuyCoins) localBitcoinsAndGlidera
-    else if (menu.getItemId == R.id.exportSnapshot) exportSnapshot
     else if (menu.getItemId == R.id.actionSettings) mkSetsForm
   }
 
   override def onResume = wrap(super.onResume) {
     app.prefs.edit.putBoolean(AbstractKit.LANDING_LN, false).commit
     checkTransData
-  }
-
-  // TODO: remove for mainnet
-  def exportSnapshot = {
-    val dbFile = new File("/data/data/com.lightning.wallet/databases/lndata4.db")
-
-    val walletDestinationFile = FileOps shell s"$appName.wallet"
-    val chainDestinationFile = FileOps shell s"$appName.spvchain"
-    val dbDestinationFile = FileOps shell s"lndata4.db"
-
-    Files.write(Files toByteArray app.walletFile, walletDestinationFile)
-    Files.write(Files toByteArray app.chainFile, chainDestinationFile)
-    Files.write(Files toByteArray dbFile, dbDestinationFile)
-
-    val files = new util.ArrayList[Uri]
-
-    files.add(Uri fromFile walletDestinationFile)
-    files.add(Uri fromFile chainDestinationFile)
-    files.add(Uri fromFile dbDestinationFile)
-
-    val share = new Intent setAction Intent.ACTION_SEND_MULTIPLE setType "text/plain"
-    share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files)
-    me startActivity share
   }
 
   // DATA READING AND BUTTON ACTIONS

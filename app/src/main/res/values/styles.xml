@@ -3,8 +3,8 @@
     <!-- page layouts -->
 
     <style name="StandardLinearLayout">
-        <item name="android:layout_height">match_parent</item>
-        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">fill_parent</item>
+        <item name="android:layout_width">fill_parent</item>
         <item name="android:orientation">vertical</item>
         <item name="android:gravity">center</item>
     </style>
@@ -96,13 +96,13 @@
     <!-- floating buttons style -->
 
     <style name="FloatingMenu">
-        <item name="menu_shadowColor">#33000000</item>
+        <item name="android:layout_alignParentRight">true</item>
         <item name="android:layout_margin">@dimen/app_padding</item>
         <item name="android:layout_alignParentBottom">true</item>
-        <item name="android:layout_alignParentRight">true</item>
-        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_height">100dp</item>
         <item name="android:layout_width">wrap_content</item>
         <item name="menu_animationDelayPerItem">0</item>
+        <item name="menu_shadowColor">#33000000</item>
         <item name="menu_labels_textSize">18sp</item>
     </style>
 

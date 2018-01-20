@@ -1,4 +1,5 @@
-<RelativeLayout style="@style/StandardLinearLayoutPage"
+<RelativeLayout
+    style="@style/StandardLinearLayoutPage"
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:fab="http://schemas.android.com/apk/res-auto">
 
@@ -35,8 +36,7 @@
         fab:menu_colorPressed="@color/btc"
         fab:menu_colorNormal="@color/btc"
         fab:menu_colorRipple="@color/btc"
-        style="@style/FloatingMenu"
-        android:id="@+id/fab">
+        style="@style/FloatingMenu">
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_flash_24dp"

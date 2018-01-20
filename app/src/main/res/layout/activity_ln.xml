@@ -12,6 +12,14 @@
             android:id="@+id/itemsList"
             style="@style/GrayDividerListView"/>
 
+        <TextView
+            style="@style/Info"
+            android:visibility="gone"
+            android:layout_weight="1"
+            android:id="@+id/lnChanInfo"
+            android:layout_width="wrap_content"
+            android:text="@string/ln_ops_chan_none"/>
+
     </LinearLayout>
 
     <com.github.clans.fab.FloatingActionMenu
@@ -19,8 +27,7 @@
         fab:menu_colorPressed="@color/ln"
         fab:menu_colorNormal="@color/ln"
         fab:menu_colorRipple="@color/ln"
-        style="@style/FloatingMenu"
-        android:id="@+id/fab">
+        style="@style/FloatingMenu">
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_btc_24dp"
@@ -31,11 +38,33 @@
             style="@style/FabButton"/>
 
         <com.github.clans.fab.FloatingActionButton
+            android:src="@drawable/ic_info_outline_white_18dp"
+            fab:fab_label="@string/ln_chan_info"
+            fab:fab_colorPressed="@color/green"
+            fab:fab_colorNormal="@color/green"
+            fab:fab_colorRipple="@color/green"
+            android:onClick="goLNOps"
+            style="@style/FabButton"
+            fab:fab_size="mini"/>
+
+        <com.github.clans.fab.FloatingActionButton
+            android:src="@drawable/ic_power_settings_new_white_18dp"
+            fab:fab_label="@string/ln_ops_start"
+            fab:fab_colorPressed="@color/green"
+            fab:fab_colorNormal="@color/green"
+            fab:fab_colorRipple="@color/green"
+            android:onClick="goLNStart"
+            android:id="@+id/fabOpen"
+            style="@style/FabButton"
+            fab:fab_size="mini"/>
+
+        <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"
             fab:fab_label="@string/ln_receive"
             fab:fab_colorPressed="@color/ln"
             fab:fab_colorNormal="@color/ln"
             fab:fab_colorRipple="@color/ln"
+            android:id="@+id/fabLNReceive"
             android:onClick="goReceive"
             style="@style/FabButton"
             fab:fab_size="mini"/>
@@ -46,6 +75,7 @@
             fab:fab_colorPressed="@color/ln"
             fab:fab_colorNormal="@color/ln"
             fab:fab_colorRipple="@color/ln"
+            android:id="@+id/fabLNQR"
             style="@style/FabButton"
             android:onClick="goQR"
             fab:fab_size="mini"/>

@@ -1,4 +1,5 @@
 <resources>
+    <item name="green" type="color">#16A764</item>
     <item name="black" type="color">#000000</item>
     <item name="white" type="color">#EEEEEE</item>
     <item name="btc" type="color">#FF9900</item>

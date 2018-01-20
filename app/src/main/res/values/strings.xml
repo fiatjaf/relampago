@@ -1,6 +1,5 @@
 <resources>
     <string name="lang">eng</string>
-    <string name="debug_export_snapshot">Export snapshot</string>
 
     <!-- stepper -->
     <string name="step_2"><![CDATA[<font color=#999999>Step 2 of 3: security</font><br><br>%1$s]]></string>
@@ -16,8 +15,9 @@
     <string name="unlock">Unlock Wallet</string>
     <string name="key_num">&#160;numeric&#160;</string>
     <string name="key_alph">&#160;standard&#160;</string>
+    <string name="ln_wallet">Lightning wallet</string>
     <string name="sets_secret_ok">New passcode has been set</string>
-    <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescan will be triggered on next launch</string>
+    <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch</string>
     <string name="sets_noscreen"><![CDATA[Do not make a screenshot<br><br><small>Since it will be saved in a gallery where other apps may access it which is not very safe</small>]]></string>
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="password_info">This app uses encryption to protect your data so please pick a passcode which is at least 6 characters long</string>
@@ -57,11 +57,11 @@
     <string name="read_settings"><![CDATA[<small>%1$s<br>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.01&#8211;6<br><br></small>Wallet settings]]></string>
     <string name="mnemonic_info"><![CDATA[<font color=#E31300>Mnemonic code is super important</font><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>Read about it</a> and be sure to save it<br><br>Properly secured mnemonic code protectes you from money loss]]></string>
     <string name="mnemonic_export_details"><![CDATA[Mnemonic code will be encrypted and exported using <strong>your current passcode</strong><br><br>You are strongly advised to read a <a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>related section</a> of wallet manual before proceeding with this]]></string>
-    <string name="buy_info"><![CDATA[<a href=https://localbitcoins.com/buy_bitcoins><strong>LocalBitcoins.com</strong></a><br>Available worldwide<br><br><a href=https://www.glidera.io/referral?client_id=86733e454669ce84ac3abd9bb2a1309c&buydestinationaddress=%1$s><strong>Glidera.io</strong></a><br>USA and Canada]]></string>
+    <string name="ln_ops_chan_none"><a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a> enables fast and secure off-chain Bitcoin transactions with a near zero fees\n\nUsing Lightning requires you to open a <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a> with a peer of your choice and then fund it with a single on-chain Bitcoin transaction</string>
 
     <!-- menu and fab -->
-    <string name="sets_secret_change">Change passcode</string>
     <string name="sets_chan_recover">Recover channel funds</string>
+    <string name="sets_secret_change">Change passcode</string>
     <string name="sets_mnemonic">View mnemonic code</string>
     <string name="sets_olympus">Set Olympus server</string>
     <string name="sets_rescan">Rescan blockchain</string>
@@ -73,13 +73,11 @@
     <string name="action_bitcoin_receive">Receive bitcoin</string>
     <string name="action_bitcoin_send">Send bitcoin</string>
     <string name="action_settings">Wallet settings</string>
-    <string name="action_buy">Testnet faucet</string>
     <string name="action_scan">Scan QR code</string>
 
-    <string name="ln_chan_info">Channel info</string>
-    <string name="ln_chan_close">Close channel</string>
     <string name="ln_receive">Receive lightning</string>
-    <string name="ln_search">Find payments</string>
+    <string name="ln_chan_info">View channel info</string>
+    <string name="ln_chan_close">Close channel</string>
 
     <!-- dialogs -->
     <string name="spend_address_tip">Paste Bitcoin address\nfrom clipboard</string>
@@ -90,7 +88,7 @@
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
     <string name="amount_hint_fin"><![CDATA[Amount in Finney%1$s]]></string>
 
-    <string name="dialog_clipboard_absent">Clipboard does not contain anything useful</string>
+    <string name="dialog_clipboard_absent">Nothing useful in clipboard</string>
     <string name="dialog_address_wrong">Bitcoin address is required</string>
     <string name="dialog_sum_empty">Please provide an amount</string>
     <string name="dialog_sum_small">Amount is too small</string>
@@ -113,9 +111,11 @@
     <string name="secret_changing">Updating passcode&#8230;</string>
     <string name="secret_checking">Checking passcode&#8230;</string>
 
+    <string name="ln_notify_opening">Opening a payment channel&#8230;</string>
     <string name="ln_notify_connecting">Connecting to Lightning peer&#8230;</string>
     <string name="ln_notify_recovering">Recovering channel funds&#8230;</string>
     <string name="ln_notify_operational">Lightning wallet is online</string>
+    <string name="ln_notify_none">No open channel found</string>
     <string name="ln_pr_make">Making payment request&#8230;</string>
     <string name="ln_done">Lightning payment settled</string>
     <string name="ln_select_peer">Select peer</string>
@@ -133,7 +133,7 @@
     <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#1BA2E0>%1$s</font>]]></string>
     <string name="txs_view_outside">View on SmartBit</string>
-    <string name="txs_p2wsh">Payment Channel Funding</string>
+    <string name="txs_p2wsh">Payment channel funding</string>
 
     <array name="txs_confs">
         <item><![CDATA[<strong>Awaiting&#160;confirmation</strong>]]></item>
@@ -146,7 +146,6 @@
     <!-- errors -->
     <string name="err_ln_old">Failed because this payment request has expired. Please ask recipient to provide a new one</string>
     <string name="err_ln_offline">Failed because channel is currently offline. Please wait a few seconds and try again</string>
-    <string name="err_ln_black">Failed because your peer is blacklisted. You may want to create a new payment channel</string>
     <string name="err_ln_general">Could not proceed with this payment. Please ask recipient to issue another one</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept it</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum</string>
@@ -181,7 +180,7 @@
     <string name="ln_send_title"><![CDATA[Send lightning<br><br><small>%1$s</small>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#1BA2E0>Incoming payment</font><br>%1$s]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
-    <string name="ln_expiry"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#stuck-payments>Expiry</a>]]></string>
+    <string name="ln_expiry"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#stuck-payments>expiry</a>]]></string>
     <string name="ln_chan_close_details">Closing a channel will result in an on-chain Bitcoin transaction which would refund the remaining Lightning balance back to your Bitcoin wallet minus some miner fee.\n\nAlso, you won\'t be able to send Lightning payments until a new payment channel is established</string>
     <string name="ln_chan_info_details"><![CDATA[%1$s<br><small>%2$s</small><br><br>Your node ID<br><font color=#999999>%3$s</font><br><br>Peer node ID<br><font color=#999999>%4$s</font><br><br>Channel ID<br><font color=#999999>%5$s</font>]]></string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>
@@ -208,15 +207,11 @@
     <string name="ln_olympus_net_error">Could not set an Olympus server because it is not reachable</string>
 
     <!-- activity_ln_ops, activity_ln_start -->
-    <string name="ln_search_nodes">Find peers</string>
     <string name="ln_force_close">Force close</string>
-    <string name="ln_ops_btc">Back to Bitcoin</string>
-
-    <string name="ln_ops_chan_none"><a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a> enables fast and secure off-chain Bitcoin transactions with a near zero fees\n\nUsing it requires you to open a <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>Payment Channel</a> with a peer of your choice and then fund it with Bitcoin transaction</string>
-    <string name="ln_ops_chan_opening"><![CDATA[Opening a Payment Channel&#8230;<br>Channel capacity is %1$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %2$s<br><br><a href=https://testnet.smartbit.com.au/tx/%3$s>Funding status</a><br>%4$s]]></string>
-    <string name="ln_ops_chan_negotiations"><![CDATA[Closing a Payment Channel&#8230;<br>Waiting for peer\'s confirmation<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
+    <string name="ln_ops_chan_opening"><![CDATA[Opening a payment channel&#8230;<br>Channel capacity is %1$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %2$s<br><br><a href=https://testnet.smartbit.com.au/tx/%3$s>Funding status</a><br>%4$s]]></string>
+    <string name="ln_ops_chan_negotiations"><![CDATA[Closing a payment channel&#8230;<br>Waiting for peer\'s confirmation<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a><br>%1$s<br><br>%2$s]]></string>
-    <string name="ln_ops_chan_bilateral_closing"><![CDATA[Closing a Payment Channel&#8230;<br>Remaining Lightning balance has been refunded to your Bitcoin wallet<br><br>%1$s]]></string>
+    <string name="ln_ops_chan_bilateral_closing"><![CDATA[Closing a payment channel&#8230;<br>Remaining Lightning balance has been refunded to your Bitcoin wallet<br><br>%1$s]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Your pending refunds</font><br>]]></string>
@@ -233,9 +228,9 @@
     </array>
 
     <!-- opening a new channel -->
-    <string name="ln_ops_start_fund_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>Fund a Payment Channel]]></string>
+    <string name="ln_ops_start_fund_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>Fund a payment channel]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
-    <string name="ln_ops_start">Open new Channel</string>
+    <string name="ln_ops_start">Open payment channel</string>
 
     <array name="ln_ops_start_node_channels">
         <item><![CDATA[<strong>No public channels</strong>]]></item>

@@ -58,7 +58,7 @@ class PublicCloud(val connector: Connector, bag: PaymentInfoBag) extends Cloud {
         operationalChannel <- app.ChannelManager.all.find(_.isOperational)
         paymentRequestAndMemo @ (pr, memo) <- retry(getRequestAndMemo, pickInc, 3 to 4)
         Some(rpi) <- retry(app.ChannelManager outPaymentObs emptyRPI(pr), pickInc, 3 to 4)
-        // Server response may arrive in some time after requesting, must account for that
+        // Server response may arrive in some time after our requesting, must account for that
       } if (data.info.isEmpty && pr.amount.forall(_.amount < 20000000L) && memo.clears.size > 20) {
         // Proceed if data is still empty, the price is low enough and number of sigs is high enough
         me BECOME data.copy(info = Some apply paymentRequestAndMemo)

@@ -25,6 +25,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   def apply[T](ex: Commitments => T) = Some(data) collect { case some: HasCommitments => ex apply some.commitments }
   def process(change: Any) = Future(me doProcess change) onFailure { case err => events onError me -> err }
   def isOperational = data match { case NormalData(_, _, None, None) => true case _ => false }
+  def isOpening = data match { case _: WaitFundingDoneData => true case _ => false }
   val listeners: mutable.Set[ChannelListener]
 
   private[this] val events = new ChannelListener {
@@ -223,7 +224,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // Fail or fulfill incoming HTLCs
       case (norm: NormalData, CMDHTLCProcess, NORMAL) =>
-        val minExpiry = LNParams.broadcaster.currentHeight + 3L
+        val minExpiry = LNParams.broadcaster.currentHeight + 6L
         for (Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs)
           me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, minExpiry)
 

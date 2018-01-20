@@ -10,16 +10,10 @@ import com.lightning.wallet.lnutils._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.LNParams._
+import com.lightning.wallet.Denomination._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-
-import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
-import com.lightning.wallet.ln.wire.{ChannelUpdate, CommitSig}
-import com.lightning.wallet.R.drawable.{await, conf1, dead}
-import com.lightning.wallet.ln.Tools.{none, random}
-import com.lightning.wallet.ln.Tools.{runAnd, wrap}
-import scala.util.{Failure, Success, Try}
 
 import fr.castorflex.android.smoothprogressbar.SmoothProgressDrawable
 import fr.castorflex.android.smoothprogressbar.SmoothProgressBar
@@ -36,10 +30,17 @@ import com.lightning.wallet.Utils.app
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Address
 import scala.language.postfixOps
-import android.app.AlertDialog
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
+
+import com.github.clans.fab.{FloatingActionButton, FloatingActionMenu}
+import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
+import com.lightning.wallet.ln.wire.{ChannelUpdate, CommitSig}
+import com.lightning.wallet.R.drawable.{await, conf1, dead}
+import com.lightning.wallet.ln.Tools.{none, random}
+import com.lightning.wallet.ln.Tools.{runAnd, wrap}
+import scala.util.{Failure, Success, Try}
 
 
 trait SearchBar { me =>
@@ -85,15 +86,20 @@ trait DataReader extends NfcReaderActivity {
 class LNActivity extends DataReader with ToolbarActivity with ListUpdater with SearchBar { me =>
   lazy val layoutInflater = app.getSystemService(LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
   lazy val viewParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-  lazy val container = findViewById(R.id.container).asInstanceOf[RelativeLayout]
-
   lazy val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
+  lazy val container = findViewById(R.id.container).asInstanceOf[RelativeLayout]
+  lazy val lnChanInfo = Utils clickableTextField findViewById(R.id.lnChanInfo)
   lazy val paymentsViewProvider = new PaymentsViewProvider
-  val imgMap = Array(await, await, conf1, dead)
+  lazy val imgMap = Array(await, await, conf1, dead)
+
+  lazy val fabLNReceive = findViewById(R.id.fabLNReceive).asInstanceOf[FloatingActionButton]
+  lazy val fabOpen = findViewById(R.id.fabOpen).asInstanceOf[FloatingActionButton]
+  lazy val fabLNQR = findViewById(R.id.fabLNQR).asInstanceOf[FloatingActionButton]
 
   lazy val adapter = new CutAdapter[PaymentInfo](PaymentTable.limit, R.layout.frag_tx_ln_line) {
     // LN line has a narrower timestamp section because payment info, also limit of rows is reduced
+    // which is fine because unline Bitcoin all the LN payments can always be found via search
 
     def getItem(position: Int) = visibleItems(position)
     def getHolder(view: View) = new TxViewHolder(view) {
@@ -112,9 +118,9 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
   }
 
-  val chanListener = new ChannelListener {
+  val chanListener = new ChannelListener { self =>
     // Updates local UI according to changes in channel
-    // Should be removed when activity is stopped
+    // Should always be removed when activity is stopped
 
     override def onError = {
       case _ \ CMDReserveExcept(CMDPlainAddHtlc(rpi), missingSat, reserveSat) =>
@@ -125,7 +131,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
         val reserve = coloredIn apply Satoshi(reserveSat)
         val missing = coloredOut apply Satoshi(missingSat)
         val sending = coloredOut apply MilliSatoshi(rpi.firstMsat)
-        onFail(error = message.format(reserve, sending, missing).html)
+        onFail(message.format(reserve, sending, missing).html)
 
       case _ \ CMDAddExcept(_: CMDPlainAddHtlc, code) =>
         // Let user know why payment could not be added
@@ -133,9 +139,10 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
 
     override def onBecome = {
-      case (chan, _, _, _) if !chan.isOperational => evacuate
-      case (_, _: NormalData, _, SYNC) => update(me getString ln_notify_connecting, Informer.LNSTATE).flash.run
-      case (_, _: NormalData, _, NORMAL) => update(me getString ln_notify_operational, Informer.LNSTATE).flash.run
+      case (chan, _, _, NORMAL | NEGOTIATIONS | CLOSING) if !chan.isOperational => me runOnUiThread whenNone
+      case (chan, _, WAIT_FUNDING_DONE, NORMAL) if chan.isOperational => me runOnUiThread whenOperational(chan)
+      case (chan, _, _, SYNC) if chan.isOperational => update(me getString ln_notify_connecting, Informer.LNSTATE).flash.run
+      case (chan, _, _, NORMAL) if chan.isOperational => update(me getString ln_notify_operational, Informer.LNSTATE).flash.run
     }
 
     override def onProcess = {
@@ -147,13 +154,8 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
   }
 
-  private[this] var sendPayment: PaymentRequest => Unit = none
-  private[this] var makePaymentRequest = anyToRunnable(none)
-  private[this] var whenStop = anyToRunnable(super.onStop)
-  private[this] var getChannelInfo = anyToRunnable(none)
-  override def onStop = whenStop.run
-
-  def evacuate = me exitTo classOf[LNOpsActivity]
+  var makePaymentRequest: Runnable = _
+  var sendPayment: PaymentRequest => Unit = _
   def react(qs: String) = paymentsViewProvider reload qs
   def notifySubTitle(subtitle: String, infoType: Int) = {
     // Title will updated separately so just update subtitle
@@ -168,88 +170,13 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     wrap(me setDetecting true)(me initNfc state)
     me startListUpdates adapter
 
-    list setAdapter adapter
-    list setFooterDividersEnabled false
-    paymentsViewProvider reload new String
-    app.kit.wallet addCoinsSentEventListener txTracker
-    app.kit.wallet addCoinsReceivedEventListener txTracker
-  } else me exitTo classOf[MainActivity]
-
-  override def onDestroy = wrap(super.onDestroy) {
-    app.kit.wallet removeCoinsSentEventListener txTracker
-    app.kit.wallet removeCoinsReceivedEventListener txTracker
-    stopDetecting
-  }
-
-  override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
-    getMenuInflater.inflate(R.menu.ln_normal_ops, menu)
-    setupSearch(menu)
-  }
-
-  override def onResume = wrap(super.onResume) {
-    app.prefs.edit.putBoolean(AbstractKit.LANDING_LN, true).commit
-    val chanOpt = app.ChannelManager.all.find(_.isOperational)
-    chanOpt map manageActive getOrElse evacuate
-  }
-
-  // APP MENU
-
-  override def onOptionsItemSelected(menu: MenuItem) = runAnd(true) {
-    if (menu.getItemId == R.id.actionCloseChannel) getChannelInfo.run
-    else if (menu.getItemId == R.id.actionSettings) mkSetsForm
-  }
-
-  def getBalance(chan: Channel): MilliSatoshi = {
-    val canSend = chan(_.localCommit.spec.toLocalMsat)
-    MilliSatoshi(canSend getOrElse 0L)
-  }
-
-  def updTitle(chan: Channel) = animateTitle {
-    // A channel always has some balance everytime
-    denom withSign getBalance(chan)
-  }
-
-  def onPaymentError(er: Throwable) = er.getMessage match {
-    case FROMBLACKLISTED => onFail(me getString err_ln_black)
-    case techDetails => onFail(techDetails)
-  }
-
-  def expiryTitle(expiry: Long, title: String) = {
-    val relativeLeft = expiry - broadcaster.currentHeight
-    val leftHuman = app.plurOrZero(blocksLeft, relativeLeft)
-    s"${me getString ln_expiry} $leftHuman<br>$title"
-  }
-
-  def qr(pr: PaymentRequest) = {
-    me goTo classOf[RequestActivity]
-    app.TransData.value = pr
-  }
-
-  def manageActive(chan: Channel) = {
-    val pay: RuntimePaymentInfo => Unit = rpi =>
-      app.ChannelManager.getOutPaymentObs(rpi).foreach(onNext = {
-        // Must account for a special fail when no routes are found
-        case Some(updatedRPI) => chan process CMDPlainAddHtlc(updatedRPI)
-        case None => onFail(me getString err_ln_no_route)
-      }, onPaymentError)
-
-    toolbar setOnClickListener onButtonTap {
-      showDenominationChooser(me getBalance chan) { pos =>
-        app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
-
-        denom = denoms apply pos
-        adapter.notifyDataSetChanged
-        updTitle(chan)
-      }
-    }
-
     list setOnItemClickListener onTap { pos =>
-      val info: PaymentInfo = adapter getItem pos
-      val description = me getDescription info.pr
       val detailsWrapper = getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
       val paymentProof = detailsWrapper.findViewById(R.id.paymentProof).asInstanceOf[Button]
       val paymentHash = detailsWrapper.findViewById(R.id.paymentHash).asInstanceOf[Button]
+
+      val info = adapter getItem pos
       val humanStatus = s"<strong>${paymentStatesMap apply info.actualStatus}</strong>"
       paymentHash setOnClickListener onButtonTap(app setBuffer info.pr.hash.toString)
 
@@ -266,8 +193,8 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
       if (info.incoming == 1) {
         val title = getString(ln_incoming_title).format(humanStatus)
-        val humanIn = humanFiat(coloredIn(info.firstSum), info.firstSum)
-        paymentDetails setText s"$description<br><br>$humanIn".html
+        val humanIn = humanFiat(prefix = coloredIn(info.firstSum), info.firstSum)
+        paymentDetails setText s"${me getDescription info.pr}<br><br>$humanIn".html
 
         // Can only show a QR again if this is not a success yet AND payment request has not expired yet
         if (info.actualStatus == SUCCESS || !info.pr.isFresh) mkForm(me negBld dialog_ok, title.html, detailsWrapper)
@@ -275,50 +202,102 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
       } else {
         val feeAmount = MilliSatoshi(info.rd.lastMsat - info.firstMsat)
-        val humanOut = humanFiat(coloredOut(info.firstSum), info.firstSum)
-        paymentDetails setText s"$description<br><br>$humanOut".html
+        val humanOut = humanFiat(prefix = coloredOut(info.firstSum), info.firstSum)
+        paymentDetails setText s"${me getDescription info.pr}<br><br>$humanOut".html
 
-        // Will hide retry button if it's a success or can't proceed
-        // Will show title with expiry countdown if payment is in-flight
-        val hideRetry = info.actualStatus == SUCCESS || info.runtime.canNotProceed(chan)
-        val bld = if (hideRetry) me negBld dialog_ok else mkChoiceDialog(none, pay(info.runtime), dialog_ok, dialog_retry)
-        val baseTitle = humanFiat(getString(ln_outgoing_title).format(coloredOut(feeAmount), humanStatus), feeAmount)
-        val finalTitle = if (info.actualStatus == WAITING) expiryTitle(info.rd.lastExpiry, baseTitle) else baseTitle
-        mkForm(bld, finalTitle.html, detailsWrapper)
+        // Will show title with expiry countdown if payment is in-flight so user can make estimations
+        val title1 = humanFiat(getString(ln_outgoing_title).format(coloredOut(feeAmount), humanStatus), feeAmount)
+        val title2 = if (info.actualStatus == WAITING) expiryTitle(info.rd.lastExpiry, title1) else title1
+        mkForm(me negBld dialog_ok, title2.html, detailsWrapper)
       }
     }
 
-    sendPayment = pr => {
-      // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
-      // we can not calculate an exact commitTx fee + HTLC fees in advance so just use a minChannelMargin
-      // which also guarantees a user has some substantial amount to be refunded once a channel is exhausted
-      val canSend0 = chan(c => c.localCommit.spec.toLocalMsat - c.remoteParams.channelReserveSatoshis * sat2msatFactor)
-      val canSend1 = canSend0.map(_ - RatesSaver.rates.feeLive.value * sat2msatFactor / 2) getOrElse 0L
-      val maxMsat = MilliSatoshi apply math.min(canSend1, maxHtlcValue.amount)
+    list setAdapter adapter
+    list setFooterDividersEnabled false
+    paymentsViewProvider reload new String
+    app.kit.wallet addCoinsSentEventListener txTracker
+    app.kit.wallet addCoinsReceivedEventListener txTracker
+  } else me exitTo classOf[MainActivity]
 
-      val title = getString(ln_send_title).format(me getDescription pr)
-      val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-      val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), title.html, content)
-      val hint = getString(amount_hint_can_send).format(denom withSign maxMsat)
-      val rateManager = new RateManager(hint, content)
+  override def onCreateOptionsMenu(menu: Menu) = {
+    getMenuInflater.inflate(R.menu.ln_normal_ops, menu)
+    setupSearch(menu)
+    true
+  }
 
-      def sendAttempt = rateManager.result match {
-        case Failure(_) => app toast dialog_sum_empty
-        case Success(ms) if maxMsat < ms => app toast dialog_sum_big
-        case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
-        case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
-        case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
+  override def onDestroy = wrap(super.onDestroy) {
+    app.kit.wallet removeCoinsSentEventListener txTracker
+    app.kit.wallet removeCoinsReceivedEventListener txTracker
+    stopDetecting
+  }
 
-        case Success(ms) => rm(alert) {
-          // Outgoing payment needs to have an amount
-          // and this amount may be higher than requested
-          pay apply emptyRPI(pr).copy(firstMsat = ms.amount)
-        }
+  override def onStop = wrap(super.onStop) {
+    // We can not show a progress bar anymore, reset method
+    // We should remove a listener, just iterate over all of them
+    app.ChannelManager.getOutPaymentObs = app.ChannelManager.outPaymentObs
+    for (chan <- app.ChannelManager.all) chan.listeners -= chanListener
+  }
+
+  override def onResume = wrap(super.onResume) {
+    app.prefs.edit.putBoolean(AbstractKit.LANDING_LN, true).commit
+    app.ChannelManager.all.find(_.isOperational) map whenOperational getOrElse {
+      app.ChannelManager.all.find(_.isOpening) map whenOpening getOrElse whenNone
+    }
+
+    app.ChannelManager.getOutPaymentObs = rpi => {
+      // Stopping animation immediately does not work sometimes so we use a guarded timer here once again
+      // On entering this activity we show a progress bar animation, a call may happen outside of this activity
+      val progressBar = layoutInflater.inflate(R.layout.frag_progress_bar, null).asInstanceOf[SmoothProgressBar]
+      def delayedStop = try timer.schedule(anyToRunnable(progressBar.progressiveStop), 250) catch none
+      val drawable = progressBar.getIndeterminateDrawable.asInstanceOf[SmoothProgressDrawable]
+
+      drawable setCallbacks new SmoothProgressDrawable.Callbacks {
+        // In some cases timer may already be disabled and will throw here because activity has been killed
+        def onStop = try timer.schedule(anyToRunnable(container removeView progressBar), 250) catch none
+        def onStart = try drawable.setColors(getResources getIntArray R.array.bar_colors) catch none
       }
 
-      val ok = alert getButton BUTTON_POSITIVE
-      ok setOnClickListener onButtonTap(sendAttempt)
-      for (sum <- pr.amount) rateManager setSum Try(sum)
+      me runOnUiThread container.addView(progressBar, viewParams)
+      app.ChannelManager.outPaymentObs(rpi).doOnTerminate(delayedStop)
+    }
+  }
+
+  override def onOptionsItemSelected(menu: MenuItem) = {
+    if (menu.getItemId == R.id.actionSettings) mkSetsForm
+    true
+  }
+
+  def qr(pr: PaymentRequest) = {
+    me goTo classOf[RequestActivity]
+    app.TransData.value = pr
+  }
+
+  def expiryTitle(expiry: Long, title: String) = {
+    val relativeLeft = expiry - broadcaster.currentHeight
+    val leftHuman = app.plurOrZero(blocksLeft, relativeLeft)
+    s"${me getString ln_expiry} $leftHuman<br>$title"
+  }
+
+  def getBalance(chan: Channel) = MilliSatoshi {
+    chan(_.localCommit.spec.toLocalMsat) getOrElse 0L
+  }
+
+  def updTitle(chan: Channel) = animateTitle {
+    // When channel is here we can show an amount
+    denom withSign getBalance(chan)
+  }
+
+  def whenOperational(chan: Channel): Unit = {
+    // We have an operational channel so set all the triggers
+    // Could be initially operational or can become one
+
+    toolbar setOnClickListener onButtonTap {
+      showDenominationChooser(me getBalance chan) { pos =>
+        // Rememeber user choice, update list and title text
+        app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
+        wrap(adapter.notifyDataSetChanged) { denom = denoms apply pos }
+        me updTitle chan
+      }
     }
 
     makePaymentRequest = anyToRunnable {
@@ -365,59 +344,97 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
             ok setOnClickListener onButtonTap(recAttempt)
 
           case _ =>
-            // Peer has not yet sent us a ChannelUpdate
-            // most likely because a funding transaction is not deep enough
+            // Peer node has not sent us a ChannelUpdate
+            // most likely because a funding tx is not yet deep enough
             new Builder(me).setCustomTitle(me getString err_ln_cant_ask).show
         }
       }
     }
 
-    whenStop = anyToRunnable {
-      // On leaving this activity we can not show a progress bar anymore
-      // so we must replace it with a basic task of just asking for routes
-      app.ChannelManager.getOutPaymentObs = app.ChannelManager.outPaymentObs
-      chan.listeners -= chanListener
-      super.onStop
-    }
+    sendPayment = pr => {
+      // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
+      // we can not calculate an exact commitTx fee + HTLC fees in advance so just use a minChannelMargin
+      // which also guarantees a user has some substantial amount to be refunded once a channel is nearly exhausted
+      val canSend0 = chan(c => c.localCommit.spec.toLocalMsat - c.remoteParams.channelReserveSatoshis * sat2msatFactor)
+      val canSend1 = canSend0.map(_ - RatesSaver.rates.feeLive.value * sat2msatFactor / 2) getOrElse 0L
+      val maxMsat = MilliSatoshi apply math.min(canSend1, maxHtlcValue.amount)
 
-    getChannelInfo = anyToRunnable {
-      val (view, field) = str2Tuple(getString(ln_chan_info_details).format(chan.data.announce.alias,
-        chan.data.announce.addresses.headOption.map(_.getHostString).orNull, nodePrivateKey.publicKey.toString,
-        chan.data.announce.nodeId.toString, chan(_.channelId).get.toString).html)
+      val title = getString(ln_send_title).format(me getDescription pr)
+      val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
+      val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), title.html, content)
+      val hint = getString(amount_hint_can_send).format(denom withSign maxMsat)
+      val rateManager = new RateManager(hint, content)
 
-      // Show channel and peer details and ofer to cooperatively close a given channel
-      lazy val dialog = mkChoiceDialog(none, rm(alert)(proceed), dialog_ok, ln_chan_close)
-      lazy val alert: AlertDialog = mkForm(dialog, null, view)
-      field setTextIsSelectable true
-      alert
+      def sendAttempt = rateManager.result match {
+        case Failure(_) => app toast dialog_sum_empty
+        case Success(ms) if maxMsat < ms => app toast dialog_sum_big
+        case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+        case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
+        case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
 
-      def proceed = passWrap(me getString ln_chan_close_details) apply checkPassNotify { _ =>
-        // attempt to close all of the channels in case we have more than one operational left
-        for (chan <- app.ChannelManager.notClosing) chan process CMDShutdown
-      }
-    }
-
-    app.ChannelManager.getOutPaymentObs = rpi => {
-      // On entering this activity we show a progress bar animation, a call may happen outside of this activity
-      val progressBar = layoutInflater.inflate(R.layout.frag_progress_bar, null).asInstanceOf[SmoothProgressBar]
-      // Stopping animation immediately does not work sometimes so we use a guarded timer here once again
-      def delayedStop = try timer.schedule(anyToRunnable(progressBar.progressiveStop), 250) catch none
-      val drawable = progressBar.getIndeterminateDrawable.asInstanceOf[SmoothProgressDrawable]
-
-      drawable setCallbacks new SmoothProgressDrawable.Callbacks {
-        // In some cases timer may already be disabled and will throw here because activity has been killed
-        def onStop = try timer.schedule(anyToRunnable(container removeView progressBar), 250) catch none
-        def onStart = try drawable.setColors(getResources getIntArray R.array.bar_colors) catch none
+        case Success(ms) => rm(alert) {
+          // Outgoing payment needs to have an amount
+          // and this amount may be higher than requested
+          val rpi = RuntimePaymentInfo(emptyRD, pr, ms.amount)
+          app.ChannelManager.getOutPaymentObs(rpi).foreach(onNext = {
+            // Must account for a special fail when no routes are found
+            case Some(updatedRPI) => chan process CMDPlainAddHtlc(updatedRPI)
+            case None => onFail(me getString err_ln_no_route)
+          }, onFail)
+        }
       }
 
-      me runOnUiThread container.addView(progressBar, viewParams)
-      app.ChannelManager.outPaymentObs(rpi).doOnTerminate(delayedStop)
+      val ok = alert getButton BUTTON_POSITIVE
+      ok setOnClickListener onButtonTap(sendAttempt)
+      for (sum <- pr.amount) rateManager setSum Try(sum)
     }
 
+    // Configure floating buttons
+    fabLNReceive setVisibility View.VISIBLE
+    fabLNQR setVisibility View.VISIBLE
+    fabOpen setVisibility View.GONE
+
+    // Reload to update subtitle
+    // watch for endless recursion
     chan.listeners += chanListener
     chanListener reloadOnBecome chan
     me updTitle chan
     checkTransData
+  }
+
+  def baseWhenNoOperational = {
+    // Should reset all actions to null objects
+    toolbar setOnClickListener onButtonTap(none)
+    makePaymentRequest = anyToRunnable(none)
+    sendPayment = none
+  }
+
+  def whenOpening(chan: Channel) = wrap(baseWhenNoOperational) {
+    // Show balance in title but inform it's an opening phase in subtitle
+    update(me getString ln_notify_opening, Informer.LNSTATE).flash.run
+    me updTitle chan
+
+    // Configure floating buttons
+    fabLNReceive setVisibility View.GONE
+    fabLNQR setVisibility View.GONE
+    fabOpen setVisibility View.GONE
+
+    // Add a listener to catch a moment
+    // when this channel becomes operational
+    chan.listeners += chanListener
+    app.TransData.value = null
+  }
+
+  def whenNone = wrap(baseWhenNoOperational) {
+    // Show generic title message and inform ther's no chan in subtitle
+    update(me getString ln_notify_none, Informer.LNSTATE).flash.run
+    animateTitle(me getString ln_wallet)
+
+    // Configure floating buttons
+    fabOpen setVisibility View.VISIBLE
+    fabLNReceive setVisibility View.GONE
+    fabLNQR setVisibility View.GONE
+    app.TransData.value = null
   }
 
   // DATA READING AND BUTTON ACTIONS
@@ -426,12 +443,9 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     case uri: BitcoinURI => me goTo classOf[BtcActivity]
     case adr: Address => me goTo classOf[BtcActivity]
 
-    case pr: PaymentRequest if pr.isFresh =>
-      app.TransData.value = null
-      sendPayment(pr)
-
     case pr: PaymentRequest =>
-      onFail(me getString err_ln_old)
+      if (pr.isFresh) sendPayment(pr)
+      else onFail(me getString err_ln_old)
       app.TransData.value = null
 
     case otherwise =>
@@ -441,6 +455,16 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   def goReceive(top: View) = makePaymentRequest.run
   def goQR(top: View) = me goTo classOf[ScanActivity]
   def goBitcoin(top: View) = me goTo classOf[BtcActivity]
+  def goLNOps(top: View) = me goTo classOf[LNOpsActivity]
+
+  def goLNStart(top: View) = {
+    val minRequired = RatesSaver.rates.feeLive multiply 2
+    lazy val required = sumIn.format(denom withSign minRequired)
+    lazy val balance = sumIn.format(denom withSign app.kit.conf1Balance)
+    lazy val notEnough = getString(err_ln_not_enough_funds).format(balance, required)
+    if (app.kit.conf1Balance isGreaterThan minRequired) me exitTo classOf[LNStartActivity]
+    else mkForm(me negBld dialog_ok, notEnough.html, null)
+  }
 
   def toggle(v: View) = {
     // Expand or collapse all txs
@@ -453,22 +477,34 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
   // Payment history and search results loader
   class PaymentsViewProvider extends ReactCallback(me) { self =>
-    def onCreateLoader(id: Int, bundle: Bundle) = if (lastQuery.isEmpty) recent else search
-    def search = new ExtendedPaymentInfoLoader { def getCursor = bag byQuery lastQuery }
-    def recent = new ExtendedPaymentInfoLoader { def getCursor = bag byRecent }
+    def onCreateLoader(id: Int, bundle: Bundle) = if (lastQuery.isEmpty) recentPays else searchPays
+    def reload(txt: String) = runAnd(lastQuery = txt)(getSupportLoaderManager.restartLoader(1, null, self).forceLoad)
     val observeTablePath = db sqlPath PaymentTable.table
     var lastQuery = new String
 
-    def reload(txt: String) = runAnd(lastQuery = txt) {
-      // Remember last search term to handle possible reload
-      getSupportLoaderManager.restartLoader(1, null, self).forceLoad
+    type InfoVec = Vector[PaymentInfo]
+    def searchPays = new ReactLoader[PaymentInfo](me) {
+      val consume = (vec: InfoVec) => me runOnUiThread update(vec)
+      def createItem(rc: RichCursor) = bag toPaymentInfo rc
+      def getCursor = bag.byQuery(lastQuery)
+
+      def update(pays: InfoVec) = {
+        wrap(adapter.notifyDataSetChanged)(adapter set pays)
+        if (pays.nonEmpty) lnChanInfo setVisibility View.GONE
+        if (pays.nonEmpty) list setVisibility View.VISIBLE
+      }
     }
 
-    abstract class ExtendedPaymentInfoLoader extends ReactLoader[PaymentInfo](me) {
-      val consume: InfoVec => Unit = payments => me runOnUiThread updatePaymentList(payments)
-      def updatePaymentList(pays: InfoVec) = wrap(adapter.notifyDataSetChanged)(adapter set pays)
-      def createItem(shifted: RichCursor) = bag toPaymentInfo shifted
-      type InfoVec = Vector[PaymentInfo]
+    def recentPays = new ReactLoader[PaymentInfo](me) {
+      val consume = (vec: InfoVec) => me runOnUiThread update(vec)
+      def createItem(rc: RichCursor) = bag toPaymentInfo rc
+      def getCursor = bag.byRecent
+
+      def update(pays: InfoVec) = {
+        wrap(adapter.notifyDataSetChanged)(adapter set pays)
+        if (pays.isEmpty) lnChanInfo setVisibility View.VISIBLE
+        if (pays.isEmpty) list setVisibility View.GONE
+      }
     }
   }
 
