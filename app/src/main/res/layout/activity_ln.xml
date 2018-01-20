@@ -23,11 +23,11 @@
     </LinearLayout>
 
     <com.github.clans.fab.FloatingActionMenu
-        fab:menu_icon="@drawable/ic_flash_24dp"
         fab:menu_colorPressed="@color/ln"
         fab:menu_colorNormal="@color/ln"
         fab:menu_colorRipple="@color/ln"
-        style="@style/FloatingMenu">
+        style="@style/FloatingMenu"
+        android:id="@+id/fam">
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_btc_24dp"
@@ -48,7 +48,7 @@
             fab:fab_size="mini"/>
 
         <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_power_settings_new_white_18dp"
+            android:src="@drawable/ic_add_white_18dp"
             fab:fab_label="@string/ln_ops_start"
             fab:fab_colorPressed="@color/green"
             fab:fab_colorNormal="@color/green"

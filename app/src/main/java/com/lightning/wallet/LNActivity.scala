@@ -93,6 +93,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   lazy val paymentsViewProvider = new PaymentsViewProvider
   lazy val imgMap = Array(await, await, conf1, dead)
 
+  lazy val fam = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu].getMenuIconView
   lazy val fabLNReceive = findViewById(R.id.fabLNReceive).asInstanceOf[FloatingActionButton]
   lazy val fabOpen = findViewById(R.id.fabOpen).asInstanceOf[FloatingActionButton]
   lazy val fabLNQR = findViewById(R.id.fabLNQR).asInstanceOf[FloatingActionButton]
@@ -139,7 +140,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
 
     override def onBecome = {
-      case (chan, _, _, NORMAL | NEGOTIATIONS | CLOSING) if !chan.isOperational => me runOnUiThread whenNone
+      case (chan, _, SYNC | WAIT_FUNDING_DONE | NORMAL, _) if !chan.isOperational => me runOnUiThread whenNone
       case (chan, _, WAIT_FUNDING_DONE, NORMAL) if chan.isOperational => me runOnUiThread whenOperational(chan)
       case (chan, _, _, SYNC) if chan.isOperational => update(me getString ln_notify_connecting, Informer.LNSTATE).flash.run
       case (chan, _, _, NORMAL) if chan.isOperational => update(me getString ln_notify_operational, Informer.LNSTATE).flash.run
@@ -289,7 +290,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
   def whenOperational(chan: Channel): Unit = {
     // We have an operational channel so set all the triggers
-    // Could be initially operational or can become one
+    // could be initially operational or can become one
 
     toolbar setOnClickListener onButtonTap {
       showDenominationChooser(me getBalance chan) { pos =>
@@ -389,7 +390,8 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
       for (sum <- pr.amount) rateManager setSum Try(sum)
     }
 
-    // Configure floating buttons
+    // Configure floating buttons and set menu icon to flash
+    fam setImageDrawable getDrawable(R.drawable.ic_flash_24dp)
     fabLNReceive setVisibility View.VISIBLE
     fabLNQR setVisibility View.VISIBLE
     fabOpen setVisibility View.GONE
@@ -411,13 +413,14 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
   def whenOpening(chan: Channel) = wrap(baseWhenNoOperational) {
     // Show balance in title but inform it's an opening phase in subtitle
+    fam setImageDrawable getDrawable(R.drawable.ic_history_white_24dp)
     update(me getString ln_notify_opening, Informer.LNSTATE).flash.run
     me updTitle chan
 
     // Configure floating buttons
     fabLNReceive setVisibility View.GONE
-    fabLNQR setVisibility View.GONE
     fabOpen setVisibility View.GONE
+    fabLNQR setVisibility View.GONE
 
     // Add a listener to catch a moment
     // when this channel becomes operational
@@ -427,12 +430,13 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
   def whenNone = wrap(baseWhenNoOperational) {
     // Show generic title message and inform ther's no chan in subtitle
+    fam setImageDrawable getDrawable(R.drawable.ic_power_white_24dp)
     update(me getString ln_notify_none, Informer.LNSTATE).flash.run
     animateTitle(me getString ln_wallet)
 
     // Configure floating buttons
-    fabOpen setVisibility View.VISIBLE
     fabLNReceive setVisibility View.GONE
+    fabOpen setVisibility View.VISIBLE
     fabLNQR setVisibility View.GONE
     app.TransData.value = null
   }

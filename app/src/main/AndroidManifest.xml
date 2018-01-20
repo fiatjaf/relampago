@@ -17,10 +17,10 @@
         android:normalScreens="true"/>
 
     <application
+
         android:name="WalletApp"
         android:allowBackup="false"
         android:fullBackupContent="false"
-        android:resizeableActivity="true"
         android:icon="@drawable/ic_launcher_testnet"
         android:label="@string/app_name">
 
@@ -68,7 +68,8 @@
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
         <activity android:launchMode="singleTask" android:name="LNActivity"
-            android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
+            android:screenOrientation="portrait" android:theme="@style/CustomBar"
+            android:windowSoftInputMode="adjustNothing"/>
 
         <activity android:launchMode="singleTask" android:name="EmergencyActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
@@ -83,7 +84,8 @@
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
         <activity android:launchMode="singleTask" android:name="LNStartActivity"
-            android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
+            android:screenOrientation="portrait" android:theme="@style/CustomBar"
+            android:windowSoftInputMode="adjustNothing"/>
 
     </application>
 </manifest>

@@ -15,7 +15,6 @@
     <string name="unlock">Unlock Wallet</string>
     <string name="key_num">&#160;numeric&#160;</string>
     <string name="key_alph">&#160;standard&#160;</string>
-    <string name="ln_wallet">Lightning wallet</string>
     <string name="sets_secret_ok">New passcode has been set</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch</string>
     <string name="sets_noscreen"><![CDATA[Do not make a screenshot<br><br><small>Since it will be saved in a gallery where other apps may access it which is not very safe</small>]]></string>
@@ -27,6 +26,7 @@
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_create">New Bitcoin Wallet</string>
     <string name="wallet_restore">Restore Wallet</string>
+    <string name="ln_wallet">Lightning wallet</string>
 
     <array name="denoms">
         <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 BTC</small></font>]]></item>
