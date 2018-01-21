@@ -140,17 +140,15 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
 
     override def onBecome = {
-      case (chan, _, SYNC | WAIT_FUNDING_DONE | NORMAL, _) if !chan.isOperational => me runOnUiThread whenNone
-      case (chan, _, WAIT_FUNDING_DONE, NORMAL) if chan.isOperational => me runOnUiThread whenOperational(chan)
+      case (chan, _, WAIT_FUNDING_DONE, NORMAL) => me runOnUiThread reWireChannel
+      case (chan, _, SYNC | WAIT_FUNDING_DONE | NORMAL, _) if !chan.isOperational => me runOnUiThread reWireChannel
       case (chan, _, _, SYNC) if chan.isOperational => update(me getString ln_notify_connecting, Informer.LNSTATE).flash.run
       case (chan, _, _, NORMAL) if chan.isOperational => update(me getString ln_notify_operational, Informer.LNSTATE).flash.run
     }
 
     override def onProcess = {
-      case (chan, norm: NormalData, _: CommitSig)
-        // GUARD: Update UI once we have some fulfilled HTLCs
-        if norm.commitments.localCommit.spec.fulfilled.nonEmpty =>
-        notifySubTitle(me getString ln_done, Informer.LNPAYMENT)
+      case (chan, norm: NormalData, _: CommitSig) =>
+        // Just update current balance on each commit
         me updTitle chan
     }
   }
@@ -206,9 +204,10 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
         val humanOut = humanFiat(prefix = coloredOut(info.firstSum), info.firstSum)
         paymentDetails setText s"${me getDescription info.pr}<br><br>$humanOut".html
 
-        // Will show title with expiry countdown if payment is in-flight so user can make estimations
+        // Will show title with expiry if payment is in-flight so user can make estimations
+        val expiryHuman = app.plurOrZero(blocksLeft, info.rd.lastExpiry - broadcaster.currentHeight)
         val title1 = humanFiat(getString(ln_outgoing_title).format(coloredOut(feeAmount), humanStatus), feeAmount)
-        val title2 = if (info.actualStatus == WAITING) expiryTitle(info.rd.lastExpiry, title1) else title1
+        val title2 = if (info.actualStatus == WAITING) s"${me getString ln_expiry} $expiryHuman<br>$title1" else title1
         mkForm(me negBld dialog_ok, title2.html, detailsWrapper)
       }
     }
@@ -241,9 +240,8 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
   override def onResume = wrap(super.onResume) {
     app.prefs.edit.putBoolean(AbstractKit.LANDING_LN, true).commit
-    app.ChannelManager.all.find(_.isOperational) map whenOperational getOrElse {
-      app.ChannelManager.all.find(_.isOpening) map whenOpening getOrElse whenNone
-    }
+    // Searches for suitable channel and wires it up accordingly
+    reWireChannel
 
     app.ChannelManager.getOutPaymentObs = rpi => {
       // Stopping animation immediately does not work sometimes so we use a guarded timer here once again
@@ -273,12 +271,6 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     app.TransData.value = pr
   }
 
-  def expiryTitle(expiry: Long, title: String) = {
-    val relativeLeft = expiry - broadcaster.currentHeight
-    val leftHuman = app.plurOrZero(blocksLeft, relativeLeft)
-    s"${me getString ln_expiry} $leftHuman<br>$title"
-  }
-
   def getBalance(chan: Channel) = MilliSatoshi {
     chan(_.localCommit.spec.toLocalMsat) getOrElse 0L
   }
@@ -288,10 +280,12 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     denom withSign getBalance(chan)
   }
 
-  def whenOperational(chan: Channel): Unit = {
-    // We have an operational channel so set all the triggers
-    // could be initially operational or can become one
+  def reWireChannel: Unit =
+    app.ChannelManager.all.find(_.isOperational) map whenOperational getOrElse {
+      app.ChannelManager.all.find(_.isOpening) map whenOpening getOrElse whenNone
+    }
 
+  def whenOperational(chan: Channel) = {
     toolbar setOnClickListener onButtonTap {
       showDenominationChooser(me getBalance chan) { pos =>
         // Rememeber user choice, update list and title text
@@ -430,7 +424,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
   def whenNone = wrap(baseWhenNoOperational) {
     // Show generic title message and inform ther's no chan in subtitle
-    fam setImageDrawable getDrawable(R.drawable.ic_power_white_24dp)
+    fam setImageDrawable getDrawable(R.drawable.ic_power_settings_new_white_24dp)
     update(me getString ln_notify_none, Informer.LNSTATE).flash.run
     animateTitle(me getString ln_wallet)
 

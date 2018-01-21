@@ -149,16 +149,16 @@ class WalletApp extends Application { me =>
     }
 
     val socketEventsListener = new ConnectionListener {
+      def reConnect(cs: ChannelVec, ann: NodeAnnouncement) = if (cs.nonEmpty) {
+        // Immediately inform affected channels and try to reconnect in 5 seconds
+        Obs.just(ann).delay(5.seconds).subscribe(ConnectionManager.connectTo, none)
+        cs.foreach(_ process CMDOffline)
+      }
+
       override def onOperational(ann: NodeAnnouncement, their: Init) = fromNode(notClosing, ann).foreach(_ process CMDOnline)
       override def onTerminalError(ann: NodeAnnouncement) = fromNode(notClosing, ann).foreach(_ process CMDShutdown)
       override def onMessage(lightningMessage: LightningMessage) = notClosing.foreach(_ process lightningMessage)
       override def onDisconnect(ann: NodeAnnouncement) = reConnect(fromNode(notClosing, ann), ann)
-    }
-
-    def reConnect(cs: ChannelVec, ann: NodeAnnouncement) = if (cs.nonEmpty) {
-      // Immediately inform affected channels and try to reconnect in 5 seconds
-      Obs.just(ann).delay(5.seconds).subscribe(ConnectionManager.connectTo, none)
-      cs.foreach(_ process CMDOffline)
     }
 
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
@@ -252,6 +252,7 @@ class WalletApp extends Application { me =>
       RatesSaver.saveObject
 
       // This is needed to clear possible leftover acts
+      // such a situation may happen if we had no connection
       if (cloud.data.acts.nonEmpty) cloud doProcess CMDStart
     }
   }

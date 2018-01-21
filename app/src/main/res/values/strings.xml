@@ -117,7 +117,6 @@
     <string name="ln_notify_operational">Lightning wallet is online</string>
     <string name="ln_notify_none">No open channel found</string>
     <string name="ln_pr_make">Making payment request&#8230;</string>
-    <string name="ln_done">Lightning payment settled</string>
     <string name="ln_select_peer">Select peer</string>
 
     <array name="info_progress">
