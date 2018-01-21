@@ -75,7 +75,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
   def INIT(state: Bundle) = {
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln_start)
     add(text = me getString ln_select_peer, tag = Informer.LNSTATE).flash.run
-    animateTitle(me getString ln_ops_start)
+    setTitle(me getString ln_ops_start)
 
     // Wire up list and load peers with empty query string
     lnStartNodesList setOnItemClickListener onTap(onPeerSelected)

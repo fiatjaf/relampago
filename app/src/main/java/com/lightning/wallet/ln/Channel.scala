@@ -585,7 +585,7 @@ object Channel {
 }
 
 trait ChannelListener {
-  def reloadOnBecome(chan: Channel): Unit = {
+  def nullOnBecome(chan: Channel): Unit = {
     // For listener to reload itself without affecting others
     val nullTransition = Tuple4(chan, chan.data, null, chan.state)
     if (onBecome isDefinedAt nullTransition) onBecome(nullTransition)

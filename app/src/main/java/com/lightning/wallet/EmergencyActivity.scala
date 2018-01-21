@@ -19,7 +19,7 @@ class EmergencyActivity extends ToolbarActivity { me =>
     <(prepareWallet, _ => app toast err_general)(none)
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_emergency)
     add(me getString emerge_subtitle, Informer.EMERGENCY).flash.run
-    animateTitle(me getString emerge_title)
+    setTitle(me getString emerge_title)
   }
 
   def prepareWallet =

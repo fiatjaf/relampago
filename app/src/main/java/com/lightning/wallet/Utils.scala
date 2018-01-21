@@ -99,7 +99,6 @@ object Utils {
 trait ToolbarActivity extends TimerActivity { me =>
   lazy val toolbar = findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   lazy val flash = uiTask(getSupportActionBar setSubtitle infos.head.value)
-  private[this] var currentAnimation = Option.empty[TimerTask]
   private[this] var infos = List.empty[Informer]
 
   val catchListener = new BlocksListener {
@@ -149,6 +148,12 @@ trait ToolbarActivity extends TimerActivity { me =>
     for (info <- infos if info.tag == tag) info.value = text
   }
 
+  def setTitle(titleText: String) = {
+    // A workaround to prevent ellipsis
+    getSupportActionBar setTitle titleText
+    getSupportActionBar setTitle titleText
+  }
+
   def notifySubTitle(subtitle: String, infoType: Int)
   def showDenominationChooser(balance: MilliSatoshi)(change: Int => Unit) = {
     val denominations = for (den <- getResources getStringArray R.array.denoms) yield den.html
@@ -159,22 +164,7 @@ trait ToolbarActivity extends TimerActivity { me =>
     lst setOnItemClickListener onTap(change)
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    new Builder(me).setCustomTitle(title.html).setView(form).show
-  }
-
-  def animateTitle(nextText: String) = new Runnable { self =>
-    private[this] val currentText = getSupportActionBar.getTitle.toString
-    private[this] val maxLength = math.max(nextText.length, currentText.length)
-
-    for (an <- currentAnimation) an.cancel
-    currentAnimation = Some apply uiTask(self)
-    timer.schedule(currentAnimation.get, 0, 75)
-
-    private[this] var index = 1
-    override def run = getSupportActionBar match { case bar =>
-      bar setTitle s"${nextText take index}${currentText drop index}".trim
-      if (index < maxLength) index += 1 else for (an <- currentAnimation) an.cancel
-    }
+    mkForm(me negBld dialog_ok, title.html, form)
   }
 
   def checkPassNotify(next: String => Unit)(pass: String) = {

@@ -46,8 +46,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_ln_ops)
-    val chanOpt = app.ChannelManager.notRefunding.headOption
-    chanOpt map manageFirst getOrElse manageNoActiveChannel
+//    val chanOpt = app.ChannelManager.notRefunding.headOption
+ //   chanOpt map manageFirst getOrElse manageNoActiveChannel
   }
 
   private def manageFirst(chan: Channel) = {
@@ -103,7 +103,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       override def onProcess = {
         case (_, _, _: CMDBestHeight) =>
           // Need to update UI on each block
-          reloadOnBecome(chan)
+          nullOnBecome(chan)
       }
     }
 
@@ -113,7 +113,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
 
     chan.listeners += chanOpsListener
-    chanOpsListener reloadOnBecome chan
+    chanOpsListener nullOnBecome chan
   }
 
   // UI which does not need a channel

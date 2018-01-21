@@ -150,32 +150,28 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   private[this] val lstTracker = new TxTracker {
     override def coinsSent(tx: Transaction) = me runOnUiThread tell(tx)
     override def coinsReceived(tx: Transaction) = me runOnUiThread tell(tx)
+    override def txConfirmed(tx: Transaction) = me runOnUiThread titleAndList
+    private def titleAndList = wrap(updTitle)(adapter.notifyDataSetChanged)
 
-    override def txConfirmed(tx: Transaction) = {
-      me runOnUiThread adapter.notifyDataSetChanged
-      updTitle
+    def tell(wrap: TxWrap) = if (!wrap.nativeValue.isZero) {
+      // Zero means this tx changes nothing in our wallet and
+      // thus it is watched or completely foreign
+
+      mnemonicWarn setVisibility View.GONE
+      adapter.set(wrap +: adapter.availableItems)
+      adapter.notifyDataSetChanged
     }
-
-    def tell(wrap: TxWrap) =
-      if (!wrap.nativeValue.isZero) {
-        mnemonicWarn setVisibility View.GONE
-        adapter.set(wrap +: adapter.availableItems)
-        adapter.notifyDataSetChanged
-      }
   }
 
-  def updTitle = animateTitle {
-    val gap = app.kit.conf0Balance minus app.kit.conf1Balance
+  def updTitle = setTitle {
     val conf0 = denom.withSign(app.kit.conf1Balance)
-    val conf1 = denom.formatted(gap)
-
-    if (gap.isZero) conf0
-    else s"$conf0 + $conf1"
+    val gap = app.kit.conf0Balance minus app.kit.conf1Balance
+    if (gap.isZero) conf0 else s"$conf0 + ${denom formatted gap}"
   }
 
   def notifySubTitle(sub: String, infoType: Int) = {
-    // Here we update not just subtitle but also a title
-    wrap(updTitle)(add(sub, infoType).flash.run)
+    // Here we update not just subtitle but also a title text
+    wrap(me runOnUiThread updTitle)(add(sub, infoType).flash.run)
     timer.schedule(delete(infoType), 8000)
   }
 
@@ -188,6 +184,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
 
     toolbar setOnClickListener onButtonTap {
       showDenominationChooser(app.kit.conf1Balance) { pos =>
+        // Rememeber user choice, update list and title text
         app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
         wrap(adapter.notifyDataSetChanged) { denom = denoms apply pos }
         updTitle
@@ -301,6 +298,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
       sendBtcPopup setAddress adr
 
     case unusable =>
+      println(unusable)
       app.TransData.value = null
   }
 

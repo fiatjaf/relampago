@@ -140,16 +140,9 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
 
     override def onBecome = {
-      case (chan, _, WAIT_FUNDING_DONE, NORMAL) => me runOnUiThread reWireChannel
-      case (chan, _, SYNC | WAIT_FUNDING_DONE | NORMAL, _) if !chan.isOperational => me runOnUiThread reWireChannel
-      case (chan, _, _, SYNC) if chan.isOperational => update(me getString ln_notify_connecting, Informer.LNSTATE).flash.run
-      case (chan, _, _, NORMAL) if chan.isOperational => update(me getString ln_notify_operational, Informer.LNSTATE).flash.run
-    }
-
-    override def onProcess = {
-      case (chan, norm: NormalData, _: CommitSig) =>
-        // Just update current balance on each commit
-        me updTitle chan
+      case (_, _, SYNC | WAIT_FUNDING_DONE | NORMAL, _) => me runOnUiThread reWireChannel
+      case (_, _, null, SYNC) => update(me getString ln_notify_connecting, Informer.LNSTATE).flash.run
+      case (_, _, null, NORMAL) => update(me getString ln_notify_operational, Informer.LNSTATE).flash.run
     }
   }
 
@@ -165,7 +158,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   def INIT(state: Bundle) = if (app.isAlive) {
     // Set action bar, main view content, wire up list events, update title later
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln)
-    add(me getString ln_notify_connecting, Informer.LNSTATE)
+    add(me getString ln_notify_none, Informer.LNSTATE)
     wrap(me setDetecting true)(me initNfc state)
     me startListUpdates adapter
 
@@ -232,7 +225,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   }
 
   override def onStop = wrap(super.onStop) {
-    // We can not show a progress bar anymore, reset method
+    // We can not show a progress bar anymore so discard it
     // We should remove a listener, just iterate over all of them
     app.ChannelManager.getOutPaymentObs = app.ChannelManager.outPaymentObs
     for (chan <- app.ChannelManager.all) chan.listeners -= chanListener
@@ -275,11 +268,6 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     chan(_.localCommit.spec.toLocalMsat) getOrElse 0L
   }
 
-  def updTitle(chan: Channel) = animateTitle {
-    // When channel is here we can show an amount
-    denom withSign getBalance(chan)
-  }
-
   def reWireChannel: Unit =
     app.ChannelManager.all.find(_.isOperational) map whenOperational getOrElse {
       app.ChannelManager.all.find(_.isOpening) map whenOpening getOrElse whenNone
@@ -291,7 +279,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
         // Rememeber user choice, update list and title text
         app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
         wrap(adapter.notifyDataSetChanged) { denom = denoms apply pos }
-        me updTitle chan
+        me setTitle denom.withSign(me getBalance chan)
       }
     }
 
@@ -341,7 +329,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
           case _ =>
             // Peer node has not sent us a ChannelUpdate
             // most likely because a funding tx is not yet deep enough
-            new Builder(me).setCustomTitle(me getString err_ln_cant_ask).show
+            mkForm(me negBld dialog_ok, me getString err_ln_cant_ask, null)
         }
       }
     }
@@ -384,18 +372,17 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
       for (sum <- pr.amount) rateManager setSum Try(sum)
     }
 
-    // Configure floating buttons and set menu icon to flash
+    // Reload to update subtitle from listener
     fam setImageDrawable getDrawable(R.drawable.ic_flash_24dp)
+    me setTitle denom.withSign(me getBalance chan)
+    chan.listeners += chanListener
+    chanListener nullOnBecome chan
+    checkTransData
+
+    // Configure floating buttons
     fabLNReceive setVisibility View.VISIBLE
     fabLNQR setVisibility View.VISIBLE
     fabOpen setVisibility View.GONE
-
-    // Reload to update subtitle
-    // watch for endless recursion
-    chan.listeners += chanListener
-    chanListener reloadOnBecome chan
-    me updTitle chan
-    checkTransData
   }
 
   def baseWhenNoOperational = {
@@ -409,7 +396,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     // Show balance in title but inform it's an opening phase in subtitle
     fam setImageDrawable getDrawable(R.drawable.ic_history_white_24dp)
     update(me getString ln_notify_opening, Informer.LNSTATE).flash.run
-    me updTitle chan
+    me setTitle denom.withSign(me getBalance chan)
 
     // Configure floating buttons
     fabLNReceive setVisibility View.GONE
@@ -426,7 +413,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     // Show generic title message and inform ther's no chan in subtitle
     fam setImageDrawable getDrawable(R.drawable.ic_power_settings_new_white_24dp)
     update(me getString ln_notify_none, Informer.LNSTATE).flash.run
-    animateTitle(me getString ln_wallet)
+    setTitle(me getString ln_wallet)
 
     // Configure floating buttons
     fabLNReceive setVisibility View.GONE

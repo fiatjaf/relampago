@@ -125,31 +125,32 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
         // A special case since only our peer can reject payments like this, leave this failed
         case _: UpdateFailMalformedHtlc => updateStatus(FAILURE, add.paymentHash)
 
-        case fail: UpdateFailHtlc => for {
-          // Cut routes, add failed nodes and chans
-          paymentInfo <- getPaymentInfo(add.paymentHash)
-          cutPaymentInfo = cutRoutes(fail)(paymentInfo.runtime)
-          // Try to use the rest of available locally saved routes
-        } completeRPI(cutPaymentInfo) match {
+        case updateFailHtlc: UpdateFailHtlc =>
+          getPaymentInfo(add.paymentHash) foreach { info =>
+            val runtime = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
+            val cutPaymentInfo = cutAffectedRoutes(updateFailHtlc)(runtime)
 
-          case Some(updatedPaymentInfo) =>
-            // There are still routes left and we have just used one
-            // if accepted: routing info will be upserted in onProcess
-            // if not accepted: status will change to FAILURE in onError
-            chan process CMDPlainAddHtlc(updatedPaymentInfo)
+            completeRPI(cutPaymentInfo) match {
+              case Some(cutPaymentInfoWithRoutes) =>
+                // There are still routes left and we have just used one
+                // if accepted: routing info will be upserted in onProcess
+                // if not accepted: status will change to FAILURE in onError
+                chan process CMDPlainAddHtlc(cutPaymentInfoWithRoutes)
 
-          case None =>
-            updateRouting(cutPaymentInfo)
-            updateStatus(FAILURE, cutPaymentInfo.pr.paymentHash)
-            // Extra channel is bad OR critical node is bad OR nothing is blacklisted OR too many attempts
-            val stop = cutPaymentInfo.canNotProceed(chan) || serverCallAttempts(add.paymentHash) > 8
+              case None =>
+                // Fail right away
+                updateRouting(cutPaymentInfo)
+                updateStatus(FAILURE, cutPaymentInfo.pr.paymentHash)
+                // Extra channel is bad OR critical node is bad OR none blacklisted OR too many attempts
+                val stop = cutPaymentInfo.canNotProceed(chan) || serverCallAttempts(add.paymentHash) > 8
 
-            // Reset in case of manual retry later
-            if (stop) serverCallAttempts(add.paymentHash) = 0
-            else app.ChannelManager.getOutPaymentObs(cutPaymentInfo)
-              .doOnSubscribe(serverCallAttempts(add.paymentHash) += 1)
-              .foreach(_ map CMDPlainAddHtlc foreach chan.process, none)
-        }
+                // Reset in case of second QR scan attempt
+                if (stop) serverCallAttempts(add.paymentHash) = 0
+                else app.ChannelManager.getOutPaymentObs(cutPaymentInfo)
+                  .doOnSubscribe(serverCallAttempts(add.paymentHash) += 1)
+                  .foreach(_ map CMDPlainAddHtlc foreach chan.process, none)
+            }
+          }
       }
 
       // End transaction
@@ -179,7 +180,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
       // WAITING will either be redeemed or refunded later
       db change PaymentTable.updFailWaitingSql
 
-    case (chan, _, WAIT_FUNDING_DONE | SYNC, NORMAL) if chan.isOperational =>
+    case (chan, _, SYNC | WAIT_FUNDING_DONE, NORMAL) if chan.isOperational =>
       // We may need to send an LN payment in -> NORMAL unless it is a shutdown
       // failed payments are really marked as FAILURE because of a branch above
       cloud doProcess CMDStart

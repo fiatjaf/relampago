@@ -76,7 +76,7 @@ object PaymentInfo {
     rpi.copy(rd = rd1)
   }
 
-  def cutRoutes(fail: UpdateFailHtlc)(rpi: RuntimePaymentInfo) = {
+  def cutAffectedRoutes(fail: UpdateFailHtlc)(rpi: RuntimePaymentInfo) = {
     // Try to reduce remaining routes and also remember bad nodes and channels
     val parsed = Try apply parseErrorPacket(rpi.rd.onion.sharedSecrets, fail.reason)
     parsed.foreach(packet => Tools log packet.failureMessage.toString)
@@ -159,8 +159,7 @@ case class PaymentInfo(rawRd: String, rawPr: String, preimage: BinaryData, incom
     case _ => status
   }
 
-  // Keep these serialized for performance reasons
-  def runtime = RuntimePaymentInfo(rd, pr, firstMsat)
+  // Keep these serialized for performance
   lazy val firstSum = MilliSatoshi(firstMsat)
   lazy val pr = to[PaymentRequest](rawPr)
   lazy val rd = to[RoutingData](rawRd)
