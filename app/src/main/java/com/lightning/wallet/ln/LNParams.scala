@@ -87,7 +87,7 @@ object AddErrorCodes {
   val ERR_FULFILLED = err_ln_fulfilled
   val ERR_IN_FLIGHT = err_ln_in_flight
   val ERR_OFFLINE = err_ln_offline
-  val ERR_FAILED = err_ln_general
+  val ERR_FAILED = err_general
 }
 
 trait PublishStatus {

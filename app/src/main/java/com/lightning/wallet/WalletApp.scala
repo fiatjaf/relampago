@@ -115,7 +115,6 @@ class WalletApp extends Application { me =>
       case _: org.bitcoinj.core.WrongNetworkException => err(err_different_net)
       case _: org.bitcoinj.core.AddressFormatException => err(err_address)
       case _: BitcoinURIParseException => err(err_uri)
-      case _: ArithmeticException => err(err_neg)
       case _: Throwable => err(err_general)
     }
   }

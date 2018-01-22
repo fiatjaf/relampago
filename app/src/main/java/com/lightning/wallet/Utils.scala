@@ -155,16 +155,15 @@ trait ToolbarActivity extends TimerActivity { me =>
   }
 
   def notifySubTitle(subtitle: String, infoType: Int)
-  def showDenominationChooser(balance: MilliSatoshi)(change: Int => Unit) = {
-    val denominations = for (den <- getResources getStringArray R.array.denoms) yield den.html
-    val title = me getString fiat_set_denom format humanFiat(coloredIn(balance), balance)
+  def showDenominationChooser(change: Int => Unit) = {
+    val denominations = getResources.getStringArray(R.array.denoms).map(_.html)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
     val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
 
     lst setOnItemClickListener onTap(change)
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    mkForm(me negBld dialog_ok, title.html, form)
+    mkForm(me negBld dialog_ok, me getString fiat_set_denom, form)
   }
 
   def checkPassNotify(next: String => Unit)(pass: String) = {
@@ -373,8 +372,8 @@ trait ToolbarActivity extends TimerActivity { me =>
     def messageWhenMakingTx: PartialFunction[Throwable, CharSequence] = {
       case _: ExceededMaxTransactionSize => app getString err_transaction_too_large
       case _: CouldNotAdjustDownwards => app getString err_empty_shrunk
-
       case notEnough: InsufficientMoneyException =>
+
         val sending = sumOut.format(denom withSign pay.cn)
         val missing = sumOut.format(denom withSign notEnough.missing)
         val balance = sumIn.format(denom withSign app.kit.conf1Balance)

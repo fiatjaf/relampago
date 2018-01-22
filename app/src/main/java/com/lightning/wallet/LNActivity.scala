@@ -23,9 +23,9 @@ import android.content.Context.LAYOUT_INFLATER_SERVICE
 import android.content.DialogInterface.BUTTON_POSITIVE
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
+import com.lightning.wallet.ln.wire.ChannelUpdate
 import android.support.v4.view.MenuItemCompat
 import android.view.ViewGroup.LayoutParams
-import android.app.AlertDialog.Builder
 import com.lightning.wallet.Utils.app
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Address
@@ -34,12 +34,9 @@ import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
 
-import com.github.clans.fab.{FloatingActionButton, FloatingActionMenu}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
-import com.lightning.wallet.ln.wire.{ChannelUpdate, CommitSig}
+import com.lightning.wallet.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.wallet.R.drawable.{await, conf1, dead}
-import com.lightning.wallet.ln.Tools.{none, random}
-import com.lightning.wallet.ln.Tools.{runAnd, wrap}
 import scala.util.{Failure, Success, Try}
 
 
@@ -85,22 +82,21 @@ trait DataReader extends NfcReaderActivity {
 
 class LNActivity extends DataReader with ToolbarActivity with ListUpdater with SearchBar { me =>
   lazy val layoutInflater = app.getSystemService(LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
+  lazy val container = findViewById(R.id.container).asInstanceOf[RelativeLayout]
+  lazy val lnChanInfo = Utils clickableTextField findViewById(R.id.lnChanInfo)
+  lazy val viewChannelInfo = findViewById(R.id.viewChannelInfo)
+  lazy val openNewChannel = findViewById(R.id.openNewChannel)
+  lazy val actionDivider = findViewById(R.id.actionDivider)
+
   lazy val viewParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
   lazy val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
-  lazy val container = findViewById(R.id.container).asInstanceOf[RelativeLayout]
-  lazy val lnChanInfo = Utils clickableTextField findViewById(R.id.lnChanInfo)
   lazy val paymentsViewProvider = new PaymentsViewProvider
   lazy val imgMap = Array(await, await, conf1, dead)
 
-  lazy val fam = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu].getMenuIconView
-  lazy val fabLNReceive = findViewById(R.id.fabLNReceive).asInstanceOf[FloatingActionButton]
-  lazy val fabOpen = findViewById(R.id.fabOpen).asInstanceOf[FloatingActionButton]
-  lazy val fabLNQR = findViewById(R.id.fabLNQR).asInstanceOf[FloatingActionButton]
-
   lazy val adapter = new CutAdapter[PaymentInfo](PaymentTable.limit, R.layout.frag_tx_ln_line) {
     // LN line has a narrower timestamp section because payment info, also limit of rows is reduced
-    // which is fine because unline Bitcoin all the LN payments can always be found via search
+    // which is fine because unlike Bitcoin all the LN payments can always be found via search
 
     def getItem(position: Int) = visibleItems(position)
     def getHolder(view: View) = new TxViewHolder(view) {
@@ -268,21 +264,18 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     chan(_.localCommit.spec.toLocalMsat) getOrElse 0L
   }
 
+  def updDenom(chan: Channel) = showDenominationChooser { pos =>
+    wrap(adapter.notifyDataSetChanged) { denom = denoms apply pos }
+    app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
+    me setTitle denom.withSign(me getBalance chan)
+  }
+
   def reWireChannel: Unit =
-    app.ChannelManager.all.find(_.isOperational) map whenOperational getOrElse {
+    app.ChannelManager.all.find(_.isOperational) map whenOpen getOrElse {
       app.ChannelManager.all.find(_.isOpening) map whenOpening getOrElse whenNone
     }
 
-  def whenOperational(chan: Channel) = {
-    toolbar setOnClickListener onButtonTap {
-      showDenominationChooser(me getBalance chan) { pos =>
-        // Rememeber user choice, update list and title text
-        app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
-        wrap(adapter.notifyDataSetChanged) { denom = denoms apply pos }
-        me setTitle denom.withSign(me getBalance chan)
-      }
-    }
-
+  def whenOpen(chan: Channel) = {
     makePaymentRequest = anyToRunnable {
       // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve
       // peer's balance can't go below their unspendable channel reserve so it should be taken into account here
@@ -373,53 +366,49 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
 
     // Reload to update subtitle from listener
-    fam setImageDrawable getDrawable(R.drawable.ic_flash_24dp)
+    toolbar setOnClickListener onButtonTap(me updDenom chan)
     me setTitle denom.withSign(me getBalance chan)
     chan.listeners += chanListener
     chanListener nullOnBecome chan
     checkTransData
 
-    // Configure floating buttons
-    fabLNReceive setVisibility View.VISIBLE
-    fabLNQR setVisibility View.VISIBLE
-    fabOpen setVisibility View.GONE
+    // Update interface buttons
+    viewChannelInfo setVisibility View.GONE
+    openNewChannel setVisibility View.GONE
+    actionDivider setVisibility View.GONE
   }
 
-  def baseWhenNoOperational = {
-    // Should reset all actions to null objects
-    toolbar setOnClickListener onButtonTap(none)
-    makePaymentRequest = anyToRunnable(none)
-    sendPayment = none
-  }
+  def whenOpening(chan: Channel) = {
+    // Reset all triggers except denomination
+    sendPayment = pr => app toast ln_notify_opening
+    makePaymentRequest = anyToRunnable(app toast ln_notify_opening)
+    toolbar setOnClickListener onButtonTap(me updDenom chan)
 
-  def whenOpening(chan: Channel) = wrap(baseWhenNoOperational) {
-    // Show balance in title but inform it's an opening phase in subtitle
-    fam setImageDrawable getDrawable(R.drawable.ic_history_white_24dp)
+    // Set title to current balance and notify channel is being opened
     update(me getString ln_notify_opening, Informer.LNSTATE).flash.run
     me setTitle denom.withSign(me getBalance chan)
-
-    // Configure floating buttons
-    fabLNReceive setVisibility View.GONE
-    fabOpen setVisibility View.GONE
-    fabLNQR setVisibility View.GONE
-
-    // Add a listener to catch a moment
-    // when this channel becomes operational
     chan.listeners += chanListener
-    app.TransData.value = null
+
+    // Update interface buttons
+    viewChannelInfo setVisibility View.VISIBLE
+    actionDivider setVisibility View.VISIBLE
+    openNewChannel setVisibility View.GONE
   }
 
-  def whenNone = wrap(baseWhenNoOperational) {
-    // Show generic title message and inform ther's no chan in subtitle
-    fam setImageDrawable getDrawable(R.drawable.ic_power_settings_new_white_24dp)
+  def whenNone = {
+    // Reset all triggers to toasts
+    sendPayment = pr => app toast ln_notify_none
+    makePaymentRequest = anyToRunnable(app toast ln_notify_none)
+    toolbar setOnClickListener onButtonTap(app toast ln_notify_none)
+
+    // Set base title and notify there is no channel in a subtitle
     update(me getString ln_notify_none, Informer.LNSTATE).flash.run
     setTitle(me getString ln_wallet)
 
-    // Configure floating buttons
-    fabLNReceive setVisibility View.GONE
-    fabOpen setVisibility View.VISIBLE
-    fabLNQR setVisibility View.GONE
-    app.TransData.value = null
+    // Update interface buttons
+    viewChannelInfo setVisibility View.GONE
+    actionDivider setVisibility View.VISIBLE
+    openNewChannel setVisibility View.VISIBLE
   }
 
   // DATA READING AND BUTTON ACTIONS

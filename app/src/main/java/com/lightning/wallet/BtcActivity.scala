@@ -175,21 +175,18 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     timer.schedule(delete(infoType), 8000)
   }
 
+  def updDenom = showDenominationChooser { pos =>
+    wrap(adapter.notifyDataSetChanged) { denom = denoms apply pos }
+    app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
+    updTitle
+  }
+
   def INIT(state: Bundle) = if (app.isAlive) {
     // Set action bar, main view content, animate title, wire up list events
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_btc)
     wrap(updTitle)(add(me getString constListener.status, Informer.PEER).flash.run)
     wrap(me setDetecting true)(me initNfc state)
     me startListUpdates adapter
-
-    toolbar setOnClickListener onButtonTap {
-      showDenominationChooser(app.kit.conf1Balance) { pos =>
-        // Rememeber user choice, update list and title text
-        app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
-        wrap(adapter.notifyDataSetChanged) { denom = denoms apply pos }
-        updTitle
-      }
-    }
 
     list setAdapter adapter
     list setFooterDividersEnabled false
@@ -249,6 +246,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     }
 
     // Wire up general listeners
+    toolbar setOnClickListener onButtonTap(updDenom)
     app.kit.wallet addCoinsSentEventListener txTracker
     app.kit.wallet addCoinsReceivedEventListener txTracker
     app.kit.peerGroup addBlocksDownloadedEventListener catchListener
@@ -289,13 +287,13 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     case pr: PaymentRequest => me goTo classOf[LNActivity]
 
     case uri: BitcoinURI =>
-      app.TransData.value = null
       val amt: TryMSat = Try(uri.getAmount)
       sendBtcPopup.set(amt, uri.getAddress)
+      app.TransData.value = null
 
     case adr: Address =>
-      app.TransData.value = null
       sendBtcPopup setAddress adr
+      app.TransData.value = null
 
     case unusable =>
       app.TransData.value = null
