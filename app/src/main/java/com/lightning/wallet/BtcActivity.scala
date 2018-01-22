@@ -298,7 +298,6 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
       sendBtcPopup setAddress adr
 
     case unusable =>
-      println(unusable)
       app.TransData.value = null
   }
 
