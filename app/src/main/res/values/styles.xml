@@ -2,6 +2,13 @@
 
     <!-- page layouts -->
 
+    <style name="WarnLinearLayout">
+        <item name="android:layout_height">fill_parent</item>
+        <item name="android:layout_width">fill_parent</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:gravity">top|center</item>
+    </style>
+
     <style name="StandardLinearLayout">
         <item name="android:layout_height">fill_parent</item>
         <item name="android:layout_width">fill_parent</item>
@@ -17,7 +24,7 @@
 
     <style name="GrayDividerListView">
         <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_width">fill_parent</item>
+        <item name="android:layout_width">match_parent</item>
         <item name="android:dividerHeight">1dp</item>
         <item name="android:divider">#33999999</item>
     </style>

@@ -25,17 +25,23 @@
 
         <ListView
             android:layout_weight="1"
+            android:visibility="gone"
             android:id="@+id/itemsList"
             style="@style/GrayDividerListView"/>
 
-        <TextView
-            style="@style/Info"
-            android:visibility="gone"
+        <LinearLayout
             android:layout_weight="1"
-            android:id="@+id/lnChanInfo"
-            android:layout_width="wrap_content"
-            android:text="@string/ln_ops_chan_none"/>
+            android:visibility="gone"
+            android:id="@+id/lnChanWarn"
+            style="@style/WarnLinearLayout">
 
+            <TextView
+                style="@style/MarginInfo"
+                android:id="@+id/lnChanInfo"
+                android:layout_width="wrap_content"
+                android:text="@string/ln_ops_chan_none"/>
+
+        </LinearLayout>
     </LinearLayout>
 
     <com.github.clans.fab.FloatingActionMenu

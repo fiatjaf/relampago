@@ -84,10 +84,10 @@ trait DataReader extends NfcReaderActivity {
 class LNActivity extends DataReader with ToolbarActivity with ListUpdater with SearchBar { me =>
   lazy val layoutInflater = app.getSystemService(LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
   lazy val container = findViewById(R.id.container).asInstanceOf[RelativeLayout]
-  lazy val lnChanInfo = Utils clickableTextField findViewById(R.id.lnChanInfo)
   lazy val viewChannelInfo = findViewById(R.id.viewChannelInfo)
   lazy val openNewChannel = findViewById(R.id.openNewChannel)
   lazy val actionDivider = findViewById(R.id.actionDivider)
+  lazy val lnChanWarn = findViewById(R.id.lnChanWarn)
 
   lazy val viewParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
   lazy val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
@@ -153,7 +153,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   }
 
   def INIT(state: Bundle) = if (app.isAlive) {
-    // Set action bar, main view content, wire up list events, update title later
+    // Set action bar, main view content, wire up list events, update subtitle later
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln)
     add(me getString ln_notify_none, Informer.LNSTATE)
     wrap(me setDetecting true)(me initNfc state)
@@ -207,6 +207,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     paymentsViewProvider reload new String
     app.kit.wallet addCoinsSentEventListener txTracker
     app.kit.wallet addCoinsReceivedEventListener txTracker
+    Utils clickableTextField findViewById(R.id.lnChanInfo)
   } else me exitTo classOf[MainActivity]
 
   override def onCreateOptionsMenu(menu: Menu) = {
@@ -463,26 +464,25 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
     type InfoVec = Vector[PaymentInfo]
     def searchPays = new ReactLoader[PaymentInfo](me) {
-      val consume = (vec: InfoVec) => me runOnUiThread update(vec)
       def createItem(rc: RichCursor) = bag toPaymentInfo rc
       def getCursor = bag.byQuery(lastQuery)
 
-      def update(pays: InfoVec) = {
+      val consume = (pays: InfoVec) => runOnUiThread {
         wrap(adapter.notifyDataSetChanged)(adapter set pays)
-        if (pays.nonEmpty) lnChanInfo setVisibility View.GONE
-        if (pays.nonEmpty) list setVisibility View.VISIBLE
       }
     }
 
     def recentPays = new ReactLoader[PaymentInfo](me) {
-      val consume = (vec: InfoVec) => me runOnUiThread update(vec)
+      val consume = (pays: InfoVec) => me runOnUiThread update(pays)
       def createItem(rc: RichCursor) = bag toPaymentInfo rc
       def getCursor = bag.byRecent
 
       def update(pays: InfoVec) = {
+        // All of these lines should run on UI thread
         wrap(adapter.notifyDataSetChanged)(adapter set pays)
-        if (pays.isEmpty) lnChanInfo setVisibility View.VISIBLE
-        if (pays.isEmpty) list setVisibility View.GONE
+        if (pays.isEmpty) lnChanWarn setVisibility View.VISIBLE
+        if (pays.nonEmpty) lnChanWarn setVisibility View.GONE
+        if (pays.nonEmpty) list setVisibility View.VISIBLE
       }
     }
   }

@@ -8,14 +8,15 @@
 
         <ListView
             android:layout_weight="1"
+            android:visibility="gone"
             android:id="@+id/itemsList"
             style="@style/GrayDividerListView"/>
 
         <LinearLayout
-            android:visibility="gone"
             android:layout_weight="1"
+            android:visibility="gone"
             android:id="@+id/mnemonicWarn"
-            style="@style/StandardLinearLayout">
+            style="@style/WarnLinearLayout">
 
             <TextView
                 style="@style/MarginInfo"

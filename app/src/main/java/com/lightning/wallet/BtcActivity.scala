@@ -157,6 +157,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
       // Zero means this tx changes nothing in our wallet and
       // thus it is watched or completely foreign
 
+      list setVisibility View.VISIBLE
       mnemonicWarn setVisibility View.GONE
       adapter.set(wrap +: adapter.availableItems)
       adapter.notifyDataSetChanged
@@ -238,11 +239,9 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
       app.kit.wallet addTransactionConfidenceEventListener lstTracker
       adapter set txs
 
-      if (txs.isEmpty) {
-        // Show user a mnemonic dialog if there is no txs
-        mnemonicInfo setText getString(mnemonic_info).html
-        mnemonicWarn setVisibility View.VISIBLE
-      }
+      if (txs.nonEmpty) list setVisibility View.VISIBLE
+      if (txs.isEmpty) mnemonicWarn setVisibility View.VISIBLE
+      if (txs.isEmpty) mnemonicInfo setText getString(mnemonic_info).html
     }
 
     // Wire up general listeners
