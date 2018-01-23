@@ -63,7 +63,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         val acceptChannelValidator = Validator[AcceptChannel]
           .rule(_.minimumDepth <= 6L, "Their minimumDepth is too high")
-          .rule(_.htlcMinimumMsat <= 200000L, "Their htlcMinimumMsat too high")
+          .rule(_.htlcMinimumMsat <= 20000L, "Their htlcMinimumMsat too high")
           .rule(_.toSelfDelay <= cmd.localParams.toSelfDelay * 2, "Their toSelfDelay is too high")
           .rule(_.maxHtlcValueInFlightMsat > UInt64(LNParams.maxHtlcValue.amount / 5), "Their maxHtlcValueInFlightMsat is too low")
           .rule(_.channelReserveSatoshis.toDouble / cmd.fundingAmountSat < LNParams.maxReserveToFundingRatio, "Their reserve is too high")
@@ -188,7 +188,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // We can only accept a new HTLC when shutdown is not active
       case (norm: NormalData, cmd: CMDAddHtlc, OPEN) if isOperational =>
         // AND this HTLC is not already in-flight AND it has not been fulfilled already
-        val activeHtlcs = Commitments.actualRemoteCommit(norm.commitments).spec.htlcs
+        val activeHtlcs = Commitments.latestRemoteCommit(norm.commitments).spec.htlcs
         val active = activeHtlcs.exists(_.add.paymentHash == cmd.rpi.pr.paymentHash)
 
         if (active) throw CMDAddExcept(cmd, ERR_IN_FLIGHT)
@@ -265,10 +265,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm: NormalData, CMDBestHeight(height), OPEN | SYNC)
-        // GUARD: close channel uncooperatively if outdated HTLC is large enough to be included in a commit tx
-        // or if outdated HTLC is small and thus filtered out of commit tx but an additional period of 288 blocks has passed
-        if norm.commitments.localCommit.htlcTxsAndSigs.isEmpty && Commitments.hasOutdatedOutgoing(norm.commitments, height - 7 * 144)
-          || norm.commitments.localCommit.htlcTxsAndSigs.nonEmpty && Commitments.hasOutdatedOutgoing(norm.commitments, height) =>
+        // GUARD: break channel if expired outgoing HTLC exists + 576 blocks of grace period have passed
+        if norm.commitments.localCommit.spec.htlcs.exists(htlc => !htlc.incoming && height - 576 >= htlc.add.expiry) ||
+          norm.commitments.remoteCommit.spec.htlcs.exists(htlc => htlc.incoming && height - 576 >= htlc.add.expiry) ||
+          Commitments.latestRemoteCommit(norm.commitments).spec.htlcs.exists(htlc => htlc.incoming &&
+            height - 576 >= htlc.add.expiry) =>
 
         startLocalCurrentClose(norm)
 

@@ -211,20 +211,16 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
                        remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, startedAt: Long = System.currentTimeMillis)
 
 object Commitments {
-  def hasNoPendingHtlc(c: Commitments) = c.localCommit.spec.htlcs.isEmpty && actualRemoteCommit(c).spec.htlcs.isEmpty
+  def hasNoPendingHtlc(c: Commitments) = c.localCommit.spec.htlcs.isEmpty && latestRemoteCommit(c).spec.htlcs.isEmpty
   def localHasUnsignedOutgoing(c: Commitments) = c.localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def remoteHasUnsignedOutgoing(c: Commitments) = c.remoteChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
-  def actualRemoteCommit(c: Commitments) = c.remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse c.remoteCommit
+  def latestRemoteCommit(c: Commitments) = c.remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse c.remoteCommit
   def addRemoteProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.remoteChanges.proposed).using(_ :+ proposal)
   def addLocalProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.localChanges.proposed).using(_ :+ proposal)
 
-  def hasOutdatedOutgoing(c: Commitments, height: Long) =
-    c.localCommit.spec.htlcs.exists(htlc => !htlc.incoming && height >= htlc.add.expiry) ||
-      c.remoteCommit.spec.htlcs.exists(htlc => htlc.incoming && height >= htlc.add.expiry)
-
   def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = {
     val remoteSigned = CommitmentSpec.findHtlcById(commitments.localCommit.spec, htlcId, incomingRelativeToLocal)
-    val localSigned = CommitmentSpec.findHtlcById(actualRemoteCommit(commitments).spec, htlcId, !incomingRelativeToLocal)
+    val localSigned = CommitmentSpec.findHtlcById(latestRemoteCommit(commitments).spec, htlcId, !incomingRelativeToLocal)
 
     for {
       htlcOut <- remoteSigned
@@ -244,7 +240,7 @@ object Commitments {
         cmd.rpi.pr.paymentHash, cmd.rpi.rd.lastExpiry, cmd.rpi.rd.onion.packet.serialize)
 
       val c1 = addLocalProposal(c, add).modify(_.localNextHtlcId).using(_ + 1)
-      val reduced = CommitmentSpec.reduce(actualRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
+      val reduced = CommitmentSpec.reduce(latestRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
       val feesSat = if (c1.localParams.isFunder) Scripts.commitTxFee(c.remoteParams.dustLimitSat, reduced).amount else 0L
       val maxAllowedHtlcs = math.min(c.localParams.maxAcceptedHtlcs, c.remoteParams.maxAcceptedHtlcs)
       val totalInFlightMsat = UInt64(reduced.htlcs.map(_.add.amountMsat).sum)
@@ -325,7 +321,7 @@ object Commitments {
     val updateFee = UpdateFee(c.channelId, ratePerKw)
     val c1 = addLocalProposal(c, updateFee)
 
-    val reduced = CommitmentSpec.reduce(actualRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
+    val reduced = CommitmentSpec.reduce(latestRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
     val remoteWithFeeSat = Scripts.commitTxFee(c1.remoteParams.dustLimitSat, reduced).amount + c1.remoteParams.channelReserveSatoshis
     if (reduced.toRemoteMsat / 1000L - remoteWithFeeSat < 0L) None else Some(c1, updateFee)
   }
