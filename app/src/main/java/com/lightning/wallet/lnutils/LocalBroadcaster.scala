@@ -30,6 +30,11 @@ object LocalBroadcaster extends Broadcaster {
       val currentFee = norm.commitments.localCommit.spec.feeratePerKw
       val shouldUpdate = LNParams.shouldUpdateFee(currentFee, ratePerKwSat)
       if (shouldUpdate) chan.sendFeeUpdate(norm, ratePerKwSat)
+
+    case (_, wait: WaitFundingDoneData, _, _) =>
+      // Watch funding script, broadcast funding tx
+      app.kit watchFunding wait.commitments
+      app.kit blockingSend wait.fundingTx
   }
 
   override def onProcess = {

@@ -116,19 +116,6 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
   }
 
-  val broadcastListener = new ChannelListener {
-    // We put this here instead of LocalBroadcaster
-    // so we can repeatedly send our funding on each launch
-    // plus pressing cancel at LNStartActivity does not interfere
-
-    override def onBecome = {
-      case (_, wait: WaitFundingDoneData, _, _) =>
-        // Watch funding script, broadcast funding tx
-        app.kit watchFunding wait.commitments
-        app.kit blockingSend wait.fundingTx
-    }
-  }
-
   val chanListener = new ChannelListener { self =>
     // Updates local UI according to changes in channel
     // should always be removed when activity is stopped
@@ -379,15 +366,12 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
       for (sum <- pr.amount) rateManager setSum Try(sum)
     }
 
-    // Make all triggers operational
+    // Make all triggers operational, update subtitle
     toolbar setOnClickListener onButtonTap(me updDenom chan)
     me setTitle denom.withSign(me getBalance chan)
-    checkTransData
-
-    // Update subtitle, stop funding watch
-    chan.listeners -= broadcastListener
     chan.listeners += chanListener
     chanListener nullOnBecome chan
+    checkTransData
 
     // Update interface buttons
     viewChannelInfo setVisibility View.GONE
@@ -405,10 +389,9 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     update(me getString ln_notify_opening, Informer.LNSTATE).flash.run
     me setTitle denom.withSign(me getBalance chan)
 
-    // Start funding watch
+    // Broadcast a funding tx
     chan.listeners += chanListener
-    chan.listeners += broadcastListener
-    broadcastListener nullOnBecome chan
+    broadcaster nullOnBecome chan
 
     // Update interface buttons
     viewChannelInfo setVisibility View.VISIBLE
