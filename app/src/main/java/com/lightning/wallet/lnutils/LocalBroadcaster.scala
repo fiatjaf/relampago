@@ -25,7 +25,7 @@ object LocalBroadcaster extends Broadcaster {
   }
 
   override def onBecome = {
-    case (chan, norm: NormalData, SYNC, NORMAL) =>
+    case (chan, norm: NormalData, SYNC, OPEN) =>
       // Check for fee changes once when channel becomes online
       val currentFee = norm.commitments.localCommit.spec.feeratePerKw
       val shouldUpdate = LNParams.shouldUpdateFee(currentFee, ratePerKwSat)

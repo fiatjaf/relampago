@@ -176,11 +176,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
         updateStatus(WAITING, add.paymentHash)
     }
 
-    case (_, _, SYNC | NORMAL | NEGOTIATIONS, CLOSING) =>
+    case (_, _, SYNC | OPEN | NEGOTIATIONS, CLOSING) =>
       // WAITING will either be redeemed or refunded later
       db change PaymentTable.updFailWaitingSql
 
-    case (chan, _, SYNC | WAIT_FUNDING_DONE, NORMAL) if chan.isOperational =>
+    case (chan, _, SYNC | WAIT_FUNDING_DONE, OPEN) if chan.isOperational =>
       // We may need to send an LN payment in -> NORMAL unless it is a shutdown
       // failed payments are really marked as FAILURE because of a branch above
       cloud doProcess CMDStart

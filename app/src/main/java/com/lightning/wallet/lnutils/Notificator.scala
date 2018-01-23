@@ -18,7 +18,7 @@ object Notificator extends ChannelListener {
   def getAlarmManager = app.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager]
 
   override def onBecome = {
-    case (_, _, NORMAL | SYNC, CLOSING | NEGOTIATIONS) =>
+    case (_, _, OPEN | SYNC, CLOSING | NEGOTIATIONS) =>
       try getAlarmManager cancel getIntent catch none
   }
 

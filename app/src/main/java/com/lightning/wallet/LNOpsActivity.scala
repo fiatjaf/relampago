@@ -157,12 +157,12 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
       } take 3
 
-      val startedAtView = time apply new Date(data.startedAt)
+      //val startedAtView = time apply new Date(data.startedAt)
       val commitHumanStatus = humanStatus apply txStatus(info.commitTx.txid)
       val commitFee = coloredOut(data.commitments.commitInput.txOut.amount - info.commitTx.txOut.map(_.amount).sum)
       val commitTxHumanView = commitStatus.format(info.commitTx.txid.toString, commitHumanStatus, commitFee)
       val combinedView = commitTxHumanView + refundStatus + tier2HumanView.mkString("<br><br>")
-      lnOpsDescription setText unilateralClosing.format(startedAtView, combinedView).html
+      //lnOpsDescription setText unilateralClosing.format(startedAtView, combinedView).html
       lnOpsAction setOnClickListener onButtonTap(goStartChannel)
       lnOpsAction setText ln_ops_start
   }

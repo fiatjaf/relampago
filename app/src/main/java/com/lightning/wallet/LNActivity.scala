@@ -27,6 +27,7 @@ import com.lightning.wallet.ln.wire.ChannelUpdate
 import android.support.v4.view.MenuItemCompat
 import android.view.ViewGroup.LayoutParams
 import com.lightning.wallet.Utils.app
+import fr.acinq.bitcoin.Crypto.sha256
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Address
 import scala.language.postfixOps
@@ -34,9 +35,9 @@ import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
 
-import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
 import com.lightning.wallet.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.wallet.R.drawable.{await, conf1, dead}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import scala.util.{Failure, Success, Try}
 
 
@@ -115,14 +116,27 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
   }
 
+  val broadcastListener = new ChannelListener {
+    // We put this here instead of LocalBroadcaster
+    // so we can repeatedly send our funding on each launch
+    // plus pressing cancel at LNStartActivity does not interfere
+
+    override def onBecome = {
+      case (_, wait: WaitFundingDoneData, _, _) =>
+        // Watch funding script, broadcast funding tx
+        app.kit watchFunding wait.commitments
+        app.kit blockingSend wait.fundingTx
+    }
+  }
+
   val chanListener = new ChannelListener { self =>
     // Updates local UI according to changes in channel
-    // Should always be removed when activity is stopped
+    // should always be removed when activity is stopped
 
     override def onError = {
       case _ \ CMDReserveExcept(CMDPlainAddHtlc(rpi), missingSat, reserveSat) =>
         // Current commit tx fee and channel reserve forbid sending of this payment
-        // Inform user with all the details laid out as cleanly as possible
+        // inform user with all the details laid out as cleanly as possible
 
         val message = me getString err_ln_fee_overflow
         val reserve = coloredIn apply Satoshi(reserveSat)
@@ -136,9 +150,9 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
 
     override def onBecome = {
-      case (_, _, SYNC | WAIT_FUNDING_DONE | NORMAL, _) => me runOnUiThread reWireChannel
+      case (_, _, SYNC | WAIT_FUNDING_DONE | OPEN, _) => me runOnUiThread reWireChannel
       case (_, _, null, SYNC) => update(me getString ln_notify_connecting, Informer.LNSTATE).flash.run
-      case (_, _, null, NORMAL) => update(me getString ln_notify_operational, Informer.LNSTATE).flash.run
+      case (_, _, null, OPEN) => update(me getString ln_notify_operational, Informer.LNSTATE).flash.run
     }
   }
 
@@ -293,16 +307,16 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
             val canReceiveHint = if (maxMsat.amount < 0L) coloredOut(maxMsat) else denom withSign maxMsat
             val rateManager = new RateManager(getString(amount_hint_can_receive).format(canReceiveHint), content)
 
-            def makeRequest(sum: MilliSatoshi, r: BinaryData) = {
+            def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
               val extraRoute = Vector(update toHop chan.data.announce.nodeId)
-              val rpi = emptyRPI apply PaymentRequest(chainHash, Some(sum), Crypto sha256 r,
+              val rpi = emptyRPI apply PaymentRequest(chainHash, Some(sum), sha256(preimage),
                 nodePrivateKey, inputDescription.getText.toString.trim, None, extraRoute)
 
               qr(rpi.pr)
               // Save incoming request to a database
               db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.pr.paymentHash)
-              db.change(PaymentTable.newSql, rpi.pr.paymentHash, r, 1, rpi.firstMsat, HIDDEN,
-                System.currentTimeMillis, rpi.text, rpi.pr.toJson, rpi.rd.toJson)
+              db.change(PaymentTable.newSql, rpi.pr.paymentHash, preimage, 1, rpi.firstMsat,
+                HIDDEN, System.currentTimeMillis, rpi.text, rpi.pr.toJson, rpi.rd.toJson)
             }
 
             def recAttempt = rateManager.result match {
@@ -365,12 +379,15 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
       for (sum <- pr.amount) rateManager setSum Try(sum)
     }
 
-    // Reload to update subtitle from listener
+    // Make all triggers operational
     toolbar setOnClickListener onButtonTap(me updDenom chan)
     me setTitle denom.withSign(me getBalance chan)
+    checkTransData
+
+    // Update subtitle, stop funding watch
+    chan.listeners -= broadcastListener
     chan.listeners += chanListener
     chanListener nullOnBecome chan
-    checkTransData
 
     // Update interface buttons
     viewChannelInfo setVisibility View.GONE
@@ -387,7 +404,11 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     // Set title to current balance and notify channel is being opened
     update(me getString ln_notify_opening, Informer.LNSTATE).flash.run
     me setTitle denom.withSign(me getBalance chan)
+
+    // Start funding watch
     chan.listeners += chanListener
+    chan.listeners += broadcastListener
+    broadcastListener nullOnBecome chan
 
     // Update interface buttons
     viewChannelInfo setVisibility View.VISIBLE
@@ -416,13 +437,14 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   def checkTransData = app.TransData.value match {
     case uri: BitcoinURI => me goTo classOf[BtcActivity]
     case adr: Address => me goTo classOf[BtcActivity]
-
     case pr: PaymentRequest =>
+
       if (pr.isFresh) sendPayment(pr)
       else onFail(me getString err_ln_old)
       app.TransData.value = null
 
-    case otherwise =>
+    case _ =>
+      // Unreadable data present
       app.TransData.value = null
   }
 

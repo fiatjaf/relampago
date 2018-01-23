@@ -63,19 +63,14 @@ case class NormalData(announce: NodeAnnouncement,
 case class NegotiationsData(announce: NodeAnnouncement, commitments: Commitments, localClosingSigned: ClosingSigned,
                             localShutdown: Shutdown, remoteShutdown: Shutdown) extends HasCommitments
 
-case class ClosingData(announce: NodeAnnouncement, commitments: Commitments, mutualClose: Seq[Transaction] = Nil,
-                       localCommit: Seq[LocalCommitPublished] = Nil, remoteCommit: Seq[RemoteCommitPublished] = Nil,
-                       nextRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
-                       startedAt: Long = System.currentTimeMillis) extends HasCommitments {
-
-  def isOutdated: Boolean = {
-    val mutualClosingStates = for (tx <- mutualClose) yield txStatus(tx.txid)
-    val isOk = mutualClosingStates exists { case cfs \ _ => cfs > minDepth }
-    isOk || startedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
-  }
+case class ClosingData(announce: NodeAnnouncement,
+                       commitments: Commitments, mutualClose: Seq[Transaction] = Nil, localCommit: Seq[LocalCommitPublished] = Nil,
+                       remoteCommit: Seq[RemoteCommitPublished] = Nil, nextRemoteCommit: Seq[RemoteCommitPublished] = Nil,
+                       revokedCommit: Seq[RevokedCommitPublished] = Nil) extends HasCommitments {
 
   // Every tier12 state txInfo is checked for spendability so if tier12States is empty
   // then we have no tier12 txs to spend which means this is either a mutual close or nothing
+  def isOutdated = commitments.startedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
   def tier12States = localCommit.flatMap(_.getState) ++ remoteCommit.flatMap(_.getState) ++
     nextRemoteCommit.flatMap(_.getState) ++ revokedCommit.flatMap(_.getState)
 
@@ -213,7 +208,7 @@ case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LN
 case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
                        remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
                        remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point], commitInput: InputInfo,
-                       remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData)
+                       remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, startedAt: Long = System.currentTimeMillis)
 
 object Commitments {
   def hasNoPendingHtlc(c: Commitments) = c.localCommit.spec.htlcs.isEmpty && actualRemoteCommit(c).spec.htlcs.isEmpty

@@ -239,11 +239,11 @@ object ImplicitJsonFormats { me =>
     jsonFormat[LNMessageVector, LNMessageVector, LNMessageVector,
       Changes](Changes.apply, "proposed", "signed", "acked")
 
-  implicit val commitmentsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit,
-    Changes, Changes, Long, Long, Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, BinaryData,
+  implicit val commitmentsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes,
+    Changes, Long, Long, Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, BinaryData, Long,
     Commitments](Commitments.apply, "localParams", "remoteParams", "localCommit", "remoteCommit", "localChanges",
     "remoteChanges", "localNextHtlcId", "remoteNextHtlcId", "remoteNextCommitInfo", "commitInput",
-    "remotePerCommitmentSecrets", "channelId")
+    "remotePerCommitmentSecrets", "channelId", "startedAt")
 
   implicit val localCommitPublishedFmt =
     jsonFormat[Seq[ClaimDelayedOutputTx], Seq[SuccessAndClaim], Seq[TimeoutAndClaim], Transaction,
@@ -282,9 +282,9 @@ object ImplicitJsonFormats { me =>
     RefundingData](RefundingData.apply, "announce", "commitments", "fundingTx"), tag = "RefundingData")
 
   implicit val closingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Seq[Transaction],
-    Seq[LocalCommitPublished], Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RevokedCommitPublished], Long,
-    ClosingData](ClosingData.apply, "announce", "commitments", "mutualClose", "localCommit", "remoteCommit", "nextRemoteCommit",
-    "revokedCommits", "startedAt"), tag = "ClosingData")
+    Seq[LocalCommitPublished], Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RevokedCommitPublished],
+    ClosingData](ClosingData.apply, "announce", "commitments", "mutualClose", "localCommit", "remoteCommit",
+    "nextRemoteCommit", "revokedCommits"), tag = "ClosingData")
 
   implicit val negotiationsDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, ClosingSigned, Shutdown, Shutdown,
     NegotiationsData](NegotiationsData.apply, "announce", "commitments", "localClosingSigned", "localShutdown",
