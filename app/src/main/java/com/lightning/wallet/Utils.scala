@@ -163,7 +163,7 @@ trait ToolbarActivity extends TimerActivity { me =>
     lst setOnItemClickListener onTap(change)
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    mkForm(me negBld dialog_ok, me getString fiat_set_denom, form)
+    mkForm(me negBld dialog_ok, getString(fiat_set_denom).html, form)
   }
 
   def checkPassNotify(next: String => Unit)(pass: String) = {

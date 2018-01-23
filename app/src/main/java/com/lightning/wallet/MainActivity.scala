@@ -4,6 +4,11 @@ import R.string._
 import android.widget._
 import com.lightning.wallet.Utils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
+import com.lightning.wallet.ln.Tools.{wrap, none, runAnd}
+import org.bitcoinj.core.{BlockChain, PeerGroup}
+import scala.util.{Failure, Success, Try}
+import R.id.{typePIN, typePass}
+
 import android.widget.RadioGroup.OnCheckedChangeListener
 import android.text.method.PasswordTransformationMethod
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -23,11 +28,6 @@ import org.ndeftools.Message
 import android.os.Bundle
 import android.view.View
 
-import com.lightning.wallet.ln.Tools.{wrap, none}
-import org.bitcoinj.core.{BlockChain, PeerGroup}
-import scala.util.{Failure, Success, Try}
-import R.id.{typePIN, typePass}
-
 
 trait ViewSwitch {
   val views: List[View]
@@ -43,15 +43,11 @@ object MainActivity {
     val proto = WalletProtobufSerializer parseToProto stream
 
     app.kit = new app.WalletKit {
+      def startUp = runAnd(setupAndStartDownload)(proceed.run)
       wallet = (new WalletProtobufSerializer).readWallet(app.params, null, proto)
       store = new org.bitcoinj.store.SPVBlockStore(app.params, app.chainFile)
       blockChain = new BlockChain(app.params, wallet, store)
       peerGroup = new PeerGroup(app.params, blockChain)
-
-      def startUp: Unit = {
-        setupAndStartDownload
-        proceed.run
-      }
     }
   }
 }

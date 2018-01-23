@@ -25,16 +25,16 @@ object LocalBroadcaster extends Broadcaster {
   }
 
   override def onBecome = {
+    case (_, wait: WaitFundingDoneData, _, _) =>
+      // Watch funding script, broadcast funding tx
+      app.kit nonBlockingSend wait.fundingTx
+      app.kit watchFunding wait.commitments
+
     case (chan, norm: NormalData, SYNC, OPEN) =>
       // Check for fee changes once when channel becomes online
       val currentFee = norm.commitments.localCommit.spec.feeratePerKw
       val shouldUpdate = LNParams.shouldUpdateFee(currentFee, ratePerKwSat)
       if (shouldUpdate) chan.sendFeeUpdate(norm, ratePerKwSat)
-
-    case (_, wait: WaitFundingDoneData, _, _) =>
-      // Watch funding script, broadcast funding tx
-      app.kit watchFunding wait.commitments
-      app.kit blockingSend wait.fundingTx
   }
 
   override def onProcess = {

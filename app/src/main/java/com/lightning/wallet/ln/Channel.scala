@@ -458,13 +458,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (close: ClosingData, CMDSpent(spendTx), _)
-        if close.mutualClose.exists(_.txid == spendTx.txid) =>
-        Tools log "Disregarding locally broadcasted mutual closing tx"
-
-
-      case (close: ClosingData, CMDSpent(spendTx), _)
-        if close.localCommit.exists(_.commitTx.txid == spendTx.txid) =>
-        Tools log "Disregarding locally broadcasted uncooperative commit tx"
+        if close.mutualClose.exists(_.txid == spendTx.txid) ||
+          close.localCommit.exists(_.commitTx.txid == spendTx.txid) =>
+          Tools log s"Disregarding closing txid ${spendTx.txid}"
 
 
       case (some: HasCommitments, CMDSpent(spendTx), _)
@@ -577,11 +573,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 }
 
 object Channel {
-  val WAIT_FOR_INIT = "WAIT_FOR_INIT"
-  val WAIT_FOR_ACCEPT = "WAIT_FOR_ACCEPT"
-  val WAIT_FOR_FUNDING = "WAIT_FOR_FUNDING"
-  val WAIT_FUNDING_SIGNED = "WAIT_FUNDING_SIGNED"
-  val WAIT_FUNDING_DONE = "WAIT_FUNDING_DONE"
+  val WAIT_FOR_INIT = "WAIT FOR INIT"
+  val WAIT_FOR_ACCEPT = "WAIT FOR ACCEPT"
+  val WAIT_FOR_FUNDING = "WAIT FOR FUNDING"
+  val WAIT_FUNDING_SIGNED = "WAIT FUNDING SIGNED"
+  val WAIT_FUNDING_DONE = "WAIT FUNDING DONE"
   val NEGOTIATIONS = "NEGOTIATIONS"
   val OPEN = "OPEN"
   val SYNC = "SYNC"
