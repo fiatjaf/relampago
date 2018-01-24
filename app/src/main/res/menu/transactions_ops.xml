@@ -4,8 +4,8 @@
 
     <item
         app:showAsAction="never"
-        android:title="Testnet faucet"
-        android:id="@+id/actionBuyCoins"/>
+        android:title="@string/action_chan"
+        android:id="@+id/actionChanInfo"/>
 
     <item
         app:showAsAction="never"

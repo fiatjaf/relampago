@@ -252,9 +252,9 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     }
   }
 
-  override def onOptionsItemSelected(menu: MenuItem) = {
-    if (menu.getItemId == R.id.actionSettings) mkSetsForm
-    true
+  override def onOptionsItemSelected(menu: MenuItem) = runAnd(true) {
+    if (menu.getItemId == R.id.actionChanInfo) me goTo classOf[LNOpsActivity]
+    else if (menu.getItemId == R.id.actionSettings) mkSetsForm
   }
 
   def qr(pr: PaymentRequest) = {
@@ -442,7 +442,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     lazy val required = sumIn.format(denom withSign minRequired)
     lazy val balance = sumIn.format(denom withSign app.kit.conf1Balance)
     lazy val notEnough = getString(err_ln_not_enough_funds).format(balance, required)
-    if (app.kit.conf1Balance isGreaterThan minRequired) me exitTo classOf[LNStartActivity]
+    if (app.kit.conf1Balance isGreaterThan minRequired) me goTo classOf[LNStartActivity]
     else mkForm(me negBld dialog_ok, notEnough.html, null)
   }
 

@@ -271,7 +271,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   }
 
   override def onOptionsItemSelected(menu: MenuItem) = runAnd(true) {
-    if (menu.getItemId == R.id.actionBuyCoins) localBitcoinsAndGlidera
+    if (menu.getItemId == R.id.actionChanInfo) me goTo classOf[LNOpsActivity]
     else if (menu.getItemId == R.id.actionSettings) mkSetsForm
   }
 
@@ -297,11 +297,6 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     case _ =>
       // Unreadable data present
       app.TransData.value = null
-  }
-
-  def localBitcoinsAndGlidera = {
-    val uri = Uri parse "https://testnet.manu.backend.hamburg/faucet"
-    me startActivity new Intent(Intent.ACTION_VIEW, uri)
   }
 
   def goReceiveBtcAddress(section: View) = {

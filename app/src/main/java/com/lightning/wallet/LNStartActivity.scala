@@ -40,7 +40,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
 
   // May change back pressed action throughout an activity lifecycle
   private[this] var whenBackPressed = anyToRunnable(super.onBackPressed)
-  override def onBackPressed: Unit = whenBackPressed.run
+  override def onBackPressed = whenBackPressed.run
 
   private[this] val worker = new ThrottledWork[String, AnnounceChansNumVec] {
     def work(radixNodeAliasOrNodeIdQuery: String) = LNParams.cloud.connector findNodes radixNodeAliasOrNodeIdQuery
@@ -73,9 +73,10 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
   }
 
   def INIT(state: Bundle) = {
+    // Set action bar, subtitle and content view
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln_start)
-    add(text = me getString ln_select_peer, tag = Informer.LNSTATE).flash.run
-    setTitle(me getString ln_ops_start)
+    add(me getString ln_select_peer, Informer.LNSTATE).flash.run
+    setTitle(me getString ln_open_channel)
 
     // Wire up list and load peers with empty query string
     lnStartNodesList setOnItemClickListener onTap(onPeerSelected)
@@ -134,7 +135,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
           // Make this a fully established channel by attaching operational listeners and adding it to list
           freshChan.listeners ++= app.ChannelManager.operationalListeners
           app.ChannelManager.all +:= freshChan
-          me exitTo classOf[LNOpsActivity]
+          me exitTo classOf[LNActivity]
       }
     }
 

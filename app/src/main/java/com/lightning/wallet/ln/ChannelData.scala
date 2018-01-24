@@ -68,9 +68,7 @@ case class ClosingData(announce: NodeAnnouncement,
                        remoteCommit: Seq[RemoteCommitPublished] = Nil, nextRemoteCommit: Seq[RemoteCommitPublished] = Nil,
                        revokedCommit: Seq[RevokedCommitPublished] = Nil) extends HasCommitments {
 
-  // Every tier12 state txInfo is checked for spendability so if tier12States is empty
-  // then we have no tier12 txs to spend which means this is either a mutual close or nothing
-  def isOutdated = commitments.startedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
+  def isOutdated = commitments.startedAt + 1000 * 3600 * 24 * 7 < System.currentTimeMillis
   def tier12States = localCommit.flatMap(_.getState) ++ remoteCommit.flatMap(_.getState) ++
     nextRemoteCommit.flatMap(_.getState) ++ revokedCommit.flatMap(_.getState)
 

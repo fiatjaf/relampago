@@ -10,13 +10,13 @@
         <Button
             style="@style/TransButton"
             android:id="@+id/openNewChannel"
-            android:text="@string/ln_ops_start"
+            android:text="@string/ln_open_channel"
             android:onClick="goLNStart"/>
 
         <Button
             style="@style/TransButton"
             android:id="@+id/viewChannelInfo"
-            android:text="@string/ln_chan_info"
+            android:text="@string/ln_details"
             android:onClick="goLNOps"/>
 
         <View
@@ -58,16 +58,6 @@
             fab:fab_colorRipple="@color/btc"
             android:onClick="goBitcoin"
             style="@style/FabButton"/>
-
-        <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_info_outline_white_18dp"
-            fab:fab_label="@string/ln_chan_info"
-            fab:fab_colorPressed="@color/green"
-            fab:fab_colorNormal="@color/green"
-            fab:fab_colorRipple="@color/green"
-            android:onClick="goLNOps"
-            style="@style/FabButton"
-            fab:fab_size="mini"/>
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"

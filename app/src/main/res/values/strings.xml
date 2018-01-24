@@ -73,12 +73,14 @@
     <string name="action_bitcoin_receive">Receive bitcoin</string>
     <string name="action_bitcoin_send">Send bitcoin</string>
     <string name="action_settings">Wallet settings</string>
+    <string name="action_chan">Channel details</string>
     <string name="action_scan">Scan QR code</string>
 
     <string name="ln_receive">Receive lightning</string>
-    <string name="ln_ops_start">Open payment channel</string>
-    <string name="ln_chan_info">View channel status</string>
+    <string name="ln_open_channel">Open payment channel</string>
+    <string name="ln_details">View opening details</string>
     <string name="ln_chan_close">Close channel</string>
+    <string name="ln_force_close">Force close</string>
 
     <!-- dialogs -->
     <string name="spend_address_tip">Paste Bitcoin address\nfrom clipboard</string>
@@ -179,8 +181,6 @@
     <string name="ln_incoming_title"><![CDATA[<font color=#1BA2E0>Incoming payment</font><br>%1$s]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
     <string name="ln_expiry"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#stuck-payments>expiry</a>]]></string>
-    <string name="ln_chan_close_details">Closing a channel will result in an on-chain Bitcoin transaction which would refund the remaining Lightning balance back to your Bitcoin wallet minus some miner fee.\n\nAlso, you won\'t be able to send Lightning payments until a new payment channel is established</string>
-    <string name="ln_chan_info_details"><![CDATA[%1$s<br><small>%2$s</small><br><br>Your node ID<br><font color=#999999>%3$s</font><br><br>Peer node ID<br><font color=#999999>%4$s</font><br><br>Channel ID<br><font color=#999999>%5$s</font>]]></string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>
     <string name="ln_htlc_notification_title">Bring your wallet online</string>
     <string name="ln_htlc_notification">to resolve pending payments</string>
@@ -204,12 +204,13 @@
     <string name="ln_olympus_sig_error">Could not set an Olympus server because a signature check failed\n\nMake sure you\'ve used a correct public key and try again</string>
     <string name="ln_olympus_net_error">Could not set an Olympus server because it is not reachable</string>
 
-    <!-- activity_ln_ops, activity_ln_start -->
-    <string name="ln_force_close">Force close</string>
-    <string name="ln_ops_chan_opening"><![CDATA[Opening a payment channel&#8230;<br>Channel capacity is %1$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %2$s<br><br><a href=https://testnet.smartbit.com.au/tx/%3$s>Funding status</a><br>%4$s]]></string>
-    <string name="ln_ops_chan_negotiations"><![CDATA[Closing a payment channel&#8230;<br>Waiting for peer\'s confirmation<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
-    <string name="ln_ops_chan_unilateral_closing"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a><br>%1$s<br><br>%2$s]]></string>
-    <string name="ln_ops_chan_bilateral_closing"><![CDATA[Closing a payment channel&#8230;<br>Remaining Lightning balance has been refunded to your Bitcoin wallet<br><br>%1$s]]></string>
+    <!-- frag_chan_details, activity_ln_start -->
+    <string name="ln_chan_close_details">Closing results in an on-chain Bitcoin transaction which will refund the remaining Lightning balance back to your Bitcoin wallet minus some miner fee.\n\nAlso, you won\'t be able to send Lightning payments until a new payment channel is established</string>
+    <string name="ln_ops_chan_opening"><![CDATA[%1$s<br><br>Opening a payment channel&#8230;<br>Channel capacity is %2$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %3$s<br><br><a href=https://testnet.smartbit.com.au/tx/%4$s>Funding status</a><br>%5$s]]></string>
+    <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br><br>Closing a payment channel&#8230;<br>Waiting until all remaining in-flight payments are resolved a peer agrees to a cooperative closing<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
+    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br><br><a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a><br><br>%2$s]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[%1$s<br><br><font color=#999999>Peer node ID</font><br>%2$s<br><br><font color=#999999>Channel ID</font><br>%3$s]]></string>
+    <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><br>Remaining Lightning balance has been refunded to your Bitcoin wallet<br><br>%2$s]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Your pending refunds</font><br>]]></string>
