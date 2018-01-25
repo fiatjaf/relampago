@@ -8,14 +8,16 @@
         <include layout="@layout/toolbar"/>
 
         <Button
-            style="@style/TransButton"
+            style="@style/MarginInfo"
             android:id="@+id/openNewChannel"
+            android:layout_width="wrap_content"
             android:text="@string/ln_open_channel"
             android:onClick="goLNStart"/>
 
         <Button
-            style="@style/TransButton"
+            style="@style/MarginInfo"
             android:id="@+id/viewChannelInfo"
+            android:layout_width="wrap_content"
             android:text="@string/ln_details"
             android:onClick="goLNOps"/>
 
