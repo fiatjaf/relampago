@@ -50,17 +50,10 @@ object LNParams { me =>
 
   // CLOUD
 
-  // Developer Olympus server with token based verification
-  private val con = new Connector("http://213.133.99.89:9001")
-
   def getCloud(tryData: TryCloudData) = tryData match {
-    case Failure(_) => new PublicCloud(con, bag) { data = CloudDataSaver.empty }
-    // Empty url string means we should use a developer server with token based verification
-    case Success(saved) if saved.url.isEmpty => new PublicCloud(con, bag) { data = saved }
-
-    case Success(saved) =>
-      val failover = new FailoverConnector(con, saved.url)
-      new PrivateCloud(failover) { data = saved }
+    case Failure(why) => new PublicCloud(bag) { data = CloudDataSaver.empty }
+    case Success(saved) if saved.url.isEmpty => new PublicCloud(bag) { data = saved }
+    case Success(saved) => new PrivateCloud { data = saved }
   }
 
   // FEE RELATED

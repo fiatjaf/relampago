@@ -300,8 +300,11 @@ trait ToolbarActivity extends TimerActivity { me =>
     }
 
     def trySave(url1: String) = delayUI {
+      println(s"url1: $url1")
       val data1 = LNParams.cloud.data.copy(url = url1)
+      println(s"data1: $data1")
       val cloud1 = LNParams getCloud Success(data1)
+      println(s"cloud1: $cloud1")
 
       cloud1.checkIfWorks.subscribe(done => {
         // Just send a dummy data with signature

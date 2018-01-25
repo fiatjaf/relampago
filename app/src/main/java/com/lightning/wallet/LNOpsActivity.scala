@@ -30,7 +30,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   override def onBackPressed =
     if (0 == chanPager.getCurrentItem) super.onBackPressed
     else chanPager.setCurrentItem(chanPager.getCurrentItem - 1)
-
+  
   def INIT(s: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_ln_ops)
     chanPager setAdapter slidingFragmentAdapter

@@ -11,9 +11,9 @@
 
     <LinearLayout
         android:layout_weight="1"
+        android:visibility="gone"
         style="@style/StandardLinearLayout"
-        android:id="@+id/lnStartDetails"
-        android:visibility="gone">
+        android:id="@+id/lnStartDetails">
 
         <ImageView
             android:layout_width="wrap_content"

@@ -37,7 +37,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   def SEND(msg: LightningMessage): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def STORE(content: HasCommitments): HasCommitments
-  def UPDATE(d1: ChannelData): Channel = BECOME(d1, state)
+  def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
     // Transition should always be defined before vars are updated
     val trans = Tuple4(me, data1, state, state1)
@@ -119,7 +119,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Not storing since they will re-send on restart
         val d1 = wait.modify(_.their) setTo Some(their)
-        me UPDATE d1
+        me UPDATA d1
 
 
       // We have already sent them a FundingLocked and now we got one from them so we can enter normal state now
@@ -137,7 +137,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         val our = makeFundingLocked(wait.commitments)
         val d1 = wait.modify(_.our) setTo Some(our)
-        me UPDATE STORE(d1) SEND our
+        me UPDATA STORE(d1) SEND our
 
 
       // We got our lock when their is already present so we can safely enter normal state now
@@ -158,7 +158,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Got new incoming HTLC so put it to changes for now
         val c1 = Commitments.receiveAdd(norm.commitments, add)
-        me UPDATE norm.copy(commitments = c1)
+        me UPDATA norm.copy(commitments = c1)
 
 
       case (norm: NormalData, fulfill: UpdateFulfillHtlc, OPEN)
@@ -166,7 +166,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Got a fulfill for an outgoing HTLC we sent them earlier
         val c1 = Commitments.receiveFulfill(norm.commitments, fulfill)
-        me UPDATE norm.copy(commitments = c1)
+        me UPDATA norm.copy(commitments = c1)
 
 
       case (norm: NormalData, fail: UpdateFailHtlc, OPEN)
@@ -174,7 +174,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Got a failure for an outgoing HTLC we sent earlier
         val c1 = Commitments.receiveFail(norm.commitments, fail)
-        me UPDATE norm.copy(commitments = c1)
+        me UPDATA norm.copy(commitments = c1)
 
 
       case (norm: NormalData, fail: UpdateFailMalformedHtlc, OPEN)
@@ -182,7 +182,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Got 'malformed' failure for an outgoing HTLC we sent earlier
         val c1 = Commitments.receiveFailMalformed(norm.commitments, fail)
-        me UPDATE norm.copy(commitments = c1)
+        me UPDATA norm.copy(commitments = c1)
 
 
       // We can only accept a new HTLC when shutdown is not active
@@ -200,7 +200,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case _ =>
             // This may be a FAILURE payment which is fine
             val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, cmd)
-            me UPDATE norm.copy(commitments = c1) SEND updateAddHtlc
+            me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
             doProcess(CMDProceed)
         }
 
@@ -208,18 +208,18 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // We're fulfilling an HTLC we got earlier
       case (norm @ NormalData(_, commitments, _, _), cmd: CMDFulfillHtlc, OPEN) =>
         val c1 \ updateFulfillHtlc = Commitments.sendFulfill(commitments, cmd)
-        me UPDATE norm.copy(commitments = c1) SEND updateFulfillHtlc
+        me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
 
 
       // Failing an HTLC we got earlier
       case (norm @ NormalData(_, commitments, _, _), cmd: CMDFailHtlc, OPEN) =>
         val c1 \ updateFailHtlc = Commitments.sendFail(commitments, cmd)
-        me UPDATE norm.copy(commitments = c1) SEND updateFailHtlc
+        me UPDATA norm.copy(commitments = c1) SEND updateFailHtlc
 
 
       case (norm @ NormalData(_, commitments, _, _), cmd: CMDFailMalformedHtlc, OPEN) =>
         val c1 \ updateFailMalformedHtlс = Commitments.sendFailMalformed(commitments, cmd)
-        me UPDATE norm.copy(commitments = c1) SEND updateFailMalformedHtlс
+        me UPDATA norm.copy(commitments = c1) SEND updateFailMalformedHtlс
 
 
       // Fail or fulfill incoming HTLCs
@@ -242,7 +242,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val nextRemotePoint = norm.commitments.remoteNextCommitInfo.right.get
         val c1 \ commitSig = Commitments.sendCommit(norm.commitments, nextRemotePoint)
         val d1 = me STORE norm.copy(commitments = c1)
-        me UPDATE d1 SEND commitSig
+        me UPDATA d1 SEND commitSig
 
 
       case (norm: NormalData, sig: CommitSig, OPEN)
@@ -251,7 +251,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // We received a commit sig from them, now we can update our local commit
         val c1 \ revokeAndAck = Commitments.receiveCommit(norm.commitments, sig)
         val d1 = me STORE norm.copy(commitments = c1)
-        me UPDATE d1 SEND revokeAndAck
+        me UPDATA d1 SEND revokeAndAck
         doProcess(CMDProceed)
 
 
@@ -261,7 +261,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // We received a revocation because we sent a commit sig
         val c1 = Commitments.receiveRevocation(norm.commitments, rev)
         val d1 = me STORE norm.copy(commitments = c1)
-        me UPDATE d1 doProcess CMDHTLCProcess
+        me UPDATA d1 doProcess CMDHTLCProcess
 
 
       case (norm: NormalData, CMDBestHeight(height), OPEN | SYNC)
@@ -307,7 +307,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val nope = Commitments.remoteHasUnsignedOutgoing(commitments)
         // Can't close cooperatively if they have unsigned outgoing HTLCs
         // we should clear our unsigned outgoing HTLCs and then start a shutdown
-        if (nope) startLocalCurrentClose(norm) else me UPDATE d1 doProcess CMDProceed
+        if (nope) startLocalCurrentClose(norm) else me UPDATA d1 doProcess CMDProceed
 
 
       case (norm @ NormalData(_, commitments, None, their), CMDProceed, OPEN)
@@ -336,7 +336,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         val our = makeFundingLocked(wait.commitments)
         val wait1 = wait.modify(_.our) setTo Some(our)
-        me UPDATE STORE(wait1)
+        me UPDATA STORE(wait1)
 
 
       // We're exiting a sync state while waiting for their FundingLocked
@@ -442,7 +442,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case _ =>
             // Fee has been further corrected and we can offer a next version of mutual closing transaction
             val _ \ nextClosingSigned = Closing.makeClosing(neg.commitments, localScript, remoteScript, nextCloseFee)
-            me UPDATE neg.copy(localClosingSigned = nextClosingSigned) SEND nextClosingSigned
+            me UPDATA neg.copy(localClosingSigned = nextClosingSigned) SEND nextClosingSigned
         }
 
 
@@ -455,7 +455,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // `commitments.remoteCommit` has to be updated to their `myCurrentPerCommitmentPoint` at this point
         val rcp = Closing.claimRemoteMainOutput(ref.commitments, ref.commitments.remoteCommit, spendTx)
         val d1 = me STORE closingDataFrom(ref).copy(remoteCommit = rcp :: Nil)
-        me UPDATE d1
+        me UPDATA d1
 
 
       case (close: ClosingData, CMDSpent(spendTx), _)
@@ -515,7 +515,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     Commitments.sendFee(norm.commitments, updatedFeeRate) foreach { case c1 \ msg =>
       // We only send a fee update if our current chan reserve + commit tx fee can afford it
       // otherwise we fail silently in hope that fee will drop or we will receive a payment
-      me UPDATE norm.copy(commitments = c1) SEND msg
+      me UPDATA norm.copy(commitments = c1) SEND msg
       doProcess(CMDProceed)
     }
 
@@ -584,8 +584,8 @@ object Channel {
   val SYNC = "SYNC"
 
   // No tears, only dreams now
-  val REFUNDING = "Refunding"
-  val CLOSING = "Closing"
+  val REFUNDING = "REFUNDING"
+  val CLOSING = "CLOSING"
 }
 
 trait ChannelListener {

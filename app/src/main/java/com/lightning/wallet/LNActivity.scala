@@ -47,9 +47,8 @@ trait SearchBar { me =>
   protected[this] var search: SearchView = _
 
   private[this] val lst = new OnQueryTextListener {
-    def onQueryTextSubmit(queryText: String) = true
-    def onQueryTextChange(queryText: String) =
-      runAnd(true)(me react queryText)
+    def onQueryTextChange(qt: String) = runAnd(true)(me react qt)
+    def onQueryTextSubmit(qt: String) = true
   }
 
   def react(query: String)

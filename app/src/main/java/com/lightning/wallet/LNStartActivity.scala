@@ -10,22 +10,22 @@ import com.lightning.wallet.Denomination._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.wire.LightningMessageCodecs._
+import com.lightning.wallet.lnutils.Connector.AnnounceChansNumVec
+import android.content.DialogInterface.BUTTON_POSITIVE
+import com.lightning.wallet.ln.Scripts.multiSig2of2
+import com.lightning.wallet.ln.Tools.runAnd
+import org.bitcoinj.script.ScriptBuilder
+import scala.collection.mutable
+import fr.acinq.bitcoin.Script
+import org.bitcoinj.core.Coin
+import android.os.Bundle
 
 import com.lightning.wallet.lnutils.{CloudAct, PaymentInfoWrap, RatesSaver}
 import android.widget.{BaseAdapter, Button, ListView, TextView}
 import com.lightning.wallet.ln.Tools.{none, random, wrap}
 import com.lightning.wallet.helper.{AES, ThrottledWork}
-import fr.acinq.bitcoin.{MilliSatoshi, Script}
 import android.view.{Menu, View, ViewGroup}
 import scala.util.{Failure, Success}
-
-import com.lightning.wallet.lnutils.Connector.AnnounceChansNumVec
-import android.content.DialogInterface.BUTTON_POSITIVE
-import com.lightning.wallet.ln.Scripts.multiSig2of2
-import org.bitcoinj.script.ScriptBuilder
-import scala.collection.mutable
-import org.bitcoinj.core.Coin
-import android.os.Bundle
 
 
 class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { me =>
@@ -38,8 +38,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
   lazy val nodeView = getString(ln_ops_start_node_view)
   private[this] val adapter = new NodesAdapter
 
-  // May change back pressed action throughout an activity lifecycle
-  private[this] var whenBackPressed = anyToRunnable(super.onBackPressed)
+  var whenBackPressed = anyToRunnable(super.onBackPressed)
   override def onBackPressed = whenBackPressed.run
 
   private[this] val worker = new ThrottledWork[String, AnnounceChansNumVec] {
@@ -57,7 +56,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
       val view = getLayoutInflater.inflate(R.layout.frag_single_line, null)
       val textLine = view.findViewById(R.id.textLine).asInstanceOf[TextView]
 
-      val (announce, connections) = adapter getItem nodePosition
+      val announce \ connections = adapter getItem nodePosition
       val humanConnects = app.plurOrZero(chansNumber, connections)
       val theirNode = humanNode(announce.nodeId, "\u0020")
 
@@ -72,8 +71,8 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
     def getCount = nodes.size
   }
 
-  def INIT(state: Bundle) = {
-    // Set action bar, subtitle and content view
+  def INIT(state: Bundle) = if (app.isAlive) {
+    // Set action bar, content view, title and subtitle text
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln_start)
     add(me getString ln_select_peer, Informer.LNSTATE).flash.run
     setTitle(me getString ln_open_channel)
@@ -82,16 +81,18 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
     lnStartNodesList setOnItemClickListener onTap(onPeerSelected)
     lnStartNodesList setAdapter adapter
     react(new String)
-  }
 
-  override def onCreateOptionsMenu(menu: Menu) = {
+    // Or back if resources are freed
+  } else me exitTo classOf[MainActivity]
+
+  override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
+    // Can search nodes by their aliases and use a QR node scanner
     getMenuInflater.inflate(R.menu.ln_start_ops, menu)
     setupSearch(menu)
-    true
   }
 
   private def onPeerSelected(pos: Int) = hideKeys {
-    val (announce, connections) = adapter getItem pos
+    val announce \ connections = adapter getItem pos
     val theirNode = humanNode(announce.nodeId, "<br>")
     val humanConnects = app.plurOrZero(chansNumber, connections)
     // This channel does not receive events yet so we need to add some custom listeners

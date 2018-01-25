@@ -40,11 +40,12 @@ abstract class Cloud extends StateMachine[CloudData] {
   }
 }
 
-// Represents a remote call to be executed, can be persisted
-case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
 // Stores token request parameters, clear tokens left and tasks to be executed, also url for custom server
 case class CloudData(info: Option[RequestAndMemo], tokens: Set[ClearToken], acts: Set[CloudAct], url: String)
-class PublicCloud(val connector: Connector, bag: PaymentInfoBag) extends Cloud { me =>
+// Represents a remote call to be executed in exchange for token or signature, can be locally persisted
+case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
+class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
+  val connector = new Connector(url = devUrl)
 
   // STATE MACHINE
 
@@ -136,8 +137,14 @@ class PublicCloud(val connector: Connector, bag: PaymentInfoBag) extends Cloud {
       "seskey" -> m.sesPubKeyHex).map(m.makeClearSigs).map(m.pack)
 }
 
-// Users may supply their own cloud with key based authentication
-class PrivateCloud(val connector: Connector) extends Cloud { me =>
+// Users may supply their own cloud
+// which has sig-based authentication
+class PrivateCloud extends Cloud { me =>
+  lazy val failover = new Connector(url = devUrl)
+  lazy val connector = new Connector(url = data.url) {
+    // User may save their channel backup on default server and then set their own private server
+    override def getBackup(key: String) = super.getBackup(key).onErrorResumeNext(_ => failover getBackup key)
+  }
 
   // STATE MACHINE
 
@@ -185,11 +192,6 @@ class Connector(val url: String) {
     "from" -> from.toString, "to" -> to.toString)
 }
 
-class FailoverConnector(failover: Connector, url: String) extends Connector(url) {
-  override def getChildTxs(txs: TxSeq) = super.getChildTxs(txs).onErrorResumeNext(_ => failover getChildTxs txs)
-  override def getBackup(key: String) = super.getBackup(key).onErrorResumeNext(_ => failover getBackup key)
-}
-
 object Connector {
   type TxSeq = Seq[Transaction]
   type StringVec = Vector[String]
@@ -200,6 +202,8 @@ object Connector {
   type ClearToken = (String, String, String)
   type TokensInfo = (String, String, Int)
   type HttpParam = (String, String)
+
+  val devUrl = "http://213.133.99.89:9001"
   val CMDStart = "CMDStart"
   val BODY = "body"
 }

@@ -17,12 +17,11 @@
         android:normalScreens="true"/>
 
     <application
-
         android:name="WalletApp"
         android:allowBackup="false"
+        android:label="@string/app_name"
         android:fullBackupContent="false"
-        android:icon="@drawable/ic_launcher_testnet"
-        android:label="@string/app_name">
+        android:icon="@drawable/ic_launcher_testnet">
 
         <receiver
             android:process=":remote"
@@ -84,8 +83,7 @@
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
         <activity android:launchMode="singleTask" android:name="LNStartActivity"
-            android:screenOrientation="portrait" android:theme="@style/CustomBar"
-            android:windowSoftInputMode="adjustNothing"/>
+            android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
     </application>
 </manifest>
