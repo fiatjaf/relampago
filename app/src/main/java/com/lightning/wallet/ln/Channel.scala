@@ -332,47 +332,21 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SYNC and REFUNDING MODE
 
 
-      // We have started a channel with REFUNDING and wait for their ChannelReestablish to start a closing
-      case (refund: RefundingData, ChannelReestablish(channelId, _, _, _, myCurrentPerCommitmentPoint), REFUNDING)
-        if channelId == refund.commitments.channelId && myCurrentPerCommitmentPoint.isDefined =>
-        askRemoteLostClose(refund, myCurrentPerCommitmentPoint.get)
+      case (refund: RefundingData, cr: ChannelReestablish, REFUNDING)
+        // GUARD: We have started a channel with REFUNDING and wait for their ChannelReestablish
+        if cr.channelId == refund.commitments.channelId && cr.myCurrentPerCommitmentPoint.isDefined =>
+        askRemoteLostClose(refund, cr.myCurrentPerCommitmentPoint.get)
 
 
-      // We may get this message any time so just save it here
-      case (wait: WaitFundingDoneData, CMDConfirmed(tx), SYNC)
-        if wait.fundingTx.txid == tx.txid =>
+      case (norm: NormalData, cr: ChannelReestablish, SYNC)
+        // GUARD: normal state but suddenly their nextRemoteRevocationNumber is greater than expected
+        if cr.channelId == norm.commitments.channelId && cr.myCurrentPerCommitmentPoint.isDefined &&
+          norm.commitments.localCommit.index < cr.nextRemoteRevocationNumber =>
 
-        val our = makeFundingLocked(wait.commitments)
-        val wait1 = wait.modify(_.our) setTo Some(our)
-        me UPDATA STORE(wait1)
-
-
-      // We're exiting a sync state while waiting for their FundingLocked
-      case (wait: WaitFundingDoneData, cr: ChannelReestablish, SYNC)
-        if cr.channelId == wait.commitments.channelId =>
-
-        BECOME(wait, WAIT_FUNDING_DONE)
-        wait.our foreach SEND
-
-
-      // No in-flight HTLCs here, just proceed with negotiations
-      case (neg: NegotiationsData, cr: ChannelReestablish, SYNC)
-        if cr.channelId == neg.commitments.channelId =>
-
-        BECOME(neg, NEGOTIATIONS)
-        me SEND neg.localClosingSigned
-
-
-      case (norm: NormalData, ChannelReestablish(channelId, _,
-        nextRemoteRevocationNumber, yourLastPerCommitmentSecret, myCurrentPerCommitmentPoint), SYNC)
-        // GUARD: we expect normal reestablish but suddenly their nextRemoteRevocationNumber is greater than expected
-        if norm.commitments.localCommit.index < nextRemoteRevocationNumber && myCurrentPerCommitmentPoint.isDefined =>
-        val secret = Generators.perCommitSecret(norm.commitments.localParams.shaSeed, nextRemoteRevocationNumber - 1)
         val routingData = RefundingData(norm.announce, norm.commitments)
-        val isProvenAhead = yourLastPerCommitmentSecret contains secret
-
-        // And they have proved this by providing a correct myCurrentPerCommitmentPoint
-        if (isProvenAhead) askRemoteLostClose(routingData, myCurrentPerCommitmentPoint.get)
+        // And they have proved this by providing a correct yourLastPerCommitmentSecret
+        val secret = Generators.perCommitSecret(norm.commitments.localParams.shaSeed, cr.nextRemoteRevocationNumber - 1)
+        if (cr.yourLastPerCommitmentSecret contains secret) askRemoteLostClose(routingData, cr.myCurrentPerCommitmentPoint.get)
         else throw new LightningException
 
 
@@ -417,6 +391,31 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         BECOME(norm.copy(commitments = c1), OPEN)
         norm.localShutdown foreach SEND
         doProcess(CMDHTLCProcess)
+
+
+      // We may get this message any time so just save it here
+      case (wait: WaitFundingDoneData, CMDConfirmed(tx), SYNC)
+        if wait.fundingTx.txid == tx.txid =>
+
+        val our = makeFundingLocked(wait.commitments)
+        val wait1 = wait.modify(_.our) setTo Some(our)
+        me UPDATA STORE(wait1)
+
+
+      // We're exiting a sync state while waiting for their FundingLocked
+      case (wait: WaitFundingDoneData, cr: ChannelReestablish, SYNC)
+        if cr.channelId == wait.commitments.channelId =>
+
+        BECOME(wait, WAIT_FUNDING_DONE)
+        wait.our foreach SEND
+
+
+      // No in-flight HTLCs here, just proceed with negotiations
+      case (neg: NegotiationsData, cr: ChannelReestablish, SYNC)
+        if cr.channelId == neg.commitments.channelId =>
+
+        BECOME(neg, NEGOTIATIONS)
+        me SEND neg.localClosingSigned
 
 
       // We just close a channel in any kind of irregular state
