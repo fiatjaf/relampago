@@ -278,8 +278,8 @@ object ImplicitJsonFormats { me =>
     }
   }
 
-  implicit val refundingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Transaction,
-    RefundingData](RefundingData.apply, "announce", "commitments", "fundingTx"), tag = "RefundingData")
+  implicit val refundingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments,
+    RefundingData](RefundingData.apply, "announce", "commitments"), tag = "RefundingData")
 
   implicit val closingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Seq[Transaction],
     Seq[LocalCommitPublished], Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RevokedCommitPublished],

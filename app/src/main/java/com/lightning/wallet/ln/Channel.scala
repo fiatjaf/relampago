@@ -8,15 +8,17 @@ import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.ln.AddErrorCodes._
 import java.util.concurrent.Executors
+
 import scala.collection.mutable
 import fr.acinq.eclair.UInt64
-import scala.util.Success
 
+import scala.util.Success
 import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
+
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction}
 import com.lightning.wallet.ln.Helpers.{Closing, Funding}
-import fr.acinq.bitcoin.Crypto.{PrivateKey, Scalar}
+import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, Scalar}
 import com.lightning.wallet.ln.Tools.{none, runAnd}
 
 
@@ -330,6 +332,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SYNC and REFUNDING MODE
 
 
+      // We have started a channel with REFUNDING and wait for their ChannelReestablish to start a closing
+      case (refund: RefundingData, ChannelReestablish(channelId, _, _, _, myCurrentPerCommitmentPoint), REFUNDING)
+        if channelId == refund.commitments.channelId && myCurrentPerCommitmentPoint.isDefined =>
+        askRemoteLostClose(refund, myCurrentPerCommitmentPoint.get)
+
+
       // We may get this message any time so just save it here
       case (wait: WaitFundingDoneData, CMDConfirmed(tx), SYNC)
         if wait.fundingTx.txid == tx.txid =>
@@ -353,6 +361,19 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         BECOME(neg, NEGOTIATIONS)
         me SEND neg.localClosingSigned
+
+
+      case (norm: NormalData, ChannelReestablish(channelId, _,
+        nextRemoteRevocationNumber, yourLastPerCommitmentSecret, myCurrentPerCommitmentPoint), SYNC)
+        // GUARD: we expect normal reestablish but suddenly their nextRemoteRevocationNumber is greater than expected
+        if norm.commitments.localCommit.index < nextRemoteRevocationNumber && myCurrentPerCommitmentPoint.isDefined =>
+        val secret = Generators.perCommitSecret(norm.commitments.localParams.shaSeed, nextRemoteRevocationNumber - 1)
+        val routingData = RefundingData(norm.announce, norm.commitments)
+        val isProvenAhead = yourLastPerCommitmentSecret contains secret
+
+        // And they have proved this by providing a correct myCurrentPerCommitmentPoint
+        if (isProvenAhead) askRemoteLostClose(routingData, myCurrentPerCommitmentPoint.get)
+        else throw new LightningException
 
 
       case (norm: NormalData, cr: ChannelReestablish, SYNC)
@@ -408,8 +429,19 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (some: HasCommitments, CMDOnline, SYNC) =>
-        me SEND ChannelReestablish(some.commitments.channelId,
-          some.commitments.localCommit.index + 1, some.commitments.remoteCommit.index)
+        // Include our current channel state in reestablish
+        // their last secret proves our state view is correct
+
+        val yourLastPerCommitmentSecret = for {
+          idx <- some.commitments.remotePerCommitmentSecrets.lastIndex
+          hashes = some.commitments.remotePerCommitmentSecrets.hashes
+          hash <- ShaChain.getHash(hashes)(ShaChain moves idx)
+        } yield Scalar(hash)
+
+        val localIndex = some.commitments.localCommit.index
+        val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, localIndex)
+        me SEND ChannelReestablish(some.commitments.channelId, localIndex + 1, some.commitments.remoteCommit.index,
+          yourLastPerCommitmentSecret, Some apply myCurrentPerCommitmentPoint)
 
 
       case (wait: WaitFundingDoneData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, SYNC)
@@ -449,12 +481,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // HANDLE FUNDING SPENT
 
 
-      case (ref: RefundingData, CMDSpent(spendTx), REFUNDING)
+      case (refund: RefundingData, CMDSpent(spendTx), REFUNDING)
         // GUARD: we have lost our state and asked them to spend their local commit
-        if spendTx.txIn.exists(_.outPoint == ref.commitments.commitInput.outPoint) =>
+        if spendTx.txIn.exists(_.outPoint == refund.commitments.commitInput.outPoint) =>
         // `commitments.remoteCommit` has to be updated to their `myCurrentPerCommitmentPoint` at this point
-        val rcp = Closing.claimRemoteMainOutput(ref.commitments, ref.commitments.remoteCommit, spendTx)
-        val d1 = me STORE closingDataFrom(ref).copy(remoteCommit = rcp :: Nil)
+        val rcp = Closing.claimRemoteMainOutput(refund.commitments, refund.commitments.remoteCommit, spendTx)
+        val d1 = me STORE closingDataFrom(refund).copy(remoteCommit = rcp :: Nil)
         me UPDATA d1
 
 
@@ -533,6 +565,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
   private def startMutualClose(neg: NegotiationsData, closeTx: Transaction) =
     BECOME(me STORE closingDataFrom(neg).copy(mutualClose = closeTx :: Nil), CLOSING)
+
+  private def askRemoteLostClose(refund: RefundingData, point: Point) = {
+    val d1 = refund.modify(_.commitments.remoteCommit.remotePerCommitmentPoint) setTo point
+    val msg = "Please be so kind as to spend your local commit" getBytes "UTF-8"
+    me UPDATA d1 SEND Error(refund.commitments.channelId, msg)
+  }
 
   private def startLocalCurrentClose(some: HasCommitments) =
     // Something went wrong and we decided to spend our CURRENT commit transaction

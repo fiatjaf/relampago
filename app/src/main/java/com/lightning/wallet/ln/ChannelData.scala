@@ -45,7 +45,7 @@ sealed trait HasCommitments extends ChannelData { val commitments: Commitments }
 case class InitData(announce: NodeAnnouncement) extends ChannelData
 case class WaitAcceptData(announce: NodeAnnouncement, cmd: CMDOpenChannel) extends ChannelData
 case class WaitFundingData(announce: NodeAnnouncement, cmd: CMDOpenChannel, accept: AcceptChannel) extends ChannelData
-case class RefundingData(announce: NodeAnnouncement, commitments: Commitments, fundingTx: Transaction) extends HasCommitments
+case class RefundingData(announce: NodeAnnouncement, commitments: Commitments) extends HasCommitments
 
 case class WaitFundingSignedData(announce: NodeAnnouncement, localParams: LocalParams, channelId: BinaryData,
                                  remoteParams: AcceptChannel, fundingTx: Transaction, localSpec: CommitmentSpec,

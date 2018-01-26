@@ -1,6 +1,5 @@
 package com.lightning.wallet.ln.wire
 
-import android.os.Handler
 import com.lightning.wallet.ln.wire.LightningMessageCodecs._
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
@@ -22,7 +21,8 @@ case class Ping(pongLength: Int, data: BinaryData) extends LightningMessage
 case class Pong(data: BinaryData) extends LightningMessage
 
 case class ChannelReestablish(channelId: BinaryData, nextLocalCommitmentNumber: Long,
-                              nextRemoteRevocationNumber: Long) extends ChannelMessage
+                              nextRemoteRevocationNumber: Long, yourLastPerCommitmentSecret: Option[Scalar],
+                              myCurrentPerCommitmentPoint: Option[Point] = None) extends ChannelMessage
 
 case class OpenChannel(chainHash: BinaryData, temporaryChannelId: BinaryData, fundingSatoshis: Long, pushMsat: Long,
                        dustLimitSatoshis: Long, maxHtlcValueInFlightMsat: UInt64, channelReserveSatoshis: Long, htlcMinimumMsat: Long,
