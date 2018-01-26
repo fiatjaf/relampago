@@ -8,17 +8,15 @@ import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.ln.AddErrorCodes._
 import java.util.concurrent.Executors
-
 import scala.collection.mutable
 import fr.acinq.eclair.UInt64
-
 import scala.util.Success
-import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 
+import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction}
-import com.lightning.wallet.ln.Helpers.{Closing, Funding}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, Scalar}
+import com.lightning.wallet.ln.Helpers.{Closing, Funding}
 import com.lightning.wallet.ln.Tools.{none, runAnd}
 
 
