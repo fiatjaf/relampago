@@ -47,7 +47,7 @@ import rx.lang.scala.{Observable => Obs}
 
 
 class WalletApp extends Application { me =>
-  lazy val params = org.bitcoinj.params.RegTestParams.get
+  lazy val params = org.bitcoinj.params.TestNet3Params.get
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val chainFile = new File(getFilesDir, s"$appName.spvchain")
   lazy val walletFile = new File(getFilesDir, s"$appName.wallet")
@@ -233,8 +233,8 @@ class WalletApp extends Application { me =>
     def shutDown = none
 
     def useCheckPoints(time: Long) = {
-//      val pts = getAssets open "checkpoints-testnet.txt"
-//      CheckpointManager.checkpoint(params, pts, store, time)
+      val pts = getAssets open "checkpoints-testnet.txt"
+      CheckpointManager.checkpoint(params, pts, store, time)
     }
 
     def decryptSeed(pass: String) = wallet.getKeyCrypter match { case crypter =>
@@ -249,10 +249,7 @@ class WalletApp extends Application { me =>
       wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
       wallet.watchMode = true
 
-      val trustedNode = InetAddresses forString "10.0.2.2"
-      peerGroup addAddress new PeerAddress(app.params, trustedNode, 8333)
-
-//      peerGroup addPeerDiscovery new DnsDiscovery(params)
+      peerGroup addPeerDiscovery new DnsDiscovery(params)
       peerGroup.setMinRequiredProtocolVersion(70015)
       peerGroup.setUserAgent(appName, "0.01")
       peerGroup.setDownloadTxDependencies(3)

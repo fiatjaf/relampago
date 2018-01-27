@@ -20,7 +20,7 @@ object LNParams { me =>
   val minHtlcValue = MilliSatoshi(1000L)
   val dustLimit = Satoshi(573L)
 
-  val chainHash = Block.RegtestGenesisBlock.hash
+  val chainHash = Block.TestnetGenesisBlock.hash
   val theirReserveToFundingRatio = 0.01 // 1%
   val maxReserveToFundingRatio = 0.05 // 5%
   val localFeatures = "02"
