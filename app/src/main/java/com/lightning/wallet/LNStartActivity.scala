@@ -108,7 +108,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
         me runOnUiThread askForFunding(freshChan, their)
     }
 
-    lazy val chanOpenListener = new ChannelListener {
+    lazy val chanOpenListener = new ChannelListener { self =>
       // Updates UI accordingly to changes in fresh channel
       // should account for user cancelling at late stages
 
@@ -125,7 +125,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
         case (_, wait: WaitFundingDoneData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
           // First we remove local listeners, then we try to save a channel to database
           ConnectionManager.listeners -= socketOpenListener
-          freshChan.listeners -= this
+          freshChan.listeners -= self
 
           freshChan STORE wait
           // Error while saving will halt any further progress here

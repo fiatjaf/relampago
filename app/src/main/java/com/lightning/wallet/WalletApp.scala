@@ -159,9 +159,9 @@ class WalletApp extends Application { me =>
         cs.foreach(_ process CMDOffline)
       }
 
+      override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = fromNode(notClosing, ann).foreach(_ process msg)
       override def onOperational(ann: NodeAnnouncement, their: Init) = fromNode(notClosing, ann).foreach(_ process CMDOnline)
       override def onTerminalError(ann: NodeAnnouncement) = fromNode(notClosing, ann).foreach(_ process CMDShutdown)
-      override def onMessage(lightningMessage: LightningMessage) = notClosing.foreach(_ process lightningMessage)
       override def onDisconnect(ann: NodeAnnouncement) = reConnect(fromNode(notClosing, ann), ann)
     }
 
@@ -176,14 +176,14 @@ class WalletApp extends Application { me =>
         ConnectionManager.connections.get(data.announce)
           .foreach(_.handler process lightningMessage)
 
-      def CLOSEANDWATCH(cd: ClosingData) = {
-        BECOME(data1 = STORE(cd), state1 = CLOSING)
+      def CLOSEANDWATCH(close: ClosingData) = {
         // Ask server once for txs which may spend our commit txs outputs to extract preimages
-        cloud.connector.getChildTxs(cd.commitTxs).foreach(_ foreach bag.extractPreimage, Tools.errlog)
+        cloud.connector.getChildTxs(close.commitTxs).foreach(_ foreach bag.extractPreimage, Tools.errlog)
         // Collect all the commit txs output publicKeyScripts and watch them locally for payment preimages
-        kit.watchScripts(cd.commitTxs.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
+        kit.watchScripts(close.commitTxs.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
+        BECOME(STORE(close), CLOSING)
 
-        cd.tier12States.map(_.txn) match {
+        close.tier12States.map(_.txn) match {
           case Nil => Tools log "Closing channel does not have tier 1-2 transactions"
           case txs => cloud doProcess CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
         }
