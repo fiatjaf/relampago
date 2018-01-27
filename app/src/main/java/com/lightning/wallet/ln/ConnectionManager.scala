@@ -3,17 +3,16 @@ package com.lightning.wallet.ln
 import scala.concurrent.duration._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Features._
+
 import rx.lang.scala.{Observable => Obs}
 import com.lightning.wallet.ln.Tools.{Bytes, none}
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import com.lightning.wallet.ln.LNParams.nodePrivateKey
 import com.lightning.wallet.ln.crypto.Noise.KeyPair
 import fr.acinq.bitcoin.BinaryData
-
 import scala.collection.mutable
 import scala.concurrent.Future
-import java.net.{InetSocketAddress, Socket}
+import java.net.Socket
 
 
 object ConnectionManager {
@@ -52,8 +51,7 @@ object ConnectionManager {
 
     val work = Future {
       val buffer = new Bytes(1024)
-      val location1 = new InetSocketAddress("10.0.2.2", ann.addresses.head.getPort)
-      socket.connect(location1, 7500)
+      socket.connect(ann.addresses.head, 7500)
       handler.init
 
       while (true) {
