@@ -183,10 +183,11 @@ class WalletApp extends Application { me =>
           .foreach(_.handler process lightningMessage)
 
       def CLOSEANDWATCH(close: ClosingData) = {
-        // Ask server once for txs which may spend our commit txs outputs to extract preimages
-        cloud.connector.getChildTxs(close.commitTxs).foreach(_ foreach bag.extractPreimage, Tools.errlog)
-        // Collect all the commit txs output publicKeyScripts and watch them locally for payment preimages
-        kit.watchScripts(close.commitTxs.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
+        val commits = close.localCommit.map(_.commitTx) ++ close.remoteCommit.map(_.commitTx) ++ close.nextRemoteCommit.map(_.commitTx)
+        // Collect all the commit txs output publicKeyScripts and watch these scripts locally for future possible payment preimages
+        kit.watchScripts(commits.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
+        // Ask server for child txs which spend our commit txs outputs and extract preimages from them
+        cloud.connector.getChildTxs(commits).foreach(_ foreach bag.extractPreimage, Tools.errlog)
         BECOME(STORE(close), CLOSING)
 
         close.tier12States.map(_.txn) match {

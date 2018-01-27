@@ -85,19 +85,20 @@ object AddErrorCodes {
 
 trait PublishStatus {
   val txn: Transaction
-  def isPublishable: Boolean
+  def isPublishable = true
 }
 
 trait DelayedPublishStatus extends PublishStatus {
-  // Is publishable iff parent depth > 0, parent not dead, no CLTV or CSV delay
-  def isPublishable = parent match { case pd \ false \ 0L => pd > 0L case _ => false }
+  // Is publishable iff parent depth > 0 AND parent is not dead AND no CLTV or CSV delays
+  override def isPublishable = parent match { case pd \ false \ 0L => pd > 0L case _ => false }
   val parent: (DepthAndDead, Long)
 }
 
-case class HideReady(txn: Transaction) extends PublishStatus { def isPublishable = true }
+case class HideReady(txn: Transaction) extends PublishStatus
+case class ShowReady(txn: Transaction, fee: Satoshi, amount: Satoshi) extends PublishStatus
 case class HideDelayed(parent: (DepthAndDead, Long), txn: Transaction) extends DelayedPublishStatus
-case class ShowReady(txn: Transaction, fee: Satoshi, amount: Satoshi) extends PublishStatus { def isPublishable = true }
-case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, fee: Satoshi, amount: Satoshi) extends DelayedPublishStatus
+case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, fee: Satoshi, amount: Satoshi)
+  extends DelayedPublishStatus
 
 trait Broadcaster extends ChannelListener { me =>
   def txStatus(txid: BinaryData): DepthAndDead

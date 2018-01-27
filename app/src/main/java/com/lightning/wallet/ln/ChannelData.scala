@@ -63,18 +63,23 @@ case class NormalData(announce: NodeAnnouncement,
 case class NegotiationsData(announce: NodeAnnouncement, commitments: Commitments, localClosingSigned: ClosingSigned,
                             localShutdown: Shutdown, remoteShutdown: Shutdown) extends HasCommitments
 
-case class ClosingData(announce: NodeAnnouncement,
-                       commitments: Commitments, mutualClose: Seq[Transaction] = Nil, localCommit: Seq[LocalCommitPublished] = Nil,
-                       remoteCommit: Seq[RemoteCommitPublished] = Nil, nextRemoteCommit: Seq[RemoteCommitPublished] = Nil,
-                       revokedCommit: Seq[RevokedCommitPublished] = Nil) extends HasCommitments {
+case class ClosingData(announce: NodeAnnouncement, commitments: Commitments, mutualClose: Seq[Transaction] = Nil,
+                       localCommit: Seq[LocalCommitPublished] = Nil, remoteCommit: Seq[RemoteCommitPublished] = Nil,
+                       nextRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
+                       closedAt: Long = System.currentTimeMillis) extends HasCommitments {
 
-  def isOutdated = commitments.startedAt + 1000 * 3600 * 24 * 7 < System.currentTimeMillis
+  def isOutdated: Boolean = {
+    val mutualClosingStates = for (tx <- mutualClose) yield txStatus(tx.txid)
+    val isOk = mutualClosingStates exists { case cfs \ _ => cfs > minDepth }
+    isOk || closedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
+  }
+
   def tier12States = localCommit.flatMap(_.getState) ++ remoteCommit.flatMap(_.getState) ++
     nextRemoteCommit.flatMap(_.getState) ++ revokedCommit.flatMap(_.getState)
 
-  lazy val commitTxs = localCommit.map(_.commitTx) ++ remoteCommit.map(_.commitTx) ++ nextRemoteCommit.map(_.commitTx)
-  lazy val closings = mutualClose.map(Left.apply) ++ localCommit.map(Right.apply) ++ remoteCommit.map(Right.apply) ++
-    nextRemoteCommit.map(Right.apply) ++ revokedCommit.map(Right.apply)
+  lazy val closings = mutualClose.map(Left.apply) ++ localCommit.map(Right.apply) ++
+    remoteCommit.map(Right.apply) ++ nextRemoteCommit.map(Right.apply) ++
+    revokedCommit.map(Right.apply)
 }
 
 sealed trait CommitPublished {

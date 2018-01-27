@@ -469,7 +469,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if spendTx.txIn.exists(_.outPoint == refund.commitments.commitInput.outPoint) =>
         // `commitments.remoteCommit` has to be updated to their `myCurrentPerCommitmentPoint` at this point
         val rcp = Closing.claimRemoteMainOutput(refund.commitments, refund.commitments.remoteCommit, spendTx)
-        BECOME(me STORE closingDataFrom(refund).copy(remoteCommit = rcp :: Nil), CLOSING)
+        BECOME(me STORE ClosingData(refund.announce, refund.commitments, remoteCommit = rcp :: Nil), CLOSING)
 
 
       case (close: ClosingData, CMDSpent(spendTx), _)
@@ -547,7 +547,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   }
 
   private def startMutualClose(neg: NegotiationsData, closeTx: Transaction) =
-    BECOME(me STORE closingDataFrom(neg).copy(mutualClose = closeTx :: Nil), CLOSING)
+    BECOME(me STORE ClosingData(neg.announce, neg.commitments, mutualClose = closeTx :: Nil), CLOSING)
 
   private def savePointSendError(refund: RefundingData, point: Point) = {
     val d1 = refund.modify(_.commitments.remoteCommit.remotePerCommitmentPoint) setTo point
@@ -559,39 +559,32 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     // Something went wrong and we decided to spend our CURRENT commit transaction
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
       case (claim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(localCommit = claim :: Nil)
-      case (claim, _) => me CLOSEANDWATCH closingDataFrom(some).copy(localCommit = claim :: Nil)
+      case (claim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, localCommit = claim :: Nil)
     }
 
   private def startRemoteCurrentClose(some: HasCommitments) =
     // They've decided to spend their CURRENT commit tx, we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, some.commitments.remoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(remoteCommit = remoteClaim :: Nil)
-      case (remoteClaim, _) => me CLOSEANDWATCH closingDataFrom(some).copy(remoteCommit = remoteClaim :: Nil)
+      case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, remoteCommit = remoteClaim :: Nil)
     }
 
   private def startRemoteNextClose(some: HasCommitments, nextRemoteCommit: RemoteCommit) =
     // They've decided to spend their NEXT commit tx, once again we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, nextRemoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(nextRemoteCommit = remoteClaim :: Nil)
-      case (remoteClaim, _) => me CLOSEANDWATCH closingDataFrom(some).copy(nextRemoteCommit = remoteClaim :: Nil)
+      case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, nextRemoteCommit = remoteClaim :: Nil)
     }
 
   private def startOtherClose(some: HasCommitments, spendTx: Transaction) =
     Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, spendTx) -> some match {
       case (Some(claim), close: ClosingData) => BECOME(me STORE close.modify(_.revokedCommit).using(claim +: _), CLOSING)
-      case (Some(claim), _) => BECOME(me STORE closingDataFrom(some).copy(revokedCommit = claim :: Nil), CLOSING)
+      case (Some(claim), _) => BECOME(me STORE ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil), CLOSING)
       // Local, remote and revoked checks have failed and we are negotiating so this must be peer's mutual tx
       case (None, neg: NegotiationsData) => startMutualClose(neg, spendTx)
       // This is weird, try to spend local commit and hope we're lucky
       case _ => startLocalCurrentClose(some)
     }
-
-  private def closingDataFrom(some: HasCommitments) = {
-    // When starting a channel close we need to update it's
-    // timestamp because closing channel expiry check depends on it
-    val c1 = some.commitments.copy(startedAt = System.currentTimeMillis)
-    ClosingData(some.announce, c1)
-  }
 }
 
 object Channel {

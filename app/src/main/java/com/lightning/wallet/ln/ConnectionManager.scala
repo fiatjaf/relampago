@@ -19,8 +19,8 @@ object ConnectionManager {
   val pair = KeyPair(nodePrivateKey.publicKey, nodePrivateKey.toBin)
   val ourInit = Init(LNParams.globalFeatures, LNParams.localFeatures)
   val connections = mutable.Map.empty[NodeAnnouncement, Worker]
-  val listeners = mutable.Set.empty[ConnectionListener]
 
+  val listeners = mutable.Set.empty[ConnectionListener]
   protected[this] val events = new ConnectionListener {
     override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = for (lst <- listeners) lst.onMessage(ann, msg)
     override def onOperational(ann: NodeAnnouncement, their: Init) = for (lst <- listeners) lst.onOperational(ann, their)

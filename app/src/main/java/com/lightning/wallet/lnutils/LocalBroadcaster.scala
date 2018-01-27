@@ -39,7 +39,7 @@ object LocalBroadcaster extends Broadcaster {
 
   override def onProcess = {
     case (_, close: ClosingData, _: Command) =>
-      val tier12Publishable = for (ts <- close.tier12States if ts.isPublishable) yield ts.txn
+      val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockingSend tx catch none
   }
