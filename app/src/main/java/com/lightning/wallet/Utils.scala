@@ -191,6 +191,12 @@ trait ToolbarActivity extends TimerActivity { me =>
       }
     }
 
+  def enterChannelSpace = {
+    val nothingToShow = app.ChannelManager.all.isEmpty
+    if (nothingToShow) app toast ln_notify_none
+    else me goTo classOf[LNOpsActivity]
+  }
+
   def mkSetsForm: Unit = {
     val leftOps = getResources getStringArray R.array.info_storage_tokens
     val tokensLeft = app.plurOrZero(leftOps, LNParams.cloud.data.tokens.size)

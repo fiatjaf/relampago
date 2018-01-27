@@ -231,7 +231,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   override def onResume = wrap(super.onResume) {
     app.prefs.edit.putBoolean(AbstractKit.LANDING_LN, true).commit
     // Searches for suitable channel and wires it up accordingly
-    reWireChannel
+    wrap(checkTransData)(reWireChannel)
 
     app.ChannelManager.getOutPaymentObs = rpi => {
       // Stopping animation immediately does not work sometimes so we use a guarded timer here once again
@@ -252,7 +252,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   }
 
   override def onOptionsItemSelected(menu: MenuItem) = runAnd(true) {
-    if (menu.getItemId == R.id.actionChanInfo) me goTo classOf[LNOpsActivity]
+    if (menu.getItemId == R.id.actionChanInfo) enterChannelSpace
     else if (menu.getItemId == R.id.actionSettings) mkSetsForm
   }
 
@@ -371,7 +371,6 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     me setTitle denom.withSign(me getBalance chan)
     chan.listeners += chanListener
     chanListener nullOnBecome chan
-    checkTransData
 
     // Update interface buttons
     viewChannelInfo setVisibility View.GONE

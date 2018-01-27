@@ -271,7 +271,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   }
 
   override def onOptionsItemSelected(menu: MenuItem) = runAnd(true) {
-    if (menu.getItemId == R.id.actionChanInfo) me goTo classOf[LNOpsActivity]
+    if (menu.getItemId == R.id.actionChanInfo) enterChannelSpace
     else if (menu.getItemId == R.id.actionSettings) mkSetsForm
   }
 
