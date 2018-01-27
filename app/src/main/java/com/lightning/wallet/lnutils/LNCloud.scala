@@ -45,7 +45,7 @@ case class CloudData(info: Option[RequestAndMemo], tokens: Set[ClearToken], acts
 // Represents a remote call to be executed in exchange for token or signature, can be locally persisted
 case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
 class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
-  val connector = new Connector(url = devUrl)
+  val connector = new Connector("http://10.0.2.2:9001")
 
   // STATE MACHINE
 
@@ -137,14 +137,9 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
       "seskey" -> m.sesPubKeyHex).map(m.makeClearSigs).map(m.pack)
 }
 
-// Users may supply their own cloud
-// which has sig-based authentication
+// Sig-based authentication
 class PrivateCloud extends Cloud { me =>
-  lazy val failover = new Connector(url = devUrl)
-  lazy val connector = new Connector(url = data.url) {
-    // User may save their channel backup on default server and then set their own private server
-    override def getBackup(key: String) = super.getBackup(key).onErrorResumeNext(_ => failover getBackup key)
-  }
+  lazy val connector = new Connector(data.url)
 
   // STATE MACHINE
 
@@ -202,8 +197,6 @@ object Connector {
   type ClearToken = (String, String, String)
   type TokensInfo = (String, String, Int)
   type HttpParam = (String, String)
-
-  val devUrl = "http://213.133.99.89:9001"
   val CMDStart = "CMDStart"
   val BODY = "body"
 }

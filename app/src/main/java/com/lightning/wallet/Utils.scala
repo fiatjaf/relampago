@@ -208,12 +208,12 @@ trait ToolbarActivity extends TimerActivity { me =>
       // by fetching encrypted static channel params from server
 
       rm(menu) {
-        val serverRequest = LNParams.cloud.connector getBackup LNParams.cloudId.toString
+        val request = LNParams.cloud.connector getBackup LNParams.cloudId.toString
         val localCommitments = app.ChannelManager.all.flatMap(_ apply identity)
         add(app getString ln_notify_recovering, Informer.LNPAYMENT).flash.run
         timer.schedule(delete(Informer.LNPAYMENT), 16000)
 
-        serverRequest.foreach(serverDataVec => {
+        request.foreach(serverDataVec => {
           // Decrypt channel datas upon successful call
           // then put them in a list and connect to peers
 

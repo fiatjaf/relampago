@@ -100,9 +100,9 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
     val detailsText = nodeView.format(announce.alias, humanConnects, s"<br>$theirNode").html
 
     val socketOpenListener = new ConnectionListener {
-      override def onMessage(lightningMessage: LightningMessage) = freshChan process lightningMessage
       override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) freshChan process CMDShutdown
       override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) freshChan process CMDShutdown
+      override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = if (ann == announce) freshChan process msg
       override def onOperational(ann: NodeAnnouncement, their: Init) = if (ann == announce)
         // Peer is reachable so now we ask user to provide a funding
         me runOnUiThread askForFunding(freshChan, their)
