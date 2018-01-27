@@ -6,12 +6,12 @@ import com.lightning.wallet.lnutils.ImplicitConversions._
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import com.lightning.wallet.Utils.{denom, coloredOut, coloredIn}
 import android.view.{LayoutInflater, View, ViewGroup}
+import com.lightning.wallet.Utils.{app, humanNode}
 
 import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import me.relex.circleindicator.CircleIndicator
 import com.lightning.wallet.ln.Tools.wrap
-import com.lightning.wallet.Utils.app
 import android.widget.Button
 import android.os.Bundle
 import java.util.Date
@@ -114,9 +114,12 @@ class ChanDetailsFrag(chan: Channel, host: LNOpsActivity) extends Fragment { me 
     }
 
     def manageOpen = {
+      val humanChannel = humanNode(chan(_.channelId).get.toString, "<br>")
+      val humanPeer = humanNode(chan.data.announce.nodeId.toString, "<br>")
+
       // Set open state explanations
-      lnOpsDescription setText getString(ln_ops_chan_open).format(me header chan,
-        chan.data.announce.nodeId.toString, chan(_.channelId).get.toString).html
+      lnOpsDescription setText getString(ln_ops_chan_open)
+        .format(me header chan, humanPeer, humanChannel).html
 
       // Initialize button
       lnOpsAction setText ln_chan_close

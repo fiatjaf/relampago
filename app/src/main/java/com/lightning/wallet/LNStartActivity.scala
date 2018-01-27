@@ -58,7 +58,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
 
       val announce \ connections = adapter getItem nodePosition
       val humanConnects = app.plurOrZero(chansNumber, connections)
-      val theirNode = humanNode(announce.nodeId, "\u0020")
+      val theirNode = humanNode(announce.nodeId.toString, "\u0020")
 
       // Display number of connections so users may pick a well connected nodes
       textLine setText nodeView.format(announce.alias, humanConnects, theirNode).html
@@ -93,7 +93,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
 
   private def onPeerSelected(pos: Int) = hideKeys {
     val announce \ connections = adapter getItem pos
-    val theirNode = humanNode(announce.nodeId, "<br>")
+    val theirNode = humanNode(announce.nodeId.toString, "<br>")
     val humanConnects = app.plurOrZero(chansNumber, connections)
     // This channel does not receive events yet so we need to add some custom listeners
     val freshChan = app.ChannelManager.createChannel(mutable.Set.empty, InitData apply announce)

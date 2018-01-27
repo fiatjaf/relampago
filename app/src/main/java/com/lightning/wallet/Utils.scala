@@ -15,11 +15,11 @@ import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
 import com.lightning.wallet.lnutils.{CloudDataSaver, RatesSaver}
+import fr.acinq.bitcoin.{Crypto, MilliSatoshi, BinaryData}
 import android.content.{Context, DialogInterface, Intent}
 import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
-import fr.acinq.bitcoin.{Crypto, MilliSatoshi}
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import java.util.{Timer, TimerTask}
@@ -35,7 +35,6 @@ import android.view.inputmethod.InputMethodManager
 import com.lightning.wallet.ln.LNParams.minDepth
 import android.support.v7.app.AppCompatActivity
 import org.bitcoinj.crypto.KeyCrypterException
-import fr.acinq.bitcoin.Crypto.PublicKey
 import android.support.v7.widget.Toolbar
 import android.view.View.OnClickListener
 import org.bitcoinj.store.SPVBlockStore
@@ -76,8 +75,8 @@ object Utils {
   def isMnemonicCorrect(mnemonic: String) = mnemonic.split("\\s+").length > 11
 
   def humanAddr(adr: Address) = s"$adr" grouped 4 mkString "\u0020"
-  def humanNode(nodeId: PublicKey, separator: String) = nodeId.toString
-    .grouped(24).map(_ grouped 3 mkString "\u0020").mkString(separator)
+  def humanNode(nodeId: String, separator: String) = nodeId.grouped(24)
+    .map(_ grouped 3 mkString "\u0020").mkString(separator)
 
   def clickableTextField(view: View): TextView = {
     val textView: TextView = view.asInstanceOf[TextView]

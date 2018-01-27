@@ -49,6 +49,7 @@ dependencies {
     compile 'info.hoang8f:android-segmented:1.0.6'
     compile 'org.scala-lang:scala-library:2.11.11'
     compile 'com.hootsuite.android:nachos:1.1.1'
+    compile 'com.muddzdev:styleabletoast:2.0.1'
     compile 'io.reactivex:rxscala_2.11:0.26.5'
     compile 'me.relex:circleindicator:1.2.2'
     compile 'com.github.clans:fab:1.6.4'
