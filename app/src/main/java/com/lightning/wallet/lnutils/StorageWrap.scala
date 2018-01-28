@@ -33,7 +33,7 @@ object StorageWrap extends ChannelListener {
   private def ourUpdate(norm: NormalData, upd: ChannelUpdate) = {
     val (_, _, outputIndex) = Tools.fromShortId(upd.shortChannelId)
     val idxMatch = norm.commitments.commitInput.outPoint.index == outputIndex
-    idxMatch && isEnabled(upd.flags) && checkSig(upd, norm.announce.nodeId)
+    idxMatch && !isDisabled(upd.flags) && checkSig(upd, norm.announce.nodeId)
   }
 
   override def onProcess = {

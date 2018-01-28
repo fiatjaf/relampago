@@ -74,10 +74,10 @@ class AnnouncementsSpec {
       println(isNode1(channelUpdate1_disabled.flags))
       println(!isNode1(channelUpdate2.flags))
       println(!isNode1(channelUpdate2_disabled.flags))
-      println(isEnabled(channelUpdate1.flags))
-      println(!isEnabled(channelUpdate1_disabled.flags))
-      println(isEnabled(channelUpdate2.flags))
-      println(!isEnabled(channelUpdate2_disabled.flags))
+      println(!isDisabled(channelUpdate1.flags))
+      println(isDisabled(channelUpdate1_disabled.flags))
+      println(!isDisabled(channelUpdate2.flags))
+      println(isDisabled(channelUpdate2_disabled.flags))
     }
 
   }

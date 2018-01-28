@@ -97,14 +97,14 @@ object Sphinx { me =>
       Vector(firstSecret), sessionKey)
   }
 
-  def computeEphemerealPublicKeysAndSharedSecrets(publicKeys: PublicKeyVec, ephemerealPublicKeys: PublicKeyVec,
+  def computeEphemerealPublicKeysAndSharedSecrets(publicKeys: PublicKeyVec, ephemeralPublicKeys: PublicKeyVec,
                                                   blindingFactors: BytesVec, sharedSecrets: BytesVec,
                                                   sessionKey: PrivateKey): (PublicKeyVec, BytesVec) =
 
-    if (publicKeys.isEmpty) (ephemerealPublicKeys, sharedSecrets) else {
-      val nextEphemerealPublicKey = blind(ephemerealPublicKeys.last, blindingFactors.last)
+    if (publicKeys.isEmpty) (ephemeralPublicKeys, sharedSecrets) else {
+      val nextEphemerealPublicKey = blind(ephemeralPublicKeys.last, blindingFactors.last)
       val nextSecret = computeSharedSecret(blind(publicKeys.head, blindingFactors), sessionKey)
-      computeEphemerealPublicKeysAndSharedSecrets(publicKeys.tail, ephemerealPublicKeys :+ nextEphemerealPublicKey,
+      computeEphemerealPublicKeysAndSharedSecrets(publicKeys.tail, ephemeralPublicKeys :+ nextEphemerealPublicKey,
         blindingFactors :+ computeblindingFactor(nextEphemerealPublicKey, nextSecret), sharedSecrets :+ nextSecret, sessionKey)
     }
 
@@ -134,7 +134,7 @@ object Sphinx { me =>
   }
 
 
-  def makeNextPacket(payload: Bytes, associatedData: Bytes, ephemerealPublicKey: Bytes,
+  def makeNextPacket(payload: Bytes, associatedData: Bytes, ephemeralPublicKey: Bytes,
                      sharedSecret: Bytes, packet: Packet, routingInfoFiller: Bytes) = {
 
     val nextRoutingInfo = {
@@ -146,7 +146,7 @@ object Sphinx { me =>
     require(payload.length == PayloadLength)
     val message = aconcat(nextRoutingInfo, associatedData)
     val nextHmac = mac(generateKey("mu", sharedSecret), message)
-    Packet(Array(Version), ephemerealPublicKey, nextRoutingInfo, nextHmac)
+    Packet(Array(Version), ephemeralPublicKey, nextRoutingInfo, nextHmac)
   }
 
   // Builds an encrypted onion packet that contains payloads and routing information for all nodes
@@ -158,10 +158,10 @@ object Sphinx { me =>
         sharedSecrets.last, packet, Array.emptyByteArray), hopPayloads dropRight 1, ephemeralKeys dropRight 1,
         sharedSecrets dropRight 1)
 
-    val (ephemerealPublicKeys, sharedsecrets) = computeEphemerealPublicKeysAndSharedSecrets(pubKeys, seskey)
+    val (ephemeralPublicKeys, sharedsecrets) = computeEphemerealPublicKeysAndSharedSecrets(pubKeys, seskey)
     val filler = generateFiller(keyType = "rho", sharedsecrets dropRight 1, hopSize = PayloadLength + MacLength, maxHops = MaxHops)
-    val lastPacket = makeNextPacket(payloads.last, assocData, ephemerealPublicKeys.last.toBin, sharedsecrets.last, LAST_PACKET, filler)
-    val packet = loop(lastPacket, payloads dropRight 1, ephemerealPublicKeys dropRight 1, sharedsecrets dropRight 1)
+    val lastPacket = makeNextPacket(payloads.last, assocData, ephemeralPublicKeys.last.toBin, sharedsecrets.last, LAST_PACKET, filler)
+    val packet = loop(lastPacket, payloads dropRight 1, ephemeralPublicKeys dropRight 1, sharedsecrets dropRight 1)
     SecretsAndPacket(sharedsecrets zip pubKeys, packet)
   }
 

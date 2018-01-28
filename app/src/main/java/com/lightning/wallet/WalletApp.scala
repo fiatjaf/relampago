@@ -198,9 +198,6 @@ class WalletApp extends Application { me =>
     }
 
     // Get routes from maintenance server and update RoutingData if they exist
-    // if payment request contains extra routing info then we also ask for assisted routes
-    // once direct route and assisted routes are fetched we combine them into single sequence
-    // and then we make an onion out of the first available route while saving the rest
     var getOutPaymentObs: RuntimePaymentInfo => Obs[RPIOpt] = outPaymentObs
 
     def outPaymentObs(rpi: RuntimePaymentInfo) =
@@ -214,11 +211,15 @@ class WalletApp extends Application { me =>
           publicRoutes <- findRoutes(tag.route.head.nodeId)
         } yield publicRoutes.map(_ ++ tag.route)
 
-        val allAssisted = Obs.zip(Obs from rpi.pr.routingInfo map augmentAssisted)
-        findRoutes(rpi.pr.nodeId).zipWith(allAssisted orElse Vector.empty) { case direct \ assisted =>
-          // We have got direct and assisted routes, now combine them into single vector and proceed
-          completeRPI(rpi.modify(_.rd.routes) setTo direct ++ assisted.flatten)
-        }
+        val routes =
+          // If payment request contains extra routing info then
+          // we ask for assisted route, otherwise for recipient id
+          if (rpi.pr.routingInfo.isEmpty) findRoutes(rpi.pr.nodeId)
+          else Obs from rpi.pr.routingInfo flatMap augmentAssisted
+
+        // Update rpi with routes and then we make an onion
+        // out of the first available route while saving the rest
+        routes map rpi.modify(_.rd.routes).setTo map completeRPI
       }
   }
 

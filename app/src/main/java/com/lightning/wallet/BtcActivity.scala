@@ -125,7 +125,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   lazy val feeDetails = getString(txs_fee_details)
   lazy val feeAbsent = getString(txs_fee_absent)
 
-  lazy val adapter = new CutAdapter[TxWrap](96, R.layout.frag_tx_btc_line) {
+  lazy val adapter = new CutAdapter[TxWrap](72, R.layout.frag_tx_btc_line) {
     // BTC line has a wider timestamp section because there is no payment info
 
     def getItem(position: Int) = visibleItems(position)

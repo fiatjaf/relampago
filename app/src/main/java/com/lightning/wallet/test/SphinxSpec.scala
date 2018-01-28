@@ -35,7 +35,7 @@ class SphinxSpec {
   val associatedData: BinaryData = "0x4242424242424242424242424242424242424242424242424242424242424242"
   
   {
-    println("generate ephemereal keys and secrets")
+    println("generate ephemeral keys and secrets")
     val (ephkeys, sharedsecrets) = computeEphemerealPublicKeysAndSharedSecrets(publicKeys, sessionKey)
     println(ephkeys(0) == PublicKey(BinaryData("0x02eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f283686619")))
     println(BinaryData(sharedsecrets(0)) == BinaryData("0x53eb63ea8a3fec3b3cd433b85cd62a4b145e1dda09391b348c4e1cd36a03ea66"))
