@@ -63,10 +63,7 @@
         <activity android:launchMode="singleTask" android:name="WalletRestoreActivity"
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
-        <activity android:launchMode="singleTask" android:name="BtcActivity"
-            android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
-
-        <activity android:launchMode="singleTask" android:name="LNActivity"
+        <activity android:launchMode="singleTask" android:name="WalletActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"
             android:windowSoftInputMode="adjustNothing"/>
 

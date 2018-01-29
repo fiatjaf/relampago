@@ -83,20 +83,11 @@
 
     <!-- overall theme style -->
 
-    <style name="SlideAnimation" parent="@android:style/Animation.Activity">
-        <item name="android:activityOpenEnterAnimation">@anim/slide_in_right</item>
-        <item name="android:activityOpenExitAnimation">@anim/slide_out_left</item>
-        <item name="android:activityCloseEnterAnimation">@anim/slide_in_left</item>
-        <item name="android:activityCloseExitAnimation">@anim/slide_out_right</item>
-    </style>
-
     <style name="NoBar" parent="Theme.AppCompat.NoActionBar">
-        <item name="android:windowAnimationStyle">@style/SlideAnimation</item>
         <item name="colorAccent">#FF34B4E3</item>
     </style>
 
     <style name="CustomBar" parent="Theme.AppCompat.Light.NoActionBar">
-        <item name="android:windowAnimationStyle">@style/SlideAnimation</item>
         <item name="colorPrimaryDark">#FF000000</item>
         <item name="colorAccent">#FF34B4E3</item>
     </style>
@@ -104,9 +95,9 @@
     <!-- floating buttons style -->
 
     <style name="FloatingMenu">
-        <item name="android:layout_alignParentRight">true</item>
         <item name="android:layout_margin">@dimen/app_padding</item>
         <item name="android:layout_alignParentBottom">true</item>
+        <item name="android:layout_alignParentRight">true</item>
         <item name="android:layout_width">wrap_content</item>
         <item name="menu_animationDelayPerItem">0</item>
         <item name="android:layout_height">100dp</item>

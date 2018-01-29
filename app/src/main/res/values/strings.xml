@@ -129,7 +129,7 @@
         <item>Sync: %1$d days behind</item>
     </array>
 
-    <!-- activity_btc -->
+    <!-- frag_view_pager_btc -->
     <string name="txs_fee_incoming"><![CDATA[<font color=#1BA2E0>Incoming transaction</font><br>%1$s]]></string>
     <string name="txs_fee_details"><![CDATA[<font color=#E31300>Outgoing transaction</font><br>%2$s<br><br>%1$s fee]]></string>
     <string name="txs_fee_absent"><![CDATA[<font color=#E31300>Outgoing transaction</font><br>%1$s<br><br>No fee]]></string>
@@ -205,7 +205,7 @@
     <string name="ln_olympus_sig_error">Could not set an Olympus server because a signature check failed\n\nMake sure you\'ve used a correct public key and try again</string>
     <string name="ln_olympus_net_error">Could not set an Olympus server because it is not reachable</string>
 
-    <!-- frag_chan_details, activity_ln_start -->
+    <!-- frag_view_pager_chan, activity_ln_start -->
     <string name="ln_chan_close_details">Closing results in an on-chain Bitcoin transaction which will refund the remaining Lightning balance back to your Bitcoin wallet minus some miner fee.\n\nAlso, you won\'t be able to send Lightning payments until a new payment channel is established</string>
     <string name="ln_ops_chan_opening"><![CDATA[%1$s<br><br>Opening a payment channel&#8230;<br>Channel capacity is %2$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %3$s<br><br><a href=https://testnet.smartbit.com.au/tx/%4$s>View funding status</a><br>%5$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br><br>Closing a payment channel&#8230;<br><br>Waiting until all remaining in-flight payments are resolved and peer agrees to a cooperative closing<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>

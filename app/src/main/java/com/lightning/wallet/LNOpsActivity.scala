@@ -17,7 +17,7 @@ import android.os.Bundle
 import java.util.Date
 
 
-class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
+class LNOpsActivity extends TimerActivity { me =>
   lazy val chanPager = findViewById(R.id.chanPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
 
@@ -38,7 +38,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   } else me exitTo classOf[MainActivity]
 }
 
-class ChanDetailsFrag(chan: Channel, host: LNOpsActivity) extends Fragment { me =>
+class ChanDetailsFrag(chan: Channel, val host: TimerActivity) extends Fragment with HumanTimeDisplay { me =>
+  // Contains a view for every channel's lifecycle state, listens to changes in state to display a current one
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
 
@@ -58,7 +59,7 @@ class ChanDetailsFrag(chan: Channel, host: LNOpsActivity) extends Fragment { me 
   var whenStop: Runnable = _
   override def onStop = wrap(super.onStop)(whenStop.run)
   override def onCreateView(inflater: LayoutInflater, container: ViewGroup, state: Bundle) =
-    inflater.inflate(R.layout.frag_chan_details, container, false)
+    inflater.inflate(R.layout.frag_view_pager_chan, container, false)
 
   override def onViewCreated(view: View, state: Bundle) = {
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
@@ -76,6 +77,7 @@ class ChanDetailsFrag(chan: Channel, host: LNOpsActivity) extends Fragment { me 
           // We may have an empty closing in some edge cases
           host runOnUiThread manageClosing(close)
 
+        // Refunding, anything else
         case _ => manageOther
       }
 
@@ -186,7 +188,7 @@ class ChanDetailsFrag(chan: Channel, host: LNOpsActivity) extends Fragment { me 
   }
 
   private def header(chan: Channel) = {
-    val humanStamp = host time new Date(chan(_.startedAt).get)
+    val humanStamp = me time new Date(chan(_.startedAt).get)
     val grayStamp = s"<font color=#999999>$humanStamp</font>"
     val alias = chan.data.announce.alias take 32
     s"${chan.state}<br>$grayStamp<br>$alias"

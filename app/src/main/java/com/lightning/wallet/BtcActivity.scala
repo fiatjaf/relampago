@@ -30,92 +30,7 @@ import android.net.Uri
 import java.util.Date
 
 
-trait HumanTimeDisplay { me: TimerActivity =>
-  val time: Date => String = date => new SimpleDateFormat(timeString) format date
-  lazy val bigFont = FontSystem.getFloat(getContentResolver, FontSystem.FONT_SCALE, 1) > 1
 
-  // Should be accessed after activity is initialized
-  lazy val timeString = DateFormat is24HourFormat me match {
-    case false if scrWidth < 2.2 & bigFont => "MM/dd/yy' <small>'h:mma'</small>'"
-    case false if scrWidth < 2.2 => "MM/dd/yy' <small>'h:mma'</small>'"
-
-    case false if scrWidth < 2.5 & bigFont => "MM/dd/yy' <small>'h:mma'</small>'"
-    case false if scrWidth < 2.5 => "MM/dd/yy' <small>'h:mma'</small>'"
-
-    case false if bigFont => "MMM dd, yyyy' <small>'h:mma'</small>'"
-    case false => "MMMM dd, yyyy' <small>'h:mma'</small>'"
-
-    case true if scrWidth < 2.2 & bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
-    case true if scrWidth < 2.2 => "d MMM yyyy' <small>'HH:mm'</small>'"
-
-    case true if scrWidth < 2.4 & bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
-    case true if scrWidth < 2.5 => "d MMM yyyy' <small>'HH:mm'</small>'"
-
-    case true if bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
-    case true => "d MMMM yyyy' <small>'HH:mm'</small>'"
-  }
-
-  // Relative or absolute date
-  def when(now: Long, date: java.util.Date) = date.getTime match { case ago =>
-    if (now - ago < 129600000) getRelativeTimeSpanString(ago, now, 0).toString else time(date)
-  }
-}
-
-trait ListUpdater extends HumanTimeDisplay { me: TimerActivity =>
-  lazy val allTxsWrapper = getLayoutInflater.inflate(R.layout.frag_txs_all, null)
-  lazy val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
-  lazy val list = findViewById(R.id.itemsList).asInstanceOf[ListView]
-  private[this] var state = SCROLL_STATE_IDLE
-  val minLinesNum = 4
-
-  def startListUpdates(adapter: BaseAdapter) =
-    list setOnScrollListener new OnScrollListener {
-      def onScroll(v: AbsListView, first: Int, visible: Int, total: Int) = none
-      def onScrollStateChanged(v: AbsListView, newState: Int) = state = newState
-      def maybeUpdate = if (SCROLL_STATE_IDLE == state) adapter.notifyDataSetChanged
-      timer.schedule(anyToRunnable(maybeUpdate), 10000, 10000)
-      allTxsWrapper setVisibility View.GONE
-      list addFooterView allTxsWrapper
-    }
-
-  abstract class CutAdapter[T](val max: Int, viewLine: Int) extends BaseAdapter {
-    // Automatically switches list view from short to long version and back again
-    def switch = cut = if (cut == minLinesNum) max else minLinesNum
-    def getItemId(position: Int) = position
-    def getCount = visibleItems.size
-
-    var cut = minLinesNum
-    var visibleItems = Vector.empty[T]
-    var availableItems = Vector.empty[T]
-
-    val set: Vector[T] => Unit = items1 => {
-      val visibility = if (items1.size > minLinesNum) View.VISIBLE else View.GONE
-      val resource = if (cut == minLinesNum) R.drawable.ic_expand_more_black_24dp
-        else R.drawable.ic_expand_less_black_24dp
-
-      allTxsWrapper setVisibility visibility
-      toggler setImageResource resource
-      visibleItems = items1 take cut
-      availableItems = items1
-    }
-
-    def getView(position: Int, savedView: View, parent: ViewGroup) = {
-      val view = if (null == savedView) getLayoutInflater.inflate(viewLine, null) else savedView
-      val hold = if (null == view.getTag) getHolder(view) else view.getTag.asInstanceOf[TxViewHolder]
-      hold fillView visibleItems(position)
-      view
-    }
-
-    def getHolder(view: View): TxViewHolder
-    abstract class TxViewHolder(view: View) {
-      val transactCircle = view.findViewById(R.id.transactCircle).asInstanceOf[ImageView]
-      val transactWhen = view.findViewById(R.id.transactWhen).asInstanceOf[TextView]
-      val transactSum = view.findViewById(R.id.transactSum).asInstanceOf[TextView]
-      def fillView(data: T): Unit
-      view setTag this
-    }
-  }
-}
 
 class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me =>
   lazy val mnemonicWarn = findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
@@ -171,7 +86,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
   }
 
   def notifyBtcEvent(message: String) = {
-    add(message, Informer.BTCEVENT).flash.run
+    add(message, Informer.BTCEVENT).uitask.run
     timer.schedule(delete(Informer.BTCEVENT), 8000)
     me runOnUiThread updTitle
   }
@@ -184,8 +99,8 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
 
   def INIT(state: Bundle) = if (app.isAlive) {
     // Set action bar, main view content, animate title, wire up list events
-    wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_btc)
-    wrap(updTitle)(add(me getString constListener.status, Informer.PEER).flash.run)
+    wrap(me setSupportActionBar toolbar)(me setContentView R.layout.frag_view_pager_btc)
+    wrap(updTitle)(add(me getString constListener.status, Informer.PEER).uitask.run)
     wrap(me setDetecting true)(me initNfc state)
     me startListUpdates adapter
 
@@ -333,7 +248,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
           val pay = AddrData(ms, spendManager.getAddress)
 
           override def processTx(pass: String, feePerKb: Coin) = {
-            add(me getString tx_announcing, Informer.BTCEVENT).flash.run
+            add(me getString tx_announcing, Informer.BTCEVENT).uitask.run
             <(app.kit blockingSend makeTx(pass, feePerKb), onTxFail)(none)
           }
 
@@ -351,7 +266,7 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     spendManager
   }
 
-  def viewMnemonic(top: View) = passWrap(me getString sets_mnemonic) apply checkPassNotify(doViewMnemonic)
+  def viewMnemonic(top: View) = passWrap(me getString sets_mnemonic) apply checkPass(doViewMnemonic)
   def nativeTransactions = app.kit.wallet.getRecentTransactions(adapter.max, false).asScala
     .toVector.map(bitcoinjTx2Wrap).filterNot(_.nativeValue.isZero)
 }

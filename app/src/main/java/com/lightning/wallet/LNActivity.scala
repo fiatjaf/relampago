@@ -42,39 +42,6 @@ import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import scala.util.{Failure, Success, Try}
 
 
-trait SearchBar { me =>
-  def react(query: String)
-  private[this] val queryListener = new OnQueryTextListener {
-    def onQueryTextChange(qt: String) = runAnd(true)(me react qt)
-    def onQueryTextSubmit(qt: String) = true
-  }
-
-  def setupSearch(menu: Menu) = {
-    val search = getActionView(menu findItem R.id.action_search)
-    search.asInstanceOf[SearchView].setOnQueryTextListener(queryListener)
-  }
-}
-
-trait DataReader extends NfcReaderActivity {
-  def readEmptyNdefMessage = app toast nfc_error
-  def readNonNdefMessage = app toast nfc_error
-  def onNfcStateChange(ok: Boolean) = none
-  def onNfcFeatureNotFound = none
-  def onNfcStateDisabled = none
-  def onNfcStateEnabled = none
-  def checkTransData: Unit
-
-  def readNdefMessage(msg: Message) = try {
-    val asText = readFirstTextNdefMessage(msg)
-    app.TransData recordValue asText
-    checkTransData
-
-  } catch { case _: Throwable =>
-    // Could not process a message
-    app toast nfc_error
-  }
-}
-
 class LNActivity extends DataReader with ToolbarActivity with ListUpdater with SearchBar { me =>
   lazy val layoutInflater = app.getSystemService(LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
   lazy val container = findViewById(R.id.container).asInstanceOf[RelativeLayout]
@@ -132,8 +99,8 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
     override def onBecome = {
       case (_, _, SYNC | WAIT_FUNDING_DONE | OPEN, _) => me runOnUiThread reWireChannel
-      case (_, _, null, SYNC) => update(me getString ln_notify_connecting, Informer.LNSTATE).flash.run
-      case (_, _, null, OPEN) => update(me getString ln_notify_operational, Informer.LNSTATE).flash.run
+      case (_, _, null, SYNC) => update(me getString ln_notify_connecting, Informer.LNSTATE).uitask.run
+      case (_, _, null, OPEN) => update(me getString ln_notify_operational, Informer.LNSTATE).uitask.run
     }
   }
 
@@ -143,12 +110,12 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
 
   def notifyBtcEvent(message: String) = {
     timer.schedule(delete(Informer.BTCEVENT), 8000)
-    add(message, Informer.BTCEVENT).flash.run
+    add(message, Informer.BTCEVENT).uitask.run
   }
 
   def INIT(state: Bundle) = if (app.isAlive) {
     // Set action bar, main view content, wire up list events, update subtitle later
-    wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln)
+    wrap(me setSupportActionBar toolbar)(me setContentView R.layout.frag_view_pager_ln)
     add(me getString ln_notify_none, Informer.LNSTATE)
     wrap(me setDetecting true)(me initNfc state)
     me startListUpdates adapter
@@ -380,7 +347,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     toolbar setOnClickListener onButtonTap(me updDenom chan)
 
     // Set title to current balance and notify channel is being opened
-    update(me getString ln_notify_opening, Informer.LNSTATE).flash.run
+    update(me getString ln_notify_opening, Informer.LNSTATE).uitask.run
     me setTitle denom.withSign(me getBalance chan)
 
     // Broadcast a funding tx
@@ -400,7 +367,7 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
     toolbar setOnClickListener onButtonTap(app toast ln_notify_none)
 
     // Set base title and notify there is no channel in a subtitle
-    update(me getString ln_notify_none, Informer.LNSTATE).flash.run
+    update(me getString ln_notify_none, Informer.LNSTATE).uitask.run
     setTitle(me getString ln_wallet)
 
     // Update interface buttons

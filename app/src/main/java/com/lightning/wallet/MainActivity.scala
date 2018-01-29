@@ -6,6 +6,7 @@ import com.lightning.wallet.Utils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.Tools.{wrap, none, runAnd}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
+import fr.acinq.bitcoin.{BinaryData, Crypto}
 import scala.util.{Failure, Success, Try}
 import R.id.{typePIN, typePass}
 
@@ -17,9 +18,7 @@ import concurrent.ExecutionContext.Implicits.global
 import org.bitcoinj.wallet.WalletProtobufSerializer
 import com.lightning.wallet.ln.LNParams
 import com.lightning.wallet.helper.AES
-import fr.acinq.bitcoin.Crypto.sha256
 import com.lightning.wallet.ln.Tools
-import fr.acinq.bitcoin.BinaryData
 import scala.concurrent.Future
 import java.io.FileInputStream
 import android.text.InputType
@@ -75,9 +74,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     }
 
     MainActivity.proceed = anyToRunnable {
-      val landingIsLN = app.prefs.getBoolean(AbstractKit.LANDING_LN, true)
-      val landing = if (landingIsLN) classOf[LNActivity] else classOf[BtcActivity]
-      me exitTo landing
+      // Unconditionally go to wallet activity
+      me exitTo classOf[WalletActivity]
     }
 
     // When activity is re-accessed after initial
@@ -127,7 +125,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
       mainPassCheck setOnClickListener onButtonTap {
         // Lazy Future has already been initialized so check a pass after it's done
-        <<(MainActivity.prepareKit map setup, wrongPass)(_ => app.kit.startAsync)
+        <<(MainActivity.prepareKit map decrypt, wrongPass)(_ => app.kit.startAsync)
         setVis(View.GONE, View.GONE, View.VISIBLE)
       }
 
@@ -138,25 +136,24 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
   // MISC
 
-  private def updateInputType = {
+  def updateInputType = {
     val (isPassword, trans) = (app.prefs.getBoolean(AbstractKit.PASS_INPUT, true), new PasswordTransformationMethod)
     val (inputType, id) = if (isPassword) (passNoSuggest, typePass) else (InputType.TYPE_CLASS_NUMBER, typePIN)
-    mainPassData setTransformationMethod trans
-    mainPassData setInputType inputType
+    wrap(mainPassData setInputType inputType)(mainPassData setTransformationMethod trans)
     mainPassKeysType check id
   }
 
-  private def setup(some: Any) = {
+  def decrypt(some: Any) = {
     val password = mainPassData.getText.toString
     LNParams setup app.kit.decryptSeed(password).getSeedBytes
   }
 
-  private def wrongPass(err: Throwable) = {
+  def wrongPass(err: Throwable) = {
     setVis(View.GONE, View.VISIBLE, View.GONE)
     Tools log err.getMessage
   }
 
-  private def inform(messageCode: Int): Unit = {
+  def inform(messageCode: Int): Unit = {
     val dlg = mkChoiceDialog(next, finish, dialog_ok, dialog_cancel)
     showForm(alertDialog = dlg.setMessage(messageCode).create)
   }
@@ -166,7 +163,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     val alert = mkForm(me negBld dialog_cancel, me getString restore_hint, lst)
 
     // Offer user a choice between entering a raw or encrypted mnemonic code
-    lst setOnItemClickListener onTap { pos => if (pos == 1) rm(alert)(exitRestoreWallet) else proceed }
+    lst setOnItemClickListener onTap { pos => if (pos == 1) rm(alert)(goRestoreWallet) else proceed }
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, mnemonicOptions)
     lst setDividerHeight 0
     lst setDivider null
@@ -186,15 +183,15 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
       def decryptAndImport = {
         val packed = BinaryData(encryptedMnemonic.getText.toString)
-        val hash = sha256(oldWalletPassword.getText.toString.binary)
+        val hash = Crypto sha256 oldWalletPassword.getText.toString.binary
         val plain = AES.decode(hash.toArray)(packed.toArray)
         require(isMnemonicCorrect(plain), "Wrong password")
         app.TransData.value = plain
-        exitRestoreWallet
+        goRestoreWallet
       }
     }
   }
 
-  def exitRestoreWallet = me exitTo classOf[WalletRestoreActivity]
+  def goRestoreWallet = me exitTo classOf[WalletRestoreActivity]
   def goCreateWallet(view: View) = me exitTo classOf[WalletCreateActivity]
 }

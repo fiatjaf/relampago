@@ -14,6 +14,7 @@ import com.lightning.wallet.lnutils.Connector.AnnounceChansNumVec
 import android.content.DialogInterface.BUTTON_POSITIVE
 import com.lightning.wallet.ln.Scripts.multiSig2of2
 import com.lightning.wallet.ln.Tools.runAnd
+import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
 import scala.collection.mutable
 import fr.acinq.bitcoin.Script
@@ -28,10 +29,11 @@ import android.view.{Menu, View, ViewGroup}
 import scala.util.{Failure, Success}
 
 
-class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { me =>
+class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me =>
   lazy val lnStartNodesList = findViewById(R.id.lnStartNodesList).asInstanceOf[ListView]
   lazy val lnStartDetailsText = findViewById(R.id.lnStartDetailsText).asInstanceOf[TextView]
   lazy val lnCancel = findViewById(R.id.lnCancel).asInstanceOf[Button]
+  lazy val toolbar = findViewById(R.id.toolbar).asInstanceOf[Toolbar]
 
   lazy val chansNumber = getResources getStringArray R.array.ln_ops_start_node_channels
   lazy val views = lnStartNodesList :: findViewById(R.id.lnStartDetails) :: Nil
@@ -40,15 +42,13 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
 
   var whenBackPressed = anyToRunnable(super.onBackPressed)
   override def onBackPressed = whenBackPressed.run
+  def react(query: String) = worker addWork query
 
   private[this] val worker = new ThrottledWork[String, AnnounceChansNumVec] {
     def work(radixNodeAliasOrNodeIdQuery: String) = LNParams.cloud.connector findNodes radixNodeAliasOrNodeIdQuery
-    def process(res: AnnounceChansNumVec) = wrap(me runOnUiThread adapter.notifyDataSetChanged)(adapter.nodes = res)
+    def process(res: AnnounceChansNumVec) = wrap(me runOnUiThread adapter.notifyDataSetChanged) { adapter.nodes = res }
     def error(err: Throwable) = Tools errlog err
   }
-
-  def react(query: String) = worker addWork query
-  def notifyBtcEvent(message: String) = none
 
   // Adapter for nodes tx list
   class NodesAdapter extends BaseAdapter {
@@ -72,12 +72,9 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
   }
 
   def INIT(state: Bundle) = if (app.isAlive) {
-    // Set action bar, content view, title and subtitle text
+    // Set action bar, content view, title and subtitle text, wire up listeners
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln_start)
-    add(me getString ln_select_peer, Informer.LNSTATE).flash.run
-    setTitle(me getString ln_open_channel)
-
-    // Wire up list and load peers with empty query string
+    wrap(toolbar setTitle ln_open_channel)(toolbar setSubtitle ln_select_peer)
     lnStartNodesList setOnItemClickListener onTap(onPeerSelected)
     lnStartNodesList setAdapter adapter
     react(new String)
