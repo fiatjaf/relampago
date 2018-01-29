@@ -12,7 +12,7 @@
             android:id="@+id/openNewChannel"
             android:layout_width="wrap_content"
             android:text="@string/ln_open_channel"
-            android:onClick="goLNStart"/>
+            android:onClick="tryGoLNStart"/>
 
         <Button
             style="@style/MarginInfo"

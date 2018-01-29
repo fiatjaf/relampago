@@ -330,8 +330,8 @@ trait ToolbarActivity extends TimerActivity { me =>
     def chooseFee: Unit =
       passWrap(getString(step_2).format(pay cute sumOut).html) { pass =>
         // Once user enters a password we create a dummy tx for fee estimates
-        app toast secret_checking
 
+        app toast secret_checking
         <(makeTx(pass, RatesSaver.rates.feeLive), onTxFail) { estimateTx =>
           // Get live final fee and set a risky final fee to be 2 times less
 

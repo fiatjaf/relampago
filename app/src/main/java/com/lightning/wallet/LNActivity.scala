@@ -435,13 +435,26 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   def goBitcoin(top: View) = me goTo classOf[BtcActivity]
   def goLNOps(top: View) = me goTo classOf[LNOpsActivity]
 
-  def goLNStart(top: View) = {
+  def tryGoLNStart(top: View) = {
     val minRequired = RatesSaver.rates.feeLive multiply 2
     lazy val required = sumIn.format(denom withSign minRequired)
     lazy val balance = sumIn.format(denom withSign app.kit.conf1Balance)
     lazy val notEnough = getString(err_ln_not_enough_funds).format(balance, required)
-    if (app.kit.conf1Balance isGreaterThan minRequired) me goTo classOf[LNStartActivity]
+    if (app.kit.conf1Balance isGreaterThan minRequired) goLNStart
     else mkForm(me negBld dialog_ok, notEnough.html, null)
+  }
+
+  def goLNStart: Unit = cloud match {
+    case _: PublicCloud if app.prefs.getBoolean(AbstractKit.TOKENS_WARN, true) =>
+      // This is the first time a user tries to open a channel so show tokens warning
+
+      val humanSum = coloredOut apply Satoshi(2000)
+      val text = getString(tokens_warn).format(humanSum).html
+      showForm(mkChoiceDialog(go, none, dialog_ok, dialog_cancel).setView(text).create)
+      def go = runAnd(app.prefs.edit.putBoolean(AbstractKit.TOKENS_WARN, false).commit)(goLNStart)
+
+    // Either private cloud or warning was cleared
+    case _ => me goTo classOf[LNStartActivity]
   }
 
   def toggle(v: View) = {
