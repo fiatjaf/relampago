@@ -38,7 +38,6 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   } else me exitTo classOf[MainActivity]
 }
 
-
 class ChanDetailsFrag(chan: Channel, host: LNOpsActivity) extends Fragment { me =>
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   lazy val txsConfs = getResources getStringArray R.array.txs_confs

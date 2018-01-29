@@ -18,13 +18,14 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import fr.castorflex.android.smoothprogressbar.SmoothProgressDrawable
 import fr.castorflex.android.smoothprogressbar.SmoothProgressBar
 import android.support.v7.widget.SearchView.OnQueryTextListener
+import android.support.v4.view.MenuItemCompat.getActionView
 import com.lightning.wallet.Denomination.sat2msatFactor
 import android.content.Context.LAYOUT_INFLATER_SERVICE
 import android.content.DialogInterface.BUTTON_POSITIVE
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import com.lightning.wallet.ln.wire.ChannelUpdate
-import android.support.v4.view.MenuItemCompat
+import android.support.v7.widget.SearchView
 import android.view.ViewGroup.LayoutParams
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.Crypto.sha256
@@ -42,21 +43,15 @@ import scala.util.{Failure, Success, Try}
 
 
 trait SearchBar { me =>
-  import android.support.v7.widget.SearchView
-  protected[this] var searchItem: MenuItem = _
-  protected[this] var search: SearchView = _
-
-  private[this] val lst = new OnQueryTextListener {
+  def react(query: String)
+  private[this] val queryListener = new OnQueryTextListener {
     def onQueryTextChange(qt: String) = runAnd(true)(me react qt)
     def onQueryTextSubmit(qt: String) = true
   }
 
-  def react(query: String)
   def setupSearch(menu: Menu) = {
-    searchItem = menu findItem R.id.action_search
-    val view = MenuItemCompat getActionView searchItem
-    search = view.asInstanceOf[SearchView]
-    search setOnQueryTextListener lst
+    val search = getActionView(menu findItem R.id.action_search)
+    search.asInstanceOf[SearchView].setOnQueryTextListener(queryListener)
   }
 }
 

@@ -16,10 +16,10 @@
 
         <Button
             style="@style/MarginInfo"
-            android:id="@+id/viewChannelInfo"
+            android:drawableLeft="@drawable/ic_info_outline_black_18dp"
             android:layout_width="wrap_content"
             android:text="@string/ln_details"
-            android:drawableLeft="@drawable/ic_info_outline_black_18dp"
+            android:id="@+id/viewChannelInfo"
             android:onClick="goLNOps"/>
 
         <View
