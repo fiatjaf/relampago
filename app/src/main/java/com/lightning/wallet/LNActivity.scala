@@ -145,10 +145,10 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
   var makePaymentRequest: Runnable = _
   var sendPayment: PaymentRequest => Unit = _
   def react(qs: String) = paymentsViewProvider reload qs
-  def notifySubTitle(subtitle: String, infoType: Int) = {
-    // Title will updated separately so just update subtitle
-    timer.schedule(delete(infoType), 8000)
-    add(subtitle, infoType).flash.run
+
+  def notifyBtcEvent(message: String) = {
+    timer.schedule(delete(Informer.BTCEVENT), 8000)
+    add(message, Informer.BTCEVENT).flash.run
   }
 
   def INIT(state: Bundle) = if (app.isAlive) {
@@ -312,8 +312,8 @@ class LNActivity extends DataReader with ToolbarActivity with ListUpdater with S
               case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
 
               case Success(ms) => rm(alert) {
-                notifySubTitle(me getString ln_pr_make, Informer.LNPAYMENT)
                 <(makeRequest(ms, random getBytes 32), onFail)(none)
+                app toast ln_pr_make
               }
             }
 

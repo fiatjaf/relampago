@@ -12,8 +12,9 @@ import android.view.View
 
 
 class EmergencyActivity extends ToolbarActivity { me =>
-  override def notifySubTitle(subtitleText: String, infoType: Int): Unit = none
+  // Whenever an app throws an uncatched exception we display this page where user can at least get a mnemonic
   def showMnemonic(view: View) = passWrap(me getString sets_mnemonic) apply checkPassNotify(doViewMnemonic)
+  def notifyBtcEvent(message: String) = none
 
   def INIT(state: Bundle) = {
     <(prepareWallet, _ => app toast err_general)(none)

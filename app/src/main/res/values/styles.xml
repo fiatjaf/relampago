@@ -120,4 +120,14 @@
         <item name="android:layout_height">wrap_content</item>
     </style>
 
+    <!-- toast -->
+
+    <style name="infoToast">
+        <item name="colorBackground">#444</item>
+        <item name="cornerRadius">4dp</item>
+        <item name="textColor">#fff</item>
+        <item name="textSize">18sp</item>
+        <item name="length">LONG</item>
+    </style>
+
 </resources>

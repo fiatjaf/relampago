@@ -170,10 +170,10 @@ class BtcActivity extends DataReader with ToolbarActivity with ListUpdater { me 
     if (gap.isZero) conf0 else s"$conf0 + ${denom formatted gap}"
   }
 
-  def notifySubTitle(sub: String, infoType: Int) = {
-    // Here we update not just subtitle but also a title text
-    wrap(me runOnUiThread updTitle)(add(sub, infoType).flash.run)
-    timer.schedule(delete(infoType), 8000)
+  def notifyBtcEvent(message: String) = {
+    add(message, Informer.BTCEVENT).flash.run
+    timer.schedule(delete(Informer.BTCEVENT), 8000)
+    me runOnUiThread updTitle
   }
 
   def updDenom = showDenominationChooser { pos =>

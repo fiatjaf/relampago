@@ -48,7 +48,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
   }
 
   def react(query: String) = worker addWork query
-  def notifySubTitle(subtitle: String, infoType: Int) = none
+  def notifyBtcEvent(message: String) = none
 
   // Adapter for nodes tx list
   class NodesAdapter extends BaseAdapter {

@@ -129,8 +129,8 @@ trait ToolbarActivity extends TimerActivity { me =>
   }
 
   val txTracker = new TxTracker {
-    override def coinsSent(tx: Transaction) = notifySubTitle(me getString tx_sent, Informer.BTCEVENT)
-    override def coinsReceived(tx: Transaction) = notifySubTitle(me getString tx_received, Informer.BTCEVENT)
+    override def coinsSent(tx: Transaction) = notifyBtcEvent(me getString tx_sent)
+    override def coinsReceived(tx: Transaction) = notifyBtcEvent(me getString tx_received)
   }
 
   // Informer CRUD
@@ -153,7 +153,7 @@ trait ToolbarActivity extends TimerActivity { me =>
     getSupportActionBar setTitle titleText
   }
 
-  def notifySubTitle(subtitle: String, infoType: Int)
+  def notifyBtcEvent(message: String)
   def showDenominationChooser(change: Int => Unit) = {
     val denominations = getResources.getStringArray(R.array.denoms).map(_.html)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
@@ -166,8 +166,8 @@ trait ToolbarActivity extends TimerActivity { me =>
   }
 
   def checkPassNotify(next: String => Unit)(pass: String) = {
-    add(app getString secret_checking, Informer.CODECHECK).flash.run
-    timer.schedule(delete(Informer.CODECHECK), 2500)
+    // This is a wrapper around checkPass which also shows a toast
+    app toast secret_checking
     checkPass(next)(pass)
   }
 
@@ -215,8 +215,7 @@ trait ToolbarActivity extends TimerActivity { me =>
       rm(menu) {
         val request = LNParams.cloud.connector getBackup LNParams.cloudId.toString
         val localCommitments = app.ChannelManager.all.flatMap(_ apply identity)
-        add(app getString ln_notify_recovering, Informer.LNPAYMENT).flash.run
-        timer.schedule(delete(Informer.LNPAYMENT), 16000)
+        app toast ln_notify_recovering
 
         request.foreach(serverDataVec => {
           // Decrypt channel datas upon successful call
@@ -274,9 +273,9 @@ trait ToolbarActivity extends TimerActivity { me =>
         def checkNewPass = if (field.getText.toString.length >= 6) changePassword else app toast secret_too_short
 
         def changePassword = {
+          // Decrypt an old password and set a new one right away
           <(rotatePass, _ => System exit 0)(_ => app toast sets_secret_ok)
-          add(app getString secret_changing, Informer.CODECHECK).flash.run
-          timer.schedule(delete(Informer.CODECHECK), 5000)
+          app toast secret_changing
         }
 
         def rotatePass = {
@@ -330,8 +329,8 @@ trait ToolbarActivity extends TimerActivity { me =>
 
     def chooseFee: Unit =
       passWrap(getString(step_2).format(pay cute sumOut).html) { pass =>
-        add(app getString secret_checking, Informer.CODECHECK).flash.run
-        timer.schedule(delete(Informer.CODECHECK), 2500)
+        // Once user enters a password we create a dummy tx for fee estimates
+        app toast secret_checking
 
         <(makeTx(pass, RatesSaver.rates.feeLive), onTxFail) { estimateTx =>
           // Get live final fee and set a risky final fee to be 2 times less

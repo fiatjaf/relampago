@@ -4,7 +4,6 @@ import R.string._
 import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
-
 import scala.concurrent.duration._
 import com.softwaremill.quicklens._
 import com.lightning.wallet.lnutils._
@@ -15,11 +14,10 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import android.app.Application.ActivityLifecycleCallbacks
-
+import com.muddzdev.styleabletoastlibrary.StyleableToast
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.Connector.CMDStart
 import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import com.lightning.wallet.ln.Channel.CLOSING
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
@@ -27,11 +25,8 @@ import org.bitcoinj.wallet.Wallet.BalanceType
 import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
-
 import scala.collection.mutable
-import android.widget.Toast
 import android.os.Bundle
-
 import scala.util.Try
 import java.io.File
 
@@ -42,7 +37,6 @@ import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.wallet.Utils.{app, appName}
 import org.bitcoinj.wallet.{Protos, Wallet}
 import android.app.{Activity, Application}
-import com.google.common.net.InetAddresses
 import rx.lang.scala.{Observable => Obs}
 
 
@@ -78,7 +72,7 @@ class WalletApp extends Application { me =>
     if (number > 0) plur(opts, number) format number else opts(0)
 
   def toast(code: Int): Unit = toast(me getString code)
-  def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
+  def toast(message: String): Unit = StyleableToast.makeText(me, message, R.style.infoToast).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s

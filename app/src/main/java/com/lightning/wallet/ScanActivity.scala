@@ -4,10 +4,10 @@ import R.string._
 import com.lightning.wallet.Utils._
 import com.journeyapps.barcodescanner._
 import com.lightning.wallet.ln.Tools.{none, wrap}
+import android.content.DialogInterface.BUTTON_POSITIVE
 import com.lightning.wallet.ln.PaymentRequest
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Address
-import android.widget.Toast
 import android.os.Bundle
 
 
@@ -38,9 +38,10 @@ class ScanActivity extends TimerActivity with BarcodeCallback { me =>
 
     // Parsing error may occur
   } catch app.TransData.onFail { code =>
-    Toast.makeText(app, text, Toast.LENGTH_LONG).show
-    showForm(mkChoiceDialog(reader.resume, finish, dialog_ok,
-      dialog_cancel).setMessage(code).create)
+    val bld = negBld(dialog_ok) setMessage code
+    val ok = showForm(bld.create) getButton BUTTON_POSITIVE
+    ok setOnClickListener onButtonTap(reader.resume)
+    app toast text
 
     // Pause anyway
   } finally reader.pause

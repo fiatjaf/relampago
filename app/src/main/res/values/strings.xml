@@ -78,7 +78,7 @@
 
     <string name="ln_receive">Receive lightning</string>
     <string name="ln_open_channel">Open payment channel</string>
-    <string name="ln_details">View opening in details</string>
+    <string name="ln_details">View opening details</string>
     <string name="ln_chan_close">Close channel</string>
     <string name="ln_force_close">Force close</string>
 

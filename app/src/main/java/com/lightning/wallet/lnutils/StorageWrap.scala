@@ -179,6 +179,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
     case (_, _, SYNC | OPEN | NEGOTIATIONS, CLOSING) =>
       // WAITING will either be redeemed or refunded later
       db change PaymentTable.updFailWaitingSql
+      uiNotify
 
     case (chan, _, SYNC | WAIT_FUNDING_DONE, OPEN) if chan.isOperational =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
