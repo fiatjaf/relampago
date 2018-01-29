@@ -150,7 +150,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         BECOME(me STORE NormalData(wait.announce, c1), OPEN) SEND our
 
 
-      // NORMAL MODE
+      // OPEN MODE
 
 
       case (norm: NormalData, add: UpdateAddHtlc, OPEN)
@@ -274,7 +274,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         startLocalCurrentClose(norm)
 
 
-      // SHUTDOWN in WAIT_FUNDING_DONE and NORMAL
+      // SHUTDOWN in WAIT_FUNDING_DONE and OPEN
 
 
       case (wait: WaitFundingDoneData, CMDShutdown, WAIT_FUNDING_DONE) =>
@@ -516,7 +516,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         startLocalCurrentClose(some)
 
 
-      // CMDShutdown in WAIT_FUNDING_DONE and NORMAL is handled differently above
+      // CMDShutdown in WAIT_FUNDING_DONE and OPEN is handled differently above
       case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | SYNC) => startLocalCurrentClose(some)
       case (_: NormalData, add: CMDAddHtlc, SYNC) => throw CMDAddExcept(add, ERR_OFFLINE)
       case _ =>

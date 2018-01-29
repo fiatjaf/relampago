@@ -131,7 +131,7 @@ class LNStartActivity extends ToolbarActivity with ViewSwitch with SearchBar { m
           // Error while saving will halt any further progress here
           // User may press cancel at this point but it won't affect anything
           val state = RefundingData(wait.announce, wait.commitments).toJson.toString
-          // Save a channel backup right away, in worst case it will be saved once channel becomes NORMAL if there are no tokens
+          // Save a channel backup right away, in worst case it will be saved once channel becomes OPEN if there are no tokens
           LNParams.cloud doProcess CloudAct(AES.encode(state, LNParams.cloudSecret), Seq("key" -> LNParams.cloudId.toString), "data/put")
           // Make this a fully established channel by attaching operational listeners and adding it to list
           freshChan.listeners ++= app.ChannelManager.operationalListeners

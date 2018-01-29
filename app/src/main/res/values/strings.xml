@@ -210,7 +210,7 @@
     <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br><br>Closing a payment channel&#8230;<br><br>Waiting until all remaining in-flight payments are resolved and peer agrees to a cooperative closing<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br><br><a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a><br><br>%2$s]]></string>
     <string name="ln_ops_chan_open"><![CDATA[%1$s<br><br><font color=#999999>Peer node ID</font><br><small>%2$s</small><br><br><font color=#999999>Channel ID</font><br><small>%3$s</small>]]></string>
-    <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><br>Remaining Lightning balance has been refunded to your Bitcoin wallet<br><br>%2$s]]></string>
+    <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><br>Remaining Lightning balance of %2$s has just been refunded to your Bitcoin wallet<br><br>%3$s]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Your pending refunds</font><br>]]></string>

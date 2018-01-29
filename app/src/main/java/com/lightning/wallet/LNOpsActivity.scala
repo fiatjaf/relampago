@@ -146,10 +146,11 @@ class ChanDetailsFrag(chan: Channel, host: LNOpsActivity) extends Fragment { me 
 
     } match {
       case Left(mutualTx) =>
+        val myBalance = mutualTx.txOut.map(_.amount).sum
         val mutualTxHumanStatus = humanStatus apply txStatus(mutualTx.txid)
-        val mutualFee = coloredOut(data.commitments.commitInput.txOut.amount - mutualTx.txOut.map(_.amount).sum)
+        val mutualFee = coloredOut(data.commitments.commitInput.txOut.amount - myBalance)
         val mutualTxHumanView = commitStatus.format(mutualTx.txid.toString, mutualTxHumanStatus, mutualFee)
-        lnOpsDescription setText bilateralClosing.format(me header chan, mutualTxHumanView).html
+        lnOpsDescription setText bilateralClosing.format(me header chan, coloredIn(myBalance), mutualTxHumanView).html
         lnOpsAction setVisibility View.GONE
 
       case Right(info) =>
