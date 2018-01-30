@@ -28,7 +28,7 @@ class LNOpsActivity extends TimerActivity { me =>
     }
 
   override def onBackPressed =
-    if (0 == chanPager.getCurrentItem) super.onBackPressed
+    if (chanPager.getCurrentItem == 0) super.onBackPressed
     else chanPager.setCurrentItem(chanPager.getCurrentItem - 1)
   
   def INIT(s: Bundle) = if (app.isAlive) {

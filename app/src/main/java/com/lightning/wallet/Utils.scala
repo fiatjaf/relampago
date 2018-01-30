@@ -198,24 +198,25 @@ trait TimerActivity extends AppCompatActivity { me =>
     app toast secret_checking
   }
 
-  def doViewMnemonic(password: String) =
-    <(app.kit decryptSeed password, onFail) { seed =>
-      val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
-      lazy val dialog = mkChoiceDialog(none, warnUser, dialog_ok, dialog_export)
-      lazy val alert = mkForm(dialog, getString(sets_noscreen).html, wordsText)
-      alert
+  def viewMnemonic(view: View) = passWrap(me getString sets_mnemonic) apply checkPass(doViewMnemonic)
+  def doViewMnemonic(password: String) = <(app.kit decryptSeed password, onFail) { seed =>
 
-      def warnUser: Unit = rm(alert) {
-        lazy val dialog1 = mkChoiceDialog(encryptAndExport, none, dialog_ok, dialog_cancel)
-        lazy val alert1 = mkForm(dialog1, null, getString(mnemonic_export_details).html)
-        alert1
+    val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
+    lazy val dialog = mkChoiceDialog(none, warnUser, dialog_ok, dialog_export)
+    lazy val alert = mkForm(dialog, getString(sets_noscreen).html, wordsText)
+    alert
 
-        def encryptAndExport: Unit = rm(alert1) {
-          val packed = AES.encode(wordsText, Crypto sha256 password.binary.data)
-          me share s"Encrypted BIP32 code ${new Date}: ${packed.toString}"
-        }
+    def warnUser: Unit = rm(alert) {
+      lazy val dialog1 = mkChoiceDialog(encryptAndExport, none, dialog_ok, dialog_cancel)
+      lazy val alert1 = mkForm(dialog1, null, getString(mnemonic_export_details).html)
+      alert1
+
+      def encryptAndExport: Unit = rm(alert1) {
+        val packed = AES.encode(wordsText, Crypto sha256 password.binary.data)
+        me share s"Encrypted BIP32 code ${new Date}: ${packed.toString}"
       }
     }
+  }
 
   abstract class TxProcessor {
     def onTxFail(exc: Throwable): Unit

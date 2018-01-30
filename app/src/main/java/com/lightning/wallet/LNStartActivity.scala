@@ -42,13 +42,6 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
 
   var whenBackPressed = anyToRunnable(super.onBackPressed)
   override def onBackPressed = whenBackPressed.run
-  def react(query: String) = worker addWork query
-
-  private[this] val worker = new ThrottledWork[String, AnnounceChansNumVec] {
-    def work(radixNodeAliasOrNodeIdQuery: String) = LNParams.cloud.connector findNodes radixNodeAliasOrNodeIdQuery
-    def process(res: AnnounceChansNumVec) = wrap(me runOnUiThread adapter.notifyDataSetChanged) { adapter.nodes = res }
-    def error(err: Throwable) = Tools errlog err
-  }
 
   // Adapter for nodes tx list
   class NodesAdapter extends BaseAdapter {
@@ -72,6 +65,13 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
   }
 
   def INIT(state: Bundle) = if (app.isAlive) {
+    new ThrottledWork[String, AnnounceChansNumVec] {
+      def work(radixNodeAliasOrNodeIdQuery: String) = LNParams.cloud.connector findNodes radixNodeAliasOrNodeIdQuery
+      def process(res: AnnounceChansNumVec) = wrap(me runOnUiThread adapter.notifyDataSetChanged) { adapter.nodes = res }
+      def error(err: Throwable) = Tools errlog err
+      me.react = addWork
+    }
+
     // Set action bar, content view, title and subtitle text, wire up listeners
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln_start)
     wrap(toolbar setTitle ln_open_channel)(toolbar setSubtitle ln_select_peer)
@@ -133,7 +133,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
           // Make this a fully established channel by attaching operational listeners and adding it to list
           freshChan.listeners ++= app.ChannelManager.operationalListeners
           app.ChannelManager.all +:= freshChan
-          me exitTo classOf[LNActivity]
+          me exitTo classOf[FragLN]
       }
     }
 

@@ -55,14 +55,6 @@
         style="@style/FloatingMenu">
 
         <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_btc_24dp"
-            fab:fab_colorPressed="@color/btc"
-            fab:fab_colorNormal="@color/btc"
-            fab:fab_colorRipple="@color/btc"
-            android:onClick="goBitcoin"
-            style="@style/FabButton"/>
-
-        <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"
             fab:fab_label="@string/ln_receive"
             fab:fab_colorPressed="@color/ln"

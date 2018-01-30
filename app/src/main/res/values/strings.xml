@@ -7,8 +7,7 @@
 
     <!-- emergency mode -->
     <string name="emerge_report">Show error report</string>
-    <string name="emerge_title">Something went wrong</string>
-    <string name="emerge_subtitle">Emergency mode</string>
+    <string name="emerge_mode">Emergency mode</string>
 
     <!-- app wide -->
     <string name="app_name">Testnet</string>

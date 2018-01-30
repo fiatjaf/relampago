@@ -30,9 +30,9 @@ class ScanActivity extends TimerActivity with BarcodeCallback { me =>
 
     // Find out where to go
     app.TransData.value match {
-      case _: PaymentRequest => me exitTo classOf[LNActivity]
-      case _: BitcoinURI => me exitTo classOf[BtcActivity]
-      case _: Address => me exitTo classOf[BtcActivity]
+      case _: PaymentRequest => me exitTo classOf[FragLN]
+      case _: BitcoinURI => me exitTo classOf[FragBTC]
+      case _: Address => me exitTo classOf[FragBTC]
       case _ => throw new RuntimeException
     }
 

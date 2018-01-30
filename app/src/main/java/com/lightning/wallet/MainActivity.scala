@@ -52,7 +52,6 @@ object MainActivity {
 }
 
 class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch { me =>
-  lazy val mnemonicOptions = getResources getStringArray R.array.restore_mnemonic_options
   lazy val mainPassKeysType = findViewById(R.id.mainPassKeysType).asInstanceOf[SegmentedGroup]
   lazy val mainPassCheck = findViewById(R.id.mainPassCheck).asInstanceOf[Button]
   lazy val mainPassData = findViewById(R.id.mainPassData).asInstanceOf[EditText]
@@ -159,11 +158,12 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   }
 
   def goRestoreWallet(view: View) = {
+    val mnemonicOptions = getResources getStringArray R.array.restore_mnemonic_options
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = mkForm(me negBld dialog_cancel, me getString restore_hint, lst)
 
-    // Offer user a choice between entering a raw or encrypted mnemonic code
-    lst setOnItemClickListener onTap { pos => if (pos == 1) rm(alert)(goRestoreWallet) else proceed }
+    // Offer user a choice between entering a raw or an encrypted mnemonic code
+    lst setOnItemClickListener onTap { case 1 => rm(alert)(goRestoreWallet) case _ => proceed }
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, mnemonicOptions)
     lst setDividerHeight 0
     lst setDivider null
@@ -192,6 +192,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     }
   }
 
-  def goRestoreWallet = me exitTo classOf[WalletRestoreActivity]
+  def goRestoreWallet: Unit = me exitTo classOf[WalletRestoreActivity]
   def goCreateWallet(view: View) = me exitTo classOf[WalletCreateActivity]
 }
