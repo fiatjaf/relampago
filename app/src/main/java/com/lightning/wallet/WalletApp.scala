@@ -13,7 +13,6 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-import android.app.Application.ActivityLifecycleCallbacks
 import com.muddzdev.styleabletoastlibrary.StyleableToast
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.Connector.CMDStart
@@ -26,7 +25,7 @@ import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
 import scala.collection.mutable
-import android.os.Bundle
+import android.app.Application
 import scala.util.Try
 import java.io.File
 
@@ -36,7 +35,6 @@ import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.wallet.Utils.{app, appName}
 import org.bitcoinj.wallet.{Protos, Wallet}
-import android.app.{Activity, Application}
 import rx.lang.scala.{Observable => Obs}
 
 
@@ -45,7 +43,6 @@ class WalletApp extends Application { me =>
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val chainFile = new File(getFilesDir, s"$appName.spvchain")
   lazy val walletFile = new File(getFilesDir, s"$appName.wallet")
-  var currentActivity: Option[Activity] = None
   var kit: WalletKit = _
 
   lazy val plur = getString(lang) match {
@@ -83,16 +80,6 @@ class WalletApp extends Application { me =>
     // These cannot be lazy vals because values may change
     Utils.denom = Utils.denoms apply prefs.getInt(AbstractKit.DENOM_TYPE, 0)
     Utils.fiatName = prefs.getString(AbstractKit.FIAT_TYPE, Utils.strDollar)
-
-    me registerActivityLifecycleCallbacks new ActivityLifecycleCallbacks {
-      override def onActivitySaveInstanceState(activity: Activity, state: Bundle) = none
-      override def onActivityCreated(activity: Activity, state: Bundle) = currentActivity = Some(activity)
-      override def onActivityStarted(activity: Activity) = currentActivity = Some(activity)
-      override def onActivityResumed(activity: Activity) = currentActivity = Some(activity)
-      override def onActivityPaused(activity: Activity) = currentActivity = None
-      override def onActivityDestroyed(activity: Activity) = none
-      override def onActivityStopped(activity: Activity) = none
-    }
   }
 
   def setBuffer(text: String) = {

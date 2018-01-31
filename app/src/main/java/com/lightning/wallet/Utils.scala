@@ -121,16 +121,16 @@ trait TimerActivity extends AppCompatActivity { me =>
     passAsk -> secretInputField
   }
 
-  def delayUI(fun: => Unit) = timer.schedule(anyToRunnable(fun), 225)
-  def rm(previous: Dialog)(fun: => Unit) = wrap(previous.dismiss)(me delayUI fun)
+  def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
+  def rm(previous: Dialog)(exec: => Unit) = wrap(previous.dismiss)(me delayUI exec)
   def mkForm(bld: Builder, title: View, content: View) = showForm(bld.setCustomTitle(title).setView(content).create)
-  def onFail(error: CharSequence): Unit = me runOnUiThread mkForm(me negBld dialog_ok, null, error).show
+  def onFail(error: CharSequence): Unit = UITask(mkForm(me negBld dialog_ok, null, error).show).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
 
   def showForm(alertDialog: AlertDialog) = {
     alertDialog setCanceledOnTouchOutside false
     alertDialog.getWindow.getAttributes.windowAnimations = R.style.SlidingDialog
-    // This may be called after a host activity is destroyed and thus would throw
+    // This may be called after a host activity is destroyed and thus it may throw
     try alertDialog.show catch none finally if (scrWidth > 2.3) alertDialog.getWindow
       .setLayout(maxDialog.toInt, WRAP_CONTENT)
 
@@ -146,20 +146,25 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   def INIT(savedInstanceState: Bundle): Unit
-  override def onCreate(savedInstanceState: Bundle) = {
+  override def onCreate(savedActivityInstanceState: Bundle) = {
     Thread setDefaultUncaughtExceptionHandler new UncaughtHandler(me)
-    super.onCreate(savedInstanceState)
-    INIT(savedInstanceState)
+    super.onCreate(savedActivityInstanceState)
+    INIT(savedActivityInstanceState)
   }
 
   override def onDestroy = wrap(super.onDestroy)(timer.cancel)
-  implicit def uiTask(run: => Runnable): TimerTask = new TimerTask { def run = me runOnUiThread run }
-  implicit def str2View(res: CharSequence): LinearLayout = str2Tuple(res) match { case view \ _ => view }
+  implicit def str2View(res: CharSequence): LinearLayout =
+    str2Tuple(res) match { case view \ _ => view }
+
+  implicit def UITask(exec: => Unit): TimerTask = {
+    val runnableExec = new Runnable { override def run = exec }
+    new TimerTask { def run = me runOnUiThread runnableExec }
+  }
 
   // Run computation in Future, deal with results on UI thread
   def <[T](fun: => T, no: Throwable => Unit)(ok: T => Unit) = <<(Future(fun), no)(ok)
   def <<[T](future: Future[T], no: Throwable => Unit)(ok: T => Unit) = future onComplete {
-    case Success(rs) => runOnUiThread(ok apply rs) case Failure(ex) => runOnUiThread(no apply ex)
+    case Success(rs) => UITask(ok apply rs).run case Failure(ex) => UITask(no apply ex).run
   }
 
   // Utils

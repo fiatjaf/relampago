@@ -35,15 +35,17 @@ import android.os.Bundle
 import java.util.Date
 
 
-class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with ToolbarFragment with SearchBar { me =>
-  override def onCreateView(i: LayoutInflater, vg: ViewGroup, sv: Bundle) = i.inflate(R.layout.frag_view_pager_ln, vg, false)
+class FragLN extends Fragment with ListUpdater with ToolbarFragment with SearchBar { me =>
+  override def onCreateView(inflator: LayoutInflater, viewGroup: ViewGroup, bn: Bundle) =
+    inflator.inflate(R.layout.frag_view_pager_ln, viewGroup, false)
+
+  lazy val host = getActivity.asInstanceOf[WalletActivity]
   lazy val layoutInflater = app.getSystemService(LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
   lazy val viewParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
   lazy val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
-  lazy val imgMap = Array(await, await, conf1, dead)
-  var sendPayment: PaymentRequest => Unit = _
-  var makePaymentRequest: Runnable = _
+  lazy val imageMap = Array(await, await, conf1, dead)
+  import host.{str2View, <, onFail, UITask}
 
   val txTracker = new TxTracker {
     override def coinsSent(tx: Transaction) = notifyBtcEvent(me getString tx_sent)
@@ -63,11 +65,16 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
         val markedPaymentSum = marker.format(denom formatted info.firstSum)
         transactWhen setText when(System.currentTimeMillis, timestamp).html
         transactSum setText s"$markedPaymentSum\u00A0${info.text}".html
-        transactCircle setImageResource imgMap(info.actualStatus)
+        transactCircle setImageResource imageMap(info.actualStatus)
       }
     }
   }
 
+  var sendPayment: PaymentRequest => Unit = none
+  var makePaymentRequest: Runnable = new Runnable { def run = none }
+  var reWireChannel: Runnable = new Runnable { def run = none }
+
+  override def onResume = wrap(super.onResume)(reWireChannel.run)
   override def onViewCreated(view: View, savedInstanceState: Bundle) = {
     val container = view.findViewById(R.id.container).asInstanceOf[RelativeLayout]
     val itemsList = view.findViewById(R.id.itemsList).asInstanceOf[ListView]
@@ -75,46 +82,48 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
     val openNewChannel = view.findViewById(R.id.openNewChannel)
     val actionDivider = view.findViewById(R.id.actionDivider)
     val lnChanWarn = view.findViewById(R.id.lnChanWarn)
-    import host.{str2View, <, uiTask, onFail}
 
-    // Payment history and search results loader
-    val paymentsViewProvider = new ReactCallback(host) {
+    new ReactCallback(host) { self =>
+      // Payment history and search results combined loader
       val observeTablePath = db sqlPath PaymentTable.table
       var lastQuery = new String
 
+      me.react = query => {
+        self.lastQuery = query
+        // Always saave last query text in a case of a sudden list update
+        host.getSupportLoaderManager.restartLoader(1, null, self).forceLoad
+      }
+
       type InfoVec = Vector[PaymentInfo]
       def searchPays = new ReactLoader[PaymentInfo](host) {
-        def createItem(rCursor: RichCursor) = bag toPaymentInfo rCursor
-        def getCursor = bag.byQuery(lastQuery)
+        def createItem(rc: RichCursor) = bag toPaymentInfo rc
+        def getCursor = bag byQuery lastQuery
 
-        val consume = (pays: InfoVec) => host runOnUiThread {
+        val consume = (pays: InfoVec) => UITask {
           // Views should have already been updated at this point
           // so search calls only update list but not anything else
-          adapter.notifyDataSetChanged
-          adapter set pays
-        }
+          wrap(adapter.notifyDataSetChanged)(adapter set pays)
+        }.run
       }
 
       def recentPays = new ReactLoader[PaymentInfo](host) {
-        val consume = (pays: InfoVec) => host runOnUiThread update(pays)
-        def createItem(rCursor: RichCursor) = bag toPaymentInfo rCursor
+        def createItem(rc: RichCursor) = bag toPaymentInfo rc
         def getCursor = bag.byRecent
 
-        def update(pays: InfoVec) = {
-          // All of these lines should run on UI thread
+        val consume = (pays: InfoVec) => UITask {
           wrap(adapter.notifyDataSetChanged)(adapter set pays)
           if (pays.isEmpty) lnChanWarn setVisibility View.VISIBLE
           if (pays.nonEmpty) itemsList setVisibility View.VISIBLE
           if (pays.nonEmpty) lnChanWarn setVisibility View.GONE
-        }
+        }.run
       }
 
       def onCreateLoader(id: Int, bundle: Bundle) =
         if (lastQuery.isEmpty) recentPays else searchPays
     }
 
-    val chanListener = new ChannelListener { self =>
-      // Updates local UI according to changes in channel
+    lazy val chanListener = new ChannelListener { self =>
+      // Updates local UI according to changes in a channel
       // should always be removed when activity is stopped
 
       override def onError = {
@@ -134,9 +143,9 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
       }
 
       override def onBecome = {
-        case (_, _, SYNC | WAIT_FUNDING_DONE | OPEN, _) => host runOnUiThread reWireChannel
-        case (_, _, null, SYNC) => update(me getString ln_notify_connecting, Informer.LNSTATE).uitask.run
-        case (_, _, null, OPEN) => update(me getString ln_notify_operational, Informer.LNSTATE).uitask.run
+        case (_, _, SYNC | WAIT_FUNDING_DONE | OPEN, _) => reWireChannel.run
+        case (_, _, null, SYNC) => update(me getString ln_notify_connecting, Informer.LNSTATE).run
+        case (_, _, null, OPEN) => update(me getString ln_notify_operational, Informer.LNSTATE).run
       }
     }
 
@@ -144,17 +153,20 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
       // Stopping animation immediately does not work sometimes so we use a guarded timer here once again
       // On entering this activity we show a progress bar animation, a call may happen outside of this activity
       val progressBar = layoutInflater.inflate(R.layout.frag_progress_bar, null).asInstanceOf[SmoothProgressBar]
-      def delayedStop = try host.timer.schedule(anyToRunnable(progressBar.progressiveStop), 250) catch none
       val drawable = progressBar.getIndeterminateDrawable.asInstanceOf[SmoothProgressDrawable]
+      def attach = container.addView(progressBar, viewParams)
+      UITask(attach).run
 
       drawable setCallbacks new SmoothProgressDrawable.Callbacks {
-        // In some cases timer may already be disabled and will throw here because activity has been killed
-        def onStop = try host.timer.schedule(anyToRunnable(container removeView progressBar), 250) catch none
+        // Sometimes timer may already be disabled and will throw here because activity has been killed
+        def onStop = try host.timer.schedule(UITask(container removeView progressBar), 250) catch none
         def onStart = try drawable.setColors(getResources getIntArray R.array.bar_colors) catch none
       }
 
-      host runOnUiThread container.addView(progressBar, viewParams)
-      app.ChannelManager.outPaymentObs(rpi).doOnTerminate(delayedStop)
+      app.ChannelManager outPaymentObs rpi doOnTerminate {
+        val stopTimerTask = UITask(progressBar.progressiveStop)
+        try host.timer.schedule(stopTimerTask, 250) catch none
+      }
     }
 
     itemsList setOnItemClickListener host.onTap { pos =>
@@ -200,13 +212,8 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
       }
     }
 
-    def reWireChannel: Unit =
-      app.ChannelManager.all.find(_.isOperational) map whenOpen getOrElse {
-        app.ChannelManager.all.find(_.isOpening) map whenOpening getOrElse whenNone
-      }
-
     def whenOpen(chan: Channel) = {
-      makePaymentRequest = anyToRunnable {
+      makePaymentRequest = UITask {
         // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve
         // peer's balance can't go below their unspendable channel reserve so it should be taken into account here
         val canReceive = chan(c => c.localCommit.spec.toRemoteMsat - c.localParams.channelReserveSat * sat2msatFactor)
@@ -300,7 +307,6 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
       me.toolbar setOnClickListener host.onButtonTap(me updDenom chan)
       me setTitle denom.withSign(me getBalance chan)
       chan.listeners += chanListener
-      chanListener nullOnBecome chan
 
       // Update interface buttons
       viewChannelInfo setVisibility View.GONE
@@ -311,11 +317,9 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
     def whenOpening(chan: Channel) = {
       // Reset all triggers except denomination
       sendPayment = pr => app toast ln_notify_opening
-      makePaymentRequest = anyToRunnable(app toast ln_notify_opening)
+      makePaymentRequest = UITask(app toast ln_notify_opening)
       me.toolbar setOnClickListener host.onButtonTap(me updDenom chan)
-
-      // Set title to current balance and notify channel is being opened
-      update(me getString ln_notify_opening, Informer.LNSTATE).uitask.run
+      update(me getString ln_notify_opening, Informer.LNSTATE).run
       me setTitle denom.withSign(me getBalance chan)
 
       // Broadcast a funding tx
@@ -332,10 +336,8 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
       // Reset all triggers
       me.toolbar setOnClickListener null
       sendPayment = pr => app toast ln_notify_none
-      makePaymentRequest = anyToRunnable(app toast ln_notify_none)
-
-      // Set base title and notify there is no channel in a subtitle
-      update(me getString ln_notify_none, Informer.LNSTATE).uitask.run
+      makePaymentRequest = UITask(app toast ln_notify_none)
+      update(me getString ln_notify_none, Informer.LNSTATE).run
       setTitle(me getString ln_wallet)
 
       // Update interface buttons
@@ -352,26 +354,25 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
       adapter.notifyDataSetChanged
     }
 
+    reWireChannel = UITask {
+      app.ChannelManager.all.find(_.isOperational) map whenOpen getOrElse {
+        app.ChannelManager.all.find(_.isOpening) map whenOpening getOrElse whenNone
+      }
+    }
+
     itemsList setAdapter adapter
     itemsList setFooterDividersEnabled false
     startListUpdates(itemsList, adapter)
 
-    me.react = query => {
-      // Initiate payment search and save last query in a case of a sudden list update
-      host.getSupportLoaderManager.restartLoader(1, null, paymentsViewProvider).forceLoad
-      paymentsViewProvider.lastQuery = query
-    }
-
     // LN page toolbar is going to be WalletActicity action bar
     me.toolbar = view.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-    add(me getString ln_notify_none, Informer.LNSTATE)
+    add(me getString ln_notify_none, Informer.LNSTATE).run
     host setSupportActionBar me.toolbar
 
     app.kit.wallet addCoinsSentEventListener txTracker
     app.kit.wallet addCoinsReceivedEventListener txTracker
     Utils clickableTextField view.findViewById(R.id.lnChanInfo)
-    react(new String)
-    reWireChannel
+    me.react(new String)
   }
 
   def updDenom(chan: Channel) = host showDenomChooser { pos =>
@@ -387,7 +388,7 @@ class FragLN(val host: WalletActivity) extends Fragment with ListUpdater with To
   def notifyBtcEvent(message: String) = {
     // In LN fragment we only temporairly update a subtitle
     host.timer.schedule(delete(Informer.BTCEVENT), 8000)
-    add(message, Informer.BTCEVENT).uitask.run
+    add(message, Informer.BTCEVENT).run
   }
 
   def qr(pr: PaymentRequest) = {

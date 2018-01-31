@@ -69,9 +69,8 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch { me =>
     if (app.TransData.value != null) {
       // Should be an unencrypted mnemonic string
       val chips = app.TransData.value.toString split "\\s+"
-      val task = anyToRunnable(restoreCode setText chips.toList.asJava)
+      timer.schedule(UITask(restoreCode setText chips.toList.asJava), 100)
       app.TransData.value = null
-      timer.schedule(task, 100)
     }
 
     restoreWhen setText datePicker.human
@@ -114,7 +113,7 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch { me =>
         if (app.isAlive) {
           setupAndStartDownload
           wallet saveToFile app.walletFile
-          exitTo apply classOf[FragBTC]
+          exitTo apply classOf[WalletActivity]
         }
       }
     }

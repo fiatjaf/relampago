@@ -25,16 +25,10 @@ class ScanActivity extends TimerActivity with BarcodeCallback { me =>
   def tryParseQR(text: String) = try {
     lastAttempt = System.currentTimeMillis
     beeper.playRawResource(R.raw.beep, false)
-    // This may throw which is fine here
-    app.TransData recordValue text
 
-    // Find out where to go
-    app.TransData.value match {
-      case _: PaymentRequest => me exitTo classOf[FragLN]
-      case _: BitcoinURI => me exitTo classOf[FragBTC]
-      case _: Address => me exitTo classOf[FragBTC]
-      case _ => throw new RuntimeException
-    }
+    // This may throw, it's fine
+    app.TransData recordValue text
+    me exitTo classOf[WalletActivity]
 
     // Parsing error may occur
   } catch app.TransData.onFail { code =>

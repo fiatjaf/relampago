@@ -52,7 +52,7 @@ class WalletCreateActivity extends TimerActivity with ViewSwitch { me =>
         if (app.isAlive) {
           setupAndStartDownload
           wallet saveToFile app.walletFile
-          me exitTo classOf[FragBTC]
+          me exitTo classOf[WalletActivity]
         }
       }
     }

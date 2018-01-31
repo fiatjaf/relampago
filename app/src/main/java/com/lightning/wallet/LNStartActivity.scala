@@ -19,6 +19,7 @@ import org.bitcoinj.script.ScriptBuilder
 import scala.collection.mutable
 import fr.acinq.bitcoin.Script
 import org.bitcoinj.core.Coin
+import java.util.TimerTask
 import android.os.Bundle
 
 import com.lightning.wallet.lnutils.{CloudAct, PaymentInfoWrap, RatesSaver}
@@ -40,7 +41,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
   lazy val nodeView = getString(ln_ops_start_node_view)
   private[this] val adapter = new NodesAdapter
 
-  var whenBackPressed = anyToRunnable(super.onBackPressed)
+  var whenBackPressed: Runnable = UITask(super.onBackPressed)
   override def onBackPressed = whenBackPressed.run
 
   // Adapter for nodes tx list
@@ -67,7 +68,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
   def INIT(state: Bundle) = if (app.isAlive) {
     new ThrottledWork[String, AnnounceChansNumVec] {
       def work(radixNodeAliasOrNodeIdQuery: String) = LNParams.cloud.connector findNodes radixNodeAliasOrNodeIdQuery
-      def process(res: AnnounceChansNumVec) = wrap(me runOnUiThread adapter.notifyDataSetChanged) { adapter.nodes = res }
+      def process(res: AnnounceChansNumVec) = wrap(UITask(adapter.notifyDataSetChanged).run)(adapter.nodes = res)
       def error(err: Throwable) = Tools errlog err
       me.react = addWork
     }
@@ -77,7 +78,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
     wrap(toolbar setTitle ln_open_channel)(toolbar setSubtitle ln_select_peer)
     lnStartNodesList setOnItemClickListener onTap(onPeerSelected)
     lnStartNodesList setAdapter adapter
-    react(new String)
+    me.react(new String)
 
     // Or back if resources are freed
   } else me exitTo classOf[MainActivity]
@@ -100,9 +101,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
       override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) freshChan process CMDShutdown
       override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) freshChan process CMDShutdown
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = if (ann == announce) freshChan process msg
-      override def onOperational(ann: NodeAnnouncement, their: Init) = if (ann == announce)
-        // Peer is reachable so now we ask user to provide a funding
-        me runOnUiThread askForFunding(freshChan, their)
+      override def onOperational(ann: NodeAnnouncement, their: Init) = if (ann == announce) askForFunding(freshChan, their).run
     }
 
     lazy val chanOpenListener = new ChannelListener { self =>
@@ -112,12 +111,13 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
       override def onBecome = {
         case (_, WaitFundingData(_, cmd, accept), WAIT_FOR_ACCEPT, WAIT_FOR_FUNDING) =>
           // Peer has agreed to open a channel so now we ask user for a tx feerate
-          me runOnUiThread askForFeerate(freshChan, cmd, accept)
+          println("ASKING FOR A FEERATE")
+          askForFeerate(freshChan, cmd, accept).run
 
         case (_, _, _, CLOSING) =>
           // Something went wrong, back off
           // like disconnect or remote error
-          me runOnUiThread cancelChannel
+          cancelChannel.run
 
         case (_, wait: WaitFundingDoneData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
           // First we remove local listeners, then we try to save a channel to database
@@ -133,16 +133,16 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
           // Make this a fully established channel by attaching operational listeners and adding it to list
           freshChan.listeners ++= app.ChannelManager.operationalListeners
           app.ChannelManager.all +:= freshChan
-          me exitTo classOf[FragLN]
+          me exitTo classOf[WalletActivity]
       }
     }
 
-    def cancelChannel: Unit = {
+    def cancelChannel: Runnable = UITask {
       freshChan.listeners -= chanOpenListener
       ConnectionManager.listeners -= socketOpenListener
       ConnectionManager.connections(announce).disconnect
       // Just disconnect this channel from all listeners
-      whenBackPressed = anyToRunnable(super.onBackPressed)
+      whenBackPressed = UITask(super.onBackPressed)
       setVis(View.VISIBLE, View.GONE)
       getSupportActionBar.show
     }
@@ -152,17 +152,17 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
     ConnectionManager.listeners += socketOpenListener
     ConnectionManager connectTo announce
 
-    // Update UI to display selected node details
-    lnCancel setOnClickListener onButtonTap(cancelChannel)
-    whenBackPressed = anyToRunnable(cancelChannel)
+    // Update UI to display selected node alias and key
+    lnCancel setOnClickListener onButtonTap(cancelChannel.run)
     lnStartDetailsText setText detailsText
+    whenBackPressed = cancelChannel
     setVis(View.GONE, View.VISIBLE)
     getSupportActionBar.hide
   }
 
   // UI utilities
 
-  def askForFunding(chan: Channel, their: Init) = {
+  def askForFunding(chan: Channel, their: Init) = UITask {
     val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
     val alert = mkForm(negPosBld(dialog_cancel, dialog_next), getString(ln_ops_start_fund_title).html, content)
     val rateManager = new RateManager(getString(amount_hint_newchan).format(denom withSign RatesSaver.rates.feeLive,
@@ -186,9 +186,9 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
     ok setOnClickListener onButtonTap(askAttempt)
   }
 
-  def askForFeerate(chan: Channel, cmd: CMDOpenChannel, accept: AcceptChannel): Unit = {
-    val multisig = multiSig2of2(cmd.localParams.fundingPrivKey.publicKey, accept.fundingPubkey)
-    val scriptPubKey = Script.write(Script pay2wsh multisig)
+  def askForFeerate(chan: Channel, cmd: CMDOpenChannel, acc: AcceptChannel): TimerTask = UITask {
+    val multisigScript = multiSig2of2(cmd.localParams.fundingPrivKey.publicKey, acc.fundingPubkey)
+    val scriptPubKey = Script.write(Script pay2wsh multisigScript)
 
     new TxProcessor {
       val funding = Coin valueOf cmd.fundingAmountSat
@@ -203,7 +203,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
         }
 
       def onTxFail(err: Throwable) =
-        mkForm(mkChoiceDialog(me delayUI askForFeerate(chan, cmd, accept),
+        mkForm(mkChoiceDialog(me delayUI askForFeerate(chan, cmd, acc),
           none, dialog_ok, dialog_cancel), messageWhenMakingTx(err), null)
     }
   }

@@ -25,14 +25,17 @@ import android.os.Bundle
 import android.net.Uri
 
 
-class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with ToolbarFragment { me =>
-  override def onCreateView(i: LayoutInflater, vg: ViewGroup, sv: Bundle) = i.inflate(R.layout.frag_view_pager_btc, vg, false)
+class FragBTC extends Fragment with ListUpdater with ToolbarFragment { me =>
+  override def onCreateView(inflator: LayoutInflater, viewGroup: ViewGroup, bn: Bundle) =
+    inflator.inflate(R.layout.frag_view_pager_btc, viewGroup, false)
+
+  lazy val host = getActivity.asInstanceOf[WalletActivity]
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
   lazy val mnemonicInfoText = getString(mnemonic_info)
   lazy val feeIncoming = getString(txs_fee_incoming)
   lazy val feeDetails = getString(txs_fee_details)
   lazy val feeAbsent = getString(txs_fee_absent)
-  import host.{str2View, <, onFail}
+  import host.{str2View, <, onFail, UITask}
 
   val barMenuListener = new Toolbar.OnMenuItemClickListener {
     def onMenuItemClick(m: MenuItem) = host onOptionsItemSelected m
@@ -45,15 +48,18 @@ class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with T
 
   val catchListener = new BlocksListener {
     def getNextTracker(initBlocksLeft: Int) = new BlocksListener { self =>
-      def onBlocksDownloaded(peer: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) = {
-        if (left % blocksPerDay == 0) update(app.plurOrZero(syncOps, left / blocksPerDay), Informer.CHAINSYNC)
-        if (left < 1) notifyFinish
-        uitask.run
+      def onBlocksDownloaded(peer: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) =
+        if (left < 1) notifyFinish else if (left % blocksPerDay == 0) notifyDaysLeft(left)
+
+      def notifyDaysLeft(blocksLeft: Int) = {
+        val daysLeft = blocksLeft / blocksPerDay
+        val text = app.plurOrZero(syncOps, daysLeft)
+        update(text, Informer.CHAINSYNC).run
       }
 
       def notifyFinish = {
         app.kit.peerGroup removeBlocksDownloadedEventListener self
-        add(me getString info_progress_done, Informer.CHAINSYNC)
+        add(me getString info_progress_done, Informer.CHAINSYNC).run
         host.timer.schedule(delete(Informer.CHAINSYNC), 5000)
       }
 
@@ -61,7 +67,7 @@ class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with T
       // lag (more than a day), otherwise no updates are visible
       private val syncOps = app.getResources getStringArray R.array.info_progress
       private val text = app.plurOrZero(syncOps, initBlocksLeft / blocksPerDay)
-      if (initBlocksLeft > blocksPerDay) add(text, Informer.CHAINSYNC)
+      if (initBlocksLeft > blocksPerDay) add(text, Informer.CHAINSYNC).run
     }
 
     def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = {
@@ -71,8 +77,8 @@ class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with T
   }
 
   val constListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
-    def onPeerConnected(peer: Peer, peerCount: Int) = update(me getString status, Informer.PEER).uitask.run
-    def onPeerDisconnected(peer: Peer, peerCount: Int) = update(me getString status, Informer.PEER).uitask.run
+    def onPeerConnected(peer: Peer, peerCount: Int) = update(me getString status, Informer.PEER).run
+    def onPeerDisconnected(peer: Peer, peerCount: Int) = update(me getString status, Informer.PEER).run
     def status = if (app.kit.peerGroup.numConnectedPeers < 1) btc_notify_connecting else btc_notify_operational
   }
 
@@ -103,28 +109,23 @@ class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with T
     val mnemonicInfo = Utils clickableTextField view.findViewById(R.id.mnemonicInfo)
     val itemsList = view.findViewById(R.id.itemsList).asInstanceOf[ListView]
 
-    val lstTracker = new TxTracker {
-      override def txConfirmed(tx: Transaction) = host runOnUiThread {
-        // Once tx is confirmed we update title and list but not subtitle
-        wrap(updTitle)(adapter.notifyDataSetChanged)
-      }
+    val lstTracker = new TxTracker { self =>
+      def whenConfirmed = wrap(updTitle)(adapter.notifyDataSetChanged)
+      override def txConfirmed(tx: Transaction) = UITask(whenConfirmed).run
+      override def coinsReceived(tx: Transaction) = UITask(tell apply tx).run
+      override def coinsSent(tx: Transaction) = UITask(tell apply tx).run
 
-      override def coinsSent(tx: Transaction) = host runOnUiThread tell(tx)
-      override def coinsReceived(tx: Transaction) = host runOnUiThread tell(tx)
-
-      def tell(wrap: TxWrap) = if (!wrap.nativeValue.isZero) {
-        // Zero means this tx changes nothing in our wallet and
-        // thus it is watched or completely foreign
-
-        itemsList setVisibility View.VISIBLE
-        mnemonicWarn setVisibility View.GONE
-        adapter.set(wrap +: adapter.availableItems)
-        adapter.notifyDataSetChanged
-      }
+      val tell = (wrap: TxWrap) =>
+        if (!wrap.nativeValue.isZero) {
+          // Zero means it changes nothing
+          itemsList setVisibility View.VISIBLE
+          mnemonicWarn setVisibility View.GONE
+          adapter.set(wrap +: adapter.availableItems)
+          adapter.notifyDataSetChanged
+        }
     }
 
     itemsList setOnItemClickListener host.onTap { pos =>
-      val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val outside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
 
@@ -135,6 +136,7 @@ class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with T
       val humanViews = for (payData <- outputs) yield payData.cute(marking).html
 
       // Wire up a popup list
+      val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
       lst setAdapter new ArrayAdapter(host, R.layout.frag_top_tip, R.id.actionTip, humanViews.toArray)
       lst setOnItemClickListener host.onTap { position => outputs(position - 1).onClick }
       lst setHeaderDividersEnabled false
@@ -179,7 +181,7 @@ class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with T
     me.toolbar = view.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     me.toolbar setOnClickListener host.onButtonTap(updDenom)
     me.toolbar setOnMenuItemClickListener barMenuListener
-    me.toolbar.inflateMenu(R.menu.transactions_ops)
+    me.toolbar.inflateMenu(R.menu.ln_wallet_ops)
 
     app.kit.wallet addCoinsSentEventListener txTracker
     app.kit.wallet addCoinsReceivedEventListener txTracker
@@ -199,8 +201,8 @@ class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with T
       if (txs.isEmpty) mnemonicInfo setText mnemonicInfoText.html
     }
 
-    // Manually update title and subtitle after we have a toolbar
-    add(me getString constListener.status, Informer.PEER).uitask.run
+    // Manually update title and subtitle once toolbar is there
+    add(me getString constListener.status, Informer.PEER).run
     updTitle
   }
 
@@ -217,9 +219,9 @@ class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with T
   }
 
   def notifyBtcEvent(message: String) = {
-    add(message, Informer.BTCEVENT).uitask.run
     host.timer.schedule(delete(Informer.BTCEVENT), 8000)
-    host runOnUiThread updTitle
+    add(message, Informer.BTCEVENT).run
+    UITask(updTitle).run
   }
 
   def nativeTransactions = {
@@ -241,9 +243,9 @@ class FragBTC(val host: WalletActivity) extends Fragment with ListUpdater with T
       case ok @ Success(ms) =>
         val processor = new host.TxProcessor {
           val pay = AddrData(ms, spendManager.getAddress)
-          override def processTx(pass: String, feePerKb: Coin) = {
-            add(me getString tx_announcing, Informer.BTCEVENT).uitask.run
-            <(app.kit blockingSend makeTx(pass, feePerKb), onTxFail)(none)
+          override def processTx(passcode: String, feePerKb: Coin) = {
+            <(app.kit blockingSend makeTx(passcode, feePerKb), onTxFail)(none)
+            add(me getString tx_announcing, Informer.BTCEVENT).run
           }
 
           override def onTxFail(err: Throwable) =

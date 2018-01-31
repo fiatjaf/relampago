@@ -1,10 +1,26 @@
 <RelativeLayout
     style="@style/StandardLinearLayoutPage"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:fab="http://schemas.android.com/apk/res-auto">
 
     <LinearLayout style="@style/StandardLinearLayout">
-        <include layout="@layout/toolbar"/>
+
+        <android.support.v7.widget.Toolbar
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+            app:subtitleTextAppearance="@style/ToolbarSubtitleAppearance"
+            app:titleTextAppearance="@style/ToolbarTitleAppearance"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+            android:background="?attr/colorPrimaryDark"
+            android:layout_width="match_parent"
+            android:layout_height="86sp"
+            android:id="@+id/toolbar"
+            android:gravity="top"
+
+            app:contentInsetLeft="@dimen/app_padding"
+            app:contentInsetStart="@dimen/app_padding"
+            app:contentInsetRight="@dimen/app_padding"
+            app:contentInsetEnd="@dimen/app_padding"/>
 
         <ListView
             android:layout_weight="1"
@@ -18,16 +34,22 @@
             android:id="@+id/mnemonicWarn"
             style="@style/WarnLinearLayout">
 
+            <Button
+                style="@style/MarginInfo"
+                android:drawablePadding="5dp"
+                android:drawableLeft="@drawable/ic_verified_user_black_18dp"
+                android:text="@string/sets_mnemonic"
+                android:layout_width="wrap_content"
+                android:onClick="viewMnemonic"/>
+
+            <View
+                android:id="@+id/actionDivider"
+                style="@style/GrayDivider"/>
+
             <TextView
                 style="@style/MarginInfo"
                 android:id="@+id/mnemonicInfo"
                 android:layout_width="wrap_content"/>
-
-            <Button
-                style="@style/Info"
-                android:onClick="viewMnemonic"
-                android:layout_width="wrap_content"
-                android:text="@string/sets_mnemonic"/>
 
         </LinearLayout>
     </LinearLayout>

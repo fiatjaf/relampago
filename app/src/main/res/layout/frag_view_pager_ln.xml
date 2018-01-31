@@ -2,10 +2,26 @@
     style="@style/StandardLinearLayoutPage"
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:fab="http://schemas.android.com/apk/res-auto"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/container">
 
     <LinearLayout style="@style/StandardLinearLayout">
-        <include layout="@layout/toolbar"/>
+
+        <android.support.v7.widget.Toolbar
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+            app:subtitleTextAppearance="@style/ToolbarSubtitleAppearance"
+            app:titleTextAppearance="@style/ToolbarTitleAppearance"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+            android:background="?attr/colorPrimaryDark"
+            android:layout_width="match_parent"
+            android:layout_height="86sp"
+            android:id="@+id/toolbar"
+            android:gravity="top"
+
+            app:contentInsetLeft="@dimen/app_padding"
+            app:contentInsetStart="@dimen/app_padding"
+            app:contentInsetRight="@dimen/app_padding"
+            app:contentInsetEnd="@dimen/app_padding"/>
 
         <Button
             style="@style/MarginInfo"
@@ -16,6 +32,7 @@
 
         <Button
             style="@style/MarginInfo"
+            android:drawablePadding="5dp"
             android:drawableLeft="@drawable/ic_info_outline_black_18dp"
             android:layout_width="wrap_content"
             android:text="@string/ln_details"

@@ -39,7 +39,7 @@ import scala.util.{Success, Try}
 
 
 trait SearchBar { me =>
-  var react: String => Any = none
+  var react: String => Unit = none
   private[this] val queryListener = new OnQueryTextListener {
     def onQueryTextChange(qt: String) = runAnd(true)(me react qt)
     def onQueryTextSubmit(qt: String) = true
@@ -88,23 +88,20 @@ trait ToolbarFragment extends HumanTimeDisplay { me =>
   var infos = List.empty[Informer]
   var toolbar: Toolbar = _
 
-  lazy val uitask = host uiTask {
-    toolbar setSubtitle infos.head.value
-  }
-
   // Informer CRUD
-  def delete(tag: Int) = host uiTask {
+  def delete(tag: Int) = host UITask {
     infos = infos.filterNot(_.tag == tag)
     toolbar setSubtitle infos.head.value
   }
 
-  def add(text: String, tag: Int) = {
+  def add(text: String, tag: Int) = host UITask {
     infos = new Informer(text, tag) :: infos
-    me
+    toolbar setSubtitle infos.head.value
   }
 
-  def update(text: String, tag: Int) = runAnd(me) {
-    for (info <- infos if info.tag == tag) info.value = text
+  def update(text: String, tag: Int) = host UITask {
+    for (vs <- infos if vs.tag == tag) vs.value = text
+    toolbar setSubtitle infos.head.value
   }
 
   def setTitle(titleText: String) = {
@@ -122,9 +119,9 @@ trait ListUpdater extends HumanTimeDisplay {
 
   def startListUpdates(list: ListView, adapter: BaseAdapter) = list setOnScrollListener new OnScrollListener {
     def onScroll(absListView: AbsListView, firstListElement: Int, visibleElement: Int, totalElements: Int) = none
-    def maybeUpdate = anyToRunnable { if (SCROLL_STATE_IDLE == state) adapter.notifyDataSetChanged }
-    def onScrollStateChanged(v: AbsListView, newState: Int) = state = newState
-    host.timer.schedule(host uiTask maybeUpdate, 10000, 10000)
+    def onScrollStateChanged(absListView: AbsListView, newState: Int) = state = newState
+    def maybeUpdate = if (SCROLL_STATE_IDLE == state) adapter.notifyDataSetChanged
+    host.timer.schedule(host UITask maybeUpdate, 10000, 10000)
     allTxsWrapper setVisibility View.GONE
     list addFooterView allTxsWrapper
   }
@@ -170,9 +167,9 @@ trait ListUpdater extends HumanTimeDisplay {
 
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[android.support.v4.view.ViewPager]
-  lazy val walletPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
-  lazy val fragBTC = new FragBTC(me)
-  lazy val fragLN = new FragLN(me)
+  lazy val walletPagerIndicator = findViewById(R.id.walletPagerIndicator).asInstanceOf[CircleIndicator]
+  lazy val fragBTC = new FragBTC
+  lazy val fragLN = new FragLN
 
   lazy val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
@@ -186,20 +183,22 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   override def onResume = wrap(super.onResume)(checkTransData)
   override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
-    getMenuInflater.inflate(R.menu.ln_normal_ops, menu)
+    // This is called shortly after fragLN sets bar as actionbar
+    getMenuInflater.inflate(R.menu.ln_wallet_ops, menu)
     fragLN setupSearch menu
   }
 
-  override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
-    if (m.getItemId == R.id.actionChanInfo) enterChannelSpace
+  override def onOptionsItemSelected(m: MenuItem) = {
+    if (m.getItemId == R.id.actionChanInfo) goLNOps(null)
     else if (m.getItemId == R.id.actionSettings) mkSetsForm
+    true
   }
 
   def INIT(state: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_wallet
-    wrap(me setDetecting true)(me initNfc state)
     walletPager setAdapter slidingFragmentAdapter
     walletPagerIndicator setViewPager walletPager
+    wrap(me setDetecting true)(me initNfc state)
   } else me exitTo classOf[MainActivity]
 
   def readEmptyNdefMessage = app toast nfc_error
@@ -221,9 +220,22 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def checkTransData = {
     app.TransData.value match {
-      case pr: PaymentRequest => if (pr.isFresh) fragLN sendPayment pr else onFail(me getString err_ln_old)
-      case link: BitcoinURI => fragBTC.sendBtcPopup.set(Try(link.getAmount), link.getAddress)
-      case address: Address => fragBTC.sendBtcPopup setAddress address
+      case pr: PaymentRequest if pr.isFresh =>
+        walletPager.setCurrentItem(1, true)
+        fragLN sendPayment pr
+
+      case pr: PaymentRequest =>
+        onFail(me getString err_ln_old)
+
+      case link: BitcoinURI =>
+        walletPager.setCurrentItem(0, true)
+        val tryMsat: TryMSat = Try(link.getAmount)
+        fragBTC.sendBtcPopup.set(tryMsat, link.getAddress)
+
+      case address: Address =>
+        walletPager.setCurrentItem(0, true)
+        fragBTC.sendBtcPopup.setAddress(address)
+
       case _ =>
     }
 
@@ -232,12 +244,18 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   def goQR(top: View) = me goTo classOf[ScanActivity]
-  def goLNOps(top: View) = me goTo classOf[LNOpsActivity]
   def goReceive(top: View) = fragLN.makePaymentRequest.run
+  def goPay(top: View) = fragBTC.sendBtcPopup
 
   def goReceiveBtcAddress(top: View) = {
     app.TransData.value = app.kit.currentAddress
     me goTo classOf[RequestActivity]
+  }
+
+  def goLNOps(top: View) = {
+    val nothingToShow = app.ChannelManager.all.isEmpty
+    if (nothingToShow) app toast ln_notify_none
+    else me goTo classOf[LNOpsActivity]
   }
 
   def tryGoLNStart(top: View) = {
@@ -271,12 +289,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
     mkForm(me negBld dialog_ok, getString(fiat_set_denom).html, form)
-  }
-
-  def enterChannelSpace = {
-    val nothingToShow = app.ChannelManager.all.isEmpty
-    if (nothingToShow) app toast ln_notify_none
-    else me goTo classOf[LNOpsActivity]
   }
 
   def mkSetsForm: Unit = {
@@ -382,18 +394,18 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     def proceed: Unit = rm(alert) {
       val view1 \ field1 = generatePromptView(InputType.TYPE_CLASS_TEXT, ln_olympus_ip, null)
-      val dialog = mkChoiceDialog(trySave(field1.getText.toString), none, dialog_ok, dialog_cancel)
+      val dialog = mkChoiceDialog(me delayUI trySave(field1.getText.toString), none, dialog_ok, dialog_cancel)
       mkForm(dialog, me getString sets_olympus, view1)
       field1 setText LNParams.cloud.data.url
     }
 
-    def trySave(url1: String) = delayUI {
+    def trySave(url1: String): Unit = {
       val data1 = LNParams.cloud.data.copy(url = url1)
       val cloud1 = LNParams getCloud Success(data1)
 
       cloud1.checkIfWorks.subscribe(done => {
-        // Just send a dummy data with signature
-        runOnUiThread(app toast ln_olympus_success)
+        // Just send some dummy data with signature
+        UITask(app toast ln_olympus_success).run
         CloudDataSaver saveObject data1
         LNParams.cloud = cloud1
       }, onError)

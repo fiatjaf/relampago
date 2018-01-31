@@ -1,9 +1,6 @@
 package com.lightning.wallet.ln
 
-import com.lightning.wallet.lnutils.ImplicitConversions._
-import java.io.{PrintWriter, StringWriter}
 import com.lightning.wallet.ln.Tools.wrap
-import com.lightning.wallet.Utils.app
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
 import crypto.RandomGenerator
@@ -23,21 +20,11 @@ object \ {
 object Tools {
   type Bytes = Array[Byte]
   val random = new RandomGenerator
-  def runAnd[T](resultData: T)(action: Any): T = resultData
+  def runAnd[T](result: T)(action: Any): T = result
+  def errlog(error: Throwable): Unit = error.printStackTrace
+  def log(message: String): Unit = android.util.Log.d("LN", message)
   def wrap(run: => Unit)(go: => Unit) = try go catch none finally run
   def none: PartialFunction[Any, Unit] = { case _ => }
-
-  def log(message: String) =
-    app.currentActivity foreach { act =>
-      act.runOnUiThread(app setBuffer message)
-    }
-
-  def errlog(error: Throwable) =
-    app.currentActivity foreach { act =>
-      val stackTraceWriter = new StringWriter
-      error printStackTrace new PrintWriter(stackTraceWriter)
-      act.runOnUiThread(app setBuffer stackTraceWriter.toString)
-    }
 
   def fromShortId(id: Long): (Int, Int, Int) = {
     val blockNumber = id.>>(40).&(0xFFFFFF).toInt

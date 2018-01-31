@@ -72,10 +72,10 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
       }
     }
 
-    MainActivity.proceed = anyToRunnable {
-      // Unconditionally go to wallet activity
+    MainActivity.proceed = UITask {
+      // Unconditionally go to wallet
       me exitTo classOf[WalletActivity]
-    }
+    }.run
 
     // When activity is re-accessed after initial
     // NFC check we need to call next manually
@@ -163,7 +163,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     val alert = mkForm(me negBld dialog_cancel, me getString restore_hint, lst)
 
     // Offer user a choice between entering a raw or an encrypted mnemonic code
-    lst setOnItemClickListener onTap { case 1 => rm(alert)(goRestoreWallet) case _ => proceed }
+    lst setOnItemClickListener onTap { case 1 => rm(alert)(exitRestoreWallet) case _ => proceed }
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, mnemonicOptions)
     lst setDividerHeight 0
     lst setDivider null
@@ -187,11 +187,11 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
         val plain = AES.decode(hash.toArray)(packed.toArray)
         require(isMnemonicCorrect(plain), "Wrong password")
         app.TransData.value = plain
-        goRestoreWallet
+        exitRestoreWallet
       }
     }
   }
 
-  def goRestoreWallet: Unit = me exitTo classOf[WalletRestoreActivity]
-  def goCreateWallet(view: View) = me exitTo classOf[WalletCreateActivity]
+  def exitRestoreWallet = me exitTo classOf[WalletRestoreActivity]
+  def exitCreateWallet(view: View) = me exitTo classOf[WalletCreateActivity]
 }
