@@ -4,10 +4,7 @@ import R.string._
 import com.lightning.wallet.Utils._
 import com.journeyapps.barcodescanner._
 import com.lightning.wallet.ln.Tools.{none, wrap}
-import android.content.DialogInterface.BUTTON_POSITIVE
-import com.lightning.wallet.ln.PaymentRequest
-import org.bitcoinj.uri.BitcoinURI
-import org.bitcoinj.core.Address
+import android.content.DialogInterface.BUTTON_NEGATIVE
 import android.os.Bundle
 
 
@@ -17,7 +14,7 @@ class ScanActivity extends TimerActivity with BarcodeCallback { me =>
   type Points = java.util.List[com.google.zxing.ResultPoint]
   private[this] var lastAttempt = System.currentTimeMillis
 
-  def INIT(state: Bundle) = {
+  def INIT(savedInstance: Bundle) = {
     setContentView(R.layout.activity_scan)
     reader decodeContinuous me
   }
@@ -30,11 +27,10 @@ class ScanActivity extends TimerActivity with BarcodeCallback { me =>
     app.TransData recordValue text
     me exitTo classOf[WalletActivity]
 
-    // Parsing error may occur
   } catch app.TransData.onFail { code =>
-    val bld = negBld(dialog_ok) setMessage code
-    val ok = showForm(bld.create) getButton BUTTON_POSITIVE
-    ok setOnClickListener onButtonTap(reader.resume)
+    val alert = showForm(negBld(dialog_ok).setMessage(code).create)
+    alert getButton BUTTON_NEGATIVE setOnClickListener onButtonTap(proceed)
+    def proceed = rm(alert)(reader.resume)
     app toast text
 
     // Pause anyway

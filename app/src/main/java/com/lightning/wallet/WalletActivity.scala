@@ -1,5 +1,6 @@
 package com.lightning.wallet
 
+import android.view._
 import android.widget._
 import com.lightning.wallet.ln._
 import com.lightning.wallet.Utils._
@@ -14,32 +15,35 @@ import android.widget.AbsListView.OnScrollListener._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
+import scala.util.{Success, Try}
+import android.support.v7.widget.{SearchView, Toolbar}
+import android.provider.Settings.{System => FontSystem}
+import com.lightning.wallet.lnutils.{CloudDataSaver, PublicCloud, RatesSaver}
+import fr.castorflex.android.smoothprogressbar.SmoothProgressDrawable
+import fr.castorflex.android.smoothprogressbar.SmoothProgressBar
 import android.support.v7.widget.SearchView.OnQueryTextListener
-import android.support.v4.app.FragmentStatePagerAdapter
+import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
+import android.content.Context.LAYOUT_INFLATER_SERVICE
 import org.ndeftools.util.activity.NfcReaderActivity
 import android.widget.AbsListView.OnScrollListener
 import me.relex.circleindicator.CircleIndicator
+import android.view.ViewGroup.LayoutParams
 import org.bitcoinj.store.SPVBlockStore
 import com.lightning.wallet.helper.AES
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
 import org.bitcoinj.core.Address
+import scala.collection.mutable
 import fr.acinq.bitcoin.Satoshi
 import android.text.InputType
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
 
-import com.lightning.wallet.lnutils.{CloudDataSaver, PublicCloud, RatesSaver}
-import android.provider.Settings.{System => FontSystem}
-import android.support.v7.widget.{SearchView, Toolbar}
-import android.view.{Menu, MenuItem, View, ViewGroup}
-import scala.util.{Success, Try}
-
 
 trait SearchBar { me =>
-  var react: String => Unit = none
+  var react: String => Unit = _
   private[this] val queryListener = new OnQueryTextListener {
     def onQueryTextChange(qt: String) = runAnd(true)(me react qt)
     def onQueryTextSubmit(qt: String) = true
@@ -52,6 +56,7 @@ trait SearchBar { me =>
 }
 
 trait HumanTimeDisplay {
+  val host: TimerActivity
   val time: Date => String = date => new SimpleDateFormat(timeString) format date
   lazy val bigFont = FontSystem.getFloat(host.getContentResolver, FontSystem.FONT_SCALE, 1) > 1
 
@@ -76,7 +81,6 @@ trait HumanTimeDisplay {
     case true => "d MMMM yyyy' <small>'HH:mm'</small>'"
   }
 
-  val host: TimerActivity
   def when(now: Long, date: Date) = date.getTime match { case ago =>
     if (now - ago < 129600000) getRelativeTimeSpanString(ago, now, 0).toString
     else time(date)
@@ -86,7 +90,7 @@ trait HumanTimeDisplay {
 trait ToolbarFragment extends HumanTimeDisplay { me =>
   // Manages multiple info tickers in toolbar subtitle
   var infos = List.empty[Informer]
-  var toolbar: Toolbar = _
+  val toolbar: Toolbar
 
   // Informer CRUD
   def delete(tag: Int) = host UITask {
@@ -165,27 +169,60 @@ trait ListUpdater extends HumanTimeDisplay {
   }
 }
 
+object WalletActivity {
+  val frags = mutable.Set.empty[Fragment]
+  def lnOpt = frags collectFirst { case ln: FragLN => ln.worker }
+  def btcOpt = frags collectFirst { case btc: FragBTC => btc.worker }
+}
+
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val walletPagerIndicator = findViewById(R.id.walletPagerIndicator).asInstanceOf[CircleIndicator]
-  lazy val fragBTC = new FragBTC
-  lazy val fragLN = new FragLN
+  lazy val layoutInflater = app.getSystemService(LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
+  lazy val viewParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
+  lazy val container = findViewById(R.id.container).asInstanceOf[FrameLayout]
+  import WalletActivity.{lnOpt, btcOpt}
 
   lazy val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
-      def getItem(pos: Int) = if (pos == 0) fragBTC else fragLN
+      def getItem(pos: Int) = if (pos == 0) new FragBTC else new FragLN
       def getCount = 2
     }
+
+  app.ChannelManager.getOutPaymentObs = rpi => {
+    // Stopping animation immediately does not work sometimes so we use a guarded timer here once again
+    // On entering this activity we show a progress bar animation, a call may happen outside of this activity
+    val progressBar = layoutInflater.inflate(R.layout.frag_progress_bar, null).asInstanceOf[SmoothProgressBar]
+    val drawable = progressBar.getIndeterminateDrawable.asInstanceOf[SmoothProgressDrawable]
+    def attach = container.addView(progressBar, viewParams)
+    UITask(attach).run
+
+    drawable setCallbacks new SmoothProgressDrawable.Callbacks {
+      // Sometimes timer may already be disabled and will throw here because activity has been killed
+      def onStart = try drawable.setColors(getResources getIntArray R.array.bar_colors) catch none
+      def onStop = try timer.schedule(UITask(container removeView progressBar), 250) catch none
+    }
+
+    app.ChannelManager outPaymentObs rpi doOnTerminate {
+      val stopTimerTask = UITask(progressBar.progressiveStop)
+      try timer.schedule(stopTimerTask, 250) catch none
+    }
+  }
+
+  override def onDestroy = wrap(super.onDestroy) {
+    // Once activity is destroyed we put default loader back in place
+    app.ChannelManager.getOutPaymentObs = app.ChannelManager.outPaymentObs
+    stopDetecting
+  }
 
   override def onBackPressed =
     if (walletPager.getCurrentItem == 0) super.onBackPressed
     else walletPager.setCurrentItem(walletPager.getCurrentItem - 1)
 
-  override def onResume = wrap(super.onResume)(checkTransData)
   override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
     // This is called shortly after fragLN sets bar as actionbar
-    getMenuInflater.inflate(R.menu.ln_wallet_ops, menu)
-    fragLN setupSearch menu
+    getMenuInflater.inflate(R.menu.ln, menu)
+    for (ln <- lnOpt) ln setupSearch menu
   }
 
   override def onOptionsItemSelected(m: MenuItem) = {
@@ -218,34 +255,17 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     app toast nfc_error
   }
 
-  def checkTransData = {
-    app.TransData.value match {
-      case pr: PaymentRequest if pr.isFresh =>
-        walletPager.setCurrentItem(1, true)
-        fragLN sendPayment pr
-
-      case pr: PaymentRequest =>
-        onFail(me getString err_ln_old)
-
-      case link: BitcoinURI =>
-        walletPager.setCurrentItem(0, true)
-        val tryMsat: TryMSat = Try(link.getAmount)
-        fragBTC.sendBtcPopup.set(tryMsat, link.getAddress)
-
-      case address: Address =>
-        walletPager.setCurrentItem(0, true)
-        fragBTC.sendBtcPopup.setAddress(address)
-
-      case _ =>
-    }
-
-    // Always clear after checking
-    app.TransData.value = null
+  def checkTransData = app.TransData.value match {
+    case link: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(link.getAmount), link.getAddress)
+    case bitcoinAddress: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddress(bitcoinAddress)
+    case pr: PaymentRequest if pr.isFresh => for (ln <- lnOpt) ln.sendPayment(pr)
+    case pr: PaymentRequest => onFail(me getString err_ln_old)
+    case _ =>
   }
 
   def goQR(top: View) = me goTo classOf[ScanActivity]
-  def goReceive(top: View) = fragLN.makePaymentRequest.run
-  def goPay(top: View) = fragBTC.sendBtcPopup
+  def goBTCSendForm(top: View) = for (btc <- btcOpt) btc.sendBtcPopup
+  def goReceiveLNForm(top: View) = for (ln <- lnOpt) ln.makePaymentRequest.run
 
   def goReceiveBtcAddress(top: View) = {
     app.TransData.value = app.kit.currentAddress
@@ -280,12 +300,17 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     case _ => me goTo classOf[LNStartActivity]
   }
 
-  def showDenomChooser(change: Int => Unit) = {
+  def showDenomChooser = {
     val denominations = getResources.getStringArray(R.array.denoms).map(_.html)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
     val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
 
-    lst setOnItemClickListener onTap(change)
+    lst setOnItemClickListener onTap { pos =>
+      wrap(app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit) { denom = denoms apply pos }
+      for (ln <- lnOpt) wrap(ln.adapter.notifyDataSetChanged)(ln.reWireChannelOrNone.run)
+      for (btc <- btcOpt) wrap(btc.adapter.notifyDataSetChanged)(btc.updTitle)
+    }
+
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
     mkForm(me negBld dialog_ok, getString(fiat_set_denom).html, form)

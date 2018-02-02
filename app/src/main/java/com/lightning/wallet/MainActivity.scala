@@ -18,7 +18,6 @@ import concurrent.ExecutionContext.Implicits.global
 import org.bitcoinj.wallet.WalletProtobufSerializer
 import com.lightning.wallet.ln.LNParams
 import com.lightning.wallet.helper.AES
-import com.lightning.wallet.ln.Tools
 import scala.concurrent.Future
 import java.io.FileInputStream
 import android.text.InputType
@@ -75,11 +74,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     MainActivity.proceed = UITask {
       // Unconditionally go to wallet
       me exitTo classOf[WalletActivity]
-    }.run
-
-    // When activity is re-accessed after initial
-    // NFC check we need to call next manually
-    if (intentProcessed) onNoNfcIntentFound
+    }
   }
 
   // NFC AND SHARE
@@ -147,14 +142,14 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     LNParams setup app.kit.decryptSeed(password).getSeedBytes
   }
 
-  def wrongPass(err: Throwable) = {
+  def wrongPass(authError: Throwable) = {
     setVis(View.GONE, View.VISIBLE, View.GONE)
-    Tools log err.getMessage
+    app toast authError.getMessage
   }
 
   def inform(messageCode: Int): Unit = {
     val dlg = mkChoiceDialog(next, finish, dialog_ok, dialog_cancel)
-    showForm(alertDialog = dlg.setMessage(messageCode).create)
+    showForm(dlg.setMessage(messageCode).create)
   }
 
   def goRestoreWallet(view: View) = {

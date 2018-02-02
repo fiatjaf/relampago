@@ -1,9 +1,8 @@
 <RelativeLayout
     style="@style/StandardLinearLayoutPage"
-    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:fab="http://schemas.android.com/apk/res-auto"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/container">
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
     <LinearLayout style="@style/StandardLinearLayout">
 
@@ -51,8 +50,8 @@
 
         <LinearLayout
             android:layout_weight="1"
-            android:visibility="gone"
             android:id="@+id/lnChanWarn"
+            android:visibility="invisible"
             style="@style/WarnLinearLayout">
 
             <TextView
@@ -74,10 +73,10 @@
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"
             fab:fab_label="@string/ln_receive"
+            android:onClick="goReceiveLNForm"
             fab:fab_colorPressed="@color/ln"
             fab:fab_colorNormal="@color/ln"
             fab:fab_colorRipple="@color/ln"
-            android:onClick="goReceive"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 

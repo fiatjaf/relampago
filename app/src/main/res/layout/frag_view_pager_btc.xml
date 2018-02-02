@@ -4,7 +4,8 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:fab="http://schemas.android.com/apk/res-auto">
 
-    <LinearLayout style="@style/StandardLinearLayout">
+    <LinearLayout
+        style="@style/StandardLinearLayout">
 
         <android.support.v7.widget.Toolbar
             android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
@@ -30,7 +31,7 @@
 
         <LinearLayout
             android:layout_weight="1"
-            android:visibility="gone"
+            android:visibility="invisible"
             android:id="@+id/mnemonicWarn"
             style="@style/WarnLinearLayout">
 
@@ -49,6 +50,7 @@
             <TextView
                 style="@style/MarginInfo"
                 android:id="@+id/mnemonicInfo"
+                android:text="@string/mnemonic_info"
                 android:layout_width="wrap_content"/>
 
         </LinearLayout>
@@ -67,8 +69,8 @@
             fab:fab_colorPressed="@color/btc"
             fab:fab_colorNormal="@color/btc"
             fab:fab_colorRipple="@color/btc"
+            android:onClick="goBTCSendForm"
             style="@style/FabButton"
-            android:onClick="goPay"
             fab:fab_size="mini"/>
 
         <com.github.clans.fab.FloatingActionButton

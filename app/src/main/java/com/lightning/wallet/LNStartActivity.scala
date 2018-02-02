@@ -85,7 +85,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
 
   override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
     // Can search nodes by their aliases and use a QR node scanner
-    getMenuInflater.inflate(R.menu.ln_start_ops, menu)
+    getMenuInflater.inflate(R.menu.ln_start, menu)
     setupSearch(menu)
   }
 
@@ -111,7 +111,6 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
       override def onBecome = {
         case (_, WaitFundingData(_, cmd, accept), WAIT_FOR_ACCEPT, WAIT_FOR_FUNDING) =>
           // Peer has agreed to open a channel so now we ask user for a tx feerate
-          println("ASKING FOR A FEERATE")
           askForFeerate(freshChan, cmd, accept).run
 
         case (_, _, _, CLOSING) =>
@@ -128,8 +127,11 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
           // Error while saving will halt any further progress here
           // User may press cancel at this point but it won't affect anything
           val state = RefundingData(wait.announce, wait.commitments).toJson.toString
-          // Save a channel backup right away, in worst case it will be saved once channel becomes OPEN if there are no tokens
-          LNParams.cloud doProcess CloudAct(AES.encode(state, LNParams.cloudSecret), Seq("key" -> LNParams.cloudId.toString), "data/put")
+          val encryptedRefunding = AES.encode(state, LNParams.cloudSecret)
+
+          // Save a channel backup right away, don't wait until a channel becomes operational
+          // in worst case it will be saved once channel becomes OPEN if there are no tokens currently
+          LNParams.cloud doProcess CloudAct(encryptedRefunding, Seq("key" -> LNParams.cloudId.toString), "data/put")
           // Make this a fully established channel by attaching operational listeners and adding it to list
           freshChan.listeners ++= app.ChannelManager.operationalListeners
           app.ChannelManager.all +:= freshChan

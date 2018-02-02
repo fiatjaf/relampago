@@ -123,7 +123,7 @@ trait TimerActivity extends AppCompatActivity { me =>
 
   def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
   def rm(previous: Dialog)(exec: => Unit) = wrap(previous.dismiss)(me delayUI exec)
-  def mkForm(bld: Builder, title: View, content: View) = showForm(bld.setCustomTitle(title).setView(content).create)
+  def mkForm(bld: Builder, title: View, body: View) = showForm(bld.setCustomTitle(title).setView(body).create)
   def onFail(error: CharSequence): Unit = UITask(mkForm(me negBld dialog_ok, null, error).show).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
 

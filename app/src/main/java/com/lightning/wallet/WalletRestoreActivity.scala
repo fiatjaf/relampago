@@ -84,8 +84,10 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch { me =>
   }
 
   override def onBackPressed = wrap(super.onBackPressed)(app.kit.stopAsync)
-  def getMnemonicText = restoreCode.getText.toString.trim.toLowerCase
-    .replaceAll("[^a-zA-Z0-9']+", " ")
+  def getMnemonicText = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")
+  def whenDialog = mkChoiceDialog(restoreWhen setText datePicker.human, none, dialog_ok, dialog_cancel)
+  def setWhen(top: View) = mkForm(whenDialog, null, datePicker.pure)
+  def recWallet(top: View) = hideKeys(doRecoverWallet)
 
   def doRecoverWallet =
     app.kit = new app.WalletKit {
@@ -117,8 +119,4 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch { me =>
         }
       }
     }
-
-  def recWallet(v: View) = hideKeys(doRecoverWallet)
-  def setWhen(v: View) = mkForm(mkChoiceDialog(restoreWhen setText datePicker.human,
-    none, dialog_ok, dialog_cancel), title = null, content = datePicker.pure)
 }

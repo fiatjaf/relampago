@@ -3,15 +3,14 @@ package com.lightning.wallet
 import com.lightning.wallet.ln._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.lnutils.ImplicitConversions._
+import com.lightning.wallet.Utils.{denom, coloredOut, coloredIn, app, humanNode}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
-import com.lightning.wallet.Utils.{denom, coloredOut, coloredIn}
 import android.view.{LayoutInflater, View, ViewGroup}
-import com.lightning.wallet.Utils.{app, humanNode}
+import com.lightning.wallet.ln.Tools.{wrap, runAnd}
 
 import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import me.relex.circleindicator.CircleIndicator
-import com.lightning.wallet.ln.Tools.wrap
 import android.widget.Button
 import android.os.Bundle
 import java.util.Date
@@ -23,13 +22,21 @@ class LNOpsActivity extends TimerActivity { me =>
 
   lazy val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
-      def getItem(pos: Int) = new ChanDetailsFrag(app.ChannelManager all pos)
+      def getItem(itemPosition: Int) = bundledFrag(itemPosition)
       def getCount = app.ChannelManager.all.size
     }
 
   override def onBackPressed =
     if (chanPager.getCurrentItem == 0) super.onBackPressed
     else chanPager.setCurrentItem(chanPager.getCurrentItem - 1)
+
+  def bundledFrag(pos: Int) = {
+    val frag = new ChanDetailsFrag
+    val arguments: Bundle = new Bundle
+    arguments.putInt("position", pos)
+    frag setArguments arguments
+    frag
+  }
   
   def INIT(s: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_ln_ops)
@@ -38,13 +45,14 @@ class LNOpsActivity extends TimerActivity { me =>
   } else me exitTo classOf[MainActivity]
 }
 
-class ChanDetailsFrag(chan: Channel) extends Fragment with HumanTimeDisplay { me =>
-  override def onCreateView(inflator: LayoutInflater, vg: ViewGroup, bundle: Bundle) =
-    inflator.inflate(R.layout.frag_view_pager_chan, vg, false)
+class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
+  override def onCreateView(i: LayoutInflater, vg: ViewGroup, bn: Bundle) =
+    i.inflate(R.layout.frag_view_pager_chan, vg, false)
 
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
   lazy val host = getActivity.asInstanceOf[LNOpsActivity]
+  import host.UITask
 
   lazy val unilateralClosing = getString(ln_ops_chan_unilateral_closing)
   lazy val bilateralClosing = getString(ln_ops_chan_bilateral_closing)
@@ -52,7 +60,6 @@ class ChanDetailsFrag(chan: Channel) extends Fragment with HumanTimeDisplay { me
   lazy val refundStatus = getString(ln_ops_chan_refund_status)
   lazy val amountStatus = getString(ln_ops_chan_amount_status)
   lazy val commitStatus = getString(ln_ops_chan_commit_status)
-  import host.UITask
 
   private val humanStatus: DepthAndDead => String = {
     case confs \ false => app.plurOrZero(txsConfs, confs)
@@ -60,7 +67,9 @@ class ChanDetailsFrag(chan: Channel) extends Fragment with HumanTimeDisplay { me
     case _ => txsConfs.head
   }
 
+  var chan: Channel = _
   var whenStop: Runnable = _
+
   override def onStop = wrap(super.onStop)(whenStop.run)
   override def onViewCreated(view: View, state: Bundle) = {
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
@@ -70,9 +79,9 @@ class ChanDetailsFrag(chan: Channel) extends Fragment with HumanTimeDisplay { me
       // Updates UI accordingly to current chan state
 
       override def onBecome = {
-        case (_, w: WaitFundingDoneData, _, _) => manageFunding(w).run
+        case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
         case (_, _: NormalData, _, _) if chan.isOperational => manageOpen.run
-        case (_, c: ClosingData, _, _) if c.closings.nonEmpty => manageClosing(c).run
+        case (_, close: ClosingData, _, _) if close.closings.nonEmpty => manageClosing(close).run
         case (_, _: NormalData, _, _) if !chan.isOperational => manageNegotiations.run
         case (_, _: NegotiationsData, _, _) => manageNegotiations.run
         case _ => manageOther.run
@@ -109,7 +118,7 @@ class ChanDetailsFrag(chan: Channel) extends Fragment with HumanTimeDisplay { me
       lnOpsAction setText ln_chan_close
       lnOpsAction setVisibility View.VISIBLE
       closeOnClick(ln_chan_close_details)
-    }.run
+    }
 
     def manageOpen = UITask {
       val humanChannel = humanNode(chan(_.channelId).get.toString, "<br>")
@@ -143,7 +152,6 @@ class ChanDetailsFrag(chan: Channel) extends Fragment with HumanTimeDisplay { me
       data.closings maxBy {
         case Left(mutualTx) => txStatus(mutualTx.txid) match { case cfs \ _ => cfs }
         case Right(info) => txStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
-
       } match {
         case Left(mutualTx) =>
           val myBalance = mutualTx.txOut.map(_.amount).sum
@@ -183,11 +191,13 @@ class ChanDetailsFrag(chan: Channel) extends Fragment with HumanTimeDisplay { me
     }
 
     // Wire up local listener and reload it right away to update view
-    wrap(chanListener nullOnBecome chan)(chan.listeners += chanListener)
+    chan = app.ChannelManager.all(getArguments getInt "position")
     whenStop = UITask(chan.listeners -= chanListener)
+    chan.listeners += chanListener
+    chanListener nullOnBecome chan
   }
 
-  private def header(chan: Channel) = {
+  def header(chan: Channel) = {
     val humanStamp = me time new Date(chan(_.startedAt).get)
     val grayStamp = s"<font color=#999999>$humanStamp</font>"
     val alias = chan.data.announce.alias take 32

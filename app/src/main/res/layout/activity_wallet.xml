@@ -1,6 +1,7 @@
 <FrameLayout
+    style="@style/StandardLinearLayoutPage"
     xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="fill_parent" android:layout_height="fill_parent">
+    android:id="@+id/container">
 
     <android.support.v4.view.ViewPager
         android:layout_width="match_parent"
@@ -10,6 +11,6 @@
     <me.relex.circleindicator.CircleIndicator
         android:id="@+id/walletPagerIndicator"
         android:layout_width="match_parent"
-        android:layout_height="135sp"/>
+        android:layout_height="136sp"/>
 
 </FrameLayout>
