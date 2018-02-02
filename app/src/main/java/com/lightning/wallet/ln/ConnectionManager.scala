@@ -65,18 +65,25 @@ object ConnectionManager {
     work onComplete { _ => events onDisconnect ann }
     def disconnect = try socket.close catch none
 
-    // Some messages need a special handling so we intercept
-    def intercept(message: LightningMessage) = message match {
-      case their: Init if areSupported(their.localFeatures) =>
-        events.onOperational(ann, their)
-        savedInit = their
 
-      case ping: Ping if ping.pongLength > 0 =>
-        handler process Pong("00" * ping.pongLength)
-        lastPing = System.currentTimeMillis
+    def intercept(message: LightningMessage) = {
+      // Some incoming messages need special handling
+      // also update ping counter on every message
+      lastPing = System.currentTimeMillis
 
-      case _: Init => events.onTerminalError(ann)
-      case _ => events.onMessage(ann, message)
+      message match {
+        case their: Init if areSupported(their.localFeatures) =>
+          // We need to save their Init in case of repeated requests
+          events.onOperational(ann, their)
+          savedInit = their
+
+        case ping: Ping if ping.pongLength > 0 =>
+          val response = Pong("00" * ping.pongLength)
+          handler process response
+
+        case _: Init => events.onTerminalError(ann)
+        case _ => events.onMessage(ann, message)
+      }
     }
   }
 
