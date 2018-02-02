@@ -32,7 +32,7 @@
         <Button
             style="@style/MarginInfo"
             android:drawablePadding="5dp"
-            android:drawableLeft="@drawable/ic_info_outline_black_18dp"
+            android:drawableLeft="@drawable/ic_info_black_18dp"
             android:layout_width="wrap_content"
             android:text="@string/ln_details"
             android:id="@+id/viewChannelInfo"

@@ -58,7 +58,7 @@ class FragLN extends Fragment { me =>
 
 class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater with ToolbarFragment with SearchBar { me =>
   import host.{getResources, rm, getString, onFail, UITask, getSupportLoaderManager, str2View, timer, getLayoutInflater, onTap}
-  import host.{onButtonTap, <, mkForm, negBld, negPosBld, mkChoiceDialog}
+  import host.{onButtonTap, onFastTap, <, mkForm, negBld, negPosBld, mkChoiceDialog}
 
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
@@ -366,8 +366,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
     }
   }
 
-  toggler setOnClickListener onButtonTap {
-    // Expand and collapse available LN payments
+  toggler setOnClickListener onFastTap {
+    // Expand and collapse LN payments
 
     adapter.switch
     adapter set adapter.availableItems
@@ -379,7 +379,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
   startListUpdates(itemsList, adapter)
 
   // LN page toolbar is going to be WalletActicity action bar
-  toolbar setOnClickListener host.onButtonTap(host.showDenomChooser)
+  toolbar setOnClickListener onFastTap(host.showDenomChooser)
   add(getString(ln_notify_none), Informer.LNSTATE).run
   host setSupportActionBar toolbar
 

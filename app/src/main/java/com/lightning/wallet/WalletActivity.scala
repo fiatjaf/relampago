@@ -23,6 +23,7 @@ import com.lightning.wallet.lnutils.{CloudDataSaver, PublicCloud, RatesSaver}
 import fr.castorflex.android.smoothprogressbar.SmoothProgressDrawable
 import fr.castorflex.android.smoothprogressbar.SmoothProgressBar
 import android.support.v7.widget.SearchView.OnQueryTextListener
+import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
 import org.ndeftools.util.activity.NfcReaderActivity
 import android.widget.AbsListView.OnScrollListener
@@ -45,8 +46,8 @@ import java.util.Date
 trait SearchBar { me =>
   var react: String => Unit = _
   private[this] val queryListener = new OnQueryTextListener {
-    def onQueryTextChange(qt: String) = runAnd(true)(me react qt)
-    def onQueryTextSubmit(qt: String) = true
+    def onQueryTextChange(query: String) = runAnd(true)(me react query)
+    def onQueryTextSubmit(query: String) = true
   }
 
   def setupSearch(menu: Menu) = {
@@ -143,7 +144,7 @@ trait ListUpdater extends HumanTimeDisplay {
     val set: Vector[T] => Unit = items1 => {
       val visibility = if (items1.size > minLinesNum) View.VISIBLE else View.GONE
       val resource = if (cut == minLinesNum) R.drawable.ic_expand_more_black_24dp
-      else R.drawable.ic_expand_less_black_24dp
+        else R.drawable.ic_expand_less_black_24dp
 
       allTxsWrapper setVisibility visibility
       toggler setImageResource resource
@@ -231,8 +232,19 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     me setContentView R.layout.activity_wallet
     walletPager setAdapter slidingFragmentAdapter
     walletPagerIndicator setViewPager walletPager
+    walletPager addOnPageChangeListener new OnPageChangeListener {
+      walletPager.setCurrentItem(app.prefs.getInt(AbstractKit.LANDING, 0), false)
+      def onPageSelected(pos: Int) = app.prefs.edit.putInt(AbstractKit.LANDING, pos).commit
+      def onPageScrolled(pos: Int, positionOffset: Float, offsetPixels: Int) = none
+      def onPageScrollStateChanged (state: Int) = none
+    }
+
+    // NFC will happen while app is open so
+    // there is no need to run it from fragment
     wrap(me setDetecting true)(me initNfc state)
   } else me exitTo classOf[MainActivity]
+
+  // NFC
 
   def readEmptyNdefMessage = app toast nfc_error
   def readNonNdefMessage = app toast nfc_error
@@ -251,6 +263,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     app toast nfc_error
   }
 
+  // EXTERNAL DATA CHECK
+
   def checkTransData = app.TransData.value match {
     case link: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(link.getAmount), link.getAddress)
     case bitcoinAddress: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddress(bitcoinAddress)
@@ -258,6 +272,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     case pr: PaymentRequest => onFail(me getString err_ln_old)
     case _ =>
   }
+
+  //BUTTONS REACTIONS
 
   def goQR(top: View) = me goTo classOf[ScanActivity]
   def goBTCSendForm(top: View) = for (btc <- btcOpt) btc.sendBtcPopup
@@ -311,6 +327,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
     mkForm(me negBld dialog_ok, getString(fiat_set_denom).html, form)
   }
+
+  // SETTINGS FORM
 
   def mkSetsForm: Unit = {
     val leftOps = getResources getStringArray R.array.info_storage_tokens

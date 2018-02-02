@@ -168,19 +168,17 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   // Utils
-  def hideKeys(fun: => Unit): Unit = try {
+  def hideKeys(exec: => Unit): Unit = try {
     val mgr = getSystemService(INPUT_METHOD_SERVICE).asInstanceOf[InputMethodManager]
     mgr.hideSoftInputFromWindow(getCurrentFocus.getWindowToken, HIDE_NOT_ALWAYS)
-  } catch none finally me delayUI fun
+  } catch none finally me delayUI exec
 
   def onTap(run: Int => Unit): OnItemClickListener = new OnItemClickListener {
     def onItemClick(adapter: AdapterView[_], view: View, pos: Int, id: Long) = run(pos)
   }
 
-  def onButtonTap(run: => Unit): OnClickListener = new OnClickListener {
-    // Shortcut for click listener for buttons, also tries to hide a keyboard
-    def onClick(view: View) = me hideKeys run
-  }
+  def onButtonTap(exec: => Unit) = new OnClickListener { def onClick(view: View) = me hideKeys exec }
+  def onFastTap(exec: => Unit) = new OnClickListener { def onClick(view: View) = exec }
 
   def share(exportedTextData: String): Unit = startActivity {
     val share = new Intent setAction Intent.ACTION_SEND setType "text/plain"

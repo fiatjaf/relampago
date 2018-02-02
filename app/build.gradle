@@ -7,9 +7,9 @@ android {
 
     defaultConfig {
         applicationId "com.lightning.wallet"
-        versionName "0.02"
+        versionName "0.03"
         minSdkVersion 16
-        versionCode 8
+        versionCode 1
     }
 
     buildTypes {

@@ -50,7 +50,7 @@ class FragBTC extends Fragment { me =>
 class FragBTCWorker(val host: WalletActivity, frag: View) extends ListUpdater with ToolbarFragment {
   val barMenuListener = new OnMenuItemClickListener { def onMenuItemClick(m: MenuItem) = host onOptionsItemSelected m }
   import host.{getResources, getString, str2View, rm, mkForm, UITask, getLayoutInflater, negPosBld, TxProcessor}
-  import host.{timer, <, mkChoiceDialog, onButtonTap, onTap, onFail, showDenomChooser}
+  import host.{timer, <, mkChoiceDialog, onButtonTap, onFastTap, onTap, onFail, showDenomChooser}
 
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
@@ -256,7 +256,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListUpdater wi
     }
   }
 
-  toggler setOnClickListener onButtonTap {
+  toggler setOnClickListener onFastTap {
     // Expand and collapse BTC transactions
 
     adapter.switch
@@ -268,7 +268,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListUpdater wi
   itemsList setFooterDividersEnabled false
   startListUpdates(itemsList, adapter)
 
-  toolbar setOnClickListener onButtonTap(showDenomChooser)
+  toolbar setOnClickListener onFastTap(showDenomChooser)
   toolbar setOnMenuItemClickListener barMenuListener
   toolbar inflateMenu R.menu.btc
 
