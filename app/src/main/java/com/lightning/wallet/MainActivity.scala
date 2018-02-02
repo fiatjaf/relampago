@@ -65,8 +65,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     Utils clickableTextField findViewById(R.id.mainGreetings)
 
     mainPassKeysType setOnCheckedChangeListener new OnCheckedChangeListener {
-      def onCheckedChanged(fancyRadioGroupView: RadioGroup, newInputKeyType: Int) = {
-        app.prefs.edit.putBoolean(AbstractKit.PASS_INPUT, newInputKeyType == typePass).commit
+      def onCheckedChanged(fancyRadioGroupView: RadioGroup, inputKeyType: Int) = {
+        app.prefs.edit.putBoolean(AbstractKit.PASS_INPUT, inputKeyType == typePass).commit
         updateInputType
       }
     }
