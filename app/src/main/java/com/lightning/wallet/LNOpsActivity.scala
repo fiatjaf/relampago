@@ -6,11 +6,11 @@ import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.Utils.{denom, coloredOut, coloredIn, app, humanNode}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, View, ViewGroup}
-import com.lightning.wallet.ln.Tools.{wrap, runAnd}
 
 import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import me.relex.circleindicator.CircleIndicator
+import com.lightning.wallet.ln.Tools.wrap
 import android.widget.Button
 import android.os.Bundle
 import java.util.Date
@@ -25,10 +25,6 @@ class LNOpsActivity extends TimerActivity { me =>
       def getItem(itemPosition: Int) = bundledFrag(itemPosition)
       def getCount = app.ChannelManager.all.size
     }
-
-  override def onBackPressed =
-    if (chanPager.getCurrentItem == 0) super.onBackPressed
-    else chanPager.setCurrentItem(chanPager.getCurrentItem - 1)
 
   def bundledFrag(pos: Int) = {
     val frag = new ChanDetailsFrag

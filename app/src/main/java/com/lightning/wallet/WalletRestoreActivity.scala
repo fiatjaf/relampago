@@ -5,9 +5,7 @@ import collection.JavaConverters._
 import android.widget.DatePicker._
 import com.lightning.wallet.R.string._
 import org.bitcoinj.wallet.KeyChain.KeyPurpose._
-import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.hootsuite.nachos.terminator.ChipTerminatorHandler._
-
 import com.lightning.wallet.Utils.{app, isMnemonicCorrect}
 import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.wallet.{DeterministicSeed, Wallet}

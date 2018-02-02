@@ -18,11 +18,11 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import scala.util.{Success, Try}
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
+import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import com.lightning.wallet.lnutils.{CloudDataSaver, PublicCloud, RatesSaver}
 import fr.castorflex.android.smoothprogressbar.SmoothProgressDrawable
 import fr.castorflex.android.smoothprogressbar.SmoothProgressBar
 import android.support.v7.widget.SearchView.OnQueryTextListener
-import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.content.Context.LAYOUT_INFLATER_SERVICE
 import org.ndeftools.util.activity.NfcReaderActivity
 import android.widget.AbsListView.OnScrollListener
@@ -214,10 +214,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     app.ChannelManager.getOutPaymentObs = app.ChannelManager.outPaymentObs
     stopDetecting
   }
-
-  override def onBackPressed =
-    if (walletPager.getCurrentItem == 0) super.onBackPressed
-    else walletPager.setCurrentItem(walletPager.getCurrentItem - 1)
 
   override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
     // This is called shortly after fragLN sets bar as actionbar

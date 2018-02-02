@@ -158,9 +158,13 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListUpdater wi
   }
 
   def updTitle = setTitle {
-    val conf0 = denom.withSign(app.kit.conf1Balance)
-    val gap = app.kit.conf0Balance minus app.kit.conf1Balance
-    if (gap.isZero) conf0 else s"$conf0 + ${denom formatted gap}"
+    val conf0 = app.kit.conf0Balance
+    val conf1 = app.kit.conf1Balance
+    val gap = conf0 minus conf1
+
+    if (gap.isPositive) s"${denom withSign conf1} + ${denom formatted gap}"
+    else if (conf0.isZero && conf1.isZero) host getString btc_wallet
+    else denom withSign conf1
   }
 
   def notifyBtcEvent(message: String) = {
