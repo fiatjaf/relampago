@@ -39,18 +39,16 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
   lazy val chansNumber = getResources getStringArray R.array.ln_ops_start_node_channels
   lazy val views = lnStartNodesList :: findViewById(R.id.lnStartDetails) :: Nil
   lazy val nodeView = getString(ln_ops_start_node_view)
-  private[this] val adapter = new NodesAdapter
 
   var whenBackPressed: Runnable = UITask(super.onBackPressed)
-  override def onBackPressed = whenBackPressed.run
+  private var nodes = Vector.empty[AnnounceChansNum]
 
-  // Adapter for nodes tx list
-  class NodesAdapter extends BaseAdapter {
+  val adapter = new BaseAdapter {
     def getView(nodePosition: Int, cv: View, parent: ViewGroup) = {
       val view = getLayoutInflater.inflate(R.layout.frag_single_line, null)
       val textLine = view.findViewById(R.id.textLine).asInstanceOf[TextView]
 
-      val announce \ connections = adapter getItem nodePosition
+      val announce \ connections = getItem(nodePosition)
       val humanConnects = app.plurOrZero(chansNumber, connections)
       val theirNode = humanNode(announce.nodeId.toString, "\u0020")
 
@@ -59,7 +57,6 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
       view
     }
 
-    var nodes = Vector.empty[AnnounceChansNum]
     def getItem(position: Int) = nodes(position)
     def getItemId(position: Int) = position
     def getCount = nodes.size
@@ -68,7 +65,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
   def INIT(state: Bundle) = if (app.isAlive) {
     new ThrottledWork[String, AnnounceChansNumVec] {
       def work(radixNodeAliasOrNodeIdQuery: String) = LNParams.cloud.connector findNodes radixNodeAliasOrNodeIdQuery
-      def process(res: AnnounceChansNumVec) = wrap(UITask(adapter.notifyDataSetChanged).run)(adapter.nodes = res)
+      def process(res: AnnounceChansNumVec) = wrap { UITask(adapter.notifyDataSetChanged).run } { nodes = res }
       def error(err: Throwable) = Tools errlog err
       me.react = addWork
     }
@@ -78,11 +75,12 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
     wrap(toolbar setTitle ln_open_channel)(toolbar setSubtitle ln_select_peer)
     lnStartNodesList setOnItemClickListener onTap(onPeerSelected)
     lnStartNodesList setAdapter adapter
-    me.react(new String)
+    react(new String)
 
     // Or back if resources are freed
   } else me exitTo classOf[MainActivity]
 
+  override def onBackPressed = whenBackPressed.run
   override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
     // Can search nodes by their aliases and use a QR node scanner
     getMenuInflater.inflate(R.menu.ln_start, menu)
@@ -94,17 +92,17 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
     val theirNode = humanNode(announce.nodeId.toString, "<br>")
     val humanConnects = app.plurOrZero(chansNumber, connections)
     // This channel does not receive events yet so we need to add some custom listeners
-    val freshChan = app.ChannelManager.createChannel(mutable.Set.empty, InitData apply announce)
     val detailsText = nodeView.format(announce.alias, humanConnects, s"<br>$theirNode").html
+    val freshChan = app.ChannelManager.createChannel(mutable.Set.empty, InitData apply announce)
 
-    val socketOpenListener = new ConnectionListener {
-      override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) freshChan process CMDShutdown
-      override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) freshChan process CMDShutdown
+    lazy val socketOpenListener = new ConnectionListener {
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = if (ann == announce) freshChan process msg
       override def onOperational(ann: NodeAnnouncement, their: Init) = if (ann == announce) askForFunding(freshChan, their).run
+      override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) chanOpenListener onError freshChan -> new LightningException
+      override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) chanOpenListener onError freshChan -> new LightningException
     }
 
-    lazy val chanOpenListener = new ChannelListener { self =>
+    lazy val chanOpenListener = new ChannelListener {
       // Updates UI accordingly to changes in fresh channel
       // should account for user cancelling at late stages
 
@@ -113,48 +111,56 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
           // Peer has agreed to open a channel so now we ask user for a tx feerate
           askForFeerate(freshChan, cmd, accept).run
 
-        case (_, _, _, CLOSING) =>
-          // Something went wrong, back off
-          // like disconnect or remote error
-          cancelChannel.run
-
         case (_, wait: WaitFundingDoneData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
-          // First we remove local listeners, then we try to save a channel to database
-          ConnectionManager.listeners -= socketOpenListener
-          freshChan.listeners -= self
-
-          freshChan STORE wait
-          // Error while saving will halt any further progress here
-          // User may press cancel at this point but it won't affect anything
-          val state = RefundingData(wait.announce, wait.commitments).toJson.toString
-          val encryptedRefunding = AES.encode(state, LNParams.cloudSecret)
-
-          // Save a channel backup right away, don't wait until a channel becomes operational
-          // in worst case it will be saved once channel becomes OPEN if there are no tokens currently
-          LNParams.cloud doProcess CloudAct(encryptedRefunding, Seq("key" -> LNParams.cloudId.toString), "data/put")
-          // Make this a fully established channel by attaching operational listeners and adding it to list
-          freshChan.listeners ++= app.ChannelManager.operationalListeners
-          app.ChannelManager.all +:= freshChan
-          me exitTo classOf[WalletActivity]
+          // Preliminary negotiations are complete, we can broadcast a transaction
+          proceed(wait)
       }
+
+      override def onError = {
+        // If anything goes wrong
+
+        case _ \ error =>
+          // Disconnect this channel and inform user
+          UITask(app toast error.getMessage).run
+          cancelChannel.run
+      }
+    }
+
+    def proceed(wait: WaitFundingDoneData): Unit = {
+      // Remove all listeners specific to this activity
+      ConnectionManager.listeners -= socketOpenListener
+      freshChan.listeners -= chanOpenListener
+
+      freshChan STORE wait
+      // Error while saving will halt any further progress here
+      // User may press cancel at this point but it won't affect anything
+      val state = RefundingData(wait.announce, wait.commitments).toJson.toString
+      val encrypted = AES.encode(state, LNParams.cloudSecret)
+
+      // Save a channel backup right away, don't wait until a channel becomes operational
+      // in worst case it will be saved once channel becomes OPEN if there are no tokens currently
+      LNParams.cloud doProcess CloudAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
+      // Make this a fully established channel by attaching operational listeners and adding it to list
+      freshChan.listeners ++= app.ChannelManager.operationalListeners
+      app.ChannelManager.all +:= freshChan
+      me exitTo classOf[WalletActivity]
     }
 
     def cancelChannel: Runnable = UITask {
       freshChan.listeners -= chanOpenListener
       ConnectionManager.listeners -= socketOpenListener
       ConnectionManager.connections(announce).disconnect
-      // Just disconnect this channel from all listeners
+      // Disconnect all local listeners and update UI
       whenBackPressed = UITask(super.onBackPressed)
       setVis(View.VISIBLE, View.GONE)
       getSupportActionBar.show
     }
 
-    // We need PaymentInfoWrap here to process inner channel errors
-    freshChan.listeners ++= Set(chanOpenListener, PaymentInfoWrap)
+    freshChan.listeners += chanOpenListener
     ConnectionManager.listeners += socketOpenListener
     ConnectionManager connectTo announce
 
-    // Update UI to display selected node alias and key
+    // Connect all local listeners and update UI accordingly
     lnCancel setOnClickListener onButtonTap(cancelChannel.run)
     lnStartDetailsText setText detailsText
     whenBackPressed = cancelChannel

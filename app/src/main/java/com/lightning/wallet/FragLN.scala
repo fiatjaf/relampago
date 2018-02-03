@@ -386,5 +386,5 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
   app.kit.wallet addCoinsSentEventListener subtitleListener
   app.kit.wallet addCoinsReceivedEventListener subtitleListener
   Utils clickableTextField frag.findViewById(R.id.lnChanInfo)
-  me.react(new String)
+  react(new String)
 }

@@ -20,6 +20,8 @@ class ScanActivity extends TimerActivity with BarcodeCallback { me =>
 
   def tryParseQR(scannedText: String) = try {
     // This may throw, but this is fine here
+
+    app toast scannedText
     lastAttempt = System.currentTimeMillis
     app.TransData recordValue scannedText
     me exitTo classOf[WalletActivity]
@@ -28,9 +30,7 @@ class ScanActivity extends TimerActivity with BarcodeCallback { me =>
     val alert = showForm(negBld(dialog_ok).setMessage(code).create)
     alert getButton BUTTON_NEGATIVE setOnClickListener onButtonTap(proceed)
     def proceed = rm(alert)(reader.resume)
-    app toast scannedText
-
-    // Pause anyway
+    // Pause in any case here
   } finally reader.pause
 
   // Only try to decode result if 3 seconds elapsed

@@ -71,8 +71,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           .rule(_.dustLimitSatoshis >= 546L, "Their dust limit is too low")
 
         val result = accept.validate(acceptChannelValidator)
-        if (result.isValid) BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING) else BECOME(wait, CLOSING)
-        if (!result.isValid) Tools.log(result.toFieldErrMapping map { case _ \ error => s"- $error" } mkString "\n")
+        if (result.isValid) BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
+        else throw new LightningException(result.toFieldErrMapping map { case _ \ error => s"• $error" } mkString "\n")
 
 
       // They have accepted our proposal, now let them sign a first commit tx
@@ -504,9 +504,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // MISC
 
 
-      case (some, CMDShutdown | _: Error, WAIT_FOR_INIT | WAIT_FOR_ACCEPT | WAIT_FOR_FUNDING | WAIT_FUNDING_SIGNED) =>
-        // This may only happen when we cancel opening of new channel or get their remote error, we lose nothing here
-        BECOME(some, CLOSING)
+      case (_, err: Error, WAIT_FOR_INIT | WAIT_FOR_ACCEPT | WAIT_FOR_FUNDING | WAIT_FUNDING_SIGNED) =>
+        // May happen if remote peer does not like any of our proposed parameters, nothing to lose here
+        val remoteErrorMessage = new String(err.data, "UTF-8")
+        throw new LightningException(remoteErrorMessage)
 
 
       case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | SYNC)

@@ -116,7 +116,7 @@
     <string name="secret_checking">Checking passcode&#8230;</string>
 
     <string name="ln_notify_none">No open channel found</string>
-    <string name="ln_notify_opening">Opening channel&#8230;</string>
+    <string name="ln_notify_opening">Opening a new channel&#8230;</string>
     <string name="ln_notify_connecting">Connecting to Lightning peer&#8230;</string>
     <string name="ln_notify_recovering">Recovering channel funds&#8230;</string>
     <string name="ln_notify_operational">Lightning wallet is online</string>
