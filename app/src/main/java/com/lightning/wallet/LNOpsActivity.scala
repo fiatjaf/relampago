@@ -6,11 +6,11 @@ import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.Utils.{denom, coloredOut, coloredIn, app, humanNode}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, View, ViewGroup}
+import com.lightning.wallet.ln.Tools.{none, wrap}
 
 import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import me.relex.circleindicator.CircleIndicator
-import com.lightning.wallet.ln.Tools.wrap
 import android.widget.Button
 import android.os.Bundle
 import java.util.Date
@@ -57,38 +57,19 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
   lazy val amountStatus = getString(ln_ops_chan_amount_status)
   lazy val commitStatus = getString(ln_ops_chan_commit_status)
 
-  private val humanStatus: DepthAndDead => String = {
-    case confs \ false => app.plurOrZero(txsConfs, confs)
+  val humanStatus: DepthAndDead => String = {
+    case cfs \ false => app.plurOrZero(txsConfs, cfs)
     case _ \ true => txsConfs.last
     case _ => txsConfs.head
   }
 
-  var chan: Channel = _
-  var whenStop: Runnable = _
+  var whenDestroy: Runnable = new Runnable { def run = none }
+  override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
 
-  override def onStop = wrap(super.onStop)(whenStop.run)
   override def onViewCreated(view: View, state: Bundle) = {
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
     val lnOpsDescription = Utils clickableTextField view.findViewById(R.id.lnOpsDescription)
-
-    lazy val chanListener = new ChannelListener {
-      // Updates UI accordingly to current chan state
-
-      override def onBecome = {
-        case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
-        case (_, _: NormalData, _, _) if chan.isOperational => manageOpen.run
-        case (_, close: ClosingData, _, _) if close.closings.nonEmpty => manageClosing(close).run
-        case (_, _: NormalData, _, _) if !chan.isOperational => manageNegotiations.run
-        case (_, _: NegotiationsData, _, _) => manageNegotiations.run
-        case _ => manageOther.run
-      }
-
-      override def onProcess = {
-        case (_, _, _: CMDBestHeight) =>
-          // Need to update UI on each block
-          nullOnBecome(chan)
-      }
-    }
+    val chan = app.ChannelManager.all(getArguments getInt "position")
 
     def closeOnClick(title: Int) = lnOpsAction setOnClickListener host.onButtonTap {
       // First closing attempt will be a cooperative one, the second try will be uncooperative
@@ -140,7 +121,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       closeOnClick(ln_force_close)
     }
 
-
     def manageClosing(data: ClosingData) = UITask {
       // Show the best closing with most confirmations
       // since multiple different closings may be present
@@ -186,9 +166,32 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       }
     }
 
-    // Wire up local listener and reload it right away to update view
-    chan = app.ChannelManager.all(getArguments getInt "position")
-    whenStop = UITask(chan.listeners -= chanListener)
+    val chanListener = new ChannelListener {
+      // Updates UI accordingly to current chan state
+
+      override def onBecome = {
+        case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
+        case (_, _: NormalData, _, _) if chan.isOperational => manageOpen.run
+        case (_, c: ClosingData, _, _) if c.closings.nonEmpty => manageClosing(c).run
+        case (_, _: NormalData, _, _) if !chan.isOperational => manageNegotiations.run
+        case (_, _: NegotiationsData, _, _) => manageNegotiations.run
+        case _ => manageOther.run
+      }
+
+      override def onProcess = {
+        case (_, _, _: CMDBestHeight) =>
+          // Need to update UI on each block
+          nullOnBecome(chan)
+      }
+    }
+
+    whenDestroy = UITask {
+      println(chan(_.channelId).get)
+      chan.listeners -= chanListener
+    }
+
+    // Wire up local a listener to this channel
+    // and reload it right away to update view
     chan.listeners += chanListener
     chanListener nullOnBecome chan
   }

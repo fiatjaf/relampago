@@ -24,7 +24,6 @@ import org.bitcoinj.wallet.Wallet.BalanceType
 import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
-import scala.collection.mutable
 import android.app.Application
 import scala.util.Try
 import java.io.File
@@ -116,7 +115,7 @@ class WalletApp extends Application { me =>
     type ChannelVec = Vector[Channel]
     type RPIOpt = Option[RuntimePaymentInfo]
 
-    val operationalListeners = mutable.Set(broadcaster, bag, StorageWrap, Notificator)
+    val operationalListeners = Set(broadcaster, bag, StorageWrap, Notificator)
     // Obtain a vector of stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: ChannelVec = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: ChannelVec, ann: NodeAnnouncement): ChannelVec = of.filter(_.data.announce == ann)
@@ -153,10 +152,10 @@ class WalletApp extends Application { me =>
     }
 
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
-    def createChannel(interested: mutable.Set[ChannelListener], bootstrap: ChannelData) = new Channel {
+    def createChannel(interested: Set[ChannelListener], bootstrap: ChannelData) = new Channel {
       def STORE(hasCommitments: HasCommitments) = runAnd(hasCommitments)(ChannelWrap put hasCommitments)
       // First add listeners, then specifically call doProcess so it runs on current thread
-      val listeners = interested
+      listeners = interested
       doProcess(bootstrap)
 
       def SEND(lightningMessage: LightningMessage) =

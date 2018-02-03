@@ -206,8 +206,8 @@
     <string name="ln_olympus_net_error">Could not set an Olympus server because it is not reachable</string>
 
     <!-- frag_view_pager_chan, activity_ln_start -->
-    <string name="ln_chan_close_details">Closing a channel results in an on-chain Bitcoin transaction which will refund the remaining Lightning balance back to your Bitcoin wallet (minus miner fee).\n\Please note that you won\'t be able to send Lightning payments until a new payment channel is established.</string>
-    <string name="ln_ops_chan_opening"><![CDATA[%1$s<br><br>Opening a payment channel&#8230;<br>Channel capacity is %2$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %3$s<br><br><a href=https://testnet.smartbit.com.au/tx/%4$s>View funding status</a><br>%5$s]]></string>
+    <string name="ln_chan_close_details">Closing a channel results in an on-chain Bitcoin transaction which will refund the remaining Lightning balance back to your Bitcoin wallet (minus miner fee).\n\nPlease note that you won\'t be able to send Lightning payments until a new payment channel is established.</string>
+    <string name="ln_ops_chan_opening"><![CDATA[%1$s<br><br>Opening a channel&#8230;<br>Capacity is %2$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %3$s<br><br><a href=https://testnet.smartbit.com.au/tx/%4$s>View funding status</a><br>%5$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br><br>Closing a payment channel&#8230;<br><br>Waiting until all remaining in-flight payments are resolved and peer agrees to a cooperative closing<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br><br><a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a><br><br>%2$s]]></string>
     <string name="ln_ops_chan_open"><![CDATA[%1$s<br><br><font color=#999999>Peer node ID</font><br><small>%2$s</small><br><br><font color=#999999>Channel ID</font><br><small>%3$s</small>]]></string>

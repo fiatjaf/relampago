@@ -8,7 +8,6 @@ import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.ln.AddErrorCodes._
 import java.util.concurrent.Executors
-import scala.collection.mutable
 import fr.acinq.eclair.UInt64
 import scala.util.Success
 
@@ -26,8 +25,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   def process(change: Any) = Future(me doProcess change) onFailure { case err => events onError me -> err }
   def isOperational = data match { case NormalData(_, _, None, None) => true case _ => false }
   def isOpening = data match { case _: WaitFundingDoneData => true case _ => false }
+  var listeners: Set[ChannelListener] = _
 
-  val listeners: mutable.Set[ChannelListener]
   private[this] val events = new ChannelListener {
     override def onError = { case malfunction => for (lst <- listeners if lst.onError isDefinedAt malfunction) lst onError malfunction }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }

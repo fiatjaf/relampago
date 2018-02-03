@@ -16,14 +16,13 @@ import com.lightning.wallet.ln.Scripts.multiSig2of2
 import com.lightning.wallet.ln.Tools.runAnd
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
-import scala.collection.mutable
 import fr.acinq.bitcoin.Script
 import org.bitcoinj.core.Coin
 import java.util.TimerTask
 import android.os.Bundle
 
-import com.lightning.wallet.lnutils.{CloudAct, PaymentInfoWrap, RatesSaver}
 import android.widget.{BaseAdapter, Button, ListView, TextView}
+import com.lightning.wallet.lnutils.{CloudAct, RatesSaver}
 import com.lightning.wallet.ln.Tools.{none, random, wrap}
 import com.lightning.wallet.helper.{AES, ThrottledWork}
 import android.view.{Menu, View, ViewGroup}
@@ -93,7 +92,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
     val humanConnects = app.plurOrZero(chansNumber, connections)
     // This channel does not receive events yet so we need to add some custom listeners
     val detailsText = nodeView.format(announce.alias, humanConnects, s"<br>$theirNode").html
-    val freshChan = app.ChannelManager.createChannel(mutable.Set.empty, InitData apply announce)
+    val freshChan = app.ChannelManager.createChannel(Set.empty, InitData apply announce)
 
     lazy val socketOpenListener = new ConnectionListener {
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = if (ann == announce) freshChan process msg

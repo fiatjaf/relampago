@@ -20,7 +20,8 @@
     <Button
         style="@style/TransButton"
         android:id="@+id/recoverChannelFunds"
-        android:text="@string/sets_chan_recover"/>
+        android:text="@string/sets_chan_recover"
+        android:visibility="gone"/>
 
     <Button
         style="@style/TransButton"
