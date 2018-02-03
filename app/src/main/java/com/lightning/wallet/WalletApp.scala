@@ -234,7 +234,7 @@ class WalletApp extends Application { me =>
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)
       peerGroup.setMinRequiredProtocolVersion(70015)
-      peerGroup.setUserAgent(appName, "0.01")
+      peerGroup.setUserAgent(appName, "0.03")
       peerGroup.setDownloadTxDependencies(3)
       peerGroup.setPingIntervalMsec(10000)
       peerGroup.setMaxConnections(5)

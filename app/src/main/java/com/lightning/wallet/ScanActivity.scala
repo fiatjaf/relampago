@@ -10,7 +10,6 @@ import android.os.Bundle
 
 class ScanActivity extends TimerActivity with BarcodeCallback { me =>
   lazy val reader = findViewById(R.id.reader).asInstanceOf[BarcodeView]
-  lazy val beeper = new com.lightning.wallet.helper.SoundPlayer(me)
   type Points = java.util.List[com.google.zxing.ResultPoint]
   private[this] var lastAttempt = System.currentTimeMillis
 
@@ -19,19 +18,17 @@ class ScanActivity extends TimerActivity with BarcodeCallback { me =>
     reader decodeContinuous me
   }
 
-  def tryParseQR(text: String) = try {
+  def tryParseQR(scannedText: String) = try {
+    // This may throw, but this is fine here
     lastAttempt = System.currentTimeMillis
-    beeper.playRawResource(R.raw.beep, false)
-
-    // This may throw, it's fine
-    app.TransData recordValue text
+    app.TransData recordValue scannedText
     me exitTo classOf[WalletActivity]
 
   } catch app.TransData.onFail { code =>
     val alert = showForm(negBld(dialog_ok).setMessage(code).create)
     alert getButton BUTTON_NEGATIVE setOnClickListener onButtonTap(proceed)
     def proceed = rm(alert)(reader.resume)
-    app toast text
+    app toast scannedText
 
     // Pause anyway
   } finally reader.pause

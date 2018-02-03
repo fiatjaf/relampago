@@ -223,7 +223,9 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   override def onOptionsItemSelected(m: MenuItem) = {
-    if (m.getItemId == R.id.actionChanInfo) goLNOps(null)
+    if (m.getItemId == R.id.actionBuyCoins) localBitcoinsAndGlidera
+    else if (m.getItemId == R.id.exportSnapshot) exportSnapshot
+    else if (m.getItemId == R.id.actionChanInfo) goLNOps(null)
     else if (m.getItemId == R.id.actionSettings) mkSetsForm
     true
   }
@@ -455,5 +457,39 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       case "siginvalid" => onFail(me getString ln_olympus_sig_error)
       case _ => onFail(me getString ln_olympus_net_error)
     }
+  }
+
+  // TODO: REMOVE ON MAINNET
+
+  import android.net.Uri
+  import java.io.File
+  import android.content.Intent
+  import com.google.common.io.Files
+
+  def exportSnapshot = {
+    val dbFile = new File("/data/data/com.lightning.wallet/databases/lndata9.db")
+
+    val walletDestinationFile = FileOps shell s"$appName.wallet"
+    val chainDestinationFile = FileOps shell s"$appName.spvchain"
+    val dbDestinationFile = FileOps shell s"lndata9.db"
+
+    Files.write(Files toByteArray app.walletFile, walletDestinationFile)
+    Files.write(Files toByteArray app.chainFile, chainDestinationFile)
+    Files.write(Files toByteArray dbFile, dbDestinationFile)
+
+    val files = new java.util.ArrayList[Uri]
+
+    files.add(Uri fromFile walletDestinationFile)
+    files.add(Uri fromFile chainDestinationFile)
+    files.add(Uri fromFile dbDestinationFile)
+
+    val share = new Intent setAction Intent.ACTION_SEND_MULTIPLE setType "text/plain"
+    share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files)
+    me startActivity share
+  }
+
+  def localBitcoinsAndGlidera = {
+    val uri = Uri parse "https://testnet.manu.backend.hamburg/faucet"
+    me startActivity new Intent(Intent.ACTION_VIEW, uri)
   }
 }
