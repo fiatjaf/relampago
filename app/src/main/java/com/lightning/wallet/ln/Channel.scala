@@ -63,7 +63,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val acceptChannelValidator = Validator[AcceptChannel]
           .rule(_.minimumDepth <= 6L, "Their minimumDepth is too high")
           .rule(_.htlcMinimumMsat <= 20000L, "Their htlcMinimumMsat too high")
-          .rule(_.toSelfDelay <= cmd.localParams.toSelfDelay * 2, "Their toSelfDelay is too high")
+          .rule(_.toSelfDelay <= cmd.localParams.toSelfDelay * 10, "Their toSelfDelay is too high")
           .rule(_.maxHtlcValueInFlightMsat > UInt64(LNParams.maxHtlcValue.amount / 5), "Their maxHtlcValueInFlightMsat is too low")
           .rule(_.channelReserveSatoshis.toDouble / cmd.fundingAmountSat < LNParams.maxReserveToFundingRatio, "Their reserve is too high")
           .rule(_.maxAcceptedHtlcs > 0, "They can accept too few incoming HTLCs")
@@ -71,7 +71,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         val result = accept.validate(acceptChannelValidator)
         if (result.isValid) BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
-        else throw new LightningException(result.toFieldErrMapping map { case _ \ error => s"• $error" } mkString "\n")
+        else throw new LightningException(result.toFieldErrMapping.map(_._1) mkString "\n")
 
 
       // They have accepted our proposal, now let them sign a first commit tx

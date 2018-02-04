@@ -129,8 +129,8 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
       // Remove all listeners specific to this activity
       ConnectionManager.listeners -= socketOpenListener
       freshChan.listeners -= chanOpenListener
-
       freshChan STORE wait
+
       // Error while saving will halt any further progress here
       // User may press cancel at this point but it won't affect anything
       val state = RefundingData(wait.announce, wait.commitments).toJson.toString

@@ -53,7 +53,7 @@
     <string name="restore_hint">Your BIP32 mnemonic code</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>%1$s<br>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.03&#8211;14<br><br></small>Wallet settings]]></string>
+    <string name="read_settings"><![CDATA[<small>%1$s<br>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.03&#8211;15<br><br></small>Wallet settings]]></string>
     <string name="fiat_set_denom"><![CDATA[<small><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
     <string name="mnemonic_info"><font color="#E31300">Your mnemonic code is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it\n\nProperly securing your mnemonic code protectes you from money loss</string>
     <string name="mnemonic_export_details"><![CDATA[Mnemonic code will be encrypted and exported using <strong>your current passcode</strong>.<br><br>You are strongly advised to read a <a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>related section</a> of wallet manual before proceeding with this.]]></string>
@@ -208,7 +208,7 @@
     <!-- frag_view_pager_chan, activity_ln_start -->
     <string name="ln_chan_close_details">Closing a channel results in an on-chain Bitcoin transaction which will refund the remaining Lightning balance back to your Bitcoin wallet (minus miner fee).\n\nPlease note that you won\'t be able to send Lightning payments until a new payment channel is established.</string>
     <string name="ln_ops_chan_opening"><![CDATA[%1$s<br><br>Opening a channel&#8230;<br>Capacity is %2$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %3$s<br><br><a href=https://testnet.smartbit.com.au/tx/%4$s>View funding status</a><br>%5$s]]></string>
-    <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br><br>Closing a payment channel&#8230;<br><br>Waiting until all remaining in-flight payments are resolved and peer agrees to a cooperative closing<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
+    <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br><br>Closing a payment channel&#8230;<br>Waiting until all remaining in-flight payments are resolved and peer agrees to a cooperative closing<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br><br><a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a><br><br>%2$s]]></string>
     <string name="ln_ops_chan_open"><![CDATA[%1$s<br><br><font color=#999999>Peer node ID</font><br><small>%2$s</small><br><br><font color=#999999>Channel ID</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><br>Remaining balance of %2$s has been refunded to your Bitcoin wallet<br><br>%3$s]]></string>
