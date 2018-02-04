@@ -117,7 +117,7 @@ trait ToolbarFragment extends HumanTimeDisplay { me =>
 }
 
 trait ListUpdater extends HumanTimeDisplay {
-  lazy val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_txs_all, null)
+  lazy val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   lazy val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
   private[this] var state = SCROLL_STATE_IDLE
   val minLinesNum = 4

@@ -60,7 +60,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListUpdater wi
   val feeDetails = getString(txs_fee_details)
   val feeAbsent = getString(txs_fee_absent)
 
-  val adapter = new CutAdapter[TxWrap](72, R.layout.frag_tx_btc_line) {
+  val adapter = new CutAdapter[TxWrap](24, R.layout.frag_tx_btc_line) {
     // BTC line has a wider timestamp section because there is no payment info
 
     def getItem(position: Int) = visibleItems(position)
