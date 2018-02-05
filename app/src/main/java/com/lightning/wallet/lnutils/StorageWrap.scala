@@ -138,11 +138,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
                 chan process CMDPlainAddHtlc(cutPaymentInfoWithRoutes)
 
               case None =>
-                // Fail right away
                 updateRouting(cutPaymentInfo)
                 updateStatus(FAILURE, cutPaymentInfo.pr.paymentHash)
-                // Extra channel is bad OR critical node is bad OR none blacklisted OR too many attempts
-                val stop = cutPaymentInfo.canNotProceed(chan) || serverCallAttempts(add.paymentHash) > 8
+                val extraHops = cutPaymentInfo.pr.routingInfo.flatMap(_.route).toSet
+                val nothingBlacklisted = cutPaymentInfo.rd.badNodes.isEmpty && cutPaymentInfo.rd.badChans.isEmpty
+                val vitalNodes = extraHops.map(_.nodeId) + chan.data.announce.nodeId + cutPaymentInfo.pr.nodeId
+                val vitalNodesBlacklisted = (vitalNodes & cutPaymentInfo.rd.badNodes).nonEmpty
+
+                // Vital node has been blacklisted OR nothing has been blacklisted OR too many route attempts
+                val stop = nothingBlacklisted || vitalNodesBlacklisted || serverCallAttempts(add.paymentHash) > 8
 
                 // Reset in case of second QR scan attempt
                 if (stop) serverCallAttempts(add.paymentHash) = 0

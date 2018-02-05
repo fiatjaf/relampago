@@ -168,13 +168,6 @@ case class PaymentInfo(rawRd: String, rawPr: String, preimage: BinaryData, incom
 case class RuntimePaymentInfo(rd: RoutingData, pr: PaymentRequest, firstMsat: Long) {
   lazy val text = pr.description match { case Right(info) => info case _ => new String }
   lazy val searchText = text + " " + pr.paymentHash.toString
-
-  def canNotProceed(chan: Channel) = {
-    val extraHops = pr.routingInfo.flatMap(_.route).toSet
-    val extraChans = extraHops.map(_.shortChannelId) & rd.badChans
-    val extraNodes = extraHops.map(_.nodeId) + pr.nodeId + chan.data.announce.nodeId & rd.badNodes
-    extraChans.nonEmpty || extraNodes.nonEmpty || rd.badNodes.isEmpty && rd.badChans.isEmpty
-  }
 }
 
 trait PaymentInfoBag { me =>
