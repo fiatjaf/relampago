@@ -170,7 +170,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
 
   override def onBecome = {
     case (_, norm: NormalData, null, SYNC) => db txWrap {
-      // At init there may be some WAITING payments which won't be retired
+      // At init there may be some WAITING payments which won't be retried
       // because user has closed an app before next retry has started
       // so first thing to do is just fail all the waiting payments
       db change PaymentTable.updFailWaitingSql
