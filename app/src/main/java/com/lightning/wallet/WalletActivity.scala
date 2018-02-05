@@ -195,18 +195,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     // On entering this activity we show a progress bar animation, a call may happen outside of this activity
     val progressBar = layoutInflater.inflate(R.layout.frag_progress_bar, null).asInstanceOf[SmoothProgressBar]
     val drawable = progressBar.getIndeterminateDrawable.asInstanceOf[SmoothProgressDrawable]
-    def attach = container.addView(progressBar, viewParams)
-    UITask(attach).run
-
-    drawable setCallbacks new SmoothProgressDrawable.Callbacks {
-      // Sometimes timer may already be disabled and will throw here because activity has been killed
-      def onStart = try drawable.setColors(getResources getIntArray R.array.bar_colors) catch none
-      def onStop = try timer.schedule(UITask(container removeView progressBar), 250) catch none
-    }
+    timer.schedule(drawable.setColors(getResources getIntArray R.array.bar_colors), 100)
+    timer.schedule(container.addView(progressBar, viewParams), 5)
 
     app.ChannelManager outPaymentObs rpi doOnTerminate {
-      val stopTimerTask = UITask(progressBar.progressiveStop)
-      try timer.schedule(stopTimerTask, 250) catch none
+      timer.schedule(container removeView progressBar, 3000)
+      UITask(progressBar.progressiveStop).run
     }
   }
 

@@ -50,6 +50,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
   lazy val host = getActivity.asInstanceOf[LNOpsActivity]
   import host.UITask
 
+  lazy val basic = getString(ln_ops_chan_basic)
+  lazy val negotiations = getString(ln_ops_chan_negotiations)
   lazy val unilateralClosing = getString(ln_ops_chan_unilateral_closing)
   lazy val bilateralClosing = getString(ln_ops_chan_bilateral_closing)
   lazy val statusLeft = getString(ln_ops_chan_unilateral_status_left)
@@ -70,6 +72,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
     val lnOpsDescription = Utils clickableTextField view.findViewById(R.id.lnOpsDescription)
     val chan = app.ChannelManager.all(getArguments getInt "position")
+    val started = me time new Date(chan(_.startedAt).get)
+    val alias = chan.data.announce.alias take 64
 
     def closeOnClick(title: Int) = lnOpsAction setOnClickListener host.onButtonTap {
       // First closing attempt will be a cooperative one, the second try will be uncooperative
@@ -77,19 +81,19 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageOther = UITask {
-      // Just show some basic info here
-      lnOpsDescription setText header(chan).html
+      // Just show basic channel info here since we don't know the specifics
+      lnOpsDescription setText basic.format(chan.state, started, alias)
       lnOpsAction setVisibility View.GONE
     }
 
     def manageFunding(wait: WaitFundingDoneData) = UITask {
       val openStatus = humanStatus(LNParams.broadcaster txStatus wait.fundingTx.txid)
       val threshold = math.max(wait.commitments.remoteParams.minimumDepth, LNParams.minDepth)
-      val balance = coloredIn(wait.commitments.commitInput.txOut.amount)
+      val capacity = coloredIn(wait.commitments.commitInput.txOut.amount)
 
       // Set funding explanations
-      lnOpsDescription setText getString(ln_ops_chan_opening).format(me header chan, balance,
-        app.plurOrZero(txsConfs, threshold), wait.fundingTx.txid.toString, openStatus).html
+      lnOpsDescription setText getString(ln_ops_chan_opening).format(chan.state, started, alias,
+        capacity, app.plurOrZero(txsConfs, threshold), wait.fundingTx.txid.toString, openStatus).html
 
       // Initialize button
       lnOpsAction setText ln_chan_close
@@ -99,11 +103,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
     def manageOpen = UITask {
       val humanChannel = humanNode(chan(_.channelId).get.toString, "<br>")
-      val humanPeer = humanNode(chan.data.announce.nodeId.toString, "<br>")
-
-      // Set open state explanations
-      lnOpsDescription setText getString(ln_ops_chan_open)
-        .format(me header chan, humanPeer, humanChannel).html
+      lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, started,
+        alias, humanNode(chan.data.announce.nodeId.toString, "<br>"), humanChannel).html
 
       // Initialize button
       lnOpsAction setText ln_chan_close
@@ -112,8 +113,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageNegotiations = UITask {
-      val text = me getString ln_ops_chan_negotiations
-      lnOpsDescription setText text.format(me header chan).html
+      // Don't show stopped timestamp yet since this has no closing data
+      lnOpsDescription setText negotiations.format(chan.state, started, alias).html
 
       // Initialize button
       lnOpsAction setText ln_force_close
@@ -133,9 +134,11 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           val myBalance = mutualTx.txOut.map(_.amount).sum
           val mutualTxHumanStatus = humanStatus apply txStatus(mutualTx.txid)
           val mutualFee = coloredOut(data.commitments.commitInput.txOut.amount - myBalance)
-          val mutualTxHumanView = commitStatus.format(mutualTx.txid.toString, mutualTxHumanStatus, mutualFee)
-          lnOpsDescription setText bilateralClosing.format(me header chan, coloredIn(myBalance), mutualTxHumanView).html
+          val mutualView = commitStatus.format(mutualTx.txid.toString, mutualTxHumanStatus, mutualFee)
+
           lnOpsAction setVisibility View.GONE
+          lnOpsDescription setText bilateralClosing.format(chan.state, started,
+            me time new Date(data.closedAt), alias, coloredIn(myBalance), mutualView).html
 
         case Right(info) =>
           val tier2HumanView = info.getState collect {
@@ -161,8 +164,10 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           val commitFee = coloredOut(data.commitments.commitInput.txOut.amount - info.commitTx.txOut.map(_.amount).sum)
           val commitTxHumanView = commitStatus.format(info.commitTx.txid.toString, commitHumanStatus, commitFee)
           val combinedView = commitTxHumanView + refundStatus + tier2HumanView.mkString("<br><br>")
-          lnOpsDescription setText unilateralClosing.format(me header chan, combinedView).html
+
           lnOpsAction setVisibility View.GONE
+          lnOpsDescription setText unilateralClosing.format(chan.state,
+            started, me time new Date(data.closedAt), alias, combinedView).html
       }
     }
 
@@ -171,9 +176,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       override def onBecome = {
         case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
-        case (_, _: NormalData, _, _) if chan.isOperational => manageOpen.run
         case (_, c: ClosingData, _, _) if c.closings.nonEmpty => manageClosing(c).run
         case (_, _: NormalData, _, _) if !chan.isOperational => manageNegotiations.run
+        case (_, _: NormalData, _, _) if chan.isOperational => manageOpen.run
         case (_, _: NegotiationsData, _, _) => manageNegotiations.run
         case _ => manageOther.run
       }
@@ -185,21 +190,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       }
     }
 
-    whenDestroy = UITask {
-      println(chan(_.channelId).get)
-      chan.listeners -= chanListener
-    }
-
-    // Wire up local a listener to this channel
-    // and reload it right away to update view
-    chan.listeners += chanListener
-    chanListener nullOnBecome chan
-  }
-
-  def header(chan: Channel) = {
-    val humanStamp = me time new Date(chan(_.startedAt).get)
-    val grayStamp = s"<font color=#999999>$humanStamp</font>"
-    val alias = chan.data.announce.alias take 32
-    s"${chan.state}<br>$grayStamp<br>$alias"
+    // Wire up a local listener
+    whenDestroy = UITask(chan.listeners -= chanListener)
+    wrap(chanListener nullOnBecome chan)(chan.listeners += chanListener)
   }
 }

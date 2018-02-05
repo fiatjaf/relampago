@@ -207,11 +207,12 @@
 
     <!-- frag_view_pager_chan, activity_ln_start -->
     <string name="ln_chan_close_details">Closing a channel results in an on-chain Bitcoin transaction which will refund the remaining Lightning balance back to your Bitcoin wallet (minus miner fee).\n\nPlease note that you won\'t be able to send Lightning payments until a new payment channel is established.</string>
-    <string name="ln_ops_chan_opening"><![CDATA[%1$s<br><br>Opening a channel&#8230;<br>Capacity is %2$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %3$s<br><br><a href=https://testnet.smartbit.com.au/tx/%4$s>View funding status</a><br>%5$s]]></string>
-    <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br><br>Closing a payment channel&#8230;<br>Waiting until all remaining in-flight payments are resolved and peer agrees to a cooperative closing<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
-    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br><br><a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a><br><br>%2$s]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[%1$s<br><br><font color=#999999>Peer node ID</font><br><small>%2$s</small><br><br><font color=#999999>Channel ID</font><br><small>%3$s</small>]]></string>
-    <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><br>Remaining balance of %2$s has been refunded to your Bitcoin wallet<br><br>%3$s]]></string>
+    <string name="ln_ops_chan_opening"><![CDATA[%1$s<br><font color=#999999>%2$s</font><br>%3$s<br><br>Opening a channel&#8230;<br>Capacity is %4$s<br><br>You will be able to send Lightning payments after a funding transaction reaches %5$s<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s]]></string>
+    <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br><font color=#999999>%2$s</font><br>%3$s<br><br>Closing a payment channel&#8230;<br>Waiting until all remaining in-flight payments are resolved and peer agrees to a cooperative closing<br><br>Remaining Lightning balance will be refunded to your Bitcoin wallet]]></string>
+    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>started <font color=#999999>%2$s</font><br>stopped <font color=#999999>%3$s</font><br>%4$s<br><br><a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a><br><br>%5$s]]></string>
+    <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br>started <font color=#999999>%2$s</font><br>stopped <font color=#999999>%3$s</font><br>%4$s<br><br>Remaining balance of %5$s has been refunded to your Bitcoin wallet<br><br>%6$s]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[%1$s<br><font color=#999999>%2$s</font><br>%3$s<br><br><font color=#999999>Peer node ID</font><br><small>%4$s</small><br><br><font color=#999999>Channel ID</font><br><small>%5$s</small>]]></string>
+    <string name="ln_ops_chan_basic"><![CDATA[%1$s<br><font color=#999999>%2$s</font>%3$s]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Your pending refunds</font><br>]]></string>

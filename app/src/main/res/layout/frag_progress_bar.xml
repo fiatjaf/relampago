@@ -14,7 +14,6 @@
     app:spb_reversed="false"
     app:spb_speed="1.2"
 
-    android:indeterminate="true"
     android:layout_height="wrap_content"
     android:layout_width="match_parent"
-    android:id="@+id/progressBar"/>
+    android:indeterminate="true"/>
