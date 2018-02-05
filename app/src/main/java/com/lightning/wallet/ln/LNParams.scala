@@ -58,8 +58,9 @@ object LNParams { me =>
 
   // FEE RELATED
 
-  def shouldUpdateFee(oldPerKw: Long, newPerKw: Long) = {
-    val mismatch = (newPerKw - oldPerKw) / (oldPerKw + newPerKw)
+  def lnFeeNotOk(feeMsat: Long) = feeMsat > 50000000
+  def shouldUpdateFee(oldFeePerKw: Long, newFeePerKw: Long) = {
+    val mismatch = (newFeePerKw - oldFeePerKw) / (oldFeePerKw + newFeePerKw)
     math.abs(2.0 * mismatch) > 0.25
   }
 
@@ -89,7 +90,7 @@ trait PublishStatus {
 }
 
 trait DelayedPublishStatus extends PublishStatus {
-  // Is publishable iff parent depth > 0 AND parent is not dead AND no CLTV or CSV delays
+  // Is publishable if parent depth > 0 AND parent is not dead AND no CLTV or CSV delays
   override def isPublishable = parent match { case pd \ false \ 0L => pd > 0L case _ => false }
   val parent: (DepthAndDead, Long)
 }

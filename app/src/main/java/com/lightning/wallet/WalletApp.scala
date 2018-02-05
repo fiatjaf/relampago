@@ -182,6 +182,7 @@ class WalletApp extends Application { me =>
 
     def outPaymentObs(rpi: RuntimePaymentInfo) =
       Obs from all.find(_.isOperational) flatMap { chan =>
+        // Account for a special case when our peer is the recipient
         def findRoutes(target: PublicKey) = chan.data.announce.nodeId match {
           case peerNodeId if peerNodeId == target => Obs just Vector(Vector.empty)
           case _ => cloud.connector.findRoutes(rpi.rd, chan.data.announce.nodeId, target)

@@ -28,29 +28,40 @@ object PaymentInfo {
   // Placeholder for unresolved outgoing payments
   val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
   val emptyRPI = (pr: PaymentRequest) => RuntimePaymentInfo(emptyRD, pr, pr.amount.get.amount)
-  def buildOnion(nodes: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
-    require(nodes.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
-    makePacket(PrivateKey(random getBytes 32), nodes, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
+  def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
+    require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
+    makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
   }
 
-  def completeRPI(rpi: RuntimePaymentInfo) = rpi.rd.routes.headOption map { route =>
-    val firstExpiry = LNParams.broadcaster.currentHeight + rpi.pr.minFinalCltvExpiry.getOrElse(9L)
-    val firstPayload = PerHopPayload(shortChannelId = 0L, amtToForward = rpi.firstMsat, firstExpiry)
-    val start = (Vector(firstPayload), Vector.empty[PublicKey], rpi.firstMsat, firstExpiry)
+  def completeRPI(rpi: RuntimePaymentInfo): Option[RuntimePaymentInfo] =
+    // Complete a first available payment route and check if it's fee is ok
+    // blacklist outlier channels and try again if fee is not ok
 
-    val (payloads, nodeIds, lastMsat, lastExpiry) = (start /: route.reverse) {
-      case (loads, nodes, msat, expiry) \ Hop(nodeId, shortChannelId, delta, _, base, proportional) =>
-        // Walk in reverse direction from receiver to sender and accumulate cltv deltas with fees
+    rpi.rd.routes match {
+      case route +: rest =>
+        val firstExpiry = LNParams.broadcaster.currentHeight + rpi.pr.minFinalCltvExpiry.getOrElse(9L)
+        val firstPayload = PerHopPayload(shortChannelId = 0L, amtToForward = rpi.firstMsat, firstExpiry)
+        val start = (Vector(firstPayload), Vector.empty[PublicKey], rpi.firstMsat, firstExpiry)
 
-        val nextFee = msat + base + (proportional * msat) / 1000000L
-        val nextPayload = PerHopPayload(shortChannelId, msat, expiry)
-        (nextPayload +: loads, nodeId +: nodes, nextFee, expiry + delta)
-      }
+        val (allPayloads, nodeIds, lastMsat, lastExpiry) = route.reverse.foldLeft(start) {
+          case (loads, nodes, msat, expiry) \ Hop(nodeId, shortChannelId, delta, _, base, prop) =>
+            // Walk in reverse direction from receiver to sender and accumulate cltv deltas with fees
 
-    val onion = buildOnion(nodeIds :+ rpi.pr.nodeId, payloads, rpi.pr.paymentHash)
-    rpi.modify(_.rd) setTo rpi.rd.copy(routes = rpi.rd.routes.tail, usedRoute = route,
-      onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
-  }
+            val nextFee = msat + base + (prop * msat) / 1000000L
+            val nextPayload = PerHopPayload(shortChannelId, msat, expiry)
+            (nextPayload +: loads, nodeId +: nodes, nextFee, expiry + delta)
+        }
+
+        if (LNParams lnFeeNotOk lastMsat - rpi.firstMsat) completeRPI(rpi.modify(_.rd.routes) setTo rest) else {
+          val onion = buildOnion(keys = nodeIds :+ rpi.pr.nodeId, payloads = allPayloads, assoc = rpi.pr.paymentHash)
+          val rd1 = rpi.rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
+          // We have a complete payment route at this point, can proceed with adding to a channel
+          Some(rpi.modify(_.rd) setTo rd1)
+        }
+
+      // No more routes
+      case _ => None
+    }
 
   def emptyRD = {
     val packet = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)

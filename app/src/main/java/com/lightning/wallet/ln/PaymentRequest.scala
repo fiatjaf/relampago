@@ -35,13 +35,8 @@ case class DescriptionHashTag(hash: BinaryData) extends Tag {
   def toInt5s: Int5Seq = encode(Bech32 eight2five hash, 'h')
 }
 
-case class Hop(nodeId: PublicKey, shortChannelId: Long,
-               cltvExpiryDelta: Int, htlcMinimumMsat: Long,
-               feeBaseMsat: Long, feeProportionalMillionths: Long) {
-
-  // When returning paths to user we order them by cumulative score, the lower the better
-  lazy val score = cltvExpiryDelta * 10 + feeBaseMsat + feeProportionalMillionths * 100
-}
+case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
+               htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long)
 
 case class RoutingInfoTag(route: PaymentRoute) extends Tag {
   def toInt5s: Int5Seq = encode(Bech32.eight2five(route flatMap pack), 'r')
