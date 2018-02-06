@@ -60,10 +60,12 @@ case class NormalData(announce: NodeAnnouncement,
                       commitments: Commitments, localShutdown: Option[Shutdown] = None,
                       remoteShutdown: Option[Shutdown] = None) extends HasCommitments
 
-case class NegotiationsData(announce: NodeAnnouncement, commitments: Commitments, localClosingSigned: ClosingSigned,
-                            localShutdown: Shutdown, remoteShutdown: Shutdown) extends HasCommitments
+case class ClosingTxProposed(unsignedTx: ClosingTx, localClosingSigned: ClosingSigned)
+case class NegotiationsData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Shutdown, remoteShutdown: Shutdown,
+                            localProposals: Seq[ClosingTxProposed], lastSignedTx: Option[ClosingTx] = None) extends HasCommitments
 
-case class ClosingData(announce: NodeAnnouncement, commitments: Commitments, mutualClose: Seq[Transaction] = Nil,
+case class ClosingData(announce: NodeAnnouncement, commitments: Commitments,
+                       localProposals: Seq[ClosingTxProposed] = Nil, mutualClose: Seq[Transaction] = Nil,
                        localCommit: Seq[LocalCommitPublished] = Nil, remoteCommit: Seq[RemoteCommitPublished] = Nil,
                        nextRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
                        closedAt: Long = System.currentTimeMillis) extends HasCommitments {

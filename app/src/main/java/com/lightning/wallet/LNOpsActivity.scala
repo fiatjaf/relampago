@@ -161,13 +161,13 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           } take 3
 
           val commitHumanStatus = humanStatus apply txStatus(info.commitTx.txid)
+          val refundPart = if (tier2HumanView.isEmpty) new String else refundStatus + tier2HumanView.mkString("<br><br>")
           val commitFee = coloredOut(data.commitments.commitInput.txOut.amount - info.commitTx.txOut.map(_.amount).sum)
           val commitTxHumanView = commitStatus.format(info.commitTx.txid.toString, commitHumanStatus, commitFee)
-          val combinedView = commitTxHumanView + refundStatus + tier2HumanView.mkString("<br><br>")
 
           lnOpsAction setVisibility View.GONE
-          lnOpsDescription setText unilateralClosing.format(chan.state,
-            started, me time new Date(data.closedAt), alias, combinedView).html
+          lnOpsDescription setText unilateralClosing.format(chan.state, started,
+            me time new Date(data.closedAt), alias, commitTxHumanView + refundPart).html
       }
     }
 
@@ -175,7 +175,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       // Updates UI accordingly to current chan state
 
       override def onBecome = {
-        case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
+        case (_, w: WaitFundingDoneData, _, _) => manageFunding(w).run
         case (_, c: ClosingData, _, _) if c.closings.nonEmpty => manageClosing(c).run
         case (_, _: NormalData, _, _) if !chan.isOperational => manageNegotiations.run
         case (_, _: NormalData, _, _) if chan.isOperational => manageOpen.run

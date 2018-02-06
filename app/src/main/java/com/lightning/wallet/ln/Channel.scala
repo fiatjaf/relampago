@@ -270,7 +270,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Commitments.latestRemoteCommit(norm.commitments).spec.htlcs.exists(htlc => htlc.incoming &&
             height - 576 >= htlc.add.expiry) =>
 
-        startLocalCurrentClose(norm)
+        startLocalClose(norm)
 
 
       // SHUTDOWN in WAIT_FUNDING_DONE and OPEN
@@ -295,7 +295,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (norm @ NormalData(_, commitments, our, their), CMDShutdown, OPEN) =>
         // We have unsigned outgoing HTLCs or already have tried to close this channel cooperatively
         val nope = our.isDefined | their.isDefined | Commitments.localHasUnsignedOutgoing(commitments)
-        if (nope) startLocalCurrentClose(norm) else me startShutdown norm
+        if (nope) startLocalClose(norm) else me startShutdown norm
 
 
       case (norm @ NormalData(_, commitments, _, None), remote: Shutdown, OPEN)
@@ -306,7 +306,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val nope = Commitments.remoteHasUnsignedOutgoing(commitments)
         // Can't close cooperatively if they have unsigned outgoing HTLCs
         // we should clear our unsigned outgoing HTLCs and then start a shutdown
-        if (nope) startLocalCurrentClose(norm) else me UPDATA d1 doProcess CMDProceed
+        if (nope) startLocalClose(norm) else me UPDATA d1 doProcess CMDProceed
 
 
       case (norm @ NormalData(_, commitments, None, their), CMDProceed, OPEN)
@@ -321,9 +321,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // GUARD: got both shutdowns, have no unsigned HTLCs so we can start negotiations
         if Commitments.hasNoPendingHtlc(commitments) && our.isDefined && their.isDefined =>
 
-        val _ \ sig = Closing.makeFirstClosing(commitments, our.get.scriptPubKey, their.get.scriptPubKey)
-        val neg = NegotiationsData(announce, commitments, localClosingSigned = sig, our.get, their.get)
-        BECOME(me STORE neg, NEGOTIATIONS) SEND sig
+        val firstProposed = Closing.makeFirstClosing(commitments, our.get.scriptPubKey, their.get.scriptPubKey)
+        val neg = NegotiationsData(announce, commitments, our.get, their.get, firstProposed :: Nil)
+        BECOME(me STORE neg, NEGOTIATIONS) SEND firstProposed.localClosingSigned
 
 
       // SYNC and REFUNDING MODE
@@ -406,13 +406,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         BECOME(wait, WAIT_FUNDING_DONE)
         wait.our foreach SEND
 
-
       // No in-flight HTLCs here, just proceed with negotiations
       case (neg: NegotiationsData, cr: ChannelReestablish, SYNC)
         if cr.channelId == neg.commitments.channelId =>
 
-        BECOME(neg, NEGOTIATIONS)
-        me SEND neg.localClosingSigned
+        // According to spec we need to re-send a last closing sig here
+        val lastSigned = neg.localProposals.head.localClosingSigned
+        BECOME(neg, NEGOTIATIONS) SEND lastSigned
 
 
       // SYNC: ONLINE/OFFLINE
@@ -434,29 +434,30 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // NEGOTIATIONS MODE
 
 
-      case (neg: NegotiationsData, ClosingSigned(channelId, feeSatoshis, remoteSig), NEGOTIATIONS)
-        if channelId == neg.commitments.channelId =>
+      case (neg @ NegotiationsData(_, commitments,
+        localShutdown, remoteShutdown, ClosingTxProposed(_, localClosingSigned) +: _, _),
+        ClosingSigned(channelId, remoteClosingFee, remoteClosingSig), NEGOTIATIONS)
+        if channelId == commitments.channelId =>
 
-        val Seq(closeFeeSat, remoteFeeSat) = Seq(neg.localClosingSigned.feeSatoshis, feeSatoshis) map Satoshi
-        val Seq(localScript, remoteScript) = Seq(neg.localShutdown.scriptPubKey, neg.remoteShutdown.scriptPubKey)
-        val lastCommitAmountSat = neg.commitments.localCommit.commitTx.tx.txOut.map(_.amount.amount).sum
-        val lastCommitFeeSat = neg.commitments.commitInput.txOut.amount.amount - lastCommitAmountSat
-        if (remoteFeeSat.amount > lastCommitFeeSat) throw new LightningException
+        val ClosingTxProposed(closing, closingSigned) = Closing.makeClosing(commitments,
+          Satoshi(remoteClosingFee), localShutdown.scriptPubKey, remoteShutdown.scriptPubKey)
 
-        val nextCloseFee = (closeFeeSat + remoteFeeSat) / 4 * 2
-        val (closingTx, signed) = Closing.makeClosing(neg.commitments, localScript, remoteScript, remoteFeeSat)
-        val closing = Scripts.addSigs(closingTx, neg.commitments.localParams.fundingPrivKey.publicKey,
-          neg.commitments.remoteParams.fundingPubkey, signed.signature, remoteSig)
+        val signedClose = Scripts.addSigs(closing, commitments.localParams.fundingPrivKey.publicKey,
+          commitments.remoteParams.fundingPubkey, closingSigned.signature, remoteClosingSig)
 
-        Scripts checkSpendable closing match {
+        Scripts checkSpendable signedClose match {
           case None => throw new LightningException
-          case Some(closingInfo) if closeFeeSat == remoteFeeSat => startMutualClose(neg, closingInfo.tx)
-          case Some(closingInfo) if nextCloseFee == remoteFeeSat => startMutualClose(neg, closingInfo.tx)
+          case Some(okClose) if remoteClosingFee == localClosingSigned.feeSatoshis =>
+            // Our current and their proposed fees are equal for this tx, can broadcast
+            startMutualClose(neg, okClose.tx)
 
-          case _ =>
-            // Fee has been further corrected and we can offer a next version of mutual closing transaction
-            val _ \ nextClosingSigned = Closing.makeClosing(neg.commitments, localScript, remoteScript, nextCloseFee)
-            me UPDATA neg.copy(localClosingSigned = nextClosingSigned) SEND nextClosingSigned
+          case Some(okClose) =>
+            val nextCloseFee = Satoshi(localClosingSigned.feeSatoshis + remoteClosingFee) / 4 * 2
+            val nextProposed = Closing.makeClosing(commitments, nextCloseFee, localShutdown.scriptPubKey, remoteShutdown.scriptPubKey)
+            if (remoteClosingFee == nextCloseFee.amount) startMutualClose(neg, okClose.tx) SEND nextProposed.localClosingSigned else {
+              val d1 = me STORE neg.copy(lastSignedTx = Some(okClose), localProposals = nextProposed +: neg.localProposals)
+              me UPDATA d1 SEND nextProposed.localClosingSigned
+            }
         }
 
 
@@ -466,26 +467,27 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (refund: RefundingData, CMDSpent(spendTx), REFUNDING)
         // GUARD: we have lost our state and asked them to spend their local commit
         if spendTx.txIn.exists(_.outPoint == refund.commitments.commitInput.outPoint) =>
-        // `commitments.remoteCommit` has to be updated to their `myCurrentPerCommitmentPoint` at this point
+        // commitments.remoteCommit has to be updated to their myCurrentPerCommitmentPoint at this point
         val rcp = Closing.claimRemoteMainOutput(refund.commitments, refund.commitments.remoteCommit, spendTx)
         BECOME(me STORE ClosingData(refund.announce, refund.commitments, remoteCommit = rcp :: Nil), CLOSING)
 
 
-      case (close: ClosingData, CMDSpent(spendTx), _)
-        if close.mutualClose.exists(_.txid == spendTx.txid) ||
-          close.localCommit.exists(_.commitTx.txid == spendTx.txid) =>
-          Tools log s"Disregarding closing txid ${spendTx.txid}"
-
-
-      case (some: HasCommitments, CMDSpent(spendTx), _)
+      case (some: HasCommitments, CMDSpent(tx), _)
         // GUARD: something which spends our funding is broadcasted, must react
-        if spendTx.txIn.exists(_.outPoint == some.commitments.commitInput.outPoint) =>
+        if tx.txIn.exists(_.outPoint == some.commitments.commitInput.outPoint) =>
+        val revokedCommitOpt = Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, tx)
+        val nextRemoteCommitEither = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
 
-        // First, we have to check if it's remote or next remote closing
-        some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit) match {
-          case Left(nextRemote) if nextRemote.txid == spendTx.txid => startRemoteNextClose(some, nextRemote)
-          case _ if some.commitments.remoteCommit.txid == spendTx.txid => startRemoteCurrentClose(some)
-          case _ => startOtherClose(some, spendTx)
+        Tuple3(revokedCommitOpt, nextRemoteCommitEither, some) match {
+          case (_, _, close: ClosingData) if close.mutualClose.exists(_.txid == tx.txid) => Tools log s"Existing mutual $tx"
+          case (_, _, close: ClosingData) if close.localCommit.exists(_.commitTx.txid == tx.txid) => Tools log s"Existing local $tx"
+          case (_, _, close: ClosingData) if close.localProposals.exists(_.unsignedTx.tx.txid == tx.txid) => startMutualClose(close, tx)
+          case (_, _, negs: NegotiationsData) if negs.localProposals.exists(_.unsignedTx.tx.txid == tx.txid) => startMutualClose(negs, tx)
+          case (Some(claim), _, closingData: ClosingData) => BECOME(me STORE closingData.modify(_.revokedCommit).using(claim +: _), CLOSING)
+          case (Some(claim), _, _) => BECOME(me STORE ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil), CLOSING)
+          case (_, Left(nextRemote), _) if nextRemote.txid == tx.txid => startRemoteNextClose(some, nextRemote)
+          case _ if some.commitments.remoteCommit.txid == tx.txid => startRemoteCurrentClose(some)
+          case _ => startLocalClose(some)
         }
 
 
@@ -496,7 +498,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (null, close: ClosingData, null) => BECOME(close, CLOSING)
       case (null, init: InitData, null) => BECOME(init, WAIT_FOR_INIT)
       case (null, wait: WaitFundingDoneData, null) => BECOME(wait, SYNC)
-      case (null, negs: NegotiationsData, null) => BECOME(negs, SYNC)
+      case (null, neg: NegotiationsData, null) => BECOME(neg, SYNC)
       case (null, norm: NormalData, null) => BECOME(norm, SYNC)
 
 
@@ -513,11 +515,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // GUARD: we only react on connection level remote errors or those related to our channel
         if err.channelId == some.commitments.channelId || err.channelId == BinaryData("00" * 32) =>
         // REFUNDING is an exception here, we CAN NOT start a local close in that state
-        startLocalCurrentClose(some)
+        startLocalClose(some)
 
 
       // CMDShutdown in WAIT_FUNDING_DONE and OPEN is handled differently above
-      case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | SYNC) => startLocalCurrentClose(some)
+      case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | SYNC) => startLocalClose(some)
       case (_: NormalData, add: CMDAddHtlc, SYNC) => throw CMDAddExcept(add, ERR_OFFLINE)
       case _ =>
     }
@@ -546,20 +548,25 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     BECOME(norm1, OPEN) SEND localShutdown
   }
 
-  private def startMutualClose(neg: NegotiationsData, closeTx: Transaction) =
-    BECOME(me STORE ClosingData(neg.announce, neg.commitments, mutualClose = closeTx :: Nil), CLOSING)
-
   private def savePointSendError(refund: RefundingData, point: Point) = {
     val d1 = refund.modify(_.commitments.remoteCommit.remotePerCommitmentPoint) setTo point
     val msg = "Please be so kind as to spend your local commit" getBytes "UTF-8"
     BECOME(d1, REFUNDING) SEND Error(refund.commitments.channelId, msg)
   }
 
-  private def startLocalCurrentClose(some: HasCommitments) =
+  private def startMutualClose(some: HasCommitments, tx: Transaction) = some match {
+    case closingData: ClosingData => BECOME(me STORE closingData.copy(mutualClose = tx +: closingData.mutualClose), CLOSING)
+    case neg: NegotiationsData => BECOME(me STORE ClosingData(neg.announce, neg.commitments, neg.localProposals, tx :: Nil), CLOSING)
+    case _ => BECOME(me STORE ClosingData(some.announce, some.commitments, Nil, tx :: Nil), CLOSING)
+  }
+
+  private def startLocalClose(some: HasCommitments) =
     // Something went wrong and we decided to spend our CURRENT commit transaction
+    // BUT if we're at negotiations AND we have a signed mutual closing tx then send it
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
-      case (claim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(localCommit = claim :: Nil)
-      case (claim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, localCommit = claim :: Nil)
+      case (_, neg: NegotiationsData) if neg.lastSignedTx.isDefined => startMutualClose(neg, neg.lastSignedTx.get.tx)
+      case (localClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(localCommit = localClaim :: Nil)
+      case (localClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, localCommit = localClaim :: Nil)
     }
 
   private def startRemoteCurrentClose(some: HasCommitments) =
@@ -574,16 +581,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     Closing.claimRemoteCommitTxOutputs(some.commitments, nextRemoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(nextRemoteCommit = remoteClaim :: Nil)
       case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, nextRemoteCommit = remoteClaim :: Nil)
-    }
-
-  private def startOtherClose(some: HasCommitments, spendTx: Transaction) =
-    Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, spendTx) -> some match {
-      case (Some(claim), close: ClosingData) => BECOME(me STORE close.modify(_.revokedCommit).using(claim +: _), CLOSING)
-      case (Some(claim), _) => BECOME(me STORE ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil), CLOSING)
-      // Local, remote and revoked checks have failed and we are negotiating so this must be peer's mutual tx
-      case (None, neg: NegotiationsData) => startMutualClose(neg, spendTx)
-      // This is weird, try to spend local commit and hope we're lucky
-      case _ => startLocalCurrentClose(some)
     }
 }
 

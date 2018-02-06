@@ -74,21 +74,22 @@ object Helpers { me =>
 
       // We don't need an extra high fee for a closing transaction so we offer an economical one
       val closingFee = Scripts.weight2fee(commitments.localCommit.spec.feeratePerKw / 2, estimatedWeight)
-      makeClosing(commitments, localScriptPubkey, remoteScriptPubkey, closingFee)
+      makeClosing(commitments, closingFee, localScriptPubkey, remoteScriptPubkey)
     }
 
-    def makeClosing(commitments: Commitments, localScriptPubkey: BinaryData,
-                    remoteScriptPubkey: BinaryData, closingFee: Satoshi) = {
+    def makeClosing(commitments: Commitments, closingFee: Satoshi,
+                    local: BinaryData, remote: BinaryData) = {
 
-      require(isValidFinalScriptPubkey(localScriptPubkey), "Invalid localScriptPubkey")
-      require(isValidFinalScriptPubkey(remoteScriptPubkey), "Invalid remoteScriptPubkey")
-      val closingTx = makeFunderClosingTx(commitments.commitInput, localScriptPubkey, remoteScriptPubkey,
-        if (LNParams.dustLimit < commitments.remoteParams.dustLimitSat) commitments.remoteParams.dustLimitSat
-        else LNParams.dustLimit, closingFee, commitments.localCommit.spec)
+      require(isValidFinalScriptPubkey(local), "Invalid localScriptPubkey")
+      require(isValidFinalScriptPubkey(remote), "Invalid remoteScriptPubkey")
 
-      val localClosingSig = Scripts.sign(closingTx, commitments.localParams.fundingPrivKey)
+      val theirDustIsHigherThanOurs = LNParams.dustLimit < commitments.remoteParams.dustLimitSat
+      val dustLimit = if (theirDustIsHigherThanOurs) commitments.remoteParams.dustLimitSat else LNParams.dustLimit
+      val closing = makeFunderClosingTx(commitments.commitInput, local, remote, dustLimit, closingFee, commitments.localCommit.spec)
+
+      val localClosingSig = Scripts.sign(closing, commitments.localParams.fundingPrivKey)
       val closingSigned = ClosingSigned(commitments.channelId, closingFee.amount, localClosingSig)
-      (closingTx, closingSigned)
+      ClosingTxProposed(closing, closingSigned)
     }
 
     def makeFunderClosingTx(commitTxInput: InputInfo, localScriptPubKey: BinaryData, remoteScriptPubKey: BinaryData,

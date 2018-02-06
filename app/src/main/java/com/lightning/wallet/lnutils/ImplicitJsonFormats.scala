@@ -278,17 +278,20 @@ object ImplicitJsonFormats { me =>
     }
   }
 
+  implicit val closingTxProposedFmt = jsonFormat[ClosingTx, ClosingSigned,
+    ClosingTxProposed](ClosingTxProposed.apply, "unsignedTx", "localClosingSigned")
+
   implicit val refundingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments,
     RefundingData](RefundingData.apply, "announce", "commitments"), tag = "RefundingData")
 
-  implicit val closingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Seq[Transaction],
-    Seq[LocalCommitPublished], Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RevokedCommitPublished], Long,
-    ClosingData](ClosingData.apply, "announce", "commitments", "mutualClose", "localCommit", "remoteCommit", "nextRemoteCommit",
-    "revokedCommits", "closedAt"), tag = "ClosingData")
+  implicit val closingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Seq[ClosingTxProposed],
+    Seq[Transaction], Seq[LocalCommitPublished], Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RevokedCommitPublished], Long,
+    ClosingData](ClosingData.apply, "announce", "commitments", "localProposals", "mutualClose", "localCommit", "remoteCommit",
+    "nextRemoteCommit", "revokedCommits", "closedAt"), tag = "ClosingData")
 
-  implicit val negotiationsDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, ClosingSigned, Shutdown, Shutdown,
-    NegotiationsData](NegotiationsData.apply, "announce", "commitments", "localClosingSigned", "localShutdown",
-    "remoteShutdown"), tag = "NegotiationsData")
+  implicit val negotiationsDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Shutdown, Shutdown, Seq[ClosingTxProposed],
+    Option[ClosingTx], NegotiationsData](NegotiationsData.apply, "announce", "commitments", "localShutdown", "remoteShutdown",
+    "localProposals", "lastSignedTx"), tag = "NegotiationsData")
 
   implicit val normalDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Option[Shutdown], Option[Shutdown],
     NormalData](NormalData.apply, "announce", "commitments", "localShutdown", "remoteShutdown"), tag = "NormalData")
