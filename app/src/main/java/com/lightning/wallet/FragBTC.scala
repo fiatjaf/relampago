@@ -183,7 +183,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListUpdater wi
     val alert = mkForm(negPosBld(dialog_cancel, dialog_next), host getString action_bitcoin_send, content)
     val rateManager = new RateManager(getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance), content)
     val spendManager = new BtcManager(rateManager)
-    host.walletPager.setCurrentItem(0, true)
+    host.walletPager.setCurrentItem(0, false)
 
     def sendAttempt = rateManager.result match {
       case Failure(why) => app toast dialog_sum_empty

@@ -7,6 +7,7 @@ import com.lightning.wallet.Utils._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Tools._
 import android.text.format.DateUtils._
+import com.journeyapps.barcodescanner._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.Denomination._
 import android.support.v4.view.MenuItemCompat._
@@ -18,18 +19,20 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import scala.util.{Success, Try}
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
-import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import com.lightning.wallet.lnutils.{CloudDataSaver, PublicCloud, RatesSaver}
+import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
 import fr.castorflex.android.smoothprogressbar.SmoothProgressDrawable
 import fr.castorflex.android.smoothprogressbar.SmoothProgressBar
 import android.support.v7.widget.SearchView.OnQueryTextListener
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
+import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
 import android.widget.AbsListView.OnScrollListener
-import me.relex.circleindicator.CircleIndicator
+import com.google.zxing.client.android.BeepManager
 import android.view.ViewGroup.LayoutParams
 import org.bitcoinj.store.SPVBlockStore
+import android.support.v4.app.Fragment
 import com.lightning.wallet.helper.AES
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
@@ -177,18 +180,22 @@ object WalletActivity {
 }
 
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
+  lazy val walletPagerTab = findViewById(R.id.walletPagerTab).asInstanceOf[SmartTabLayout]
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[android.support.v4.view.ViewPager]
-  lazy val walletPagerIndicator = findViewById(R.id.walletPagerIndicator).asInstanceOf[CircleIndicator]
   lazy val layoutInflater = app.getSystemService(LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
   lazy val viewParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
   lazy val container = findViewById(R.id.container).asInstanceOf[FrameLayout]
   import WalletActivity.{lnOpt, btcOpt}
 
-  lazy val slidingFragmentAdapter =
-    new FragmentStatePagerAdapter(getSupportFragmentManager) {
-      def getItem(pos: Int) = if (pos == 0) new FragBTC else new FragLN
-      def getCount = 2
-    }
+  lazy val adapter = {
+    val fragScan = classOf[FragScan]
+    val fragBTC = classOf[FragBTC]
+    val fragLN = classOf[FragLN]
+
+    val items = FragmentPagerItems `with` me
+    val ready = items.add("bitcoin", fragBTC).add("lightning", fragLN).add("scanner", fragScan)
+    new FragmentPagerItemAdapter(getSupportFragmentManager, ready.create)
+  }
 
   app.ChannelManager.getOutPaymentObs = rpi => {
     // Stopping animation immediately does not work sometimes so we use a guarded timer here once again
@@ -210,26 +217,34 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     stopDetecting
   }
 
+  override def onResume = wrap(super.onResume) {
+    val pos = app.prefs.getInt(AbstractKit.LANDING, 0)
+    walletPager.setCurrentItem(math.min(pos, 1), false)
+  }
+
   override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
     // This is called shortly after fragLN sets bar as actionbar
     getMenuInflater.inflate(R.menu.ln, menu)
     for (ln <- lnOpt) ln setupSearch menu
   }
 
-  override def onOptionsItemSelected(m: MenuItem) = {
+  override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionBuyCoins) localBitcoinsAndGlidera
     else if (m.getItemId == R.id.exportSnapshot) exportSnapshot
-    else if (m.getItemId == R.id.actionChanInfo) goLNOps(null)
     else if (m.getItemId == R.id.actionSettings) mkSetsForm
-    true
   }
+
+  override def onBackPressed =
+    if (walletPager.getCurrentItem <= 1) super.onBackPressed
+    else walletPager.setCurrentItem(walletPager.getCurrentItem - 1)
 
   def INIT(state: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_wallet
-    walletPager setAdapter slidingFragmentAdapter
-    walletPagerIndicator setViewPager walletPager
-    walletPager addOnPageChangeListener new OnPageChangeListener {
-      walletPager.setCurrentItem(app.prefs.getInt(AbstractKit.LANDING, 0), false)
+    walletPager setOffscreenPageLimit 2
+    walletPager setAdapter adapter
+
+    walletPagerTab setViewPager walletPager
+    walletPagerTab setOnPageChangeListener new OnPageChangeListener {
       def onPageSelected(pos: Int) = app.prefs.edit.putInt(AbstractKit.LANDING, pos).commit
       def onPageScrolled(pos: Int, positionOffset: Float, offsetPixels: Int) = none
       def onPageScrollStateChanged (state: Int) = none
@@ -261,17 +276,20 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData = app.TransData.value match {
-    case link: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(link.getAmount), link.getAddress)
-    case bitcoinAddress: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddress(bitcoinAddress)
-    case pr: PaymentRequest if pr.isFresh => for (ln <- lnOpt) ln.sendPayment(pr)
-    case pr: PaymentRequest => onFail(me getString err_ln_old)
-    case _ =>
+  def checkTransData = {
+    app.TransData.value match {
+      case link: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(link.getAmount), link.getAddress)
+      case bitcoinAddress: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddress(bitcoinAddress)
+      case pr: PaymentRequest => for (ln <- lnOpt) ln.sendPayment(pr)
+      case _ =>
+    }
+
+    // Clear irregardless
+    app.TransData.value = null
   }
 
   //BUTTONS REACTIONS
 
-  def goQR(top: View) = me goTo classOf[ScanActivity]
   def goBTCSendForm(top: View) = for (btc <- btcOpt) btc.sendBtcPopup
   def goReceiveLNForm(top: View) = for (ln <- lnOpt) ln.makePaymentRequest.run
 
@@ -485,5 +503,53 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   def localBitcoinsAndGlidera = {
     val uri = Uri parse "https://testnet.manu.backend.hamburg/faucet"
     me startActivity new Intent(Intent.ACTION_VIEW, uri)
+  }
+}
+
+class FragScan extends Fragment with BarcodeCallback { me =>
+  type Points = java.util.List[com.google.zxing.ResultPoint]
+  lazy val host = getActivity.asInstanceOf[WalletActivity]
+  lazy val beepManager = new BeepManager(host)
+  var lastAttempt = System.currentTimeMillis
+  var barcodeReader: BarcodeView = _
+
+  override def onCreateView(inflator: LayoutInflater, vg: ViewGroup, bn: Bundle) =
+    inflator.inflate(R.layout.frag_view_pager_scan, vg, false)
+
+  override def onViewCreated(view: View, savedInstanceState: Bundle) = {
+    barcodeReader = view.findViewById(R.id.reader).asInstanceOf[BarcodeView]
+    barcodeReader decodeContinuous me
+  }
+
+  override def setUserVisibleHint(isVisibleToUser: Boolean) = {
+    if (barcodeReader != null && isVisibleToUser) barcodeReader.resume
+    if (barcodeReader != null && !isVisibleToUser) resetView
+    super.setUserVisibleHint(isVisibleToUser)
+  }
+
+  // Only try to decode result if 2.5 seconds elapsed
+  override def possibleResultPoints(points: Points) = none
+  override def barcodeResult(res: BarcodeResult) = Option(res.getText) foreach {
+    rawText => if (System.currentTimeMillis - lastAttempt > 2500) tryParseQR(rawText)
+  }
+
+  def resetView = {
+    barcodeReader.pause
+    val ft = getFragmentManager.beginTransaction
+    ft.detach(me).attach(me).commit
+  }
+
+  def tryParseQR(scannedText: String) = try {
+    // This may throw which is expected and fine
+
+    beepManager.playBeepSound
+    lastAttempt = System.currentTimeMillis
+    app.TransData recordValue scannedText
+    host.checkTransData
+
+  } catch app.TransData.onFail { code =>
+    val builder = host negBld dialog_ok setMessage code
+    host.walletPager.setCurrentItem(1, false)
+    host showForm builder.create
   }
 }

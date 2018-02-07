@@ -610,7 +610,6 @@ trait ChannelListener {
   type Incoming = (Channel, ChannelData, Any)
   type Transition = (Channel, ChannelData, String, String)
   def onError: PartialFunction[Malfunction, Unit] = none
-  // These two are only called when there is no exception
   def onBecome: PartialFunction[Transition, Unit] = none
   def onProcess: PartialFunction[Incoming, Unit] = none
 }

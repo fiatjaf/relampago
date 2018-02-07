@@ -45,7 +45,6 @@ class FragLN extends Fragment { me =>
     worker.reWireChannelOrNone.run
     // Inversively call parent check
     worker.host.checkTransData
-    app.TransData.value = null
     super.onResume
   }
 
@@ -153,7 +152,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
             val inputDescription = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
             val canReceiveHint = if (maxMsat.amount < 0L) coloredOut(maxMsat) else denom withSign maxMsat
             val rateManager = new RateManager(getString(amount_hint_can_receive).format(canReceiveHint), content)
-            val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), getString(ln_receive), content)
+            val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), getString(action_ln_receive), content)
 
             def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
               val extraRoute = Vector(update toHop chan.data.announce.nodeId)
@@ -203,7 +202,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
       val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), title.html, content)
       val hint = getString(amount_hint_can_send).format(denom withSign maxMsat)
       val rateManager = new RateManager(hint, content)
-      host.walletPager.setCurrentItem(1, true)
+      host.walletPager.setCurrentItem(1, false)
 
       def sendAttempt = rateManager.result match {
         case Failure(_) => app toast dialog_sum_empty

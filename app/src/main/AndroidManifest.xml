@@ -70,9 +70,6 @@
         <activity android:launchMode="singleTask" android:name="EmergencyActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
-        <activity android:launchMode="singleTask" android:name="ScanActivity"
-            android:screenOrientation="portrait" android:theme="@style/NoBar"/>
-
         <activity android:launchMode="singleTask" android:name="RequestActivity"
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 

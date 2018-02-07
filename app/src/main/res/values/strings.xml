@@ -71,13 +71,12 @@
     <string name="secret_new">New passcode</string>
     <string name="secret_wrong">Wrong passcode</string>
     <string name="secret_too_short">New passcode is too short</string>
+    <string name="action_chan_details">View channel details</string>
     <string name="action_bitcoin_receive">Receive bitcoin</string>
+    <string name="action_ln_receive">Receive lightning</string>
     <string name="action_bitcoin_send">Send bitcoin</string>
     <string name="action_settings">Wallet settings</string>
-    <string name="action_chan">Channel details</string>
-    <string name="action_scan">Scan QR code</string>
 
-    <string name="ln_receive">Receive lightning</string>
     <string name="ln_open_channel">Open payment channel</string>
     <string name="ln_details">View opening details</string>
     <string name="ln_chan_close">Close channel</string>
@@ -147,7 +146,6 @@
     </array>
 
     <!-- errors -->
-    <string name="err_ln_old">Failed because this payment request has expired. Please ask recipient to provide a new one.</string>
     <string name="err_ln_offline">Failed because channel is currently offline. Please wait a few seconds and try again.</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept it.</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum.</string>
@@ -166,7 +164,7 @@
     <string name="err_different_net">Failed because request contains an address that belongs to a different network.</string>
     <string name="err_address">Failed because neither Bitcoin address nor Lightning payment request has been found.</string>
     <string name="err_uri">Failed because request contains a malformed URI which could not be parsed.</string>
-    <string name="err_general">Failed because an unexpected error has occurred.</string>
+    <string name="err_general">Failed because an error has occurred.</string>
 
     <!-- LN QR and NFC related messages -->
     <string name="nfc_enabled">NFC is on</string>

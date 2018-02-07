@@ -6,11 +6,6 @@
     <LinearLayout style="@style/StandardLinearLayout">
         <include layout="@layout/toolbar"/>
 
-        <View
-            android:background="@color/black"
-            android:layout_width="match_parent"
-            android:layout_height="24sp"/>
-
         <Button
             style="@style/MarginInfo"
             android:id="@+id/openNewChannel"
@@ -60,23 +55,23 @@
         style="@style/FloatingMenu">
 
         <com.github.clans.fab.FloatingActionButton
+            android:src="@drawable/ic_info_outline_white_18dp"
+            fab:fab_label="@string/action_chan_details"
+            fab:fab_colorPressed="@color/ln"
+            fab:fab_colorNormal="@color/ln"
+            fab:fab_colorRipple="@color/ln"
+            android:onClick="goLNOps"
+            style="@style/FabButton"
+            fab:fab_size="mini"/>
+
+        <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"
-            fab:fab_label="@string/ln_receive"
+            fab:fab_label="@string/action_ln_receive"
             android:onClick="goReceiveLNForm"
             fab:fab_colorPressed="@color/ln"
             fab:fab_colorNormal="@color/ln"
             fab:fab_colorRipple="@color/ln"
             style="@style/FabButton"
-            fab:fab_size="mini"/>
-
-        <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_fullscreen_white_18dp"
-            fab:fab_label="@string/action_scan"
-            fab:fab_colorPressed="@color/ln"
-            fab:fab_colorNormal="@color/ln"
-            fab:fab_colorRipple="@color/ln"
-            style="@style/FabButton"
-            android:onClick="goQR"
             fab:fab_size="mini"/>
 
     </com.github.clans.fab.FloatingActionMenu>

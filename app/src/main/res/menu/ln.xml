@@ -12,11 +12,6 @@
 
     <item
         app:showAsAction="never"
-        android:title="@string/action_chan"
-        android:id="@+id/actionChanInfo"/>
-
-    <item
-        app:showAsAction="never"
         android:title="@string/action_settings"
         android:id="@+id/actionSettings"/>
 
