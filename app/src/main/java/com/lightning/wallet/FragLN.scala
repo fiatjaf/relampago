@@ -228,8 +228,10 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
       for (sum <- pr.amount) rateManager setSum Try(sum)
     }
 
-    // Reload listener to get subtitle updated
-    me setTitle denom.withSign(me getBalance chan)
+    // Set title value to current channel balance in selected denomination
+    host getBalance chan map MilliSatoshi map denom.withSign foreach setTitle
+
+    // Reload to get subtitle updated
     chan.listeners += chanListener
     chanListener nullOnBecome chan
 
@@ -243,8 +245,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
     // Reset all triggers except denomination
     sendPayment = pr => app toast ln_notify_opening
     makePaymentRequest = UITask(app toast ln_notify_opening)
-    update(getString(ln_notify_opening), Informer.LNSTATE).run
-    me setTitle denom.withSign(me getBalance chan)
+    update(host getString ln_notify_opening, Informer.LNSTATE).run
+    // Set title value to current channel balance in selected denomination
+    host getBalance chan map MilliSatoshi map denom.withSign foreach setTitle
 
     // Broadcast a funding tx
     chan.listeners += chanListener
@@ -267,10 +270,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
     viewChannelInfo setVisibility View.GONE
     actionDivider setVisibility View.VISIBLE
     openNewChannel setVisibility View.VISIBLE
-  }
-
-  def getBalance(chan: Channel) = MilliSatoshi {
-    chan(_.localCommit.spec.toLocalMsat) getOrElse 0L
   }
 
   def notifyBtcEvent(message: String) = {

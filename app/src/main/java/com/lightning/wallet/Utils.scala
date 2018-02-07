@@ -228,9 +228,6 @@ trait TimerActivity extends AppCompatActivity { me =>
 
     def chooseFee: Unit =
       passWrap(getString(step_2).format(pay cute sumOut).html) { pass =>
-        // Once user enters a password we create a dummy tx for fee estimates
-
-        app toast secret_checking
         <(makeTx(pass, RatesSaver.rates.feeLive), onTxFail) { estimateTx =>
           // Get live final fee and set a risky final fee to be 2 times less
 
@@ -258,6 +255,9 @@ trait TimerActivity extends AppCompatActivity { me =>
           lazy val alert = mkForm(dialog, getString(step_3).format(pay cute sumOut).html, form)
           alert
         }
+
+        // Let know something is on
+        app toast secret_checking
       }
 
     def makeTx(pass: String, fee: Coin) = {

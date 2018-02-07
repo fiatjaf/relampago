@@ -17,12 +17,13 @@ import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
 import scala.util.{Success, Try}
+import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
 import com.lightning.wallet.lnutils.{CloudDataSaver, PublicCloud, RatesSaver}
+import fr.castorflex.android.smoothprogressbar.{SmoothProgressDrawable, SmoothProgressBar}
 import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
-import fr.castorflex.android.smoothprogressbar.SmoothProgressDrawable
-import fr.castorflex.android.smoothprogressbar.SmoothProgressBar
+
 import android.support.v7.widget.SearchView.OnQueryTextListener
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
@@ -39,7 +40,6 @@ import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
 import org.bitcoinj.core.Address
 import scala.collection.mutable
-import fr.acinq.bitcoin.Satoshi
 import android.text.InputType
 import org.ndeftools.Message
 import android.os.Bundle
@@ -222,16 +222,18 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     walletPager.setCurrentItem(math.min(pos, 1), false)
   }
 
-  override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
-    // This is called shortly after fragLN sets bar as actionbar
+  override def onCreateOptionsMenu(menu: Menu) = {
+    // Called after fragLN sets it's bar as actionbar
     getMenuInflater.inflate(R.menu.ln, menu)
     for (ln <- lnOpt) ln setupSearch menu
+    true
   }
 
-  override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
+  override def onOptionsItemSelected(m: MenuItem) = {
     if (m.getItemId == R.id.actionBuyCoins) localBitcoinsAndGlidera
     else if (m.getItemId == R.id.exportSnapshot) exportSnapshot
     else if (m.getItemId == R.id.actionSettings) mkSetsForm
+    true
   }
 
   override def onBackPressed =
@@ -327,6 +329,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   def showDenomChooser = {
+    val btcFunds = coin2MSat(app.kit.conf1Balance)
+    val lnFunds = MilliSatoshi(app.ChannelManager.notClosing.flatMap(getBalance).sum)
+    val btcPrettyFunds = humanFiat(sumIn format denom.withSign(btcFunds), btcFunds, " ")
+    val lnPrettyFunds = humanFiat(sumIn format denom.withSign(lnFunds), lnFunds, " ")
+    val title = getString(fiat_set_denom).format(btcPrettyFunds, lnPrettyFunds)
     val denominations = getResources.getStringArray(R.array.denoms).map(_.html)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
     val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
@@ -339,8 +346,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    mkForm(me negBld dialog_ok, getString(fiat_set_denom).html, form)
+    mkForm(me negBld dialog_ok, title.html, form)
   }
+
+  def getBalance(chan: Channel) =
+    chan(_.localCommit.spec.toLocalMsat)
 
   // SETTINGS FORM
 
