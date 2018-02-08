@@ -112,14 +112,13 @@ class WalletApp extends Application { me =>
   }
 
   object ChannelManager {
-    type ChannelVec = Vector[Channel]
     type RPIOpt = Option[RuntimePaymentInfo]
 
     val operationalListeners = Set(broadcaster, bag, StorageWrap, Notificator)
     // Obtain a vector of stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-    var all: ChannelVec = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
-    def fromNode(of: ChannelVec, ann: NodeAnnouncement): ChannelVec = of.filter(_.data.announce == ann)
-    def notClosing: ChannelVec = all.filter(_.state != Channel.CLOSING)
+    var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
+    def fromNode(of: Vector[Channel], ann: NodeAnnouncement): Vector[Channel] = of.filter(_.data.announce == ann)
+    def notClosing: Vector[Channel] = all.filter(_.state != Channel.CLOSING)
 
     val chainEventsListener = new TxTracker with BlocksListener {
       override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
@@ -139,10 +138,10 @@ class WalletApp extends Application { me =>
     }
 
     val socketEventsListener = new ConnectionListener {
-      def reConnect(cs: ChannelVec, ann: NodeAnnouncement) = if (cs.nonEmpty) {
-        // Immediately inform affected channels and try to reconnect in 5 seconds
+      def reConnect(vc: Vector[Channel], ann: NodeAnnouncement) = if (vc.nonEmpty) {
+        // Immediately inform affected channels and try to reconnect back in 5 seconds
         Obs.just(ann).delay(5.seconds).subscribe(ConnectionManager.connectTo, none)
-        cs.foreach(_ process CMDOffline)
+        vc.foreach(_ process CMDOffline)
       }
 
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = fromNode(notClosing, ann).foreach(_ process msg)

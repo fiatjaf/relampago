@@ -11,7 +11,7 @@
             android:id="@+id/openNewChannel"
             android:layout_width="wrap_content"
             android:text="@string/ln_open_channel"
-            android:onClick="tryGoLNStart"/>
+            android:onClick="goAddChannel"/>
 
         <Button
             style="@style/MarginInfo"
@@ -55,22 +55,22 @@
         style="@style/FloatingMenu">
 
         <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_info_outline_white_18dp"
-            fab:fab_label="@string/action_chan_details"
+            android:src="@drawable/ic_add_white_18dp"
+            fab:fab_label="@string/ln_open_channel"
             fab:fab_colorPressed="@color/ln"
             fab:fab_colorNormal="@color/ln"
             fab:fab_colorRipple="@color/ln"
-            android:onClick="goLNOps"
+            android:onClick="goAddChannel"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"
             fab:fab_label="@string/action_ln_receive"
-            android:onClick="goReceiveLNForm"
             fab:fab_colorPressed="@color/ln"
             fab:fab_colorNormal="@color/ln"
             fab:fab_colorRipple="@color/ln"
+            android:onClick="goReceiveLN"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 

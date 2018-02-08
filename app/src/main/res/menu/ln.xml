@@ -5,24 +5,15 @@
 
     <item
         android:title="Search"
-        android:id="@+id/action_search"
         app:showAsAction="always|collapseActionView"
         android:icon="@android:drawable/ic_menu_search"
-        app:actionViewClass="android.support.v7.widget.SearchView"/>
+        app:actionViewClass="android.support.v7.widget.SearchView"
+        android:id="@+id/action_search"/>
 
     <item
-        app:showAsAction="never"
-        android:title="@string/action_settings"
-        android:id="@+id/actionSettings"/>
-
-    <item
-        app:showAsAction="never"
-        android:title="Testnet faucet"
-        android:id="@+id/actionBuyCoins"/>
-
-    <item
-        app:showAsAction="never"
-        android:title="Export snapshot"
-        android:id="@+id/exportSnapshot"/>
+        android:title="Channel details"
+        app:showAsAction="always|collapseActionView"
+        android:icon="@drawable/ic_settings_white_24dp"
+        android:id="@+id/actionLNOps"/>
 
 </menu>

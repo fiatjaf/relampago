@@ -229,11 +229,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     true
   }
 
-  override def onOptionsItemSelected(m: MenuItem) = {
+  override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionBuyCoins) localBitcoinsAndGlidera
-    else if (m.getItemId == R.id.exportSnapshot) exportSnapshot
-    else if (m.getItemId == R.id.actionSettings) mkSetsForm
-    true
+    if (m.getItemId == R.id.exportSnapshot) exportSnapshot
+    if (m.getItemId == R.id.actionSettings) mkSetsForm
+    if (m.getItemId == R.id.actionLNOps) goLNOps(null)
   }
 
   override def onBackPressed =
@@ -292,10 +292,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   //BUTTONS REACTIONS
 
-  def goBTCSendForm(top: View) = for (btc <- btcOpt) btc.sendBtcPopup
-  def goReceiveLNForm(top: View) = for (ln <- lnOpt) ln.makePaymentRequest.run
+  def goReceiveLN(top: View) = for (ln <- lnOpt) ln.makePaymentRequest.run
+  def goSendBTC(top: View) = for (btc <- btcOpt) btc.sendBtcPopup
 
-  def goReceiveBtcAddress(top: View) = {
+  def goReceiveBTC(top: View) = {
     app.TransData.value = app.kit.currentAddress
     me goTo classOf[RequestActivity]
   }
@@ -306,23 +306,23 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     else me goTo classOf[LNOpsActivity]
   }
 
-  def tryGoLNStart(top: View) = {
+  def goAddChannel(top: View) = {
     val minRequired = RatesSaver.rates.feeLive multiply 2
     lazy val required = sumIn.format(denom withSign minRequired)
     lazy val balance = sumIn.format(denom withSign app.kit.conf1Balance)
     lazy val notEnough = getString(err_ln_not_enough_funds).format(balance, required)
-    if (app.kit.conf1Balance isGreaterThan minRequired) goLNStart
+    if (app.kit.conf1Balance isGreaterThan minRequired) goSelectChannel
     else mkForm(me negBld dialog_ok, notEnough.html, null)
   }
 
-  def goLNStart: Unit = cloud match {
+  def goSelectChannel: Unit = cloud match {
     case _: PublicCloud if app.prefs.getBoolean(AbstractKit.TOKENS_WARN, true) =>
       // This is the first time a user tries to open a channel so show tokens warning
 
       val humanSum = coloredOut apply Satoshi(2000)
       val text = getString(tokens_warn).format(humanSum).html
       showForm(mkChoiceDialog(go, none, dialog_ok, dialog_cancel).setView(text).create)
-      def go = runAnd(app.prefs.edit.putBoolean(AbstractKit.TOKENS_WARN, false).commit)(goLNStart)
+      def go = runAnd(app.prefs.edit.putBoolean(AbstractKit.TOKENS_WARN, false).commit)(goSelectChannel)
 
     // Either private cloud or warning was cleared
     case _ => me goTo classOf[LNStartActivity]

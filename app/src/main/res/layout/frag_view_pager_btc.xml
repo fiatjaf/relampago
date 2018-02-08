@@ -47,32 +47,22 @@
         style="@style/FloatingMenu">
 
         <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_info_outline_white_18dp"
-            fab:fab_label="@string/action_chan_details"
-            fab:fab_colorPressed="@color/ln"
-            fab:fab_colorNormal="@color/ln"
-            fab:fab_colorRipple="@color/ln"
-            android:onClick="goLNOps"
-            style="@style/FabButton"
-            fab:fab_size="mini"/>
-
-        <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_upward_white_18dp"
             fab:fab_label="@string/action_bitcoin_send"
             fab:fab_colorPressed="@color/btc"
             fab:fab_colorNormal="@color/btc"
             fab:fab_colorRipple="@color/btc"
-            android:onClick="goBTCSendForm"
+            android:onClick="goSendBTC"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"
             fab:fab_label="@string/action_bitcoin_receive"
-            android:onClick="goReceiveBtcAddress"
             fab:fab_colorPressed="@color/btc"
             fab:fab_colorNormal="@color/btc"
             fab:fab_colorRipple="@color/btc"
+            android:onClick="goReceiveBTC"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 
