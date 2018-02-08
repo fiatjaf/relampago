@@ -124,39 +124,40 @@ case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimPena
 // COMMITMENTS
 
 case class Htlc(incoming: Boolean, add: UpdateAddHtlc)
-case class CommitmentSpec(htlcs: Set[Htlc], fulfilled: Set[HtlcAndFulfill], failed: Set[HtlcAndFail],
-                          feeratePerKw: Long, toLocalMsat: Long, toRemoteMsat: Long)
+case class CommitmentSpec(htlcs: Set[Htlc], fulfilled: Set[HtlcAndFulfill],
+                          failed: Set[HtlcAndFail], feeratePerKw: Long,
+                          toLocalMsat: Long, toRemoteMsat: Long)
 
 object CommitmentSpec {
   def findHtlcById(cs: CommitmentSpec, id: Long, isIncoming: Boolean): Option[Htlc] =
     cs.htlcs.find(htlc => htlc.add.id == id && htlc.incoming == isIncoming)
 
   type HtlcAndFulfill = (Htlc, UpdateFulfillHtlc)
-  private def fulfill(cs: CommitmentSpec, in: Boolean, u: UpdateFulfillHtlc) =
+  private def fulfill(cs: CommitmentSpec, in: Boolean, m: UpdateFulfillHtlc) =
 
-    findHtlcById(cs, u.id, in) match {
+    findHtlcById(cs, m.id, in) match {
       case Some(htlc) if htlc.incoming =>
         cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat,
-          fulfilled = cs.fulfilled + Tuple2(htlc, u), htlcs = cs.htlcs - htlc)
+          fulfilled = cs.fulfilled + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
 
       case Some(htlc) =>
         cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat,
-          fulfilled = cs.fulfilled + Tuple2(htlc, u), htlcs = cs.htlcs - htlc)
+          fulfilled = cs.fulfilled + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
 
       case None => cs
     }
 
   type HtlcAndFail = (Htlc, LightningMessage)
-  private def fail(cs: CommitmentSpec, in: Boolean, u: HasHtlcId) =
+  private def fail(cs: CommitmentSpec, in: Boolean, m: HasHtlcId) =
 
-    findHtlcById(cs, u.id, in) match {
+    findHtlcById(cs, m.id, in) match {
       case Some(htlc) if htlc.incoming =>
         cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat,
-          failed = cs.failed + Tuple2(htlc, u), htlcs = cs.htlcs - htlc)
+          failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
 
       case Some(htlc) =>
         cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat,
-          failed = cs.failed + Tuple2(htlc, u), htlcs = cs.htlcs - htlc)
+          failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
 
       case None => cs
     }

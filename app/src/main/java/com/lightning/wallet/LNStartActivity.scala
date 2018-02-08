@@ -43,16 +43,15 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
   private var nodes = Vector.empty[AnnounceChansNum]
 
   val adapter = new BaseAdapter {
-    def getView(nodePosition: Int, cv: View, parent: ViewGroup) = {
+    def getView(pos: Int, cv: View, parent: ViewGroup) = {
       val view = getLayoutInflater.inflate(R.layout.frag_single_line, null)
       val textLine = view.findViewById(R.id.textLine).asInstanceOf[TextView]
 
-      val announce \ connections = getItem(nodePosition)
-      val humanConnects = app.plurOrZero(chansNumber, connections)
-      val theirNode = humanNode(announce.nodeId.toString, "\u0020")
-
-      // Display number of connections so users may pick a well connected nodes
-      textLine setText nodeView.format(announce.alias, humanConnects, theirNode).html
+      val announce \ connections = getItem(pos)
+      val conncections = app.plurOrZero(chansNumber, connections)
+      val theirNodeKey = humanNode(announce.nodeId.toString, "\u0020")
+      val txt = nodeView.format(announce.alias, conncections, theirNodeKey)
+      textLine setText txt.html
       view
     }
 
@@ -90,12 +89,15 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
     val announce \ connections = adapter getItem pos
     val theirNode = humanNode(announce.nodeId.toString, "<br>")
     val humanConnects = app.plurOrZero(chansNumber, connections)
-    // This channel does not receive events yet so we need to add some custom listeners
     val detailsText = nodeView.format(announce.alias, humanConnects, s"<br>$theirNode").html
     val freshChan = app.ChannelManager.createChannel(Set.empty, InitData apply announce)
 
     lazy val socketOpenListener = new ConnectionListener {
-      override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = if (ann == announce) freshChan process msg
+      override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
+        case setupMsg: ChannelSetupMessage if ann == announce => freshChan process setupMsg
+        case _ => // Opening channel is only allowed to receive setup messages
+      }
+
       override def onOperational(ann: NodeAnnouncement, their: Init) = if (ann == announce) askForFunding(freshChan, their).run
       override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) chanOpenListener onError freshChan -> new LightningException
       override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) chanOpenListener onError freshChan -> new LightningException
@@ -140,7 +142,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
       // in worst case it will be saved once channel becomes OPEN if there are no tokens currently
       LNParams.cloud doProcess CloudAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
       // Make this a fully established channel by attaching operational listeners and adding it to list
-      freshChan.listeners ++= app.ChannelManager.operationalListeners
+      freshChan.listeners = app.ChannelManager.operationalListeners
       app.ChannelManager.all +:= freshChan
       me exitTo classOf[WalletActivity]
     }

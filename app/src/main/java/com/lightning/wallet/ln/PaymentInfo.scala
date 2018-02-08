@@ -178,7 +178,7 @@ case class PaymentInfo(rawRd: String, rawPr: String, preimage: BinaryData, incom
 
 case class RuntimePaymentInfo(rd: RoutingData, pr: PaymentRequest, firstMsat: Long) {
   lazy val text = pr.description match { case Right(info) => info case _ => new String }
-  lazy val searchText = text + " " + pr.paymentHash.toString
+  lazy val searchText = s"$text ${pr.paymentHash.toString}"
 }
 
 trait PaymentInfoBag { me =>

@@ -74,10 +74,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         else throw new LightningException(result.toFieldErrMapping.map(_._1) mkString "\n")
 
 
-      // They have accepted our proposal, now let them sign a first commit tx
       case (WaitFundingData(announce, cmd, accept), (fundTx: Transaction, outIndex: Int), WAIT_FOR_FUNDING) =>
-        val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstFunderCommitTxs(cmd, accept,
-          fundTx.hash, outIndex, accept.firstPerCommitmentPoint)
+        // They have accepted our proposal, now let them sign a first commit so we can safely broadcast a funding
+
+        val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) =
+          Funding.makeFirstFunderCommitTxs(cmd, accept, fundTx.hash,
+            outIndex, accept.firstPerCommitmentPoint)
 
         val localSigOfRemoteTx = Scripts.sign(remoteCommitTx, cmd.localParams.fundingPrivKey)
         val fundingCreated = FundingCreated(cmd.temporaryChannelId, fundTx.hash, outIndex, localSigOfRemoteTx)
@@ -86,10 +88,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           localSpec, localCommitTx, firstRemoteCommit), WAIT_FUNDING_SIGNED) SEND fundingCreated
 
 
-      // They have signed our first commit tx, we can broadcast a funding tx
-      case (wait: WaitFundingSignedData, remote: FundingSigned, WAIT_FUNDING_SIGNED)
-        if remote.channelId == wait.channelId =>
-
+      // They have signed our first commit, we can broadcast a funding tx
+      case (wait: WaitFundingSignedData, remote: FundingSigned, WAIT_FUNDING_SIGNED) =>
         val signedLocalCommitTx = Scripts.addSigs(wait.localCommitTx, wait.localParams.fundingPrivKey.publicKey,
           wait.remoteParams.fundingPubkey, Scripts.sign(wait.localCommitTx, wait.localParams.fundingPrivKey), remote.signature)
 
@@ -113,20 +113,15 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // We have not yet sent a FundingLocked but just got one from them so we save it and keep waiting
-      case (wait @ WaitFundingDoneData(_, None, _, _, _), their: FundingLocked, WAIT_FUNDING_DONE)
-        if their.channelId == wait.commitments.channelId =>
-
+      case (wait @ WaitFundingDoneData(_, None, _, _, _), their: FundingLocked, WAIT_FUNDING_DONE) =>
         // Not storing since they will re-send on restart
         val d1 = wait.modify(_.their) setTo Some(their)
         me UPDATA d1
 
 
-      // We have already sent them a FundingLocked and now we got one from them so we can enter normal state now
-      case (wait @ WaitFundingDoneData(_, Some(our), _, _, _), their: FundingLocked, WAIT_FUNDING_DONE)
-        if their.channelId == wait.commitments.channelId =>
-
-        val point = Right(their.nextPerCommitmentPoint)
-        val c1 = wait.commitments.copy(remoteNextCommitInfo = point)
+      // We have already sent them a FundingLocked and now we got one from them so can enter normal state
+      case (wait @ WaitFundingDoneData(_, Some(our), _, _, _), their: FundingLocked, WAIT_FUNDING_DONE) =>
+        val c1 = wait.commitments.modify(_.remoteNextCommitInfo) setTo Right(their.nextPerCommitmentPoint)
         BECOME(me STORE NormalData(wait.announce, c1), OPEN)
 
 
@@ -143,42 +138,32 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (wait @ WaitFundingDoneData(_, _, Some(their), _, _), CMDConfirmed(tx), WAIT_FUNDING_DONE)
         if wait.fundingTx.txid == tx.txid =>
 
-        val our = makeFundingLocked(wait.commitments)
-        val point = Right(their.nextPerCommitmentPoint)
-        val c1 = wait.commitments.copy(remoteNextCommitInfo = point)
-        BECOME(me STORE NormalData(wait.announce, c1), OPEN) SEND our
+        val c1 = wait.commitments.modify(_.remoteNextCommitInfo) setTo Right(their.nextPerCommitmentPoint)
+        BECOME(me STORE NormalData(wait.announce, c1), OPEN) SEND makeFundingLocked(wait.commitments)
 
 
       // OPEN MODE
 
 
-      case (norm: NormalData, add: UpdateAddHtlc, OPEN)
-        if add.channelId == norm.commitments.channelId =>
-
+      case (norm: NormalData, add: UpdateAddHtlc, OPEN) =>
         // Got new incoming HTLC so put it to changes for now
         val c1 = Commitments.receiveAdd(norm.commitments, add)
         me UPDATA norm.copy(commitments = c1)
 
 
-      case (norm: NormalData, fulfill: UpdateFulfillHtlc, OPEN)
-        if fulfill.channelId == norm.commitments.channelId =>
-
-        // Got a fulfill for an outgoing HTLC we sent them earlier
+      case (norm: NormalData, fulfill: UpdateFulfillHtlc, OPEN) =>
+        // Got a fulfill for an outgoing HTLC we have sent them earlier
         val c1 = Commitments.receiveFulfill(norm.commitments, fulfill)
         me UPDATA norm.copy(commitments = c1)
 
 
-      case (norm: NormalData, fail: UpdateFailHtlc, OPEN)
-        if fail.channelId == norm.commitments.channelId =>
-
+      case (norm: NormalData, fail: UpdateFailHtlc, OPEN) =>
         // Got a failure for an outgoing HTLC we sent earlier
         val c1 = Commitments.receiveFail(norm.commitments, fail)
         me UPDATA norm.copy(commitments = c1)
 
 
-      case (norm: NormalData, fail: UpdateFailMalformedHtlc, OPEN)
-        if fail.channelId == norm.commitments.channelId =>
-
+      case (norm: NormalData, fail: UpdateFailMalformedHtlc, OPEN) =>
         // Got 'malformed' failure for an outgoing HTLC we sent earlier
         val c1 = Commitments.receiveFailMalformed(norm.commitments, fail)
         me UPDATA norm.copy(commitments = c1)
@@ -244,9 +229,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA d1 SEND commitSig
 
 
-      case (norm: NormalData, sig: CommitSig, OPEN)
-        if sig.channelId == norm.commitments.channelId =>
-
+      case (norm: NormalData, sig: CommitSig, OPEN) =>
         // We received a commit sig from them, now we can update our local commit
         val c1 \ revokeAndAck = Commitments.receiveCommit(norm.commitments, sig)
         val d1 = me STORE norm.copy(commitments = c1)
@@ -254,9 +237,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         doProcess(CMDProceed)
 
 
-      case (norm: NormalData, rev: RevokeAndAck, OPEN)
-        if rev.channelId == norm.commitments.channelId =>
-
+      case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
         // We received a revocation because we sent a commit sig
         val c1 = Commitments.receiveRevocation(norm.commitments, rev)
         val d1 = me STORE norm.copy(commitments = c1)
@@ -281,9 +262,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me startShutdown NormalData(wait.announce, wait.commitments)
 
 
-      case (wait: WaitFundingDoneData, remote: Shutdown, WAIT_FUNDING_DONE)
+      case (wait: WaitFundingDoneData, remote: Shutdown, WAIT_FUNDING_DONE) =>
         // They have decided to close our channel before it reached a min depth
-        if remote.channelId == wait.commitments.channelId =>
 
         val norm = NormalData(wait.announce, wait.commitments)
         val norm1 = norm.modify(_.remoteShutdown) setTo Some(remote)
@@ -298,9 +278,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if (nope) startLocalClose(norm) else me startShutdown norm
 
 
-      case (norm @ NormalData(_, commitments, _, None), remote: Shutdown, OPEN)
-        // GUARD: Either they initiate a shutdown or respond to the one we sent
-        if remote.channelId == norm.commitments.channelId =>
+      case (norm @ NormalData(_, commitments, _, None), remote: Shutdown, OPEN) =>
+        // GUARD: Either they initiate a shutdown or respond to the one we have sent
 
         val d1 = norm.modify(_.remoteShutdown) setTo Some(remote)
         val nope = Commitments.remoteHasUnsignedOutgoing(commitments)
@@ -330,26 +309,26 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (refund: RefundingData, cr: ChannelReestablish, REFUNDING)
-        // GUARD: We have started a channel with REFUNDING and wait for their ChannelReestablish
-        if cr.channelId == refund.commitments.channelId && cr.myCurrentPerCommitmentPoint.isDefined =>
+        // GUARD: We have started a channel with REFUNDING data
+        // and explicitly wait for their ChannelReestablish
+        if cr.myCurrentPerCommitmentPoint.isDefined =>
+
         savePointSendError(refund, cr.myCurrentPerCommitmentPoint.get)
 
 
       case (norm: NormalData, cr: ChannelReestablish, SYNC)
-        // GUARD: normal state but suddenly their nextRemoteRevocationNumber is greater than expected
-        if cr.channelId == norm.commitments.channelId && cr.myCurrentPerCommitmentPoint.isDefined &&
-          norm.commitments.localCommit.index < cr.nextRemoteRevocationNumber =>
+        // GUARD: normal state but their nextRemoteRevocationNumber is too far away
+        if norm.commitments.localCommit.index < cr.nextRemoteRevocationNumber &&
+          cr.myCurrentPerCommitmentPoint.isDefined =>
 
-        val routingData = RefundingData(norm.announce, norm.commitments)
+        val refunding = RefundingData(norm.announce, norm.commitments)
         // And they have proved this by providing a correct yourLastPerCommitmentSecret
         val secret = Generators.perCommitSecret(norm.commitments.localParams.shaSeed, cr.nextRemoteRevocationNumber - 1)
-        if (cr.yourLastPerCommitmentSecret contains secret) savePointSendError(routingData, cr.myCurrentPerCommitmentPoint.get)
+        if (cr.yourLastPerCommitmentSecret contains secret) savePointSendError(refunding, cr.myCurrentPerCommitmentPoint.get)
         else throw new LightningException
 
 
-      case (norm: NormalData, cr: ChannelReestablish, SYNC)
-        if cr.channelId == norm.commitments.channelId =>
-
+      case (norm: NormalData, cr: ChannelReestablish, SYNC) =>
         // If next_local_commitment_number is 1 in both the channel_reestablish it sent
         // and received, then the node MUST retransmit funding_locked, otherwise it MUST NOT
         if (cr.nextLocalCommitmentNumber == 1 && norm.commitments.localCommit.index == 0)
@@ -400,16 +379,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // We're exiting a sync state while waiting for their FundingLocked
-      case (wait: WaitFundingDoneData, cr: ChannelReestablish, SYNC)
-        if cr.channelId == wait.commitments.channelId =>
-
+      case (wait: WaitFundingDoneData, cr: ChannelReestablish, SYNC) =>
         BECOME(wait, WAIT_FUNDING_DONE)
         wait.our foreach SEND
 
-      // No in-flight HTLCs here, just proceed with negotiations
-      case (neg: NegotiationsData, cr: ChannelReestablish, SYNC)
-        if cr.channelId == neg.commitments.channelId =>
 
+      // No in-flight HTLCs here, just proceed with negotiations
+      case (neg: NegotiationsData, cr: ChannelReestablish, SYNC) =>
         // According to spec we need to re-send a last closing sig here
         val lastSigned = neg.localProposals.head.localClosingSigned
         BECOME(neg, NEGOTIATIONS) SEND lastSigned
@@ -436,8 +412,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (neg @ NegotiationsData(_, commitments,
         localShutdown, remoteShutdown, ClosingTxProposed(_, localClosingSigned) +: _, _),
-        ClosingSigned(channelId, remoteClosingFee, remoteClosingSig), NEGOTIATIONS)
-        if channelId == commitments.channelId =>
+        ClosingSigned(channelId, remoteClosingFee, remoteClosingSig), NEGOTIATIONS) =>
 
         val ClosingTxProposed(closing, closingSigned) = Closing.makeClosing(commitments,
           Satoshi(remoteClosingFee), localShutdown.scriptPubKey, remoteShutdown.scriptPubKey)
@@ -511,9 +486,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         throw new LightningException(remoteErrorMessage)
 
 
-      case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | SYNC)
+      case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | SYNC) =>
         // GUARD: we only react on connection level remote errors or those related to our channel
-        if err.channelId == some.commitments.channelId || err.channelId == BinaryData("00" * 32) =>
         // REFUNDING is an exception here, we CAN NOT start a local close in that state
         startLocalClose(some)
 

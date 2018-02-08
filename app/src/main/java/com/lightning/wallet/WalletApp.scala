@@ -4,6 +4,7 @@ import R.string._
 import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
+
 import scala.concurrent.duration._
 import com.softwaremill.quicklens._
 import com.lightning.wallet.lnutils._
@@ -14,9 +15,11 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.muddzdev.styleabletoastlibrary.StyleableToast
+
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.Connector.CMDStart
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import com.lightning.wallet.ln.Channel.CLOSING
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
@@ -25,14 +28,16 @@ import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
 import android.app.Application
+
 import scala.util.Try
 import java.io.File
 
-import com.lightning.wallet.ln.wire.{Init, LightningMessage, NodeAnnouncement}
+import com.lightning.wallet.ln.wire._
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.wallet.Utils.{app, appName}
+import fr.acinq.bitcoin.BinaryData
 import org.bitcoinj.wallet.{Protos, Wallet}
 import rx.lang.scala.{Observable => Obs}
 
@@ -112,13 +117,12 @@ class WalletApp extends Application { me =>
   }
 
   object ChannelManager {
-    type RPIOpt = Option[RuntimePaymentInfo]
-
     val operationalListeners = Set(broadcaster, bag, StorageWrap, Notificator)
-    // Obtain a vector of stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-    var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
-    def fromNode(of: Vector[Channel], ann: NodeAnnouncement): Vector[Channel] = of.filter(_.data.announce == ann)
-    def notClosing: Vector[Channel] = all.filter(_.state != Channel.CLOSING)
+    // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
+    var all = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
+    def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = of.filter(_.data.announce == ann)
+    def byId(of: Vector[Channel], id: BinaryData) = of.find(chan => chan(_.channelId) contains id)
+    def notClosing = all.filter(_.state != Channel.CLOSING)
 
     val chainEventsListener = new TxTracker with BlocksListener {
       override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
@@ -133,21 +137,27 @@ class WalletApp extends Application { me =>
 
         val spent = CMDSpent(tx)
         bag.extractPreimage(spent.tx)
-        for (chan <- all) chan process spent
+        all.foreach(_ process spent)
       }
     }
 
     val socketEventsListener = new ConnectionListener {
-      def reConnect(vc: Vector[Channel], ann: NodeAnnouncement) = if (vc.nonEmpty) {
-        // Immediately inform affected channels and try to reconnect back in 5 seconds
-        Obs.just(ann).delay(5.seconds).subscribe(ConnectionManager.connectTo, none)
-        vc.foreach(_ process CMDOffline)
+      override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
+        case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, ann).foreach(_ process msg)
+        case channelMsg: ChannelMessage => byId(notClosing, channelMsg.channelId).foreach(_ process channelMsg)
+        case upd: ChannelUpdate => fromNode(notClosing, ann).foreach(_ process msg)
+        case _ => // Open channels are only allowed to receive channel messages
       }
 
-      override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = fromNode(notClosing, ann).foreach(_ process msg)
       override def onOperational(ann: NodeAnnouncement, their: Init) = fromNode(notClosing, ann).foreach(_ process CMDOnline)
       override def onTerminalError(ann: NodeAnnouncement) = fromNode(notClosing, ann).foreach(_ process CMDShutdown)
-      override def onDisconnect(ann: NodeAnnouncement) = reConnect(fromNode(notClosing, ann), ann)
+      override def onDisconnect(ann: NodeAnnouncement) = maybeReconnect(fromNode(notClosing, ann), ann)
+
+      def maybeReconnect(cs: Vector[Channel], ann: NodeAnnouncement) = if (cs.nonEmpty) {
+        // Immediately inform affected channels and try to reconnect back again in 5 seconds
+        Obs.just(ann).delay(5.seconds).subscribe(ConnectionManager.connectTo, none)
+        cs.foreach(_ process CMDOffline)
+      }
     }
 
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
@@ -176,6 +186,7 @@ class WalletApp extends Application { me =>
       }
     }
 
+    type RPIOpt = Option[RuntimePaymentInfo]
     // Get routes from maintenance server and update RoutingData if they exist
     var getOutPaymentObs: RuntimePaymentInfo => Obs[RPIOpt] = outPaymentObs
 
