@@ -4,10 +4,10 @@ import R.string._
 import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
-
 import scala.concurrent.duration._
 import com.softwaremill.quicklens._
 import com.lightning.wallet.lnutils._
+import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Tools._
 import spray.json.DefaultJsonProtocol._
 import com.lightning.wallet.ln.LNParams._
@@ -15,11 +15,9 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.muddzdev.styleabletoastlibrary.StyleableToast
-
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.Connector.CMDStart
 import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import com.lightning.wallet.ln.Channel.CLOSING
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
@@ -27,17 +25,15 @@ import org.bitcoinj.wallet.Wallet.BalanceType
 import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
+import fr.acinq.bitcoin.BinaryData
 import android.app.Application
-
 import scala.util.Try
 import java.io.File
 
-import com.lightning.wallet.ln.wire._
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.wallet.Utils.{app, appName}
-import fr.acinq.bitcoin.BinaryData
 import org.bitcoinj.wallet.{Protos, Wallet}
 import rx.lang.scala.{Observable => Obs}
 
@@ -161,25 +157,25 @@ class WalletApp extends Application { me =>
     }
 
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
-    def createChannel(interested: Set[ChannelListener], bootstrap: ChannelData) = new Channel {
+    def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel {
       def STORE(hasCommitments: HasCommitments) = runAnd(hasCommitments)(ChannelWrap put hasCommitments)
       // First add listeners, then specifically call doProcess so it runs on current thread
-      listeners = interested
+      listeners = initialListeners
       doProcess(bootstrap)
 
       def SEND(lightningMessage: LightningMessage) =
         ConnectionManager.connections.get(data.announce)
           .foreach(_.handler process lightningMessage)
 
-      def CLOSEANDWATCH(close: ClosingData) = {
-        val commits = close.localCommit.map(_.commitTx) ++ close.remoteCommit.map(_.commitTx) ++ close.nextRemoteCommit.map(_.commitTx)
-        // Collect all the commit txs output publicKeyScripts and watch these scripts locally for future possible payment preimages
+      def CLOSEANDWATCH(cd: ClosingData) = {
+        val commits = cd.localCommit.map(_.commitTx) ++ cd.remoteCommit.map(_.commitTx) ++ cd.nextRemoteCommit.map(_.commitTx)
+        // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
         kit.watchScripts(commits.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
         // Ask server for child txs which spend our commit txs outputs and extract preimages from them
         cloud.connector.getChildTxs(commits).foreach(_ foreach bag.extractPreimage, Tools.errlog)
-        BECOME(STORE(close), CLOSING)
+        BECOME(STORE(cd), CLOSING)
 
-        close.tier12States.map(_.txn) match {
+        cd.tier12States.map(_.txn) match {
           case Nil => Tools log "Closing channel does not have tier 1-2 transactions"
           case txs => cloud doProcess CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
         }

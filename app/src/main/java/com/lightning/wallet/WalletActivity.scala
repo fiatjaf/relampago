@@ -12,7 +12,6 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.Denomination._
 import android.support.v4.view.MenuItemCompat._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
-import android.widget.AbsListView.OnScrollListener._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
@@ -31,7 +30,9 @@ import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
 import android.widget.AbsListView.OnScrollListener
 import com.google.zxing.client.android.BeepManager
+import com.lightning.wallet.ln.Channel.myBalance
 import android.view.ViewGroup.LayoutParams
+import android.support.v4.view.ViewPager
 import org.bitcoinj.store.SPVBlockStore
 import android.support.v4.app.Fragment
 import com.lightning.wallet.helper.AES
@@ -119,20 +120,10 @@ trait ToolbarFragment extends HumanTimeDisplay { me =>
   }
 }
 
-trait ListUpdater extends HumanTimeDisplay {
+trait ListToggler extends HumanTimeDisplay {
   lazy val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   lazy val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
-  private[this] var state = SCROLL_STATE_IDLE
   val minLinesNum = 4
-
-  def startListUpdates(list: ListView, adapter: BaseAdapter) = list setOnScrollListener new OnScrollListener {
-    def onScroll(absListView: AbsListView, firstListElement: Int, visibleElement: Int, totalElements: Int) = none
-    def onScrollStateChanged(absListView: AbsListView, newState: Int) = state = newState
-    def maybeUpdate = if (SCROLL_STATE_IDLE == state) adapter.notifyDataSetChanged
-    host.timer.schedule(host UITask maybeUpdate, 10000, 10000)
-    allTxsWrapper setVisibility View.GONE
-    list addFooterView allTxsWrapper
-  }
 
   abstract class CutAdapter[T](val max: Int, viewLine: Int) extends BaseAdapter {
     // Automatically switches list view from short to long version and back again
@@ -180,12 +171,25 @@ object WalletActivity {
 }
 
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
+  lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
   lazy val walletPagerTab = findViewById(R.id.walletPagerTab).asInstanceOf[SmartTabLayout]
-  lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val layoutInflater = app.getSystemService(LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
   lazy val viewParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
   lazy val container = findViewById(R.id.container).asInstanceOf[FrameLayout]
+  private[this] var listState = OnScrollListener.SCROLL_STATE_IDLE
+  private[this] var pagerState = ViewPager.SCROLL_STATE_IDLE
   import WalletActivity.{lnOpt, btcOpt}
+
+  val listListener = new OnScrollListener {
+    def onScroll(view: AbsListView, first: Int, vis: Int, total: Int) = none
+    def onScrollStateChanged(view: AbsListView, state: Int) = listState = state
+  }
+
+  val pagerListener = new OnPageChangeListener {
+    def onPageSelected(pos: Int) = app.prefs.edit.putInt(AbstractKit.LANDING, pos).commit
+    def onPageScrolled(pos: Int, positionOffset: Float, offsetPixels: Int) = none
+    def onPageScrollStateChanged (state: Int) = pagerState = state
+  }
 
   lazy val adapter = {
     val fragScan = classOf[FragScan]
@@ -240,21 +244,25 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     if (walletPager.getCurrentItem <= 1) super.onBackPressed
     else walletPager.setCurrentItem(walletPager.getCurrentItem - 1)
 
+  def updateListsTime = {
+    val notPaging = ViewPager.SCROLL_STATE_IDLE == pagerState
+    val notScrolling = OnScrollListener.SCROLL_STATE_IDLE == listState
+    if (notPaging && notScrolling) for (ln <- lnOpt) ln.adapter.notifyDataSetChanged
+    if (notPaging && notScrolling) for (btc <- btcOpt) btc.adapter.notifyDataSetChanged
+  }
+
   def INIT(state: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_wallet
-    walletPager setOffscreenPageLimit 2
-    walletPager setAdapter adapter
 
+    walletPager setAdapter adapter
+    walletPager setOffscreenPageLimit 2
     walletPagerTab setViewPager walletPager
-    walletPagerTab setOnPageChangeListener new OnPageChangeListener {
-      def onPageSelected(pos: Int) = app.prefs.edit.putInt(AbstractKit.LANDING, pos).commit
-      def onPageScrolled(pos: Int, positionOffset: Float, offsetPixels: Int) = none
-      def onPageScrollStateChanged (state: Int) = none
-    }
+    walletPagerTab setOnPageChangeListener pagerListener
 
     // NFC will happen while app is open so
     // there is no need to run it from fragment
     wrap(me setDetecting true)(me initNfc state)
+    timer.schedule(updateListsTime, 10000, 10000)
   } else me exitTo classOf[MainActivity]
 
   // NFC
@@ -330,7 +338,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def showDenomChooser = {
     val btcFunds = coin2MSat(app.kit.conf1Balance)
-    val lnFunds = MilliSatoshi(app.ChannelManager.notClosing.flatMap(getBalance).sum)
+    val lnFunds = MilliSatoshi(app.ChannelManager.notClosing.flatMap(myBalance).sum)
     val btcPrettyFunds = humanFiat(sumIn format denom.withSign(btcFunds), btcFunds, " ")
     val lnPrettyFunds = humanFiat(sumIn format denom.withSign(lnFunds), lnFunds, " ")
     val title = getString(fiat_set_denom).format(btcPrettyFunds, lnPrettyFunds)
@@ -348,9 +356,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
     mkForm(me negBld dialog_ok, title.html, form)
   }
-
-  def getBalance(chan: Channel) =
-    chan(_.localCommit.spec.toLocalMsat)
 
   // SETTINGS FORM
 
@@ -429,7 +434,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       def openForm = passWrap(me getString sets_secret_change) apply checkPass { oldPass =>
         val view \ field = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_new, null)
         mkForm(mkChoiceDialog(checkNewPass, none, dialog_ok, dialog_cancel), me getString sets_secret_change, view)
-        def checkNewPass = if (field.getText.toString.length >= 6) changePassword else app toast secret_too_short
+        def checkNewPass = if (field.getText.length >= 6) changePassword else app toast secret_too_short
 
         def changePassword = {
           // Decrypt an old password and set a new one right away

@@ -13,10 +13,10 @@ import scala.util.Success
 
 import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, Scalar}
 import com.lightning.wallet.ln.Helpers.{Closing, Funding}
 import com.lightning.wallet.ln.Tools.{none, runAnd}
+import fr.acinq.bitcoin.{Satoshi, Transaction}
 
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
@@ -571,6 +571,9 @@ object Channel {
   // No tears, only dreams now
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
+
+  def myBalance(chan: Channel) =
+    chan(_.localCommit.spec.toLocalMsat)
 }
 
 trait ChannelListener {

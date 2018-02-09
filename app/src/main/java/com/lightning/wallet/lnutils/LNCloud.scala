@@ -45,7 +45,7 @@ case class CloudData(info: Option[RequestAndMemo], tokens: Set[ClearToken], acts
 // Represents a remote call to be executed in exchange for token or signature, can be locally persisted
 case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
 class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
-  val connector = new Connector("http://213.133.99.89:9001")
+  val connector = new Connector("http://10.0.2.2:9001")
 
   // STATE MACHINE
 

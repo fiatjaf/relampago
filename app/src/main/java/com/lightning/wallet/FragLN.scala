@@ -22,6 +22,7 @@ import com.lightning.wallet.Denomination.sat2msatFactor
 import android.content.DialogInterface.BUTTON_POSITIVE
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import com.lightning.wallet.ln.wire.ChannelUpdate
+import com.lightning.wallet.ln.Channel.myBalance
 import android.support.v7.widget.Toolbar
 import android.support.v4.app.Fragment
 import com.lightning.wallet.Utils.app
@@ -55,7 +56,7 @@ class FragLN extends Fragment { me =>
   }
 }
 
-class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater with ToolbarFragment with SearchBar { me =>
+class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment with SearchBar { me =>
   import host.{getResources, rm, getString, onFail, UITask, getSupportLoaderManager, str2View, timer, getLayoutInflater, onTap}
   import host.{onButtonTap, onFastTap, <, mkForm, negBld, negPosBld, mkChoiceDialog}
 
@@ -229,7 +230,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
     }
 
     // Set title value to current channel balance in selected denomination
-    host getBalance chan map MilliSatoshi map denom.withSign foreach setTitle
+    myBalance(chan) map MilliSatoshi map denom.withSign foreach setTitle
 
     // Reload to get subtitle updated
     chan.listeners += chanListener
@@ -247,7 +248,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
     makePaymentRequest = UITask(app toast ln_notify_opening)
     update(host getString ln_notify_opening, Informer.LNSTATE).run
     // Set title value to current channel balance in selected denomination
-    host getBalance chan map MilliSatoshi map denom.withSign foreach setTitle
+    myBalance(chan) map MilliSatoshi map denom.withSign foreach setTitle
 
     // Broadcast a funding tx
     chan.listeners += chanListener
@@ -373,8 +374,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListUpdater wit
   }
 
   itemsList setAdapter adapter
+  itemsList addFooterView allTxsWrapper
   itemsList setFooterDividersEnabled false
-  startListUpdates(itemsList, adapter)
+  itemsList setOnScrollListener host.listListener
 
   // LN page toolbar is going to be WalletActicity action bar
   toolbar setOnClickListener onFastTap(host.showDenomChooser)

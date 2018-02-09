@@ -47,7 +47,7 @@ class FragBTC extends Fragment { me =>
   }
 }
 
-class FragBTCWorker(val host: WalletActivity, frag: View) extends ListUpdater with ToolbarFragment {
+class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment {
   val barMenuListener = new OnMenuItemClickListener { def onMenuItemClick(m: MenuItem) = host onOptionsItemSelected m }
   import host.{getResources, getString, str2View, rm, mkForm, UITask, getLayoutInflater, negPosBld, TxProcessor}
   import host.{timer, <, mkChoiceDialog, onButtonTap, onFastTap, onTap, onFail, showDenomChooser}
@@ -265,9 +265,11 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListUpdater wi
   }
 
   itemsList setAdapter adapter
+  itemsList addFooterView allTxsWrapper
   itemsList setFooterDividersEnabled false
-  startListUpdates(itemsList, adapter)
+  itemsList setOnScrollListener host.listListener
 
+  // BTC page will just act as a local toolbar
   toolbar setOnClickListener onFastTap(showDenomChooser)
   toolbar setOnMenuItemClickListener barMenuListener
   toolbar inflateMenu R.menu.btc
