@@ -71,7 +71,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         val result = accept.validate(acceptChannelValidator)
         if (result.isValid) BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
-        else throw new LightningException(result.toFieldErrMapping.map(_._1) mkString "\n")
+        else throw new LightningException(result.toFieldErrMapping.map(_._2) mkString "\n")
 
 
       case (WaitFundingData(announce, cmd, accept), (fundTx: Transaction, outIndex: Int), WAIT_FOR_FUNDING) =>
@@ -482,8 +482,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (_, err: Error, WAIT_FOR_INIT | WAIT_FOR_ACCEPT | WAIT_FOR_FUNDING | WAIT_FUNDING_SIGNED) =>
         // May happen if remote peer does not like any of our proposed parameters, nothing to lose here
-        val remoteErrorMessage = new String(err.data, "UTF-8")
-        throw new LightningException(remoteErrorMessage)
+        throw new LightningException(err.humanText)
 
 
       case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | SYNC) =>

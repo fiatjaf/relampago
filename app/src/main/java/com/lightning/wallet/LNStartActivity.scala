@@ -98,9 +98,10 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
         case _ => // Opening channel is only allowed to receive setup messages
       }
 
+      val peerOffline = new LightningException(me getString err_ln_peer_offline)
       override def onOperational(ann: NodeAnnouncement, their: Init) = if (ann == announce) askForFunding(freshChan, their).run
-      override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) chanOpenListener onError freshChan -> new LightningException
-      override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) chanOpenListener onError freshChan -> new LightningException
+      override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) chanOpenListener onError freshChan -> peerOffline
+      override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) chanOpenListener onError freshChan -> peerOffline
     }
 
     lazy val chanOpenListener = new ChannelListener {
