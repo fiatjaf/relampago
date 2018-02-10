@@ -10,6 +10,7 @@ import com.lightning.wallet.lnutils._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Tools._
 import spray.json.DefaultJsonProtocol._
+import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
@@ -18,7 +19,6 @@ import com.muddzdev.styleabletoastlibrary.StyleableToast
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.Connector.CMDStart
 import java.util.concurrent.TimeUnit.MILLISECONDS
-import com.lightning.wallet.ln.Channel.CLOSING
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
@@ -96,7 +96,7 @@ class WalletApp extends Application { me =>
   }
 
   object TransData {
-    var value: Any = _
+    var value: Any = new String
     val lnLink = "(?i)(lightning:)?([a-zA-Z0-9]+)\\W*".r
     def recordValue(rawText: String) = value = rawText match {
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
@@ -113,11 +113,13 @@ class WalletApp extends Application { me =>
   }
 
   object ChannelManager {
-    val operationalListeners = Set(broadcaster, bag, StorageWrap, Notificator)
+    val operationalListeners = Set(broadcaster, bag, StorageWrap)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = of.filter(_.data.announce == ann)
-    def byId(of: Vector[Channel], id: BinaryData) = of.find(chan => chan(_.channelId) contains id)
+    def canSend(msat: Long) = all.filter(chan => isOperational(chan) && estimateCanSend(chan) >= msat)
+    def canReceive(msat: Long) = all.filter(chan => isOperational(chan) && estimateCanReceive(chan) >= msat)
+    def notClosingOrRefunding = all.filter(chan => chan.state != Channel.CLOSING && chan.state != Channel.REFUNDING)
     def notClosing = all.filter(_.state != Channel.CLOSING)
 
     val chainEventsListener = new TxTracker with BlocksListener {
@@ -139,9 +141,9 @@ class WalletApp extends Application { me =>
 
     val socketEventsListener = new ConnectionListener {
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
-        case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, ann).foreach(_ process msg)
-        case channelMsg: ChannelMessage => byId(notClosing, channelMsg.channelId).foreach(_ process channelMsg)
-        case upd: ChannelUpdate => fromNode(notClosing, ann).foreach(_ process msg)
+        case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, ann).foreach(_ process err)
+        case cm: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains cm.channelId).foreach(_ process cm)
+        case _: ChannelUpdate => fromNode(notClosing, ann).foreach(_ process msg) // Channel listener will save it later
         case _ => // Open channels are only allowed to receive channel messages
       }
 
@@ -182,32 +184,38 @@ class WalletApp extends Application { me =>
       }
     }
 
-    type RPIOpt = Option[RuntimePaymentInfo]
-    // Get routes from maintenance server and update RoutingData if they exist
-    var getOutPaymentObs: RuntimePaymentInfo => Obs[RPIOpt] = outPaymentObs
+    // Get routes from maintenance server and add them to RoutingData if routes exist
+    var getOutPaymentObs: RuntimePaymentInfo => Obs[RuntimePaymentInfo] = addRoutesToRPIObs
 
-    def outPaymentObs(rpi: RuntimePaymentInfo) =
-      Obs from all.find(_.isOperational) flatMap { chan =>
-        // Account for a special case when our peer is the recipient
-        def findRoutes(target: PublicKey) = chan.data.announce.nodeId match {
-          case peerNodeId if peerNodeId == target => Obs just Vector(Vector.empty)
-          case _ => cloud.connector.findRoutes(rpi.rd, chan.data.announce.nodeId, target)
-        }
+    def addRoutesToRPIObs(rpi: RuntimePaymentInfo) = {
+      // We do not require target channels to be online just yet
+      val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
+      def findRoutes(payeeNodeId: PublicKey) = cloud.connector.findRoutes(rpi.rd, sources, payeeNodeId)
+      // MUST contain one or more ordered entries, indicating the forward route from a public node to the final destination
+      def augmentAssisted(tag: RoutingInfoTag) = findRoutes(tag.route.head.nodeId).map(rs => for (pub <- rs) yield pub ++ tag.route)
+      // If payment request contains extra routing infos then we ask for assisted routes, otherwise we ask for direct for recipient id
+      val result = if (rpi.pr.routingInfo.isEmpty) findRoutes(rpi.pr.nodeId) else Obs from rpi.pr.routingInfo flatMap augmentAssisted
+      // Update RPI with routes and then we can make an onion out of the first available route while saving the rest
+      for (routes <- result) yield rpi.modify(_.rd.routes) setTo routes
+    }
 
-        def augmentAssisted(tag: RoutingInfoTag) = for {
-          publicRoutes <- findRoutes(tag.route.head.nodeId)
-        } yield publicRoutes.map(_ ++ tag.route)
+    def getTargetLocalChannel(rpi: RuntimePaymentInfo) = {
+      // Find a local channel which has enough balance, is online, belongs to correct peer
+      val peerNode = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
+      canSend(rpi.firstMsat).filter(_.state == Channel.OPEN).find(_.data.announce.nodeId == peerNode)
+    }
 
-        val routes =
-          // If payment request contains extra routing info then
-          // we ask for assisted route, otherwise for recipient id
-          if (rpi.pr.routingInfo.isEmpty) findRoutes(rpi.pr.nodeId)
-          else Obs from rpi.pr.routingInfo flatMap augmentAssisted
+    def makeFullRPI(rpi: RuntimePaymentInfo): Obs[Option[RuntimePaymentInfo]] = {
+      // Whenever called make sure and RPI has it's rd set to emptyRD in case if recipient BECOMES our peer
+      // Take an empty RPI and fill it with routes, then fill it with onion made from a first acceptable route
+      val inFlight = notClosing.flatMap(inFlightOutgoingHtlcs).exists(_.add.paymentHash == rpi.pr.paymentHash)
+      val isFulfilled = bag.getPaymentInfo(rpi.pr.paymentHash).toOption.exists(_.actualStatus == SUCCESS)
+      val isToPeer = all.exists(_.data.announce.nodeId == rpi.pr.nodeId)
 
-        // Update rpi with routes and then we make an onion
-        // out of the first available route while saving the rest
-        routes map rpi.modify(_.rd.routes).setTo map completeRPI
-      }
+      if (inFlight) Obs error new LightningException(me getString err_ln_in_flight)
+      else if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
+      if (isToPeer) Obs just completeRPI(rpi) else addRoutesToRPIObs(rpi) map completeRPI
+    }
   }
 
   abstract class WalletKit extends AbstractKit {

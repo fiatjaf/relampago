@@ -28,9 +28,9 @@ import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
 import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
+import com.lightning.wallet.ln.Channel.myBalanceMsat
 import android.widget.AbsListView.OnScrollListener
 import com.google.zxing.client.android.BeepManager
-import com.lightning.wallet.ln.Channel.myBalance
 import android.view.ViewGroup.LayoutParams
 import android.support.v4.view.ViewPager
 import org.bitcoinj.store.SPVBlockStore
@@ -338,7 +338,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def showDenomChooser = {
     val btcFunds = coin2MSat(app.kit.conf1Balance)
-    val lnFunds = MilliSatoshi(app.ChannelManager.notClosing.flatMap(myBalance).sum)
+    val lnFunds = MilliSatoshi(app.ChannelManager.notClosingOrRefunding.map(myBalanceMsat).sum)
     val btcPrettyFunds = humanFiat(sumIn format denom.withSign(btcFunds), btcFunds, " ")
     val lnPrettyFunds = humanFiat(sumIn format denom.withSign(lnFunds), lnFunds, " ")
     val title = getString(fiat_set_denom).format(btcPrettyFunds, lnPrettyFunds)

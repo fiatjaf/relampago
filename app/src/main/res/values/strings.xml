@@ -145,7 +145,7 @@
     </array>
 
     <!-- errors -->
-    <string name="err_ln_offline">Failed because channel is currently offline. Please wait a few seconds and try again.</string>
+    <string name="err_ln_peer_offline">This remote peer could not be reached. Please try a different one.</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept it.</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum.</string>
     <string name="err_ln_too_many">Failed because too many payments are already in-flight.</string>
@@ -153,10 +153,9 @@
     <string name="err_ln_fulfilled">Failed because this payment is already fulfilled.</string>
     <string name="err_ln_in_flight">Failed because this payment is already in-flight.</string>
 
-    <string name="err_ln_peer_offline">This remote peer could not be reached. Please try a different one.</string>
     <string name="err_ln_cant_ask">Can\'t ask for payments right now because a funding Bitcoin transaction has not got 6 confirmations yet.</string>
-    <string name="err_ln_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br>for a payment channel<br><br>can send %1$s<br>min required %2$s<br><br>Bitcoin wallet should contain more funds in order to proceed with this<br><br>Please note that Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
     <string name="err_ln_fee_overflow"><![CDATA[Failed because this payment combined with Bitcoin <a href=http://lightning-wallet.com/using-lightning-wallet#commit-transaction-fee>commit transaction</a> fee exceeds your unspendable channel reserve<br><br>reserve %1$s<br>sending %2$s<br>missing %3$s]]></string>
+    <string name="err_ln_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br>for a payment channel<br><br>can send %1$s<br>min required %2$s<br><br>Bitcoin wallet should contain more funds in order to proceed with this<br><br>Please note that Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
 
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br><br>Please note that Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
     <string name="err_transaction_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
@@ -182,8 +181,6 @@
     <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
     <string name="ln_expiry"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#stuck-payments>expiry</a>]]></string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>
-    <string name="ln_htlc_notification_title">Bring your wallet online</string>
-    <string name="ln_htlc_notification">to resolve pending payments</string>
     <string name="ln_no_description">No description provided</string>
     <string name="ln_copy_proof">Copy Proof of Payment</string>
     <string name="ln_copy_hash">Copy Payment Hash</string>

@@ -13,23 +13,23 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import com.lightning.wallet.ln.Tools.{none, random, wrap, runAnd}
-import com.lightning.wallet.R.drawable.{await, conf1, dead}
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
-import scala.util.{Failure, Success, Try}
-
 import com.lightning.wallet.Denomination.sat2msatFactor
 import android.content.DialogInterface.BUTTON_POSITIVE
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import com.lightning.wallet.ln.wire.ChannelUpdate
-import com.lightning.wallet.ln.Channel.myBalance
 import android.support.v7.widget.Toolbar
+import com.lightning.wallet.ln.Channel
 import android.support.v4.app.Fragment
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.Crypto.sha256
 import org.bitcoinj.core.Transaction
 import android.os.Bundle
 import java.util.Date
+
+import com.lightning.wallet.ln.Tools.{none, random, wrap, runAnd}
+import com.lightning.wallet.R.drawable.{await, conf1, dead}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
+import scala.util.{Failure, Success, Try}
 
 
 class FragLN extends Fragment { me =>

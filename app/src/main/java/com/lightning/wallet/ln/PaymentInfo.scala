@@ -27,7 +27,6 @@ object PaymentInfo {
 
   // Placeholder for unresolved outgoing payments
   val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
-  val emptyRPI = (pr: PaymentRequest) => RuntimePaymentInfo(emptyRD, pr, pr.amount.get.amount)
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
     makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
@@ -64,8 +63,9 @@ object PaymentInfo {
     }
 
   def emptyRD = {
+    // Default RoutingData contains an empty route so it can be used to send funds to a peer right away
     val packet = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
-    RoutingData(Vector.empty, Vector.empty, Set.empty, Set.empty, SecretsAndPacket(Vector.empty, packet), 0L, 0L)
+    RoutingData(Vector(Vector.empty), Vector.empty, Set.empty, Set.empty, SecretsAndPacket(Vector.empty, packet), 0L, 0L)
   }
 
   private def without(rs: Vector[PaymentRoute], fn: Hop => Boolean) = rs.filterNot(_ exists fn)

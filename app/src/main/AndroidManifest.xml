@@ -23,10 +23,6 @@
         android:fullBackupContent="false"
         android:icon="@drawable/ic_launcher_testnet">
 
-        <receiver
-            android:process=":remote"
-            android:name=".lnutils.Notificator"/>
-
         <activity
             android:name="MainActivity"
             android:theme="@style/NoBar"

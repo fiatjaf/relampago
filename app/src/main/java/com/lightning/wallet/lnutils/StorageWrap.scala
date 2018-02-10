@@ -129,7 +129,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
         case updateFailHtlc: UpdateFailHtlc =>
           getPaymentInfo(add.paymentHash) foreach { info =>
             val runtime = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
-            val cutPaymentInfo = cutAffectedRoutes(updateFailHtlc)(runtime)
+            val cutPaymentInfo: RuntimePaymentInfo = cutAffectedRoutes(updateFailHtlc)(runtime)
 
             completeRPI(cutPaymentInfo) match {
               case Some(cutPaymentInfoWithRoutes) =>

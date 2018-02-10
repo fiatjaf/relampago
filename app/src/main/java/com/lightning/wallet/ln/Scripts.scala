@@ -120,7 +120,7 @@ object Scripts { me =>
   trait TransactionWithInputInfo {
     // Input of current tx - output of next tx output reveals a final fee
     def --(that: TransactionWithInputInfo) = input.txOut.amount - that.amount
-    def amount: Satoshi = tx.txOut.head.amount
+    def amount: Satoshi = tx.txOut.reduce(_.amount + _.amount)
     def input: InputInfo
     def tx: Transaction
   }

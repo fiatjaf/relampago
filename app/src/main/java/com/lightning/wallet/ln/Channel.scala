@@ -6,10 +6,8 @@ import com.softwaremill.quicklens._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.PaymentInfo._
-import com.lightning.wallet.ln.AddErrorCodes._
 import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
-import scala.util.Success
 
 import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -23,8 +21,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
   def apply[T](ex: Commitments => T) = Some(data) collect { case some: HasCommitments => ex apply some.commitments }
   def process(change: Any) = Future(me doProcess change) onFailure { case err => events onError me -> err }
-  def isOperational = data match { case NormalData(_, _, None, None) => true case _ => false }
-  def isOpening = data match { case _: WaitFundingDoneData => true case _ => false }
   var listeners: Set[ChannelListener] = _
 
   private[this] val events = new ChannelListener {
@@ -170,23 +166,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // We can only accept a new HTLC when shutdown is not active
-      case (norm: NormalData, cmd: CMDAddHtlc, OPEN) if isOperational =>
-        // AND this HTLC is not already in-flight AND it has not been fulfilled already
-        val activeHtlcs = Commitments.latestRemoteCommit(norm.commitments).spec.htlcs
-        val active = activeHtlcs.exists(_.add.paymentHash == cmd.rpi.pr.paymentHash)
-
-        if (active) throw CMDAddExcept(cmd, ERR_IN_FLIGHT)
-        LNParams.bag getPaymentInfo cmd.rpi.pr.paymentHash match {
-          // When re-sending an already fulfilled HTLC a peer may provide us with a preimage without routing a payment
-          case Success(info: PaymentInfo) if info.actualStatus == SUCCESS => throw CMDAddExcept(cmd, ERR_FULFILLED)
-          case Success(info: PaymentInfo) if info.incoming == 1 => throw CMDAddExcept(cmd, ERR_FAILED)
-
-          case _ =>
-            // This may be a FAILURE payment which is fine
-            val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, cmd)
-            me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
-            doProcess(CMDProceed)
-        }
+      case (norm: NormalData, cmd: CMDAddHtlc, OPEN) if isOperational(me) =>
+        val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, cmd)
+        me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
+        doProcess(CMDProceed)
 
 
       // We're fulfilling an HTLC we got earlier
@@ -288,17 +271,17 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if (nope) startLocalClose(norm) else me UPDATA d1 doProcess CMDProceed
 
 
-      case (norm @ NormalData(_, commitments, None, their), CMDProceed, OPEN)
-        // GUARD: got their shutdown, have no unsigned HTLCs, send our and go
-        if Commitments.hasNoPendingHtlc(commitments) && their.isDefined =>
+      case (norm @ NormalData(_, _, None, their), CMDProceed, OPEN)
+        // GUARD: got their shutdown while having no in-flight HTLCs
+        if inFlightOutgoingHtlcs(me).isEmpty && their.isDefined =>
 
         me startShutdown norm
         doProcess(CMDProceed)
 
 
       case (NormalData(announce, commitments, our, their), CMDProceed, OPEN)
-        // GUARD: got both shutdowns, have no unsigned HTLCs so we can start negotiations
-        if Commitments.hasNoPendingHtlc(commitments) && our.isDefined && their.isDefined =>
+        // GUARD: got both shutdowns without in-flight HTLCs so we can start negs
+        if inFlightOutgoingHtlcs(me).isEmpty && our.isDefined && their.isDefined =>
 
         val firstProposed = Closing.makeFirstClosing(commitments, our.get.scriptPubKey, their.get.scriptPubKey)
         val neg = NegotiationsData(announce, commitments, our.get, their.get, firstProposed :: Nil)
@@ -491,9 +474,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         startLocalClose(some)
 
 
-      // CMDShutdown in WAIT_FUNDING_DONE and OPEN is handled differently above
+      // CMDShutdown in WAIT_FUNDING_DONE and OPEN may be handled as a cooperative close
       case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | SYNC) => startLocalClose(some)
-      case (_: NormalData, add: CMDAddHtlc, SYNC) => throw CMDAddExcept(add, ERR_OFFLINE)
       case _ =>
     }
 
@@ -571,8 +553,29 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  def myBalance(chan: Channel) =
-    chan(_.localCommit.spec.toLocalMsat)
+  def myBalanceMsat(chan: Channel) = chan(_.localCommit.spec.toLocalMsat) getOrElse 0L
+  def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
+  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
+
+  def inFlightOutgoingHtlcs(chan: Channel) = chan.data match {
+    case norm: NormalData => Commitments.latestRemoteCommit(norm.commitments).spec.htlcs
+    case neg: NegotiationsData => Commitments.latestRemoteCommit(neg.commitments).spec.htlcs
+    case _ => Set.empty[Htlc]
+  }
+
+  def estimateCanReceive(chan: Channel) = chan { c =>
+    // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve
+    // peer's balance can't go below their channel reserve, commit tx fee is always paid by us
+    val canReceive = c.localCommit.spec.toRemoteMsat - c.localParams.channelReserveSat * 1000L
+    math.min(canReceive, LNParams.maxHtlcValue.amount)
+  } getOrElse 0L
+
+  def estimateCanSend(chan: Channel) = chan { c =>
+    val currentCommitFee = c.localCommit.commitTx -- c.localCommit.commitTx
+    val currentTotalFee = c.remoteParams.channelReserveSatoshis + currentCommitFee.amount
+    // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
+    math.min(c.localCommit.spec.toLocalMsat - currentTotalFee * 1000L, LNParams.maxHtlcValue.amount)
+  } getOrElse 0L
 }
 
 trait ChannelListener {

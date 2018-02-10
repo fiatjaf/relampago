@@ -131,14 +131,15 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         case Right(info) => txStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
       } match {
         case Left(mutualTx) =>
-          val myBalance = mutualTx.txOut.map(_.amount).sum
+          // TODO: this is not my Sat
+          val mySat = mutualTx.txOut.reduce(_.amount + _.amount)
           val mutualTxHumanStatus = humanStatus apply txStatus(mutualTx.txid)
-          val mutualFee = coloredOut(data.commitments.commitInput.txOut.amount - myBalance)
+          val mutualFee = coloredOut(data.commitments.commitInput.txOut.amount - mySat)
           val mutualView = commitStatus.format(mutualTx.txid.toString, mutualTxHumanStatus, mutualFee)
 
           lnOpsAction setVisibility View.GONE
           lnOpsDescription setText bilateralClosing.format(chan.state, started,
-            me time new Date(data.closedAt), alias, coloredIn(myBalance), mutualView).html
+            me time new Date(data.closedAt), alias, coloredIn(mySat), mutualView).html
 
         case Right(info) =>
           val tier2HumanView = info.getState collect {

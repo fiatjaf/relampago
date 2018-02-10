@@ -9,15 +9,15 @@ import android.net.Uri
 
 object StorageTable extends Table {
   val (table, key, value) = ("storage", "value", "key")
-  def updSql = s"UPDATE $table SET $value = ? WHERE $key = ?"
-  def selectSql = s"SELECT * FROM $table WHERE $key = ?"
-  def killSql = s"DELETE FROM $table WHERE $key = ?"
+  val updSql = s"UPDATE $table SET $value = ? WHERE $key = ?"
+  val selectSql = s"SELECT * FROM $table WHERE $key = ?"
+  val killSql = s"DELETE FROM $table WHERE $key = ?"
 
-  def newSql = s"""
+  val newSql = s"""
     INSERT OR IGNORE INTO $table
     ($key, $value) VALUES (?, ?)"""
 
-  def createSql = s"""
+  val createSql = s"""
     CREATE TABLE $table(
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $key TEXT NOT NULL UNIQUE,
@@ -27,16 +27,16 @@ object StorageTable extends Table {
 
 object ChannelTable extends Table {
   val (table, identifier, data) = ("channel", "identifier", "data")
-  def updSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
+  val updSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
   // Order is important! New channels should always appear on top
-  def selectAllSql = s"SELECT * FROM $table ORDER BY $id DESC"
-  def killSql = s"DELETE FROM $table WHERE $identifier = ?"
+  val selectAllSql = s"SELECT * FROM $table ORDER BY $id DESC"
+  val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
-  def newSql = s"""
+  val newSql = s"""
     INSERT OR IGNORE INTO $table
     ($identifier, $data) VALUES (?, ?)"""
 
-  def createSql = s"""
+  val createSql = s"""
     CREATE TABLE $table(
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $identifier TEXT NOT NULL UNIQUE,
@@ -50,24 +50,24 @@ object PaymentTable extends Table {
     ("payment", "hash", "preimage", "incoming", "msat", "status", "stamp", "text", "pr", "rd", "search")
 
   // Inserting new records for data and fast search
-  def newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
+  val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
   val insert9 = s"$hash, $preimage, $incoming, $msat, $status, $stamp, $text, $pr, $rd"
-  def newSql = s"INSERT OR IGNORE INTO $table ($insert9) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  val newSql = s"INSERT OR IGNORE INTO $table ($insert9) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
   val limit = 24
-  def searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT DISTINCT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
-  def selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
-  def selectSql = s"SELECT * FROM $table WHERE $hash = ?"
+  val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT DISTINCT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
+  val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
+  val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
   // Updating various parts of data
-  def updRoutingSql = s"UPDATE $table SET $rd = ? WHERE $hash = ?"
-  def updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
-  def updFailWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
-  def updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ? WHERE $hash = ?"
-  def updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $msat = ?, $stamp = ? WHERE $hash = ?"
-  def createVirtualSql = s"CREATE VIRTUAL TABLE $fts$table USING $fts($search, $hash)"
+  val updRoutingSql = s"UPDATE $table SET $rd = ? WHERE $hash = ?"
+  val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
+  val updFailWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
+  val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ? WHERE $hash = ?"
+  val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $msat = ?, $stamp = ? WHERE $hash = ?"
+  val createVirtualSql = s"CREATE VIRTUAL TABLE $fts$table USING $fts($search, $hash)"
 
-  def createSql = s"""
+  val createSql = s"""
     CREATE TABLE $table(
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $hash STRING UNIQUE NOT NULL,

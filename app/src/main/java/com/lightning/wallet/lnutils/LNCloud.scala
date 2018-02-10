@@ -182,9 +182,11 @@ class Connector(val url: String) {
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getBackup(key: String) = ask[StringVec]("data/get", "key" -> key).map(_ map HEX.decode)
   def getChildTxs(txs: TxSeq) = ask[TxSeq]("txs/get", "txids" -> txs.map(_.txid).toJson.toString.hex)
-  def findRoutes(rd: RoutingData, from: PublicKey, to: PublicKey) = ask[PaymentRouteVec]("router/routes",
-    "nodes" -> rd.badNodes.map(_.toBin).toJson.toString.hex, "channels" -> rd.badChans.toJson.toString.hex,
-    "from" -> from.toString, "to" -> to.toString)
+
+  def findRoutes(rd: RoutingData, froms: Set[PublicKey], to: PublicKey) =
+    ask[PaymentRouteVec]("router/routes", "xn" -> rd.badNodes.map(_.toBin).toJson.toString.hex,
+      "xc" -> rd.badChans.toJson.toString.hex, "froms" -> froms.map(_.toBin).toJson.toString.hex,
+      "tos" -> Set(to).map(_.toBin).toString.hex)
 }
 
 object Connector {

@@ -76,12 +76,13 @@ case class ClosingData(announce: NodeAnnouncement, commitments: Commitments,
     isOk || closedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
   }
 
-  def tier12States = localCommit.flatMap(_.getState) ++ remoteCommit.flatMap(_.getState) ++
-    nextRemoteCommit.flatMap(_.getState) ++ revokedCommit.flatMap(_.getState)
+  def tier12States =
+    localCommit.flatMap(_.getState) ++ remoteCommit.flatMap(_.getState) ++
+      nextRemoteCommit.flatMap(_.getState) ++ revokedCommit.flatMap(_.getState)
 
-  lazy val closings = mutualClose.map(Left.apply) ++ localCommit.map(Right.apply) ++
-    remoteCommit.map(Right.apply) ++ nextRemoteCommit.map(Right.apply) ++
-    revokedCommit.map(Right.apply)
+  lazy val closings = mutualClose.map(Left.apply) ++
+    localCommit.map(Right.apply) ++ remoteCommit.map(Right.apply) ++
+      nextRemoteCommit.map(Right.apply) ++ revokedCommit.map(Right.apply)
 }
 
 sealed trait CommitPublished {
@@ -217,7 +218,6 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
                        remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, startedAt: Long = System.currentTimeMillis)
 
 object Commitments {
-  def hasNoPendingHtlc(c: Commitments) = c.localCommit.spec.htlcs.isEmpty && latestRemoteCommit(c).spec.htlcs.isEmpty
   def localHasUnsignedOutgoing(c: Commitments) = c.localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def remoteHasUnsignedOutgoing(c: Commitments) = c.remoteChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def latestRemoteCommit(c: Commitments) = c.remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse c.remoteCommit
