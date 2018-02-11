@@ -117,9 +117,8 @@ class WalletApp extends Application { me =>
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = of.filter(_.data.announce == ann)
-    def canSend(msat: Long) = all.filter(chan => isOperational(chan) && estimateCanSend(chan) >= msat)
-    def canReceive(msat: Long) = all.filter(chan => isOperational(chan) && estimateCanReceive(chan) >= msat)
-    def notClosingOrRefunding = all.filter(chan => chan.state != Channel.CLOSING && chan.state != Channel.REFUNDING)
+    def canSend(msat: Long) = all.filter(cn => cn.state == Channel.OPEN && isOperational(cn) && estimateCanSend(cn) >= msat)
+    def notClosingOrRefunding = all.filter(cn => cn.state != Channel.CLOSING && cn.state != Channel.REFUNDING)
     def notClosing = all.filter(_.state != Channel.CLOSING)
 
     val chainEventsListener = new TxTracker with BlocksListener {
@@ -143,7 +142,7 @@ class WalletApp extends Application { me =>
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
         case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, ann).foreach(_ process err)
         case cm: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains cm.channelId).foreach(_ process cm)
-        case _: ChannelUpdate => fromNode(notClosing, ann).foreach(_ process msg) // Channel listener will save it later
+        case cu: ChannelUpdate => fromNode(notClosing, ann).foreach(_ process cu)
         case _ => // Open channels are only allowed to receive channel messages
       }
 
@@ -160,14 +159,11 @@ class WalletApp extends Application { me =>
 
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
     def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel {
-      def STORE(hasCommitments: HasCommitments) = runAnd(hasCommitments)(ChannelWrap put hasCommitments)
+      def STORE(hasCommitmentsData: HasCommitments) = runAnd(hasCommitmentsData)(ChannelWrap put hasCommitmentsData)
+      def SEND(msg: LightningMessage) = ConnectionManager.connections.get(data.announce).foreach(_.handler process msg)
       // First add listeners, then specifically call doProcess so it runs on current thread
       listeners = initialListeners
       doProcess(bootstrap)
-
-      def SEND(lightningMessage: LightningMessage) =
-        ConnectionManager.connections.get(data.announce)
-          .foreach(_.handler process lightningMessage)
 
       def CLOSEANDWATCH(cd: ClosingData) = {
         val commits = cd.localCommit.map(_.commitTx) ++ cd.remoteCommit.map(_.commitTx) ++ cd.nextRemoteCommit.map(_.commitTx)
@@ -184,12 +180,11 @@ class WalletApp extends Application { me =>
       }
     }
 
-    // Get routes from maintenance server and add them to RoutingData if routes exist
-    var getOutPaymentObs: RuntimePaymentInfo => Obs[RuntimePaymentInfo] = addRoutesToRPIObs
+    // This is supposed to be updated at runtime if we want to do some additional work
+    // for instance, this can be used to show a loader line on main page while loading is in progress
+    var withRemoteRoutesRPI: (Set[PublicKey], RuntimePaymentInfo) => Obs[RuntimePaymentInfo] = withRoutesRPI
 
-    def addRoutesToRPIObs(rpi: RuntimePaymentInfo) = {
-      // We do not require target channels to be online just yet
-      val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
+    def withRoutesRPI(sources: Set[PublicKey], rpi: RuntimePaymentInfo) = {
       def findRoutes(payeeNodeId: PublicKey) = cloud.connector.findRoutes(rpi.rd, sources, payeeNodeId)
       // MUST contain one or more ordered entries, indicating the forward route from a public node to the final destination
       def augmentAssisted(tag: RoutingInfoTag) = findRoutes(tag.route.head.nodeId).map(rs => for (pub <- rs) yield pub ++ tag.route)
@@ -199,22 +194,40 @@ class WalletApp extends Application { me =>
       for (routes <- result) yield rpi.modify(_.rd.routes) setTo routes
     }
 
-    def getTargetLocalChannel(rpi: RuntimePaymentInfo) = {
-      // Find a local channel which has enough balance, is online, belongs to correct peer
-      val peerNode = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
-      canSend(rpi.firstMsat).filter(_.state == Channel.OPEN).find(_.data.announce.nodeId == peerNode)
-    }
-
-    def makeFullRPI(rpi: RuntimePaymentInfo): Obs[Option[RuntimePaymentInfo]] = {
-      // Whenever called make sure and RPI has it's rd set to emptyRD in case if recipient BECOMES our peer
+    def withRoutesOnionRPI(rpi: RuntimePaymentInfo) = {
       // Take an empty RPI and fill it with routes, then fill it with onion made from a first acceptable route
       val inFlight = notClosing.flatMap(inFlightOutgoingHtlcs).exists(_.add.paymentHash == rpi.pr.paymentHash)
       val isFulfilled = bag.getPaymentInfo(rpi.pr.paymentHash).toOption.exists(_.actualStatus == SUCCESS)
-      val isToPeer = all.exists(_.data.announce.nodeId == rpi.pr.nodeId)
+      val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
 
       if (inFlight) Obs error new LightningException(me getString err_ln_in_flight)
       else if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
-      if (isToPeer) Obs just completeRPI(rpi) else addRoutesToRPIObs(rpi) map completeRPI
+      else if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
+      else if (sources contains rpi.pr.nodeId) Obs just withOnionRPI(rpi)
+      else withRemoteRoutesRPI(sources, rpi) map withOnionRPI
+    }
+
+    def send(rpi: RuntimePaymentInfo, noRouteLeft: => Unit): Unit = {
+      // Empty used route means a recipient is one of our current direct peers
+      val targetNode = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
+      // Find a local channel which has enough funds, is also online and belongs to a correct node key
+      val chanOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == targetNode)
+
+      chanOpt match {
+        case Some(chan) => chan process rpi
+        case None => withOnionRPI(rpi) match {
+          // We have a new onion from a spare route
+          case Some(rpi1) => send(rpi1, noRouteLeft)
+          case None => noRouteLeft
+        }
+      }
+    }
+
+    def sendOpt(opt: Option[RuntimePaymentInfo], noRouteLeft: => Unit) = opt match {
+      // No RPI may happen here when no available routes left after applying withOnionRPI
+      // this should be used instead of send because withOnionRPI may prune all the routes
+      case Some(rpi) => send(rpi, noRouteLeft)
+      case None => noRouteLeft
     }
   }
 
@@ -248,20 +261,20 @@ class WalletApp extends Application { me =>
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)
       peerGroup.setMinRequiredProtocolVersion(70015)
-      peerGroup.setUserAgent(appName, "0.04")
+      peerGroup.setUserAgent(appName, "0.05")
       peerGroup.setDownloadTxDependencies(0)
       peerGroup.setPingIntervalMsec(10000)
       peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
+      // Clear out possible leftover cloud acts
+      // mark as failed all the not in-flight WAITING outgoing payments
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
-      ChannelManager.initConnect
-      RatesSaver.saveObject
-
-      // This is needed to clear possible leftover acts
-      // such a situation may happen if we had no connection
       if (cloud.data.acts.nonEmpty) cloud doProcess CMDStart
+      PaymentInfoWrap.markNotInFlightFailed
+      ChannelManager.initConnect
+      RatesSaver.initialize
     }
   }
 }

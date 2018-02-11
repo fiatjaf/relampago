@@ -165,9 +165,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA norm.copy(commitments = c1)
 
 
-      // We can only accept a new HTLC when shutdown is not active
-      case (norm: NormalData, cmd: CMDAddHtlc, OPEN) if isOperational(me) =>
-        val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, cmd)
+      // We can only accept a new HTLC when channel is both operational and online
+      case (norm: NormalData, rpi: RuntimePaymentInfo, OPEN) if isOperational(me) =>
+        val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, rpi)
         me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
         doProcess(CMDProceed)
 
@@ -292,11 +292,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (refund: RefundingData, cr: ChannelReestablish, REFUNDING)
-        // GUARD: We have started a channel with REFUNDING data
-        // and explicitly wait for their ChannelReestablish
+        // GUARD: We have explicitly started with a REFUNDING data
         if cr.myCurrentPerCommitmentPoint.isDefined =>
-
-        savePointSendError(refund, cr.myCurrentPerCommitmentPoint.get)
+        val pt = cr.myCurrentPerCommitmentPoint.get
+        savePointSendError(refund, pt)
 
 
       case (norm: NormalData, cr: ChannelReestablish, SYNC)
@@ -563,18 +562,18 @@ object Channel {
     case _ => Set.empty[Htlc]
   }
 
-  def estimateCanReceive(chan: Channel) = chan { c =>
+  def estimateCanReceive(chan: Channel) = chan { cs =>
     // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve
     // peer's balance can't go below their channel reserve, commit tx fee is always paid by us
-    val canReceive = c.localCommit.spec.toRemoteMsat - c.localParams.channelReserveSat * 1000L
+    val canReceive = cs.localCommit.spec.toRemoteMsat - cs.localParams.channelReserveSat * 1000L
     math.min(canReceive, LNParams.maxHtlcValue.amount)
   } getOrElse 0L
 
-  def estimateCanSend(chan: Channel) = chan { c =>
-    val currentCommitFee = c.localCommit.commitTx -- c.localCommit.commitTx
-    val currentTotalFee = c.remoteParams.channelReserveSatoshis + currentCommitFee.amount
+  def estimateCanSend(chan: Channel) = chan { cs =>
+    val currentCommitFee = cs.localCommit.commitTx -- cs.localCommit.commitTx
+    val currentTotalFee = cs.remoteParams.channelReserveSatoshis + currentCommitFee.amount
     // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
-    math.min(c.localCommit.spec.toLocalMsat - currentTotalFee * 1000L, LNParams.maxHtlcValue.amount)
+    math.min(cs.localCommit.spec.toLocalMsat - currentTotalFee * 1000L, LNParams.maxHtlcValue.amount)
   } getOrElse 0L
 }
 

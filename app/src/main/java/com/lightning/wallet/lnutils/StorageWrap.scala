@@ -8,7 +8,6 @@ import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.ln.Announcements._
-import com.lightning.wallet.ln.AddErrorCodes._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.Connector.CMDStart
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
@@ -63,7 +62,7 @@ object ChannelWrap {
   }
 }
 
-object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
+object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def updateStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
   def updateRouting(rpi: RuntimePaymentInfo) = db.change(PaymentTable.updRoutingSql, rpi.rd.toJson, rpi.pr.paymentHash)
   def updOkIncoming(u: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, u.amountMsat, System.currentTimeMillis, u.paymentHash)
@@ -77,17 +76,20 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
     preimage = rc string PaymentTable.preimage, incoming = rc int PaymentTable.incoming, firstMsat = rc long PaymentTable.msat,
     status = rc int PaymentTable.status, stamp = rc long PaymentTable.stamp, text = rc string PaymentTable.text)
 
+  def markNotInFlightFailed = db txWrap {
+    db change PaymentTable.updFailAllWaitingSql
+    // Mark all WAITING payments as FAILURE and immediately restore those in flight
+    val inFlight = app.ChannelManager.notClosing.flatMap(inFlightOutgoingHtlcs)
+    for (htlc <- inFlight) updateStatus(WAITING, htlc.add.paymentHash)
+  }
+
   // Records a number of retry attempts for a given outgoing payment hash
-  val serverCallAttempts = mutable.Map.empty[BinaryData, Int] withDefaultValue 0
+  val srvCallAttempts = mutable.Map.empty[BinaryData, Int] withDefaultValue 0
 
   override def onError = {
-    case _ \ CMDAddExcept(_, ERR_IN_FLIGHT) =>
-      // Don't mark in-flight payments as failed
-      uiNotify
-
     case (_, exc: CMDException) =>
-      // Needed for retry failures, also prevents shutdown
-      updateStatus(FAILURE, exc.cmd.rpi.pr.paymentHash)
+      // Needed for retry failures, prevents shutdown
+      updateStatus(FAILURE, exc.rpi.pr.paymentHash)
       uiNotify
 
     case chan \ error =>
@@ -97,72 +99,71 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
   }
 
   override def onProcess = {
-    case (_, _: NormalData, cmd: CMDAddHtlc) => db txWrap {
-      // This may either be a new payment or an old payment retry
+    case (_, _: NormalData, rpi: RuntimePaymentInfo) =>
+      // This may either be a new payment or an old payment retry attempt
       // so either an insert or update should be executed successfully
 
-      updateRouting(cmd.rpi)
-      updateStatus(WAITING, cmd.rpi.pr.paymentHash)
-      db.change(PaymentTable.newVirtualSql, cmd.rpi.searchText, cmd.rpi.pr.paymentHash)
-      db.change(PaymentTable.newSql, cmd.rpi.pr.paymentHash, NOIMAGE, 0, cmd.rpi.firstMsat,
-        WAITING, System.currentTimeMillis, cmd.rpi.text, cmd.rpi.pr.toJson, cmd.rpi.rd.toJson)
+      db txWrap {
+        me updateRouting rpi
+        updateStatus(WAITING, rpi.pr.paymentHash)
+        db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.pr.paymentHash)
+        db.change(PaymentTable.newSql, rpi.pr.paymentHash, NOIMAGE, 0, rpi.firstMsat,
+          WAITING, System.currentTimeMillis, rpi.text, rpi.pr.toJson, rpi.rd.toJson)
+      }
 
-      // End transaction
-      // update interface
+      // UI update
       uiNotify
-    }
 
-    case (chan, norm: NormalData, _: CommitSig) => db txWrap {
-      if (norm.commitments.localCommit.spec.fulfilled.nonEmpty) {
-        // First thing to do is to update related record states in a database
+    case (chan, norm: NormalData, _: CommitSig) =>
+      // Update affected record states in a database
+      // then retry failed payments where possible
+
+      db txWrap {
         for (Htlc(true, add) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(add)
         for (Htlc(false, _) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkOutgoing(fulfill)
-        // Then we need to let the cloud know as it may be waiting for a payment
+        for (Htlc(false, add) \ updateFailure <- norm.commitments.localCommit.spec.failed) updateFailure match {
+          // Malformed outgoing HTLC is a special case which can only happen if our direct peer replies with it
+          // in all other cases an onion error should be extracted and payment should be retried
+
+          case updateMalformed: UpdateFailMalformedHtlc =>
+            updateStatus(FAILURE, add.paymentHash)
+
+          case updateFailHtlc: UpdateFailHtlc =>
+            getPaymentInfo(add.paymentHash) foreach { info =>
+              // Try to extract an onion error and prune the rest of affected routes
+              val reconstructedRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
+              val cutRPI = cutAffectedRoutes(updateFailHtlc)(reconstructedRPI)
+              app.ChannelManager.sendOpt(withOnionRPI(cutRPI), noRouteLeft)
+
+              def noRouteLeft = {
+                updateStatus(FAILURE, add.paymentHash)
+                val extraNodes = info.pr.routingInfo.flatMap(_.route).map(_.nodeId).toSet
+                val extraChans = info.pr.routingInfo.flatMap(_.route).map(_.shortChannelId).toSet
+
+                val stop =
+                  cutRPI.rd.badNodes.contains(info.pr.nodeId) ||
+                    extraNodes.subsetOf(cutRPI.rd.badNodes) ||
+                    extraChans.subsetOf(cutRPI.rd.badChans) ||
+                    srvCallAttempts(add.paymentHash) > 4
+
+                if (stop) srvCallAttempts(add.paymentHash) = 0
+                else app.ChannelManager.withRoutesOnionRPI(cutRPI)
+                  .doOnSubscribe(srvCallAttempts(add.paymentHash) += 1)
+                  .foreach(app.ChannelManager.sendOpt(_, none), none)
+              }
+            }
+        }
+      }
+
+      if (norm.commitments.localCommit.spec.fulfilled.nonEmpty) {
+        // Let the cloud know since it may be waiting for a payment
+        // also vibrate to let a user know that payment is fulfilled
         cloud doProcess CMDStart
         vibrate(lnSettled)
       }
 
-      for (Htlc(false, add) \ some <- norm.commitments.localCommit.spec.failed) some match {
-        // A special case since only our peer can reject payments like this, leave this failed
-        case _: UpdateFailMalformedHtlc => updateStatus(FAILURE, add.paymentHash)
-
-        case updateFailHtlc: UpdateFailHtlc =>
-          getPaymentInfo(add.paymentHash) foreach { info =>
-            val runtime = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
-            val cutPaymentInfo: RuntimePaymentInfo = cutAffectedRoutes(updateFailHtlc)(runtime)
-
-            completeRPI(cutPaymentInfo) match {
-              case Some(cutPaymentInfoWithRoutes) =>
-                // There are still routes left and we have just used one
-                // if accepted: routing info will be upserted in onProcess
-                // if not accepted: status will change to FAILURE in onError
-                chan process CMDPlainAddHtlc(cutPaymentInfoWithRoutes)
-
-              case None =>
-                updateRouting(cutPaymentInfo)
-                updateStatus(FAILURE, cutPaymentInfo.pr.paymentHash)
-                val extraHops = cutPaymentInfo.pr.routingInfo.flatMap(_.route).toSet
-                val nothingBlacklisted = cutPaymentInfo.rd.badNodes.isEmpty && cutPaymentInfo.rd.badChans.isEmpty
-                val extraChannelBlacklisted = (extraHops.map(_.shortChannelId) & cutPaymentInfo.rd.badChans).nonEmpty
-                val vitalNodes = extraHops.map(_.nodeId) + chan.data.announce.nodeId + cutPaymentInfo.pr.nodeId
-                val vitalNodesBlacklisted = (vitalNodes & cutPaymentInfo.rd.badNodes).nonEmpty
-
-                val stop = extraChannelBlacklisted || vitalNodesBlacklisted ||
-                  nothingBlacklisted || serverCallAttempts(add.paymentHash) > 8
-
-                // Reset in case of second QR scan attempt
-                if (stop) serverCallAttempts(add.paymentHash) = 0
-                else app.ChannelManager.getOutPaymentObs(cutPaymentInfo)
-                  .doOnSubscribe(serverCallAttempts(add.paymentHash) += 1)
-                  .foreach(_ map CMDPlainAddHtlc foreach chan.process, none)
-            }
-          }
-      }
-
-      // End transaction
-      // update interface
+      // UI update
       uiNotify
-    }
 
     case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
       // Mutual tx has enough confirmations or hard timeout has passed out
@@ -170,24 +171,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener {
   }
 
   override def onBecome = {
-    case (_, norm: NormalData, null, SYNC) => db txWrap {
-      // At init there may be some WAITING payments which won't be retried
-      // because user has closed an app before next retry has started
-      // so first thing to do is just fail all the waiting payments
-      db change PaymentTable.updFailWaitingSql
-
-      for (Htlc(false, add) <- norm.commitments.localCommit.spec.htlcs)
-        // These are the outgoing payments which will be retransmitted
-        // so we should immediately reinstate their WAITING state
-        updateStatus(WAITING, add.paymentHash)
-    }
-
     case (_, _, SYNC | OPEN | NEGOTIATIONS, CLOSING) =>
       // WAITING will either be redeemed or refunded later
-      db change PaymentTable.updFailWaitingSql
+      markNotInFlightFailed
       uiNotify
 
-    case (chan, _, SYNC | WAIT_FUNDING_DONE, OPEN) if chan.isOperational =>
+    case (chan, _, SYNC | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
       // failed payments are really marked as FAILURE because of a branch above
       cloud doProcess CMDStart

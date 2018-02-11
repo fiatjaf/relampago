@@ -49,7 +49,7 @@ object RatesSaver {
   // Either load saved rates data or create a new object from scratch
   var rates = StorageWrap get KEY map to[Rates] getOrElse Rates(Nil, Map.empty, 0)
   def safe = retry(LNParams.cloud.connector.ask[Result]("rates/get"), pickInc, 3 to 4)
-  def saveObject = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
+  def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
     val fees = for (notZero <- newFee("6") +: rates.feeHistory if notZero > 0) yield notZero
     rates = Rates(fees take 3, newFiat, System.currentTimeMillis)
     StorageWrap.put(rates.toJson.toString, KEY)

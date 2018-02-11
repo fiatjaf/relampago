@@ -49,10 +49,10 @@ object Features {
   def areSupported(bitset: util.BitSet): Boolean = !(0 until bitset.length by 2 exists bitset.get)
 }
 
-case class CMDAddExcept(cmd: CMDAddHtlc, code: Int) extends CMDException
-case class CMDReserveExcept(cmd: CMDAddHtlc, missingSat: Long, reserveSat: Long) extends CMDException
-class LightningException(reason: String = "( ͡° ͜ʖ ͡°)") extends RuntimeException(reason)
-trait CMDException extends LightningException { val cmd: CMDAddHtlc }
+case class CMDAddExcept(rpi: RuntimePaymentInfo, code: Int) extends CMDException
+case class CMDReserveExcept(rpi: RuntimePaymentInfo, missingSat: Long, reserveSat: Long) extends CMDException
+class LightningException(reason: String = "Generic Lightning exception") extends RuntimeException(reason)
+trait CMDException extends LightningException { val rpi: RuntimePaymentInfo }
 
 // STATE MACHINE
 

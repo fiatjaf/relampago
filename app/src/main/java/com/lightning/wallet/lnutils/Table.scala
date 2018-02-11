@@ -62,7 +62,7 @@ object PaymentTable extends Table {
   // Updating various parts of data
   val updRoutingSql = s"UPDATE $table SET $rd = ? WHERE $hash = ?"
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
-  val updFailWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
+  val updFailAllWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $msat = ?, $stamp = ? WHERE $hash = ?"
   val createVirtualSql = s"CREATE VIRTUAL TABLE $fts$table USING $fts($search, $hash)"

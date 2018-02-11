@@ -65,14 +65,12 @@ object Utils {
 
   // Mapping from text to Android id integer
   val Seq(strDollar, strEuro, strYen, strYuan) = Seq("dollar", "euro", "yen", "yuan")
+  val passNoSuggest = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
   val fiatMap = Map(typeUSD -> strDollar, typeEUR -> strEuro, typeJPY -> strYen, typeCNY -> strYuan)
   val revFiatMap = Map(strDollar -> typeUSD, strEuro -> typeEUR, strYen -> typeJPY, strYuan -> typeCNY)
-  val passNoSuggest = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
-  def isMnemonicCorrect(mnemonic: String) = mnemonic.split("\\s+").length > 11
-
-  def humanAddr(adr: Address) = s"$adr" grouped 4 mkString "\u0020"
-  def humanNode(nodeId: String, separator: String) = nodeId.grouped(24)
-    .map(_ grouped 3 mkString "\u0020").mkString(separator)
+  def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
+  def isMnemonicCorrect(mnemonicCode: String) = mnemonicCode.split("\\s+").length > 11
+  def humanAddr(adr: Address) = adr.toString grouped 4 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {
     val textView: TextView = view.asInstanceOf[TextView]

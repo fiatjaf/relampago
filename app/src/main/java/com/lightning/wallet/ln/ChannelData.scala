@@ -33,10 +33,6 @@ case class CMDFailMalformedHtlc(id: Long, onionHash: BinaryData, code: Int) exte
 case class CMDFulfillHtlc(id: Long, preimage: BinaryData) extends Command
 case class CMDFailHtlc(id: Long, reason: BinaryData) extends Command
 
-sealed trait CMDAddHtlc extends Command { val rpi: RuntimePaymentInfo }
-case class CMDSilentAddHtlc(rpi: RuntimePaymentInfo) extends CMDAddHtlc
-case class CMDPlainAddHtlc(rpi: RuntimePaymentInfo) extends CMDAddHtlc
-
 // CHANNEL DATA
 
 sealed trait ChannelData { val announce: NodeAnnouncement }
@@ -234,16 +230,16 @@ object Commitments {
     } yield htlcIn.add
   }
 
-  def sendAdd(c: Commitments, cmd: CMDAddHtlc) =
-    if (cmd.rpi.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddExcept(cmd, ERR_REMOTE_AMOUNT_LOW)
-    else if (cmd.rpi.firstMsat > maxHtlcValue.amount) throw CMDAddExcept(cmd, ERR_AMOUNT_OVERFLOW)
-    else if (cmd.rpi.pr.paymentHash.size != 32) throw CMDAddExcept(cmd, ERR_FAILED)
+  def sendAdd(c: Commitments, rpi: RuntimePaymentInfo) =
+    if (rpi.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddExcept(rpi, ERR_REMOTE_AMOUNT_LOW)
+    else if (rpi.firstMsat > maxHtlcValue.amount) throw CMDAddExcept(rpi, ERR_AMOUNT_OVERFLOW)
+    else if (rpi.pr.paymentHash.size != 32) throw CMDAddExcept(rpi, ERR_FAILED)
     else {
 
       // Let's compute the current commitment
       // *as seen by them* with this change taken into account
-      val add = UpdateAddHtlc(c.channelId, c.localNextHtlcId, cmd.rpi.rd.lastMsat,
-        cmd.rpi.pr.paymentHash, cmd.rpi.rd.lastExpiry, cmd.rpi.rd.onion.packet.serialize)
+      val add = UpdateAddHtlc(c.channelId, c.localNextHtlcId, rpi.rd.lastMsat,
+        rpi.pr.paymentHash, rpi.rd.lastExpiry, rpi.rd.onion.packet.serialize)
 
       val c1 = addLocalProposal(c, add).modify(_.localNextHtlcId).using(_ + 1)
       val reduced = CommitmentSpec.reduce(latestRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
@@ -257,9 +253,9 @@ object Commitments {
       val missingSat = reduced.toRemoteMsat / 1000L - reserveWithTxFeeSat
 
       // We should both check if WE can send another HTLC and if PEER can accept another HTLC
-      if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddExcept(cmd, ERR_TOO_MANY_HTLC)
-      if (outgoing.size > maxAllowedHtlcs | incoming.size > maxAllowedHtlcs) throw CMDAddExcept(cmd, ERR_TOO_MANY_HTLC)
-      if (missingSat < 0L) throw CMDReserveExcept(cmd, missingSat, reserveWithTxFeeSat)
+      if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddExcept(rpi, ERR_TOO_MANY_HTLC)
+      if (outgoing.size > maxAllowedHtlcs | incoming.size > maxAllowedHtlcs) throw CMDAddExcept(rpi, ERR_TOO_MANY_HTLC)
+      if (missingSat < 0L) throw CMDReserveExcept(rpi, missingSat, reserveWithTxFeeSat)
       c1 -> add
     }
 

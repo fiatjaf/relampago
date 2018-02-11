@@ -32,9 +32,8 @@ object PaymentInfo {
     makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
   }
 
-  def completeRPI(rpi: RuntimePaymentInfo): Option[RuntimePaymentInfo] =
-    // Complete a first available payment route and check if it's fee is ok
-    // blacklist outlier channels and try again if fee is not ok
+  def withOnionRPI(rpi: RuntimePaymentInfo): Option[RuntimePaymentInfo] =
+    // Complete a first available route and check if it's fee is ok
 
     rpi.rd.routes match {
       case route +: rest =>
@@ -51,11 +50,11 @@ object PaymentInfo {
             (nextPayload +: loads, nodeId +: nodes, nextFee, expiry + delta)
         }
 
-        if (LNParams lnFeeNotOk lastMsat - rpi.firstMsat) completeRPI(rpi.modify(_.rd.routes) setTo rest) else {
+        if (LNParams lnFeeNotOk lastMsat - rpi.firstMsat) withOnionRPI(rpi.modify(_.rd.routes) setTo rest) else {
           val onion = buildOnion(keys = nodeIds :+ rpi.pr.nodeId, payloads = allPayloads, assoc = rpi.pr.paymentHash)
           val rd1 = rpi.rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
-          // We have a complete payment route at this point, can proceed with adding to a channel
-          Some(rpi.modify(_.rd) setTo rd1)
+          val rpi1 = rpi.copy(rd = rd1)
+          Some(rpi1)
         }
 
       // No more routes
@@ -68,9 +67,9 @@ object PaymentInfo {
     RoutingData(Vector(Vector.empty), Vector.empty, Set.empty, Set.empty, SecretsAndPacket(Vector.empty, packet), 0L, 0L)
   }
 
-  private def without(rs: Vector[PaymentRoute], fn: Hop => Boolean) = rs.filterNot(_ exists fn)
-  private def failHtlc(sharedSecret: BinaryData, failure: FailureMessage, add: UpdateAddHtlc) = {
-    // Will send an error onion packet which contains a detailed description back to payment sender
+  def without(rs: Vector[PaymentRoute], fn: Hop => Boolean) = rs.filterNot(_ exists fn)
+  def failHtlc(sharedSecret: BinaryData, failure: FailureMessage, add: UpdateAddHtlc) = {
+    // Will send an error onion which contains a detailed description back to payment sender
     val reason = createErrorPacket(sharedSecret, failure)
     CMDFailHtlc(add.id, reason)
   }

@@ -216,6 +216,12 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
           // Outgoing payment needs to have an amount
           // and this amount may be higher than requested
           val rpi = RuntimePaymentInfo(emptyRD, pr, ms.amount)
+
+          app.ChannelManager.completeRPI(rpi).foreach(onNext = {
+            case Some(rpi1) => app.ChannelManager.send(rpi1)(onFail)
+            case _ => onFail(host getString err_ln_no_route)
+          }, onFail)
+
           app.ChannelManager.getOutPaymentObs(rpi).foreach(onNext = {
             // Must account for a special fail when no routes are found
             case Some(updatedRPI) => chan process CMDPlainAddHtlc(updatedRPI)
