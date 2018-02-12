@@ -207,6 +207,11 @@ class WalletApp extends Application { me =>
       else withRemoteRoutesRPI(sources, rpi) map useRoutesLeft
     }
 
+    def withRoutesAndOnionRPIFromPR(pr: PaymentRequest) = {
+      val rpi = RuntimePaymentInfo(emptyRD, pr, pr.unsafeMsat)
+      withRoutesAndOnionRPI(rpi)
+    }
+
     def send(rpi: RuntimePaymentInfo, noRouteLeft: => Unit): Unit = {
       // Empty used route means a recipient is one of our current direct peers
       val targetNode = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
@@ -223,12 +228,8 @@ class WalletApp extends Application { me =>
       }
     }
 
-    def sendOpt(opt: Option[RuntimePaymentInfo], noRouteLeft: => Unit) = opt match {
-      // No RPI may happen here when no available routes left after applying withOnionRPI
-      // this should be used instead of send because withOnionRPI may prune all the routes
-      case Some(rpi) => send(rpi, noRouteLeft)
-      case None => noRouteLeft
-    }
+    def sendOpt(opt: Option[RuntimePaymentInfo], noRouteLeft: => Unit) =
+      if (opt.isDefined) send(opt.get, noRouteLeft) else noRouteLeft
   }
 
   abstract class WalletKit extends AbstractKit {
@@ -267,14 +268,15 @@ class WalletApp extends Application { me =>
       peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
-      // Clear out possible leftover cloud acts
-      // mark as failed all the not in-flight WAITING outgoing payments
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
-      if (cloud.data.acts.nonEmpty) cloud doProcess CMDStart
-      PaymentInfoWrap.markNotInFlightFailed
       ChannelManager.initConnect
       RatesSaver.initialize
+
+      // Clear out possible leftover cloud acts
+      // Mark all abandoned payments as failed
+      PaymentInfoWrap.markNotInFlightFailed
+      cloud doProcess CMDStart
     }
   }
 }

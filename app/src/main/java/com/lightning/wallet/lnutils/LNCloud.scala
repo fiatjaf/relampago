@@ -9,6 +9,7 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import fr.acinq.bitcoin.{BinaryData, Crypto, Transaction}
+import com.lightning.wallet.ln.Tools.{none, random}
 import rx.lang.scala.{Observable => Obs}
 import scala.util.{Failure, Success}
 
@@ -16,7 +17,6 @@ import com.lightning.wallet.ln.wire.LightningMessageCodecs.AnnounceChansNum
 import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
 import collection.JavaConverters.mapAsJavaMapConverter
 import com.github.kevinsawicki.http.HttpRequest.post
-import com.lightning.wallet.ln.Tools.random
 import rx.lang.scala.schedulers.IOScheduler
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.wallet.Utils.app
@@ -46,24 +46,24 @@ case class CloudData(info: Option[RequestAndMemo], tokens: Set[ClearToken], acts
 case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
 class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
   val connector = new Connector("http://10.0.2.2:9002")
+  val maxPrice = 20000000L
 
   // STATE MACHINE
 
   def doProcess(some: Any) = (data, some) match {
-    case CloudData(None, tokens, acts, _) \ CMDStart
-      // Try to get new tokens either when we have no tokens left
-      // or when we have no acts to execute and a few tokens left
-      if tokens.isEmpty || acts.isEmpty && tokens.size < 5 =>
+    case CloudData(None, tokens, _, _) \ CMDStart
+      // Try to obtain new tokens when we have less than five of them left
+      // and there exists an operational channel which can handle a max price
+      if tokens.size < 5 && app.ChannelManager.canSend(maxPrice).nonEmpty =>
 
       for {
-        operationalChannel <- app.ChannelManager.all.find(_.isOperational)
-        paymentRequestAndMemo @ (pr, memo) <- retry(getRequestAndMemo, pickInc, 3 to 4)
-        Some(rpi) <- retry(app.ChannelManager outPaymentObs emptyRPI(pr), pickInc, 3 to 4)
-        // Server response may arrive in some time after our requesting, must account for that
-      } if (data.info.isEmpty && pr.amount.forall(_.amount < 20000000L) && memo.clears.size > 20) {
-        // Proceed if data is still empty, the price is low enough and number of sigs is high enough
-        me BECOME data.copy(info = Some apply paymentRequestAndMemo)
-        operationalChannel process CMDSilentAddHtlc(rpi)
+        prAndMemo @ (pr, memo) <- retry(getRequestAndMemo, pickInc, 3 to 4)
+        Some(rpi) <- retry(app.ChannelManager withRoutesAndOnionRPIFromPR pr, pickInc, 3 to 4)
+        // Server response may arrive in some time after our requesting, we must account for that
+      } if (data.info.isEmpty && pr.unsafeMsat < maxPrice && memo.clears.size > 20) {
+        // If data is empty, price is low enough and number of sigs is sufficient
+        me BECOME data.copy(info = Some apply prAndMemo)
+        app.ChannelManager.send(rpi, none)
       }
 
     // Execute if we are not busy and have available tokens and actions, don't care amout memo
@@ -73,30 +73,27 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
       go.foreach(_ => me BECOME data.copy(acts = data.acts - action, tokens = data.tokens - token), onError)
       isFree = false
 
-      // data may change while request is on so we always copy it
-      def onError(serverError: Throwable) = serverError.getMessage match {
+      def onError(err: Throwable) = err.getMessage match {
         case "tokeninvalid" => me BECOME data.copy(tokens = data.tokens - token)
         case "tokenused" => me BECOME data.copy(tokens = data.tokens - token)
-        case _ => Tools errlog serverError
+        case _ => Tools errlog err
       }
 
     // We don't have acts or tokens but have a memo
+    // which means a payment is waiting so check if it's done
     case CloudData(Some(pr \ memo), _, _, _) \ CMDStart =>
 
       bag getPaymentInfo pr.paymentHash match {
-        case Success(rpi) if rpi.actualStatus == SUCCESS => me resolveSuccess memo
-        // These will have long expiration times, could be retried multiple times
-        case Success(rpi) if rpi.actualStatus == FAILURE =>
+        case Success(pay) if pay.actualStatus == SUCCESS => me resolveSuccess memo
+        case Success(pay) if pay.actualStatus == FAILURE && !pr.isFresh => eraseRequestData
+        // Repeatedly retry an existing payment request instead of getting a new one until it expires
+        case Success(pay) if pay.actualStatus == FAILURE && app.ChannelManager.canSend(maxPrice).nonEmpty =>
+          val go = retry(app.ChannelManager withRoutesAndOnionRPIFromPR pr, pickInc, 3 to 4)
+          go.foreach(app.ChannelManager.sendOpt(_, none), none)
 
-          if (!pr.isFresh) eraseRequestData else for {
-            operationalChannel <- app.ChannelManager.all.find(_.isOperational)
-            // Repeatedly retry an old request instead of getting a new one until it expires
-            Some(pay) <- retry(app.ChannelManager outPaymentObs emptyRPI(pr), pickInc, 3 to 4)
-          } operationalChannel process CMDSilentAddHtlc(pay)
-
-        // First attempt has been rejected
+        // The very first attempt was rejected
         case Failure(_) => eraseRequestData
-        // Probably WAITING so do nothing
+        // It's WAITING so do nothing
         case _ =>
       }
 
