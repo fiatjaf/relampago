@@ -46,15 +46,16 @@ case class CloudData(info: Option[RequestAndMemo], tokens: Set[ClearToken], acts
 case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
 class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
   val connector = new Connector("http://10.0.2.2:9002")
-  val maxPrice = 20000000L
+  val expectedPrice = 2000000L // 2000 SAT
+  val maxPrice = 20000000L // 20000 SAT
 
   // STATE MACHINE
 
   def doProcess(some: Any) = (data, some) match {
-    case CloudData(None, tokens, _, _) \ CMDStart
+    case CloudData(None, clearTokens, _, _) \ CMDStart
       // Try to obtain new tokens when we have less than five of them left
       // and there exists an operational channel which can handle a max price
-      if tokens.size < 5 && app.ChannelManager.canSend(maxPrice).nonEmpty =>
+      if clearTokens.size < 5 && app.ChannelManager.canSend(maxPrice).nonEmpty =>
 
       for {
         prAndMemo @ (pr, memo) <- retry(getRequestAndMemo, pickInc, 3 to 4)

@@ -268,15 +268,12 @@ class WalletApp extends Application { me =>
       peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
+      // Mark all abandoned payments as failed right away
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
+      PaymentInfoWrap.markNotInFlightFailed
       ChannelManager.initConnect
       RatesSaver.initialize
-
-      // Clear out possible leftover cloud acts
-      // Mark all abandoned payments as failed
-      PaymentInfoWrap.markNotInFlightFailed
-      cloud doProcess CMDStart
     }
   }
 }
