@@ -56,6 +56,8 @@ object RoutingInfoTag {
   }
 
   type PaymentRoute = Vector[Hop]
+  type PaymentRouteVec = Vector[PaymentRoute]
+
   val chunkLength = 33 + 8 + 4 + 4 + 2
   def parseAll(data: Int5Seq): PaymentRoute =
     data.grouped(chunkLength).map(parse).toVector

@@ -10,10 +10,11 @@ import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import fr.acinq.bitcoin.{BinaryData, Crypto, Transaction}
 import rx.lang.scala.{Observable => Obs}
-import scala.util.{Failure, Success}
 
+import scala.util.{Failure, Success}
 import com.lightning.wallet.ln.wire.LightningMessageCodecs.AnnounceChansNum
-import com.lightning.wallet.ln.RoutingInfoTag.PaymentRoute
+import com.lightning.wallet.ln.RoutingInfoTag.{PaymentRoute, PaymentRouteVec}
+
 import collection.JavaConverters.mapAsJavaMapConverter
 import com.github.kevinsawicki.http.HttpRequest.post
 import com.lightning.wallet.ln.Tools.random
@@ -22,6 +23,7 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.wallet.Utils.app
 import org.bitcoinj.core.Utils.HEX
 import java.net.ProtocolException
+
 import org.bitcoinj.core.ECKey
 import java.math.BigInteger
 
@@ -193,7 +195,6 @@ object Connector {
   type TxSeq = Seq[Transaction]
   type StringVec = Vector[String]
   type BigIntegerVec = Vector[BigInteger]
-  type PaymentRouteVec = Vector[PaymentRoute]
   type AnnounceChansNumVec = Vector[AnnounceChansNum]
   type RequestAndMemo = (PaymentRequest, BlindMemo)
   type ClearToken = (String, String, String)

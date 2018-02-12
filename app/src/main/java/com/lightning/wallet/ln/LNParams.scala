@@ -58,7 +58,7 @@ object LNParams { me =>
 
   // FEE RELATED
 
-  def lnFeeNotOk(feeMsat: Long) = feeMsat > 50000000
+  def isFeeNotOk(feeMsat: Long) = feeMsat > 50000000
   def shouldUpdateFee(oldPerKw: Long, newPerKw: Long) = {
     val mismatch = (newPerKw - oldPerKw) / (oldPerKw + newPerKw)
     math.abs(2.0 * mismatch) > 0.25

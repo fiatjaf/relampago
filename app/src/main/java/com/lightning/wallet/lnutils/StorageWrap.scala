@@ -72,15 +72,24 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
 
-  def toPaymentInfo(rc: RichCursor) = PaymentInfo(rawRd = rc string PaymentTable.rd, rawPr = rc string PaymentTable.pr,
-    preimage = rc string PaymentTable.preimage, incoming = rc int PaymentTable.incoming, firstMsat = rc long PaymentTable.msat,
-    status = rc int PaymentTable.status, stamp = rc long PaymentTable.stamp, text = rc string PaymentTable.text)
+  def toPaymentInfo(rc: RichCursor) =
+    PaymentInfo(rawRd = rc string PaymentTable.rd, rawPr = rc string PaymentTable.pr, preimage = rc string PaymentTable.preimage,
+      incoming = rc int PaymentTable.incoming, firstMsat = rc long PaymentTable.msat, status = rc int PaymentTable.status,
+      stamp = rc long PaymentTable.stamp, text = rc string PaymentTable.text)
 
   def markNotInFlightFailed = db txWrap {
     db change PaymentTable.updFailAllWaitingSql
     // Mark all WAITING payments as FAILURE and immediately restore those in flight
     val inFlight = app.ChannelManager.notClosing.flatMap(inFlightOutgoingHtlcs)
     for (htlc <- inFlight) updateStatus(WAITING, htlc.add.paymentHash)
+  }
+
+  def stop(rpi: RuntimePaymentInfo) = {
+    val extraRoutes = rpi.pr.routingInfo.flatMap(_.route).toSet
+    extraRoutes.map(_.shortChannelId).subsetOf(rpi.rd.badChans) ||
+      extraRoutes.map(_.nodeId).subsetOf(rpi.rd.badNodes) ||
+      rpi.rd.badNodes.contains(rpi.pr.nodeId) ||
+      srvCallAttempts(rpi.pr.paymentHash) > 4
   }
 
   // Records a number of retry attempts for a given outgoing payment hash
@@ -104,11 +113,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       // so either an insert or update should be executed successfully
 
       db txWrap {
-        me updateRouting rpi
+        updateRouting(rpi)
         updateStatus(WAITING, rpi.pr.paymentHash)
-        db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.pr.paymentHash)
+        val text = rpi.pr.description.right getOrElse new String
+        val searchQueryText = s"$text ${rpi.pr.paymentHash.toString}"
+        db.change(PaymentTable.newVirtualSql, searchQueryText, rpi.pr.paymentHash)
         db.change(PaymentTable.newSql, rpi.pr.paymentHash, NOIMAGE, 0, rpi.firstMsat,
-          WAITING, System.currentTimeMillis, rpi.text, rpi.pr.toJson, rpi.rd.toJson)
+          WAITING, System.currentTimeMillis, text, rpi.pr.toJson, rpi.rd.toJson)
       }
 
       // UI update
@@ -125,29 +136,20 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
           // Malformed outgoing HTLC is a special case which can only happen if our direct peer replies with it
           // in all other cases an onion error should be extracted and payment should be retried
 
-          case updateMalformed: UpdateFailMalformedHtlc =>
+          case malformed: UpdateFailMalformedHtlc =>
             updateStatus(FAILURE, add.paymentHash)
 
           case updateFailHtlc: UpdateFailHtlc =>
             getPaymentInfo(add.paymentHash) foreach { info =>
               // Try to extract an onion error and prune the rest of affected routes
-              val reconstructedRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
-              val cutRPI = cutAffectedRoutes(updateFailHtlc)(reconstructedRPI)
-              app.ChannelManager.sendOpt(withOnionRPI(cutRPI), noRouteLeft)
+              val restoredRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
+              val updatedRPI = cutAffectedRoutes(updateFailHtlc)(restoredRPI)
+              app.ChannelManager.sendOpt(useRoutesLeft(updatedRPI), fail)
 
-              def noRouteLeft = {
+              def fail = {
                 updateStatus(FAILURE, add.paymentHash)
-                val extraNodes = info.pr.routingInfo.flatMap(_.route).map(_.nodeId).toSet
-                val extraChans = info.pr.routingInfo.flatMap(_.route).map(_.shortChannelId).toSet
-
-                val stop =
-                  cutRPI.rd.badNodes.contains(info.pr.nodeId) ||
-                    extraNodes.subsetOf(cutRPI.rd.badNodes) ||
-                    extraChans.subsetOf(cutRPI.rd.badChans) ||
-                    srvCallAttempts(add.paymentHash) > 4
-
-                if (stop) srvCallAttempts(add.paymentHash) = 0
-                else app.ChannelManager.withRoutesOnionRPI(cutRPI)
+                if (me stop updatedRPI) srvCallAttempts(add.paymentHash) = 0
+                else app.ChannelManager.withRoutesAndOnionRPI(updatedRPI)
                   .doOnSubscribe(srvCallAttempts(add.paymentHash) += 1)
                   .foreach(app.ChannelManager.sendOpt(_, none), none)
               }

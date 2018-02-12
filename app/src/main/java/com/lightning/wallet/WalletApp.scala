@@ -118,6 +118,7 @@ class WalletApp extends Application { me =>
     var all = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = of.filter(_.data.announce == ann)
     def canSend(msat: Long) = all.filter(cn => cn.state == Channel.OPEN && isOperational(cn) && estimateCanSend(cn) >= msat)
+    def canReceive(msat: Long) = all.filter(cn => cn.state == Channel.OPEN && isOperational(cn) && estimateCanReceive(cn) >= msat)
     def notClosingOrRefunding = all.filter(cn => cn.state != Channel.CLOSING && cn.state != Channel.REFUNDING)
     def notClosing = all.filter(_.state != Channel.CLOSING)
 
@@ -194,8 +195,7 @@ class WalletApp extends Application { me =>
       for (routes <- result) yield rpi.modify(_.rd.routes) setTo routes
     }
 
-    def withRoutesOnionRPI(rpi: RuntimePaymentInfo) = {
-      // Take an empty RPI and fill it with routes, then fill it with onion made from a first acceptable route
+    def withRoutesAndOnionRPI(rpi: RuntimePaymentInfo) = {
       val inFlight = notClosing.flatMap(inFlightOutgoingHtlcs).exists(_.add.paymentHash == rpi.pr.paymentHash)
       val isFulfilled = bag.getPaymentInfo(rpi.pr.paymentHash).toOption.exists(_.actualStatus == SUCCESS)
       val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
@@ -203,8 +203,8 @@ class WalletApp extends Application { me =>
       if (inFlight) Obs error new LightningException(me getString err_ln_in_flight)
       else if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
       else if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      else if (sources contains rpi.pr.nodeId) Obs just withOnionRPI(rpi)
-      else withRemoteRoutesRPI(sources, rpi) map withOnionRPI
+      else if (sources contains rpi.pr.nodeId) Obs just useRoute(Vector.empty, Vector.empty, rpi)
+      else withRemoteRoutesRPI(sources, rpi) map useRoutesLeft
     }
 
     def send(rpi: RuntimePaymentInfo, noRouteLeft: => Unit): Unit = {
@@ -215,7 +215,7 @@ class WalletApp extends Application { me =>
 
       chanOpt match {
         case Some(chan) => chan process rpi
-        case None => withOnionRPI(rpi) match {
+        case None => useRoutesLeft(rpi) match {
           // We have a new onion from a spare route
           case Some(rpi1) => send(rpi1, noRouteLeft)
           case None => noRouteLeft
