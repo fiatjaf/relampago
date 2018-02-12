@@ -6,8 +6,9 @@ import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.Protocol._
 import fr.acinq.eclair.crypto.BitStream._
 import com.lightning.wallet.ln.PaymentRequest._
+import com.lightning.wallet.ln.RoutingInfoTag._
 import com.lightning.wallet.ln.crypto.MultiStreamUtils._
-import com.lightning.wallet.ln.RoutingInfoTag.PaymentRoute
+
 import fr.acinq.eclair.crypto.BitStream
 import java.nio.ByteOrder.BIG_ENDIAN
 import java.math.BigInteger
@@ -117,14 +118,16 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
 
 object PaymentRequest {
   type Int5Seq = Seq[Int5]
-  def apply(chain: BinaryData, amount: Option[MilliSatoshi],
-            paymentHash: BinaryData, privateKey: PrivateKey, description: String,
-            fallbackAddress: Option[String], extra: PaymentRoute): PaymentRequest = {
+  type AmountOption = Option[MilliSatoshi]
+
+  def apply(chain: BinaryData, amount: Option[MilliSatoshi], paymentHash: BinaryData,
+            privateKey: PrivateKey, description: String, fallbackAddress: Option[String],
+            routing: PaymentRouteVec): PaymentRequest = {
 
     val paymentHashTag = PaymentHashTag(paymentHash)
-    val tags = Vector(DescriptionTag(description), ExpiryTag(3600 * 6), paymentHashTag)
-    PaymentRequest(getPrefix(chain), amount, System.currentTimeMillis / 1000L, privateKey.publicKey,
-      if (extra.isEmpty) tags else RoutingInfoTag(extra) +: tags, BinaryData.empty) sign privateKey
+    val tags = routing.map(RoutingInfoTag.apply) ++ Vector(DescriptionTag(description), ExpiryTag(3600 * 6), paymentHashTag)
+    val pr = PaymentRequest(getPrefix(chain), amount, System.currentTimeMillis / 1000L, privateKey.publicKey, tags, BinaryData.empty)
+    pr sign privateKey
   }
 
   def getPrefix(chain: BinaryData) = chain match {
@@ -142,7 +145,6 @@ object PaymentRequest {
       case _ => 'm'
     }
 
-    type AmountOption = Option[MilliSatoshi]
     def decode(input: String): AmountOption = input.lastOption match {
       case Some('p') => Some(MilliSatoshi apply input.dropRight(1).toLong / 10)
       case Some('n') => Some(MilliSatoshi apply input.dropRight(1).toLong * 100)

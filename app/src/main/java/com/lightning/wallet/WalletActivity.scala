@@ -366,45 +366,35 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
     val menu = mkForm(me negBld dialog_ok, getString(read_settings).format(tokensLeft).html, form)
     val recoverChannelFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
-    val setBackupServer = form.findViewById(R.id.setBackupServer).asInstanceOf[Button]
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
     val changePass = form.findViewById(R.id.changePass).asInstanceOf[Button]
 
     recoverChannelFunds setOnClickListener onButtonTap {
-      // After wallet data is lost users may recover channel funds
+      // When wallet data is lost users may recover channel funds
       // by fetching encrypted static channel params from server
 
-      rm(menu) {
-        val request = LNParams.cloud.connector getBackup LNParams.cloudId.toString
-        val localCommitments = app.ChannelManager.all.flatMap(_ apply identity)
-        app toast ln_notify_recovering
+      rm(menu)(app toast dialog_recovering)
+      cloud.connector.getBackup(cloudId).foreach(serverDataVec => {
+        // Decrypt channel recovery datas upon successful call and put
+        // them into an active channel list, then connect to peers
 
-        request.foreach(serverDataVec => {
-          // Decrypt channel datas upon successful call
-          // then put them in a list and connect to peers
+        for {
+          encoded <- serverDataVec
+          jsonDecoded = AES.decode(cloudSecret)(encoded)
+          // This may be some garbage so omit this one if it fails
+          refundingData <- Try apply to[RefundingData](jsonDecoded)
+          // Now throw it away if it is already present in list of local channels
+          if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
+          chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
+          // Start watching this channel's funding tx output right away
+          isAdded = app.kit watchFunding refundingData.commitments
+        } app.ChannelManager.all +:= chan
 
-          for {
-            encoded <- serverDataVec
-            jsonDecoded = AES.decode(LNParams.cloudSecret)(encoded)
-            // This may be some garbage so omit this one if it fails
-            refundingData <- Try apply to[RefundingData](jsonDecoded)
-            // Now throw it away if it is already present in list of local channels
-            if !localCommitments.exists(_.channelId == refundingData.commitments.channelId)
-            chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
-            isAdded = app.kit watchFunding refundingData.commitments
-          } app.ChannelManager.all +:= chan
-
-          // New channels have been added
-          // and they need to be reconnected
-          app.ChannelManager.initConnect
-        }, none)
-      }
-    }
-
-    setBackupServer setOnClickListener onButtonTap {
-      // Power users may provide their own backup servers
-      rm(menu)(new SetBackupServer)
+        // New channels have been added
+        // so they need to be reconnected
+        app.ChannelManager.initConnect
+      }, none)
     }
 
     rescanWallet setOnClickListener onButtonTap {
@@ -451,38 +441,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       }
 
       rm(menu)(openForm)
-    }
-  }
-
-  class SetBackupServer {
-    val view \ field = str2Tuple(LNParams.cloudPrivateKey.publicKey.toString)
-    val dialog = mkChoiceDialog(proceed, none, dialog_next, dialog_cancel)
-    val alert = mkForm(dialog, getString(ln_olympus_key).html, view)
-    field setTextIsSelectable true
-
-    def proceed: Unit = rm(alert) {
-      val view1 \ field1 = generatePromptView(InputType.TYPE_CLASS_TEXT, ln_olympus_ip, null)
-      val dialog = mkChoiceDialog(me delayUI trySave(field1.getText.toString), none, dialog_ok, dialog_cancel)
-      mkForm(dialog, me getString sets_olympus, view1)
-      field1 setText LNParams.cloud.data.url
-    }
-
-    def trySave(url1: String): Unit = {
-      val data1 = LNParams.cloud.data.copy(url = url1)
-      val cloud1 = LNParams getCloud Success(data1)
-
-      cloud1.checkIfWorks.subscribe(done => {
-        // Just send some dummy data with signature
-        UITask(app toast ln_olympus_success).run
-        CloudDataSaver saveObject data1
-        LNParams.cloud = cloud1
-      }, onError)
-    }
-
-    def onError(error: Throwable) = error.getMessage match {
-      case "keynotfound" => onFail(me getString ln_olympus_key_error)
-      case "siginvalid" => onFail(me getString ln_olympus_sig_error)
-      case _ => onFail(me getString ln_olympus_net_error)
     }
   }
 

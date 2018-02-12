@@ -178,7 +178,7 @@ class Connector(val url: String) {
     }
 
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
-  def getBackup(key: String) = ask[StringVec]("data/get", "key" -> key).map(_ map HEX.decode)
+  def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString).map(_ map HEX.decode)
   def getChildTxs(txs: TxSeq) = ask[TxSeq]("txs/get", "txids" -> txs.map(_.txid).toJson.toString.hex)
 
   def findRoutes(rd: RoutingData, froms: Set[PublicKey], to: PublicKey) =

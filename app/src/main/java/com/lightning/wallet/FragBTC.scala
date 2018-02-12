@@ -95,7 +95,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
       def notifyFinish = {
         app.kit.peerGroup removeBlocksDownloadedEventListener self
-        add(host getString info_progress_done, Informer.CHAINSYNC).run
+        add(host getString btc_progress_done, Informer.CHAINSYNC).run
         timer.schedule(delete(Informer.CHAINSYNC), 5000)
       }
 
@@ -134,8 +134,8 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   }
 
   val subtitleListener = new TxTracker {
-    override def coinsSent(tx: Transaction) = notifyBtcEvent(host getString tx_sent)
-    override def coinsReceived(tx: Transaction) = notifyBtcEvent(host getString tx_received)
+    override def coinsSent(tx: Transaction) = notifyBtcEvent(host getString btc_sent)
+    override def coinsReceived(tx: Transaction) = notifyBtcEvent(host getString btc_received)
   }
 
   def updView(showText: Boolean) = {
@@ -196,7 +196,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
           override def processTx(passcode: String, feePerKb: Coin) = {
             <(app.kit blockingSend makeTx(passcode, feePerKb), onTxFail)(none)
-            add(getString(tx_announcing), Informer.BTCEVENT).run
+            add(getString(btc_announcing), Informer.BTCEVENT).run
           }
 
           override def onTxFail(err: Throwable) =

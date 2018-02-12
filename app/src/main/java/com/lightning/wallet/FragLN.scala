@@ -17,6 +17,7 @@ import com.lightning.wallet.Denomination.sat2msatFactor
 import android.content.DialogInterface.BUTTON_POSITIVE
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import com.lightning.wallet.ln.wire.ChannelUpdate
+import com.lightning.wallet.ln.PaymentRequest.write
 import android.support.v7.widget.Toolbar
 import com.lightning.wallet.ln.Channel
 import android.support.v4.app.Fragment
@@ -43,8 +44,6 @@ class FragLN extends Fragment { me =>
   override def onResume = {
     // Save itself in registry
     WalletActivity.frags += me
-    worker.reWireChannelOrNone.run
-    // Inversively call parent check
     worker.host.checkTransData
     super.onResume
   }
@@ -89,13 +88,13 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     }
   }
 
-  val chanListener = new ChannelListener { self =>
+  val chanListener = new ChannelListener {
     // Updates local UI according to changes in a channel
     // should always be removed when activity is stopped
 
     override def onError = {
-      case _ \ CMDReserveExcept(CMDPlainAddHtlc(rpi), missingSat, reserveSat) =>
-        // Current commit tx fee and channel reserve forbid sending of this payment
+      case _ \ CMDReserveExcept(rpi, missingSat, reserveSat) =>
+        // Commit tx fee + channel reserve forbid sending of this payment
         // inform user with all the details laid out as cleanly as possible
 
         val message = getString(err_ln_fee_overflow)
@@ -104,179 +103,19 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         val sending = coloredOut apply MilliSatoshi(rpi.firstMsat)
         onFail(message.format(reserve, sending, missing).html)
 
-      case _ \ CMDAddExcept(_: CMDPlainAddHtlc, code) =>
-        // Let user know why payment could not be added
+      case _ \ CMDAddExcept(_, code) =>
         onFail(host getString code)
-    }
-
-    override def onBecome = {
-      case (_, _, SYNC | WAIT_FUNDING_DONE | OPEN, _) => reWireChannelOrNone.run
-      case (_, _, null, SYNC) => update(host getString ln_notify_connecting, Informer.LNSTATE).run
-      case (_, _, null, OPEN) => update(host getString ln_notify_operational, Informer.LNSTATE).run
     }
   }
 
   val subtitleListener = new TxTracker {
-    override def coinsSent(tx: Transaction) = notifyBtcEvent(host getString tx_sent)
-    override def coinsReceived(tx: Transaction) = notifyBtcEvent(host getString tx_received)
+    override def coinsSent(tx: Transaction) = notifyBtcEvent(host getString btc_sent)
+    override def coinsReceived(tx: Transaction) = notifyBtcEvent(host getString btc_received)
   }
 
   val onFragmentDestroy = UITask {
     app.kit.wallet removeCoinsSentEventListener subtitleListener
     app.kit.wallet removeCoinsReceivedEventListener subtitleListener
-    for (chan <- app.ChannelManager.all) chan.listeners -= chanListener
-  }
-
-  val reWireChannelOrNone: Runnable = UITask {
-    app.ChannelManager.all.find(_.isOperational) map whenOpen getOrElse {
-      app.ChannelManager.all.find(_.isOpening) map whenOpening getOrElse whenNone
-    }
-  }
-
-  var sendPayment: PaymentRequest => Unit = none
-  var makePaymentRequest: Runnable = UITask(none)
-
-  def whenOpen(chan: Channel) = {
-    // Make all triggers operational
-    makePaymentRequest = host UITask {
-      // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve
-      // peer's balance can't go below their unspendable channel reserve so it should be taken into account here
-      val canReceive = chan(c => c.localCommit.spec.toRemoteMsat - c.localParams.channelReserveSat * sat2msatFactor)
-      val maxMsat = MilliSatoshi apply math.min(canReceive getOrElse 0L, maxHtlcValue.amount)
-
-      chan(_.channelId.toString) foreach { chanIdKey =>
-        StorageWrap get chanIdKey map to[ChannelUpdate] match {
-          // Can issue requests if a saved ChannelUpdate is present
-
-          case Success(update) =>
-            val content = getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
-            val inputDescription = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
-            val canReceiveHint = if (maxMsat.amount < 0L) coloredOut(maxMsat) else denom withSign maxMsat
-            val rateManager = new RateManager(getString(amount_hint_can_receive).format(canReceiveHint), content)
-            val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), getString(action_ln_receive), content)
-
-            def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
-              val extraRoute = Vector(update toHop chan.data.announce.nodeId)
-              val rpi = emptyRPI apply PaymentRequest(chainHash, Some(sum), sha256(preimage),
-                nodePrivateKey, inputDescription.getText.toString.trim, None, extraRoute)
-
-              qr(rpi.pr)
-              // Save incoming request to a database
-              db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.pr.paymentHash)
-              db.change(PaymentTable.newSql, rpi.pr.paymentHash, preimage, 1, rpi.firstMsat,
-                HIDDEN, System.currentTimeMillis, rpi.text, rpi.pr.toJson, rpi.rd.toJson)
-            }
-
-            def recAttempt = rateManager.result match {
-              case Failure(_) => app toast dialog_sum_empty
-              case Success(ms) if maxMsat < ms => app toast dialog_sum_big
-              case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
-
-              case Success(ms) => rm(alert) {
-                // Requests without amount are not allowed for now
-                <(makeRequest(ms, random getBytes 32), onFail)(none)
-                app toast ln_pr_make
-              }
-            }
-
-            val ok = alert getButton BUTTON_POSITIVE
-            ok setOnClickListener onButtonTap(recAttempt)
-
-          case _ =>
-            // Peer node has not sent us a ChannelUpdate
-            // likely because a funding transaction is not yet deep enough
-            mkForm(negBld(dialog_ok), getString(err_ln_cant_ask), null)
-        }
-      }
-    }
-
-    sendPayment = pr => {
-      // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
-      // we can not calculate an exact commitTx fee + HTLC fees in advance so just use a minChannelMargin
-      // which also guarantees a user has some substantial amount to be refunded once a channel is nearly exhausted
-      val canSend0 = chan(c => c.localCommit.spec.toLocalMsat - c.remoteParams.channelReserveSatoshis * sat2msatFactor)
-      val canSend1 = canSend0.map(_ - RatesSaver.rates.feeLive.value * sat2msatFactor / 2) getOrElse 0L
-      val maxMsat = MilliSatoshi apply math.min(canSend1, maxHtlcValue.amount)
-
-      val title = getString(ln_send_title).format(me getDescription pr)
-      val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-      val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), title.html, content)
-      val hint = getString(amount_hint_can_send).format(denom withSign maxMsat)
-      val rateManager = new RateManager(hint, content)
-      host.walletPager.setCurrentItem(1, false)
-
-      def sendAttempt = rateManager.result match {
-        case Failure(_) => app toast dialog_sum_empty
-        case Success(ms) if maxMsat < ms => app toast dialog_sum_big
-        case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
-        case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
-        case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
-
-        case Success(ms) => rm(alert) {
-          // Outgoing payment needs to have an amount
-          // and this amount may be higher than requested
-          val rpi = RuntimePaymentInfo(emptyRD, pr, ms.amount)
-
-          app.ChannelManager.completeRPI(rpi).foreach(onNext = {
-            case Some(rpi1) => app.ChannelManager.send(rpi1)(onFail)
-            case _ => onFail(host getString err_ln_no_route)
-          }, onFail)
-
-          app.ChannelManager.getOutPaymentObs(rpi).foreach(onNext = {
-            // Must account for a special fail when no routes are found
-            case Some(updatedRPI) => chan process CMDPlainAddHtlc(updatedRPI)
-            case None => onFail(host getString err_ln_no_route)
-          }, onFail)
-        }
-      }
-
-      val ok = alert getButton BUTTON_POSITIVE
-      ok setOnClickListener onButtonTap(sendAttempt)
-      for (sum <- pr.amount) rateManager setSum Try(sum)
-    }
-
-    // Set title value to current channel balance in selected denomination
-    myBalance(chan) map MilliSatoshi map denom.withSign foreach setTitle
-
-    // Reload to get subtitle updated
-    chan.listeners += chanListener
-    chanListener nullOnBecome chan
-
-    // Update interface buttons
-    viewChannelInfo setVisibility View.GONE
-    openNewChannel setVisibility View.GONE
-    actionDivider setVisibility View.GONE
-  }
-
-  def whenOpening(chan: Channel) = {
-    // Reset all triggers except denomination
-    sendPayment = pr => app toast ln_notify_opening
-    makePaymentRequest = UITask(app toast ln_notify_opening)
-    update(host getString ln_notify_opening, Informer.LNSTATE).run
-    // Set title value to current channel balance in selected denomination
-    myBalance(chan) map MilliSatoshi map denom.withSign foreach setTitle
-
-    // Broadcast a funding tx
-    chan.listeners += chanListener
-    broadcaster nullOnBecome chan
-
-    // Update interface buttons
-    viewChannelInfo setVisibility View.VISIBLE
-    actionDivider setVisibility View.VISIBLE
-    openNewChannel setVisibility View.GONE
-  }
-
-  def whenNone = {
-    // Reset all triggers
-    sendPayment = pr => app toast ln_notify_none
-    makePaymentRequest = UITask(app toast ln_notify_none)
-    update(getString(ln_notify_none), Informer.LNSTATE).run
-    me setTitle getString(ln_wallet)
-
-    // Update interface buttons
-    viewChannelInfo setVisibility View.GONE
-    actionDivider setVisibility View.VISIBLE
-    openNewChannel setVisibility View.VISIBLE
   }
 
   def notifyBtcEvent(message: String) = {
@@ -309,23 +148,23 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       wrap(adapter.notifyDataSetChanged)(adapter set pays)
       lnChanWarn setVisibility textVisibility
       itemsList setVisibility listVisibility
-    }.run
+    }
 
     def recentPays = new ReactLoader[PaymentInfo](host) {
-      val consume = (pays: InfoVec) => updView(pays, pays.isEmpty)
+      val consume = (pays: InfoVec) => updView(pays, pays.isEmpty).run
       def createItem(rCursor: RichCursor) = bag toPaymentInfo rCursor
       def getCursor = bag.byRecent
     }
 
     def searchPays = new ReactLoader[PaymentInfo](host) {
-      val consume = (pays: InfoVec) => updView(pays, showText = false)
+      val consume = (pays: InfoVec) => updView(pays, showText = false).run
       def createItem(rCursor: RichCursor) = bag toPaymentInfo rCursor
       def getCursor = bag byQuery lastQuery
     }
 
     // Recent payment history and paymenr search combined
     me.react = vs => runAnd(lastQuery = vs)(getSupportLoaderManager.restartLoader(1, null, self).forceLoad)
-    def onCreateLoader(id: Int, bundle: Bundle) = if (lastQuery.isEmpty) recentPays else searchPays
+    def onCreateLoader(loaderId: Int, bundle: Bundle) = if (lastQuery.isEmpty) recentPays else searchPays
   }
 
   itemsList setOnItemClickListener onTap { pos =>
@@ -341,10 +180,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     if (info.actualStatus == SUCCESS) {
       paymentHash setVisibility View.GONE
       paymentProof setVisibility View.VISIBLE
-
       paymentProof setOnClickListener onButtonTap {
-        val serializedPaymentRequest = PaymentRequest write info.pr
-        app setBuffer getString(ln_proof).format(serializedPaymentRequest,
+        app setBuffer getString(ln_proof).format(write(info.pr),
           info.pr.hash.toString, info.preimage.toString)
       }
     }
@@ -372,7 +209,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   toggler setOnClickListener onFastTap {
-    // Expand and collapse LN payments
+    // Expand and collapse lightning payments
 
     adapter.switch
     adapter set adapter.availableItems
