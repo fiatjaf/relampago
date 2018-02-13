@@ -53,18 +53,19 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
 
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, _, _) \ CMDStart
-      // Try to obtain new tokens when we have less than five of them left
-      // and there exists an operational channel which can handle a max price
-      if clearTokens.size < 5 && app.ChannelManager.canSend(maxPrice).nonEmpty =>
+      // We are free, have less than five tokens left, have channel which can handle a price
+      if isFree && clearTokens.size < 5 && app.ChannelManager.canSend(maxPrice).nonEmpty =>
+      isFree = false
 
       for {
         prAndMemo @ (pr, memo) <- retry(getRequestAndMemo, pickInc, 3 to 4)
         Some(rpi) <- retry(app.ChannelManager withRoutesAndOnionRPIFromPR pr, pickInc, 3 to 4)
-        // Server response may arrive in some time after our requesting, we must account for that
+        // Server response may arrive in some time after our requesting, must account for that
       } if (data.info.isEmpty && pr.unsafeMsat < maxPrice && memo.clears.size > 20) {
         // If data is empty, price is low enough and number of sigs is sufficient
         me BECOME data.copy(info = Some apply prAndMemo)
         app.ChannelManager.send(rpi, none)
+        isFree = true
       }
 
     // Execute if we are not busy and have available tokens and actions, don't care amout memo
@@ -98,9 +99,9 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
         case _ =>
       }
 
-    case (_, action: CloudAct) =>
-      val actions1 = data.acts + action
-      me BECOME data.copy(acts = actions1)
+    case (_, act: CloudAct) =>
+      // Record new action and try to send it
+      me BECOME data.copy(acts = data.acts + act)
       me doProcess CMDStart
 
     case _ =>
@@ -149,9 +150,9 @@ class PrivateCloud extends Cloud { me =>
       go1.foreach(_ => me BECOME data.copy(acts = data.acts - action), Tools.errlog)
       isFree = false
 
-    case (_, action: CloudAct) =>
-      val actions1 = data.acts + action
-      me BECOME data.copy(acts = actions1)
+    case (_, act: CloudAct) =>
+      // Record new action and try to send it
+      me BECOME data.copy(acts = data.acts + act)
       me doProcess CMDStart
 
     case _ =>
@@ -184,7 +185,7 @@ class Connector(val url: String) {
   def findRoutes(rd: RoutingData, froms: Set[PublicKey], to: PublicKey) =
     ask[PaymentRouteVec]("router/routes", "xn" -> rd.badNodes.map(_.toBin).toJson.toString.hex,
       "xc" -> rd.badChans.toJson.toString.hex, "froms" -> froms.map(_.toBin).toJson.toString.hex,
-      "tos" -> Set(to).map(_.toBin).toString.hex)
+      "tos" -> Set(to).map(_.toBin).toJson.toString.hex)
 }
 
 object Connector {

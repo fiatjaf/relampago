@@ -15,11 +15,8 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
-import scala.util.{Success, Try}
-import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
-import com.lightning.wallet.lnutils.{CloudDataSaver, PublicCloud, RatesSaver}
 import fr.castorflex.android.smoothprogressbar.{SmoothProgressDrawable, SmoothProgressBar}
 import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
 
@@ -31,19 +28,24 @@ import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.wallet.ln.Channel.myBalanceMsat
 import android.widget.AbsListView.OnScrollListener
 import com.google.zxing.client.android.BeepManager
+import com.lightning.wallet.lnutils.RatesSaver
 import android.view.ViewGroup.LayoutParams
 import android.support.v4.view.ViewPager
 import org.bitcoinj.store.SPVBlockStore
 import android.support.v4.app.Fragment
 import com.lightning.wallet.helper.AES
 import android.text.format.DateFormat
+import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
 import org.bitcoinj.core.Address
 import scala.collection.mutable
 import android.text.InputType
+import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
+import android.net.Uri
+import scala.util.Try
 import java.util.Date
 
 
@@ -201,7 +203,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     new FragmentPagerItemAdapter(getSupportFragmentManager, ready.create)
   }
 
-  app.ChannelManager.getOutPaymentObs = rpi => {
+  app.ChannelManager.withRemoteRoutesRPI = (sources, rpi) => {
     // Stopping animation immediately does not work sometimes so we use a guarded timer here once again
     // On entering this activity we show a progress bar animation, a call may happen outside of this activity
     val progressBar = layoutInflater.inflate(R.layout.frag_progress_bar, null).asInstanceOf[SmoothProgressBar]
@@ -209,7 +211,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     timer.schedule(drawable.setColors(getResources getIntArray R.array.bar_colors), 100)
     timer.schedule(container.addView(progressBar, viewParams), 5)
 
-    app.ChannelManager outPaymentObs rpi doOnTerminate {
+    app.ChannelManager.withRoutesRPI(sources, rpi) doOnTerminate {
       timer.schedule(container removeView progressBar, 3000)
       UITask(progressBar.progressiveStop).run
     }
@@ -217,7 +219,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   override def onDestroy = wrap(super.onDestroy) {
     // Once activity is destroyed we put default loader back in place
-    app.ChannelManager.getOutPaymentObs = app.ChannelManager.outPaymentObs
+    app.ChannelManager.withRemoteRoutesRPI = app.ChannelManager.withRoutesRPI
     stopDetecting
   }
 
@@ -235,7 +237,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionBuyCoins) localBitcoinsAndGlidera
-    if (m.getItemId == R.id.exportSnapshot) exportSnapshot
     if (m.getItemId == R.id.actionSettings) mkSetsForm
     if (m.getItemId == R.id.actionLNOps) goLNOps(null)
   }
@@ -300,7 +301,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   //BUTTONS REACTIONS
 
-  def goReceiveLN(top: View) = for (ln <- lnOpt) ln.makePaymentRequest.run
+  def goReceiveLN(top: View) = for (ln <- lnOpt) ln.makePaymentRequest
   def goSendBTC(top: View) = for (btc <- btcOpt) btc.sendBtcPopup
 
   def goReceiveBTC(top: View) = {
@@ -319,25 +320,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     lazy val required = sumIn.format(denom withSign minRequired)
     lazy val balance = sumIn.format(denom withSign app.kit.conf1Balance)
     lazy val notEnough = getString(err_ln_not_enough_funds).format(balance, required)
-    if (app.kit.conf1Balance isGreaterThan minRequired) goSelectChannel
+    if (app.kit.conf1Balance isGreaterThan minRequired) me goTo classOf[LNStartActivity]
     else mkForm(me negBld dialog_ok, notEnough.html, null)
   }
 
-  def goSelectChannel: Unit = cloud match {
-    case _: PublicCloud if app.prefs.getBoolean(AbstractKit.TOKENS_WARN, true) =>
-      // This is the first time a user tries to open a channel so show tokens warning
-
-      val humanSum = coloredOut apply Satoshi(2000)
-      val text = getString(tokens_warn).format(humanSum).html
-      showForm(mkChoiceDialog(go, none, dialog_ok, dialog_cancel).setView(text).create)
-      def go = runAnd(app.prefs.edit.putBoolean(AbstractKit.TOKENS_WARN, false).commit)(goSelectChannel)
-
-    // Either private cloud or warning was cleared
-    case _ => me goTo classOf[LNStartActivity]
-  }
-
   def showDenomChooser = {
-    val btcFunds = coin2MSat(app.kit.conf1Balance)
+    val btcFunds = coin2MSat(app.kit.conf0Balance)
     val lnFunds = MilliSatoshi(app.ChannelManager.notClosingOrRefunding.map(myBalanceMsat).sum)
     val btcPrettyFunds = humanFiat(sumIn format denom.withSign(btcFunds), btcFunds, " ")
     val lnPrettyFunds = humanFiat(sumIn format denom.withSign(lnFunds), lnFunds, " ")
@@ -347,9 +335,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
 
     lst setOnItemClickListener onTap { pos =>
-      wrap(app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit) { denom = denoms apply pos }
-      for (ln <- lnOpt) wrap(ln.adapter.notifyDataSetChanged)(ln.reWireChannelOrNone.run)
+      // Persist user setting first and update view
+
+      denom = denoms apply pos
+      app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
       for (btc <- btcOpt) wrap(btc.adapter.notifyDataSetChanged)(btc.updTitle)
+      for (ln <- lnOpt) wrap(ln.adapter.notifyDataSetChanged)(ln.updTitleAndSubtitle)
     }
 
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
@@ -415,16 +406,16 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     }
 
     viewMnemonic setOnClickListener onButtonTap {
-      // Provided as an external function because it
-      // may be accessed directly from mainpage
+      // Provided as an external function because
+      // it may be accessed directly from mainpage
       rm(menu)(me viewMnemonic null)
     }
 
     changePass setOnClickListener onButtonTap {
       def openForm = passWrap(me getString sets_secret_change) apply checkPass { oldPass =>
         val view \ field = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_new, null)
-        mkForm(mkChoiceDialog(checkNewPass, none, dialog_ok, dialog_cancel), me getString sets_secret_change, view)
-        def checkNewPass = if (field.getText.length >= 6) changePassword else app toast secret_too_short
+        mkForm(mkChoiceDialog(if (field.getText.length >= 6) changePassword else app toast secret_too_short,
+          none, dialog_ok, dialog_cancel), getString(sets_secret_change), view)
 
         def changePassword = {
           // Decrypt an old password and set a new one right away
@@ -433,7 +424,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         }
 
         def rotatePass = {
-          app.kit.wallet.decrypt(oldPass)
+          app.kit.wallet decrypt oldPass
           // Make sure we have alphabetical keyboard from now on
           app.encryptWallet(app.kit.wallet, field.getText.toString)
           app.prefs.edit.putBoolean(AbstractKit.PASS_INPUT, true).commit
@@ -442,35 +433,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
       rm(menu)(openForm)
     }
-  }
-
-  // TODO: REMOVE ON MAINNET
-
-  import android.net.Uri
-  import java.io.File
-  import android.content.Intent
-  import com.google.common.io.Files
-
-  def exportSnapshot = {
-    val dbFile = new File("/data/data/com.lightning.wallet/databases/lndata9.db")
-
-    val walletDestinationFile = FileOps shell s"$appName.wallet"
-    val chainDestinationFile = FileOps shell s"$appName.spvchain"
-    val dbDestinationFile = FileOps shell s"lndata9.db"
-
-    Files.write(Files toByteArray app.walletFile, walletDestinationFile)
-    Files.write(Files toByteArray app.chainFile, chainDestinationFile)
-    Files.write(Files toByteArray dbFile, dbDestinationFile)
-
-    val files = new java.util.ArrayList[Uri]
-
-    files.add(Uri fromFile walletDestinationFile)
-    files.add(Uri fromFile chainDestinationFile)
-    files.add(Uri fromFile dbDestinationFile)
-
-    val share = new Intent setAction Intent.ACTION_SEND_MULTIPLE setType "text/plain"
-    share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, files)
-    me startActivity share
   }
 
   def localBitcoinsAndGlidera = {
@@ -495,21 +457,15 @@ class FragScan extends Fragment with BarcodeCallback { me =>
   }
 
   override def setUserVisibleHint(isVisibleToUser: Boolean) = {
-    if (barcodeReader != null && isVisibleToUser) barcodeReader.resume
-    if (barcodeReader != null && !isVisibleToUser) resetView
+    if (barcodeReader != null) if (isVisibleToUser) barcodeReader.resume else barcodeReader.pause
+    if (!isVisibleToUser) getFragmentManager.beginTransaction.detach(me).attach(me).commit
     super.setUserVisibleHint(isVisibleToUser)
   }
 
-  // Only try to decode result if 2.5 seconds elapsed
+  // Only try to decode result after 2 seconds
   override def possibleResultPoints(points: Points) = none
   override def barcodeResult(res: BarcodeResult) = Option(res.getText) foreach {
-    rawText => if (System.currentTimeMillis - lastAttempt > 2500) tryParseQR(rawText)
-  }
-
-  def resetView = {
-    barcodeReader.pause
-    val ft = getFragmentManager.beginTransaction
-    ft.detach(me).attach(me).commit
+    rawText => if (System.currentTimeMillis - lastAttempt > 2000) tryParseQR(rawText)
   }
 
   def tryParseQR(scannedText: String) = try {

@@ -10,6 +10,7 @@ import com.lightning.wallet.ln.Tools.{none, wrap}
 
 import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
 import com.lightning.wallet.ln.LNParams.DepthAndDead
+import com.lightning.wallet.ln.Channel.isOperational
 import me.relex.circleindicator.CircleIndicator
 import android.widget.Button
 import android.os.Bundle
@@ -130,16 +131,16 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         case Left(mutualTx) => txStatus(mutualTx.txid) match { case cfs \ _ => cfs }
         case Right(info) => txStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
       } match {
+
         case Left(mutualTx) =>
-          // TODO: this is not my Sat
-          val mySat = mutualTx.txOut.reduce(_.amount + _.amount)
-          val mutualTxHumanStatus = humanStatus apply txStatus(mutualTx.txid)
-          val mutualFee = coloredOut(data.commitments.commitInput.txOut.amount - mySat)
-          val mutualView = commitStatus.format(mutualTx.txid.toString, mutualTxHumanStatus, mutualFee)
+          val mutualStatus = txStatus(mutualTx.txid)
+          val outputsWithFee = mutualTx.txOut.map(_.amount).sum
+          val fee = coloredOut(data.commitments.commitInput.txOut.amount - outputsWithFee)
+          val mutualView = commitStatus.format(mutualTx.txid.toString, humanStatus(mutualStatus), fee)
 
           lnOpsAction setVisibility View.GONE
           lnOpsDescription setText bilateralClosing.format(chan.state, started,
-            me time new Date(data.closedAt), alias, coloredIn(mySat), mutualView).html
+            me time new Date(data.closedAt), alias, mutualView).html
 
         case Right(info) =>
           val tier2HumanView = info.getState collect {
@@ -178,9 +179,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       override def onBecome = {
         case (_, w: WaitFundingDoneData, _, _) => manageFunding(w).run
         case (_, c: ClosingData, _, _) if c.closings.nonEmpty => manageClosing(c).run
-        case (_, _: NormalData, _, _) if !chan.isOperational => manageNegotiations.run
-        case (_, _: NormalData, _, _) if chan.isOperational => manageOpen.run
+        case (_, _: NormalData, _, _) if isOperational(chan) => manageOpen.run
         case (_, _: NegotiationsData, _, _) => manageNegotiations.run
+        case (_, _: NormalData, _, _) => manageNegotiations.run
         case _ => manageOther.run
       }
 

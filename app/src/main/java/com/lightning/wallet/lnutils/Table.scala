@@ -65,7 +65,7 @@ object PaymentTable extends Table {
   val updFailAllWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $msat = ?, $stamp = ? WHERE $hash = ?"
-  val createVirtualSql = s"CREATE VIRTUAL TABLE $fts$table USING $fts($search, $hash)"
+  val createVSql = s"CREATE VIRTUAL TABLE $fts$table USING $fts($search, $hash)"
 
   val createSql = s"""
     CREATE TABLE $table(
@@ -87,7 +87,7 @@ object PaymentTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, version: Int, secret: String)
-extends SQLiteOpenHelper(context, "lndata11.db", null, version) { me =>
+extends SQLiteOpenHelper(context, "lndata14.db", null, version) { me =>
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
@@ -102,7 +102,7 @@ extends SQLiteOpenHelper(context, "lndata11.db", null, version) { me =>
   } finally base.endTransaction
 
   def onCreate(dbs: SQLiteDatabase) = {
-    dbs execSQL PaymentTable.createVirtualSql
+    dbs execSQL PaymentTable.createVSql
     dbs execSQL PaymentTable.createSql
     dbs execSQL StorageTable.createSql
     dbs execSQL ChannelTable.createSql

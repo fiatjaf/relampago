@@ -30,7 +30,7 @@ object LocalBroadcaster extends Broadcaster {
       app.kit nonBlockingSend wait.fundingTx
       app.kit watchFunding wait.commitments
 
-    case (chan, norm: NormalData, SYNC, OPEN) =>
+    case (chan, norm: NormalData, OFFLINE, OPEN) =>
       // Check for fee changes once when channel becomes online
       val currentFee = norm.commitments.localCommit.spec.feeratePerKw
       val shouldUpdate = LNParams.shouldUpdateFee(currentFee, ratePerKwSat)

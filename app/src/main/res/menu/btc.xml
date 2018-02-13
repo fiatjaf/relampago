@@ -13,9 +13,4 @@
         android:title="Testnet faucet"
         android:id="@+id/actionBuyCoins"/>
 
-    <item
-        app:showAsAction="never"
-        android:title="Export snapshot"
-        android:id="@+id/exportSnapshot"/>
-
 </menu>

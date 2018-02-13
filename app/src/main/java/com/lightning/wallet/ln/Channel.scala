@@ -7,14 +7,15 @@ import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.PaymentInfo._
 import java.util.concurrent.Executors
-import fr.acinq.eclair.UInt64
 
+import fr.acinq.eclair.UInt64
 import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
+
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, Scalar}
 import com.lightning.wallet.ln.Helpers.{Closing, Funding}
 import com.lightning.wallet.ln.Tools.{none, runAnd}
-import fr.acinq.bitcoin.{Satoshi, Transaction}
+import fr.acinq.bitcoin.{MilliSatoshi, Satoshi, Transaction}
 
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
@@ -227,7 +228,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA d1 doProcess CMDHTLCProcess
 
 
-      case (norm: NormalData, CMDBestHeight(height), OPEN | SYNC)
+      case (norm: NormalData, CMDBestHeight(height), OPEN | OFFLINE)
         // GUARD: break channel if expired outgoing HTLC exists + 576 blocks of grace period have passed
         if norm.commitments.localCommit.spec.htlcs.exists(htlc => !htlc.incoming && height - 576 >= htlc.add.expiry) ||
           norm.commitments.remoteCommit.spec.htlcs.exists(htlc => htlc.incoming && height - 576 >= htlc.add.expiry) ||
@@ -298,7 +299,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         savePointSendError(refund, pt)
 
 
-      case (norm: NormalData, cr: ChannelReestablish, SYNC)
+      case (norm: NormalData, cr: ChannelReestablish, OFFLINE)
         // GUARD: normal state but their nextRemoteRevocationNumber is too far away
         if norm.commitments.localCommit.index < cr.nextRemoteRevocationNumber &&
           cr.myCurrentPerCommitmentPoint.isDefined =>
@@ -310,7 +311,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         else throw new LightningException
 
 
-      case (norm: NormalData, cr: ChannelReestablish, SYNC) =>
+      case (norm: NormalData, cr: ChannelReestablish, OFFLINE) =>
         // If next_local_commitment_number is 1 in both the channel_reestablish it sent
         // and received, then the node MUST retransmit funding_locked, otherwise it MUST NOT
         if (cr.nextLocalCommitmentNumber == 1 && norm.commitments.localCommit.index == 0)
@@ -352,7 +353,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // We may get this message any time so just save it here
-      case (wait: WaitFundingDoneData, CMDConfirmed(tx), SYNC)
+      case (wait: WaitFundingDoneData, CMDConfirmed(tx), OFFLINE)
         if wait.fundingTx.txid == tx.txid =>
 
         val our = makeFundingLocked(wait.commitments)
@@ -361,13 +362,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // We're exiting a sync state while waiting for their FundingLocked
-      case (wait: WaitFundingDoneData, cr: ChannelReestablish, SYNC) =>
+      case (wait: WaitFundingDoneData, cr: ChannelReestablish, OFFLINE) =>
         BECOME(wait, WAIT_FUNDING_DONE)
         wait.our foreach SEND
 
 
       // No in-flight HTLCs here, just proceed with negotiations
-      case (neg: NegotiationsData, cr: ChannelReestablish, SYNC) =>
+      case (neg: NegotiationsData, cr: ChannelReestablish, OFFLINE) =>
         // According to spec we need to re-send a last closing sig here
         val lastSigned = neg.localProposals.head.localClosingSigned
         BECOME(neg, NEGOTIATIONS) SEND lastSigned
@@ -376,7 +377,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SYNC: ONLINE/OFFLINE
 
 
-      case (some: HasCommitments, CMDOnline, SYNC) =>
+      case (some: HasCommitments, CMDOnline, OFFLINE) =>
         val ShaHashesWithIndex(hashes, lastIndex) = some.commitments.remotePerCommitmentSecrets
         val yourLastPerCommitmentSecret = lastIndex.map(ShaChain.moves).flatMap(ShaChain getHash hashes).getOrElse(Sphinx zeroes 32)
         val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
@@ -384,9 +385,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Some apply Scalar(yourLastPerCommitmentSecret), Some apply myCurrentPerCommitmentPoint)
 
 
-      case (wait: WaitFundingDoneData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, SYNC)
-      case (negs: NegotiationsData, CMDOffline, NEGOTIATIONS) => BECOME(negs, SYNC)
-      case (norm: NormalData, CMDOffline, OPEN) => BECOME(norm, SYNC)
+      case (wait: WaitFundingDoneData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, OFFLINE)
+      case (negs: NegotiationsData, CMDOffline, NEGOTIATIONS) => BECOME(negs, OFFLINE)
+      case (norm: NormalData, CMDOffline, OPEN) => BECOME(norm, OFFLINE)
 
 
       // NEGOTIATIONS MODE
@@ -454,9 +455,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (null, ref: RefundingData, null) => BECOME(ref, REFUNDING)
       case (null, close: ClosingData, null) => BECOME(close, CLOSING)
       case (null, init: InitData, null) => BECOME(init, WAIT_FOR_INIT)
-      case (null, wait: WaitFundingDoneData, null) => BECOME(wait, SYNC)
-      case (null, neg: NegotiationsData, null) => BECOME(neg, SYNC)
-      case (null, norm: NormalData, null) => BECOME(norm, SYNC)
+      case (null, wait: WaitFundingDoneData, null) => BECOME(wait, OFFLINE)
+      case (null, neg: NegotiationsData, null) => BECOME(neg, OFFLINE)
+      case (null, norm: NormalData, null) => BECOME(norm, OFFLINE)
 
 
       // MISC
@@ -467,14 +468,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         throw new LightningException(err.humanText)
 
 
-      case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | SYNC) =>
+      case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
         // GUARD: we only react on connection level remote errors or those related to our channel
         // REFUNDING is an exception here, we CAN NOT start a local close in that state
         startLocalClose(some)
 
 
       // CMDShutdown in WAIT_FUNDING_DONE and OPEN may be handled as a cooperative close
-      case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | SYNC) => startLocalClose(some)
+      case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | OFFLINE) => startLocalClose(some)
       case _ =>
     }
 
@@ -545,15 +546,14 @@ object Channel {
   val WAIT_FUNDING_SIGNED = "WAIT-FUNDING-SIGNED"
   val WAIT_FUNDING_DONE = "WAIT-FUNDING-DONE"
   val NEGOTIATIONS = "NEGOTIATIONS"
+  val OFFLINE = "OFFLINE"
   val OPEN = "OPEN"
-  val SYNC = "SYNC"
 
   // No tears, only dreams now
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
   def myBalanceMsat(chan: Channel) = chan(_.localCommit.spec.toLocalMsat) getOrElse 0L
-  def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
 
   def inFlightOutgoingHtlcs(chan: Channel) = chan.data match {

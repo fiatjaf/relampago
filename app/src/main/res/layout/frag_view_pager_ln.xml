@@ -6,26 +6,6 @@
     <LinearLayout style="@style/StandardLinearLayout">
         <include layout="@layout/toolbar"/>
 
-        <Button
-            style="@style/MarginInfo"
-            android:id="@+id/openNewChannel"
-            android:layout_width="wrap_content"
-            android:text="@string/ln_open_channel"
-            android:onClick="goAddChannel"/>
-
-        <Button
-            style="@style/MarginInfo"
-            android:drawablePadding="5dp"
-            android:drawableLeft="@drawable/ic_access_time_black_18dp"
-            android:layout_width="wrap_content"
-            android:text="@string/ln_details"
-            android:id="@+id/viewChannelInfo"
-            android:onClick="goLNOps"/>
-
-        <View
-            android:id="@+id/actionDivider"
-            style="@style/GrayDivider"/>
-
         <ListView
             android:layout_weight="1"
             android:visibility="gone"

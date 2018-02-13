@@ -1,6 +1,5 @@
 package com.lightning.wallet
 
-import spray.json._
 import android.view._
 import android.widget._
 import com.lightning.wallet.ln._
@@ -12,25 +11,18 @@ import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import com.lightning.wallet.Denomination.sat2msatFactor
-import android.content.DialogInterface.BUTTON_POSITIVE
-import com.lightning.wallet.lnutils.JsonHttpUtils.to
-import com.lightning.wallet.ln.wire.ChannelUpdate
+
+import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
+import com.lightning.wallet.ln.Tools.{none, wrap, runAnd}
+import com.lightning.wallet.R.drawable.{await, conf1, dead}
 import com.lightning.wallet.ln.PaymentRequest.write
 import android.support.v7.widget.Toolbar
 import com.lightning.wallet.ln.Channel
 import android.support.v4.app.Fragment
 import com.lightning.wallet.Utils.app
-import fr.acinq.bitcoin.Crypto.sha256
 import org.bitcoinj.core.Transaction
 import android.os.Bundle
 import java.util.Date
-
-import com.lightning.wallet.ln.Tools.{none, random, wrap, runAnd}
-import com.lightning.wallet.R.drawable.{await, conf1, dead}
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
-import scala.util.{Failure, Success, Try}
 
 
 class FragLN extends Fragment { me =>
@@ -42,33 +34,28 @@ class FragLN extends Fragment { me =>
     worker = new FragLNWorker(getActivity.asInstanceOf[WalletActivity], view)
 
   override def onResume = {
-    // Save itself in registry
     WalletActivity.frags += me
-    worker.host.checkTransData
+    worker.onFragmentResume
     super.onResume
   }
 
   override def onDestroy = {
     WalletActivity.frags -= me
-    worker.onFragmentDestroy.run
+    worker.onFragmentDestroy
     super.onDestroy
   }
 }
 
 class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment with SearchBar { me =>
-  import host.{getResources, rm, getString, onFail, UITask, getSupportLoaderManager, str2View, timer, getLayoutInflater, onTap}
-  import host.{onButtonTap, onFastTap, <, mkForm, negBld, negPosBld, mkChoiceDialog}
+  import host.{getResources, getString, onFail, UITask, getSupportLoaderManager, str2View, timer, getLayoutInflater, onTap}
+  import host.{onButtonTap, onFastTap, mkForm, negBld, mkChoiceDialog}
 
-  val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
   val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
-  val imageMap = Array(await, await, conf1, dead)
-
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
-  val viewChannelInfo = frag.findViewById(R.id.viewChannelInfo)
-  val openNewChannel = frag.findViewById(R.id.openNewChannel)
-  val actionDivider = frag.findViewById(R.id.actionDivider)
+  val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   val lnChanWarn = frag.findViewById(R.id.lnChanWarn)
+  val imageMap = Array(await, await, conf1, dead)
 
   val adapter = new CutAdapter[PaymentInfo](PaymentTable.limit, R.layout.frag_tx_ln_line) {
     // LN line has smaller timestamps because payment info, also limit of rows is reduced
@@ -93,9 +80,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     // should always be removed when activity is stopped
 
     override def onError = {
+      // Commit tx fee + channel reserve forbid sending of this payment
+      // inform user with all the details laid out as cleanly as possible
       case _ \ CMDReserveExcept(rpi, missingSat, reserveSat) =>
-        // Commit tx fee + channel reserve forbid sending of this payment
-        // inform user with all the details laid out as cleanly as possible
 
         val message = getString(err_ln_fee_overflow)
         val reserve = coloredIn apply Satoshi(reserveSat)
@@ -103,8 +90,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         val sending = coloredOut apply MilliSatoshi(rpi.firstMsat)
         onFail(message.format(reserve, sending, missing).html)
 
+      // Show detailed description to user
       case _ \ CMDAddExcept(_, code) =>
         onFail(host getString code)
+    }
+
+    override def onBecome = {
+      // Update toolbar every time
+      case _ => updTitleAndSubtitle
     }
   }
 
@@ -113,18 +106,45 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     override def coinsReceived(tx: Transaction) = notifyBtcEvent(host getString btc_received)
   }
 
-  val onFragmentDestroy = UITask {
+  def onFragmentResume = {
+    app.kit.wallet addCoinsSentEventListener subtitleListener
+    app.kit.wallet addCoinsReceivedEventListener subtitleListener
+    for (chan <- app.ChannelManager.all) chan.listeners += chanListener
+    wrap(host.checkTransData)(updTitleAndSubtitle)
+  }
+
+  def onFragmentDestroy = {
     app.kit.wallet removeCoinsSentEventListener subtitleListener
     app.kit.wallet removeCoinsReceivedEventListener subtitleListener
+    for (chan <- app.ChannelManager.all) chan.listeners -= chanListener
+  }
+
+  def updTitleAndSubtitle = {
+    val totalChannels = app.ChannelManager.notClosingOrRefunding
+    val online = totalChannels.count(_.state != Channel.OFFLINE)
+    val funds = totalChannels.map(myBalanceMsat).sum
+    val total = totalChannels.size
+
+    val subtitle =
+      if (total == 0) getString(ln_notify_none)
+      else if (online == 0) getString(notify_connecting)
+      else if (online == total) getString(ln_status_online)
+      else getString(ln_status_mix).format(online, total)
+
+    val title =
+      if (funds == 0L) getString(ln_wallet)
+      else denom withSign MilliSatoshi(funds)
+
+    update(subtitle, Informer.LNSTATE).run
+    UITask(me setTitle title).run
   }
 
   def notifyBtcEvent(message: String) = {
-    // In LN we only temporairly update a subtitle
     timer.schedule(delete(Informer.BTCEVENT), 8000)
-    add(message, Informer.BTCEVENT).run
+    add(text = message, Informer.BTCEVENT).run
   }
 
-  def qr(pr: PaymentRequest) = {
+  def showQR(pr: PaymentRequest) = {
     host goTo classOf[RequestActivity]
     app.TransData.value = pr
   }
@@ -133,6 +153,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     case Right(description) if description.nonEmpty => description take 140
     case Left(descriptionHash) => s"<i>${descriptionHash.toString}</i>"
     case _ => s"<i>${host getString ln_no_description}</i>"
+  }
+
+  def makePaymentRequest = {
+
+  }
+
+  def sendPayment(pr: PaymentRequest) = {
+
   }
 
   // INIT
@@ -193,7 +221,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
       // Can show a QR again if this is not a success yet AND payment request has not expired yet
       if (info.actualStatus == SUCCESS || !info.pr.isFresh) mkForm(negBld(dialog_ok), title.html, detailsWrapper)
-      else mkForm(mkChoiceDialog(none, qr(info.pr), dialog_ok, dialog_retry), title.html, detailsWrapper)
+      else mkForm(mkChoiceDialog(none, showQR(info.pr), dialog_ok, dialog_retry), title.html, detailsWrapper)
 
     } else {
       val feeAmount = MilliSatoshi(info.rd.lastMsat - info.firstMsat)
@@ -221,13 +249,10 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   itemsList setFooterDividersEnabled false
   itemsList setOnScrollListener host.listListener
 
-  // LN page toolbar is going to be WalletActicity action bar
-  toolbar setOnClickListener onFastTap(host.showDenomChooser)
+  // LN page toolbar will be an action bar
   add(getString(ln_notify_none), Informer.LNSTATE).run
-  host setSupportActionBar toolbar
-
-  app.kit.wallet addCoinsSentEventListener subtitleListener
-  app.kit.wallet addCoinsReceivedEventListener subtitleListener
   Utils clickableTextField frag.findViewById(R.id.lnChanInfo)
+  toolbar setOnClickListener onFastTap(host.showDenomChooser)
+  host setSupportActionBar toolbar
   react(new String)
 }

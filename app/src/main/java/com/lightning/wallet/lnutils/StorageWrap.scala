@@ -85,11 +85,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def stop(rpi: RuntimePaymentInfo) = {
-    val extraRoutes = rpi.pr.routingInfo.flatMap(_.route).toSet
-    extraRoutes.map(_.shortChannelId).subsetOf(rpi.rd.badChans) ||
-      extraRoutes.map(_.nodeId).subsetOf(rpi.rd.badNodes) ||
-      rpi.rd.badNodes.contains(rpi.pr.nodeId) ||
-      srvCallAttempts(rpi.pr.paymentHash) > 4
+    val extraChans = rpi.pr.routingInfo.flatMap(_.route).map(_.shortChannelId)
+    val allExtraChansExluded = extraChans.nonEmpty && extraChans.toSet.subsetOf(rpi.rd.badChans)
+    allExtraChansExluded || rpi.rd.badNodes.contains(rpi.pr.nodeId) || srvCallAttempts(rpi.pr.paymentHash) > 4
   }
 
   // Records a number of retry attempts for a given outgoing payment hash
@@ -173,14 +171,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onBecome = {
-    case (_, _, SYNC | OPEN | NEGOTIATIONS, CLOSING) =>
+    case (_, _, OFFLINE | OPEN | NEGOTIATIONS, CLOSING) =>
       // WAITING will either be redeemed or refunded later
       markNotInFlightFailed
       uiNotify
 
-    case (chan, _, SYNC | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
+    case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
-      // failed payments are really marked as FAILURE because of a branch above
       cloud doProcess CMDStart
   }
 }

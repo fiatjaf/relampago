@@ -35,14 +35,14 @@ class FragBTC extends Fragment { me =>
     worker = new FragBTCWorker(getActivity.asInstanceOf[WalletActivity], view)
 
   override def onResume = {
-    // Save itself in registry
     WalletActivity.frags += me
+    worker.onFragmentResume
     super.onResume
   }
 
   override def onDestroy = {
     WalletActivity.frags -= me
-    worker.onFragmentDestroy.run
+    worker.onFragmentDestroy
     super.onDestroy
   }
 }
@@ -62,19 +62,21 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
   val adapter = new CutAdapter[TxWrap](24, R.layout.frag_tx_btc_line) {
     // BTC line has a wider timestamp section because there is no payment info
+    // amount of history is low here because displaying each tx is costly
 
     def getItem(position: Int) = visibleItems(position)
     def getHolder(view: View) = new TxViewHolder(view) {
 
       def fillView(wrap: TxWrap) = {
-        val statusImage = if (wrap.tx.getConfidence.getConfidenceType == DEAD) dead
-        else if (wrap.tx.getConfidence.getDepthInBlocks >= minDepth) conf1
-        else await
-
         if (wrap.nativeValue.isNegative) {
           val amountWithoutFee = wrap.fee map wrap.nativeValue.add getOrElse wrap.nativeValue
           transactSum setText sumOut.format(denom formatted amountWithoutFee.negate).html
         } else transactSum setText sumIn.format(denom formatted wrap.nativeValue).html
+
+        val statusImage =
+          if (wrap.tx.getConfidence.getConfidenceType == DEAD) dead
+          else if (wrap.tx.getConfidence.getDepthInBlocks >= minDepth) conf1
+          else await
 
         transactWhen setText when(System.currentTimeMillis, wrap.tx.getUpdateTime).html
         transactCircle setImageResource statusImage
@@ -115,7 +117,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   val constListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
     def onPeerConnected(peer: Peer, peerCount: Int) = update(host getString status, Informer.PEER).run
     def onPeerDisconnected(peer: Peer, peerCount: Int) = update(host getString status, Informer.PEER).run
-    def status = if (app.kit.peerGroup.numConnectedPeers < 1) btc_notify_connecting else btc_notify_operational
+    def status = if (app.kit.peerGroup.numConnectedPeers < 1) notify_connecting else btc_status_online
   }
 
   val itemsListListener = new TxTracker { self =>
@@ -145,16 +147,28 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     itemsList setVisibility listVisibility
   }
 
-  val onFragmentDestroy = UITask {
+  def onFragmentResume = {
+    app.kit.peerGroup addConnectedEventListener constListener
+    app.kit.peerGroup addDisconnectedEventListener constListener
+    app.kit.peerGroup addBlocksDownloadedEventListener catchListener
+
+    app.kit.wallet addCoinsSentEventListener itemsListListener
+    app.kit.wallet addCoinsReceivedEventListener itemsListListener
+    app.kit.wallet addTransactionConfidenceEventListener itemsListListener
+    app.kit.wallet addCoinsReceivedEventListener subtitleListener
+    app.kit.wallet addCoinsSentEventListener subtitleListener
+  }
+
+  def onFragmentDestroy = {
     app.kit.peerGroup removeConnectedEventListener constListener
     app.kit.peerGroup removeDisconnectedEventListener constListener
     app.kit.peerGroup removeBlocksDownloadedEventListener catchListener
-    app.kit.wallet removeCoinsReceivedEventListener subtitleListener
-    app.kit.wallet removeCoinsSentEventListener subtitleListener
 
     app.kit.wallet removeCoinsSentEventListener itemsListListener
     app.kit.wallet removeCoinsReceivedEventListener itemsListListener
     app.kit.wallet removeTransactionConfidenceEventListener itemsListListener
+    app.kit.wallet removeCoinsReceivedEventListener subtitleListener
+    app.kit.wallet removeCoinsSentEventListener subtitleListener
   }
 
   def updTitle = setTitle {
@@ -269,28 +283,18 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   itemsList setFooterDividersEnabled false
   itemsList setOnScrollListener host.listListener
 
-  // BTC page will just act as a local toolbar
-  toolbar setOnClickListener onFastTap(showDenomChooser)
-  toolbar setOnMenuItemClickListener barMenuListener
-  toolbar inflateMenu R.menu.btc
-
-  app.kit.peerGroup addConnectedEventListener constListener
-  app.kit.peerGroup addDisconnectedEventListener constListener
-  app.kit.peerGroup addBlocksDownloadedEventListener catchListener
-  app.kit.wallet addCoinsReceivedEventListener subtitleListener
-  app.kit.wallet addCoinsSentEventListener subtitleListener
-
-  // Wait for transactions list
-  <(nativeTransactions, onFail) { transactions =>
-    app.kit.wallet addCoinsSentEventListener itemsListListener
-    app.kit.wallet addCoinsReceivedEventListener itemsListListener
-    app.kit.wallet addTransactionConfidenceEventListener itemsListListener
-    updView(transactions.isEmpty)
-    adapter set transactions
+  <(nativeTransactions, onFail) { txs =>
+    // Fill list with bitcoin transactions
+    // and update views accordingly
+    updView(txs.isEmpty)
+    adapter set txs
   }
 
   // Manually update title and subtitle once toolbar is there
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
   add(host getString constListener.status, Informer.PEER).run
+  toolbar setOnClickListener onFastTap(showDenomChooser)
+  toolbar setOnMenuItemClickListener barMenuListener
+  toolbar inflateMenu R.menu.btc
   updTitle
 }

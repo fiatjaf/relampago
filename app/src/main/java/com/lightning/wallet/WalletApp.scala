@@ -4,6 +4,7 @@ import R.string._
 import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
+
 import scala.concurrent.duration._
 import com.softwaremill.quicklens._
 import com.lightning.wallet.lnutils._
@@ -16,17 +17,20 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.muddzdev.styleabletoastlibrary.StyleableToast
+
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.Connector.CMDStart
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
-import fr.acinq.bitcoin.BinaryData
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 import android.app.Application
+
 import scala.util.Try
 import java.io.File
 
@@ -66,7 +70,8 @@ class WalletApp extends Application { me =>
   }
 
   def plurOrZero(opts: Array[String], number: Long) =
-    if (number > 0) plur(opts, number) format number else opts(0)
+    if (number > 0) plur(opts, number) format number
+    else opts(0)
 
   def toast(code: Int): Unit = toast(me getString code)
   def toast(message: String): Unit = StyleableToast.makeText(me, message, R.style.infoToast).show
@@ -116,11 +121,11 @@ class WalletApp extends Application { me =>
     val operationalListeners = Set(broadcaster, bag, StorageWrap)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
-    def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = of.filter(_.data.announce == ann)
-    def canSend(msat: Long) = all.filter(cn => cn.state == Channel.OPEN && isOperational(cn) && estimateCanSend(cn) >= msat)
-    def canReceive(msat: Long) = all.filter(cn => cn.state == Channel.OPEN && isOperational(cn) && estimateCanReceive(cn) >= msat)
-    def notClosingOrRefunding = all.filter(cn => cn.state != Channel.CLOSING && cn.state != Channel.REFUNDING)
-    def notClosing = all.filter(_.state != Channel.CLOSING)
+    def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
+    def canSend(msat: Long) = for (c <- all if c.state == Channel.OPEN && isOperational(c) && estimateCanSend(c) > msat) yield c
+    def canReceive(msat: Long) = for (c <- all if c.state == Channel.OPEN && isOperational(c) && estimateCanReceive(c) > msat) yield c
+    def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
+    def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
     val chainEventsListener = new TxTracker with BlocksListener {
       override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
