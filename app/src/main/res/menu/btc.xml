@@ -4,8 +4,9 @@
     android:checkableBehavior="single">
 
     <item
-        app:showAsAction="never"
-        android:title="@string/action_settings"
+        android:title="Wallet settings"
+        app:showAsAction="always|collapseActionView"
+        android:icon="@drawable/ic_settings_white_24dp"
         android:id="@+id/actionSettings"/>
 
 </menu>
