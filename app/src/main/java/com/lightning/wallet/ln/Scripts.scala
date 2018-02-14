@@ -197,7 +197,7 @@ object Scripts { me =>
   def obscuredCommitTxNumber(number: Long, isFunder: Boolean, local: Point, remote: Point) = {
     val (paymentBasepoint1, paymentBasepoint2) = if (isFunder) (local, remote) else (remote, local)
     val combined = paymentBasepoint1.toBin(compressed = true) ++ paymentBasepoint2.toBin(compressed = true)
-    val blind = Crypto.sha256(combined).takeRight(6).reverse ++ BinaryData("0x0000")
+    val blind = (Crypto sha256 combined takeRight 6).reverse ++ BinaryData("0x0000")
     number ^ Protocol.uint64(blind, ByteOrder.LITTLE_ENDIAN)
   }
 

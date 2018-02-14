@@ -70,7 +70,7 @@ class LNStartActivity extends TimerActivity with ViewSwitch with SearchBar { me 
 
     // Set action bar, content view, title and subtitle text, wire up listeners
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln_start)
-    wrap(getSupportActionBar setTitle ln_open_channel)(getSupportActionBar setSubtitle ln_select_peer)
+    wrap(getSupportActionBar setTitle ln_open_channel)(getSupportActionBar setSubtitle ln_status_peer)
     lnStartNodesList setOnItemClickListener onTap(onPeerSelected)
     lnStartNodesList setAdapter adapter
     react(new String)

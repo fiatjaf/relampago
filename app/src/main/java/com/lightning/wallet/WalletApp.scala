@@ -83,7 +83,7 @@ class WalletApp extends Application { me =>
   Utils.appReference = me
   override def onCreate = wrap(super.onCreate) {
     // These cannot be lazy vals because values may change
-    Utils.denom = Utils.denoms apply prefs.getInt(AbstractKit.DENOM_TYPE, 0)
+    Utils.denom = Utils denoms prefs.getInt(AbstractKit.DENOM_TYPE, 0)
     Utils.fiatName = prefs.getString(AbstractKit.FIAT_TYPE, Utils.strDollar)
   }
 
@@ -186,10 +186,6 @@ class WalletApp extends Application { me =>
       }
     }
 
-    // This is supposed to be updated at runtime if we want to do some additional work
-    // for instance, this can be used to show a loader line on main page while loading is in progress
-    var withRemoteRoutesRPI: (Set[PublicKey], RuntimePaymentInfo) => Obs[RuntimePaymentInfo] = withRoutesRPI
-
     def withRoutesRPI(sources: Set[PublicKey], rpi: RuntimePaymentInfo) = {
       def findRoutes(payeeNodeId: PublicKey) = cloud.connector.findRoutes(rpi.rd, sources, payeeNodeId)
       // MUST contain one or more ordered entries, indicating the forward route from a public node to the final destination
@@ -206,10 +202,10 @@ class WalletApp extends Application { me =>
       val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
 
       if (inFlight) Obs error new LightningException(me getString err_ln_in_flight)
-      else if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
-      else if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      else if (sources contains rpi.pr.nodeId) Obs just useRoute(Vector.empty, Vector.empty, rpi)
-      else withRemoteRoutesRPI(sources, rpi) map useRoutesLeft
+      if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
+      if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
+      if (sources contains rpi.pr.nodeId) Obs just useRoute(Vector.empty, Vector.empty, rpi)
+      else withRoutesRPI(sources, rpi) map useRoutesLeft
     }
 
     def withRoutesAndOnionRPIFromPR(pr: PaymentRequest) = {
@@ -219,8 +215,8 @@ class WalletApp extends Application { me =>
 
     def send(rpi: RuntimePaymentInfo, noRouteLeft: => Unit): Unit = {
       // Empty used route means a recipient is one of our current direct peers
-      val targetNode = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
       // Find a local channel which has enough funds, is also online and belongs to a correct node key
+      val targetNode = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
       val chanOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == targetNode)
 
       chanOpt match {

@@ -41,10 +41,8 @@ import java.text.SimpleDateFormat
 import org.bitcoinj.core.Address
 import scala.collection.mutable
 import android.text.InputType
-import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
-import android.net.Uri
 import scala.util.Try
 import java.util.Date
 
@@ -203,24 +201,17 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     new FragmentPagerItemAdapter(getSupportFragmentManager, ready.create)
   }
 
-  app.ChannelManager.withRemoteRoutesRPI = (sources, rpi) => {
-    // Stopping animation immediately does not work sometimes so we use a guarded timer here once again
-    // On entering this activity we show a progress bar animation, a call may happen outside of this activity
-    val progressBar = layoutInflater.inflate(R.layout.frag_progress_bar, null).asInstanceOf[SmoothProgressBar]
-    val drawable = progressBar.getIndeterminateDrawable.asInstanceOf[SmoothProgressDrawable]
+  def placeLoader = {
+    val loader = layoutInflater.inflate(R.layout.frag_progress_bar, null).asInstanceOf[SmoothProgressBar]
+    val drawable: SmoothProgressDrawable = loader.getIndeterminateDrawable.asInstanceOf[SmoothProgressDrawable]
     timer.schedule(drawable.setColors(getResources getIntArray R.array.bar_colors), 100)
-    timer.schedule(container.addView(progressBar, viewParams), 5)
-
-    app.ChannelManager.withRoutesRPI(sources, rpi) doOnTerminate {
-      timer.schedule(container removeView progressBar, 3000)
-      UITask(progressBar.progressiveStop).run
-    }
+    container.addView(loader, viewParams)
+    loader
   }
 
-  override def onDestroy = wrap(super.onDestroy) {
-    // Once activity is destroyed we put default loader back in place
-    app.ChannelManager.withRemoteRoutesRPI = app.ChannelManager.withRoutesRPI
-    stopDetecting
+  def removeLoader(loader: SmoothProgressBar) = {
+    timer.schedule(container removeView loader, 3000)
+    timer.schedule(loader.progressiveStop, 200)
   }
 
   override def onResume = wrap(super.onResume) {
@@ -228,17 +219,17 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     walletPager.setCurrentItem(math.min(pos, 1), false)
   }
 
+  override def onDestroy = wrap(super.onDestroy)(stopDetecting)
+  override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
+    if (m.getItemId == R.id.actionSettings) makeSettingsForm
+    if (m.getItemId == R.id.actionLNOps) goLNOps(null)
+  }
+
   override def onCreateOptionsMenu(menu: Menu) = {
-    // Called after fragLN sets it's bar as actionbar
+    // Called after fragLN sets toolbar as actionbar
     getMenuInflater.inflate(R.menu.ln, menu)
     for (ln <- lnOpt) ln setupSearch menu
     true
-  }
-
-  override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
-    if (m.getItemId == R.id.actionBuyCoins) localBitcoinsAndGlidera
-    if (m.getItemId == R.id.actionSettings) mkSetsForm
-    if (m.getItemId == R.id.actionLNOps) goLNOps(null)
   }
 
   override def onBackPressed =
@@ -311,7 +302,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def goLNOps(top: View) = {
     val nothingToShow = app.ChannelManager.all.isEmpty
-    if (nothingToShow) app toast ln_notify_none
+    if (nothingToShow) app toast ln_status_none
     else me goTo classOf[LNOpsActivity]
   }
 
@@ -337,7 +328,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     lst setOnItemClickListener onTap { pos =>
       // Persist user setting first and update view
 
-      denom = denoms apply pos
+      denom = denoms(pos)
       app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
       for (btc <- btcOpt) wrap(btc.adapter.notifyDataSetChanged)(btc.updTitle)
       for (ln <- lnOpt) wrap(ln.adapter.notifyDataSetChanged)(ln.updTitleAndSubtitle)
@@ -350,7 +341,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // SETTINGS FORM
 
-  def mkSetsForm: Unit = {
+  def makeSettingsForm = {
     val leftOps = getResources getStringArray R.array.info_storage_tokens
     val tokensLeft = app.plurOrZero(leftOps, LNParams.cloud.data.tokens.size)
 
@@ -433,11 +424,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
       rm(menu)(openForm)
     }
-  }
-
-  def localBitcoinsAndGlidera = {
-    val uri = Uri parse "https://testnet.manu.backend.hamburg/faucet"
-    me startActivity new Intent(Intent.ACTION_VIEW, uri)
   }
 }
 

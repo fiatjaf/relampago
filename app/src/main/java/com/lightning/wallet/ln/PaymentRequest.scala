@@ -104,7 +104,7 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
 
   def hash: BinaryData = {
     val base = prefix + Amount.encode(amount)
-    Crypto.sha256(base.getBytes("UTF-8") ++ stream.bytes)
+    Crypto sha256 base.getBytes("UTF-8") ++ stream.bytes
   }
 
   def sign(priv: PrivateKey) = {
@@ -288,7 +288,7 @@ object PaymentRequest {
 
     val signature = sig.reverse
     val (r, s, recid) = Signature decode signature
-    val messageHash = Crypto.sha256(hrp.getBytes ++ stream1.bytes)
+    val messageHash = Crypto sha256 hrp.getBytes ++ stream1.bytes
     val (pub1, pub2) = Crypto.recoverPublicKey(r -> s, messageHash)
     val pub = if (recid % 2 != 0) pub2 else pub1
 

@@ -101,19 +101,20 @@
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
-    <string name="notify_connecting">Connecting&#8230;</string>
     <string name="btc_status_online">Bitcoin wallet is online</string>
-    <string name="btc_progress_done">Blockchain is up to date</string>
-    <string name="btc_announcing">Announcing transaction&#8230;</string>
-    <string name="btc_received">Bitcoin transaction received</string>
-    <string name="btc_sent">Bitcoin transaction sent</string>
+    <string name="ln_status_online">Ligtning wallet is online</string>
+    <string name="btc_status_connecting">Connecting to Bitcoin peers&#8230;</string>
+    <string name="ln_status_connecting">Connecting to Lightning nodes&#8230;</string>
+    <string name="ln_status_mix">Connected to %1$d of %2$d channels</string>
+    <string name="ln_status_none">No open channel found</string>
+    <string name="ln_status_peer">Select peer</string>
 
     <string name="secret_changing">Updating passcode&#8230;</string>
     <string name="secret_checking">Checking passcode&#8230;</string>
-    <string name="ln_status_online">Lightning wallet is online</string>
-    <string name="ln_status_mix">%1$d of %2$d channels online</string>
-    <string name="ln_notify_none">No open channel found</string>
-    <string name="ln_select_peer">Select peer</string>
+    <string name="btc_announcing">Announcing transaction&#8230;</string>
+    <string name="btc_progress_done">Blockchain is up to date</string>
+    <string name="btc_received">Bitcoin transaction received</string>
+    <string name="btc_sent">Bitcoin transaction sent</string>
 
     <array name="info_progress">
         <item>Sync is complete</item>

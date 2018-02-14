@@ -1,5 +1,6 @@
 package com.lightning.wallet
 
+import spray.json._
 import android.view._
 import android.widget._
 import com.lightning.wallet.ln._
@@ -10,11 +11,14 @@ import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
+import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 
-import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
-import com.lightning.wallet.ln.Tools.{none, wrap, runAnd}
+import scala.util.{Failure, Success, Try}
 import com.lightning.wallet.R.drawable.{await, conf1, dead}
+import com.lightning.wallet.ln.Tools.{none, random, runAnd, wrap}
+import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
+import android.content.DialogInterface.BUTTON_POSITIVE
 import com.lightning.wallet.ln.PaymentRequest.write
 import android.support.v7.widget.Toolbar
 import com.lightning.wallet.ln.Channel
@@ -23,6 +27,8 @@ import com.lightning.wallet.Utils.app
 import org.bitcoinj.core.Transaction
 import android.os.Bundle
 import java.util.Date
+
+import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
 
 
 class FragLN extends Fragment { me =>
@@ -48,7 +54,7 @@ class FragLN extends Fragment { me =>
 
 class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment with SearchBar { me =>
   import host.{getResources, getString, onFail, UITask, getSupportLoaderManager, str2View, timer, getLayoutInflater, onTap}
-  import host.{onButtonTap, onFastTap, mkForm, negBld, mkChoiceDialog}
+  import host.{rm, <, onButtonTap, onFastTap, mkForm, negBld, negPosBld, mkChoiceDialog}
 
   val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
   val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
@@ -126,8 +132,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     val total = totalChannels.size
 
     val subtitle =
-      if (total == 0) getString(ln_notify_none)
-      else if (online == 0) getString(notify_connecting)
+      if (total == 0) getString(ln_status_none)
+      else if (online == 0) getString(ln_status_connecting)
       else if (online == total) getString(ln_status_online)
       else getString(ln_status_mix).format(online, total)
 
@@ -149,18 +155,98 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     app.TransData.value = pr
   }
 
+  def ifOperational(next: Vector[Channel] => Unit) = {
+    val operational = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
+    if (operational.isEmpty) app toast ln_status_none else next(operational)
+  }
+
+  def sendPayment(pr: PaymentRequest) = ifOperational { operational =>
+    val maxCanSend = MilliSatoshi(operational.map(estimateCanSend).max)
+    val popupTitle = getString(ln_send_title).format(me getDescription pr)
+    val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
+    val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), popupTitle.html, content)
+    val hint = getString(amount_hint_can_send).format(denom withSign maxCanSend)
+    val rateManager = new RateManager(hint, content)
+
+    def sendAttempt = rateManager.result match {
+      case Failure(_) => app toast dialog_sum_empty
+      case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
+      case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+      case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
+      case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
+
+      case Success(ms) => rm(alert) {
+        // Outgoing payment needs to have an amount
+        // and this amount may be higher than requested
+
+        val loader = host.placeLoader
+        val rpi = RuntimePaymentInfo(emptyRD, pr, ms.amount)
+        val request = app.ChannelManager.withRoutesAndOnionRPI(rpi)
+        val request1 = request.doOnTerminate(host removeLoader loader)
+        request1.foreach(app.ChannelManager.sendOpt(_, inform), onFail)
+      }
+    }
+
+    val ok = alert getButton BUTTON_POSITIVE
+    ok setOnClickListener onButtonTap(sendAttempt)
+    for (sum <- pr.amount) rateManager setSum Try(sum)
+    host.walletPager.setCurrentItem(1, false)
+  }
+
+  def makePaymentRequest = ifOperational { operational =>
+    val chans \ extraHops = operational.flatMap(StorageWrap.getUpd).unzip
+    if (extraHops.isEmpty) mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
+    else withChannels(chans.map(estimateCanReceive).max)
+
+    def withChannels(maxReceive: Long) = {
+      val maxCanReceive = MilliSatoshi(maxReceive)
+      val reserveUnspent = getString(err_ln_reserve).format(coloredOut apply -maxCanReceive)
+      if (maxCanReceive.amount < 0L) mkForm(negBld(dialog_ok), reserveUnspent.html, null)
+      else withReserve(maxCanReceive)
+    }
+
+    def withReserve(maxReceive: MilliSatoshi) = {
+      val content = getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
+      val inputDescription = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
+      val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), getString(action_ln_receive), content)
+      val hint = getString(amount_hint_can_receive).format(denom withSign maxReceive)
+      val rateManager = new RateManager(hint, content)
+
+      def makeRequest(requestedSum: MilliSatoshi, preimage: BinaryData) = {
+        val rpi = RuntimePaymentInfo(emptyRD, PaymentRequest(chainHash, Some(requestedSum),
+          Crypto sha256 preimage, nodePrivateKey, inputDescription.getText.toString.trim,
+          None, extraHops), requestedSum.amount)
+
+        db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.paymentHashString)
+        db.change(PaymentTable.newSql, rpi.paymentHashString, preimage, 1, rpi.firstMsat,
+          HIDDEN, System.currentTimeMillis.toString, rpi.text, rpi.pr.toJson, rpi.rd.toJson)
+
+        // Show to user
+        showQR(rpi.pr)
+      }
+
+      def recAttempt = rateManager.result match {
+        case Failure(_) => app toast dialog_sum_empty
+        case Success(ms) if maxReceive < ms => app toast dialog_sum_big
+        case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+
+        case Success(ms) => rm(alert) {
+          // Requests without amount are not allowed for now
+          <(makeRequest(ms, random getBytes 32), onFail)(none)
+          app toast dialog_pr_making
+        }
+      }
+
+      val ok = alert getButton BUTTON_POSITIVE
+      ok setOnClickListener onButtonTap(recAttempt)
+    }
+  }
+
+  def inform = onFail(host getString err_ln_no_route)
   def getDescription(pr: PaymentRequest) = pr.description match {
     case Right(description) if description.nonEmpty => description take 140
     case Left(descriptionHash) => s"<i>${descriptionHash.toString}</i>"
     case _ => s"<i>${host getString ln_no_description}</i>"
-  }
-
-  def makePaymentRequest = {
-
-  }
-
-  def sendPayment(pr: PaymentRequest) = {
-
   }
 
   // INIT
@@ -250,7 +336,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   itemsList setOnScrollListener host.listListener
 
   // LN page toolbar will be an action bar
-  add(getString(ln_notify_none), Informer.LNSTATE).run
+  add(getString(ln_status_none), Informer.LNSTATE).run
   Utils clickableTextField frag.findViewById(R.id.lnChanInfo)
   toolbar setOnClickListener onFastTap(host.showDenomChooser)
   host setSupportActionBar toolbar

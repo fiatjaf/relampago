@@ -117,7 +117,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   val constListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
     def onPeerConnected(peer: Peer, peerCount: Int) = update(host getString status, Informer.PEER).run
     def onPeerDisconnected(peer: Peer, peerCount: Int) = update(host getString status, Informer.PEER).run
-    def status = if (app.kit.peerGroup.numConnectedPeers < 1) notify_connecting else btc_status_online
+    def status = if (app.kit.peerGroup.numConnectedPeers < 1) btc_status_connecting else btc_status_online
   }
 
   val itemsListListener = new TxTracker { self =>

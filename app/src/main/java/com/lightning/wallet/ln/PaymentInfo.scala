@@ -11,10 +11,11 @@ import com.lightning.wallet.ln.wire.FailureMessageCodecs._
 import com.lightning.wallet.ln.wire.LightningMessageCodecs._
 
 import scala.util.{Success, Try}
-import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Transaction}
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import com.lightning.wallet.ln.Tools.random
+import fr.acinq.bitcoin.Crypto
 import scodec.bits.BitVector
 import scodec.Attempt
 
@@ -140,7 +141,7 @@ object PaymentInfo {
       failHtlc(sharedSecret, PermanentNodeFailure, add)
 
   } getOrElse {
-    val hash = sha256(add.onionRoutingPacket)
+    val hash = Crypto sha256 add.onionRoutingPacket
     CMDFailMalformedHtlc(add.id, hash, BADONION)
   }
 }
@@ -149,11 +150,15 @@ case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv:
 case class RoutingData(routes: Vector[PaymentRoute], usedRoute: PaymentRoute, badNodes: Set[PublicKey],
                        badChans: Set[Long], onion: SecretsAndPacket, lastMsat: Long, lastExpiry: Long)
 
-// PaymentInfo is constructed directly from database
-// firstMsat is an amount I'm actually getting or an amount I'm paying without routing fees
-// incoming firstMsat is updated on fulfilling, outgoing firstMsat is updated on pay attempt
+case class RuntimePaymentInfo(rd: RoutingData, pr: PaymentRequest, firstMsat: Long) {
+  // firstMsat is an amount I'm actually getting or an amount I'm paying without routing fees
+  // incoming firstMsat is updated on fulfilling, outgoing firstMsat is updated on pay attempt
+  lazy val text = pr.description.right getOrElse new String
+  lazy val paymentHashString = pr.paymentHash.toString
+  lazy val searchText = s"$text $paymentHashString"
+}
 
-case class RuntimePaymentInfo(rd: RoutingData, pr: PaymentRequest, firstMsat: Long)
+// PaymentInfo is constructed directly from database
 case class PaymentInfo(rawRd: String, rawPr: String, preimage: BinaryData, incoming: Int,
                        firstMsat: Long, status: Int, stamp: Long, text: String) {
 

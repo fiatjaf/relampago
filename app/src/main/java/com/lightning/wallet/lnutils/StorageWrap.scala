@@ -16,6 +16,7 @@ import com.lightning.wallet.ln.Tools.none
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
 import scala.collection.mutable
+import language.postfixOps
 
 
 object StorageWrap extends ChannelListener {
@@ -29,15 +30,20 @@ object StorageWrap extends ChannelListener {
     RichCursor(cursor).headTry(_ string StorageTable.value)
   }
 
-  private def ourUpdate(norm: NormalData, upd: ChannelUpdate) = {
+  def getUpd(chan: Channel) = for {
+    longChanId <- chan(_.channelId.toString)
+    update <- get(longChanId) map to[ChannelUpdate] toOption
+  } yield chan -> Vector(update toHop chan.data.announce.nodeId)
+
+  def isOurUpdate(norm: NormalData, upd: ChannelUpdate) = {
     val (_, _, outputIndex) = Tools.fromShortId(upd.shortChannelId)
     val idxMatch = norm.commitments.commitInput.outPoint.index == outputIndex
     idxMatch && !isDisabled(upd.flags) && checkSig(upd, norm.announce.nodeId)
   }
 
   override def onProcess = {
-    case (chan, norm: NormalData, upd: ChannelUpdate) if ourUpdate(norm, upd) =>
-      // Store update in a database and process no further updates afterwards
+    case (chan, norm: NormalData, upd: ChannelUpdate) if isOurUpdate(norm, upd) =>
+      // Store our update in a database and process no further updates afterwards
       put(upd.toJson.toString, norm.commitments.channelId.toString)
       chan.listeners -= StorageWrap
   }
@@ -67,14 +73,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def updateRouting(rpi: RuntimePaymentInfo) = db.change(PaymentTable.updRoutingSql, rpi.rd.toJson, rpi.pr.paymentHash)
   def updOkIncoming(u: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, u.amountMsat, System.currentTimeMillis, u.paymentHash)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, fulfill.paymentPreimage, fulfill.paymentHash)
-  def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
+  def getPaymentInfo(paymentHash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, paymentHash) headTry toPaymentInfo
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
 
   def toPaymentInfo(rc: RichCursor) =
-    PaymentInfo(rawRd = rc string PaymentTable.rd, rawPr = rc string PaymentTable.pr, preimage = rc string PaymentTable.preimage,
-      incoming = rc int PaymentTable.incoming, firstMsat = rc long PaymentTable.msat, status = rc int PaymentTable.status,
+    PaymentInfo(rawRd = rc string PaymentTable.rd, rawPr = rc string PaymentTable.pr,
+      preimage = rc string PaymentTable.preimage, incoming = rc int PaymentTable.incoming,
+      firstMsat = rc long PaymentTable.msat, status = rc int PaymentTable.status,
       stamp = rc long PaymentTable.stamp, text = rc string PaymentTable.text)
 
   def markNotInFlightFailed = db txWrap {
@@ -86,8 +93,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   def stop(rpi: RuntimePaymentInfo) = {
     val extraChans = rpi.pr.routingInfo.flatMap(_.route).map(_.shortChannelId)
-    val allExtraChansExluded = extraChans.nonEmpty && extraChans.toSet.subsetOf(rpi.rd.badChans)
-    allExtraChansExluded || rpi.rd.badNodes.contains(rpi.pr.nodeId) || srvCallAttempts(rpi.pr.paymentHash) > 4
+    val extraChansExluded = extraChans.nonEmpty && extraChans.toSet.subsetOf(rpi.rd.badChans)
+    extraChansExluded | srvCallAttempts(rpi.pr.paymentHash) > 2
   }
 
   // Records a number of retry attempts for a given outgoing payment hash
@@ -113,11 +120,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       db txWrap {
         updateRouting(rpi)
         updateStatus(WAITING, rpi.pr.paymentHash)
-        val text = rpi.pr.description.right getOrElse new String
-        val searchQueryText = s"$text ${rpi.pr.paymentHash.toString}"
-        db.change(PaymentTable.newVirtualSql, searchQueryText, rpi.pr.paymentHash)
-        db.change(PaymentTable.newSql, rpi.pr.paymentHash, NOIMAGE, 0, rpi.firstMsat,
-          WAITING, System.currentTimeMillis, text, rpi.pr.toJson, rpi.rd.toJson)
+        db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.paymentHashString)
+        db.change(PaymentTable.newSql, rpi.paymentHashString, NOIMAGE, 0, rpi.firstMsat,
+          WAITING, System.currentTimeMillis.toString, rpi.text, rpi.pr.toJson, rpi.rd.toJson)
       }
 
       // UI update
@@ -130,11 +135,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       db txWrap {
         for (Htlc(true, add) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(add)
         for (Htlc(false, _) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkOutgoing(fulfill)
-        for (Htlc(false, add) \ updateFailure <- norm.commitments.localCommit.spec.failed) updateFailure match {
-          // Malformed outgoing HTLC is a special case which can only happen if our direct peer replies with it
+        for (Htlc(false, add) \ failure <- norm.commitments.localCommit.spec.failed) failure match {
+          // Malformed outgoing HTLC is a special case which can only come happen with direct peer
           // in all other cases an onion error should be extracted and payment should be retried
 
-          case malformed: UpdateFailMalformedHtlc =>
+          case _: UpdateFailMalformedHtlc =>
             updateStatus(FAILURE, add.paymentHash)
 
           case updateFailHtlc: UpdateFailHtlc =>
@@ -142,13 +147,16 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
               // Try to extract an onion error and prune the rest of affected routes
               val restoredRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
               val updatedRPI = cutAffectedRoutes(updateFailHtlc)(restoredRPI)
-              app.ChannelManager.sendOpt(useRoutesLeft(updatedRPI), fail)
+              app.ChannelManager.sendOpt(useRoutesLeft(updatedRPI), retry)
 
-              def fail = {
+              def retry = {
+                // Update UI and increment counter
+                srvCallAttempts(add.paymentHash) += 1
                 updateStatus(FAILURE, add.paymentHash)
+
+                // Issue another route request if we can proceed
                 if (me stop updatedRPI) srvCallAttempts(add.paymentHash) = 0
                 else app.ChannelManager.withRoutesAndOnionRPI(updatedRPI)
-                  .doOnSubscribe(srvCallAttempts(add.paymentHash) += 1)
                   .foreach(app.ChannelManager.sendOpt(_, none), none)
               }
             }
