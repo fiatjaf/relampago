@@ -28,8 +28,6 @@ import org.bitcoinj.core.Transaction
 import android.os.Bundle
 import java.util.Date
 
-import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
-
 
 class FragLN extends Fragment { me =>
   override def onCreateView(inflator: LayoutInflater, vg: ViewGroup, bn: Bundle) =
@@ -155,6 +153,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     app.TransData.value = pr
   }
 
+  def inform = onFail(host getString err_ln_no_route)
   def ifOperational(next: Vector[Channel] => Unit) = {
     val operational = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
     if (operational.isEmpty) app toast ln_status_none else next(operational)
@@ -196,16 +195,16 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   def makePaymentRequest = ifOperational { operational =>
     val chans \ extraHops = operational.flatMap(StorageWrap.getUpd).unzip
     if (extraHops.isEmpty) mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
-    else withChannels(chans.map(estimateCanReceive).max)
+    else withUpdates(chans.map(estimateCanReceive).max)
 
-    def withChannels(maxReceive: Long) = {
+    def withUpdates(maxReceive: Long) = {
       val maxCanReceive = MilliSatoshi(maxReceive)
-      val reserveUnspent = getString(err_ln_reserve).format(coloredOut apply -maxCanReceive)
+      val reserveUnspent = getString(err_ln_reserve) format coloredOut(-maxCanReceive)
       if (maxCanReceive.amount < 0L) mkForm(negBld(dialog_ok), reserveUnspent.html, null)
-      else withReserve(maxCanReceive)
+      else withEnoughReserve(maxCanReceive)
     }
 
-    def withReserve(maxReceive: MilliSatoshi) = {
+    def withEnoughReserve(maxReceive: MilliSatoshi) = {
       val content = getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
       val inputDescription = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
       val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), getString(action_ln_receive), content)
@@ -242,7 +241,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     }
   }
 
-  def inform = onFail(host getString err_ln_no_route)
   def getDescription(pr: PaymentRequest) = pr.description match {
     case Right(description) if description.nonEmpty => description take 140
     case Left(descriptionHash) => s"<i>${descriptionHash.toString}</i>"

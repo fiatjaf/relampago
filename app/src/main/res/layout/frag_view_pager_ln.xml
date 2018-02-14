@@ -36,7 +36,7 @@
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_add_white_18dp"
-            fab:fab_label="@string/ln_open_channel"
+            fab:fab_label="@string/action_ln_open"
             fab:fab_colorPressed="@color/ln"
             fab:fab_colorNormal="@color/ln"
             fab:fab_colorRipple="@color/ln"

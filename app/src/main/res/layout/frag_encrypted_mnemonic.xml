@@ -27,7 +27,7 @@
         style="@style/StdText"
         android:paddingBottom="25dp"
         android:layout_width="wrap_content"
-        android:text="@string/restore_pass"/>
+        android:text="@string/secret_wallet"/>
 
     <View style="@style/GrayDivider"/>
 

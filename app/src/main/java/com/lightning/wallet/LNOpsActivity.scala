@@ -97,7 +97,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         capacity, app.plurOrZero(txsConfs, threshold), wait.fundingTx.txid.toString, openStatus).html
 
       // Initialize button
-      lnOpsAction setText ln_chan_close
+      lnOpsAction setText action_ln_close
       lnOpsAction setVisibility View.VISIBLE
       closeOnClick(ln_chan_close_details)
     }
@@ -108,7 +108,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         alias, humanNode(chan.data.announce.nodeId.toString, "<br>"), humanChannel).html
 
       // Initialize button
-      lnOpsAction setText ln_chan_close
+      lnOpsAction setText action_ln_close
       lnOpsAction setVisibility View.VISIBLE
       closeOnClick(ln_chan_close_details)
     }
@@ -118,9 +118,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       lnOpsDescription setText negotiations.format(chan.state, started, alias).html
 
       // Initialize button
-      lnOpsAction setText ln_force_close
+      lnOpsAction setText action_ln_force
       lnOpsAction setVisibility View.VISIBLE
-      closeOnClick(ln_force_close)
+      closeOnClick(action_ln_force)
     }
 
     def manageClosing(data: ClosingData) = UITask {
