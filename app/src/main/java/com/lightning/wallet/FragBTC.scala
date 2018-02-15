@@ -207,7 +207,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
       case ok @ Success(ms) =>
         val processor = new TxProcessor {
           val pay = AddrData(ms, spendManager.getAddress)
-
           override def processTx(passcode: String, feePerKb: Coin) = {
             <(app.kit blockingSend makeTx(passcode, feePerKb), onTxFail)(none)
             add(getString(btc_announcing), Informer.BTCEVENT).run

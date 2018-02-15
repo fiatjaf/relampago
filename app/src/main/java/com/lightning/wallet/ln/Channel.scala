@@ -503,6 +503,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   }
 
   private def savePointSendError(refund: RefundingData, point: Point) = {
+    // TODO: they may do nothing on error, then send an earlier point on next reconnect
     val d1 = refund.modify(_.commitments.remoteCommit.remotePerCommitmentPoint) setTo point
     val msg = "Please be so kind as to spend your local commit" getBytes "UTF-8"
     BECOME(d1, REFUNDING) SEND Error(refund.commitments.channelId, msg)

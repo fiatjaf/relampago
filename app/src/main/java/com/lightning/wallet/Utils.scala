@@ -119,6 +119,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     passAsk -> secretInputField
   }
 
+  def finishMe(top: View) = finish
   def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
   def rm(previous: Dialog)(exec: => Unit) = wrap(previous.dismiss)(me delayUI exec)
   def mkForm(bld: Builder, title: View, body: View) = showForm(bld.setCustomTitle(title).setView(body).create)

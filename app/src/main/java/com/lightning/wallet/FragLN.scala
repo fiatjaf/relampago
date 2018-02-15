@@ -81,9 +81,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   val chanListener = new ChannelListener {
-    // Updates local UI according to changes in a channel
-    // should always be removed when activity is stopped
-    override def onBecome = { case _ => updWholeUI }
+    // Should be removed on activity destroyed
 
     override def onError = {
       // Commit tx fee + channel reserve forbid sending of this payment
@@ -96,9 +94,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         val sending = coloredOut apply MilliSatoshi(rpi.firstMsat)
         onFail(message.format(reserve, sending, missing).html)
 
-      // Show detailed description to user
       case _ \ CMDAddExcept(_, code) =>
+        // Display detailed description
         onFail(host getString code)
+    }
+
+    override def onBecome = {
+      // Updates local UI on every state change
+      case _ => updTitleSubtitleViewOpening
     }
   }
 
@@ -111,7 +114,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     app.kit.wallet addCoinsSentEventListener subtitleListener
     app.kit.wallet addCoinsReceivedEventListener subtitleListener
     for (chan <- app.ChannelManager.all) chan.listeners += chanListener
-    wrap(host.checkTransData)(updWholeUI)
+    wrap(host.checkTransData)(updTitleSubtitleViewOpening)
   }
 
   def onFragmentDestroy = {
@@ -120,7 +123,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     for (chan <- app.ChannelManager.all) chan.listeners -= chanListener
   }
 
-  def updWholeUI = {
+  def updTitleSubtitleViewOpening = {
     val totalChannels = app.ChannelManager.notClosingOrRefunding
     val onlineChannels = totalChannels.count(_.state != Channel.OFFLINE)
     val hasOpeningChannels = totalChannels exists isOpening
@@ -154,43 +157,47 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     app.TransData.value = pr
   }
 
-  def inform = onFail(host getString err_ln_no_route)
   def ifOperational(next: Vector[Channel] => Unit) = {
     val operational = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
     if (operational.isEmpty) app toast ln_status_none else next(operational)
   }
 
   def sendPayment(pr: PaymentRequest) = ifOperational { operational =>
-    val maxCanSend = MilliSatoshi(operational.map(estimateCanSend).max)
-    val popupTitle = getString(ln_send_title).format(me getDescription pr)
-    val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-    val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), popupTitle.html, content)
-    val hint = getString(amount_hint_can_send).format(denom withSign maxCanSend)
-    val rateManager = new RateManager(hint, content)
-
-    def sendAttempt = rateManager.result match {
-      case Failure(_) => app toast dialog_sum_empty
-      case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
-      case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
-      case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
-      case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
-
-      case Success(ms) => rm(alert) {
-        // Outgoing payment needs to have an amount
-        // and this amount may be higher than requested
-
-        val loader = host.placeLoader
-        val rpi = RuntimePaymentInfo(emptyRD, pr, ms.amount)
-        val request = app.ChannelManager.withRoutesAndOnionRPI(rpi)
-        val request1 = request.doOnTerminate(host removeLoader loader)
-        request1.foreach(app.ChannelManager.sendOpt(_, inform), onFail)
-      }
-    }
-
-    val ok = alert getButton BUTTON_POSITIVE
-    ok setOnClickListener onButtonTap(sendAttempt)
-    for (sum <- pr.amount) rateManager setSum Try(sum)
+    if (pr.isFresh) withFreshPaymentRequest else app toast err_ln_expired_pr
     host.walletPager.setCurrentItem(1, false)
+
+    def withFreshPaymentRequest = {
+      def noRoute = onFail(host getString err_ln_no_route)
+      val maxCanSend = MilliSatoshi(operational.map(estimateCanSend).max)
+      val popupTitle = getString(ln_send_title).format(me getDescription pr)
+      val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
+      val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), popupTitle.html, content)
+      val hint = getString(amount_hint_can_send).format(denom withSign maxCanSend)
+      val rateManager = new RateManager(hint, content)
+
+      def sendAttempt = rateManager.result match {
+        case Failure(_) => app toast dialog_sum_empty
+        case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
+        case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+        case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
+        case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
+
+        case Success(ms) => rm(alert) {
+          // Outgoing payment needs to have an amount
+          // and this amount may be higher than requested
+
+          val loader = host.placeLoader
+          val rpi = RuntimePaymentInfo(emptyRD, pr, ms.amount)
+          val request = app.ChannelManager.withRoutesAndOnionRPI(rpi)
+          val request1 = request.doOnTerminate(host removeLoader loader)
+          request1.foreach(app.ChannelManager.sendOpt(_, noRoute), onFail)
+        }
+      }
+
+      val ok = alert getButton BUTTON_POSITIVE
+      ok setOnClickListener onButtonTap(sendAttempt)
+      for (sum <- pr.amount) rateManager setSum Try(sum)
+    }
   }
 
   def makePaymentRequest = ifOperational { operational =>

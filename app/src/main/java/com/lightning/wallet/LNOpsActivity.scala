@@ -23,7 +23,6 @@ import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 class LNOpsActivity extends TimerActivity { me =>
   lazy val chanPager = findViewById(R.id.chanPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
-  def goBack(top: View) = finish
 
   lazy val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
@@ -198,7 +197,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
         case (_, _: NegotiationsData, _, _) => manageNegotiations.run
         case (_, c: ClosingData, _, _) if c.closings.nonEmpty => manageClosing(c).run
-        case _ => manageOther.run
+        case anythingElse => manageOther.run
       }
 
       override def onProcess = {

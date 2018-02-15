@@ -1,46 +1,57 @@
-<LinearLayout
-    style="@style/StandardLinearLayout"
-    xmlns:android="http://schemas.android.com/apk/res/android">
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent" android:layout_height="fill_parent">
+    <LinearLayout style="@style/StandardLinearLayout">
 
-    <LinearLayout
-        android:layout_height="wrap_content"
-        android:layout_width="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center">
+        <LinearLayout
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
 
-        <ImageButton
-            android:src="@drawable/qr_18dp"
-            android:layout_height="60dp" android:layout_width="60dp"
-            android:id="@+id/shareQR" android:enabled="false"/>
+            <ImageButton
+                android:src="@drawable/qr_18dp"
+                android:layout_height="60dp" android:layout_width="60dp"
+                android:id="@+id/shareQR" android:enabled="false"/>
 
-        <ImageButton
-            android:src="@drawable/ic_share_white_18dp"
-            android:layout_width="60dp" android:layout_height="60dp"
-            android:id="@+id/shareText"/>
+            <ImageButton
+                android:src="@drawable/ic_share_white_18dp"
+                android:layout_width="60dp" android:layout_height="60dp"
+                android:id="@+id/shareText"/>
+
+        </LinearLayout>
+
+        <ImageView
+            android:id="@+id/reqCode"
+            android:layout_marginTop="15dp"
+            android:layout_marginBottom="15dp"
+            android:layout_width="@dimen/bitmap_qr_wrap_width"
+            android:layout_height="@dimen/bitmap_qr_wrap_height"/>
+
+        <Button
+            style="@style/Info"
+            android:visibility="gone"
+            android:onClick="showTip"
+            android:id="@+id/reqNfcEnabled"
+            android:text="@string/nfc_enabled"
+            android:layout_width="wrap_content"/>
+
+        <Button
+            style="@style/Info"
+            android:visibility="gone"
+            android:onClick="goSettings"
+            android:id="@+id/reqNfcSettings"
+            android:text="@string/nfc_settings"
+            android:layout_width="wrap_content"/>
 
     </LinearLayout>
 
-    <ImageView
-        android:id="@+id/reqCode"
-        android:layout_marginTop="15dp"
-        android:layout_marginBottom="15dp"
-        android:layout_width="@dimen/bitmap_qr_wrap_width"
-        android:layout_height="@dimen/bitmap_qr_wrap_height"/>
+    <ImageButton
+        android:onClick="finishMe"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/app_padding"
+        android:src="@drawable/ic_arrow_back_white_24dp"
+        android:background="?android:selectableItemBackground"/>
 
-    <Button
-        style="@style/Info"
-        android:visibility="gone"
-        android:onClick="showTip"
-        android:id="@+id/reqNfcEnabled"
-        android:text="@string/nfc_enabled"
-        android:layout_width="wrap_content"/>
-
-    <Button
-        style="@style/Info"
-        android:visibility="gone"
-        android:onClick="goSettings"
-        android:id="@+id/reqNfcSettings"
-        android:text="@string/nfc_settings"
-        android:layout_width="wrap_content"/>
-
-</LinearLayout>
+</FrameLayout>
