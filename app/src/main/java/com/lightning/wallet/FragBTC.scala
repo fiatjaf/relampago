@@ -21,6 +21,7 @@ import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.wallet.ln.LNParams.minDepth
 import android.support.v7.widget.Toolbar
 import android.support.v4.app.Fragment
+import fr.acinq.bitcoin.MilliSatoshi
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
@@ -197,32 +198,30 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val alert = mkForm(negPosBld(dialog_cancel, dialog_next), host getString action_bitcoin_send, content)
     val rateManager = new RateManager(getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance), content)
     val spendManager = new BtcManager(rateManager)
-    host.walletPager.setCurrentItem(0, false)
+
+    def next(ms: MilliSatoshi) = new TxProcessor {
+      val pay = AddrData(ms, spendManager.getAddress)
+
+      override def processTx(pass: String, feePerKb: Coin) = {
+        <(app.kit blockingSend makeTx(pass, feePerKb), onTxFail)(none)
+        add(host getString btc_announcing, Informer.BTCEVENT).run
+      }
+
+      override def onTxFail(txGenerationError: Throwable) =
+        mkForm(mkChoiceDialog(host delayUI sendBtcPopup.set(Success(ms), pay.address),
+          none, dialog_ok, dialog_cancel), messageWhenMakingTx(txGenerationError), null)
+    }
 
     def sendAttempt = rateManager.result match {
       case Failure(why) => app toast dialog_sum_empty
       case _ if spendManager.getAddress == null => app toast dialog_address_wrong
       case Success(ms) if MIN_NONDUST_OUTPUT isGreaterThan ms => app toast dialog_sum_small
-
-      case ok @ Success(ms) =>
-        val processor = new TxProcessor {
-          val pay = AddrData(ms, spendManager.getAddress)
-          override def processTx(passcode: String, feePerKb: Coin) = {
-            <(app.kit blockingSend makeTx(passcode, feePerKb), onTxFail)(none)
-            add(getString(btc_announcing), Informer.BTCEVENT).run
-          }
-
-          override def onTxFail(err: Throwable) =
-            mkForm(mkChoiceDialog(host delayUI sendBtcPopup.set(ok, pay.address),
-              none, dialog_ok, dialog_cancel), messageWhenMakingTx(err), null)
-        }
-
-        // Initiate the spending sequence
-        rm(alert)(processor.chooseFee)
+      case Success(ms) => rm(alert)(next(ms).chooseFee)
     }
 
     val ok = alert getButton BUTTON_POSITIVE
     ok setOnClickListener onButtonTap(sendAttempt)
+    host.walletPager.setCurrentItem(0, false)
     spendManager
   }
 
