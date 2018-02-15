@@ -118,9 +118,8 @@ object Scripts { me =>
   // TRANSACTION TEMPLATES
 
   trait TransactionWithInputInfo {
-    // Input of current tx - output of next tx output reveals a final fee
-    def --(that: TransactionWithInputInfo) = input.txOut.amount - that.amount
-    def amount: Satoshi = tx.txOut.map(_.amount).sum
+    // Input of current tx subtracted from output of next tx outputs reveals a final fee
+    def --(that: TransactionWithInputInfo) = input.txOut.amount - that.tx.allOutputsAmount
     def input: InputInfo
     def tx: Transaction
   }

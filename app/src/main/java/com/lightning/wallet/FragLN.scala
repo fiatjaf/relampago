@@ -58,6 +58,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
+  val viewOpeningDetails = frag.findViewById(R.id.viewOpeningDetails)
   val lnChanWarn = frag.findViewById(R.id.lnChanWarn)
   val imageMap = Array(await, await, conf1, dead)
 
@@ -82,6 +83,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   val chanListener = new ChannelListener {
     // Updates local UI according to changes in a channel
     // should always be removed when activity is stopped
+    override def onBecome = { case _ => updWholeUI }
 
     override def onError = {
       // Commit tx fee + channel reserve forbid sending of this payment
@@ -98,11 +100,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       case _ \ CMDAddExcept(_, code) =>
         onFail(host getString code)
     }
-
-    override def onBecome = {
-      // Update toolbar every time
-      case _ => updTitleAndSubtitle
-    }
   }
 
   val subtitleListener = new TxTracker {
@@ -114,7 +111,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     app.kit.wallet addCoinsSentEventListener subtitleListener
     app.kit.wallet addCoinsReceivedEventListener subtitleListener
     for (chan <- app.ChannelManager.all) chan.listeners += chanListener
-    wrap(host.checkTransData)(updTitleAndSubtitle)
+    wrap(host.checkTransData)(updWholeUI)
   }
 
   def onFragmentDestroy = {
@@ -123,24 +120,28 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     for (chan <- app.ChannelManager.all) chan.listeners -= chanListener
   }
 
-  def updTitleAndSubtitle = {
+  def updWholeUI = {
     val totalChannels = app.ChannelManager.notClosingOrRefunding
-    val online = totalChannels.count(_.state != Channel.OFFLINE)
+    val onlineChannels = totalChannels.count(_.state != Channel.OFFLINE)
+    val hasOpeningChannels = totalChannels exists isOpening
     val funds = totalChannels.map(myBalanceMsat).sum
     val total = totalChannels.size
 
     val subtitle =
       if (total == 0) getString(ln_status_none)
-      else if (online == 0) getString(ln_status_connecting)
-      else if (online == total) getString(ln_status_online)
-      else getString(ln_status_mix).format(online, total)
+      else if (onlineChannels == 0) getString(ln_status_connecting)
+      else if (onlineChannels == total) getString(ln_status_online)
+      else getString(ln_status_mix).format(onlineChannels, onlineChannels)
 
-    val title =
-      if (funds == 0L) getString(ln_wallet)
-      else denom withSign MilliSatoshi(funds)
+    val updateWarningAndTitle = UITask {
+      val title = if (funds == 0L) getString(ln_wallet) else denom withSign MilliSatoshi(funds)
+      val openingViewMode = if (hasOpeningChannels) View.VISIBLE else View.GONE
+      viewOpeningDetails setVisibility openingViewMode
+      me setTitle title
+    }
 
     update(subtitle, Informer.LNSTATE).run
-    UITask(me setTitle title).run
+    updateWarningAndTitle.run
   }
 
   def notifyBtcEvent(message: String) = {

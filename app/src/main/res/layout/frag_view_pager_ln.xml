@@ -3,8 +3,24 @@
     xmlns:fab="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <LinearLayout style="@style/StandardLinearLayout">
+    <LinearLayout
+        android:baselineAligned="true"
+        style="@style/StandardLinearLayout">
         <include layout="@layout/toolbar"/>
+
+        <LinearLayout
+            style="@style/WarnLinearLayout"
+            android:id="@+id/viewOpeningDetails"
+            android:visibility="gone">
+
+            <Button
+                style="@style/MarginInfo"
+                android:onClick="goChanDetails"
+                android:layout_width="wrap_content"
+                android:text="@string/ln_opening_view"/>
+
+            <View style="@style/GrayDivider"/>
+        </LinearLayout>
 
         <ListView
             android:layout_weight="1"

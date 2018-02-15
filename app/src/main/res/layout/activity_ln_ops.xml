@@ -13,4 +13,12 @@
         android:layout_gravity="bottom"
         android:layout_height="48dp"/>
 
+    <ImageButton
+        android:onClick="goBack"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:padding="@dimen/app_padding"
+        android:src="@drawable/ic_arrow_back_white_24dp"
+        android:background="?android:selectableItemBackground"/>
+
 </FrameLayout>

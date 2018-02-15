@@ -509,6 +509,7 @@ case class Transaction(version: Long, txIn: Seq[TxIn], txOut: Seq[TxOut], lockTi
   lazy val whash: BinaryData = Crypto.hash256(Transaction.write(this))
   lazy val wtxid: BinaryData = whash.reverse
   lazy val bin: BinaryData = Transaction.write(this)
+  lazy val allOutputsAmount: Satoshi = txOut.map(_.amount).sum
 
   // this is much easier to use than Scala's default toString
   override def toString: String = bin.toString

@@ -3,7 +3,9 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:fab="http://schemas.android.com/apk/res-auto">
 
-    <LinearLayout style="@style/StandardLinearLayout">
+    <LinearLayout
+        android:baselineAligned="true"
+        style="@style/StandardLinearLayout">
         <include layout="@layout/toolbar"/>
 
         <ListView
@@ -14,8 +16,8 @@
 
         <LinearLayout
             android:layout_weight="1"
-            android:visibility="invisible"
             android:id="@+id/mnemonicWarn"
+            android:visibility="invisible"
             style="@style/WarnLinearLayout">
 
             <Button

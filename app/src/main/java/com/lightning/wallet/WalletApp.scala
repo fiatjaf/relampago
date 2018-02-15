@@ -123,7 +123,6 @@ class WalletApp extends Application { me =>
     var all = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
     def canSend(msat: Long) = for (c <- all if c.state == Channel.OPEN && isOperational(c) && estimateCanSend(c) > msat) yield c
-    def canReceive(msat: Long) = for (c <- all if c.state == Channel.OPEN && isOperational(c) && estimateCanReceive(c) > msat) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
@@ -220,12 +219,8 @@ class WalletApp extends Application { me =>
       val chanOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == targetNode)
 
       chanOpt match {
-        case Some(chan) => chan process rpi
-        case None => useRoutesLeft(rpi) match {
-          // We have a new onion from a spare route
-          case Some(rpi1) => send(rpi1, noRouteLeft)
-          case None => noRouteLeft
-        }
+        case Some(targetChan) => targetChan process rpi
+        case None => sendOpt(useRoutesLeft(rpi), noRouteLeft)
       }
     }
 

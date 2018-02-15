@@ -7,15 +7,14 @@ import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.PaymentInfo._
 import java.util.concurrent.Executors
-
 import fr.acinq.eclair.UInt64
-import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 
+import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, Scalar}
 import com.lightning.wallet.ln.Helpers.{Closing, Funding}
 import com.lightning.wallet.ln.Tools.{none, runAnd}
-import fr.acinq.bitcoin.{MilliSatoshi, Satoshi, Transaction}
+import fr.acinq.bitcoin.{ Satoshi, Transaction}
 
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
@@ -553,8 +552,9 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  def myBalanceMsat(chan: Channel) = chan(_.localCommit.spec.toLocalMsat) getOrElse 0L
+  def myBalanceMsat(chan: Channel) = chan(commitments => commitments.localCommit.spec.toLocalMsat) getOrElse 0L
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
+  def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
 
   def inFlightOutgoingHtlcs(chan: Channel) = chan.data match {
     case norm: NormalData => Commitments.latestRemoteCommit(norm.commitments).spec.htlcs
@@ -569,12 +569,17 @@ object Channel {
     math.min(canReceive, LNParams.maxHtlcValue.amount)
   } getOrElse 0L
 
-  def estimateCanSend(chan: Channel) = chan { cs =>
+  def estimateTotalCanSend(chan: Channel) = chan { cs =>
     val currentCommitFee = cs.localCommit.commitTx -- cs.localCommit.commitTx
     val currentTotalFee = cs.remoteParams.channelReserveSatoshis + currentCommitFee.amount
     // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
-    math.min(cs.localCommit.spec.toLocalMsat - currentTotalFee * 1000L, LNParams.maxHtlcValue.amount)
+    cs.localCommit.spec.toLocalMsat - currentTotalFee * 1000L
   } getOrElse 0L
+
+  def estimateCanSend(chan: Channel) = {
+    val unconstrainedCanSend = estimateTotalCanSend(chan)
+    math.min(unconstrainedCanSend, LNParams.maxHtlcValue.amount)
+  }
 }
 
 trait ChannelListener {

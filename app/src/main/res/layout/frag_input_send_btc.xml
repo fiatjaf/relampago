@@ -1,7 +1,6 @@
 <LinearLayout
     style="@style/StandardLinearLayout"
     xmlns:android="http://schemas.android.com/apk/res/android">
-
     <include layout="@layout/frag_input_fiat_converter"/>
 
     <TextView

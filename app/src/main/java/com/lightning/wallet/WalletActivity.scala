@@ -222,7 +222,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   override def onDestroy = wrap(super.onDestroy)(stopDetecting)
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionSettings) makeSettingsForm
-    if (m.getItemId == R.id.actionLNOps) goLNOps(null)
+    if (m.getItemId == R.id.actionLNOps) goChanDetails(null)
   }
 
   override def onCreateOptionsMenu(menu: Menu) = {
@@ -300,7 +300,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     me goTo classOf[RequestActivity]
   }
 
-  def goLNOps(top: View) = {
+  def goChanDetails(top: View) = {
     val nothingToShow = app.ChannelManager.all.isEmpty
     if (nothingToShow) app toast ln_status_none
     else me goTo classOf[LNOpsActivity]
@@ -331,7 +331,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       denom = denoms(pos)
       app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
       for (btc <- btcOpt) wrap(btc.adapter.notifyDataSetChanged)(btc.updTitle)
-      for (ln <- lnOpt) wrap(ln.adapter.notifyDataSetChanged)(ln.updTitleAndSubtitle)
+      for (ln <- lnOpt) wrap(ln.adapter.notifyDataSetChanged)(ln.updWholeUI)
     }
 
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
