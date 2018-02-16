@@ -15,9 +15,9 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 
 import scala.util.{Failure, Success, Try}
-import com.lightning.wallet.R.drawable.{await, conf1, dead}
 import com.lightning.wallet.ln.Tools.{none, random, runAnd, wrap}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
+import com.lightning.wallet.R.drawable.{await, conf1, dead, frozen}
 import android.content.DialogInterface.BUTTON_POSITIVE
 import com.lightning.wallet.ln.PaymentRequest.write
 import android.support.v7.widget.Toolbar
@@ -59,8 +59,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   val viewOpeningDetails = frag.findViewById(R.id.viewOpeningDetails)
+  val imageMap = Array(await, await, conf1, dead, frozen)
   val lnChanWarn = frag.findViewById(R.id.lnChanWarn)
-  val imageMap = Array(await, await, conf1, dead)
 
   val adapter = new CutAdapter[PaymentInfo](PaymentTable.limit, R.layout.frag_tx_ln_line) {
     // LN line has smaller timestamps because payment info, also limit of rows is reduced
