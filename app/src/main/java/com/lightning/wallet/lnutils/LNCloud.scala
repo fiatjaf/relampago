@@ -3,6 +3,7 @@ package com.lightning.wallet.lnutils
 import spray.json._
 import DefaultJsonProtocol._
 import com.lightning.wallet.ln._
+import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.Connector._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
@@ -83,19 +84,26 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
     // We do not have any acts or tokens but have a memo
     // which means a payment is in progress so check it's status
     case CloudData(Some(pr \ memo), _, _, _) \ CMDStart if isFree =>
+      val inFlight = app.ChannelManager.notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs)
+      val tokenRequestInFlight = inFlight.exists(_.add.paymentHash == pr.paymentHash)
 
-      bag getPaymentInfo pr.paymentHash match {
-        case Success(pay) if pay.actualStatus == SUCCESS => me resolveSuccess memo
-        case Success(pay) if pay.actualStatus == FAILURE && !pr.isFresh => me updRequestData None
-        // Repeatedly retry an existing payment request instead of getting a new one until it fully expires
-        case Success(pay) if pay.actualStatus == FAILURE && app.ChannelManager.canSend(maxPrice).nonEmpty =>
+      if (!tokenRequestInFlight) {
+        // Payment is not in progress anymore so it's either failed or fulfilled
+        val send = connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
+        val send1 = send.map(memo.makeClearSigs).map(memo.packEverything).doOnCompleted(me doProcess CMDStart)
+        send1.foreach(fresh => me BECOME data.copy(info = None, tokens = data.tokens ++ fresh), onError)
+      }
+
+      def onError(err: Throwable) = err.getMessage match {
+        case "notfulfilled" if pr.isFresh && app.ChannelManager.canSend(maxPrice).nonEmpty =>
+          // Retry an existing payment request instead of getting a new one until it expires
           val send = me getSided retry(withRoutesAndOnionRPIFromPR(pr), pickInc, 4 to 5)
           send.foreach(app.ChannelManager.sendOpt(_, none), none)
 
-        // The very first attempt has been cancelled
-        case Failure(why) => me updRequestData None
-        // It's WAITING so do nothing
-        case _ =>
+        // A special case where server can't find
+        // our tokens at all so we just start over
+        case "notfound" => me updRequestData None
+        case other => Tools log other
       }
 
     case (_, act: CloudAct) =>
@@ -111,9 +119,7 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
   val updRequestData: Option[RequestAndMemo] => Unit = oram => me BECOME data.copy(info = oram)
   // Send CMDStart only in case if call was successful as we may enter an infinite loop otherwise
   // We only start over if server can't actually find our tokens, otherwise just wait for next try
-  def resolveSuccess(memo: BlindMemo) = getClearTokens(memo).doOnCompleted(me doProcess CMDStart)
-    .foreach(plus => me BECOME data.copy(info = None, tokens = data.tokens ++ plus),
-      error => if (error.getMessage == "notfound") me updRequestData None)
+
 
   def getFreshData = for {
     prm @ (pr, memo) <- getPaymentRequestAndBlindMemo
@@ -141,9 +147,6 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
         connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
           "seskey" -> memo.sesPubKeyHex).map(PaymentRequest.read).map(pr => pr -> memo)
       }
-
-  def getClearTokens(memo: BlindMemo) = connector.ask[BigIntegerVec]("blindtokens/redeem",
-    "seskey" -> memo.sesPubKeyHex) map memo.makeClearSigs map memo.packEverything
 }
 
 // Sig-based authentication

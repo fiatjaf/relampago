@@ -191,7 +191,7 @@ class WalletApp extends Application { me =>
     }
 
     def withRoutesAndOnionRPI(rpi: RuntimePaymentInfo) = {
-      val inFlight = notClosing.flatMap(inFlightOutgoingHtlcs).exists(_.add.paymentHash == rpi.pr.paymentHash)
+      val inFlight = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs).exists(_.add.paymentHash == rpi.pr.paymentHash)
       val isFulfilled = bag.getPaymentInfo(rpi.pr.paymentHash).toOption.exists(_.actualStatus == SUCCESS)
       val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
 
