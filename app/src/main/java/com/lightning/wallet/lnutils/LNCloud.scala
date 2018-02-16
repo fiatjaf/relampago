@@ -89,7 +89,7 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
 
       if (!tokenRequestInFlight) {
         // Payment is not in progress anymore so it's either failed or fulfilled
-        val send = connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
+        val send = me getSided connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
         val send1 = send.map(memo.makeClearSigs).map(memo.packEverything).doOnCompleted(me doProcess CMDStart)
         send1.foreach(fresh => me BECOME data.copy(info = None, tokens = data.tokens ++ fresh), onError)
       }
