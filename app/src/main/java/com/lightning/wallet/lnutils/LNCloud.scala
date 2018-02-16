@@ -98,7 +98,7 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
         case "notfulfilled" if pr.isFresh && app.ChannelManager.canSend(maxPrice).nonEmpty =>
           // Retry an existing payment request instead of getting a new one until it expires
           val send = me getSided retry(withRoutesAndOnionRPIFromPR(pr), pickInc, 4 to 5)
-          send.foreach(app.ChannelManager.sendOpt(_, none), none)
+          send.foreach(app.ChannelManager.sendEither(_, none), none)
 
         // A special case where server can't find
         // our tokens at all so we just start over
@@ -124,7 +124,7 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
   def getFreshData = for {
     prm @ (pr, memo) <- getPaymentRequestAndBlindMemo
     if pr.unsafeMsat < maxPrice && memo.clears.size > 20
-    Some(rpi) <- withRoutesAndOnionRPIFromPR(pr)
+    Right(rpi) <- withRoutesAndOnionRPIFromPR(pr)
     if data.info.isEmpty
   } yield rpi -> prm
 

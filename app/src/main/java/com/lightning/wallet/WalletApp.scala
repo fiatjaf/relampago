@@ -202,20 +202,21 @@ class WalletApp extends Application { me =>
       else withRoutesRPI(sources, rpi) map useRoutesLeft
     }
 
-    def send(rpi: RuntimePaymentInfo, noRouteLeft: => Unit): Unit = {
-      // Empty used route means a recipient is one of our current direct peers
+    def send(rpi: RuntimePaymentInfo, noRouteLeft: RuntimePaymentInfo => Unit): Unit = {
       // Find a local channel which has enough funds, is also online and belongs to a correct node key
       val targetNode = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
       val chanOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == targetNode)
 
       chanOpt match {
-        case Some(targetChan) => targetChan process rpi
-        case None => sendOpt(useRoutesLeft(rpi), noRouteLeft)
+        case Some(targetChannel) => targetChannel process rpi
+        case None => sendEither(useRoutesLeft(rpi), noRouteLeft)
       }
     }
 
-    def sendOpt(opt: Option[RuntimePaymentInfo], noRouteLeft: => Unit) =
-      if (opt.isDefined) send(opt.get, noRouteLeft) else noRouteLeft
+    def sendEither(foe: FullOrEmptyRPI, noRouteLeft: RuntimePaymentInfo => Unit) = foe match {
+      case Right(rpiWithValidPayRoutePresent) => send(rpiWithValidPayRoutePresent, noRouteLeft)
+      case Left(rpiWithEmptyPayRoute) => noRouteLeft(rpiWithEmptyPayRoute)
+    }
   }
 
   abstract class WalletKit extends AbstractKit {

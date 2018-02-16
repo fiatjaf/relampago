@@ -37,7 +37,7 @@ object CloudDataSaver {
   def tryGetObject: TryCloudData = StorageWrap get KEY map to[CloudData]
   def saveObject(data: CloudData) = StorageWrap.put(data.toJson.toString, KEY)
   type TryCloudData = Try[CloudData]
-  val KEY = "cloudData101"
+  val KEY = "cloudData"
 }
 
 object RatesSaver {

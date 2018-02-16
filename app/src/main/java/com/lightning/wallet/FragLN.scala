@@ -167,7 +167,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     host.walletPager.setCurrentItem(1, false)
 
     def withFreshPaymentRequest = {
-      def noRoute = onFail(host getString err_ln_no_route)
       val maxCanSend = MilliSatoshi(operational.map(estimateCanSend).max)
       val popupTitle = getString(ln_send_title).format(me getDescription pr)
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
@@ -185,12 +184,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         case Success(ms) => rm(alert) {
           // Outgoing payment needs to have an amount
           // and this amount may be higher than requested
-
-          val loader = host.placeLoader
           val rpi = RuntimePaymentInfo(emptyRD, pr, ms.amount)
-          val request = app.ChannelManager.withRoutesAndOnionRPI(rpi)
-          val request1 = request.doOnTerminate(host removeLoader loader)
-          request1.foreach(app.ChannelManager.sendOpt(_, noRoute), onFail)
+          me doSend rpi
         }
       }
 
@@ -200,10 +195,17 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     }
   }
 
+  def doSend(rpi: RuntimePaymentInfo) =
+    host.placeLoader match { case loader =>
+      val request = app.ChannelManager.withRoutesAndOnionRPI(rpi)
+      val request1 = request.doOnTerminate(host removeLoader loader)
+      request1.foreach(app.ChannelManager.sendEither(_, none), onFail)
+    }
+
   def makePaymentRequest = ifOperational { operational =>
-    val chans \ extraHops = operational.flatMap(StorageWrap.getUpd).unzip
+    val goodChannels \ extraHops = operational.flatMap(StorageWrap.getUpd).unzip
     if (extraHops.isEmpty) mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
-    else withUpdates(chans.map(estimateCanReceive).max)
+    else withUpdates(goodChannels.map(estimateCanReceive).max)
 
     def withUpdates(maxReceive: Long) = {
       val maxCanReceive = MilliSatoshi(maxReceive)
@@ -294,6 +296,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     val paymentHash = detailsWrapper.findViewById(R.id.paymentHash).asInstanceOf[Button]
 
     val info = adapter getItem pos
+    val rpi = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
     val humanStatus = s"<strong>${paymentStatesMap apply info.actualStatus}</strong>"
     paymentHash setOnClickListener onButtonTap(app setBuffer info.pr.hash.toString)
 
@@ -310,7 +313,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       val title = getString(ln_incoming_title).format(humanStatus)
       val humanIn = humanFiat(prefix = coloredIn(info.firstSum), info.firstSum)
       paymentDetails setText s"${me getDescription info.pr}<br><br>$humanIn".html
-
       // Can show a QR again if this is not a success yet AND payment request has not expired yet
       if (info.actualStatus == SUCCESS || !info.pr.isFresh) mkForm(negBld(dialog_ok), title.html, detailsWrapper)
       else mkForm(mkChoiceDialog(none, showQR(info.pr), dialog_ok, dialog_retry), title.html, detailsWrapper)
@@ -322,9 +324,11 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
       // Will show title with expiry if payment is in-flight so user can make estimations
       val expiryHuman = app.plurOrZero(blocksLeft, info.rd.lastExpiry - broadcaster.currentHeight)
-      val title1 = humanFiat(getString(ln_outgoing_title).format(coloredOut(feeAmount), humanStatus), feeAmount)
-      val title2 = if (info.actualStatus == WAITING) s"${host getString ln_expiry} $expiryHuman<br>$title1" else title1
-      mkForm(negBld(dialog_ok), title2.html, detailsWrapper)
+      val title = humanFiat(getString(ln_outgoing_title).format(coloredOut(feeAmount), humanStatus), feeAmount)
+      val title1 = if (info.actualStatus == WAITING) s"${host getString ln_expiry} $expiryHuman<br>$title" else title
+      // Allow user to retry this payment using excluded nodes and channels if it is a failure and pr is not expired
+      if (info.actualStatus != FAILURE || !info.pr.isFresh) mkForm(negBld(dialog_ok), title1.html, detailsWrapper)
+      else mkForm(mkChoiceDialog(none, doSend(rpi), dialog_ok, dialog_retry), title1.html, detailsWrapper)
     }
   }
 

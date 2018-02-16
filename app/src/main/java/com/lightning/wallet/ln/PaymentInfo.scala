@@ -33,14 +33,17 @@ object PaymentInfo {
     makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
   }
 
+  type FullOrEmptyRPI = Either[RuntimePaymentInfo, RuntimePaymentInfo]
   def useRoutesLeft(rpi: RuntimePaymentInfo) = useFirstRoute(rpi.rd.routes, rpi)
-  def useFirstRoute(rest: PaymentRouteVec, rpi: RuntimePaymentInfo): Option[RuntimePaymentInfo] =
-    rest match { case firstRoute +: tail => useRoute(tail, firstRoute, rpi) case _ => None }
+  def useFirstRoute(rest: PaymentRouteVec, rpi: RuntimePaymentInfo) = rest match {
+    case firstCandidate +: restOfRoutes => useRoute(firstCandidate, restOfRoutes, rpi)
+    case noRoutesLeft => Left(rpi)
+  }
 
-  def useRoute(rest: PaymentRouteVec, route: PaymentRoute, rpi: RuntimePaymentInfo) = {
-    val firstExpiry = LNParams.broadcaster.currentHeight + rpi.pr.minFinalCltvExpiry.getOrElse(9L)
-    val firstPayload = PerHopPayload(shortChannelId = 0L, amtToForward = rpi.firstMsat, firstExpiry)
-    val start = (Vector(firstPayload), Vector.empty[PublicKey], rpi.firstMsat, firstExpiry)
+  def useRoute(route: PaymentRoute, rest: PaymentRouteVec, rpi: RuntimePaymentInfo): FullOrEmptyRPI = {
+    val firstExpiry = LNParams.broadcaster.currentHeight + rpi.pr.minFinalCltvExpiry.getOrElse(default = 9L)
+    val firstPayloadVector = PerHopPayload(shortChannelId = 0L, rpi.firstMsat, firstExpiry) +: Vector.empty
+    val start = (firstPayloadVector, Vector.empty[PublicKey], rpi.firstMsat, firstExpiry)
 
     val (allPayloads, nodeIds, lastMsat, lastExpiry) = route.reverse.foldLeft(start) {
       case (loads, nodes, msat, expiry) \ Hop(nodeId, shortChannelId, delta, _, base, prop) =>
@@ -54,7 +57,8 @@ object PaymentInfo {
     if (LNParams isFeeNotOk lastMsat - rpi.firstMsat) useFirstRoute(rest, rpi) else {
       val onion = buildOnion(keys = nodeIds :+ rpi.pr.nodeId, allPayloads, rpi.pr.paymentHash)
       val rd1 = RoutingData(rest, route, rpi.rd.badNodes, rpi.rd.badChans, onion, lastMsat, lastExpiry)
-      Some(rpi.modify(_.rd) setTo rd1)
+      val rpi1 = rpi.copy(rd = rd1)
+      Right(rpi1)
     }
   }
 

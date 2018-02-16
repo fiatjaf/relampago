@@ -12,10 +12,8 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.Connector.CMDStart
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import com.lightning.wallet.helper.RichCursor
-import com.lightning.wallet.ln.Tools.none
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
-import scala.collection.mutable
 import language.postfixOps
 
 
@@ -92,33 +90,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def stop(rpi: RuntimePaymentInfo) = {
-    val extraChans = rpi.pr.routingInfo.flatMap(_.route).map(_.shortChannelId)
-    val extraChansExluded = extraChans.nonEmpty && extraChans.toSet.subsetOf(rpi.rd.badChans)
-    extraChansExluded | srvCallAttempts(rpi.pr.paymentHash) > 2
+    // This RPI has no routes but may have
+    // new black nodes or channs so save it
+    updateStatus(FAILURE, rpi.pr.paymentHash)
+    updateRouting(rpi)
   }
-
-  def tryResend(add: UpdateAddHtlc, updateFailHtlc: UpdateFailHtlc) =
-    // Try to extract an onion error, prune the rest of affected routes
-    // and either use the rest of routes or issue a new route request
-    getPaymentInfo(add.paymentHash) foreach { info =>
-      val restoredRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
-      val updatedRPI = cutAffectedRoutes(updateFailHtlc)(restoredRPI)
-      app.ChannelManager.sendOpt(useRoutesLeft(updatedRPI), retry)
-
-      def retry = {
-        // Update UI and increment counter
-        srvCallAttempts(add.paymentHash) += 1
-        updateStatus(FAILURE, add.paymentHash)
-
-        // Issue another route request if we can proceed
-        if (me stop updatedRPI) srvCallAttempts(add.paymentHash) = 0
-        else app.ChannelManager.withRoutesAndOnionRPI(updatedRPI)
-          .foreach(app.ChannelManager.sendOpt(_, none), none)
-      }
-    }
-
-  // Records a number of retry attempts for a given outgoing payment hash
-  val srvCallAttempts = mutable.Map.empty[BinaryData, Int] withDefaultValue 0
 
   override def onError = {
     case (_, exc: CMDException) =>
@@ -158,8 +134,16 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
         for (Htlc(false, add) \ failure <- norm.commitments.localCommit.spec.failed) failure match {
           // Malformed outgoing HTLC is a special case which can only come happen with direct peer
           // in all other cases an onion error should be extracted and payment should be retried
-          case _: UpdateFailMalformedHtlc => updateStatus(FAILURE, add.paymentHash)
-          case updateFailHtlc: UpdateFailHtlc => tryResend(add, updateFailHtlc)
+
+          case updateFailHtlc: UpdateFailHtlc =>
+            getPaymentInfo(add.paymentHash) foreach { info =>
+              val restoredRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
+              val updatedRPI = cutAffectedRoutes(updateFailHtlc)(restoredRPI)
+              app.ChannelManager.sendEither(useRoutesLeft(updatedRPI), stop)
+            }
+
+          case _: UpdateFailMalformedHtlc =>
+            updateStatus(FAILURE, add.paymentHash)
         }
       }
 
