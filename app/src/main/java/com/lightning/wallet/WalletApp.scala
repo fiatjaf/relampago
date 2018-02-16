@@ -4,7 +4,6 @@ import R.string._
 import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
-
 import scala.concurrent.duration._
 import com.softwaremill.quicklens._
 import com.lightning.wallet.lnutils._
@@ -17,20 +16,16 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.muddzdev.styleabletoastlibrary.StyleableToast
-
 import collection.JavaConverters.seqAsJavaListConverter
-import com.lightning.wallet.lnutils.Connector.CMDStart
 import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
+import fr.acinq.bitcoin.BinaryData
 import android.app.Application
-
 import scala.util.Try
 import java.io.File
 
@@ -205,11 +200,6 @@ class WalletApp extends Application { me =>
       if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
       if (sources contains rpi.pr.nodeId) Obs just useRoute(Vector.empty, Vector.empty, rpi)
       else withRoutesRPI(sources, rpi) map useRoutesLeft
-    }
-
-    def withRoutesAndOnionRPIFromPR(pr: PaymentRequest) = {
-      val rpi = RuntimePaymentInfo(emptyRD, pr, pr.unsafeMsat)
-      withRoutesAndOnionRPI(rpi)
     }
 
     def send(rpi: RuntimePaymentInfo, noRouteLeft: => Unit): Unit = {

@@ -104,6 +104,7 @@
     <string name="btc_status_connecting">Connecting to Bitcoin peers&#8230;</string>
     <string name="ln_status_connecting">Connecting to Lightning nodes&#8230;</string>
     <string name="ln_status_mix">Connected to %1$d of %2$d channels</string>
+    <string name="ln_status_pr_expired">Expired payment request</string>
     <string name="ln_status_none">No open channel found</string>
     <string name="ln_status_peer">Select peer</string>
 
@@ -145,7 +146,6 @@
     <string name="err_ln_no_route">Failed because no route to recipient could be found.</string>
     <string name="err_ln_fulfilled">Failed because this payment is already fulfilled.</string>
     <string name="err_ln_in_flight">Failed because this payment is already in-flight.</string>
-    <string name="err_ln_expired_pr">Failed because this payment request has expired</string>
 
     <string name="err_ln_6_confs">Can\'t ask for payments yet because a funding Bitcoin transaction has not got 6 confirmations yet.</string>
     <string name="err_ln_reserve">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving.</string>

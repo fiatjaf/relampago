@@ -9,7 +9,6 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import fr.acinq.bitcoin.{BinaryData, Crypto, Transaction}
-import com.lightning.wallet.ln.Tools.{none, random}
 import rx.lang.scala.{Observable => Obs}
 import scala.util.{Failure, Success}
 
@@ -18,6 +17,7 @@ import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
 import collection.JavaConverters.mapAsJavaMapConverter
 import com.github.kevinsawicki.http.HttpRequest.post
 import rx.lang.scala.schedulers.IOScheduler
+import com.lightning.wallet.ln.Tools.none
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.wallet.Utils.app
 import org.bitcoinj.core.Utils.HEX
@@ -28,10 +28,13 @@ import java.math.BigInteger
 
 abstract class Cloud extends StateMachine[CloudData] {
   // Persisted data exchange with a maintenance server
-  // Checks if user's server accepts a signature
-  def checkIfWorks: Obs[Any] = Obs just true
   protected[this] var isFree = true
   val connector: Connector
+
+  def getSided[T](obs: Obs[T] /* side effects */) = {
+    val observable1 = obs doOnSubscribe { isFree = false }
+    observable1 doOnTerminate { isFree = true }
+  }
 
   def BECOME(d1: CloudData) = {
     // Save to db on every update
@@ -44,57 +47,53 @@ abstract class Cloud extends StateMachine[CloudData] {
 case class CloudData(info: Option[RequestAndMemo], tokens: Set[ClearToken], acts: Set[CloudAct], url: String)
 // Represents a remote call to be executed in exchange for token or signature, can be locally persisted
 case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
+
 class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
   val connector = new Connector("http://10.0.2.2:9002")
-  val expectedPrice = 2000000L // 2000 SAT
-  val maxPrice = 20000000L // 20000 SAT
+  val maxPrice = 20000000L
 
   // STATE MACHINE
 
   def doProcess(some: Any) = (data, some) match {
-    case CloudData(None, clearTokens, _, _) \ CMDStart
-      // We are free, have less than five tokens left, have channel which can handle a price
-      if isFree && clearTokens.size < 5 && app.ChannelManager.canSend(maxPrice).nonEmpty =>
-      isFree = false
-
-      for {
-        prAndMemo @ (pr, memo) <- retry(getRequestAndMemo, pickInc, 3 to 4)
-        Some(rpi) <- retry(app.ChannelManager withRoutesAndOnionRPIFromPR pr, pickInc, 3 to 4)
-        // Server response may arrive in some time after our requesting, must account for that
-      } if (data.info.isEmpty && pr.unsafeMsat < maxPrice && memo.clears.size > 20) {
-        // If data is empty, price is low enough and number of sigs is sufficient
-        me BECOME data.copy(info = Some apply prAndMemo)
+    case CloudData(None, clearTokens, acts, _) \ CMDStart
+      // Info is None AND we are free AND few tokens left AND acts is empty AND have a non-depleted channel
+      if isFree && clearTokens.size < 5 && acts.isEmpty && app.ChannelManager.canSend(maxPrice).nonEmpty =>
+      // This will intercept the next case only if we have no cloud acts left which is desirable
+      me getSided retry(getFreshData, pickInc, 4 to 5) foreach { case rpi \ prm =>
+        // If requested sum is low enough and tokens quantity is high enough
+        // and info has not already been set by another request
         app.ChannelManager.send(rpi, none)
-        isFree = true
+        me updRequestData Some(prm)
       }
 
-    // Execute if we are not busy and have available tokens and actions, don't care amout memo
-    case CloudData(_, SET(token @ (point, clear, sig), _*), SET(action, _*), _) \ CMDStart if isFree =>
-      val params = Seq("point" -> point, "cleartoken" -> clear, "clearsig" -> sig, BODY -> action.data.toString) ++ action.plus
-      val go = connector.ask[String](action.path, params:_*) doOnTerminate { isFree = true } doOnCompleted { me doProcess CMDStart }
-      go.foreach(_ => me BECOME data.copy(acts = data.acts - action, tokens = data.tokens - token), onError)
-      isFree = false
+    // Execute if we are free and have available tokens and actions, don't care amout memo here
+    case CloudData(_, SET(token @ (point, clear, signature), _*), SET(action, _*), _) \ CMDStart if isFree =>
+      val params = Seq("point" -> point, "cleartoken" -> clear, "clearsig" -> signature, BODY -> action.data.toString)
+      val send = me getSided connector.ask[String](action.path, params ++ action.plus:_*).doOnCompleted(me doProcess CMDStart)
+      send.foreach(onResponse, onResponse)
 
-      def onError(err: Throwable) = err.getMessage match {
-        case "tokeninvalid" => me BECOME data.copy(tokens = data.tokens - token)
-        case "tokenused" => me BECOME data.copy(tokens = data.tokens - token)
-        case _ => Tools errlog err
+      def onResponse(response: Any) = response match {
+        case "done" => me BECOME data.copy(acts = data.acts - action, tokens = data.tokens - token)
+        case err: Throwable if err.getMessage == "tokeninvalid" => me BECOME data.copy(tokens = data.tokens - token)
+        case err: Throwable if err.getMessage == "tokenused" => me BECOME data.copy(tokens = data.tokens - token)
+        case err: Throwable => Tools errlog err
+        case _ =>
       }
 
-    // We don't have acts or tokens but have a memo
-    // which means a payment is waiting so check if it's done
-    case CloudData(Some(pr \ memo), _, _, _) \ CMDStart =>
+    // We do not have any acts or tokens but have a memo
+    // which means a payment is in progress so check it's status
+    case CloudData(Some(pr \ memo), _, _, _) \ CMDStart if isFree =>
 
       bag getPaymentInfo pr.paymentHash match {
         case Success(pay) if pay.actualStatus == SUCCESS => me resolveSuccess memo
-        case Success(pay) if pay.actualStatus == FAILURE && !pr.isFresh => eraseRequestData
-        // Repeatedly retry an existing payment request instead of getting a new one until it expires
+        case Success(pay) if pay.actualStatus == FAILURE && !pr.isFresh => me updRequestData None
+        // Repeatedly retry an existing payment request instead of getting a new one until it fully expires
         case Success(pay) if pay.actualStatus == FAILURE && app.ChannelManager.canSend(maxPrice).nonEmpty =>
-          val go = retry(app.ChannelManager withRoutesAndOnionRPIFromPR pr, pickInc, 3 to 4)
-          go.foreach(app.ChannelManager.sendOpt(_, none), none)
+          val send = me getSided retry(withRoutesAndOnionRPIFromPR(pr), pickInc, 4 to 5)
+          send.foreach(app.ChannelManager.sendOpt(_, none), none)
 
-        // The very first attempt was rejected
-        case Failure(_) => eraseRequestData
+        // The very first attempt has been cancelled
+        case Failure(why) => me updRequestData None
         // It's WAITING so do nothing
         case _ =>
       }
@@ -109,16 +108,28 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
 
   // ADDING NEW TOKENS
 
-  def eraseRequestData = me BECOME data.copy(info = None)
+  val updRequestData: Option[RequestAndMemo] => Unit = oram => me BECOME data.copy(info = oram)
   // Send CMDStart only in case if call was successful as we may enter an infinite loop otherwise
   // We only start over if server can't actually find our tokens, otherwise just wait for next try
   def resolveSuccess(memo: BlindMemo) = getClearTokens(memo).doOnCompleted(me doProcess CMDStart)
     .foreach(plus => me BECOME data.copy(info = None, tokens = data.tokens ++ plus),
-      error => if (error.getMessage == "notfound") eraseRequestData)
+      error => if (error.getMessage == "notfound") me updRequestData None)
+
+  def getFreshData = for {
+    prm @ (pr, memo) <- getPaymentRequestAndBlindMemo
+    if pr.unsafeMsat < maxPrice && memo.clears.size > 20
+    Some(rpi) <- withRoutesAndOnionRPIFromPR(pr)
+    if data.info.isEmpty
+  } yield rpi -> prm
+
+  def withRoutesAndOnionRPIFromPR(pr: PaymentRequest) = {
+    val emptyRPI = RuntimePaymentInfo(emptyRD, pr, pr.unsafeMsat)
+    app.ChannelManager withRoutesAndOnionRPI emptyRPI
+  }
 
   // TALKING TO SERVER
 
-  def getRequestAndMemo: Obs[RequestAndMemo] =
+  def getPaymentRequestAndBlindMemo: Obs[RequestAndMemo] =
     connector.ask[TokensInfo]("blindtokens/info") flatMap {
       case (signerMasterPubKey, signerSessionPubKey, quantity) =>
         val pubKeyQ = ECKey.fromPublicOnly(HEX decode signerMasterPubKey)
@@ -131,9 +142,8 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
           "seskey" -> memo.sesPubKeyHex).map(PaymentRequest.read).map(pr => pr -> memo)
       }
 
-  def getClearTokens(m: BlindMemo) =
-    connector.ask[BigIntegerVec]("blindtokens/redeem",
-      "seskey" -> m.sesPubKeyHex).map(m.makeClearSigs).map(m.pack)
+  def getClearTokens(memo: BlindMemo) = connector.ask[BigIntegerVec]("blindtokens/redeem",
+    "seskey" -> memo.sesPubKeyHex) map memo.makeClearSigs map memo.packEverything
 }
 
 // Sig-based authentication
@@ -145,10 +155,10 @@ class PrivateCloud extends Cloud { me =>
   def doProcess(some: Any) = (data, some) match {
     // Execute if we are not busy and have available actions
     case CloudData(_, _, SET(action, _*), _) \ CMDStart if isFree =>
-      val go = connector.ask[String](action.path, signed(action.data) ++ action.plus:_*)
-      val go1 = go doOnTerminate { isFree = true } doOnCompleted { me doProcess CMDStart }
-      go1.foreach(_ => me BECOME data.copy(acts = data.acts - action), Tools.errlog)
-      isFree = false
+      val sig = Crypto encodeSignature Crypto.sign(Crypto sha256 action.data, LNParams.cloudPrivateKey)
+      val params = Seq("sig" -> sig.toString, "pubkey" -> LNParams.cloudPublicKey.toString, BODY -> data.toString)
+      val send = connector.ask[String](action.path, params ++ action.plus:_*).doOnCompleted(me doProcess CMDStart)
+      send.foreach(ok => me BECOME data.copy(acts = data.acts - action), Tools.errlog)
 
     case (_, act: CloudAct) =>
       // Record new action and try to send it
@@ -156,16 +166,6 @@ class PrivateCloud extends Cloud { me =>
       me doProcess CMDStart
 
     case _ =>
-  }
-
-  def signed(data: BinaryData) = {
-    val sig = Crypto encodeSignature Crypto.sign(Crypto sha256 data, LNParams.cloudPrivateKey)
-    Seq("sig" -> sig.toString, "pubkey" -> LNParams.cloudPublicKey.toString, BODY -> data.toString)
-  }
-
-  override def checkIfWorks = {
-    val params = signed(random getBytes 32)
-    connector.ask[String]("check", params:_*)
   }
 }
 

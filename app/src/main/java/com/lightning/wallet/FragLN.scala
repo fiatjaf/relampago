@@ -163,7 +163,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   def sendPayment(pr: PaymentRequest) = ifOperational { operational =>
-    if (pr.isFresh) withFreshPaymentRequest else app toast err_ln_expired_pr
+    if (pr.isFresh) withFreshPaymentRequest else app toast ln_status_pr_expired
     host.walletPager.setCurrentItem(1, false)
 
     def withFreshPaymentRequest = {
