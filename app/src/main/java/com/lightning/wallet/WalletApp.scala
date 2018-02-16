@@ -143,7 +143,7 @@ class WalletApp extends Application { me =>
         case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, ann).foreach(_ process err)
         case cm: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains cm.channelId).foreach(_ process cm)
         case cu: ChannelUpdate => fromNode(notClosing, ann).foreach(_ process cu)
-        case _ => // Open channels are only allowed to receive channel messages
+        case _ =>
       }
 
       override def onOperational(ann: NodeAnnouncement, their: Init) = fromNode(notClosing, ann).foreach(_ process CMDOnline)
@@ -191,21 +191,25 @@ class WalletApp extends Application { me =>
     }
 
     def withRoutesAndOnionRPI(rpi: RuntimePaymentInfo) = {
-      val inFlight = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs).exists(_.add.paymentHash == rpi.pr.paymentHash)
-      val isFulfilled = bag.getPaymentInfo(rpi.pr.paymentHash).toOption.exists(_.actualStatus == SUCCESS)
+      val paymentOpt = bag.getPaymentInfo(rpi.pr.paymentHash).toOption
       val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
+      val inFlightOutgoing = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs)
+      val inFlight = inFlightOutgoing.exists(_.add.paymentHash == rpi.pr.paymentHash)
+      val isFulfilled = paymentOpt.exists(_.actualStatus == SUCCESS)
+      val isFrozen = paymentOpt.exists(_.actualStatus == FROZEN)
 
-      if (inFlight) Obs error new LightningException(me getString err_ln_in_flight)
-      if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
-      if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      if (sources contains rpi.pr.nodeId) Obs just useRoute(Vector.empty, Vector.empty, rpi)
+      if (isFrozen) Obs error new LightningException(me getString err_ln_frozen)
+      else if (inFlight) Obs error new LightningException(me getString err_ln_in_flight)
+      else if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
+      else if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
+      else if (sources contains rpi.pr.nodeId) Obs just useRoute(Vector.empty, Vector.empty, rpi)
       else withRoutesRPI(sources, rpi) map useRoutesLeft
     }
 
     def send(rpi: RuntimePaymentInfo, noRouteLeft: RuntimePaymentInfo => Unit): Unit = {
-      // Find a local channel which has enough funds, is also online and belongs to a correct node key
-      val targetNode = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
-      val chanOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == targetNode)
+      // Find a local channel which has enough funds, is also online and belongs to a correct node
+      val target = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
+      val chanOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == target)
 
       chanOpt match {
         case Some(targetChannel) => targetChannel process rpi
@@ -214,8 +218,8 @@ class WalletApp extends Application { me =>
     }
 
     def sendEither(foe: FullOrEmptyRPI, noRouteLeft: RuntimePaymentInfo => Unit) = foe match {
-      case Right(rpiWithValidPayRoutePresent) => send(rpiWithValidPayRoutePresent, noRouteLeft)
-      case Left(rpiWithEmptyPayRoute) => noRouteLeft(rpiWithEmptyPayRoute)
+      case Right(rpiWithValidPaymentRoutePresent) => send(rpiWithValidPaymentRoutePresent, noRouteLeft)
+      case Left(rpiWithEmptyPaymentRoute) => noRouteLeft(rpiWithEmptyPaymentRoute)
     }
   }
 

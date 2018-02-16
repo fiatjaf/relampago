@@ -1,6 +1,5 @@
 package com.lightning.wallet.ln
 
-import com.softwaremill.quicklens._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.crypto._
 import com.lightning.wallet.ln.PaymentInfo._
@@ -25,6 +24,7 @@ object PaymentInfo {
   final val WAITING = 1
   final val SUCCESS = 2
   final val FAILURE = 3
+  final val FROZEN = 4
 
   // Placeholder for unresolved outgoing payments
   val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")

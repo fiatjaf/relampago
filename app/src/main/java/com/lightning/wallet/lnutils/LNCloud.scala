@@ -11,7 +11,6 @@ import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import fr.acinq.bitcoin.{BinaryData, Crypto, Transaction}
 import rx.lang.scala.{Observable => Obs}
-import scala.util.{Failure, Success}
 
 import com.lightning.wallet.ln.wire.LightningMessageCodecs.AnnounceChansNum
 import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
