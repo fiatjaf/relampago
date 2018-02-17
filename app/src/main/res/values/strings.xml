@@ -148,7 +148,7 @@
     <string name="err_ln_in_flight">Failed because this payment is already in-flight.</string>
     <string name="err_ln_frozen">Can not retry this payment because it is frozen.</string>
 
-    <string name="err_ln_6_confs">Can\'t ask for payments yet because a funding Bitcoin transaction has not got 6 confirmations yet.</string>
+    <string name="err_ln_6_confs">Can\'t ask for payments yet because a funding Bitcoin transaction has not got 6 confirmations.</string>
     <string name="err_ln_reserve">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving.</string>
     <string name="err_ln_fee_overflow"><![CDATA[Failed because this payment combined with Bitcoin <a href=http://lightning-wallet.com/using-lightning-wallet#commit-transaction-fee>commit transaction</a> fee exceeds your unspendable channel reserve<br><br>reserve %1$s<br>sending %2$s<br>missing %3$s.]]></string>
     <string name="err_ln_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br>for a payment channel<br><br>can send %1$s<br>min required %2$s<br><br>Bitcoin wallet should contain more funds in order to proceed with this<br><br>Please note that Bitcoin transactions need to get at least one confirmation to become spendable.]]></string>
@@ -190,14 +190,12 @@
         <item>Frozen</item>
     </array>
 
-    <!-- frag_view_pager_chan, activity_ln_start -->
-
     <string name="ln_chan_close_details">Channel closing results in an on-chain Bitcoin transaction which refunds the remaining Lightning balance back to your Bitcoin wallet</string>
     <string name="ln_chan_force_details"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a> takes more fees and time than a cooperaive one]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[%1$s<br>started at <font color=#999999>%2$s</font><br>total capacity %3$s<br>spendable %4$s<br>receivable %5$s<br>%6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[%1$s<br>started at <font color=#999999>%2$s</font><br>total capacity %3$s<br>spendable %4$s<br>receivable %5$s<br>%6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br>%8$s]]></string>
     <string name="ln_ops_chan_opening"><![CDATA[%1$s<br>started at <font color=#999999>%2$s</font><br>total capacity %3$s<br>%4$s<br><br>Funding Bitcoin transaction needs to reach %5$s for this channel to become usable<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s]]></string>
-    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>started at <font color=#999999>%2$s</font><br>stopped at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br>%6$s<br><br>Refundable channel balance will be transferred to your Bitcoin wallet<br><br>%7$s]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br>started at <font color=#999999>%2$s</font><br>stopped at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br>%6$s<br><br>Refundable channel balance has been transferred to your Bitcoin wallet<br><br>%7$s]]></string>
+    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>started at <font color=#999999>%2$s</font><br>stopped at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s<br><br>Refundable channel balance will be transferred to your Bitcoin wallet<br><br>%6$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br>started at <font color=#999999>%2$s</font><br>total capacity %3$s<br>refundable %4$s<br>%5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>total capacity %2$s<br><font color=#999999>%3$s</font>%3$s]]></string>
 
@@ -208,6 +206,9 @@
     <string name="ln_ops_chan_unilateral_status_dead"><![CDATA[%1$s<br>= %2$s cancelled]]></string>
     <string name="ln_ops_chan_unilateral_status_done"><![CDATA[%1$s<br>= %2$s received]]></string>
     <string name="ln_ops_chan_unilateral_status_left"><![CDATA[%2$s<br>= %3$s %1$s]]></string>
+
+    <string name="ln_ops_type_alive">alive %1$s</string>
+    <string name="ln_ops_type_all">all %1$s</string>
 
     <array name="ln_status_left_blocks">
         <item><![CDATA[in progress&#8230;]]></item>

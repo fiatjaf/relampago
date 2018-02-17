@@ -574,7 +574,7 @@ object Channel {
     val currentCommitFee = cs.localCommit.commitTx -- cs.localCommit.commitTx
     val currentTotalFee = cs.remoteParams.channelReserveSatoshis + currentCommitFee.amount
     // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
-    // Sending limit consistes of unspendable channel reserve + current commit tx fee
+    // Sending limit consists of unspendable channel reserve + current commit tx fee
     cs.localCommit.spec.toLocalMsat - currentTotalFee * 1000L
   } getOrElse 0L
 

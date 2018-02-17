@@ -21,7 +21,6 @@
             android:textSize="18sp"
             android:id="@+id/typeUSD"
             android:layout_width="55dp"
-            android:layout_height="wrap_content"
             style="@style/RadioButton"/>
 
         <RadioButton
@@ -29,7 +28,6 @@
             android:textSize="18sp"
             android:id="@+id/typeEUR"
             android:layout_width="55dp"
-            android:layout_height="wrap_content"
             style="@style/RadioButton"/>
 
         <RadioButton
@@ -37,15 +35,12 @@
             android:textSize="18sp"
             android:id="@+id/typeJPY"
             android:layout_width="55dp"
-            android:layout_height="wrap_content"
             style="@style/RadioButton"/>
 
         <RadioButton
             android:text="CNY"
             android:textSize="18sp"
             android:id="@+id/typeCNY"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
             style="@style/RadioButton"/>
 
     </info.hoang8f.android.segmented.SegmentedGroup>

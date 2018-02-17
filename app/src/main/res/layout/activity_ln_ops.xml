@@ -21,4 +21,23 @@
         android:src="@drawable/ic_arrow_back_white_24dp"
         android:background="?android:selectableItemBackground"/>
 
+    <info.hoang8f.android.segmented.SegmentedGroup
+        android:layout_gravity="top|center_horizontal"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="25dp"
+        android:id="@+id/viewFilter">
+
+        <RadioButton
+            android:textSize="18sp"
+            android:id="@+id/typeAlive"
+            style="@style/RadioButton"/>
+
+        <RadioButton
+            android:textSize="18sp"
+            android:id="@+id/typeAll"
+            style="@style/RadioButton"/>
+
+    </info.hoang8f.android.segmented.SegmentedGroup>
 </FrameLayout>

@@ -5,15 +5,17 @@ import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
+import android.widget.RadioGroup.OnCheckedChangeListener
 import com.lightning.wallet.Denomination.sat2msatFactor
+import info.hoang8f.android.segmented.SegmentedGroup
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import me.relex.circleindicator.CircleIndicator
-import android.widget.Button
 import android.os.Bundle
 import java.util.Date
 
 import com.lightning.wallet.Utils.{app, coloredIn, coloredOut, denom, humanNode}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
+import android.widget.{Button, RadioButton, RadioGroup}
 import android.view.{LayoutInflater, View, ViewGroup}
 import com.lightning.wallet.ln.Tools.{none, wrap}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
@@ -22,11 +24,15 @@ import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 class LNOpsActivity extends TimerActivity { me =>
   lazy val chanPager = findViewById(R.id.chanPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
+  lazy val viewFilter = findViewById(R.id.viewFilter).asInstanceOf[SegmentedGroup]
+  lazy val typeAlive = findViewById(R.id.typeAlive).asInstanceOf[RadioButton]
+  lazy val typeAll = findViewById(R.id.typeAll).asInstanceOf[RadioButton]
+  var cachedDisplayedChannels = Vector.empty[Channel]
 
-  lazy val slidingFragmentAdapter =
+  val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
       def getItem(itemPosition: Int) = bundledFrag(itemPosition)
-      def getCount = app.ChannelManager.all.size
+      def getCount = cachedDisplayedChannels.size
     }
 
   def bundledFrag(pos: Int) = {
@@ -36,11 +42,29 @@ class LNOpsActivity extends TimerActivity { me =>
     frag setArguments arguments
     frag
   }
-  
-  def INIT(s: Bundle) = if (app.isAlive) {
-    setContentView(R.layout.activity_ln_ops)
+
+  def updateCountView = {
+    typeAlive setText getString(ln_ops_type_alive).format(app.ChannelManager.notClosing.size)
+    typeAll setText getString(ln_ops_type_all).format(app.ChannelManager.all.size)
+  }
+
+  def reloadCacheAndView = {
+    val aliveOnly = viewFilter.getCheckedRadioButtonId == R.id.typeAlive
+    if (aliveOnly) cachedDisplayedChannels = app.ChannelManager.notClosing
+    else cachedDisplayedChannels = app.ChannelManager.all map identity
     chanPager setAdapter slidingFragmentAdapter
     chanPagerIndicator setViewPager chanPager
+    updateCountView
+  }
+
+  def INIT(s: Bundle) = if (app.isAlive) {
+    setContentView(R.layout.activity_ln_ops)
+    viewFilter setOnCheckedChangeListener new OnCheckedChangeListener {
+      def onCheckedChanged(radioGroup: RadioGroup, int: Int) = reloadCacheAndView
+    }
+
+    viewFilter check R.id.typeAlive
+    // Set listener and check alive chans
   } else me exitTo classOf[MainActivity]
 }
 
@@ -75,7 +99,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
   override def onViewCreated(view: View, state: Bundle) = {
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
     val lnOpsDescription = Utils clickableTextField view.findViewById(R.id.lnOpsDescription)
-    val chan = app.ChannelManager.all(getArguments getInt "position")
+    val chan = host.cachedDisplayedChannels(getArguments getInt "position")
     val started = me time new Date(chan(_.startedAt).get)
     val capacity = chan(_.commitInput.txOut.amount).get
     val alias = chan.data.announce.alias take 64
@@ -136,9 +160,10 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageClosing(data: ClosingData) = UITask {
       // Show the best current closing with most confirmations
       // since multiple different closings may be present at once
-      val refundable = Satoshi(myBalanceMsat(chan) / sat2msatFactor)
       val closed = me time new Date(data.closedAt)
       lnOpsAction setVisibility View.GONE
+      // If not closing becomes closing
+      UITask(host.updateCountView).run
 
       val best = data.closings maxBy {
         case Left(mutualTx) => txStatus(mutualTx.txid) match { case cfs \ _ => cfs }
@@ -149,6 +174,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         case Left(mutualTx) =>
           val status = humanStatus apply txStatus(mutualTx.txid)
           val myFee = coloredOut(capacity - mutualTx.allOutputsAmount)
+          val refundable = Satoshi(myBalanceMsat(chan) / sat2msatFactor)
           val mutualView = commitStatus.format(mutualTx.txid.toString, status, myFee)
           lnOpsDescription setText bilateralClosing.format(chan.state, started, closed,
             coloredIn(capacity), coloredIn(refundable), alias, mutualView).html
@@ -177,9 +203,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
           val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
           val refundsView = if (tier12View.isEmpty) new String else refundStatus + tier12View
-
           lnOpsDescription setText unilateralClosing.format(chan.state, started, closed,
-            coloredIn(capacity), coloredIn(refundable), alias, commitView + refundsView).html
+            coloredIn(capacity), alias, commitView + refundsView).html
       }
     }
 
