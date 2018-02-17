@@ -2,13 +2,12 @@ package com.lightning.wallet
 
 import com.lightning.wallet.ln._
 import com.lightning.wallet.R.string._
+import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
 import com.lightning.wallet.Denomination.sat2msatFactor
 import com.lightning.wallet.ln.LNParams.DepthAndDead
-import com.lightning.wallet.ln.Channel.isOperational
 import me.relex.circleindicator.CircleIndicator
-import com.lightning.wallet.ln.Channel
 import android.widget.Button
 import android.os.Bundle
 import java.util.Date
@@ -107,10 +106,10 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
     def manageOpen = UITask {
       val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
-      val canReceive = MilliSatoshi(Channel estimateCanReceive chan)
-      val canSpend = MilliSatoshi(Channel estimateTotalCanSend chan)
+      val canReceive = MilliSatoshi apply estimateCanReceive(chan)
+      val canSpend = MilliSatoshi apply estimateTotalCanSend(chan)
 
-      val inFlight = app.plurOrZero(inFlightPayments, Channel.inFlightOutgoingHtlcs(chan).size)
+      val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
       val canSpendHuman = if (canSpend.amount < 0L) coloredOut(canSpend) else coloredIn(canSpend)
       val canReceiveHuman = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
       lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, started, coloredIn(capacity),
@@ -123,8 +122,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageNegotiations = UITask {
-      val refundable = Satoshi(Channel.myBalanceMsat(chan) / sat2msatFactor)
-      val inFlight = app.plurOrZero(inFlightPayments, Channel.inFlightOutgoingHtlcs(chan).size)
+      val refundable = Satoshi(myBalanceMsat(chan) / sat2msatFactor)
+      val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
       lnOpsDescription setText negotiations.format(chan.state, started, coloredIn(capacity),
         coloredIn(refundable), alias, inFlight).html
 
@@ -135,24 +134,24 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageClosing(data: ClosingData) = UITask {
-      // Show the best closing with most confirmations
-      // since multiple different closings may be present
+      // Show the best current closing with most confirmations
+      // since multiple different closings may be present at once
+      val refundable = Satoshi(myBalanceMsat(chan) / sat2msatFactor)
+      val closed = me time new Date(data.closedAt)
+      lnOpsAction setVisibility View.GONE
 
-      data.closings maxBy {
+      val best = data.closings maxBy {
         case Left(mutualTx) => txStatus(mutualTx.txid) match { case cfs \ _ => cfs }
         case Right(info) => txStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
-      } match {
+      }
 
+      best match {
         case Left(mutualTx) =>
           val status = humanStatus apply txStatus(mutualTx.txid)
           val myFee = coloredOut(capacity - mutualTx.allOutputsAmount)
-          val refundable = Satoshi(Channel.myBalanceMsat(chan) / sat2msatFactor)
           val mutualView = commitStatus.format(mutualTx.txid.toString, status, myFee)
-
-          lnOpsAction setVisibility View.GONE
-          lnOpsDescription setText bilateralClosing.format(chan.state,
-            started, me time new Date(data.closedAt), coloredIn(capacity),
-            coloredIn(refundable), alias, mutualView).html
+          lnOpsDescription setText bilateralClosing.format(chan.state, started, closed,
+            coloredIn(capacity), coloredIn(refundable), alias, mutualView).html
 
         case Right(info) =>
           val tier12View = info.getState collect {
@@ -172,18 +171,15 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
             case ShowDelayed(_ \ false \ left, _, fee, amt) =>
               val leftDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
               statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
-          } take 3 mkString "<br><br>"
+          } take 2 mkString "<br><br>"
 
           val status = humanStatus apply txStatus(info.commitTx.txid)
           val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
-          val refundable = Satoshi(Channel.myBalanceMsat(chan) / sat2msatFactor)
           val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
           val refundsView = if (tier12View.isEmpty) new String else refundStatus + tier12View
 
-          lnOpsAction setVisibility View.GONE
-          lnOpsDescription setText unilateralClosing.format(chan.state,
-            started, me time new Date(data.closedAt), coloredIn(capacity),
-            coloredIn(refundable), alias, commitView + refundsView).html
+          lnOpsDescription setText unilateralClosing.format(chan.state, started, closed,
+            coloredIn(capacity), coloredIn(refundable), alias, commitView + refundsView).html
       }
     }
 
@@ -191,12 +187,11 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       // Updates UI accordingly to current chan state
 
       override def onBecome = {
-        case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
+        case (_, waitFunding: WaitFundingDoneData, _, _) => manageFunding(waitFunding).run
+        case (_, close: ClosingData, _, _) if close.closings.nonEmpty => manageClosing(close).run
         case (_, _: NormalData, _, _) if isOperational(chan) => manageOpen.run
-        case (_, _: NormalData, _, _) => manageNegotiations.run
-
         case (_, _: NegotiationsData, _, _) => manageNegotiations.run
-        case (_, c: ClosingData, _, _) if c.closings.nonEmpty => manageClosing(c).run
+        case (_, _: NormalData, _, _) => manageNegotiations.run
         case anythingElse => manageOther.run
       }
 

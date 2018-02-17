@@ -28,7 +28,6 @@ object StorageTable extends Table {
 object ChannelTable extends Table {
   val (table, identifier, data) = ("channel", "identifier", "data")
   val updSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
-  // Order is important! New channels should always appear on top
   val selectAllSql = s"SELECT * FROM $table ORDER BY $id DESC"
   val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
@@ -45,27 +44,32 @@ object ChannelTable extends Table {
 }
 
 object PaymentTable extends Table {
-  import com.lightning.wallet.ln.PaymentInfo.{HIDDEN, WAITING, SUCCESS, FAILURE}
+  import com.lightning.wallet.ln.PaymentInfo.{HIDDEN, SUCCESS, FAILURE, WAITING}
   val Tuple11(table, hash, preimage, incoming, msat, status, stamp, text, pr, rd, search) =
     ("payment", "hash", "preimage", "incoming", "msat", "status", "stamp", "text", "pr", "rd", "search")
 
-  // Inserting new records for data and fast search
+  // Inserting
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
   val insert9 = s"$hash, $preimage, $incoming, $msat, $status, $stamp, $text, $pr, $rd"
   val newSql = s"INSERT OR IGNORE INTO $table ($insert9) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
+  // Selecting
   val limit = 24
-  val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT DISTINCT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
-  val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
+  val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
+  val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT DISTINCT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
 
-  // Updating various parts of data
+  // Updating
   val updRoutingSql = s"UPDATE $table SET $rd = ? WHERE $hash = ?"
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
   val updFailAllWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $msat = ?, $stamp = ? WHERE $hash = ?"
-  val createVSql = s"CREATE VIRTUAL TABLE $fts$table USING $fts($search, $hash)"
+
+  // Creating
+  val createVSql = s"""
+    CREATE VIRTUAL TABLE $fts$table
+    USING $fts($search, $hash)"""
 
   val createSql = s"""
     CREATE TABLE $table(

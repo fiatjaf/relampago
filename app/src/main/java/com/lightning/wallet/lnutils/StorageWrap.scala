@@ -82,11 +82,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       firstMsat = rc long PaymentTable.msat, status = rc int PaymentTable.status,
       stamp = rc long PaymentTable.stamp, text = rc string PaymentTable.text)
 
-  def markNotInFlightFailed = db txWrap {
+  def markFailedAndFrozen = db txWrap {
     db change PaymentTable.updFailAllWaitingSql
-    // Mark all WAITING payments as FAILURE and immediately restore those in flight
-    val inFlight = app.ChannelManager.notClosing.flatMap(inFlightOutgoingHtlcs)
-    for (htlc <- inFlight) updateStatus(WAITING, htlc.add.paymentHash)
+    for (hash <- app.ChannelManager.activeInFlightHashes) updateStatus(WAITING, hash)
+    for (hash <- app.ChannelManager.frozenInFlightHashes) updateStatus(FROZEN, hash)
   }
 
   def stop(rpi: RuntimePaymentInfo) = {
@@ -165,7 +164,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def onBecome = {
     case (_, _, OFFLINE | OPEN | NEGOTIATIONS, CLOSING) =>
       // WAITING will either be redeemed or refunded later
-      markNotInFlightFailed
+      markFailedAndFrozen
       uiNotify
 
     case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>

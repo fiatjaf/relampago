@@ -59,11 +59,11 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
       // Info is None AND we are free AND few tokens left AND acts is empty AND have a non-depleted channel
       if isFree && clearTokens.size < 5 && acts.isEmpty && app.ChannelManager.canSend(maxPrice).nonEmpty =>
       // This will intercept the next case only if we have no cloud acts left which is desirable
-      me getSided retry(getFreshData, pickInc, 4 to 5) foreach { case rpi \ prm =>
+      me getSided retry(getFreshData, pickInc, 4 to 5) foreach { case rpi \ info =>
         // If requested sum is low enough and tokens quantity is high enough
         // and info has not already been set by another request
         app.ChannelManager.send(rpi, none)
-        me updRequestData Some(prm)
+        me BECOME data.copy(info = info)
       }
 
     // Execute if we are free and have available tokens and actions, don't care amout memo here
@@ -81,13 +81,10 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
       }
 
     // We do not have any acts or tokens but have a memo
-    // which means a payment is in progress so check it's status
     case CloudData(Some(pr \ memo), _, _, _) \ CMDStart if isFree =>
-      val inFlight = app.ChannelManager.notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs)
-      val tokenRequestInFlight = inFlight.exists(_.add.paymentHash == pr.paymentHash)
-
-      if (!tokenRequestInFlight) {
-        // Payment is not in progress anymore so it's either failed or fulfilled
+      // Our payment may still be in-flight or ir may be fulfilled or failed already
+      val isInFlight = app.ChannelManager.activeInFlightHashes contains pr.paymentHash
+      if (isInFlight) Tools log "LNCloud payment is still in-flight, doing nothing" else {
         val send = me getSided connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
         val send1 = send.map(memo.makeClearSigs).map(memo.packEverything).doOnCompleted(me doProcess CMDStart)
         send1.foreach(fresh => me BECOME data.copy(info = None, tokens = data.tokens ++ fresh), onError)
@@ -99,14 +96,14 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
           val send = me getSided retry(withRoutesAndOnionRPIFromPR(pr), pickInc, 4 to 5)
           send.foreach(app.ChannelManager.sendEither(_, none), none)
 
-        // A special case where server can't find
-        // our tokens at all so we just start over
-        case "notfound" => me updRequestData None
+        // A special case where server can't find our tokens
+        case "notfound" => me BECOME data.copy(info = None)
         case other => Tools log other
       }
 
     case (_, act: CloudAct) =>
       // Record new action and try to send it
+      // recording happens irregardless of state
       me BECOME data.copy(acts = data.acts + act)
       me doProcess CMDStart
 
@@ -115,21 +112,18 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
 
   // ADDING NEW TOKENS
 
-  val updRequestData: Option[RequestAndMemo] => Unit = oram => me BECOME data.copy(info = oram)
-  // Send CMDStart only in case if call was successful as we may enter an infinite loop otherwise
-  // We only start over if server can't actually find our tokens, otherwise just wait for next try
-
-
   def getFreshData = for {
-    prm @ (pr, memo) <- getPaymentRequestAndBlindMemo
+    prAndMemo @ (pr, memo) <- getPaymentRequestAndBlindMemo
     if pr.unsafeMsat < maxPrice && memo.clears.size > 20
     Right(rpi) <- withRoutesAndOnionRPIFromPR(pr)
+    info = Some(prAndMemo)
     if data.info.isEmpty
-  } yield rpi -> prm
+  } yield rpi -> info
 
   def withRoutesAndOnionRPIFromPR(pr: PaymentRequest) = {
     val emptyRPI = RuntimePaymentInfo(emptyRD, pr, pr.unsafeMsat)
-    app.ChannelManager withRoutesAndOnionRPI emptyRPI
+    // These payments will always be dust so frozen is not an issue
+    app.ChannelManager withRoutesAndOnionRPIFrozenAllowed emptyRPI
   }
 
   // TALKING TO SERVER
@@ -164,6 +158,7 @@ class PrivateCloud extends Cloud { me =>
 
     case (_, act: CloudAct) =>
       // Record new action and try to send it
+      // recording happens irregardless of state
       me BECOME data.copy(acts = data.acts + act)
       me doProcess CMDStart
 

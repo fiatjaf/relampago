@@ -146,7 +146,7 @@
     <string name="err_ln_no_route">Failed because no route to recipient could be found.</string>
     <string name="err_ln_fulfilled">Failed because this payment is already fulfilled.</string>
     <string name="err_ln_in_flight">Failed because this payment is already in-flight.</string>
-    <string name="err_ln_frozen">Failed because this payment is frozen.</string>
+    <string name="err_ln_frozen">Can not retry this payment because it is frozen.</string>
 
     <string name="err_ln_6_confs">Can\'t ask for payments yet because a funding Bitcoin transaction has not got 6 confirmations yet.</string>
     <string name="err_ln_reserve">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving.</string>

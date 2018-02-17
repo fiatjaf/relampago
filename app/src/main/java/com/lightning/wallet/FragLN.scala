@@ -158,7 +158,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   def ifOperational(next: Vector[Channel] => Unit) = {
-    val operational = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
+    val operational = app.ChannelManager.notClosingOrRefunding filter isOperational
     if (operational.isEmpty) app toast ln_status_none else next(operational)
   }
 

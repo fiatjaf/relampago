@@ -116,10 +116,15 @@ class WalletApp extends Application { me =>
     val operationalListeners = Set(broadcaster, bag, StorageWrap)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
+
     def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
     def canSend(msat: Long) = for (c <- all if c.state == Channel.OPEN && isOperational(c) && estimateCanSend(c) > msat) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
+
+    def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)
+    def frozenInFlightHashes = all.diff(notClosingOrRefunding).flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)
+    def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
     val chainEventsListener = new TxTracker with BlocksListener {
       override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
@@ -157,7 +162,6 @@ class WalletApp extends Application { me =>
       }
     }
 
-    def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
     def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel {
       def STORE(hasCommitmentsData: HasCommitments) = runAnd(hasCommitmentsData)(ChannelWrap put hasCommitmentsData)
       def SEND(msg: LightningMessage) = ConnectionManager.connections.get(data.announce).foreach(_.handler process msg)
@@ -191,15 +195,18 @@ class WalletApp extends Application { me =>
     }
 
     def withRoutesAndOnionRPI(rpi: RuntimePaymentInfo) = {
-      val paymentOpt = bag.getPaymentInfo(rpi.pr.paymentHash).toOption
-      val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
-      val inFlightOutgoing = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs)
-      val inFlight = inFlightOutgoing.exists(_.add.paymentHash == rpi.pr.paymentHash)
-      val isFulfilled = paymentOpt.exists(_.actualStatus == SUCCESS)
-      val isFrozen = paymentOpt.exists(_.actualStatus == FROZEN)
-
+      val isFrozen = frozenInFlightHashes.contains(rpi.pr.paymentHash)
       if (isFrozen) Obs error new LightningException(me getString err_ln_frozen)
-      else if (inFlight) Obs error new LightningException(me getString err_ln_in_flight)
+      else withRoutesAndOnionRPIFrozenAllowed(rpi)
+    }
+
+    def withRoutesAndOnionRPIFrozenAllowed(rpi: RuntimePaymentInfo) = {
+      val paymentOption = bag.getPaymentInfo(rpi.pr.paymentHash).toOption
+      val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
+      val isInFlight = activeInFlightHashes.contains(rpi.pr.paymentHash)
+      val isFulfilled = paymentOption.exists(_.actualStatus == SUCCESS)
+
+      if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
       else if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
       else if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
       else if (sources contains rpi.pr.nodeId) Obs just useRoute(Vector.empty, Vector.empty, rpi)
@@ -207,7 +214,7 @@ class WalletApp extends Application { me =>
     }
 
     def send(rpi: RuntimePaymentInfo, noRouteLeft: RuntimePaymentInfo => Unit): Unit = {
-      // Find a local channel which has enough funds, is also online and belongs to a correct node
+      // Find a local channel which has enough funds, is online and belongs to a correct node
       val target = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
       val chanOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == target)
 
@@ -262,7 +269,7 @@ class WalletApp extends Application { me =>
       // Mark all abandoned payments as failed right away
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
-      PaymentInfoWrap.markNotInFlightFailed
+      PaymentInfoWrap.markFailedAndFrozen
       ChannelManager.initConnect
       RatesSaver.initialize
     }

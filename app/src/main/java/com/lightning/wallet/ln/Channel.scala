@@ -272,9 +272,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm @ NormalData(_, _, None, their), CMDProceed, OPEN)
-        // GUARD: got their shutdown while having no in-flight HTLCs
         if inFlightOutgoingHtlcs(me).isEmpty && their.isDefined =>
-
+        // GUARD: got their shutdown with no in-flight HTLCs
         me startShutdown norm
         doProcess(CMDProceed)
 
@@ -558,8 +557,9 @@ object Channel {
   def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
 
   def inFlightOutgoingHtlcs(chan: Channel) = chan.data match {
-    case norm: NormalData => Commitments.latestRemoteCommit(norm.commitments).spec.htlcs
-    case neg: NegotiationsData => Commitments.latestRemoteCommit(neg.commitments).spec.htlcs
+    // Channels should always be filtered by some criteria before calling this method
+    // like find all current in-flight HTLC from alive chans or all frozen from closing chans
+    case some: HasCommitments => Commitments.latestRemoteCommit(some.commitments).spec.htlcs
     case _ => Set.empty[Htlc]
   }
 
@@ -574,6 +574,7 @@ object Channel {
     val currentCommitFee = cs.localCommit.commitTx -- cs.localCommit.commitTx
     val currentTotalFee = cs.remoteParams.channelReserveSatoshis + currentCommitFee.amount
     // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
+    // Sending limit consistes of unspendable channel reserve + current commit tx fee
     cs.localCommit.spec.toLocalMsat - currentTotalFee * 1000L
   } getOrElse 0L
 
