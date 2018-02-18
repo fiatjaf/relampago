@@ -5,12 +5,12 @@
     <Button
         style="@style/TransButton"
         android:id="@+id/paymentHash"
-        android:text="@string/ln_copy_hash"/>
+        android:text="@string/ln_share_hash"/>
 
     <Button
         style="@style/TransButton"
         android:id="@+id/paymentProof"
-        android:text="@string/ln_copy_proof"
+        android:text="@string/ln_share_proof"
         android:visibility="gone"/>
 
     <View style="@style/GrayDivider"/>

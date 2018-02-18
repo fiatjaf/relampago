@@ -49,15 +49,16 @@ case class CloudData(info: Option[RequestAndMemo], tokens: Set[ClearToken], acts
 case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
 
 class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
+  def capableChanExists = app.ChannelManager.canSend(max).nonEmpty
   val connector = new Connector("http://10.0.2.2:9002")
-  val maxPrice = 20000000L
+  val max = 20000000L
 
   // STATE MACHINE
 
   def doProcess(some: Any) = (data, some) match {
-    case CloudData(None, clearTokens, acts, _) \ CMDStart
-      // Info is None AND we are free AND few tokens left AND acts is empty AND have a non-depleted channel
-      if isFree && clearTokens.size < 5 && acts.isEmpty && app.ChannelManager.canSend(maxPrice).nonEmpty =>
+    case CloudData(None, tokens, acts, _) \ CMDStart
+      // We are free AND (no tokens left OR few tokens left AND no acts left) AND channel exists
+      if isFree && (tokens.isEmpty || acts.isEmpty && tokens.size < 5) && capableChanExists =>
       // This will intercept the next case only if we have no acts left which is desirable
       me getSided retry(getFreshData, pickInc, 4 to 5) foreach { case rpi \ info =>
         // If requested sum is low enough and tokens quantity is high enough
@@ -91,8 +92,8 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
       }
 
       def onError(err: Throwable) = err.getMessage match {
-        case "notfulfilled" if pr.isFresh && app.ChannelManager.canSend(maxPrice).nonEmpty =>
-          // Retry an existing payment request instead of getting a new one until it expires
+        case "notfulfilled" if pr.isFresh && capableChanExists =>
+          // Retry an existing request instead of getting a new one until it expires
           val send = me getSided retry(withRoutesAndOnionRPIFromPR(pr), pickInc, 4 to 5)
           send.foreach(foeRPI => app.ChannelManager.sendEither(foeRPI, none), none)
 
@@ -113,8 +114,8 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
   // ADDING NEW TOKENS
 
   def getFreshData = for {
-    prAndMemo @ (pr, memo) <- getPaymentRequestAndBlindMemo
-    if pr.unsafeMsat < maxPrice && memo.clears.size > 20
+    prAndMemo @ (pr, memo) <- getPaymentRequestBlindMemo
+    if pr.unsafeMsat < max && memo.clears.size > 20
     Right(rpi) <- withRoutesAndOnionRPIFromPR(pr)
     info = Some(prAndMemo)
     if data.info.isEmpty
@@ -128,7 +129,7 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
 
   // TALKING TO SERVER
 
-  def getPaymentRequestAndBlindMemo: Obs[RequestAndMemo] =
+  def getPaymentRequestBlindMemo: Obs[RequestAndMemo] =
     connector.ask[TokensInfo]("blindtokens/info") flatMap {
       case (signerMasterPubKey, signerSessionPubKey, quantity) =>
         val pubKeyQ = ECKey.fromPublicOnly(HEX decode signerMasterPubKey)

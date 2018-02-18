@@ -130,7 +130,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   def updTitleSubtitleAbdButtons = {
     val activeChannels = app.ChannelManager.notClosingOrRefunding
     val onlineChannels = activeChannels.count(_.state != Channel.OFFLINE)
-    val openingChannelsExist = activeChannels exists isOpening
+    val openingChannelExist = activeChannels exists isOpening
     val funds = activeChannels.map(myBalanceMsat).sum
     val total = activeChannels.size
 
@@ -145,8 +145,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       else denom withSign MilliSatoshi(funds)
 
     val updateWarningAndTitle = UITask {
-      lnDivider setVisibility viewMap(openingChannelsExist || total == 0)
-      lnChanDetails setVisibility viewMap(openingChannelsExist)
+      lnDivider setVisibility viewMap(total == 0 || openingChannelExist)
+      lnChanDetails setVisibility viewMap(openingChannelExist)
       lnAddChannel setVisibility viewMap(total == 0)
       me setTitle title
     }
@@ -211,8 +211,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     }
 
   def makePaymentRequest = ifOperational { operational =>
-    val goodChannels \ extraHops = operational.flatMap(StorageWrap.getUpd).unzip
-    if (extraHops.isEmpty) mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
+    val goodChannels \ extraRoutes = operational.flatMap(StorageWrap.getUpd).unzip
+    if (extraRoutes.isEmpty) mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
     else withUpdates(goodChannels.map(estimateCanReceive).max)
 
     def withUpdates(maxReceive: Long) = {
@@ -232,7 +232,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       def makeRequest(requestedSum: MilliSatoshi, preimage: BinaryData) = {
         val rpi = RuntimePaymentInfo(emptyRD, PaymentRequest(chainHash, Some(requestedSum),
           Crypto sha256 preimage, nodePrivateKey, inputDescription.getText.toString.trim,
-          None, extraHops), requestedSum.amount)
+          None, extraRoutes), requestedSum.amount)
 
         db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.paymentHashString)
         db.change(PaymentTable.newSql, rpi.paymentHashString, preimage, 1, rpi.firstMsat,
@@ -306,14 +306,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     val info = adapter getItem pos
     val rpi = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
     val humanStatus = s"<strong>${paymentStatesMap apply info.actualStatus}</strong>"
-    paymentHash setOnClickListener onButtonTap(app setBuffer info.pr.hash.toString)
+    paymentHash setOnClickListener onButtonTap(host share rpi.paymentHashString)
 
     if (info.actualStatus == SUCCESS) {
       paymentHash setVisibility View.GONE
       paymentProof setVisibility View.VISIBLE
       paymentProof setOnClickListener onButtonTap {
-        app setBuffer getString(ln_proof).format(write(info.pr),
-          info.pr.hash.toString, info.preimage.toString)
+        host share getString(ln_proof).format(write(info.pr),
+          rpi.paymentHashString, info.preimage.toString)
       }
     }
 
