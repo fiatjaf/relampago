@@ -54,11 +54,15 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   import host.{getResources, getString, onFail, UITask, getSupportLoaderManager, str2View, timer, getLayoutInflater, onTap}
   import host.{rm, <, onButtonTap, onFastTap, mkForm, negBld, negPosBld, mkChoiceDialog}
 
-  val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
-  val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-  val viewOpeningDetails = frag.findViewById(R.id.viewOpeningDetails)
+  val lnChanDetails = frag.findViewById(R.id.lnChanDetails)
+  val lnAddChannel = frag.findViewById(R.id.lnAddChannel)
+  val lnDivider = frag.findViewById(R.id.lnDivider)
+
+  val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
+  val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
+  val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
   val imageMap = Array(await, await, conf1, dead, frozen)
   val lnChanWarn = frag.findViewById(R.id.lnChanWarn)
 
@@ -101,7 +105,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
     override def onBecome = {
       // Updates local UI on every state change
-      case _ => updTitleSubtitleViewOpening
+      case _ => updTitleSubtitleAbdButtons
     }
   }
 
@@ -114,7 +118,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     app.kit.wallet addCoinsSentEventListener subtitleListener
     app.kit.wallet addCoinsReceivedEventListener subtitleListener
     for (chan <- app.ChannelManager.all) chan.listeners += chanListener
-    wrap(host.checkTransData)(updTitleSubtitleViewOpening)
+    wrap(host.checkTransData)(updTitleSubtitleAbdButtons)
   }
 
   def onFragmentDestroy = {
@@ -123,12 +127,12 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     for (chan <- app.ChannelManager.all) chan.listeners -= chanListener
   }
 
-  def updTitleSubtitleViewOpening = {
-    val totalChannels = app.ChannelManager.notClosingOrRefunding
-    val onlineChannels = totalChannels.count(_.state != Channel.OFFLINE)
-    val hasOpeningChannels = totalChannels exists isOpening
-    val funds = totalChannels.map(myBalanceMsat).sum
-    val total = totalChannels.size
+  def updTitleSubtitleAbdButtons = {
+    val activeChannels = app.ChannelManager.notClosingOrRefunding
+    val onlineChannels = activeChannels.count(_.state != Channel.OFFLINE)
+    val openingChannelsExist = activeChannels exists isOpening
+    val funds = activeChannels.map(myBalanceMsat).sum
+    val total = activeChannels.size
 
     val subtitle =
       if (total == 0) getString(ln_status_none)
@@ -136,10 +140,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       else if (onlineChannels == total) getString(ln_status_online)
       else getString(ln_status_mix).format(onlineChannels, onlineChannels)
 
+    val title =
+      if (funds == 0L) getString(ln_wallet)
+      else denom withSign MilliSatoshi(funds)
+
     val updateWarningAndTitle = UITask {
-      val title = if (funds == 0L) getString(ln_wallet) else denom withSign MilliSatoshi(funds)
-      val openingViewMode = if (hasOpeningChannels) View.VISIBLE else View.GONE
-      viewOpeningDetails setVisibility openingViewMode
+      lnDivider setVisibility viewMap(openingChannelsExist || total == 0)
+      lnChanDetails setVisibility viewMap(openingChannelsExist)
+      lnAddChannel setVisibility viewMap(total == 0)
       me setTitle title
     }
 
@@ -196,10 +204,10 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   def doSend(rpi: RuntimePaymentInfo) =
-    host.placeLoader match { case loader =>
+    host.placeLoader match { case indeterminateLoader =>
       val request = app.ChannelManager.withRoutesAndOnionRPI(rpi)
-      val request1 = request.doOnTerminate(host removeLoader loader)
-      request1.foreach(app.ChannelManager.sendEither(_, none), onFail)
+      val request1 = request.doOnTerminate(host removeLoader indeterminateLoader)
+      request1.foreach(foeRPI => app.ChannelManager.sendEither(foeRPI, none), onFail)
     }
 
   def makePaymentRequest = ifOperational { operational =>

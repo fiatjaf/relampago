@@ -331,7 +331,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       denom = denoms(pos)
       app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
       for (btc <- btcOpt) wrap(btc.adapter.notifyDataSetChanged)(btc.updTitle)
-      for (ln <- lnOpt) wrap(ln.adapter.notifyDataSetChanged)(ln.updTitleSubtitleViewOpening)
+      for (ln <- lnOpt) wrap(ln.adapter.notifyDataSetChanged)(ln.updTitleSubtitleAbdButtons)
     }
 
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)

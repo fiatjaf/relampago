@@ -69,6 +69,7 @@
     <string name="action_bitcoin_receive">Receive bitcoin</string>
     <string name="action_bitcoin_send">Send bitcoin</string>
 
+    <string name="action_ln_view">Channel opening in progress\nView details and status</string>
     <string name="action_ln_receive">Receive lightning</string>
     <string name="action_ln_open">Open new channel</string>
     <string name="action_ln_close">Close channel</string>
@@ -172,7 +173,6 @@
 
     <string name="ln_description_hint">add some description</string>
     <string name="ln_send_title"><![CDATA[Send lightning<br><br><small>%1$s</small>]]></string>
-    <string name="ln_opening_view">Channel opening in progress\nView details and status</string>
     <string name="ln_incoming_title"><![CDATA[<font color=#1BA2E0>Incoming payment</font><br>%1$s]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
     <string name="ln_expiry"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#stuck-payments>expiry</a>]]></string>
@@ -206,9 +206,8 @@
     <string name="ln_ops_chan_unilateral_status_dead"><![CDATA[%1$s<br>= %2$s cancelled]]></string>
     <string name="ln_ops_chan_unilateral_status_done"><![CDATA[%1$s<br>= %2$s received]]></string>
     <string name="ln_ops_chan_unilateral_status_left"><![CDATA[%2$s<br>= %3$s %1$s]]></string>
-
-    <string name="ln_ops_type_alive">alive %1$s</string>
-    <string name="ln_ops_type_all">all %1$s</string>
+    <string name="ln_ops_type_alive"><![CDATA[alive <small>%1$s</small>]]></string>
+    <string name="ln_ops_type_all"><![CDATA[all <small>%1$s</small>]]></string>
 
     <array name="ln_status_left_blocks">
         <item><![CDATA[in progress&#8230;]]></item>

@@ -8,19 +8,23 @@
         style="@style/StandardLinearLayout">
         <include layout="@layout/toolbar"/>
 
-        <LinearLayout
-            style="@style/WarnLinearLayout"
-            android:id="@+id/viewOpeningDetails"
-            android:visibility="gone">
+        <Button
+            style="@style/MarginInfo"
+            android:onClick="goAddChannel"
+            android:id="@+id/lnAddChannel"
+            android:layout_width="wrap_content"
+            android:text="@string/action_ln_open"/>
 
-            <Button
-                style="@style/MarginInfo"
-                android:onClick="goChanDetails"
-                android:layout_width="wrap_content"
-                android:text="@string/ln_opening_view"/>
+        <Button
+            style="@style/MarginInfo"
+            android:onClick="goChanDetails"
+            android:id="@+id/lnChanDetails"
+            android:layout_width="wrap_content"
+            android:text="@string/action_ln_view"/>
 
-            <View style="@style/GrayDivider"/>
-        </LinearLayout>
+        <View
+            style="@style/GrayDivider"
+            android:id="@+id/lnDivider"/>
 
         <ListView
             android:layout_weight="1"

@@ -58,7 +58,7 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
     case CloudData(None, clearTokens, acts, _) \ CMDStart
       // Info is None AND we are free AND few tokens left AND acts is empty AND have a non-depleted channel
       if isFree && clearTokens.size < 5 && acts.isEmpty && app.ChannelManager.canSend(maxPrice).nonEmpty =>
-      // This will intercept the next case only if we have no cloud acts left which is desirable
+      // This will intercept the next case only if we have no acts left which is desirable
       me getSided retry(getFreshData, pickInc, 4 to 5) foreach { case rpi \ info =>
         // If requested sum is low enough and tokens quantity is high enough
         // and info has not already been set by another request
@@ -94,7 +94,7 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
         case "notfulfilled" if pr.isFresh && app.ChannelManager.canSend(maxPrice).nonEmpty =>
           // Retry an existing payment request instead of getting a new one until it expires
           val send = me getSided retry(withRoutesAndOnionRPIFromPR(pr), pickInc, 4 to 5)
-          send.foreach(app.ChannelManager.sendEither(_, none), none)
+          send.foreach(foeRPI => app.ChannelManager.sendEither(foeRPI, none), none)
 
         // A special case where server can't find our tokens
         case "notfound" => me BECOME data.copy(info = None)

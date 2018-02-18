@@ -44,8 +44,8 @@ class LNOpsActivity extends TimerActivity { me =>
   }
 
   def updateCountView = {
-    typeAlive setText getString(ln_ops_type_alive).format(app.ChannelManager.notClosing.size)
-    typeAll setText getString(ln_ops_type_all).format(app.ChannelManager.all.size)
+    typeAlive setText getString(ln_ops_type_alive).format(app.ChannelManager.notClosing.size).html
+    typeAll setText getString(ln_ops_type_all).format(app.ChannelManager.all.size).html
   }
 
   def reloadCacheAndView = {
@@ -162,8 +162,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       // since multiple different closings may be present at once
       val closed = me time new Date(data.closedAt)
       lnOpsAction setVisibility View.GONE
-      // If not closing becomes closing
-      UITask(host.updateCountView).run
+      // If alive becomes closing
+      host.updateCountView
 
       val best = data.closings maxBy {
         case Left(mutualTx) => txStatus(mutualTx.txid) match { case cfs \ _ => cfs }

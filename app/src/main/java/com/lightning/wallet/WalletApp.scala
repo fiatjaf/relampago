@@ -5,7 +5,6 @@ import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
 import scala.concurrent.duration._
-import com.softwaremill.quicklens._
 import com.lightning.wallet.lnutils._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Tools._
@@ -184,16 +183,6 @@ class WalletApp extends Application { me =>
       }
     }
 
-    def withRoutesRPI(sources: Set[PublicKey], rpi: RuntimePaymentInfo) = {
-      def findRoutes(payeeNodeId: PublicKey) = cloud.connector.findRoutes(rpi.rd, sources, payeeNodeId)
-      // MUST contain one or more ordered entries, indicating the forward route from a public node to the final destination
-      def augmentAssisted(tag: RoutingInfoTag) = findRoutes(tag.route.head.nodeId).map(rs => for (pub <- rs) yield pub ++ tag.route)
-      // If payment request contains extra routing infos then we ask for assisted routes, otherwise we ask for direct for recipient id
-      val result = if (rpi.pr.routingInfo.isEmpty) findRoutes(rpi.pr.nodeId) else Obs from rpi.pr.routingInfo flatMap augmentAssisted
-      // Update RPI with routes and then we can make an onion out of the first available route while saving the rest
-      for (routes <- result) yield rpi.modify(_.rd.routes) setTo routes
-    }
-
     def withRoutesAndOnionRPI(rpi: RuntimePaymentInfo) = {
       val isFrozen = frozenInFlightHashes.contains(rpi.pr.paymentHash)
       if (isFrozen) Obs error new LightningException(me getString err_ln_frozen)
@@ -201,30 +190,40 @@ class WalletApp extends Application { me =>
     }
 
     def withRoutesAndOnionRPIFrozenAllowed(rpi: RuntimePaymentInfo) = {
-      val paymentOption = bag.getPaymentInfo(rpi.pr.paymentHash).toOption
       val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
+      val paymentRecordOpt = bag.getPaymentInfo(rpi.pr.paymentHash).toOption
+      val isFulfilled = paymentRecordOpt.exists(_.actualStatus == SUCCESS)
       val isInFlight = activeInFlightHashes.contains(rpi.pr.paymentHash)
-      val isFulfilled = paymentOption.exists(_.actualStatus == SUCCESS)
 
       if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
       else if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
       else if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      else if (sources contains rpi.pr.nodeId) Obs just useRoute(Vector.empty, Vector.empty, rpi)
-      else withRoutesRPI(sources, rpi) map useRoutesLeft
+      else completeRPI(sources, rpi)
+    }
+
+    def completeRPI(sources: Set[PublicKey], rpi: RuntimePaymentInfo): Obs[FullOrEmptyRPI] = {
+      def findRemoteRoutes(target: PublicKey) = cloud.connector.findRoutes(rpi.rd, sources, target)
+      def findRoutes(target: PublicKey) = if (sources contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
+      def findAssisted(tag: RoutingInfoTag) = findRoutes(tag.route.head.nodeId).map(rts => for (pub <- rts) yield pub ++ tag.route)
+      // If payment request contains extra routing info then we ask for assisted routes, otherwise we directly ask for recipient id
+      val result = if (rpi.pr.routingInfo.isEmpty) findRoutes(rpi.pr.nodeId) else Obs from rpi.pr.routingInfo flatMap findAssisted
+      // Update RPI with routes and then we can make an onion out of the first available route while saving the rest
+      for (routes <- result) yield useFirstRoute(routes, rpi)
     }
 
     def send(rpi: RuntimePaymentInfo, noRouteLeft: RuntimePaymentInfo => Unit): Unit = {
       // Find a local channel which has enough funds, is online and belongs to a correct node
+      // empty used route means we're sending to our peer and should use it's nodeId as a target
       val target = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
-      val chanOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == target)
+      val channelOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == target)
 
-      chanOpt match {
+      channelOpt match {
         case Some(targetChannel) => targetChannel process rpi
         case None => sendEither(useRoutesLeft(rpi), noRouteLeft)
       }
     }
 
-    def sendEither(foe: FullOrEmptyRPI, noRouteLeft: RuntimePaymentInfo => Unit) = foe match {
+    def sendEither(foeRPI: FullOrEmptyRPI, noRouteLeft: RuntimePaymentInfo => Unit) = foeRPI match {
       case Right(rpiWithValidPaymentRoutePresent) => send(rpiWithValidPaymentRoutePresent, noRouteLeft)
       case Left(rpiWithEmptyPaymentRoute) => noRouteLeft(rpiWithEmptyPaymentRoute)
     }
