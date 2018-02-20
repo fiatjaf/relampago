@@ -1,9 +1,7 @@
 package com.lightning.wallet
 
 import R.string._
-import android.widget.{Button, EditText}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
-
 import com.lightning.wallet.ln.Tools.wrap
 import org.bitcoinj.store.SPVBlockStore
 import com.lightning.wallet.ln.LNParams
@@ -14,12 +12,9 @@ import android.os.Bundle
 
 
 class WalletCreateActivity extends TimerActivity with ViewSwitch { me =>
-  lazy val createWallet = findViewById(R.id.createWallet).asInstanceOf[Button]
-  lazy val createPass = findViewById(R.id.createPass).asInstanceOf[EditText]
-
-  lazy val views =
-    findViewById(R.id.createInfo) ::
-    findViewById(R.id.createProgress) :: Nil
+  lazy val createPass = findViewById(R.id.createPass).asInstanceOf[android.widget.EditText]
+  lazy val createWallet = findViewById(R.id.createWallet).asInstanceOf[android.widget.Button]
+  lazy val views = findViewById(R.id.createInfo) :: findViewById(R.id.createProgress) :: Nil
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_create)

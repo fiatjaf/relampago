@@ -155,7 +155,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   def goRestoreWallet(view: View) = {
     val mnemonicOptions = getResources getStringArray R.array.restore_mnemonic_options
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-    val alert = mkForm(me negBld dialog_cancel, me getString restore_hint, lst)
+    val alert = mkForm(me negBld dialog_cancel, getString(restore_hint), lst)
 
     // Offer user a choice between entering a raw or an encrypted mnemonic code
     lst setOnItemClickListener onTap { case 1 => rm(alert)(exitRestoreWallet) case _ => proceed }

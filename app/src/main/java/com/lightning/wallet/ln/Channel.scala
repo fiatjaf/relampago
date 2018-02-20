@@ -14,7 +14,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, Scalar}
 import com.lightning.wallet.ln.Helpers.{Closing, Funding}
 import com.lightning.wallet.ln.Tools.{none, runAnd}
-import fr.acinq.bitcoin.{ Satoshi, Transaction}
+import fr.acinq.bitcoin.{Satoshi, Transaction}
 
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
@@ -42,26 +42,24 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
   def doProcess(change: Any) = {
     Tuple3(data, change, state) match {
-      case (InitData(announce), cmd @ CMDOpenChannel(localParams, tempId,
-        initialFeeratePerKw, pushMsat, _, fundingSat), WAIT_FOR_INIT) =>
-
-        BECOME(WaitAcceptData(announce, cmd), WAIT_FOR_ACCEPT) SEND OpenChannel(LNParams.chainHash,
-          tempId, fundingSat, pushMsat, LNParams.dustLimit.amount, localParams.maxHtlcValueInFlightMsat,
-          localParams.channelReserveSat, LNParams.minHtlcValue.amount, initialFeeratePerKw, localParams.toSelfDelay,
-          localParams.maxAcceptedHtlcs, localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint,
-          localParams.paymentBasepoint, localParams.delayedPaymentBasepoint, localParams.htlcBasepoint,
-          Generators.perCommitPoint(localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
+      case (InitData(announce), cmd: CMDOpenChannel, WAIT_FOR_INIT) =>
+        BECOME(WaitAcceptData(announce, cmd), WAIT_FOR_ACCEPT) SEND OpenChannel(LNParams.chainHash, cmd.tempChanId,
+          cmd.realFundingAmountSat, cmd.pushMsat, LNParams.dustLimit.amount, cmd.localParams.maxHtlcValueInFlightMsat,
+          cmd.localParams.channelReserveSat, LNParams.minHtlcValue.amount, cmd.initialFeeratePerKw, cmd.localParams.toSelfDelay,
+          cmd.localParams.maxAcceptedHtlcs, cmd.localParams.fundingPrivKey.publicKey, cmd.localParams.revocationBasepoint,
+          cmd.localParams.paymentBasepoint, cmd.localParams.delayedPaymentBasepoint, cmd.localParams.htlcBasepoint,
+          Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
 
 
       case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT)
-        if accept.temporaryChannelId == cmd.temporaryChannelId =>
+        if accept.temporaryChannelId == cmd.tempChanId =>
 
         val acceptChannelValidator = Validator[AcceptChannel]
           .rule(_.minimumDepth <= 6L, "Their minimumDepth is too high")
           .rule(_.htlcMinimumMsat <= 20000L, "Their htlcMinimumMsat too high")
-          .rule(_.toSelfDelay <= cmd.localParams.toSelfDelay * 10, "Their toSelfDelay is too high")
+          .rule(_.toSelfDelay <= cmd.localParams.toSelfDelay * 20, "Their toSelfDelay is too high")
           .rule(_.maxHtlcValueInFlightMsat > UInt64(LNParams.maxHtlcValue.amount / 20), "Their maxHtlcValueInFlightMsat is too low")
-          .rule(_.channelReserveSatoshis.toDouble / cmd.fundingAmountSat < LNParams.maxReserveToFundingRatio, "Their reserve is too high")
+          .rule(_.channelReserveSatoshis.toDouble / cmd.realFundingAmountSat < LNParams.maxReserveToFundingRatio, "Our reserve is too high")
           .rule(_.maxAcceptedHtlcs > 0, "They can accept too few incoming HTLCs")
           .rule(_.dustLimitSatoshis >= 546L, "Their dust limit is too low")
 
@@ -70,19 +68,17 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         else throw new LightningException(result.toFieldErrMapping.map(_._2) mkString "\n")
 
 
-      case (WaitFundingData(announce, cmd, accept), (fundTx: Transaction, outIndex: Int), WAIT_FOR_FUNDING) =>
-        // They have accepted our proposal, now let them sign a first commit so we can safely broadcast a funding
-
-        val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) =
-          Funding.makeFirstFunderCommitTxs(cmd, accept, fundTx.hash,
-            outIndex, accept.firstPerCommitmentPoint)
+      case (WaitFundingData(announce, cmd, accept), CMDFunding(fundTx), WAIT_FOR_FUNDING) =>
+        // They have accepted our proposal, let them sign a first commit so we can broadcast a funding
+        if (fundTx.txOut(cmd.outIndex).amount.amount != cmd.realFundingAmountSat) throw new LightningException
+        val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstFunderCommitTxs(cmd, accept,
+          fundTx.hash, fundingTxOutputIndex = cmd.outIndex, remoteFirstPoint = accept.firstPerCommitmentPoint)
 
         val localSigOfRemoteTx = Scripts.sign(remoteCommitTx, cmd.localParams.fundingPrivKey)
-        val fundingCreated = FundingCreated(cmd.temporaryChannelId, fundTx.hash, outIndex, localSigOfRemoteTx)
+        val fundingCreated = FundingCreated(cmd.tempChanId, fundTx.hash, cmd.outIndex, localSigOfRemoteTx)
         val firstRemoteCommit = RemoteCommit(0L, remoteSpec, remoteCommitTx.tx.txid, accept.firstPerCommitmentPoint)
-        BECOME(WaitFundingSignedData(announce, cmd.localParams, Tools.toLongId(fundTx.hash, outIndex), accept, fundTx,
+        BECOME(WaitFundingSignedData(announce, cmd.localParams, Tools.toLongId(fundTx.hash, cmd.outIndex), accept, fundTx,
           localSpec, localCommitTx, firstRemoteCommit), WAIT_FUNDING_SIGNED) SEND fundingCreated
-
 
       // They have signed our first commit, we can broadcast a funding tx
       case (wait: WaitFundingSignedData, remote: FundingSigned, WAIT_FUNDING_SIGNED) =>
@@ -474,7 +470,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // CMDShutdown in WAIT_FUNDING_DONE and OPEN may be handled as a cooperative close
       case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | OFFLINE) => startLocalClose(some)
-      case _ =>
+      case other =>
     }
 
     // Change has been successfully processed

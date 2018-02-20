@@ -51,7 +51,7 @@ object Features {
 
 case class CMDAddExcept(rpi: RuntimePaymentInfo, code: Int) extends CMDException
 case class CMDReserveExcept(rpi: RuntimePaymentInfo, missingSat: Long, reserveSat: Long) extends CMDException
-class LightningException(reason: String = "Generic Lightning exception") extends RuntimeException(reason)
+class LightningException(reason: String = "Something went wrong") extends RuntimeException(reason)
 trait CMDException extends LightningException { val rpi: RuntimePaymentInfo }
 
 // STATE MACHINE

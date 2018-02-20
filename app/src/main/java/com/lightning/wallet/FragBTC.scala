@@ -202,14 +202,14 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     def next(ms: MilliSatoshi) = new TxProcessor {
       val pay = AddrData(ms, spendManager.getAddress)
 
-      override def processTx(pass: String, feePerKb: Coin) = {
-        <(app.kit blockingSend makeTx(pass, feePerKb), onTxFail)(none)
+      def processTx(pass: String, feePerKb: Coin) = {
+        <(app.kit blockingSend unsigned(pass, feePerKb), onTxFail)(none)
         add(host getString btc_announcing, Informer.BTCEVENT).run
       }
 
-      override def onTxFail(txGenerationError: Throwable) =
+      def onTxFail(generationError: Throwable) =
         mkForm(mkChoiceDialog(host delayUI sendBtcPopup.set(Success(ms), pay.address),
-          none, dialog_ok, dialog_cancel), messageWhenMakingTx(txGenerationError), null)
+          none, dialog_ok, dialog_cancel), messageWhenMakingTx(generationError), null)
     }
 
     def sendAttempt = rateManager.result match {

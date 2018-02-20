@@ -221,16 +221,16 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   abstract class TxProcessor {
-    def onTxFail(exc: Throwable): Unit
     def processTx(pass: String, feePerKb: Coin)
+    def onTxFail(exc: Throwable): Unit
     val pay: PayData
 
     def chooseFee: Unit =
       passWrap(getString(step_2).format(pay cute sumOut).html) { pass =>
-        <(makeTx(pass, RatesSaver.rates.feeLive), onTxFail) { estimateTx =>
-          // Get live final fee and set a risky final fee to be 2 times less
+        <(app.kit sign unsigned(pass, RatesSaver.rates.feeLive), onTxFail) { signed =>
+          // Get signed live final fee and set a risky final fee to be two times less
 
-          val livePerTxFee: MilliSatoshi = estimateTx.getFee
+          val livePerTxFee: MilliSatoshi = signed.tx.getFee
           val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
           val markedLivePerTxFee = sumOut format denom.withSign(livePerTxFee)
           val markedRiskyPerTxFee = sumOut format denom.withSign(riskyPerTxFee)
@@ -259,16 +259,16 @@ trait TimerActivity extends AppCompatActivity { me =>
         app toast secret_checking
       }
 
-    def makeTx(pass: String, fee: Coin) = {
+    def unsigned(pass: String, fee: Coin) = {
+      // Create an unsigned transaction request
       val crypter = app.kit.wallet.getKeyCrypter
       val keyParameter = crypter deriveKey pass
       val request = pay.sendRequest
 
       request.feePerKb = fee
       request.aesKey = keyParameter
-      app.kit.wallet completeTx request
-      request.tx.verify
-      request.tx
+      app.kit.wallet assembleTx request
+      request
     }
 
     def messageWhenMakingTx: PartialFunction[Throwable, CharSequence] = {
@@ -345,16 +345,15 @@ class BtcManager(val man: RateManager) { me =>
   }
 }
 
-
 trait PayData {
   def sendRequest: SendRequest
   def destination: String
   def onClick: Unit
   def cn: Coin
 
-  def cute(direction: String): String = coin2MSat(cn) match { case msat =>
-    val top = destination + "<br><br>" + direction.format(denom withSign msat)
-    humanFiat(top, msat)
+  def cute(direction: String) = coin2MSat(cn) match { case msat =>
+    // Used to display the meaning of this output along with human readable value
+    humanFiat(s"$destination<br><br>" + direction.format(denom withSign msat), msat)
   }
 }
 
@@ -364,9 +363,9 @@ case class AddrData(cn: Coin, address: Address) extends PayData {
   def destination = humanAddr(address)
 
   def sendRequest = {
-    val isAll = app.kit.conf1Balance equals cn
-    if (isAll) SendRequest.emptyWallet(address)
-    else SendRequest.to(address, cn)
+    val notEmptying = app.kit.conf1Balance isGreaterThan cn
+    if (notEmptying) SendRequest.to(address, cn)
+    else SendRequest.emptyWallet(address)
   }
 }
 
@@ -376,12 +375,11 @@ case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
   def destination = app getString txs_p2wsh
 
   def sendRequest = {
-    val funding = new Transaction(app.params)
-    funding.addOutput(cn, pay2wsh)
-    SendRequest forTx funding
+    val notEmptying = app.kit.conf1Balance isGreaterThan cn
+    if (notEmptying) SendRequest.to(app.params, pay2wsh, cn)
+    else SendRequest.emptyWallet(app.params, pay2wsh)
   }
 }
-
 
 abstract class TextChangedWatcher extends TextWatcher {
   override def beforeTextChanged(s: CharSequence, x: Int, y: Int, z: Int) = none
@@ -400,7 +398,7 @@ with WalletCoinsReceivedEventListener with TransactionConfidenceEventListener {
   def onCoinsSent(w: Wallet, tx: Transaction, a: Coin, b: Coin) = if (a isGreaterThan b) coinsSent(tx)
   def onCoinsReceived(w: Wallet, tx: Transaction, a: Coin, b: Coin) = if (b isGreaterThan a) coinsReceived(tx)
 
-  def onTransactionConfidenceChanged(wallet: Wallet, tx: Transaction) =
+  def onTransactionConfidenceChanged(w: Wallet, tx: Transaction) =
     if (tx.getConfidence.getDepthInBlocks == minDepth) txConfirmed(tx)
 
   def coinsSent(tx: Transaction): Unit = none

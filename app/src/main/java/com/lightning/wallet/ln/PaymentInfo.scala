@@ -90,7 +90,6 @@ object PaymentInfo {
     // Try to reduce remaining routes and also remember bad nodes and channels
     val parsed = Try apply parseErrorPacket(rpi.rd.onion.sharedSecrets, fail.reason)
     parsed.foreach(packet => Tools log packet.failureMessage.toString)
-    println(parsed)
 
     parsed map {
       case ErrorPacket(nodeKey, _: Node) =>

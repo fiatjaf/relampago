@@ -4,6 +4,7 @@ import R.string._
 import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
+
 import scala.concurrent.duration._
 import com.lightning.wallet.lnutils._
 import com.lightning.wallet.ln.wire._
@@ -15,8 +16,10 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.muddzdev.styleabletoastlibrary.StyleableToast
+
 import collection.JavaConverters.seqAsJavaListConverter
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
@@ -25,6 +28,7 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
 import fr.acinq.bitcoin.BinaryData
 import android.app.Application
+
 import scala.util.Try
 import java.io.File
 
@@ -32,7 +36,7 @@ import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.wallet.Utils.{app, appName}
-import org.bitcoinj.wallet.{Protos, Wallet}
+import org.bitcoinj.wallet.{Protos, SendRequest, Wallet}
 import rx.lang.scala.{Observable => Obs}
 
 
@@ -144,6 +148,7 @@ class WalletApp extends Application { me =>
 
     val socketEventsListener = new ConnectionListener {
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
+        // Channel level Error will fall under ChannelMessage case but node level Error should be sent to all chans
         case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, ann).foreach(_ process err)
         case cm: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains cm.channelId).foreach(_ process cm)
         case cu: ChannelUpdate => fromNode(notClosing, ann).foreach(_ process cu)
@@ -231,14 +236,22 @@ class WalletApp extends Application { me =>
 
   abstract class WalletKit extends AbstractKit {
     type ScriptSeq = Seq[org.bitcoinj.script.Script]
-    def blockingSend(tx: Transaction) = nonBlockingSend(tx).get.toString
-    def nonBlockingSend(tx: Transaction) = peerGroup.broadcastTransaction(tx, 1).broadcast
+    def blockingSend(unsigned: SendRequest): String = blockingSend(sign(unsigned).tx)
+    def blockingSend(transaction: Transaction): String = nonBlockingSend(transaction).get.toString
+    def nonBlockingSend(transaction: Transaction) = peerGroup.broadcastTransaction(transaction, 1).broadcast
     def watchFunding(cs: Commitments) = watchScripts(cs.commitInput.txOut.publicKeyScript :: Nil)
     def watchScripts(scripts: ScriptSeq) = wallet addWatchedScripts scripts.asJava
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE
     def conf1Balance = wallet getBalance BalanceType.AVAILABLE_SPENDABLE
     def currentAddress = wallet currentAddress KeyPurpose.RECEIVE_FUNDS
     def shutDown = none
+
+    def sign(unsigned: SendRequest) = {
+      // Create a tx ready for broadcast
+      wallet finalizeReadyTx unsigned
+      unsigned.tx.verify
+      unsigned
+    }
 
     def useCheckPoints(time: Long) = {
       val pts = getAssets open "checkpoints-testnet.txt"

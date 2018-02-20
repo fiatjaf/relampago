@@ -31,12 +31,12 @@
 
         <RadioButton
             android:textSize="18sp"
-            android:id="@+id/typeAlive"
+            android:id="@+id/typeAll"
             style="@style/RadioButton"/>
 
         <RadioButton
             android:textSize="18sp"
-            android:id="@+id/typeAll"
+            android:id="@+id/typeAlive"
             style="@style/RadioButton"/>
 
     </info.hoang8f.android.segmented.SegmentedGroup>

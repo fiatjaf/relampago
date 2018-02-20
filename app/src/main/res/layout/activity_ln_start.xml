@@ -5,31 +5,7 @@
     <include layout="@layout/toolbar"/>
 
     <ListView
-        android:layout_weight="1"
         android:id="@+id/lnStartNodesList"
         style="@style/GrayDividerListView"/>
 
-    <LinearLayout
-        android:layout_weight="1"
-        android:visibility="gone"
-        style="@style/StandardLinearLayout"
-        android:id="@+id/lnStartDetails">
-
-        <ImageView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/ic_launcher"/>
-
-        <TextView
-            style="@style/MarginInfo"
-            android:id="@+id/lnStartDetailsText"
-            android:layout_width="wrap_content"/>
-
-        <Button
-            style="@style/Info"
-            android:id="@+id/lnCancel"
-            android:layout_width="wrap_content"
-            android:text="@string/dialog_cancel"/>
-
-    </LinearLayout>
 </LinearLayout>

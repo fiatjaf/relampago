@@ -138,7 +138,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       if (total == 0) getString(ln_status_none)
       else if (onlineChannels == 0) getString(ln_status_connecting)
       else if (onlineChannels == total) getString(ln_status_online)
-      else getString(ln_status_mix).format(onlineChannels, onlineChannels)
+      else getString(ln_status_mix).format(onlineChannels, total)
 
     val title =
       if (funds == 0L) getString(ln_wallet)

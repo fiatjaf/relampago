@@ -75,5 +75,8 @@
         <activity android:launchMode="singleTask" android:name="LNStartActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
+        <activity android:launchMode="singleTask" android:name="LNStartFundActivity"
+            android:screenOrientation="portrait" android:theme="@style/NoBar"/>
+
     </application>
 </manifest>
