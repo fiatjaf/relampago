@@ -52,6 +52,7 @@ class LNStartFundActivity extends TimerActivity { me =>
         finish
     }
 
+    app.TransData.value = null
     // Or back if resources are freed
   } else me exitTo classOf[MainActivity]
 
@@ -160,7 +161,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       freshChan.listeners -= openListener
       ConnectionManager.listeners -= openListener
       ConnectionManager.connections(announce).disconnect
-      super.onBackPressed
+      finish
     }
 
     // Wire up listeners and connect

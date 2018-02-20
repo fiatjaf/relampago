@@ -4,7 +4,6 @@ import R.string._
 import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
-
 import scala.concurrent.duration._
 import com.lightning.wallet.lnutils._
 import com.lightning.wallet.ln.wire._
@@ -16,10 +15,8 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.muddzdev.styleabletoastlibrary.StyleableToast
-
 import collection.JavaConverters.seqAsJavaListConverter
 import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
@@ -27,16 +24,16 @@ import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
 import fr.acinq.bitcoin.BinaryData
+import java.net.InetSocketAddress
 import android.app.Application
-
 import scala.util.Try
 import java.io.File
 
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import android.content.{ClipData, ClipboardManager, Context}
-import com.lightning.wallet.Utils.{app, appName}
 import org.bitcoinj.wallet.{Protos, SendRequest, Wallet}
+import com.lightning.wallet.Utils.{app, appName}
 import rx.lang.scala.{Observable => Obs}
 
 
@@ -101,9 +98,14 @@ class WalletApp extends Application { me =>
   object TransData {
     var value: Any = new String
     val lnLink = "(?i)(lightning:)?([a-zA-Z0-9]+)\\W*".r
+    val nodeLink = "([a-fA-F0-9]{66})@([a-zA-Z0-9:\\.\\-_]+):([0-9]+)".r
+
     def recordValue(rawText: String) = value = rawText match {
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
       case lnLink(_, body) if notMixedCase(body) => PaymentRequest read body.toLowerCase
+      case nodeLink(key, host, port) => NodeAnnouncement(null, BinaryData.empty, 0L, PublicKey(key),
+        (0L.toByte, 0L.toByte, 0L.toByte), key take 16, new InetSocketAddress(host, port.toInt) :: Nil)
+
       case _ => getTo(rawText)
     }
 

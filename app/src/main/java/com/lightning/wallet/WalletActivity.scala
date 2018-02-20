@@ -17,12 +17,13 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
-import fr.castorflex.android.smoothprogressbar.{SmoothProgressDrawable, SmoothProgressBar}
+import fr.castorflex.android.smoothprogressbar.{SmoothProgressBar, SmoothProgressDrawable}
 import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
 
 import android.support.v7.widget.SearchView.OnQueryTextListener
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
+import com.lightning.wallet.ln.wire.NodeAnnouncement
 import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.wallet.ln.Channel.myBalanceMsat
@@ -282,12 +283,15 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     app.TransData.value match {
       case link: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(link.getAmount), link.getAddress)
       case bitcoinAddress: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddress(bitcoinAddress)
+      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
       case pr: PaymentRequest => for (ln <- lnOpt) ln.sendPayment(pr)
       case _ =>
     }
 
-    // Clear irregardless
-    app.TransData.value = null
+    app.TransData.value match {
+      case _: NodeAnnouncement => // Do nothing
+      case _ => app.TransData.value = null
+    }
   }
 
   //BUTTONS REACTIONS
