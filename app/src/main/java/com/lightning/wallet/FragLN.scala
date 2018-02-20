@@ -119,6 +119,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     app.kit.wallet addCoinsSentEventListener subtitleListener
     app.kit.wallet addCoinsReceivedEventListener subtitleListener
     for (chan <- app.ChannelManager.all) chan.listeners += chanListener
+    // We may have opening channels here so get their funding tx broadcasted
+    for (chan <- app.ChannelManager.notClosing) broadcaster nullOnBecome chan
     wrap(host.checkTransData)(updTitleSubtitleAbdButtons)
   }
 

@@ -50,6 +50,7 @@ class LNOpsActivity extends TimerActivity { me =>
 
   def reloadCacheAndView = {
     val aliveOnly = viewFilter.getCheckedRadioButtonId == R.id.typeAlive
+    app.prefs.edit.putBoolean(AbstractKit.CHAN_VIEW_ALIVE, aliveOnly).commit
     if (aliveOnly) cachedDisplayedChannels = app.ChannelManager.notClosingOrRefunding
     else cachedDisplayedChannels = app.ChannelManager.all.filter(_.state != REFUNDING)
     chanPager setAdapter slidingFragmentAdapter
@@ -63,8 +64,8 @@ class LNOpsActivity extends TimerActivity { me =>
       def onCheckedChanged(rg: RadioGroup, int: Int) = reloadCacheAndView
     }
 
-    viewFilter check R.id.typeAll
-    // Set listener and check all chans
+    val aliveOnly = app.prefs.getBoolean(AbstractKit.CHAN_VIEW_ALIVE, true)
+    if (aliveOnly) viewFilter check R.id.typeAlive else viewFilter check R.id.typeAll
   } else me exitTo classOf[MainActivity]
 }
 
