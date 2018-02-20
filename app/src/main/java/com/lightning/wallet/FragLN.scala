@@ -45,7 +45,8 @@ class FragLN extends Fragment { me =>
 
   override def onDestroy = {
     WalletActivity.frags -= me
-    worker.onFragmentDestroy
+    // This may be nullified hence a null check
+    if (worker != null) worker.onFragmentDestroy
     super.onDestroy
   }
 }
