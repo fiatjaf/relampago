@@ -60,6 +60,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   val lnAddChannel = frag.findViewById(R.id.lnAddChannel)
   val lnDivider = frag.findViewById(R.id.lnDivider)
 
+  val lnStatus = getResources getStringArray R.array.ln_status_online
   val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
   val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
@@ -129,16 +130,16 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
   def updTitleSubtitleAbdButtons = {
     val activeChannels = app.ChannelManager.notClosingOrRefunding
-    val onlineChannels = activeChannels.count(_.state != Channel.OFFLINE)
+    val online = activeChannels.count(_.state != Channel.OFFLINE)
     val openingChannelExist = activeChannels exists isOpening
     val funds = activeChannels.map(myBalanceMsat).sum
     val total = activeChannels.size
 
     val subtitle =
       if (total == 0) getString(ln_status_none)
-      else if (onlineChannels == 0) getString(ln_status_connecting)
-      else if (onlineChannels == total) getString(ln_status_online)
-      else getString(ln_status_mix).format(onlineChannels, total)
+      else if (online == 0) app.plurOrZero(lnStatus, online)
+      else if (online == total) app.plurOrZero(lnStatus, online)
+      else lnStatus.last.format(online, total)
 
     val title =
       if (funds == 0L) getString(ln_wallet)
@@ -171,7 +172,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   def sendPayment(pr: PaymentRequest) = ifOperational { operational =>
-    if (pr.isFresh) withFreshPaymentRequest else app toast ln_status_pr_expired
+    if (pr.isFresh) withFreshPaymentRequest else app toast dialog_pr_expired
     host.walletPager.setCurrentItem(1, false)
 
     def withFreshPaymentRequest = {
