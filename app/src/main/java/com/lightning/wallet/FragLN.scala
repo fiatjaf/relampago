@@ -324,9 +324,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       val title = getString(ln_incoming_title).format(humanStatus)
       val humanIn = humanFiat(prefix = coloredIn(info.firstSum), info.firstSum)
       paymentDetails setText s"${me getDescription info.pr}<br><br>$humanIn".html
-      // Can show a QR again if this is not a success yet AND payment request has not expired yet
-      if (info.actualStatus == SUCCESS || !info.pr.isFresh) mkForm(negBld(dialog_ok), title.html, detailsWrapper)
-      else mkForm(mkChoiceDialog(none, showQR(info.pr), dialog_ok, dialog_retry), title.html, detailsWrapper)
+      mkForm(negBld(dialog_ok), title.html, detailsWrapper)
 
     } else {
       val feeAmount = MilliSatoshi(info.rd.lastMsat - info.firstMsat)
