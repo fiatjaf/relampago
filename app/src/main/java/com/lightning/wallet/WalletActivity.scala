@@ -312,10 +312,18 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def goAddChannel(top: View) = {
     val minRequired = RatesSaver.rates.feeLive multiply 2
-    lazy val required = sumIn.format(denom withSign minRequired)
-    lazy val balance = sumIn.format(denom withSign app.kit.conf1Balance)
-    lazy val notEnough = getString(err_ln_not_enough_funds).format(balance, required)
-    if (app.kit.conf1Balance isGreaterThan minRequired) me goTo classOf[LNStartActivity]
+    val isFine = app.kit.conf1Balance isGreaterThan minRequired
+
+    lazy val notEnough = {
+      val txt = me getString err_ln_not_enough_funds
+      val pending = app.kit.conf0Balance minus app.kit.conf1Balance
+      val balanceHuman = sumIn format denom.withSign(app.kit.conf1Balance)
+      val requiredHuman = sumIn format denom.withSign(minRequired)
+      val pendingHuman = sumIn format denom.withSign(pending)
+      txt.format(balanceHuman, pendingHuman, requiredHuman)
+    }
+
+    if (isFine) me goTo classOf[LNStartActivity]
     else mkForm(me negBld dialog_ok, notEnough.html, null)
   }
 
