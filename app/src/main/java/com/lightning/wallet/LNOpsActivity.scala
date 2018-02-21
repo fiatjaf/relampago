@@ -7,7 +7,6 @@ import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
 import android.widget.RadioGroup.OnCheckedChangeListener
-import com.lightning.wallet.Denomination.sat2msatFactor
 import info.hoang8f.android.segmented.SegmentedGroup
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import me.relex.circleindicator.CircleIndicator
@@ -152,7 +151,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageNegotiations = UITask {
-      val refundable = Satoshi(myBalanceMsat(chan) / sat2msatFactor)
+      val refundable = Satoshi(myBalanceMsat(chan) / 1000L)
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
       lnOpsDescription setText negotiations.format(chan.state, started, coloredIn(capacity),
         coloredIn(refundable), alias, inFlight).html
@@ -178,9 +177,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       best match {
         case Left(mutualTx) =>
+          val refundable = Satoshi(myBalanceMsat(chan) / 1000L)
           val status = humanStatus apply txStatus(mutualTx.txid)
           val myFee = coloredOut(capacity - mutualTx.allOutputsAmount)
-          val refundable = Satoshi(myBalanceMsat(chan) / sat2msatFactor)
           val mutualView = commitStatus.format(mutualTx.txid.toString, status, myFee)
           lnOpsDescription setText bilateralClosing.format(chan.state, started, closed,
             coloredIn(capacity), coloredIn(refundable), alias, mutualView).html

@@ -7,25 +7,35 @@ import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.MilliSatoshi
 import language.implicitConversions
 import org.bitcoinj.core.Coin
-import language.postfixOps
 
 
 object Denomination {
-  val sat2msatFactor = 1000L
-  val btc2msatFactor = 100000000000L
   val locale = new java.util.Locale("en", "US")
   val symbols = new DecimalFormatSymbols(locale)
+  symbols.setGroupingSeparator(' ')
+  symbols.setDecimalSeparator('.')
+
   val formatFiat = new DecimalFormat("#,###,###.##")
   formatFiat setDecimalFormatSymbols symbols
 
-  def btcBigDecimal2MSat(btc: BigDecimal) = MilliSatoshi(btc * btc2msatFactor toLong)
-  implicit def mSat2Coin(msat: MilliSatoshi): Coin = Coin.valueOf(msat.amount / sat2msatFactor)
-  implicit def coin2MSat(cn: Coin): MilliSatoshi = MilliSatoshi(cn.value * sat2msatFactor)
+  implicit def mSat2Coin(msat: MilliSatoshi): Coin = Coin.valueOf(msat.amount / 1000L)
+  implicit def coin2MSat(cn: Coin): MilliSatoshi = MilliSatoshi(cn.value * 1000L)
+
+  def btcBigDecimal2MSat(btc: BigDecimal) = {
+    val btcAsMsat = btc * BtcDenomination.factor
+    MilliSatoshi(btcAsMsat.toLong)
+  }
 }
 
 trait Denomination {
-  def rawString2MSat(raw: String) = MilliSatoshi(BigDecimal(raw) * factor toLong)
-  def formatted(msat: MilliSatoshi) = fmt format BigDecimal(msat.amount) / factor
+  def rawString2MSat(raw: String) = {
+    val factored = BigDecimal(raw) * factor
+    MilliSatoshi(factored.toLong)
+  }
+
+  def formatted(msat: MilliSatoshi) =
+    fmt format BigDecimal(msat.amount) / factor
+
   def withSign(msat: MilliSatoshi): String
   val fmt: DecimalFormat
   val factor: Long
@@ -35,7 +45,7 @@ trait Denomination {
 object SatDenomination extends Denomination {
   val fmt = new DecimalFormat("###,###,###.###")
   val txt = app getString amount_hint_sat
-  val factor = sat2msatFactor
+  val factor = 1000L
 
   fmt setDecimalFormatSymbols symbols
   def withSign(msat: MilliSatoshi) =
@@ -55,7 +65,7 @@ object FinDenomination extends Denomination {
 object BtcDenomination extends Denomination {
   val fmt = new DecimalFormat("##0.000########")
   val txt = app getString amount_hint_btc
-  val factor = btc2msatFactor
+  val factor = 100000000000L
 
   fmt setDecimalFormatSymbols symbols
   def withSign(msat: MilliSatoshi) =

@@ -5,9 +5,10 @@
     <EditText
         android:paddingTop="20dp"
         style="@style/BigInputText"
+        android:digits=". 0123456789"
         android:inputType="numberDecimal"
-        android:focusableInTouchMode="true"
-        android:id="@+id/fiatInputAmount"/>
+        android:id="@+id/fiatInputAmount"
+        android:focusableInTouchMode="true"/>
 
     <info.hoang8f.android.segmented.SegmentedGroup
         android:layout_height="wrap_content"
@@ -56,7 +57,7 @@
         android:focusable="true"
         style="@style/BigInputText"
         android:id="@+id/inputAmount"
-        android:digits=".,0123456789"
+        android:digits=". 0123456789"
         android:inputType="numberDecimal"/>
 
     <TextView

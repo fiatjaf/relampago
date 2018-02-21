@@ -79,7 +79,7 @@ object Utils {
   }
 
   def currentRate = Try(RatesSaver.rates exchange fiatName)
-  def msatInFiat(msat: MilliSatoshi) = currentRate.map(perBtc => msat.amount * perBtc / btc2msatFactor)
+  def msatInFiat(msat: MilliSatoshi) = currentRate.map(_ * msat.amount / BtcDenomination.factor)
   def humanFiat(prefix: String, ms: MilliSatoshi, div: String = "<br>"): String = msatInFiat(ms) match {
     case Success(amt) if fiatName == strYuan => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} CNY</font>"
     case Success(amt) if fiatName == strEuro => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} EUR</font>"
@@ -292,9 +292,9 @@ class RateManager(extra: String, val content: View) { me =>
   val hintDenom = Utils clickableTextField content.findViewById(R.id.hintDenom)
   val fiatType = content.findViewById(R.id.fiatType).asInstanceOf[SegmentedGroup]
   val fiatInput = content.findViewById(R.id.fiatInputAmount).asInstanceOf[EditText]
-  def result: TryMSat = Try(denom rawString2MSat satInput.getText.toString.noCommas)
+  def result: TryMSat = Try(denom rawString2MSat satInput.getText.toString.noSpaces)
   def setSum(res: TryMSat) = satInput.setText(res map denom.formatted getOrElse null)
-  def fiatDecimal = BigDecimal(fiatInput.getText.toString.noCommas)
+  def fiatDecimal = BigDecimal(fiatInput.getText.toString.noSpaces)
 
   val fiatListener = new TextChangedWatcher {
     def upd = setSum(currentRate.map(perBtc => fiatDecimal / perBtc) map btcBigDecimal2MSat)

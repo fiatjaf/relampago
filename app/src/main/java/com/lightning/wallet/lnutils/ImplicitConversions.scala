@@ -19,6 +19,6 @@ object ImplicitConversions {
 class StringOps(source: String) {
   def binary = BinaryData(source getBytes "UTF-8")
   def hex = HEX.encode(source getBytes "UTF-8")
-  def noCommas = source.replace(",", "")
+  def noSpaces = source.replace(" ", "")
   def html = Html fromHtml source
 }
