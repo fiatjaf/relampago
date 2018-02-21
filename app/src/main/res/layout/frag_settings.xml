@@ -23,5 +23,10 @@
         android:text="@string/sets_chan_recover"
         android:visibility="gone"/>
 
+    <Button
+        style="@style/TransButton"
+        android:id="@+id/createZygote"
+        android:text="@string/sets_zygote"/>
+
     <View style="@style/GrayDivider"/>
 </LinearLayout>

@@ -17,13 +17,14 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
+import com.lightning.wallet.ln.wire.{NodeAnnouncement, Zygote}
 import fr.castorflex.android.smoothprogressbar.{SmoothProgressBar, SmoothProgressDrawable}
 import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
 
+import com.lightning.wallet.ln.wire.LightningMessageCodecs.zygoteCodec
 import android.support.v7.widget.SearchView.OnQueryTextListener
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
-import com.lightning.wallet.ln.wire.NodeAnnouncement
 import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.wallet.ln.Channel.myBalanceMsat
@@ -38,14 +39,18 @@ import com.lightning.wallet.helper.AES
 import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
+import com.google.common.io.Files
 import java.text.SimpleDateFormat
 import org.bitcoinj.core.Address
 import scala.collection.mutable
+import android.content.Intent
 import android.text.InputType
 import org.ndeftools.Message
 import android.os.Bundle
+import android.net.Uri
 import scala.util.Try
 import java.util.Date
+import java.io.File
 
 
 trait SearchBar { me =>
@@ -360,6 +365,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
     val menu = mkForm(me negBld dialog_ok, getString(read_settings).format(tokensLeft).html, form)
     val recoverChannelFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
+    val createZygote = form.findViewById(R.id.createZygote).asInstanceOf[Button]
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
     val changePass = form.findViewById(R.id.changePass).asInstanceOf[Button]
@@ -391,6 +397,27 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       }, none)
     }
 
+    createZygote setOnClickListener onButtonTap {
+      def openForm = showForm(mkChoiceDialog(ok = <(createZygote, onFail) { zygote =>
+        val share = new Intent setAction Intent.ACTION_SEND_MULTIPLE setType "text/plain"
+        val content = new java.util.ArrayList[Uri]
+        content.add(Uri fromFile zygote)
+
+        // Explain all the caveates to user before procceding to zygote sharing
+        me startActivity share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, content)
+      }, none, dialog_ok, dialog_cancel).setMessage(zygote_details).create)
+
+      def createZygote = {
+        val backupFile = FileOps shell "zygote.migration"
+        val dbFile = new File(s"/data/data/com.lightning.wallet/databases/$dbFileName")
+        val zygote = Zygote(Files toByteArray dbFile, Files toByteArray app.walletFile, Files toByteArray app.chainFile)
+        Files.write(zygoteCodec.encode(zygote).require.toByteArray, backupFile)
+        backupFile
+      }
+
+      rm(menu)(openForm)
+    }
+
     rescanWallet setOnClickListener onButtonTap {
       def openForm = passWrap(me getString sets_rescan) apply checkPass { pass =>
         val dlg = mkChoiceDialog(go, none, dialog_ok, dialog_cancel).setMessage(sets_rescan_ok)
@@ -417,12 +444,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     changePass setOnClickListener onButtonTap {
       def openForm = passWrap(me getString sets_secret_change) apply checkPass { oldPass =>
         val view \ field = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_new, null)
-        mkForm(mkChoiceDialog(if (field.getText.length >= 6) changePassword else app toast secret_too_short,
-          none, dialog_ok, dialog_cancel), getString(sets_secret_change), view)
+        mkForm(mkChoiceDialog(react, none, dialog_ok, dialog_cancel), getString(sets_secret_change), view)
+        def react = if (field.getText.length >= 6) changePassword else app toast secret_too_short
 
         def changePassword = {
           // Decrypt an old password and set a new one right away
-          <(rotatePass, _ => System exit 0)(_ => app toast sets_secret_ok)
+          <(rotatePass, onFail)(_ => app toast sets_secret_ok)
           app toast secret_changing
         }
 

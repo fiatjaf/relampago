@@ -1,7 +1,6 @@
 package com.lightning.wallet.lnutils
 
 import com.lightning.wallet.ln.Tools.{none, runAnd}
-import net.sqlcipher.database.SQLiteOpenHelper
 import net.sqlcipher.database.SQLiteDatabase
 import android.content.Context
 import android.net.Uri
@@ -90,8 +89,8 @@ object PaymentTable extends Table {
 }
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
-class CipherOpenHelper(context: Context, version: Int, secret: String)
-extends SQLiteOpenHelper(context, "lndata15.db", null, version) { me =>
+class CipherOpenHelper(context: Context, name: String, secret: String)
+extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)

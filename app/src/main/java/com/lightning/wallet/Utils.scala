@@ -12,15 +12,6 @@ import org.bitcoinj.core.listeners._
 import org.bitcoinj.wallet.listeners._
 import com.lightning.wallet.Denomination._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-import android.content.{Context, DialogInterface, Intent}
-import com.lightning.wallet.ln.Tools.{none, wrap}
-import org.bitcoinj.wallet.{SendRequest, Wallet}
-import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
-import fr.acinq.bitcoin.{Crypto, MilliSatoshi}
-import scala.util.{Failure, Success, Try}
-import android.app.{AlertDialog, Dialog}
-import java.util.{Timer, TimerTask}
-
 import org.bitcoinj.wallet.Wallet.ExceededMaxTransactionSize
 import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
 import android.widget.RadioGroup.OnCheckedChangeListener
@@ -43,6 +34,15 @@ import scala.concurrent.Future
 import android.os.Bundle
 import java.util.Date
 
+import android.content.{Context, DialogInterface, Intent}
+import com.lightning.wallet.ln.Tools.{none, wrap}
+import org.bitcoinj.wallet.{SendRequest, Wallet}
+import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
+import fr.acinq.bitcoin.{Crypto, MilliSatoshi}
+import scala.util.{Failure, Success, Try}
+import android.app.{AlertDialog, Dialog}
+import java.util.{Timer, TimerTask}
+
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import InputMethodManager.HIDE_NOT_ALWAYS
 import Context.INPUT_METHOD_SERVICE
@@ -54,8 +54,12 @@ object Utils {
   var denom: Denomination = _
   var fiatName: String = _
 
+  val fileName = "Testnet"
+  val dbFileName = s"$fileName.db"
+  val walletFileName = s"$fileName.wallet"
+  val chainFileName = s"$fileName.spvchain"
+
   lazy val app = appReference
-  lazy val appName = app getString app_name
   lazy val sumIn = app getString txs_sum_in
   lazy val sumOut = app getString txs_sum_out
   lazy val denoms = List(SatDenomination, FinDenomination, BtcDenomination)

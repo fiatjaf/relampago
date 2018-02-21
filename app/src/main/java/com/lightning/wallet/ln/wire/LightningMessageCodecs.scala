@@ -134,6 +134,7 @@ object LightningMessageCodecs { me =>
   val rgb: Codec[RGB] = bytes(3).xmap(bv2Rgb, rgb2Bv)
   def binarydata(size: Int): Codec[BinaryData] = bytes(size).xmap(vec2Bin, bin2Vec)
   val varsizebinarydata: Codec[BinaryData] = variableSizeBytes(value = bytes.xmap(vec2Bin, bin2Vec), size = uint16)
+  val varsizebinarydataLong: Codec[BinaryData] = variableSizeBytesLong(value = bytes.xmap(vec2Bin, bin2Vec), size = uint32)
   val zeropaddedstring: Codec[String] = fixedSizeBytes(32, utf8).xmap(_.takeWhile(_ != '\u0000'), identity)
 
   // Data formats
@@ -368,4 +369,13 @@ object LightningMessageCodecs { me =>
       .typecase(cr = nodeAnnouncementCodec, tag = 257)
       .typecase(cr = channelUpdateCodec, tag = 258)
       .typecase(cr = announcementSignatures.as[AnnouncementSignatures], tag = 259)
+
+  // Not in a spec
+
+  private val zygote =
+    (varsizebinarydataLong withContext "db") ::
+      (varsizebinarydataLong withContext "wallet") ::
+      (varsizebinarydataLong withContext "chain")
+
+  val zygoteCodec = zygote.as[Zygote]
 }

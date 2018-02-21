@@ -6,10 +6,10 @@ import com.lightning.wallet.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
 
 import scala.util.{Failure, Success}
+import com.lightning.wallet.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
 import com.lightning.wallet.lnutils.CloudDataSaver.TryCloudData
 import com.lightning.wallet.ln.LNParams.DepthAndDead
-import com.lightning.wallet.Utils.app
 import fr.acinq.eclair.UInt64
 
 
@@ -46,7 +46,7 @@ object LNParams { me =>
   def setup(seed: BinaryData) = generate(seed) match { case master =>
     extendedCloudKey = derivePrivateKey(master, hardened(92) :: hardened(0) :: Nil)
     extendedNodeKey = derivePrivateKey(master, hardened(46) :: hardened(0) :: Nil)
-    db = new CipherOpenHelper(app, 1, sha256(seed).toString)
+    db = new CipherOpenHelper(app, dbFileName, sha256(seed).toString)
     cloud = me getCloud CloudDataSaver.tryGetObject
   }
 

@@ -17,9 +17,9 @@
         android:normalScreens="true"/>
 
     <application
+        android:label="Testnet"
         android:name="WalletApp"
         android:allowBackup="false"
-        android:label="@string/app_name"
         android:fullBackupContent="false"
         android:icon="@drawable/ic_launcher_testnet">
 

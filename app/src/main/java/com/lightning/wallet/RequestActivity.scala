@@ -55,7 +55,7 @@ object QRGen {
 object FileOps {
   def shell(name: String) = {
     val path = Environment.getExternalStorageDirectory
-    val dir = new File(path.getAbsolutePath + "/" + appName)
+    val dir = new File(path.getAbsolutePath)
     if (!dir.exists) dir.mkdirs
     new File(dir, name)
   }

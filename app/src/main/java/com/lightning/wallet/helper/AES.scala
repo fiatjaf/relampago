@@ -18,13 +18,11 @@ object AES {
   def enc(data: Bytes, key: Bytes, initVector: Bytes) = cipher(key, initVector, Cipher.ENCRYPT_MODE) doFinal data
   def dec(data: Bytes, key: Bytes, initVector: Bytes) = cipher(key, initVector, Cipher.DECRYPT_MODE) doFinal data
   def unpack(raw: Bytes): (Bytes, Bytes) = (raw.slice(1, 1 + ivLength), raw drop 1 + ivLength)
-  def pack(iv: Bytes, cipher: Bytes): Bytes = aconcat(Array(version), iv, cipher)
-  private[this] val version = 1.toByte
+  def pack(iv: Bytes, cipher: Bytes): Bytes = aconcat(Array(1.toByte), iv, cipher)
   private[this] val ivLength = 16
 
   def encode(plaintext: String, key: Bytes): BinaryData = {
-    // Takes any string and returns an encoded string with iv
-    // Can be directly sent over internet connection
+    // Takes any input string and returns an encoded string
 
     val initVec = random getBytes ivLength
     val plainbytes = plaintext getBytes "UTF-8"

@@ -5,6 +5,7 @@ import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
 import scala.concurrent.duration._
+import com.lightning.wallet.Utils._
 import com.lightning.wallet.lnutils._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Tools._
@@ -33,15 +34,14 @@ import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import android.content.{ClipData, ClipboardManager, Context}
 import org.bitcoinj.wallet.{Protos, SendRequest, Wallet}
-import com.lightning.wallet.Utils.{app, appName}
 import rx.lang.scala.{Observable => Obs}
 
 
 class WalletApp extends Application { me =>
   lazy val params = org.bitcoinj.params.TestNet3Params.get
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
-  lazy val chainFile = new File(getFilesDir, s"$appName.spvchain")
-  lazy val walletFile = new File(getFilesDir, s"$appName.wallet")
+  lazy val walletFile = new File(getFilesDir, walletFileName)
+  lazy val chainFile = new File(getFilesDir, chainFileName)
   var kit: WalletKit = _
 
   lazy val plur = getString(lang) match {
@@ -84,7 +84,7 @@ class WalletApp extends Application { me =>
 
   def setBuffer(text: String) = {
     // Set clipboard contents to given text and notify user via toast
-    clipboardManager setPrimaryClip ClipData.newPlainText(appName, text)
+    clipboardManager setPrimaryClip ClipData.newPlainText("wallet", text)
     me toast getString(copied_to_clipboard).format(text)
   }
 
@@ -103,10 +103,15 @@ class WalletApp extends Application { me =>
     def recordValue(rawText: String) = value = rawText match {
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
       case lnLink(_, body) if notMixedCase(body) => PaymentRequest read body.toLowerCase
-      case nodeLink(key, host, port) => NodeAnnouncement(null, BinaryData.empty, 0L, PublicKey(key),
-        (0L.toByte, 0L.toByte, 0L.toByte), key take 16, new InetSocketAddress(host, port.toInt) :: Nil)
 
-      case _ => getTo(rawText)
+      case nodeLink(key, hostName, port) =>
+        val rgb = (Byte.MinValue, Byte.MinValue, Byte.MinValue)
+        val address = new InetSocketAddress(hostName, port.toInt) :: Nil
+        NodeAnnouncement(null, null, 0L, PublicKey(key), rgb, key take 16, address)
+
+      case _ =>
+        // BTC address?
+        getTo(rawText)
     }
 
     def onFail(err: Int => Unit): PartialFunction[Throwable, Unit] = {
@@ -274,7 +279,6 @@ class WalletApp extends Application { me =>
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)
       peerGroup.setMinRequiredProtocolVersion(70015)
-      peerGroup.setUserAgent(appName, "0.06")
       peerGroup.setDownloadTxDependencies(0)
       peerGroup.setPingIntervalMsec(10000)
       peerGroup.setMaxConnections(5)
