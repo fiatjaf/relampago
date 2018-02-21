@@ -3,7 +3,6 @@ package com.lightning.wallet.lnutils
 import spray.json._
 import DefaultJsonProtocol._
 import com.lightning.wallet.ln._
-import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.Connector._
 import com.lightning.wallet.lnutils.JsonHttpUtils._

@@ -21,7 +21,7 @@ object LNParams { me =>
   val dustLimit = Satoshi(573L)
 
   val chainHash = Block.TestnetGenesisBlock.hash
-  val theirReserveToFundingRatio = 50 // times
+  val theirReserveToFundingRatio = 100 // times
   val maxReserveToFundingRatio = 0.05 // 5%
   val localFeatures = "02"
   val globalFeatures = ""
@@ -33,6 +33,8 @@ object LNParams { me =>
   var db: CipherOpenHelper = _
 
   lazy val nodePrivateKey: PrivateKey = extendedNodeKey.privateKey // Corresponding pubkey is node id
+  lazy val nodePublicKey: PublicKey = nodePrivateKey.publicKey // This is a node id
+
   lazy val cloudPrivateKey: PrivateKey = extendedCloudKey.privateKey // Sign messages to private maintenance server
   lazy val cloudPublicKey: PublicKey = cloudPrivateKey.publicKey // Check signed messages on private maintenance server
 

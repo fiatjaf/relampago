@@ -1,6 +1,7 @@
 package com.lightning.wallet
 
 import com.lightning.wallet.ln._
+import com.lightning.wallet.Utils._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.lnutils.ImplicitConversions._
@@ -13,11 +14,11 @@ import me.relex.circleindicator.CircleIndicator
 import android.os.Bundle
 import java.util.Date
 
-import com.lightning.wallet.Utils.{app, coloredIn, coloredOut, denom, humanNode}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.widget.{Button, RadioButton, RadioGroup}
 import android.view.{LayoutInflater, View, ViewGroup}
 import com.lightning.wallet.ln.Tools.{none, wrap}
+import com.lightning.wallet.lnutils.StorageWrap
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 
 
@@ -130,15 +131,19 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageOpen = UITask {
-      val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
-      val canReceive = MilliSatoshi apply estimateCanReceive(chan)
-      val canSpend = MilliSatoshi apply estimateTotalCanSend(chan)
+      val canReceiveMsat = estimateCanReceive(chan)
+      val canSpendMsat = estimateTotalCanSend(chan)
+      val canReceive = MilliSatoshi(canReceiveMsat)
+      val canSpend = MilliSatoshi(canSpendMsat)
 
+      val hasUpdate = StorageWrap.getUpd(chan).isDefined
+      val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
-      val canSpendHuman = if (canSpend.amount < 0L) coloredOut(canSpend) else coloredIn(canSpend)
-      val canReceiveHuman = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
+      val canSpendHuman = if (canSpendMsat < 0L) coloredOut(canSpend) else coloredIn(canSpend)
+      val canReceiveHuman = if (canReceiveMsat < 0L) coloredOut(canReceive) else coloredIn(canReceive)
+      val canReceiveFinal = if (hasUpdate) canReceiveHuman else sumOut format getString(ln_ops_chan_receive_wait)
       lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, started, coloredIn(capacity),
-        canSpendHuman, canReceiveHuman, alias, inFlight, nodeId).html
+        canSpendHuman, canReceiveFinal, alias, inFlight, nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE

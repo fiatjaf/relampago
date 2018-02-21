@@ -2,12 +2,12 @@ package com.lightning.wallet.ln
 
 import scala.concurrent.duration._
 import com.lightning.wallet.ln.wire._
+import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.Features._
 
 import rx.lang.scala.{Observable => Obs}
 import com.lightning.wallet.ln.Tools.{Bytes, none}
 import scala.concurrent.ExecutionContext.Implicits.global
-import com.lightning.wallet.ln.LNParams.nodePrivateKey
 import com.lightning.wallet.ln.crypto.Noise.KeyPair
 import fr.acinq.bitcoin.BinaryData
 import scala.concurrent.Future
@@ -15,7 +15,7 @@ import java.net.Socket
 
 
 object ConnectionManager {
-  val pair = KeyPair(nodePrivateKey.publicKey, nodePrivateKey.toBin)
+  val pair = KeyPair(nodePublicKey.toBin, nodePrivateKey.toBin)
   val ourInit = Init(LNParams.globalFeatures, LNParams.localFeatures)
   var connections = Map.empty[NodeAnnouncement, Worker]
   var listeners = Set.empty[ConnectionListener]

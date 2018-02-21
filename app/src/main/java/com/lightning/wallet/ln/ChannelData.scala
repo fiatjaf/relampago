@@ -72,7 +72,7 @@ case class ClosingData(announce: NodeAnnouncement, commitments: Commitments,
   def isOutdated: Boolean = {
     val mutualClosingStates = for (tx <- mutualClose) yield txStatus(tx.txid)
     val isOk = mutualClosingStates exists { case cfs \ _ => cfs > minDepth }
-    isOk || closedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
+    isOk || closedAt + 1000 * 3600 * 24 * 7 < System.currentTimeMillis
   }
 
   def tier12States =

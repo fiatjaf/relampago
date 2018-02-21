@@ -37,7 +37,6 @@ class FragBTC extends Fragment { me =>
 
   override def onResume = {
     WalletActivity.frags += me
-    worker.onFragmentResume
     super.onResume
   }
 
@@ -122,19 +121,22 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     def status = if (app.kit.peerGroup.numConnectedPeers < 1) btc_status_connecting else btc_status_online
   }
 
-  val itemsListListener = new TxTracker { self =>
+  val itemsListListener = new TxTracker {
     def whenConfirmed = wrap(updTitle)(adapter.notifyDataSetChanged)
     override def txConfirmed(tx: Transaction) = UITask(whenConfirmed).run
-    override def coinsReceived(tx: Transaction) = UITask(tell apply tx).run
-    override def coinsSent(tx: Transaction) = UITask(tell apply tx).run
+    override def coinsReceived(tx: Transaction) = guard(tx)
+    override def coinsSent(tx: Transaction) = guard(tx)
 
-    val tell = (wrap: TxWrap) =>
-      if (!wrap.nativeValue.isZero) {
-        // Zero means it changes nothing in wallet
-        adapter.set(wrap +: adapter.availableItems)
-        adapter.notifyDataSetChanged
-        updView(false)
-      }
+    def guard(wrap: TxWrap): Unit = {
+      if (wrap.nativeValue.isZero) return
+      updateItems(wrap).run
+    }
+
+    def updateItems(wrap: TxWrap) = UITask {
+      adapter.set(wrap +: adapter.availableItems)
+      adapter.notifyDataSetChanged
+      updView(showText = false)
+    }
   }
 
   val subtitleListener = new TxTracker {
@@ -147,18 +149,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val listVisibility = if (showText) View.GONE else View.VISIBLE
     mnemonicWarn setVisibility textVisibility
     itemsList setVisibility listVisibility
-  }
-
-  def onFragmentResume = {
-    app.kit.peerGroup addConnectedEventListener constListener
-    app.kit.peerGroup addDisconnectedEventListener constListener
-    app.kit.peerGroup addBlocksDownloadedEventListener catchListener
-
-    app.kit.wallet addCoinsSentEventListener itemsListListener
-    app.kit.wallet addCoinsReceivedEventListener itemsListListener
-    app.kit.wallet addTransactionConfidenceEventListener itemsListListener
-    app.kit.wallet addCoinsReceivedEventListener subtitleListener
-    app.kit.wallet addCoinsSentEventListener subtitleListener
   }
 
   def onFragmentDestroy = {
@@ -281,11 +271,20 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   itemsList addFooterView allTxsWrapper
   itemsList setFooterDividersEnabled false
   itemsList setOnScrollListener host.listListener
+  app.kit.peerGroup addConnectedEventListener constListener
+  app.kit.peerGroup addDisconnectedEventListener constListener
+  app.kit.peerGroup addBlocksDownloadedEventListener catchListener
+
+  app.kit.wallet addCoinsSentEventListener itemsListListener
+  app.kit.wallet addCoinsReceivedEventListener itemsListListener
+  app.kit.wallet addTransactionConfidenceEventListener itemsListListener
+  app.kit.wallet addCoinsReceivedEventListener subtitleListener
+  app.kit.wallet addCoinsSentEventListener subtitleListener
 
   <(nativeTransactions, onFail) { txs =>
     // Fill list with bitcoin transactions
     // and update views accordingly
-    updView(txs.isEmpty)
+    updView(showText = txs.isEmpty)
     adapter set txs
   }
 

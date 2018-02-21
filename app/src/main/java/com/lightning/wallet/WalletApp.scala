@@ -214,8 +214,8 @@ class WalletApp extends Application { me =>
       def findAssisted(tag: RoutingInfoTag) = findRoutes(tag.route.head.nodeId).map(rts => for (pub <- rts) yield pub ++ tag.route)
       // If payment request contains extra routing info then we ask for assisted routes, otherwise we directly ask for recipient id
       val result = if (rpi.pr.routingInfo.isEmpty) findRoutes(rpi.pr.nodeId) else Obs from rpi.pr.routingInfo flatMap findAssisted
-      // Update RPI with routes and then we can make an onion out of the first available route while saving the rest
-      for (routes <- result) yield useFirstRoute(routes, rpi)
+      // Update RPI with routes and then we can make an onion out of the first available shortest route while saving the rest
+      for (routes <- result) yield useFirstRoute(routes.sortBy(_.size), rpi)
     }
 
     def send(rpi: RuntimePaymentInfo, noRouteLeft: RuntimePaymentInfo => Unit): Unit = {

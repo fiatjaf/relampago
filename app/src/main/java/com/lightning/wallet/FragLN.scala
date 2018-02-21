@@ -117,8 +117,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   def onFragmentResume = {
-    app.kit.wallet addCoinsSentEventListener subtitleListener
-    app.kit.wallet addCoinsReceivedEventListener subtitleListener
     for (chan <- app.ChannelManager.all) chan.listeners += chanListener
     // We may have opening channels here so get their funding tx broadcasted
     for (chan <- app.ChannelManager.notClosing) broadcaster nullOnBecome chan
@@ -175,8 +173,13 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   def sendPayment(pr: PaymentRequest) = ifOperational { operational =>
-    if (pr.isFresh) withFreshPaymentRequest else app toast dialog_pr_expired
+    // An operational channel exists, this is not a payment to itself
+    // and this payment request is not yet expired
+
     host.walletPager.setCurrentItem(1, false)
+    if (pr.nodeId == nodePublicKey) app toast err_general
+    else if (pr.isFresh) withFreshPaymentRequest
+    else app toast dialog_pr_expired
 
     def withFreshPaymentRequest = {
       val maxCanSend = MilliSatoshi(operational.map(estimateCanSend).max)
@@ -354,6 +357,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   itemsList addFooterView allTxsWrapper
   itemsList setFooterDividersEnabled false
   itemsList setOnScrollListener host.listListener
+  app.kit.wallet addCoinsSentEventListener subtitleListener
+  app.kit.wallet addCoinsReceivedEventListener subtitleListener
 
   // LN page toolbar will be an action bar
   add(getString(ln_status_none), Informer.LNSTATE).run
