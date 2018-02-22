@@ -96,7 +96,8 @@ class WalletApp extends Application { me =>
   }
 
   object TransData {
-    var value: Any = new String
+    var value: Any = _
+    // value should be null at start
     val lnLink = "(?i)(lightning:)?([a-zA-Z0-9]+)\\W*".r
     val nodeLink = "([a-fA-F0-9]{66})@([a-zA-Z0-9:\\.\\-_]+):([0-9]+)".r
 

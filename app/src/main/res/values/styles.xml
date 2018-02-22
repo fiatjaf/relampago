@@ -118,7 +118,7 @@
         <item name="cornerRadius">4dp</item>
         <item name="textColor">#fff</item>
         <item name="textSize">18sp</item>
-        <item name="length">SHORT</item>
+        <item name="length">LONG</item>
     </style>
 
     <!-- toolbar -->

@@ -4,11 +4,14 @@ import R.string._
 import android.widget._
 import com.lightning.wallet.Utils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-import com.lightning.wallet.ln.Tools.{wrap, none, runAnd}
+import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
+import com.google.common.io.{ByteStreams, Files}
 import scala.util.{Failure, Success, Try}
+import java.io.{File, FileInputStream}
 import R.id.{typePIN, typePass}
 
+import com.lightning.wallet.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import android.widget.RadioGroup.OnCheckedChangeListener
 import android.text.method.PasswordTransformationMethod
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -19,10 +22,11 @@ import com.lightning.wallet.ln.LNParams
 import com.lightning.wallet.helper.AES
 import fr.acinq.bitcoin.Crypto
 import scala.concurrent.Future
-import java.io.FileInputStream
 import android.text.InputType
 import android.content.Intent
 import org.ndeftools.Message
+import scodec.bits.BitVector
+import android.app.Activity
 import android.os.Bundle
 import android.view.View
 
@@ -54,6 +58,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   lazy val mainPassKeysType = findViewById(R.id.mainPassKeysType).asInstanceOf[SegmentedGroup]
   lazy val mainPassCheck = findViewById(R.id.mainPassCheck).asInstanceOf[Button]
   lazy val mainPassData = findViewById(R.id.mainPassData).asInstanceOf[EditText]
+  private[this] val RESPONSE_CODE = 101
 
   lazy val views =
     findViewById(R.id.mainChoice) ::
@@ -78,6 +83,9 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   }
 
   // NFC AND SHARE
+
+  override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent) =
+    if (requestCode == RESPONSE_CODE & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
 
   override def onNoNfcIntentFound = {
     // Filter out failures and nulls, try to set value, proceed if successful and inform if not
@@ -155,20 +163,23 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   def goRestoreWallet(view: View) = {
     val mnemonicOptions = getResources getStringArray R.array.restore_mnemonic_options
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-    val alert = mkForm(me negBld dialog_cancel, getString(restore_hint), lst)
-
-    // Offer user a choice between entering a raw or an encrypted mnemonic code
-    lst setOnItemClickListener onTap { case 1 => rm(alert)(exitRestoreWallet) case _ => proceed }
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, mnemonicOptions)
-    lst setDividerHeight 0
-    lst setDivider null
+    val alert = mkForm(me negBld dialog_cancel, null, lst)
 
-    def proceed = rm(alert) {
+    lst setDivider null
+    lst setDividerHeight 0
+    lst setOnItemClickListener onTap {
+      case 0 => proceedWithEncryptedMnemonic
+      case 1 => rm(alert)(exitRestoreWallet)
+      case 2 => proceedWithMigrationFile
+    }
+
+    def proceedWithEncryptedMnemonic = rm(alert) {
       val form = getLayoutInflater.inflate(R.layout.frag_encrypted_mnemonic, null)
       val encryptedMnemonic = form.findViewById(R.id.encryptedMnemonic).asInstanceOf[EditText]
       val oldWalletPassword = form.findViewById(R.id.oldWalletPassword).asInstanceOf[EditText]
       lazy val dialog = mkChoiceDialog(attempt, none, dialog_ok, dialog_cancel)
-      lazy val alert1 = mkForm(dialog, me getString wallet_restore, form)
+      lazy val alert1 = mkForm(dialog, getString(wallet_restore), form)
       alert1
 
       def attempt: Unit = rm(alert1) {
@@ -184,6 +195,23 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
         exitRestoreWallet
       }
     }
+
+    def proceedWithMigrationFile = rm(alert) {
+      val intent = new Intent(Intent.ACTION_OPEN_DOCUMENT) setType "text/plain"
+      startActivityForResult(intent addCategory Intent.CATEGORY_OPENABLE, RESPONSE_CODE)
+    }
+  }
+
+  def restoreFromZygote(intent: Intent) = {
+    val databaseFile = new File(app.getDatabasePath(dbFileName).getPath)
+    val inputStream = getContentResolver.openInputStream(intent.getData)
+    val bitVector = BitVector(ByteStreams toByteArray inputStream)
+    val zygote = walletZygoteCodec.decode(bitVector).require.value
+    if (!databaseFile.exists) databaseFile.getParentFile.mkdirs
+    Files.write(zygote.wallet, app.walletFile)
+    Files.write(zygote.chain, app.chainFile)
+    Files.write(zygote.db, databaseFile)
+    next
   }
 
   def exitRestoreWallet = me exitTo classOf[WalletRestoreActivity]

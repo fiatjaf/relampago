@@ -400,9 +400,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       }, none, dialog_ok, dialog_cancel).setMessage(zygote_details).create)
 
       def createZygote = {
-        val backupFile = FileOps shell "zygote.migrate"
-        val dbFile = new File(s"/data/data/com.lightning.wallet/databases/$dbFileName")
-        val Seq(dbBytes, walletBytes, chainBytes) = Seq(dbFile, app.walletFile, app.chainFile) map Files.toByteArray
+        val backupFile = FileOps shell "zygote.txt"
+        val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
+        val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
+        val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
         val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
         Files.write(encoded.require.toByteArray, backupFile)
         backupFile

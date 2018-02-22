@@ -34,16 +34,25 @@
             </intent-filter>
 
             <intent-filter>
+                <!-- receiving shared text -->
                 <action android:name="android.intent.action.SEND"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <data android:mimeType="text/plain"/>
             </intent-filter>
 
             <intent-filter>
-                <data android:scheme="lightning"/>
+                <!-- receiving link clicks -->
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="lightning"/>
+            </intent-filter>
+
+            <intent-filter>
+                <!-- receiving files -->
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
             </intent-filter>
 
             <intent-filter>

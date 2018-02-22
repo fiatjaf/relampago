@@ -36,8 +36,8 @@
         <EditText
             style="@style/Info"
             android:id="@+id/restorePass"
-            android:layout_width="wrap_content"
             android:hint="@string/secret_new"
+            android:layout_width="wrap_content"
             android:inputType="textVisiblePassword"/>
 
         <TextView
