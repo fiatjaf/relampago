@@ -403,14 +403,14 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         val content = new java.util.ArrayList[Uri]
         content.add(Uri fromFile zygote)
 
-        // Explain all the caveates to user before procceding to zygote sharing
+        // Explain all the caveates to user before procceding with zygote sharing
         me startActivity share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, content)
       }, none, dialog_ok, dialog_cancel).setMessage(zygote_details).create)
 
       def createZygote = {
-        val backupFile = FileOps shell "zygote.migration"
+        val backupFile = FileOps shell "zygote.migrate"
         val dbFile = new File(s"/data/data/com.lightning.wallet/databases/$dbFileName")
-        val zygote = Zygote(Files toByteArray dbFile, Files toByteArray app.walletFile, Files toByteArray app.chainFile)
+        val zygote = Zygote(1, Files toByteArray dbFile, Files toByteArray app.walletFile, Files toByteArray app.chainFile)
         Files.write(zygoteCodec.encode(zygote).require.toByteArray, backupFile)
         backupFile
       }

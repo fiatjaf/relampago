@@ -9,9 +9,9 @@ import com.lightning.wallet.ln.AddErrorCodes._
 import com.lightning.wallet.ln.LNParams.broadcaster._
 
 import fr.acinq.bitcoin.{BinaryData, Transaction}
-import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
-import com.lightning.wallet.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.wallet.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
+import com.lightning.wallet.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
+import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import com.lightning.wallet.ln.wire.LightningMessageCodecs.LNMessageVector
 import org.bitcoinj.wallet.SendRequest
 import fr.acinq.eclair.UInt64

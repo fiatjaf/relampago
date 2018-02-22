@@ -373,7 +373,8 @@ object LightningMessageCodecs { me =>
   // Not in a spec
 
   private val zygote =
-    (varsizebinarydataLong withContext "db") ::
+    (uint16 withContext "v") ::
+      (varsizebinarydataLong withContext "db") ::
       (varsizebinarydataLong withContext "wallet") ::
       (varsizebinarydataLong withContext "chain")
 

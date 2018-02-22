@@ -105,4 +105,4 @@ case class ChannelUpdate(signature: BinaryData, chainHash: BinaryData, shortChan
 
 // Not in a spec
 
-case class Zygote(db: BinaryData, wallet: BinaryData, chain: BinaryData)
+case class Zygote(v: Int, db: BinaryData, wallet: BinaryData, chain: BinaryData)
