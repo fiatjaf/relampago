@@ -2,8 +2,9 @@ package com.lightning.wallet.helper
 
 import com.lightning.wallet.ln.Tools.{Bytes, random}
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
-import com.lightning.wallet.ln.crypto.MultiStreamUtils.aconcat
-import fr.acinq.bitcoin.BinaryData
+import com.lightning.wallet.ln.wire.LightningMessageCodecs.aesZygoteCodec
+import com.lightning.wallet.ln.wire.AESZygote
+import scodec.bits.BitVector
 import javax.crypto.Cipher
 
 
@@ -17,23 +18,20 @@ object AES {
 
   def enc(data: Bytes, key: Bytes, initVector: Bytes) = cipher(key, initVector, Cipher.ENCRYPT_MODE) doFinal data
   def dec(data: Bytes, key: Bytes, initVector: Bytes) = cipher(key, initVector, Cipher.DECRYPT_MODE) doFinal data
-  def unpack(raw: Bytes): (Bytes, Bytes) = (raw.slice(1, 1 + ivLength), raw drop 1 + ivLength)
-  def pack(iv: Bytes, cipher: Bytes): Bytes = aconcat(Array(1.toByte), iv, cipher)
   private[this] val ivLength = 16
 
-  def encode(plaintext: String, key: Bytes): BinaryData = {
-    // Takes any input string and returns an encoded string
+  def encode(plain: String, key: Bytes) = {
+    // Takes any input string and returns a zygote
 
     val initVec = random getBytes ivLength
-    val plainbytes = plaintext getBytes "UTF-8"
-    val cipherbytes = enc(plainbytes, key, initVec)
-    pack(initVec, cipherbytes)
+    val cipher = enc(plain getBytes "UTF-8", key, initVec)
+    val zygote = AESZygote(v = 1, initVec, cipher)
+    aesZygoteCodec.encode(zygote).require.toHex
   }
 
-  def decode(key: Bytes)(packed: Bytes): String = {
-    // Takes packed format with has version number and iv
-    val (initVec, cipherbytes) = unpack(packed)
-    val raw = dec(cipherbytes, key, initVec)
-    new String(raw, "UTF-8")
+  def decode(cipher: String, key: Bytes) = {
+    val bitVector = BitVector(cipher getBytes "UTF-8")
+    val zygote = aesZygoteCodec.decode(bitVector).require.value
+    new String(dec(zygote.ciphertext, key, zygote.iv), "UTF-8")
   }
 }

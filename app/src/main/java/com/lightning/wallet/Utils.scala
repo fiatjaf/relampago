@@ -198,7 +198,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   def checkPass(next: String => Unit)(pass: String) = {
-    // Takes a method to be executed after a wallet pass check is successful, also shows a toast
+    // Takes a method to be executed after a pass check is successful, also shows a toast
     def proceed(isCorrect: Boolean) = if (isCorrect) next(pass) else app toast secret_wrong
     <(app.kit.wallet checkPassword pass, _ => app toast err_general)(proceed)
     app toast secret_checking
@@ -206,6 +206,7 @@ trait TimerActivity extends AppCompatActivity { me =>
 
   def viewMnemonic(view: View) = passWrap(me getString sets_mnemonic) apply checkPass(doViewMnemonic)
   def doViewMnemonic(password: String) = <(app.kit decryptSeed password, onFail) { seed =>
+    // Warn user and proceed to export an encrypted mnemonic code using current password
 
     val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
     lazy val dialog = mkChoiceDialog(none, warnUser, dialog_ok, dialog_export)
@@ -218,8 +219,8 @@ trait TimerActivity extends AppCompatActivity { me =>
       alert1
 
       def encryptAndExport: Unit = rm(alert1) {
-        val packed = AES.encode(wordsText, Crypto sha256 password.binary.data)
-        me share s"Encrypted BIP32 code ${new Date}: ${packed.toString}"
+        val hex = AES.encode(wordsText, Crypto sha256 password.binary)
+        me share s"Encrypted BIP32 mnemonic code ${new Date}: $hex"
       }
     }
   }

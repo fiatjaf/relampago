@@ -17,11 +17,10 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
-import com.lightning.wallet.ln.wire.{NodeAnnouncement, Zygote}
+import com.lightning.wallet.ln.wire.{NodeAnnouncement, WalletZygote}
 import fr.castorflex.android.smoothprogressbar.{SmoothProgressBar, SmoothProgressDrawable}
 import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
-
-import com.lightning.wallet.ln.wire.LightningMessageCodecs.zygoteCodec
+import com.lightning.wallet.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import android.support.v7.widget.SearchView.OnQueryTextListener
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
@@ -284,19 +283,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData = {
-    app.TransData.value match {
-      case link: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(link.getAmount), link.getAddress)
-      case bitcoinAddress: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddress(bitcoinAddress)
-      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-      case pr: PaymentRequest => for (ln <- lnOpt) ln.sendPayment(pr)
-      case _ =>
-    }
-
-    app.TransData.value match {
-      case _: NodeAnnouncement => // Do nothing
-      case _ => app.TransData.value = null
-    }
+  def checkTransData = app.TransData.value match {
+    case link: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(link.getAmount), link.getAddress)
+    case bitcoinAddress: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddress(bitcoinAddress)
+    case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+    case pr: PaymentRequest => for (ln <- lnOpt) ln.sendPayment(pr)
+    case _ =>
   }
 
   //BUTTONS REACTIONS
@@ -380,8 +372,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         // them into an active channel list, then connect to peers
 
         for {
-          encoded <- serverDataVec
-          jsonDecoded = AES.decode(cloudSecret)(encoded)
+          encrypted <- serverDataVec
+          jsonDecoded = AES.decode(encrypted, cloudSecret)
           // This may be some garbage so omit this one if it fails
           refundingData <- Try apply to[RefundingData](jsonDecoded)
           // Now throw it away if it is already present in list of local channels
@@ -400,18 +392,19 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     createZygote setOnClickListener onButtonTap {
       def openForm = showForm(mkChoiceDialog(ok = <(createZygote, onFail) { zygote =>
         val share = new Intent setAction Intent.ACTION_SEND_MULTIPLE setType "text/plain"
-        val content = new java.util.ArrayList[Uri]
-        content.add(Uri fromFile zygote)
+        val data = new java.util.ArrayList[Uri]
+        data.add(Uri fromFile zygote)
 
         // Explain all the caveates to user before procceding with zygote sharing
-        me startActivity share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, content)
+        me startActivity share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, data)
       }, none, dialog_ok, dialog_cancel).setMessage(zygote_details).create)
 
       def createZygote = {
         val backupFile = FileOps shell "zygote.migrate"
         val dbFile = new File(s"/data/data/com.lightning.wallet/databases/$dbFileName")
-        val zygote = Zygote(1, Files toByteArray dbFile, Files toByteArray app.walletFile, Files toByteArray app.chainFile)
-        Files.write(zygoteCodec.encode(zygote).require.toByteArray, backupFile)
+        val Seq(dbBytes, walletBytes, chainBytes) = Seq(dbFile, app.walletFile, app.chainFile) map Files.toByteArray
+        val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
+        Files.write(encoded.require.toByteArray, backupFile)
         backupFile
       }
 

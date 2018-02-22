@@ -176,6 +176,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     // An operational channel exists, this is not a payment to itself
     // and this payment request is not yet expired
 
+    app.TransData.value = null
     host.walletPager.setCurrentItem(1, false)
     if (pr.nodeId == nodePublicKey) app toast err_general
     else if (pr.isFresh) withFreshPaymentRequest

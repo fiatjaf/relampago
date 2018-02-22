@@ -213,6 +213,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val ok = alert getButton BUTTON_POSITIVE
     ok setOnClickListener onButtonTap(sendAttempt)
     host.walletPager.setCurrentItem(0, false)
+    app.TransData.value = null
     spendManager
   }
 
