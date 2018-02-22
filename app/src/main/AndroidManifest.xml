@@ -46,13 +46,7 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="lightning"/>
-            </intent-filter>
-
-            <intent-filter>
-                <!-- receiving files -->
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <data android:mimeType="text/plain"/>
+                <data android:scheme="bitcoin"/>
             </intent-filter>
 
             <intent-filter>
