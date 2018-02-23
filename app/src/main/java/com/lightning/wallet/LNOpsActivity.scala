@@ -44,15 +44,15 @@ class LNOpsActivity extends TimerActivity { me =>
   }
 
   def updateCountView = {
-    typeAlive setText getString(ln_ops_type_alive).format(app.ChannelManager.notClosing.size).html
-    typeAll setText getString(ln_ops_type_all).format(app.ChannelManager.all.size).html
+    typeAlive setText getString(ln_ops_type_alive).format(app.ChannelManager.notClosingOrRefunding.size).html
+    typeAll setText getString(ln_ops_type_all).format(app.ChannelManager.notRefunding.size).html
   }
 
   def reloadCacheAndView = {
     val aliveOnly = viewFilter.getCheckedRadioButtonId == R.id.typeAlive
     app.prefs.edit.putBoolean(AbstractKit.CHAN_VIEW_ALIVE, aliveOnly).commit
     if (aliveOnly) cachedDisplayedChannels = app.ChannelManager.notClosingOrRefunding
-    else cachedDisplayedChannels = app.ChannelManager.all.filter(_.state != REFUNDING)
+    else cachedDisplayedChannels = app.ChannelManager.notRefunding
     chanPager setAdapter slidingFragmentAdapter
     chanPagerIndicator setViewPager chanPager
     updateCountView

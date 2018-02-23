@@ -171,13 +171,13 @@ object Helpers { me =>
         claimTimeout <- Scripts checkSpendable signed
       } yield claimTimeout
 
-      val main = claimRemoteMainOutput(commitments, remoteCommit, remoteCommitTx.tx)
+      val main = claimRemoteMainOutput(commitments, remoteCommit.remotePerCommitmentPoint, remoteCommitTx.tx)
       main.copy(claimHtlcSuccess = claimSuccessTxs.toList, claimHtlcTimeout = claimTimeoutTxs.toList)
     }
 
-    // Special case when we have lost our data and ask them to spend their local current commit tx
-    def claimRemoteMainOutput(commitments: Commitments, remoteCommit: RemoteCommit, commitTx: Transaction) = {
-      val localPaymentPrivkey = derivePrivKey(commitments.localParams.paymentKey, remoteCommit.remotePerCommitmentPoint)
+    def claimRemoteMainOutput(commitments: Commitments, remotePerCommitmentPoint: Point, commitTx: Transaction) = {
+      // May be a special case where we have lost our data and explicitly ask them to spend their local current commit
+      val localPaymentPrivkey = derivePrivKey(commitments.localParams.paymentKey, remotePerCommitmentPoint)
 
       RemoteCommitPublished(Scripts.checkSpendable {
         val txWithInputInfo = Scripts.makeClaimP2WPKHOutputTx(commitTx, localPaymentPrivkey.publicKey,

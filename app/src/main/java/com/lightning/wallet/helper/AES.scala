@@ -29,8 +29,8 @@ object AES {
     aesZygoteCodec.encode(zygote).require.toHex
   }
 
-  def decode(cipher: String, key: Bytes) = {
-    val bitVector = BitVector(cipher getBytes "UTF-8")
+  def decode(raw: String, key: Bytes) = {
+    val bitVector = BitVector.fromHex(raw).get
     val zygote = aesZygoteCodec.decode(bitVector).require.value
     new String(dec(zygote.ciphertext, key, zygote.iv), "UTF-8")
   }

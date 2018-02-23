@@ -96,23 +96,21 @@ class WalletApp extends Application { me =>
   }
 
   object TransData {
-    var value: Any = _
-    // value should be null at start
+    var value: Any = _ // must be null at start
     val lnLink = "(?i)(lightning:)?([a-zA-Z0-9]+)\\W*".r
     val nodeLink = "([a-fA-F0-9]{66})@([a-zA-Z0-9:\\.\\-_]+):([0-9]+)".r
 
     def recordValue(rawText: String) = value = rawText match {
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
       case lnLink(_, body) if notMixedCase(body) => PaymentRequest read body.toLowerCase
+      case nodeLink(key, hostName, port) => mkna(PublicKey(key), hostName, port.toInt)
+      case _ => getTo(rawText)
+    }
 
-      case nodeLink(key, hostName, port) =>
-        val rgb = (Byte.MinValue, Byte.MinValue, Byte.MinValue)
-        val address = new InetSocketAddress(hostName, port.toInt) :: Nil
-        NodeAnnouncement(null, null, 0L, PublicKey(key), rgb, key take 16, address)
-
-      case _ =>
-        // BTC address?
-        getTo(rawText)
+    def mkna(key: PublicKey, host: String, port: Int) = {
+      val address = new InetSocketAddress(host, port) :: Nil
+      val rgb = (Byte.MinValue, Byte.MinValue, Byte.MinValue)
+      NodeAnnouncement(null, null, 0L, key, rgb, host, address)
     }
 
     def onFail(err: Int => Unit): PartialFunction[Throwable, Unit] = {
@@ -131,6 +129,7 @@ class WalletApp extends Application { me =>
     def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
     def canSend(msat: Long) = for (c <- all if c.state == Channel.OPEN && isOperational(c) && estimateCanSend(c) > msat) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
+    def notRefunding = for (c <- all if c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
     def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)

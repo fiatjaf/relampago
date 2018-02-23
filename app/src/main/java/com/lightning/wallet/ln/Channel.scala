@@ -286,22 +286,18 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SYNC and REFUNDING MODE
 
 
-      case (refund: RefundingData, cr: ChannelReestablish, REFUNDING)
-        // GUARD: We have explicitly started with a REFUNDING data
-        if cr.myCurrentPerCommitmentPoint.isDefined =>
-        val pt = cr.myCurrentPerCommitmentPoint.get
-        savePointSendError(refund, pt)
+      case (ref: RefundingData, cr: ChannelReestablish, REFUNDING)
+        // GUARD: We have explicitly started with a fresh REFUNDING data
+        // we need to make sure their commitment point can be saved only once
+        if cr.myCurrentPerCommitmentPoint.isDefined && ref.remoteLatestPoint.isEmpty =>
+        storeRefund(ref, cr.myCurrentPerCommitmentPoint.get)
 
 
       case (norm: NormalData, cr: ChannelReestablish, OFFLINE)
-        // GUARD: normal state but their nextRemoteRevocationNumber is too far away
-        if norm.commitments.localCommit.index < cr.nextRemoteRevocationNumber &&
-          cr.myCurrentPerCommitmentPoint.isDefined =>
-
-        val refunding = RefundingData(norm.announce, norm.commitments)
-        // And they have proved this by providing a correct yourLastPerCommitmentSecret
+        // GUARD: we have started in NORMAL state but their nextRemoteRevocationNumber is too far away
+        if norm.commitments.localCommit.index < cr.nextRemoteRevocationNumber && cr.myCurrentPerCommitmentPoint.isDefined =>
         val secret = Generators.perCommitSecret(norm.commitments.localParams.shaSeed, cr.nextRemoteRevocationNumber - 1)
-        if (cr.yourLastPerCommitmentSecret contains secret) savePointSendError(refunding, cr.myCurrentPerCommitmentPoint.get)
+        if (cr.yourLastPerCommitmentSecret contains secret) storeRefund(norm, cr.myCurrentPerCommitmentPoint.get)
         else throw new LightningException
 
 
@@ -415,20 +411,20 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // HANDLE FUNDING SPENT
 
+      case (RefundingData(announce, Some(remoteLatestPoint), commitments), CMDSpent(spendTx), REFUNDING)
+        // GUARD: we have got a remote commit which we asked them to spend and we have their point
+        if spendTx.txIn.exists(_.outPoint == commitments.commitInput.outPoint) =>
 
-      case (refund: RefundingData, CMDSpent(spendTx), REFUNDING)
-        // GUARD: we have lost our state and asked them to spend their local commit
-        if spendTx.txIn.exists(_.outPoint == refund.commitments.commitInput.outPoint) =>
-        // commitments.remoteCommit has to be updated to their myCurrentPerCommitmentPoint at this point
-        val rcp = Closing.claimRemoteMainOutput(refund.commitments, refund.commitments.remoteCommit, spendTx)
-        BECOME(me STORE ClosingData(refund.announce, refund.commitments, remoteCommit = rcp :: Nil), CLOSING)
+        // Claim our main output using their point and go to CLOSING
+        val rcp = Closing.claimRemoteMainOutput(commitments, remoteLatestPoint, spendTx)
+        BECOME(me STORE ClosingData(announce, commitments, remoteCommit = rcp :: Nil), CLOSING)
 
 
-      case (some: HasCommitments, CMDSpent(tx), _)
-        // GUARD: something which spends our funding is broadcasted, must react
-        if tx.txIn.exists(_.outPoint == some.commitments.commitInput.outPoint) =>
-        val revokedCommitOpt = Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, tx)
+      case (some: HasCommitments, CMDSpent(tx), any)
+        // GUARD: tx which spends our funding is broadcasted, must react, but NOT in REFUNDING state
+        if tx.txIn.exists(_.outPoint == some.commitments.commitInput.outPoint) && any != REFUNDING =>
         val nextRemoteCommitEither = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
+        val revokedCommitOpt = Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, tx)
 
         Tuple3(revokedCommitOpt, nextRemoteCommitEither, some) match {
           case (_, _, close: ClosingData) if close.mutualClose.exists(_.txid == tx.txid) => Tools log s"Existing mutual $tx"
@@ -463,7 +459,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
-        // GUARD: we only react on connection level remote errors or those related to our channel
         // REFUNDING is an exception here, we CAN NOT start a local close in that state
         startLocalClose(some)
 
@@ -485,9 +480,15 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       doProcess(CMDProceed)
     }
 
+  def storeRefund(some: HasCommitments, point: Point) = {
+    val msg = "please publish your local commitment" getBytes "UTF-8"
+    val ref = RefundingData(some.announce, Some(point), some.commitments)
+    BECOME(STORE(ref), REFUNDING) SEND Error(ref.commitments.channelId, msg)
+  }
+
   private def makeFundingLocked(cs: Commitments) = {
-    val point = Generators.perCommitPoint(cs.localParams.shaSeed, 1L)
-    FundingLocked(cs.channelId, point)
+    val first = Generators.perCommitPoint(cs.localParams.shaSeed, 1L)
+    FundingLocked(cs.channelId, nextPerCommitmentPoint = first)
   }
 
   private def startShutdown(norm: NormalData) = {
@@ -495,13 +496,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     val localShutdown = Shutdown(norm.commitments.channelId, finalScriptPubKey)
     val norm1 = norm.modify(_.localShutdown) setTo Some(localShutdown)
     BECOME(norm1, OPEN) SEND localShutdown
-  }
-
-  private def savePointSendError(refund: RefundingData, point: Point) = {
-    // TODO: they may do nothing on error, then send an earlier point on next reconnect
-    val d1 = refund.modify(_.commitments.remoteCommit.remotePerCommitmentPoint) setTo point
-    val msg = "Please be so kind as to spend your local commit" getBytes "UTF-8"
-    BECOME(d1, REFUNDING) SEND Error(refund.commitments.channelId, msg)
   }
 
   private def startMutualClose(some: HasCommitments, tx: Transaction) = some match {

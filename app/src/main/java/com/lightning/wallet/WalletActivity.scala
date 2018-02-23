@@ -400,7 +400,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       }, none, dialog_ok, dialog_cancel).setMessage(zygote_details).create)
 
       def createZygote = {
-        val backupFile = FileOps shell "zygote.txt"
+        val backupFile = FileOps shell s"zygote ${new Date}.txt"
         val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
         val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
         val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray

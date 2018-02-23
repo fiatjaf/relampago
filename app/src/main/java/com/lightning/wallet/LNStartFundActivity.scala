@@ -97,9 +97,9 @@ class LNStartFundActivity extends TimerActivity { me =>
           freshChan STORE wait
 
           // Error while saving will halt any further progress here
-          // User may press back at this point but it won't affect anything
-          val backup = RefundingData(wait.announce, wait.commitments).toJson.toString
-          val encrypted = AES.encode(backup, LNParams.cloudSecret)
+          // Pressing back at this point but it won't affect anything
+          val refund = RefundingData(wait.announce, None, wait.commitments)
+          val encrypted = AES.encode(refund.toJson.toString, LNParams.cloudSecret)
 
           // Save a channel backup right away, don't wait until a channel becomes operational
           // in worst case it will be saved once channel becomes OPEN if there are no tokens currently
