@@ -361,6 +361,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (neg: NegotiationsData, cr: ChannelReestablish, OFFLINE) =>
         // According to spec we need to re-send a last closing sig here
         val lastSigned = neg.localProposals.head.localClosingSigned
+        List(neg.localShutdown, lastSigned) foreach SEND
         BECOME(neg, NEGOTIATIONS) SEND lastSigned
 
 
@@ -417,16 +418,18 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Claim our main output using their point and go to CLOSING
         val rcp = Closing.claimRemoteMainOutput(commitments, remoteLatestPoint, spendTx)
-        BECOME(me STORE ClosingData(announce, commitments, remoteCommit = rcp :: Nil), CLOSING)
+        val d1 = ClosingData(announce, commitments, refundRemoteCommit = rcp :: Nil)
+        BECOME(me STORE d1, CLOSING)
 
 
-      case (some: HasCommitments, CMDSpent(tx), any)
-        // GUARD: tx which spends our funding is broadcasted, must react, but NOT in REFUNDING state
-        if tx.txIn.exists(_.outPoint == some.commitments.commitInput.outPoint) && any != REFUNDING =>
-        val nextRemoteCommitEither = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
+      case (some: HasCommitments, CMDSpent(tx), _)
+        // GUARD: tx which spends our funding is broadcasted, must react
+        if tx.txIn.exists(_.outPoint == some.commitments.commitInput.outPoint) =>
         val revokedCommitOpt = Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, tx)
+        val nextRemoteCommitEither = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
 
         Tuple3(revokedCommitOpt, nextRemoteCommitEither, some) match {
+          case (_, _, close: ClosingData) if close.refundRemoteCommit.nonEmpty => Tools log s"Existing refund"
           case (_, _, close: ClosingData) if close.mutualClose.exists(_.txid == tx.txid) => Tools log s"Existing mutual $tx"
           case (_, _, close: ClosingData) if close.localCommit.exists(_.commitTx.txid == tx.txid) => Tools log s"Existing local $tx"
           case (_, _, close: ClosingData) if close.localProposals.exists(_.unsignedTx.tx.txid == tx.txid) => startMutualClose(close, tx)

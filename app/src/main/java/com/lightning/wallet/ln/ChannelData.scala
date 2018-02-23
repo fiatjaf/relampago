@@ -44,7 +44,6 @@ sealed trait HasCommitments extends ChannelData { val commitments: Commitments }
 case class InitData(announce: NodeAnnouncement) extends ChannelData
 case class WaitAcceptData(announce: NodeAnnouncement, cmd: CMDOpenChannel) extends ChannelData
 case class WaitFundingData(announce: NodeAnnouncement, cmd: CMDOpenChannel, accept: AcceptChannel) extends ChannelData
-case class RefundingData(announce: NodeAnnouncement, remoteLatestPoint: Option[Point], commitments: Commitments) extends HasCommitments
 
 case class WaitFundingSignedData(announce: NodeAnnouncement, localParams: LocalParams, channelId: BinaryData,
                                  remoteParams: AcceptChannel, fundingTx: Transaction, localSpec: CommitmentSpec,
@@ -63,25 +62,31 @@ case class ClosingTxProposed(unsignedTx: ClosingTx, localClosingSigned: ClosingS
 case class NegotiationsData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Shutdown, remoteShutdown: Shutdown,
                             localProposals: Seq[ClosingTxProposed], lastSignedTx: Option[ClosingTx] = None) extends HasCommitments
 
-case class ClosingData(announce: NodeAnnouncement, commitments: Commitments,
-                       localProposals: Seq[ClosingTxProposed] = Nil, mutualClose: Seq[Transaction] = Nil,
-                       localCommit: Seq[LocalCommitPublished] = Nil, remoteCommit: Seq[RemoteCommitPublished] = Nil,
-                       nextRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
+case class RefundingData(announce: NodeAnnouncement, remoteLatestPoint: Option[Point],
+                         commitments: Commitments) extends HasCommitments
+
+case class ClosingData(announce: NodeAnnouncement,
+                       commitments: Commitments, localProposals: Seq[ClosingTxProposed] = Nil,
+                       mutualClose: Seq[Transaction] = Nil, localCommit: Seq[LocalCommitPublished] = Nil,
+                       remoteCommit: Seq[RemoteCommitPublished] = Nil, nextRemoteCommit: Seq[RemoteCommitPublished] = Nil,
+                       refundRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
                        closedAt: Long = System.currentTimeMillis) extends HasCommitments {
 
   def isOutdated: Boolean = {
     val mutualClosingStates = for (tx <- mutualClose) yield txStatus(tx.txid)
     val isOk = mutualClosingStates exists { case cfs \ _ => cfs > minDepth }
-    isOk || closedAt + 1000 * 3600 * 24 * 7 < System.currentTimeMillis
+    isOk || closedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
   }
 
   def tier12States =
     localCommit.flatMap(_.getState) ++ remoteCommit.flatMap(_.getState) ++
-      nextRemoteCommit.flatMap(_.getState) ++ revokedCommit.flatMap(_.getState)
+      nextRemoteCommit.flatMap(_.getState) ++ refundRemoteCommit.flatMap(_.getState) ++
+      revokedCommit.flatMap(_.getState)
 
-  lazy val closings = mutualClose.map(Left.apply) ++
-    localCommit.map(Right.apply) ++ remoteCommit.map(Right.apply) ++
-      nextRemoteCommit.map(Right.apply) ++ revokedCommit.map(Right.apply)
+  lazy val closings =
+    mutualClose.map(Left.apply) ++ localCommit.map(Right.apply) ++
+      remoteCommit.map(Right.apply) ++ nextRemoteCommit.map(Right.apply) ++
+      refundRemoteCommit.map(Right.apply) ++ revokedCommit.map(Right.apply)
 }
 
 sealed trait CommitPublished {

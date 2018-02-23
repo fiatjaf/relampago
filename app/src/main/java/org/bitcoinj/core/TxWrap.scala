@@ -8,25 +8,28 @@ import com.lightning.wallet.{AddrData, P2WSHData}
 import scala.util.Try
 
 
+object TxWrap {
+  val HIDE = "HIDE"
+}
+
 class TxWrap(val tx: Transaction) {
-  // Excludes watched inputs and outputs from value calculation
-  val nativeValue = getValueSentToMe subtract getValueSentFromMe
-  // Fee may be null so we use Option to avoid exceptions
-  val fee = Option(tx.getFee)
-
-  private def inOuts(input: TransactionInput): Option[TransactionOutput] =
-    Stream(UNSPENT, SPENT, PENDING).map(app.kit.wallet.getTransactionPool)
-      .map(input.getConnectedOutput).find(_ != null)
-
-  private def getValueSentFromMe = tx.getInputs.asScala.flatMap(inOuts).foldLeft(Coin.ZERO) {
+  private val nativeSentFromMe = tx.getInputs.asScala.flatMap(inOuts).foldLeft(Coin.ZERO) {
     case accumulator \ output if output isMine app.kit.wallet => accumulator add output.getValue
     case accumulator \ _ => accumulator
   }
 
-  private def getValueSentToMe = tx.getOutputs.asScala.foldLeft(Coin.ZERO) {
+  private val nativeSentToMe = tx.getOutputs.asScala.foldLeft(Coin.ZERO) {
     case accumulator \ out if out isMine app.kit.wallet => accumulator add out.getValue
     case accumulator \ _ => accumulator
   }
+
+  // valueDelta being zero means this is a watched transaction
+  // valueWithoutFee being zero means this is a to-itself transaction
+
+  val fee = Option(tx.getFee)
+  val valueDelta = nativeSentToMe subtract nativeSentFromMe
+  val valueWithoutFee = fee map valueDelta.add getOrElse valueDelta
+  val visibleValue = if (valueWithoutFee.isZero) nativeSentToMe else valueWithoutFee
 
   // Depending on whether this is an incoming or outgoing transaction
   // we collect either outputs which belong to us or the foreign ones
@@ -40,4 +43,8 @@ class TxWrap(val tx: Transaction) {
     case publicKeyScript if publicKeyScript.isSentToP2WSH => P2WSHData(out.getValue, publicKeyScript)
     case publicKeyScript => AddrData(out.getValue, publicKeyScript getToAddress app.params)
   }
+
+  private def inOuts(input: TransactionInput): Option[TransactionOutput] =
+    Stream(UNSPENT, SPENT, PENDING).map(app.kit.wallet.getTransactionPool)
+      .map(input.getConnectedOutput).find(_ != null)
 }

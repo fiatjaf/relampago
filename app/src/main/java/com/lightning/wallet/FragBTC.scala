@@ -69,16 +69,12 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     def getHolder(view: View) = new TxViewHolder(view) {
 
       def fillView(wrap: TxWrap) = {
-        if (wrap.nativeValue.isNegative) {
-          val amountWithoutFee = wrap.fee map wrap.nativeValue.add getOrElse wrap.nativeValue
-          transactSum setText sumOut.format(denom formatted amountWithoutFee.negate).html
-        } else transactSum setText sumIn.format(denom formatted wrap.nativeValue).html
-
-        val statusImage =
-          if (wrap.tx.getConfidence.getConfidenceType == DEAD) dead
+        val statusImage = if (wrap.tx.getConfidence.getConfidenceType == DEAD) dead
           else if (wrap.tx.getConfidence.getDepthInBlocks >= minDepth) conf1
           else await
 
+        if (wrap.visibleValue.isPositive) transactSum setText sumIn.format(denom formatted wrap.visibleValue).html
+        else transactSum setText sumOut.format(denom formatted wrap.valueWithoutFee.negate).html
         transactWhen setText when(System.currentTimeMillis, wrap.tx.getUpdateTime).html
         transactCircle setImageResource statusImage
       }
@@ -128,7 +124,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     override def coinsSent(tx: Transaction) = guard(tx)
 
     def guard(wrap: TxWrap): Unit = {
-      if (wrap.nativeValue.isZero) return
+      if (wrap.valueDelta.isZero) return
       updateItems(wrap).run
     }
 
@@ -181,7 +177,8 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
   def nativeTransactions = {
     val raw = app.kit.wallet.getRecentTransactions(adapter.max, false)
-    raw.asScala.toVector.map(bitcoinjTx2Wrap).filterNot(_.nativeValue.isZero)
+    val notHidden = raw.asScala.toVector.filterNot(_.getMemo == TxWrap.HIDE)
+    notHidden.map(bitcoinjTx2Wrap).filterNot(_.valueDelta.isZero)
   }
 
   def sendBtcPopup: BtcManager = {
@@ -224,9 +221,9 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val outside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
 
     val wrap = adapter getItem pos
-    val marking = if (wrap.nativeValue.isPositive) sumIn else sumOut
+    val marking = if (wrap.visibleValue.isPositive) sumIn else sumOut
     val confirms = app.plurOrZero(txsConfs, wrap.tx.getConfidence.getDepthInBlocks)
-    val outputs = wrap.payDatas(wrap.nativeValue.isPositive).flatMap(_.toOption)
+    val outputs = wrap.payDatas(wrap.visibleValue.isPositive).flatMap(_.toOption)
     val humanViews = for (payData <- outputs) yield payData.cute(marking).html
 
     // Wire up a popup list
@@ -246,7 +243,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
       case _ if wrap.tx.getConfidence.getConfidenceType == DEAD =>
         mkForm(host negBld dialog_ok, sumOut.format(txsConfs.last).html, lst)
 
-      case _ if wrap.nativeValue.isPositive =>
+      case _ if wrap.visibleValue.isPositive =>
         val details = feeIncoming.format(confirms)
         mkForm(host negBld dialog_ok, details.html, lst)
 

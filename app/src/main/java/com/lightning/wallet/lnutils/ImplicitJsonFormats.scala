@@ -284,10 +284,11 @@ object ImplicitJsonFormats { me =>
   implicit val refundingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Option[Point], Commitments,
     RefundingData](RefundingData.apply, "announce", "remoteLatestPoint", "commitments"), tag = "RefundingData")
 
-  implicit val closingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Seq[ClosingTxProposed],
-    Seq[Transaction], Seq[LocalCommitPublished], Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RevokedCommitPublished], Long,
+  implicit val closingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement,
+    Commitments, Seq[ClosingTxProposed], Seq[Transaction], Seq[LocalCommitPublished],
+    Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RevokedCommitPublished], Long,
     ClosingData](ClosingData.apply, "announce", "commitments", "localProposals", "mutualClose", "localCommit", "remoteCommit",
-    "nextRemoteCommit", "revokedCommits", "closedAt"), tag = "ClosingData")
+    "nextRemoteCommit", "refundRemoteCommit", "revokedCommit", "closedAt"), tag = "ClosingData")
 
   implicit val negotiationsDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Shutdown, Shutdown, Seq[ClosingTxProposed],
     Option[ClosingTx], NegotiationsData](NegotiationsData.apply, "announce", "commitments", "localShutdown", "remoteShutdown",

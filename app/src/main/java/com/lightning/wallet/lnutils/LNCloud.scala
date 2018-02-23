@@ -96,7 +96,8 @@ class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
           val send = me getSided retry(withRoutesAndOnionRPIFromPR(pr), pickInc, 4 to 5)
           send.foreach(foeRPI => app.ChannelManager.sendEither(foeRPI, none), none)
 
-        // A special case where server can't find our tokens
+        // Server can't find our tokens or request has expired
+        case "notfulfilled" => me BECOME data.copy(info = None)
         case "notfound" => me BECOME data.copy(info = None)
         case other => Tools log other
       }
