@@ -3,13 +3,16 @@ package org.bitcoinj.core
 import com.lightning.wallet.ln._
 import com.lightning.wallet.Utils._
 import scala.collection.JavaConverters._
-import org.bitcoinj.wallet.WalletTransaction.Pool._
 import com.lightning.wallet.{AddrData, P2WSHData}
+import org.bitcoinj.wallet.WalletTransaction.Pool.{UNSPENT, SPENT, PENDING}
+import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import scala.util.Try
 
 
 object TxWrap {
   val HIDE = "HIDE"
+  def watchedWrap(wrap: TxWrap) = wrap.valueDelta.isZero
+  def hiddenWrap(wrap: TxWrap) = wrap.tx.getMemo == HIDE
 }
 
 class TxWrap(val tx: Transaction) {
@@ -23,13 +26,14 @@ class TxWrap(val tx: Transaction) {
     case accumulator \ _ => accumulator
   }
 
-  // valueDelta being zero means this is a watched transaction
-  // valueWithoutFee being zero means this is a to-itself transaction
-
   val fee = Option(tx.getFee)
   val valueDelta = nativeSentToMe subtract nativeSentFromMe
   val valueWithoutFee = fee map valueDelta.add getOrElse valueDelta
-  val visibleValue = if (valueWithoutFee.isZero) nativeSentToMe else valueWithoutFee
+
+  val visibleValue =
+    if (valueDelta.isPositive) valueDelta // This is an incoming tx, we don't care about fee
+    else if (valueWithoutFee.isZero) nativeSentToMe // This is a to-itself transaction, hide the fee
+    else valueWithoutFee // This is an outgoing tx, remove the fee part
 
   // Depending on whether this is an incoming or outgoing transaction
   // we collect either outputs which belong to us or the foreign ones
@@ -47,4 +51,7 @@ class TxWrap(val tx: Transaction) {
   private def inOuts(input: TransactionInput): Option[TransactionOutput] =
     Stream(UNSPENT, SPENT, PENDING).map(app.kit.wallet.getTransactionPool)
       .map(input.getConnectedOutput).find(_ != null)
+
+  def depth = tx.getConfidence.getDepthInBlocks
+  def isDead = tx.getConfidence.getConfidenceType == DEAD
 }

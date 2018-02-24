@@ -56,6 +56,7 @@
     <string name="mnemonic_export_details"><![CDATA[Mnemonic code will be encrypted and exported using <strong>your current passcode</strong>.<br><br>You are strongly advised to read a <a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>related section</a> of wallet manual before proceeding with this]]></string>
     <string name="ln_ops_chan_none"><a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a> enables fast and secure off-chain Bitcoin transactions with low fees. Using it requires you to open a <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a> with a peer of your choice and then fund it with an on-chain Bitcoin transaction.\n\nThis app uses paid <a href="http://lightning-wallet.com/storage-tokens#storage-tokens">storage tokens</a> to secure your wallet backups and thus makes sure your funds are never lost.</string>
     <string name="zygote_details">This tool will create a full snapshot of current wallet state which can be used to fully restore your wallet at a later time, possibly on another device.</string>
+    <string name="boost_details"><![CDATA[You can raise a fee for this transaction and thus get it confirmed faster<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
 
     <!-- menu and fab -->
     <string name="sets_chan_recover">Recover channel funds</string>
@@ -98,6 +99,7 @@
     <string name="dialog_export">Encrypt and export</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_retry">Retry</string>
+    <string name="dialog_boost">Boost</string>
     <string name="dialog_next">Next</string>
     <string name="dialog_pay">Pay</string>
     <string name="dialog_ok">OK</string>

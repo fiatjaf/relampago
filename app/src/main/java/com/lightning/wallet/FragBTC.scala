@@ -3,23 +3,26 @@ package com.lightning.wallet
 import android.view._
 import android.widget._
 import org.bitcoinj.core._
+import org.bitcoinj.core.TxWrap._
 import collection.JavaConverters._
 import com.lightning.wallet.Utils._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.Denomination._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.R.drawable.{await, conf1, dead}
-import com.lightning.wallet.ln.Tools.{none, wrap}
+import com.lightning.wallet.ln.Tools.{none, wrap, runAnd}
 import scala.util.{Failure, Success}
 
 import android.content.DialogInterface.BUTTON_POSITIVE
 import org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT
-import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import android.support.v7.widget.Toolbar.OnMenuItemClickListener
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
+import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import com.lightning.wallet.ln.LNParams.minDepth
+import com.lightning.wallet.lnutils.RatesSaver
 import android.support.v7.widget.Toolbar
+import android.app.AlertDialog.Builder
 import android.support.v4.app.Fragment
 import fr.acinq.bitcoin.MilliSatoshi
 import android.content.Intent
@@ -48,7 +51,7 @@ class FragBTC extends Fragment { me =>
   }
 }
 
-class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment {
+class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment { me =>
   val barMenuListener = new OnMenuItemClickListener { def onMenuItemClick(m: MenuItem) = host onOptionsItemSelected m }
   import host.{getResources, getString, str2View, rm, mkForm, UITask, getLayoutInflater, negPosBld, TxProcessor}
   import host.{timer, <, mkChoiceDialog, onButtonTap, onFastTap, onTap, onFail, showDenomChooser}
@@ -57,9 +60,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
   val txsConfs = getResources getStringArray R.array.txs_confs
-  val feeIncoming = getString(txs_fee_incoming)
-  val feeDetails = getString(txs_fee_details)
-  val feeAbsent = getString(txs_fee_absent)
 
   val adapter = new CutAdapter[TxWrap](24, R.layout.frag_tx_btc_line) {
     // BTC line has a wider timestamp section because there is no payment info
@@ -69,14 +69,14 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     def getHolder(view: View) = new TxViewHolder(view) {
 
       def fillView(wrap: TxWrap) = {
-        val statusImage = if (wrap.tx.getConfidence.getConfidenceType == DEAD) dead
-          else if (wrap.tx.getConfidence.getDepthInBlocks >= minDepth) conf1
-          else await
-
-        if (wrap.visibleValue.isPositive) transactSum setText sumIn.format(denom formatted wrap.visibleValue).html
-        else transactSum setText sumOut.format(denom formatted wrap.valueWithoutFee.negate).html
+        val statusImage = if (wrap.isDead) dead else if (wrap.depth >= minDepth) conf1 else await
         transactWhen setText when(System.currentTimeMillis, wrap.tx.getUpdateTime).html
         transactCircle setImageResource statusImage
+
+        wrap.visibleValue.isPositive match {
+          case true => transactSum setText sumIn.format(denom formatted wrap.visibleValue).html
+          case false => transactSum setText sumOut.format(denom formatted wrap.visibleValue.negate).html
+        }
       }
     }
   }
@@ -129,7 +129,10 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     }
 
     def updateItems(wrap: TxWrap) = UITask {
-      adapter.set(wrap +: adapter.availableItems)
+      val updated = wrap +: adapter.availableItems
+      // Make sure we don't have hidden transactions
+      // we can get one if user applies CPFP boosting
+      adapter.set(updated filterNot hiddenWrap)
       adapter.notifyDataSetChanged
       updView(showText = false)
     }
@@ -176,9 +179,8 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   }
 
   def nativeTransactions = {
-    val raw = app.kit.wallet.getRecentTransactions(adapter.max, false)
-    val notHidden = raw.asScala.toVector.filterNot(_.getMemo == TxWrap.HIDE)
-    notHidden.map(bitcoinjTx2Wrap).filterNot(_.valueDelta.isZero)
+    val raw = app.kit.wallet.getRecentTransactions(adapter.max, false).asScala
+    raw.toVector map bitcoinjTx2Wrap filterNot hiddenWrap filterNot watchedWrap
   }
 
   def sendBtcPopup: BtcManager = {
@@ -191,8 +193,8 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
       val pay = AddrData(ms, spendManager.getAddress)
 
       def processTx(pass: String, feePerKb: Coin) = {
-        <(app.kit blockingSend unsigned(pass, feePerKb), onTxFail)(none)
         add(host getString btc_announcing, Informer.BTCEVENT).run
+        <(app.kit blockingSend unsigned(pass, feePerKb), onTxFail)(none)
       }
 
       def onTxFail(generationError: Throwable) =
@@ -214,6 +216,34 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     spendManager
   }
 
+  def boostIncoming(wrap: TxWrap) = {
+    val newFee = RatesSaver.rates.feeLive divide 2
+    val boost = coloredIn(wrap.valueDelta minus newFee)
+    val current = coloredIn(wrap.valueDelta)
+
+    val warning = getString(boost_details).format(current, boost)
+    host.passWrap(warning.html) apply host.checkPass { pass =>
+      // Try to send a CPFP tx and hide an old one
+      <(doSend(pass), onError)(none)
+    }
+
+    def onError(err: Throwable) = {
+      // Place an old tx back to list
+      // and inform user about an error
+      wrap.tx setMemo null
+      onFail(err)
+    }
+
+    def doSend(pass: String) = runAnd(wrap.tx setMemo HIDE) {
+      val request = childPaysForParent(app.kit.wallet, wrap.tx, newFee)
+      request.aesKey = app.kit.wallet.getKeyCrypter deriveKey pass
+
+      // Check once again if tx should be re-sent before proceeding
+      if (wrap.depth < 1 && !wrap.isDead) app.kit blockingSend request
+      else throw new Exception(host getString err_general)
+    }
+  }
+
   // INIT
 
   itemsList setOnItemClickListener onTap { pos =>
@@ -221,15 +251,21 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val outside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
 
     val wrap = adapter getItem pos
+    val confs = app.plurOrZero(txsConfs, wrap.depth)
     val marking = if (wrap.visibleValue.isPositive) sumIn else sumOut
-    val confirms = app.plurOrZero(txsConfs, wrap.tx.getConfidence.getDepthInBlocks)
-    val outputs = wrap.payDatas(wrap.visibleValue.isPositive).flatMap(_.toOption)
-    val humanViews = for (payData <- outputs) yield payData.cute(marking).html
 
-    // Wire up a popup list
+    val header = wrap.fee match {
+      case _ if wrap.isDead => sumOut format txsConfs.last
+      case _ if wrap.visibleValue.isPositive => getString(txs_fee_incoming) format confs
+      case Some(fee) => humanFiat(getString(txs_fee_details).format(coloredOut(fee), confs), fee)
+      case None => getString(txs_fee_absent) format confs
+    }
+
+    val outputs = wrap.payDatas(wrap.visibleValue.isPositive).flatMap(_.toOption)
+    val humanOutputs = for (paymentData <- outputs) yield paymentData.cute(marking).html
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-    lst setAdapter new ArrayAdapter(host, R.layout.frag_top_tip, R.id.actionTip, humanViews.toArray)
-    lst setOnItemClickListener onTap { position => outputs(position - 1).onClick }
+    lst setAdapter new ArrayAdapter(host, R.layout.frag_top_tip, R.id.actionTip, humanOutputs.toArray)
+    lst setOnItemClickListener onTap { pos1 => outputs(pos1 - 1).onClick /* -1 because header */ }
     lst setHeaderDividersEnabled false
     lst addHeaderView detailsWrapper
 
@@ -239,22 +275,14 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
       host startActivity new Intent(Intent.ACTION_VIEW, uri)
     }
 
-    wrap.fee match {
-      case _ if wrap.tx.getConfidence.getConfidenceType == DEAD =>
-        mkForm(host negBld dialog_ok, sumOut.format(txsConfs.last).html, lst)
+    // See if CPFP can be applied
+    val hasEnoughValue = wrap.valueDelta isGreaterThan RatesSaver.rates.feeLive
+    val isStale = wrap.tx.getUpdateTime.getTime < System.currentTimeMillis - 60000
+    val canBoost = wrap.depth < 1 && !wrap.isDead && isStale && hasEnoughValue
 
-      case _ if wrap.visibleValue.isPositive =>
-        val details = feeIncoming.format(confirms)
-        mkForm(host negBld dialog_ok, details.html, lst)
-
-      case Some(fee) =>
-        val details = feeDetails.format(marking.format(denom withSign fee), confirms)
-        mkForm(host negBld dialog_ok, humanFiat(details, fee).html, lst)
-
-      case None =>
-        val details = feeAbsent.format(confirms).html
-        mkForm(host negBld dialog_ok, details, lst)
-    }
+    lazy val dlg: Builder = mkChoiceDialog(none, rm(alert)(me boostIncoming wrap), dialog_ok, dialog_boost)
+    lazy val alert = if (canBoost) mkForm(dlg, header.html, lst) else mkForm(host negBld dialog_ok, header.html, lst)
+    alert
   }
 
   toggler setOnClickListener onFastTap {
