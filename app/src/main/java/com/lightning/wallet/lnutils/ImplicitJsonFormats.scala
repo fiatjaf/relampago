@@ -3,7 +3,6 @@ package com.lightning.wallet.lnutils
 import spray.json._
 import com.lightning.wallet.ln._
 import com.lightning.wallet.ln.wire._
-import spray.json.DefaultJsonProtocol._
 import com.lightning.wallet.ln.Scripts._
 import com.lightning.wallet.ln.wire.LightningMessageCodecs._
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
@@ -23,14 +22,14 @@ import java.math.BigInteger
 import scodec.Codec
 
 
-object ImplicitJsonFormats { me =>
-  val json2String = (_: JsValue).convertTo[String]
+object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   def json2BitVec(json: JsValue): Option[BitVector] = BitVector fromHex json2String(json)
   def sCodecJsonFmt[T](codec: Codec[T] /* Json <-> sCodec bridge */) = new JsonFormat[T] {
     def read(serialized: JsValue) = codec.decode(json2BitVec(serialized).get).require.value
     def write(internal: T) = codec.encode(internal).require.toHex.toJson
   }
 
+  val json2String = (_: JsValue).convertTo[String]
   def taggedJsonFmt[T](base: JsonFormat[T], tag: String) =
     // Adds an external tag which can be later used to discern
     // different children of the same super class
@@ -239,11 +238,11 @@ object ImplicitJsonFormats { me =>
     jsonFormat[LNMessageVector, LNMessageVector, LNMessageVector,
       Changes](Changes.apply, "proposed", "signed", "acked")
 
-  implicit val commitmentsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes,
-    Changes, Long, Long, Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, BinaryData, Long,
+  implicit val commitmentsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes, Changes,
+    Long, Long, Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, BinaryData, Option[Hop], Long,
     Commitments](Commitments.apply, "localParams", "remoteParams", "localCommit", "remoteCommit", "localChanges",
     "remoteChanges", "localNextHtlcId", "remoteNextHtlcId", "remoteNextCommitInfo", "commitInput",
-    "remotePerCommitmentSecrets", "channelId", "startedAt")
+    "remotePerCommitmentSecrets", "channelId", "extraHop", "startedAt")
 
   implicit val localCommitPublishedFmt =
     jsonFormat[Seq[ClaimDelayedOutputTx], Seq[SuccessAndClaim], Seq[TimeoutAndClaim], Transaction,

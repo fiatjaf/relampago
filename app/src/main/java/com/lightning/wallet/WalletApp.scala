@@ -9,7 +9,6 @@ import com.lightning.wallet.Utils._
 import com.lightning.wallet.lnutils._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Tools._
-import spray.json.DefaultJsonProtocol._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._

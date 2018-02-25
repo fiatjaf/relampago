@@ -29,7 +29,7 @@ case class PaymentHashTag(hash: BinaryData) extends Tag {
 }
 
 case class DescriptionTag(description: String) extends Tag {
-  def toInt5s = encode(Bech32 eight2five description.getBytes("UTF-8"), 'd')
+  def toInt5s = encode(Bech32 eight2five description.getBytes, 'd')
 }
 
 case class DescriptionHashTag(hash: BinaryData) extends Tag {
@@ -92,8 +92,8 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
   }
 
   def description = tags.collectFirst {
-    case DescriptionHashTag(hash) => Left(hash)
-    case DescriptionTag(text) => Right(text)
+    case DescriptionHashTag(hash) => hash.toString
+    case DescriptionTag(description) => description
   }.get
 
   def stream: BitStream = {

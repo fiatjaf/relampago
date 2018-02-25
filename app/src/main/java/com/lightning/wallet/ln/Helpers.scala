@@ -120,14 +120,18 @@ object Helpers { me =>
 
       val allSuccessTxs = for {
         HtlcTxAndSigs(info: HtlcSuccessTx, localSig, remoteSig) <- commitments.localCommit.htlcTxsAndSigs
-        PaymentInfo(_, _, preimage, 1, _, _, _, _) <- bag.getPaymentInfo(info.add.paymentHash).toOption
-        success: HtlcSuccessTx = Scripts.addSigs(info, localSig, remoteSig, preimage)
+        paymentInfo <- bag.getPaymentInfo(info.add.paymentHash).toOption
+
+        // First transaction can be spent immediately, subsequent one has CSV timeout
+        success = Scripts.addSigs(info, localSig, remoteSig, paymentInfo.preimage)
         delayedClaim <- Scripts checkSpendable makeClaimDelayedOutput(success.tx)
       } yield success -> delayedClaim
 
       val allTimeoutTxs = for {
         HtlcTxAndSigs(info: HtlcTimeoutTx, localSig, remoteSig) <- commitments.localCommit.htlcTxsAndSigs
-        timeout: HtlcTimeoutTx = Scripts.addSigs(htlcTimeoutTx = info, localSig, remoteSig)
+        timeout = Scripts.addSigs(info, localSig, remoteSig)
+
+        // First transaction has CLTV timeout, subsequent one has CSV timeout
         delayedClaim <- Scripts checkSpendable makeClaimDelayedOutput(timeout.tx)
       } yield timeout -> delayedClaim
 
@@ -150,13 +154,13 @@ object Helpers { me =>
 
       val claimSuccessTxs = for {
         HtlcTimeoutTx(_, _, add) <- timeoutTxs
-        PaymentInfo(_, _, preimage, 1, _, _, _, _) <- bag.getPaymentInfo(add.paymentHash).toOption
+        paymentInfo <- bag.getPaymentInfo(add.paymentHash).toOption
         claimHtlcSuccessTx = Scripts.makeClaimHtlcSuccessTx(remoteCommitTx.tx, localHtlcPrivkey.publicKey,
           remoteHtlcPubkey, remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey,
           add, remoteCommit.spec.feeratePerKw)
 
-        sig = Scripts.sign(claimHtlcSuccessTx, localHtlcPrivkey)
-        signed = Scripts.addSigs(claimHtlcSuccessTx, sig, preimage)
+        signature = Scripts.sign(claimHtlcSuccessTx, localHtlcPrivkey)
+        signed = Scripts.addSigs(claimHtlcSuccessTx, signature, paymentInfo.preimage)
         claimSuccess <- Scripts checkSpendable signed
       } yield claimSuccess
 

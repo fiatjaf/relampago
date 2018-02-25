@@ -35,6 +35,7 @@ import android.os.Bundle
 import java.util.Date
 
 import android.content.{Context, DialogInterface, Intent}
+import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import com.lightning.wallet.ln.Tools.{none, wrap}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
@@ -55,7 +56,7 @@ object Utils {
   var fiatName: String = _
 
   val fileName = "Testnet"
-  val dbFileName = s"$fileName-1.db"
+  val dbFileName = s"$fileName-2.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
 
@@ -74,7 +75,7 @@ object Utils {
   val revFiatMap = Map(strDollar -> typeUSD, strEuro -> typeEUR, strYen -> typeJPY, strYuan -> typeCNY)
   def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
   def isMnemonicCorrect(mnemonicCode: String) = mnemonicCode.split("\\s+").length > 11
-  def humanAddr(adr: Address) = adr.toString grouped 4 mkString "\u0020"
+  def humanFour(adr: String) = adr grouped 4 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {
     val textView: TextView = view.asInstanceOf[TextView]
@@ -342,48 +343,40 @@ class BtcManager(val man: RateManager) { me =>
     }
   }
 
-  def setAddress(adr: Address) = {
+  def setAddress(addr: Address) = {
     addressPaste setVisibility View.GONE
     addressData setVisibility View.VISIBLE
-    addressData setText humanAddr(adr)
-    addressData setTag adr
+    addressData setText humanFour(addr.toString)
+    addressData setTag addr
   }
 }
 
 trait PayData {
+  def isEmpty = app.kit.conf1Balance equals cn
   def sendRequest: SendRequest
   def destination: String
   def onClick: Unit
   def cn: Coin
 
-  def cute(direction: String) = coin2MSat(cn) match { case msat =>
-    // Used to display the meaning of this output along with human readable value
-    humanFiat(s"$destination<br><br>" + direction.format(denom withSign msat), msat)
+  def cute(direction: String) = {
+    val msat: MilliSatoshi = coin2MSat(cn)
+    val human = direction.format(denom withSign msat)
+    humanFiat(s"$destination<br><br>$human", msat)
   }
 }
 
 case class AddrData(cn: Coin, address: Address) extends PayData {
+  def sendRequest = if (isEmpty) emptyWallet(address) else to(address, cn)
   def link = BitcoinURI.convertToBitcoinURI(address, cn, null, null)
   def onClick = app.setBuffer(address.toString)
-  def destination = humanAddr(address)
-
-  def sendRequest = {
-    val notEmptying = app.kit.conf1Balance isGreaterThan cn
-    if (notEmptying) SendRequest.to(address, cn)
-    else SendRequest.emptyWallet(address)
-  }
+  def destination = humanFour(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
-  // This will only be used for funding lightning payment channels
+  // This will only be used for funding of LN payment channels as destination is unreadable
+  def sendRequest = if (isEmpty) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
   def onClick = app.setBuffer(denom withSign cn)
   def destination = app getString txs_p2wsh
-
-  def sendRequest = {
-    val notEmptying = app.kit.conf1Balance isGreaterThan cn
-    if (notEmptying) SendRequest.to(app.params, pay2wsh, cn)
-    else SendRequest.emptyWallet(app.params, pay2wsh)
-  }
 }
 
 abstract class TextChangedWatcher extends TextWatcher {

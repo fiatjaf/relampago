@@ -1,7 +1,6 @@
 package com.lightning.wallet.lnutils
 
 import spray.json._
-import DefaultJsonProtocol._
 import com.lightning.wallet.ln._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.Connector._
@@ -176,14 +175,13 @@ class Connector(val url: String) {
       case _ => throw new ProtocolException
     }
 
+  def getBlock(hash: String) = ask[BlockHeightAndTxs]("block/get", "hash" -> hash)
   def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getChildTxs(txs: TxSeq) = ask[TxSeq]("txs/get", "txids" -> txs.map(_.txid).toJson.toString.hex)
-
-  def findRoutes(rd: RoutingData, froms: Set[PublicKey], to: PublicKey) =
-    ask[PaymentRouteVec]("router/routes", "xn" -> rd.badNodes.map(_.toBin).toJson.toString.hex,
-      "xc" -> rd.badChans.toJson.toString.hex, "froms" -> froms.map(_.toBin).toJson.toString.hex,
-      "tos" -> Set(to).map(_.toBin).toJson.toString.hex)
+  def findRoutes(rd: RoutingData, froms: Set[PublicKey], to: PublicKey) = ask[PaymentRouteVec]("router/routes",
+    "froms" -> froms.map(_.toBin).toJson.toString.hex, "tos" -> Set(to).map(_.toBin).toJson.toString.hex,
+    "xn" -> rd.badNodes.map(_.toBin).toJson.toString.hex, "xc" -> rd.badChans.toJson.toString.hex)
 }
 
 object Connector {
@@ -192,6 +190,7 @@ object Connector {
   type BigIntegerVec = Vector[BigInteger]
   type AnnounceChansNumVec = Vector[AnnounceChansNum]
   type RequestAndMemo = (PaymentRequest, BlindMemo)
+  type BlockHeightAndTxs = (Long, StringVec)
   type ClearToken = (String, String, String)
   type TokensInfo = (String, String, Int)
   type HttpParam = (String, String)

@@ -44,12 +44,12 @@ object ChannelTable extends Table {
 
 object PaymentTable extends Table {
   import com.lightning.wallet.ln.PaymentInfo.{HIDDEN, SUCCESS, FAILURE, WAITING}
-  val Tuple11(table, hash, preimage, incoming, msat, status, stamp, text, pr, rd, search) =
-    ("payment", "hash", "preimage", "incoming", "msat", "status", "stamp", "text", "pr", "rd", "search")
+  val Tuple11(table, hash, preimage, incoming, msat, status, stamp, description, pr, rd, search) =
+    ("payment", "hash", "preimage", "incoming", "msat", "status", "stamp", "description", "pr", "rd", "search")
 
   // Inserting
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
-  val insert9 = s"$hash, $preimage, $incoming, $msat, $status, $stamp, $text, $pr, $rd"
+  val insert9 = s"$hash, $preimage, $incoming, $msat, $status, $stamp, $description, $pr, $rd"
   val newSql = s"INSERT OR IGNORE INTO $table ($insert9) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
   // Selecting
@@ -79,7 +79,7 @@ object PaymentTable extends Table {
       $msat INTEGER NOT NULL,
       $status INTEGER NOT NULL,
       $stamp INTEGER NOT NULL,
-      $text STRING NOT NULL,
+      $description STRING NOT NULL,
       $pr STRING NOT NULL,
       $rd STRING NOT NULL
     );

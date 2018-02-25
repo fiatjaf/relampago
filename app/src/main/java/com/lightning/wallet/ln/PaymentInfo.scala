@@ -11,9 +11,9 @@ import com.lightning.wallet.ln.wire.LightningMessageCodecs._
 
 import scala.util.{Success, Try}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+import com.lightning.wallet.ln.Tools.{random, randomPrivKey}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Transaction}
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
-import com.lightning.wallet.ln.Tools.random
 import fr.acinq.bitcoin.Crypto
 import scodec.bits.BitVector
 import scodec.Attempt
@@ -26,8 +26,11 @@ object PaymentInfo {
   final val FAILURE = 3
   final val FROZEN = 4
 
-  // Placeholder for unresolved outgoing payments
   val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
+  val NOPACKET = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
+  def emptyRD = RoutingData(Vector.empty, Vector.empty, Set.empty, Set.empty, SecretsAndPacket(Vector.empty, NOPACKET), 0L, 0L)
+  def emptyHop(shortChannelId: Long) = Hop(randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
+
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
     makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
@@ -60,11 +63,6 @@ object PaymentInfo {
       val rpi1 = rpi.copy(rd = rd1)
       Right(rpi1)
     }
-  }
-
-  def emptyRD = {
-    val packet = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
-    RoutingData(Vector.empty, Vector.empty, Set.empty, Set.empty, SecretsAndPacket(Vector.empty, packet), 0L, 0L)
   }
 
   def without(rs: Vector[PaymentRoute], fn: Hop => Boolean) = rs.filterNot(_ exists fn)
@@ -157,14 +155,14 @@ case class RoutingData(routes: Vector[PaymentRoute], usedRoute: PaymentRoute, ba
 case class RuntimePaymentInfo(rd: RoutingData, pr: PaymentRequest, firstMsat: Long) {
   // firstMsat is an amount I'm actually getting or an amount I'm paying without routing fees
   // incoming firstMsat is updated on fulfilling, outgoing firstMsat is updated on pay attempt
-  lazy val text = pr.description.right getOrElse new String
+  def searchText = pr.description + " " + paymentHashString
   lazy val paymentHashString = pr.paymentHash.toString
-  lazy val searchText = s"$text $paymentHashString"
 }
 
 // PaymentInfo is constructed directly from database
-case class PaymentInfo(rawRd: String, rawPr: String, preimage: BinaryData, incoming: Int,
-                       firstMsat: Long, status: Int, stamp: Long, text: String) {
+case class PaymentInfo(rawRd: String, rawPr: String, preimage: BinaryData,
+                       incoming: Int, firstMsat: Long, status: Int, stamp: Long,
+                       description: String, hash: String) {
 
   def actualStatus = incoming match {
     // Once we have a preimage it is a SUCCESS
@@ -175,8 +173,8 @@ case class PaymentInfo(rawRd: String, rawPr: String, preimage: BinaryData, incom
     case _ => status
   }
 
-  // Keep these serialized for performance
   lazy val firstSum = MilliSatoshi(firstMsat)
+  // Keep these serialized for performance
   lazy val pr = to[PaymentRequest](rawPr)
   lazy val rd = to[RoutingData](rawRd)
 }

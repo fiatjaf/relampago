@@ -11,8 +11,8 @@ import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
-import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
+import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
 import scala.util.{Failure, Success, Try}
 import com.lightning.wallet.ln.Tools.{none, random, runAnd, wrap}
@@ -64,10 +64,13 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   val lnStatus = getResources getStringArray R.array.ln_status_online
   val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
   val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
+  val expiryLeft = getResources getStringArray R.array.ln_status_expiry
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
   val imageMap = Array(await, await, conf1, dead, frozen)
   val lnChanWarn = frag.findViewById(R.id.lnChanWarn)
+  val noDesc = host getString ln_no_description
 
+  def getDescription(txt: String) = if (txt.isEmpty) s"<i>$noDesc</i>" else txt take 140
   val adapter = new CutAdapter[PaymentInfo](PaymentTable.limit, R.layout.frag_tx_ln_line) {
     // LN line has smaller timestamps because payment info, also limit of rows is reduced
     // which is fine because unlike Bitcoin all the LN payments can be found via search
@@ -77,10 +80,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
       def fillView(info: PaymentInfo) = {
         val timestamp = new Date(info.stamp)
-        val marker = if (info.incoming == 1) sumIn else sumOut
-        val markedPaymentSum = marker.format(denom formatted info.firstSum)
+        val markedPayment = info.incoming match {
+          case 1 => sumIn.format(denom formatted info.firstSum)
+          case _ => sumOut.format(denom formatted -info.firstSum)
+        }
+
+        val fastId = humanFour(info.hash.toUpperCase take 8)
+        transactSum setText s"$markedPayment <font color=#999999>$fastId</font>".html
         transactWhen setText when(System.currentTimeMillis, timestamp).html
-        transactSum setText s"$markedPaymentSum\u00A0${info.text}".html
         transactCircle setImageResource imageMap(info.actualStatus)
       }
     }
@@ -107,7 +114,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
     override def onBecome = {
       // Updates local UI on every state change
-      case _ => updTitleSubtitleAbdButtons
+      case _ => updTitleSubtitleAndButtons
     }
   }
 
@@ -120,7 +127,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     for (chan <- app.ChannelManager.all) chan.listeners += chanListener
     // We may have opening channels here so get their funding tx broadcasted
     for (chan <- app.ChannelManager.notClosing) broadcaster nullOnBecome chan
-    wrap(host.checkTransData)(updTitleSubtitleAbdButtons)
+    wrap(host.checkTransData)(updTitleSubtitleAndButtons)
   }
 
   def onFragmentDestroy = {
@@ -129,7 +136,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     for (chan <- app.ChannelManager.all) chan.listeners -= chanListener
   }
 
-  def updTitleSubtitleAbdButtons = {
+  def updTitleSubtitleAndButtons = {
     val activeChannels = app.ChannelManager.notClosingOrRefunding
     val online = activeChannels.count(_.state != Channel.OFFLINE)
     val openingChannelExist = activeChannels exists isOpening
@@ -184,8 +191,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
     def withFreshPaymentRequest = {
       val maxCanSend = MilliSatoshi(operational.map(estimateCanSend).max)
-      val popupTitle = getString(ln_send_title).format(me getDescription pr)
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
+      val popupTitle = getString(ln_send_title).format(me getDescription pr.description)
       val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), popupTitle.html, content)
       val hint = getString(amount_hint_can_send).format(denom withSign maxCanSend)
       val rateManager = new RateManager(hint, content)
@@ -244,7 +251,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
         db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.paymentHashString)
         db.change(PaymentTable.newSql, rpi.paymentHashString, preimage, 1, rpi.firstMsat,
-          HIDDEN, System.currentTimeMillis.toString, rpi.text, rpi.pr.toJson, rpi.rd.toJson)
+          HIDDEN, System.currentTimeMillis, rpi.pr.description, rpi.pr.toJson, rpi.rd.toJson)
 
         // Show to user
         showQR(rpi.pr)
@@ -265,12 +272,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       val ok = alert getButton BUTTON_POSITIVE
       ok setOnClickListener onButtonTap(recAttempt)
     }
-  }
-
-  def getDescription(pr: PaymentRequest) = pr.description match {
-    case Right(description) if description.nonEmpty => description take 140
-    case Left(descriptionHash) => s"<i>${descriptionHash.toString}</i>"
-    case _ => s"<i>${host getString ln_no_description}</i>"
   }
 
   // INIT
@@ -312,6 +313,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     val paymentHash = detailsWrapper.findViewById(R.id.paymentHash).asInstanceOf[Button]
 
     val info = adapter getItem pos
+    val description = me getDescription info.description
     val rpi = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
     val humanStatus = s"<strong>${paymentStatesMap apply info.actualStatus}</strong>"
     paymentHash setOnClickListener onButtonTap(host share rpi.paymentHashString)
@@ -327,19 +329,20 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
     if (info.incoming == 1) {
       val title = getString(ln_incoming_title).format(humanStatus)
-      val humanIn = humanFiat(prefix = coloredIn(info.firstSum), info.firstSum)
-      paymentDetails setText s"${me getDescription info.pr}<br><br>$humanIn".html
+      val humanIn = humanFiat(coloredIn(info.firstSum), info.firstSum)
+      paymentDetails setText s"$description<br><br>$humanIn".html
       mkForm(negBld(dialog_ok), title.html, detailsWrapper)
 
     } else {
-      val feeAmount = MilliSatoshi(info.rd.lastMsat - info.firstMsat)
-      val humanOut = humanFiat(prefix = coloredOut(info.firstSum), info.firstSum)
-      paymentDetails setText s"${me getDescription info.pr}<br><br>$humanOut".html
+      val fee = MilliSatoshi(info.rd.lastMsat - info.firstMsat)
+      val humanOut = humanFiat(coloredOut(info.firstSum), info.firstSum)
+      paymentDetails setText s"$description<br><br>$humanOut".html
 
       // Will show title with expiry if payment is in-flight so user can make estimations
-      val expiryHuman = app.plurOrZero(blocksLeft, info.rd.lastExpiry - broadcaster.currentHeight)
-      val title = humanFiat(getString(ln_outgoing_title).format(coloredOut(feeAmount), humanStatus), feeAmount)
-      val title1 = if (info.actualStatus == WAITING) s"${host getString ln_expiry} $expiryHuman<br>$title" else title
+      val expiry = app.plurOrZero(expiryLeft, info.rd.lastExpiry - broadcaster.currentHeight)
+      val title = humanFiat(getString(ln_outgoing_title).format(coloredOut(fee), humanStatus), fee)
+      val title1 = if (info.actualStatus == WAITING) s"$expiry<br>$title" else title
+
       // Allow user to retry this payment using excluded nodes and channels if it is a failure and pr is not expired
       if (info.actualStatus != FAILURE || !info.pr.isFresh) mkForm(negBld(dialog_ok), title1.html, detailsWrapper)
       else mkForm(mkChoiceDialog(none, doSend(rpi), dialog_ok, dialog_retry), title1.html, detailsWrapper)

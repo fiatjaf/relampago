@@ -219,7 +219,8 @@ case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LN
 case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
                        remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
                        remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point], commitInput: InputInfo,
-                       remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, startedAt: Long = System.currentTimeMillis)
+                       remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, extraHop: Option[Hop] = None,
+                       startedAt: Long = System.currentTimeMillis)
 
 object Commitments {
   def localHasUnsignedOutgoing(c: Commitments) = c.localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined

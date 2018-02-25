@@ -1,10 +1,13 @@
 package com.lightning.wallet.ln
 
 import com.lightning.wallet.ln.Tools.wrap
+
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
 import crypto.RandomGenerator
 import java.util
+
+import fr.acinq.bitcoin.Crypto.PrivateKey
 
 
 object SET {
@@ -23,15 +26,20 @@ object Tools {
   def runAnd[T](result: T)(action: Any): T = result
   def errlog(error: Throwable): Unit = error.printStackTrace
   def log(message: String): Unit = android.util.Log.d("LN", message)
+  def randomPrivKey = PrivateKey(random getBytes 32, compressed = true)
   def wrap(run: => Unit)(go: => Unit) = try go catch none finally run
   def none: PartialFunction[Any, Unit] = { case _ => }
+
 
   def fromShortId(id: Long): (Int, Int, Int) = {
     val blockNumber = id.>>(40).&(0xFFFFFF).toInt
     val txOrd = id.>>(16).&(0xFFFFFF).toInt
-    val outOrd = id.&(0xFFFF).toInt
-    (blockNumber, txOrd, outOrd)
+    val outIdx = id.&(0xFFFF).toInt
+    (blockNumber, txOrd, outIdx)
   }
+
+  def toShortId(blockNumber: Int, txOrd: Int, outIdx: Int): Long =
+    blockNumber.&(0xFFFFFFL).<<(40) | txOrd.&(0xFFFFFFL).<<(16) | outIdx.&(0xFFFFL)
 
   def toLongId(fundingHash: BinaryData, fundingOutputIndex: Int): BinaryData =
     if (fundingOutputIndex >= 65536 | fundingHash.size != 32) throw new LightningException

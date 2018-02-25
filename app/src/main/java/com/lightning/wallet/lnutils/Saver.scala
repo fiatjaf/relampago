@@ -3,7 +3,6 @@ package com.lightning.wallet.lnutils
 import spray.json._
 import com.lightning.wallet.ln._
 import scala.concurrent.duration._
-import spray.json.DefaultJsonProtocol._
 import com.lightning.wallet.Denomination._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._

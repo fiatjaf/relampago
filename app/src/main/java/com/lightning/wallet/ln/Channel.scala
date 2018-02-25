@@ -87,17 +87,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         if (Scripts.checkSpendable(signedLocalCommitTx).isEmpty) BECOME(wait, CLOSING) else {
           val localCommit = LocalCommit(0L, wait.localSpec, htlcTxsAndSigs = Nil, signedLocalCommitTx)
-          val localChanges = Changes(proposed = Vector.empty, signed = Vector.empty, acked = Vector.empty)
-          val remoteChanges = Changes(proposed = Vector.empty, signed = Vector.empty, acked = Vector.empty)
-          val dummy = PrivateKey(data = Tools.random getBytes 32, compressed = true).toPoint
-
-          val commitments = Commitments(wait.localParams, wait.remoteParams, localCommit,
-            remoteCommit = wait.remoteCommit, localChanges, remoteChanges, localNextHtlcId = 0L,
-            remoteNextHtlcId = 0L, remoteNextCommitInfo = Right(dummy), wait.localCommitTx.input,
-            remotePerCommitmentSecrets = ShaHashesWithIndex(Map.empty, None), wait.channelId)
+          val commits = Commitments(wait.localParams, wait.remoteParams, localCommit, wait.remoteCommit,
+            localChanges = Changes(proposed = Vector.empty, signed = Vector.empty, acked = Vector.empty),
+            remoteChanges = Changes(proposed = Vector.empty, signed = Vector.empty, acked = Vector.empty),
+            localNextHtlcId = 0L, remoteNextHtlcId = 0L, Right(Tools.randomPrivKey.toPoint),
+            wait.localCommitTx.input, ShaHashesWithIndex(Map.empty, None), wait.channelId)
 
           BECOME(WaitFundingDoneData(wait.announce, None, None,
-            wait.fundingTx, commitments), WAIT_FUNDING_DONE)
+            wait.fundingTx, commits), WAIT_FUNDING_DONE)
         }
 
 
@@ -135,6 +132,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // OPEN MODE
+
+
+      case (norm: NormalData, hop: Hop, OPEN | OFFLINE) =>
+        // Got either an empty Hop with shortChannelId or a final one
+        val d1 = norm.modify(_.commitments.extraHop) setTo Some(hop)
+        me UPDATA d1
 
 
       case (norm: NormalData, add: UpdateAddHtlc, OPEN) =>
@@ -483,7 +486,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       doProcess(CMDProceed)
     }
 
-  def storeRefund(some: HasCommitments, point: Point) = {
+  private def storeRefund(some: HasCommitments, point: Point) = {
     val msg = "please publish your local commitment" getBytes "UTF-8"
     val ref = RefundingData(some.announce, Some(point), some.commitments)
     BECOME(STORE(ref), REFUNDING) SEND Error(ref.commitments.channelId, msg)

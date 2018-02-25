@@ -69,14 +69,17 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     def getHolder(view: View) = new TxViewHolder(view) {
 
       def fillView(wrap: TxWrap) = {
-        val statusImage = if (wrap.isDead) dead else if (wrap.depth >= minDepth) conf1 else await
-        transactWhen setText when(System.currentTimeMillis, wrap.tx.getUpdateTime).html
-        transactCircle setImageResource statusImage
+        val timestamp = when(System.currentTimeMillis, wrap.tx.getUpdateTime)
+        val status = if (wrap.isDead) dead else if (wrap.depth >= minDepth) conf1 else await
 
-        wrap.visibleValue.isPositive match {
-          case true => transactSum setText sumIn.format(denom formatted wrap.visibleValue).html
-          case false => transactSum setText sumOut.format(denom formatted wrap.visibleValue.negate).html
+        val markedPaymentSum = wrap.visibleValue.isPositive match {
+          case true => sumIn.format(denom formatted wrap.visibleValue)
+          case false => sumOut.format(denom formatted wrap.visibleValue)
         }
+
+        transactCircle setImageResource status
+        transactSum setText markedPaymentSum.html
+        transactWhen setText timestamp.html
       }
     }
   }
@@ -253,14 +256,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val wrap = adapter getItem pos
     val confs = app.plurOrZero(txsConfs, wrap.depth)
     val marking = if (wrap.visibleValue.isPositive) sumIn else sumOut
-
-    val header = wrap.fee match {
-      case _ if wrap.isDead => sumOut format txsConfs.last
-      case _ if wrap.visibleValue.isPositive => getString(txs_fee_incoming) format confs
-      case Some(fee) => humanFiat(getString(txs_fee_details).format(coloredOut(fee), confs), fee)
-      case None => getString(txs_fee_absent) format confs
-    }
-
     val outputs = wrap.payDatas(wrap.visibleValue.isPositive).flatMap(_.toOption)
     val humanOutputs = for (paymentData <- outputs) yield paymentData.cute(marking).html
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
@@ -273,6 +268,13 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
       val smartbit = "https://testnet.smartbit.com.au/tx/"
       val uri = Uri.parse(smartbit + wrap.tx.getHashAsString)
       host startActivity new Intent(Intent.ACTION_VIEW, uri)
+    }
+
+    val header = wrap.fee match {
+      case _ if wrap.isDead => sumOut format txsConfs.last
+      case _ if wrap.visibleValue.isPositive => getString(txs_fee_incoming) format confs
+      case Some(fee) => humanFiat(getString(txs_fee_details).format(coloredOut(fee), confs), fee)
+      case None => getString(txs_fee_absent) format confs
     }
 
     // See if CPFP can be applied
@@ -309,7 +311,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
   <(nativeTransactions, onFail) { txs =>
     // Fill list with bitcoin transactions
-    // and update views accordingly
     updView(showText = txs.isEmpty)
     adapter set txs
   }

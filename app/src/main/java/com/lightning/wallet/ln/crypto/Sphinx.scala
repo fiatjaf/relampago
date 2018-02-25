@@ -72,7 +72,7 @@ object Sphinx { me =>
 
   def generateKey(keyType: Bytes, secret: Bytes): Bytes = Digests.hmacSha256(keyType, secret)
   def generateKey(keyType: String, secret: Bytes): Bytes = generateKey(keyType getBytes "UTF-8", secret)
-  def computeblindingFactor(pub: PublicKey, secret: Bytes): Bytes = Sha256Hash hash aconcat(pub.toBin, secret)
+  def computeBlindingFactor(pub: PublicKey, secret: Bytes): Bytes = Sha256Hash hash aconcat(pub.toBin, secret)
   def blind(pub: PublicKey, blindingFactors: BytesVec): PublicKey = blindingFactors.foldLeft(pub)(blind)
 
   def blind(pub: PublicKey, blindingFactor: Bytes): PublicKey = {
@@ -90,7 +90,7 @@ object Sphinx { me =>
   def computeEphemerealPublicKeysAndSharedSecrets(publicKeys: PublicKeyVec, sessionKey: PrivateKey): (PublicKeyVec, BytesVec) = {
     val firstEphemerealPublicKey = blind(pub = PublicKey(value = Crypto.curve.getG, compressed = true), sessionKey.value.toByteArray)
     val firstSecret: Bytes = computeSharedSecret(pub = publicKeys.head, secret = sessionKey)
-    val firstBlindingFactor = computeblindingFactor(firstEphemerealPublicKey, firstSecret)
+    val firstBlindingFactor = computeBlindingFactor(firstEphemerealPublicKey, firstSecret)
 
     computeEphemerealPublicKeysAndSharedSecrets(publicKeys.tail,
       Vector(firstEphemerealPublicKey), Vector(firstBlindingFactor),
@@ -105,7 +105,7 @@ object Sphinx { me =>
       val nextEphemerealPublicKey = blind(ephemeralPublicKeys.last, blindingFactors.last)
       val nextSecret = computeSharedSecret(blind(publicKeys.head, blindingFactors), sessionKey)
       computeEphemerealPublicKeysAndSharedSecrets(publicKeys.tail, ephemeralPublicKeys :+ nextEphemerealPublicKey,
-        blindingFactors :+ computeblindingFactor(nextEphemerealPublicKey, nextSecret), sharedSecrets :+ nextSecret, sessionKey)
+        blindingFactors :+ computeBlindingFactor(nextEphemerealPublicKey, nextSecret), sharedSecrets :+ nextSecret, sessionKey)
     }
 
   def generateFiller(keyType: String, sharedSecrets: BytesVec, hopSize: Int, maxHops: Int): Bytes =
@@ -127,7 +127,7 @@ object Sphinx { me =>
     val hmac = bin.slice(PayloadLength, PayloadLength + MacLength)
     val nextRoutinfo = bin.drop(PayloadLength + MacLength)
 
-    val factor = computeblindingFactor(PublicKey(packet.publicKey), sharedSecret)
+    val factor = computeBlindingFactor(PublicKey(packet.publicKey), sharedSecret)
     val pubKey = blind(PublicKey(packet.publicKey), factor).toBin.toArray
     val nextPacket = Packet(Array(Version), pubKey, nextRoutinfo, hmac)
     ParsedPacket(bin take PayloadLength, nextPacket, sharedSecret)

@@ -10,6 +10,7 @@ import android.widget.RadioGroup.OnCheckedChangeListener
 import info.hoang8f.android.segmented.SegmentedGroup
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import me.relex.circleindicator.CircleIndicator
+import com.lightning.wallet.lnutils.StorageWrap
 import android.os.Bundle
 import java.util.Date
 
@@ -17,7 +18,6 @@ import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.widget.{Button, RadioButton, RadioGroup}
 import android.view.{LayoutInflater, View, ViewGroup}
 import com.lightning.wallet.ln.Tools.{none, wrap}
-import com.lightning.wallet.lnutils.StorageWrap
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 
 

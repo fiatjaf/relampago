@@ -34,8 +34,14 @@ object StorageWrap extends ChannelListener {
   } yield chan -> Vector(update toHop chan.data.announce.nodeId)
 
   def isOurUpdate(norm: NormalData, upd: ChannelUpdate) = {
-    val (_, _, outputIndex) = Tools.fromShortId(upd.shortChannelId)
-    val idxMatch = norm.commitments.commitInput.outPoint.index == outputIndex
+    val (blockNumber, txOrd, outIdx) = Tools.fromShortId(upd.shortChannelId)
+
+    val myIdx = norm.commitments.commitInput.outPoint.index.toInt
+    val myBlockNumber = 100
+
+    (0 to 7500).exists(ord => Tools.toShortId(myBlockNumber, ord, myIdx) == upd.shortChannelId)
+
+    val idxMatch = norm.commitments.commitInput.outPoint.index == outIdx
     idxMatch && !isDisabled(upd.flags) && checkSig(upd, norm.announce.nodeId)
   }
 
@@ -76,11 +82,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
 
-  def toPaymentInfo(rc: RichCursor) =
-    PaymentInfo(rawRd = rc string PaymentTable.rd, rawPr = rc string PaymentTable.pr,
-      preimage = rc string PaymentTable.preimage, incoming = rc int PaymentTable.incoming,
-      firstMsat = rc long PaymentTable.msat, status = rc int PaymentTable.status,
-      stamp = rc long PaymentTable.stamp, text = rc string PaymentTable.text)
+  def toPaymentInfo(rc: RichCursor) = PaymentInfo(rawRd = rc string PaymentTable.rd, rawPr = rc string PaymentTable.pr,
+    preimage = rc string PaymentTable.preimage, incoming = rc int PaymentTable.incoming, firstMsat = rc long PaymentTable.msat,
+    status = rc int PaymentTable.status, stamp = rc long PaymentTable.stamp, description = rc string PaymentTable.description,
+    hash = rc string PaymentTable.hash)
 
   def markFailedAndFrozen = db txWrap {
     db change PaymentTable.updFailAllWaitingSql
@@ -117,7 +122,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
         updateStatus(WAITING, rpi.pr.paymentHash)
         db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.paymentHashString)
         db.change(PaymentTable.newSql, rpi.paymentHashString, NOIMAGE, 0, rpi.firstMsat,
-          WAITING, System.currentTimeMillis.toString, rpi.text, rpi.pr.toJson, rpi.rd.toJson)
+          WAITING, System.currentTimeMillis, rpi.pr.description, rpi.pr.toJson, rpi.rd.toJson)
       }
 
       // UI update

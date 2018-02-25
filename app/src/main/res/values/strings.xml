@@ -184,7 +184,6 @@
     <string name="ln_send_title"><![CDATA[Send lightning<br><br><small>%1$s</small>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#1BA2E0>Incoming payment</font><br>%1$s]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
-    <string name="ln_expiry"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#stuck-payments>expiry</a>]]></string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>
     <string name="ln_no_description">No description provided</string>
     <string name="ln_share_proof">Share Proof of Payment</string>
@@ -223,6 +222,12 @@
         <item><![CDATA[in progress&#8230;]]></item>
         <item><![CDATA[in %1$s block]]></item>
         <item><![CDATA[in %1$s blocks]]></item>
+    </array>
+
+    <array name="ln_status_expiry">
+        <item><![CDATA[cancelling&#8230;]]></item>
+        <item><![CDATA[expires in %1$s block]]></item>
+        <item><![CDATA[expires in %1$s blocks]]></item>
     </array>
 
     <array name="ln_in_flight_payments">
