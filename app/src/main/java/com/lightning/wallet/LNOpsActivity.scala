@@ -161,15 +161,15 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       closeOnClick(ln_chan_force_details)
     }
 
-    def manageClosing(data: ClosingData) = UITask {
+    def manageClosing(close: ClosingData) = UITask {
       // Show the best current closing with most confirmations
       // since multiple different closings may be present at once
-      val closed = me time new Date(data.closedAt)
+      val closed = me time new Date(close.closedAt)
       lnOpsAction setVisibility View.GONE
       // If alive becomes closing
       host.updateCountView
 
-      val best = data.closings maxBy {
+      val best = close.closings maxBy {
         case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ _ => cfs }
         case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
       }
@@ -207,9 +207,14 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
           val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
           val refundsView = if (tier12View.isEmpty) new String else refundStatus + tier12View
-          lnOpsDescription setText unilateralClosing.format(chan.state, started, closed,
-            coloredIn(capacity), alias, commitView + refundsView).html
+          lnOpsDescription setText unilateralClosing.format(chan.state, getStartedBy(close),
+            started, closed, coloredIn(capacity), alias, commitView + refundsView).html
       }
+    }
+
+    def getStartedBy(c: ClosingData) = getString {
+      val byYou = c.localCommit.nonEmpty || c.refundRemoteCommit.nonEmpty
+      if (byYou) ln_ops_unilateral_you else ln_ops_unilateral_peer
     }
 
     val chanListener = new ChannelListener {
@@ -221,7 +226,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         case (_, _: NormalData, _, _) if isOperational(chan) => manageOpen.run
         case (_, _: NegotiationsData, _, _) => manageNegotiations.run
         case (_, _: NormalData, _, _) => manageNegotiations.run
-        case anythingElse => manageOther.run
+        case otherwise => manageOther.run
       }
 
       override def onProcess = {
