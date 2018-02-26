@@ -101,14 +101,16 @@ case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, fee: Sato
   extends DelayedPublishStatus
 
 trait Broadcaster extends ChannelListener { me =>
-  def txStatus(txid: BinaryData): DepthAndDead
+  def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
+  def getBlockHashString(txid: BinaryData): Option[String]
+  def getStatus(txid: BinaryData): DepthAndDead
   def currentHeight: Long
   def ratePerKwSat: Long
 
   // Parent state and next tier cltv delay
   // Actual negative delay will be represented as 0L
   def cltv(parent: Transaction, child: Transaction) = {
-    val parentDepth \ parentIsDead = txStatus(parent.txid)
+    val parentDepth \ parentIsDead = getStatus(parent.txid)
     val cltvDelay = math.max(cltvBlocks(child) - currentHeight, 0L)
     parentDepth -> parentIsDead -> cltvDelay
   }
@@ -116,7 +118,7 @@ trait Broadcaster extends ChannelListener { me =>
   // Parent state and cltv + next tier csv delay
   // Actual negative delay will be represented as 0L
   def csv(parent: Transaction, child: Transaction) = {
-    val parentDepth \ parentIsDead = txStatus(parent.txid)
+    val parentDepth \ parentIsDead = getStatus(parent.txid)
     val cltvDelay = math.max(cltvBlocks(parent) - currentHeight, 0L)
     val csvDelay = math.max(csvTimeout(child) - parentDepth, 0L)
     parentDepth -> parentIsDead -> (cltvDelay + csvDelay)

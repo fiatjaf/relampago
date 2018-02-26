@@ -29,7 +29,6 @@ object PaymentInfo {
   val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
   val NOPACKET = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
   def emptyRD = RoutingData(Vector.empty, Vector.empty, Set.empty, Set.empty, SecretsAndPacket(Vector.empty, NOPACKET), 0L, 0L)
-  def emptyHop(shortChannelId: Long) = Hop(randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
@@ -87,7 +86,6 @@ object PaymentInfo {
   def cutAffectedRoutes(fail: UpdateFailHtlc)(rpi: RuntimePaymentInfo) = {
     // Try to reduce remaining routes and also remember bad nodes and channels
     val parsed = Try apply parseErrorPacket(rpi.rd.onion.sharedSecrets, fail.reason)
-    parsed.foreach(packet => Tools log packet.failureMessage.toString)
 
     parsed map {
       case ErrorPacket(nodeKey, _: Node) =>

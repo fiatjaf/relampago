@@ -11,9 +11,9 @@ import fr.acinq.eclair.UInt64
 
 import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, Scalar}
 import com.lightning.wallet.ln.Helpers.{Closing, Funding}
 import com.lightning.wallet.ln.Tools.{none, runAnd}
+import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
 
 
@@ -136,8 +136,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (norm: NormalData, hop: Hop, OPEN | OFFLINE) =>
         // Got either an empty Hop with shortChannelId or a final one
+        // do not trigger listeners and silently update a current state
         val d1 = norm.modify(_.commitments.extraHop) setTo Some(hop)
-        me UPDATA d1
+        data = me STORE d1
 
 
       case (norm: NormalData, add: UpdateAddHtlc, OPEN) =>
@@ -489,7 +490,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   private def storeRefund(some: HasCommitments, point: Point) = {
     val msg = "please publish your local commitment" getBytes "UTF-8"
     val ref = RefundingData(some.announce, Some(point), some.commitments)
-    BECOME(STORE(ref), REFUNDING) SEND Error(ref.commitments.channelId, msg)
+    BECOME(me STORE ref, REFUNDING) SEND Error(ref.commitments.channelId, msg)
   }
 
   private def makeFundingLocked(cs: Commitments) = {
@@ -578,6 +579,12 @@ object Channel {
     val unconstrainedCanSend = estimateTotalCanSend(chan)
     math.min(unconstrainedCanSend, LNParams.maxHtlcValue.amount)
   }
+
+  def getHop(chan: Channel) = for {
+    Some(extraHop) <- chan(_.extraHop)
+    // Ensure the hop is the final one
+    if extraHop.htlcMinimumMsat > 0L
+  } yield chan -> Vector(extraHop)
 }
 
 trait ChannelListener {

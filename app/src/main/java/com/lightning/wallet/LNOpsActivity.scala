@@ -5,7 +5,7 @@ import com.lightning.wallet.Utils._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-import com.lightning.wallet.ln.LNParams.broadcaster.txStatus
+import com.lightning.wallet.ln.LNParams.broadcaster.getStatus
 import android.widget.RadioGroup.OnCheckedChangeListener
 import info.hoang8f.android.segmented.SegmentedGroup
 import com.lightning.wallet.ln.LNParams.DepthAndDead
@@ -18,7 +18,7 @@ import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.widget.{Button, RadioButton, RadioGroup}
 import android.view.{LayoutInflater, View, ViewGroup}
 import com.lightning.wallet.ln.Tools.{none, wrap}
-import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 
 
 class LNOpsActivity extends TimerActivity { me =>
@@ -117,11 +117,12 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageFunding(wait: WaitFundingDoneData) = UITask {
-      val openStatus = humanStatus(LNParams.broadcaster txStatus wait.fundingTx.txid)
+      val fundingTxId = Commitments fundingTxid wait.commitments
+      val openStatus = humanStatus(LNParams.broadcaster getStatus fundingTxId)
       val threshold = math.max(wait.commitments.remoteParams.minimumDepth, LNParams.minDepth)
       lnOpsDescription setText getString(ln_ops_chan_opening).format(chan.state, started,
         coloredIn(capacity), alias, app.plurOrZero(txsConfs, threshold),
-        wait.fundingTx.txid.toString, openStatus).html
+        fundingTxId.toString, openStatus).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -135,14 +136,13 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       val canReceive = MilliSatoshi(canReceiveMsat)
       val canSpend = MilliSatoshi(canSpendMsat)
 
-      val hasUpdate = StorageWrap.getUpd(chan).isDefined
       val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
       val canSpendHuman = if (canSpendMsat < 0L) coloredOut(canSpend) else coloredIn(canSpend)
       val canReceiveHuman = if (canReceiveMsat < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-      val canReceiveFinal = if (hasUpdate) canReceiveHuman else sumOut format getString(ln_ops_chan_receive_wait)
-      lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, started, coloredIn(capacity),
-        canSpendHuman, canReceiveFinal, alias, inFlight, nodeId).html
+      val canReceiveFinal = if (getHop(chan).isDefined) canReceiveHuman else sumOut format getString(ln_ops_chan_receive_wait)
+      lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, started, coloredIn(capacity), canSpendHuman,
+        canReceiveFinal, alias, inFlight, nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -171,14 +171,14 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       host.updateCountView
 
       val best = data.closings maxBy {
-        case Left(mutualTx) => txStatus(mutualTx.txid) match { case cfs \ _ => cfs }
-        case Right(info) => txStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
+        case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ _ => cfs }
+        case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
       }
 
       best match {
         case Left(mutualTx) =>
           val refundable = Satoshi(myBalanceMsat(chan) / 1000L)
-          val status = humanStatus apply txStatus(mutualTx.txid)
+          val status = humanStatus apply getStatus(mutualTx.txid)
           val myFee = coloredOut(capacity - mutualTx.allOutputsAmount)
           val mutualView = commitStatus.format(mutualTx.txid.toString, status, myFee)
           lnOpsDescription setText bilateralClosing.format(chan.state, started, closed,
@@ -204,7 +204,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
               statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
           } take 2 mkString "<br><br>"
 
-          val status = humanStatus apply txStatus(info.commitTx.txid)
+          val status = humanStatus apply getStatus(info.commitTx.txid)
           val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
           val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
           val refundsView = if (tier12View.isEmpty) new String else refundStatus + tier12View

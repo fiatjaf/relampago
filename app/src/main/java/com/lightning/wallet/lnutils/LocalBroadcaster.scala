@@ -16,13 +16,24 @@ object LocalBroadcaster extends Broadcaster {
   def currentHeight = math.max(app.kit.wallet.getLastBlockSeenHeight,
     app.kit.peerGroup.getMostCommonChainHeight)
 
-  def txStatus(txid: BinaryData) = {
+  def getTx(txid: BinaryData) = {
     val wrapped = Sha256Hash wrap txid.toArray
-    Option(app.kit.wallet getTransaction wrapped) map { tx =>
-      val isTxDead = tx.getConfidence.getConfidenceType == DEAD
-      tx.getConfidence.getDepthInBlocks -> isTxDead
-    } getOrElse 0 -> false
+    Option(app.kit.wallet getTransaction wrapped)
   }
+
+  def getStatus(txid: BinaryData) = getTx(txid) map { tx =>
+    val isTxDead = tx.getConfidence.getConfidenceType == DEAD
+    tx.getConfidence.getDepthInBlocks -> isTxDead
+  } getOrElse 0 -> false
+
+  def getBlockHashString(txid: BinaryData) = for {
+    // Given a txid return a hash of containing block
+    // this will return a single block hash
+
+    transaction <- getTx(txid)
+    hashes <- Option(transaction.getAppearsInHashes)
+    firstBlockHash = hashes.keySet.iterator.next
+  } yield firstBlockHash.toString
 
   override def onBecome = {
     case (_, wait: WaitFundingDoneData, _, _) =>

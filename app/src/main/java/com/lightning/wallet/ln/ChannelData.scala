@@ -73,7 +73,7 @@ case class ClosingData(announce: NodeAnnouncement,
                        closedAt: Long = System.currentTimeMillis) extends HasCommitments {
 
   def isOutdated: Boolean = {
-    val mutualClosingStates = for (tx <- mutualClose) yield txStatus(tx.txid)
+    val mutualClosingStates = for (tx <- mutualClose) yield getStatus(tx.txid)
     val isOk = mutualClosingStates exists { case cfs \ _ => cfs > minDepth }
     isOk || closedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
   }
@@ -223,6 +223,7 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
                        startedAt: Long = System.currentTimeMillis)
 
 object Commitments {
+  def fundingTxid(c: Commitments) = BinaryData(c.commitInput.outPoint.hash.reverse)
   def localHasUnsignedOutgoing(c: Commitments) = c.localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def remoteHasUnsignedOutgoing(c: Commitments) = c.remoteChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def latestRemoteCommit(c: Commitments) = c.remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse c.remoteCommit

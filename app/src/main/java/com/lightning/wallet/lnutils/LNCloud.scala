@@ -29,7 +29,7 @@ abstract class Cloud extends StateMachine[CloudData] {
   protected[this] var isFree = true
   val connector: Connector
 
-  def getSided[T](obs: Obs[T] /* side effects */) = {
+  def getSided[T](obs: Obs[T] /* manage isFree */) = {
     val observable1 = obs doOnSubscribe { isFree = false }
     observable1 doOnTerminate { isFree = true }
   }
@@ -48,7 +48,7 @@ case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
 
 class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
   def capableChanExists = app.ChannelManager.canSend(max).nonEmpty
-  val connector = new Connector("http://213.133.99.89:9002")
+  val connector = new Connector("http://10.0.2.2:9002")
   val max = 20000000L
 
   // STATE MACHINE
@@ -190,8 +190,8 @@ object Connector {
   type BigIntegerVec = Vector[BigInteger]
   type AnnounceChansNumVec = Vector[AnnounceChansNum]
   type RequestAndMemo = (PaymentRequest, BlindMemo)
-  type BlockHeightAndTxs = (Long, StringVec)
   type ClearToken = (String, String, String)
+  type BlockHeightAndTxs = (Long, StringVec)
   type TokensInfo = (String, String, Int)
   type HttpParam = (String, String)
   val CMDStart = "CMDStart"

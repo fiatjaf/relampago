@@ -1,13 +1,11 @@
 package com.lightning.wallet.ln
 
-import com.lightning.wallet.ln.Tools.wrap
-
+import com.lightning.wallet.ln.Tools.runAnd
+import fr.acinq.bitcoin.Crypto.PrivateKey
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
 import crypto.RandomGenerator
 import java.util
-
-import fr.acinq.bitcoin.Crypto.PrivateKey
 
 
 object SET {
@@ -30,16 +28,17 @@ object Tools {
   def wrap(run: => Unit)(go: => Unit) = try go catch none finally run
   def none: PartialFunction[Any, Unit] = { case _ => }
 
-
-  def fromShortId(id: Long): (Int, Int, Int) = {
-    val blockNumber = id.>>(40).&(0xFFFFFF).toInt
-    val txOrd = id.>>(16).&(0xFFFFFF).toInt
-    val outIdx = id.&(0xFFFF).toInt
-    (blockNumber, txOrd, outIdx)
+  def fromShortId(id: Long) = {
+    val blockHeight = id.>>(40).&(0xFFFFFF).toInt
+    val txIndex = id.>>(16).&(0xFFFFFF).toInt
+    val outputIndex = id.&(0xFFFF).toInt
+    (blockHeight, txIndex, outputIndex)
   }
 
-  def toShortId(blockNumber: Int, txOrd: Int, outIdx: Int): Long =
-    blockNumber.&(0xFFFFFFL).<<(40) | txOrd.&(0xFFFFFFL).<<(16) | outIdx.&(0xFFFFL)
+  def toShortIdOpt(blockHeight: Long, txIndex: Long, outputIndex: Long): Option[Long] = {
+    val result = blockHeight.&(0xFFFFFFL).<<(40) | txIndex.&(0xFFFFFFL).<<(16) | outputIndex.&(0xFFFFL)
+    if (txIndex < 0) None else Some(result)
+  }
 
   def toLongId(fundingHash: BinaryData, fundingOutputIndex: Int): BinaryData =
     if (fundingOutputIndex >= 65536 | fundingHash.size != 32) throw new LightningException
@@ -66,7 +65,7 @@ trait CMDException extends LightningException { val rpi: RuntimePaymentInfo }
 
 abstract class StateMachine[T] {
   def become(freshData: T, freshState: String) =
-    wrap { data = freshData } { state = freshState }
+    runAnd { data = freshData } { state = freshState }
 
   def doProcess(change: Any)
   var state: String = _

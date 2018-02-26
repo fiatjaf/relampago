@@ -7,14 +7,12 @@ import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
-import com.lightning.wallet.ln.Announcements._
+import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.Connector.CMDStart
-import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import com.lightning.wallet.helper.RichCursor
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
-import language.postfixOps
 
 
 object StorageWrap extends ChannelListener {
@@ -28,27 +26,25 @@ object StorageWrap extends ChannelListener {
     RichCursor(cursor).headTry(_ string StorageTable.value)
   }
 
-  def getUpd(chan: Channel) = for {
-    longChanId <- chan(_.channelId.toString)
-    update <- get(longChanId) map to[ChannelUpdate] toOption
-  } yield chan -> Vector(update toHop chan.data.announce.nodeId)
-
-  def isOurUpdate(norm: NormalData, upd: ChannelUpdate) = {
-    val (blockNumber, txOrd, outIdx) = Tools.fromShortId(upd.shortChannelId)
-
-    val myIdx = norm.commitments.commitInput.outPoint.index.toInt
-    val myBlockNumber = 100
-
-    (0 to 7500).exists(ord => Tools.toShortId(myBlockNumber, ord, myIdx) == upd.shortChannelId)
-
-    val idxMatch = norm.commitments.commitInput.outPoint.index == outIdx
-    idxMatch && !isDisabled(upd.flags) && checkSig(upd, norm.announce.nodeId)
-  }
-
   override def onProcess = {
-    case (chan, norm: NormalData, upd: ChannelUpdate) if isOurUpdate(norm, upd) =>
-      // Store our update in a database and process no further updates afterwards
-      put(upd.toJson.toString, norm.commitments.channelId.toString)
+    case (chan, norm: NormalData, _: CMDBestHeight)
+      // GUARD: don't have an extra hop, get the block
+      if norm.commitments.extraHop.isEmpty =>
+
+      val txid = Commitments fundingTxid norm.commitments
+      val outIdx = norm.commitments.commitInput.outPoint.index
+
+      for {
+        hash <- broadcaster getBlockHashString txid
+        height \ txIds <- retry(cloud.connector getBlock hash, pickInc, 4 to 5)
+        shortChannelId <- Tools.toShortIdOpt(height, txIds indexOf txid.toString, outIdx)
+      } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
+
+    case (chan, norm: NormalData, upd: ChannelUpdate)
+      // GUARD: we already have an old or empty Hop, replace it with a new one
+      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
+      // Set a fresh update for this channel and process no further updates afterwards
+      chan process upd.toHop(chan.data.announce.nodeId)
       chan.listeners -= StorageWrap
   }
 }

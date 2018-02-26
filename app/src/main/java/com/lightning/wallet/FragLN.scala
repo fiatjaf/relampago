@@ -179,9 +179,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     if (operational.isEmpty) app toast ln_status_none else next(operational)
   }
 
-  def sendPayment(pr: PaymentRequest) = ifOperational { operational =>
-    // An operational channel exists, this is not a payment to itself
-    // and this payment request is not yet expired
+  def sendPayment(pr: PaymentRequest) = ifOperational { operationalChannels =>
+    // We only can proceed if an operational (normal and online) channel exists,
+    // this is not a payment to itself and this payment request has not expired
 
     app.TransData.value = null
     host.walletPager.setCurrentItem(1, false)
@@ -190,7 +190,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     else app toast dialog_pr_expired
 
     def withFreshPaymentRequest = {
-      val maxCanSend = MilliSatoshi(operational.map(estimateCanSend).max)
+      val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSend).max)
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val popupTitle = getString(ln_send_title).format(me getDescription pr.description)
       val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), popupTitle.html, content)
@@ -225,10 +225,10 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       request1.foreach(foeRPI => app.ChannelManager.sendEither(foeRPI, none), onFail)
     }
 
-  def makePaymentRequest = ifOperational { operational =>
-    val goodChannels \ extraRoutes = operational.flatMap(StorageWrap.getUpd).unzip
-    if (extraRoutes.isEmpty) mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
-    else withUpdates(goodChannels.map(estimateCanReceive).max)
+  def makePaymentRequest = ifOperational { operationalChannels =>
+    val goodChannels \ extraRoutes = operationalChannels.flatMap(getHop).unzip
+    if (extraRoutes.nonEmpty) withUpdates(goodChannels.map(estimateCanReceive).max)
+    else mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
 
     def withUpdates(maxReceive: Long) = {
       val maxCanReceive = MilliSatoshi(maxReceive)
