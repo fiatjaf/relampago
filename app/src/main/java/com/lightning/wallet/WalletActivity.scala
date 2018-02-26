@@ -490,6 +490,7 @@ class FragScan extends Fragment with BarcodeCallback { me =>
   def tryParseQR(scannedText: String) = try {
     // This may throw which is expected and fine
 
+    barcodeReader.pause
     beepManager.playBeepSound
     lastAttempt = System.currentTimeMillis
     app.TransData recordValue scannedText

@@ -48,7 +48,7 @@ case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
 
 class PublicCloud(bag: PaymentInfoBag) extends Cloud { me =>
   def capableChanExists = app.ChannelManager.canSend(max).nonEmpty
-  val connector = new Connector("http://10.0.2.2:9002")
+  val connector = new Connector("http://213.133.99.89:9002")
   val max = 20000000L
 
   // STATE MACHINE

@@ -102,11 +102,11 @@ class WalletApp extends Application { me =>
     def recordValue(rawText: String) = value = rawText match {
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
       case lnLink(_, body) if notMixedCase(body) => PaymentRequest read body.toLowerCase
-      case nodeLink(key, hostName, port) => mkna(PublicKey(key), hostName, port.toInt)
+      case nodeLink(key, hostName, port) => mkNA(PublicKey(key), hostName, port.toInt)
       case _ => getTo(rawText)
     }
 
-    def mkna(key: PublicKey, host: String, port: Int) = {
+    def mkNA(key: PublicKey, host: String, port: Int) = {
       val address = new InetSocketAddress(host, port) :: Nil
       val rgb = (Byte.MinValue, Byte.MinValue, Byte.MinValue)
       NodeAnnouncement(null, null, 0L, key, rgb, host, address)
