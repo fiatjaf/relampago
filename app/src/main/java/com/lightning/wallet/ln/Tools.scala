@@ -47,13 +47,17 @@ object Tools {
 }
 
 object Features {
+  val OPTION_DATA_LOSS_PROTECT_MANDATORY = 0
   val OPTION_DATA_LOSS_PROTECT_OPTIONAL = 1
   val INITIAL_ROUTING_SYNC_BIT_OPTIONAL = 3
 
   implicit def binData2BitSet(data: BinaryData): util.BitSet = util.BitSet valueOf data.reverse.toArray
-  def initialRoutingSync(bitset: util.BitSet): Boolean = bitset get INITIAL_ROUTING_SYNC_BIT_OPTIONAL
-  def dataLossProtect(bitset: util.BitSet): Boolean = bitset get OPTION_DATA_LOSS_PROTECT_OPTIONAL
-  def areSupported(bitset: util.BitSet): Boolean = !(0 until bitset.length by 2 exists bitset.get)
+  def initialRoutingSync(bitset: util.BitSet) = bitset.get(INITIAL_ROUTING_SYNC_BIT_OPTIONAL)
+  def areSupported(bitset: util.BitSet) = !(0 until bitset.length by 2 exists bitset.get)
+
+  def dataLossProtect(bitset: util.BitSet) =
+    bitset.get(OPTION_DATA_LOSS_PROTECT_OPTIONAL) ||
+      bitset.get(OPTION_DATA_LOSS_PROTECT_MANDATORY)
 }
 
 case class CMDAddExcept(rpi: RuntimePaymentInfo, code: Int) extends CMDException
