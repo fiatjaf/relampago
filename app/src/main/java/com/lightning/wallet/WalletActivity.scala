@@ -24,7 +24,6 @@ import com.lightning.wallet.ln.wire.{NodeAnnouncement, WalletZygote}
 import fr.castorflex.android.smoothprogressbar.{SmoothProgressBar, SmoothProgressDrawable}
 import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
 import com.lightning.wallet.ln.wire.LightningMessageCodecs.walletZygoteCodec
-import android.support.v7.widget.SearchView.OnQueryTextListener
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.content.DialogInterface.OnDismissListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
@@ -57,14 +56,17 @@ import java.io.File
 
 trait SearchBar { me =>
   var react: String => Unit = _
-  private[this] val queryListener = new OnQueryTextListener {
-    def onQueryTextChange(query: String) = runAnd(true)(me react query)
-    def onQueryTextSubmit(query: String) = true
+  var searchView: SearchView = _
+
+  val queryListener = new SearchView.OnQueryTextListener {
+    def onQueryTextChange(ask: String) = runAnd(true)(me react ask)
+    def onQueryTextSubmit(ask: String) = true
   }
 
   def setupSearch(menu: Menu) = {
-    val search = getActionView(menu findItem R.id.action_search)
-    search.asInstanceOf[SearchView].setOnQueryTextListener(queryListener)
+    val item = menu findItem R.id.action_search
+    searchView = getActionView(item).asInstanceOf[SearchView]
+    searchView setOnQueryTextListener queryListener
   }
 }
 

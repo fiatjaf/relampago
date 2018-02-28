@@ -70,13 +70,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   val lnChanWarn = frag.findViewById(R.id.lnChanWarn)
   val noDesc = host getString ln_no_description
 
-  def getDescription(txt: String) = if (txt.isEmpty) s"<i>$noDesc</i>" else txt take 140
+  var showDescription = false
   val adapter = new CutAdapter[PaymentInfo](PaymentTable.limit, R.layout.frag_tx_ln_line) {
     // LN line has smaller timestamps because payment info, also limit of rows is reduced
     // which is fine because unlike Bitcoin all the LN payments can be found via search
 
     def getItem(position: Int) = visibleItems(position)
-    def getHolder(view: View) = new TxViewHolder(view) {
+    def getHolder(paymentView: View) = new TxViewHolder(paymentView) {
+      val transactWhat = paymentView.findViewById(R.id.transactWhat).asInstanceOf[TextView]
 
       def fillView(info: PaymentInfo) = {
         val timestamp = new Date(info.stamp)
@@ -89,6 +90,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         transactSum setText s"$markedPayment <font color=#999999>$fastId</font>".html
         transactWhen setText when(System.currentTimeMillis, timestamp).html
         transactCircle setImageResource imageMap(info.actualStatus)
+        transactWhat setText getDescription(info.description).html
+        transactWhat setVisibility viewMap(showDescription)
       }
     }
   }
@@ -122,6 +125,21 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     override def coinsSent(tx: Transaction) = notifyBtcEvent(host getString btc_sent)
     override def coinsReceived(tx: Transaction) = notifyBtcEvent(host getString btc_received)
   }
+
+  override def setupSearch(menu: Menu) = {
+    // Expand payment list if search is active
+    // hide payment description if it's not
+
+    super.setupSearch(menu)
+    searchView addOnAttachStateChangeListener new View.OnAttachStateChangeListener {
+      def onViewDetachedFromWindow(arg: View) = runAnd(showDescription = false)(adapter.notifyDataSetChanged)
+      def onViewAttachedToWindow(arg: View) = runAnd(showDescription = true)(adapter.notifyDataSetChanged)
+    }
+  }
+
+  def getDescription(txt: String) =
+    if (txt.isEmpty) s"<i>$noDesc</i>"
+    else txt take 140
 
   def onFragmentResume = {
     for (chan <- app.ChannelManager.all) chan.listeners += chanListener
