@@ -59,10 +59,9 @@ object FingerPassCode {
   def informUser(e: GFError) = e match {
     case GFError.DECRYPTION_FAILED => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
     case GFError.CRYPTO_OBJECT_INIT => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
-    case GFError.ENCRYPTION_FAILED => runAnd(FingerPassCode.erase)(app toast err_general)
+    case GFError.ENCRYPTION_FAILED => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
     case GFError.TIMEOUT => app toast fp_err_timeout
-    case GFError.LOCKOUT => app toast fp_err_failure
-    case otherwise => app toast err_general
+    case otherwise => app toast fp_err_failure
   }
 }
 

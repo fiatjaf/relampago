@@ -414,6 +414,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
             dlg setOnDismissListener new OnDismissListener {
               def onDismiss(dialog: DialogInterface) = gf.cancel
               gf.encrypt(fileName, pass, callback)
+              alert
             }
           }
         }

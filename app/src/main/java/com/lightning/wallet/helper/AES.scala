@@ -10,7 +10,7 @@ import javax.crypto.Cipher
 
 object AES {
   def cipher(key: Bytes, initVector: Bytes, mode: Int) =
-    Cipher getInstance "AES/CTR/NoPadding" match { case aesCipher =>
+    Cipher getInstance "AES/CBC/PKCS7Padding" match { case aesCipher =>
       val ivParameterSpec: IvParameterSpec = new IvParameterSpec(initVector)
       aesCipher.init(mode, new SecretKeySpec(key, "AES"), ivParameterSpec)
       aesCipher
