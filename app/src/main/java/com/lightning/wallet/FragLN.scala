@@ -182,9 +182,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   def sendPayment(pr: PaymentRequest) = ifOperational { operationalChannels =>
     // We only can proceed if an operational (normal and online) channel exists,
     // this is not a payment to itself and this payment request has not expired
-
-    app.TransData.value = null
-    host.walletPager.setCurrentItem(1, false)
     if (pr.nodeId == nodePublicKey) app toast err_general
     else if (pr.isFresh) withFreshPaymentRequest
     else app toast dialog_pr_expired

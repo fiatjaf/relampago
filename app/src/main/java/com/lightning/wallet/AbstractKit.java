@@ -14,7 +14,8 @@ import javax.annotation.Nullable;
 
 
 public abstract class AbstractKit extends AbstractIdleService {
-    public static final String CHAN_VIEW_ALIVE = "chanViewAlive";
+    public static final String ENCRYPTED_PASSCODE = "fingerprintPasscode";
+    public static final String CHAN_VIEW_ALIVE_ONLY = "chanViewAlive";
     public static final String DENOM_TYPE = "bitcoinDenomType";
     public static final String FIAT_TYPE = "fiatCurrencyType";
     public static final String ERROR_REPORT = "errorReport";

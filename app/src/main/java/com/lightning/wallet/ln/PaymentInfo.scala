@@ -11,9 +11,9 @@ import com.lightning.wallet.ln.wire.LightningMessageCodecs._
 
 import scala.util.{Success, Try}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
-import com.lightning.wallet.ln.Tools.{random, randomPrivKey}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Transaction}
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
+import com.lightning.wallet.ln.Tools.random
 import fr.acinq.bitcoin.Crypto
 import scodec.bits.BitVector
 import scodec.Attempt
@@ -121,6 +121,7 @@ object PaymentInfo {
       failHtlc(sharedSecret, FinalIncorrectCltvExpiry(add.expiry), add)
 
     case (Attempt.Successful(_), nextPacket, sharedSecret)
+      // We may not have enough time to enforce this on-chain
       if nextPacket.isLast && add.expiry < minExpiry =>
       failHtlc(sharedSecret, FinalExpiryTooSoon, add)
 

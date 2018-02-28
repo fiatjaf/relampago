@@ -194,10 +194,9 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
     def next(ms: MilliSatoshi) = new TxProcessor {
       val pay = AddrData(ms, spendManager.getAddress)
-
-      def processTx(pass: String, feePerKb: Coin) = {
+      def processTx(passcode: String, feePerKb: Coin) = {
         add(host getString btc_announcing, Informer.BTCEVENT).run
-        <(app.kit blockingSend unsigned(pass, feePerKb), onTxFail)(none)
+        <(app.kit blockingSend unsigned(passcode, feePerKb), onTxFail)(none)
       }
 
       def onTxFail(generationError: Throwable) =
@@ -214,8 +213,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
     val ok = alert getButton BUTTON_POSITIVE
     ok setOnClickListener onButtonTap(sendAttempt)
-    host.walletPager.setCurrentItem(0, false)
-    app.TransData.value = null
     spendManager
   }
 

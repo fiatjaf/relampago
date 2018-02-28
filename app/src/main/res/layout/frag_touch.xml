@@ -1,0 +1,18 @@
+<LinearLayout
+    style="@style/StandardLinearLayout"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <TextView
+        style="@style/MarginInfo"
+        android:text="@string/fp_touch"
+        android:layout_width="wrap_content"/>
+
+    <ImageView
+        android:id="@+id/mainFingerprint"
+        android:layout_marginBottom="25dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_fingerprint_black_24dp"/>
+
+    <View style="@style/GrayDivider"/>
+</LinearLayout>

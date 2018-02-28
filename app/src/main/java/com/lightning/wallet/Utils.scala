@@ -210,13 +210,13 @@ trait TimerActivity extends AppCompatActivity { me =>
     // Warn user and proceed to export an encrypted mnemonic code using current password
 
     val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
-    lazy val dialog = mkChoiceDialog(none, warnUser, dialog_ok, dialog_export)
-    lazy val alert = mkForm(dialog, getString(sets_noscreen).html, wordsText)
+    lazy val bld = mkChoiceDialog(none, warnUser, dialog_ok, dialog_export)
+    lazy val alert = mkForm(bld, getString(sets_noscreen).html, wordsText)
     alert
 
     def warnUser: Unit = rm(alert) {
-      lazy val dialog1 = mkChoiceDialog(encryptAndExport, none, dialog_ok, dialog_cancel)
-      lazy val alert1 = mkForm(dialog1, null, getString(mnemonic_export_details).html)
+      lazy val bld1 = mkChoiceDialog(encryptAndExport, none, dialog_ok, dialog_cancel)
+      lazy val alert1 = mkForm(bld1, null, getString(mnemonic_export_details).html)
       alert1
 
       def encryptAndExport: Unit = rm(alert1) {

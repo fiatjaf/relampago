@@ -37,9 +37,9 @@
     </array>
 
     <array name="restore_mnemonic_options">
-        <item>Use an encrypted mnemonic code which was exported from a previous wallet</item>
-        <item>Enter plain mnemonic code which was saved from a previous wallet</item>
-        <item>Choose a migration file</item>
+        <item>Use encrypted mnemonic</item>
+        <item>Enter plain mnemonic</item>
+        <item>Use migration file</item>
     </array>
 
     <string name="create_wallet_creating">Generating your wallet\nIt may take up to a few minutes</string>
@@ -50,7 +50,7 @@
     <string name="restore_hint">Your BIP32 mnemonic code</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>%1$s<br>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.06&#8211;23<br><br></small>Wallet settings]]></string>
+    <string name="read_settings"><![CDATA[<small>%1$s<br>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.06&#8211;23</small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
     <string name="mnemonic_info"><font color="#E31300">Your mnemonic code is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.\n\nProperly secured mnemonic code protectes you from money loss.</string>
     <string name="mnemonic_export_details"><![CDATA[Mnemonic code will be encrypted and exported using <strong>your current passcode</strong>.<br><br>You are strongly advised to read a <a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>related section</a> of wallet manual before proceeding with this]]></string>
@@ -169,7 +169,20 @@
     <string name="err_different_net">Failed because request contains an address that belongs to a different network.</string>
     <string name="err_address">Failed because neither Bitcoin address nor Lightning payment request has been found.</string>
     <string name="err_uri">Failed because request contains a malformed URI which could not be parsed.</string>
-    <string name="err_general">Failed because an error has occurred.</string>
+    <string name="err_general">Failed because an error has occurred</string>
+
+    <!-- fingerprint -->
+    <string name="fp_err_try_again">Try again</string>
+    <string name="fp_err_dirty">Sensor is dirty</string>
+    <string name="fp_err_failure">Fingerprint failed</string>
+    <string name="fp_err_timeout">Fingerprint timed out</string>
+    <string name="fp_disable">Disable fingerprint auth</string>
+    <string name="fp_enable">Enable fingerprint auth</string>
+
+    <string name="fp_touch">
+        Please touch a sensor\n
+        to complete procedure
+    </string>
 
     <!-- LN QR and NFC related messages -->
     <string name="nfc_enabled">NFC is on</string>
@@ -200,7 +213,7 @@
 
     <string name="ln_chan_close_details">Channel closing results in an on-chain Bitcoin transaction which refunds the remaining Lightning balance back to your Bitcoin wallet</string>
     <string name="ln_chan_force_details"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a> takes more fees and time than a cooperaive one]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>total capacity %3$s<br>can spend %4$s<br><a href=http://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>can receive</a> %5$s<br>%6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>total capacity %3$s<br>can send %4$s<br><a href=http://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>can receive</a> %5$s<br>%6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_opening"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>total capacity %3$s<br>%4$s<br><br>Funding Bitcoin transaction needs to reach %5$s for this channel to become usable<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>closed at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br>%6$s<br><br>Refundable channel balance has been transferred to your Bitcoin wallet<br><br>%7$s]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>%6$s<br><br>Refundable channel balance will be transferred to your Bitcoin wallet<br><br>%7$s]]></string>

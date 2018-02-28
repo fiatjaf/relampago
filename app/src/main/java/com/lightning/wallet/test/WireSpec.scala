@@ -21,6 +21,19 @@ class WireSpec {
     bin
   }, compressed = true)
 
+  def randomBytes(size: Int): BinaryData = {
+    val bin = new Array[Byte](size)
+    Random.nextBytes(bin)
+    bin
+  }
+
+  def randomSignature: BinaryData = {
+    val priv = randomBytes(32)
+    val data = randomBytes(32)
+    val (r, s) = Crypto.sign(data, PrivateKey(priv, true))
+    Crypto.encodeSignature(r, s) :+ fr.acinq.bitcoin.SIGHASH_ALL.toByte
+  }
+
   def allTests = {
     def bin(size: Int, fill: Byte): BinaryData = Array.fill[Byte](size)(fill)
 
@@ -29,19 +42,6 @@ class WireSpec {
     def point(fill: Byte) = Scalar(bin(32, fill)).toPoint
 
     def publicKey(fill: Byte) = PrivateKey(bin(32, fill), compressed = true).publicKey
-
-    def randomBytes(size: Int): BinaryData = {
-      val bin = new Array[Byte](size)
-      Random.nextBytes(bin)
-      bin
-    }
-
-    def randomSignature: BinaryData = {
-      val priv = randomBytes(32)
-      val data = randomBytes(32)
-      val (r, s) = Crypto.sign(data, PrivateKey(priv, true))
-      Crypto.encodeSignature(r, s) :+ fr.acinq.bitcoin.SIGHASH_ALL.toByte
-    }
 
     {
       println("encode/decode with rgb codec")

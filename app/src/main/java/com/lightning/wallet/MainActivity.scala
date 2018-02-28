@@ -5,13 +5,15 @@ import android.widget._
 import com.lightning.wallet.Utils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
+import co.infinum.goldfinger.{Goldfinger, Warning}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
 import com.google.common.io.{ByteStreams, Files}
+import co.infinum.goldfinger.{Error => GFError}
 import scala.util.{Failure, Success, Try}
 import java.io.{File, FileInputStream}
 import R.id.{typePIN, typePass}
 
-import com.lightning.wallet.ln.wire.LightningMessageCodecs.walletZygoteCodec
+import ln.wire.LightningMessageCodecs.walletZygoteCodec
 import android.widget.RadioGroup.OnCheckedChangeListener
 import android.text.method.PasswordTransformationMethod
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -38,6 +40,32 @@ trait ViewSwitch {
   }
 }
 
+object FingerPassCode {
+  def exists = app.prefs.contains(AbstractKit.ENCRYPTED_PASSCODE)
+  def erase = app.prefs.edit.remove(AbstractKit.ENCRYPTED_PASSCODE).commit
+  def record(base64: String) = app.prefs.edit.putString(AbstractKit.ENCRYPTED_PASSCODE, base64).commit
+  def get = app.prefs.getString(AbstractKit.ENCRYPTED_PASSCODE, "No encrypted passcode exists here")
+
+  def informUser(w: Warning) = w match {
+    case Warning.DIRTY => app toast fp_err_dirty
+    case Warning.FAILURE => app toast fp_err_try_again
+    case Warning.INSUFFICIENT => app toast fp_err_try_again
+    case Warning.TOO_SLOW => app toast fp_err_try_again
+    case Warning.TOO_FAST => app toast fp_err_try_again
+    case Warning.PARTIAL => app toast fp_err_try_again
+    case otherwise =>
+  }
+
+  def informUser(e: GFError) = e match {
+    case GFError.DECRYPTION_FAILED => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
+    case GFError.CRYPTO_OBJECT_INIT => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
+    case GFError.ENCRYPTION_FAILED => runAnd(FingerPassCode.erase)(app toast err_general)
+    case GFError.TIMEOUT => app toast fp_err_timeout
+    case GFError.LOCKOUT => app toast fp_err_failure
+    case otherwise => app toast err_general
+  }
+}
+
 object MainActivity {
   var proceed: Runnable = _
   lazy val prepareKit = Future {
@@ -56,9 +84,11 @@ object MainActivity {
 
 class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch { me =>
   lazy val mainPassKeysType = findViewById(R.id.mainPassKeysType).asInstanceOf[SegmentedGroup]
+  lazy val mainFingerprint = findViewById(R.id.mainFingerprint).asInstanceOf[ImageView]
   lazy val mainPassCheck = findViewById(R.id.mainPassCheck).asInstanceOf[Button]
   lazy val mainPassData = findViewById(R.id.mainPassData).asInstanceOf[EditText]
-  private[this] val RESPONSE_CODE = 101
+  lazy val gf = new Goldfinger.Builder(me).build
+  private[this] val FILE_CODE = 101
 
   lazy val views =
     findViewById(R.id.mainChoice) ::
@@ -85,13 +115,13 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   // NFC AND SHARE
 
   override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent) =
-    if (requestCode == RESPONSE_CODE & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
+    if (requestCode == FILE_CODE & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
 
   override def onNoNfcIntentFound = {
     // Filter out failures and nulls, try to set value, proceed if successful and inform if not
     val attempts = Try(getIntent.getDataString) :: Try(getIntent getStringExtra Intent.EXTRA_TEXT) :: Nil
     val valid = attempts collectFirst { case res @ Success(nonNull: String) => res map app.TransData.recordValue }
-    if (valid.isEmpty) next else valid foreach { case Failure(err) => app.TransData.onFail(inform)(err) case _ => next }
+    if (valid.isEmpty) next else valid foreach { case Failure(err) => app.TransData.onFail(popup)(err) case _ => next }
   }
 
   def readNdefMessage(msg: Message) = try {
@@ -101,15 +131,15 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
   } catch { case err: Throwable =>
     // Could not process a message
-    me inform nfc_error
+    me popup nfc_error
   }
 
   def onNfcStateEnabled = none
   def onNfcStateDisabled = none
   def onNfcFeatureNotFound = none
   def onNfcStateChange(ok: Boolean) = none
-  def readNonNdefMessage = me inform nfc_error
-  def readEmptyNdefMessage = me inform nfc_error
+  def readNonNdefMessage = me popup nfc_error
+  def readEmptyNdefMessage = me popup nfc_error
 
   // STARTUP LOGIC
 
@@ -120,7 +150,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     case (true, true) => MainActivity.proceed.run
 
     case (true, false) =>
-      // Launch of a previously closed app
+      // Load Future in a background
       setVis(View.GONE, View.VISIBLE, View.GONE)
       <<(MainActivity.prepareKit, throw _)(none)
       updateInputType
@@ -129,6 +159,21 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
         // Lazy Future has already been initialized so check a pass after it's done
         <<(MainActivity.prepareKit map decrypt, wrongPass)(_ => app.kit.startAsync)
         setVis(View.GONE, View.GONE, View.VISIBLE)
+        gf.cancel
+      }
+
+      if (gf.hasEnrolledFingerprint && FingerPassCode.exists) {
+        // This device hase fingerprint support, prints registered
+        // and user has saved an encrypted passcode in app prefs
+
+        val callback = new Goldfinger.Callback {
+          def onWarning(warn: Warning) = FingerPassCode informUser warn
+          def onSuccess(passcode: String) = runAnd(mainPassData setText passcode)(mainPassCheck.performClick)
+          def onError(err: GFError) = runAnd(mainFingerprint setVisibility View.GONE)(FingerPassCode informUser err)
+        }
+
+        mainFingerprint setVisibility View.VISIBLE
+        gf.decrypt(fileName, FingerPassCode.get, callback)
       }
 
     // Just should not ever happen
@@ -155,9 +200,9 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     app toast authError.getMessage
   }
 
-  def inform(messageCode: Int): Unit = {
+  def popup(messageCode: Int): Unit = {
     val dlg = mkChoiceDialog(next, finish, dialog_ok, dialog_cancel)
-    showForm(dlg.setMessage(messageCode).create)
+    showForm(alertDialog = dlg.setMessage(messageCode).create)
   }
 
   def goRestoreWallet(view: View) = {
@@ -198,7 +243,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
     def proceedWithMigrationFile = rm(alert) {
       val intent = new Intent(Intent.ACTION_OPEN_DOCUMENT) setType "text/plain"
-      startActivityForResult(intent addCategory Intent.CATEGORY_OPENABLE, RESPONSE_CODE)
+      startActivityForResult(intent addCategory Intent.CATEGORY_OPENABLE, FILE_CODE)
     }
   }
 

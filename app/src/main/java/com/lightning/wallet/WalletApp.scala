@@ -23,7 +23,6 @@ import org.bitcoinj.wallet.Wallet.BalanceType
 import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
-import fr.acinq.bitcoin.BinaryData
 import java.net.InetSocketAddress
 import android.app.Application
 import scala.util.Try
@@ -33,6 +32,7 @@ import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import android.content.{ClipData, ClipboardManager, Context}
 import org.bitcoinj.wallet.{Protos, SendRequest, Wallet}
+import fr.acinq.bitcoin.{BinaryData, Crypto}
 import rx.lang.scala.{Observable => Obs}
 
 
@@ -106,10 +106,11 @@ class WalletApp extends Application { me =>
       case _ => getTo(rawText)
     }
 
-    def mkNA(key: PublicKey, host: String, port: Int) = {
-      val address = new InetSocketAddress(host, port) :: Nil
-      val rgb = (Byte.MinValue, Byte.MinValue, Byte.MinValue)
-      NodeAnnouncement(null, null, 0L, key, rgb, host, address)
+    def mkNA(nodeId: PublicKey, hostName: String, port: Int) = {
+      // Make a fake node announcement with a dummy signature so it can be serialized
+      val sig = Crypto encodeSignature Crypto.sign(random getBytes 32, LNParams.cloudPrivateKey)
+      NodeAnnouncement(sig, "", 0L, nodeId, (Byte.MinValue, Byte.MinValue, Byte.MinValue),
+        hostName, new InetSocketAddress(hostName, port) :: Nil)
     }
 
     def onFail(err: Int => Unit): PartialFunction[Throwable, Unit] = {
@@ -142,11 +143,11 @@ class WalletApp extends Application { me =>
       override def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
       override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
 
-      override def coinsSent(tx: Transaction) = {
+      override def coinsSent(txj: Transaction) = {
         // We always attempt to extract a payment preimage
         // just assuming any incoming tx may contain it
 
-        val spent = CMDSpent(tx)
+        val spent = CMDSpent(txj)
         bag.extractPreimage(spent.tx)
         all.foreach(_ process spent)
       }
@@ -242,9 +243,9 @@ class WalletApp extends Application { me =>
 
   abstract class WalletKit extends AbstractKit {
     type ScriptSeq = Seq[org.bitcoinj.script.Script]
+    def blockingSend(tx: Transaction): String = nonBlockingSend(tx).get.toString
     def blockingSend(unsigned: SendRequest): String = blockingSend(sign(unsigned).tx)
-    def blockingSend(transaction: Transaction): String = nonBlockingSend(transaction).get.toString
-    def nonBlockingSend(transaction: Transaction) = peerGroup.broadcastTransaction(transaction, 1).broadcast
+    def nonBlockingSend(tx: Transaction) = peerGroup.broadcastTransaction(tx, 1).broadcast
     def watchFunding(cs: Commitments) = watchScripts(cs.commitInput.txOut.publicKeyScript :: Nil)
     def watchScripts(scripts: ScriptSeq) = wallet addWatchedScripts scripts.asJava
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE

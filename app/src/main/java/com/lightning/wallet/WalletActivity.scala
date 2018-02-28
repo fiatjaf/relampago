@@ -15,6 +15,9 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
+import co.infinum.goldfinger.{Error => GFError}
+import android.content.{DialogInterface, Intent}
+import co.infinum.goldfinger.{Goldfinger, Warning}
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
 import com.lightning.wallet.ln.wire.{NodeAnnouncement, WalletZygote}
@@ -23,6 +26,7 @@ import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, Fragme
 import com.lightning.wallet.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import android.support.v7.widget.SearchView.OnQueryTextListener
 import android.support.v4.view.ViewPager.OnPageChangeListener
+import android.content.DialogInterface.OnDismissListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
 import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -42,7 +46,6 @@ import com.google.common.io.Files
 import java.text.SimpleDateFormat
 import org.bitcoinj.core.Address
 import scala.collection.mutable
-import android.content.Intent
 import android.text.InputType
 import org.ndeftools.Message
 import android.os.Bundle
@@ -238,7 +241,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   override def onBackPressed =
-    if (walletPager.getCurrentItem <= 1) super.onBackPressed
+    if (walletPager.getCurrentItem < 2) super.onBackPressed
     else walletPager.setCurrentItem(walletPager.getCurrentItem - 1)
 
   def updateListsTime = {
@@ -283,13 +286,33 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData = app.TransData.value match {
-    case link: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(link.getAmount), link.getAddress)
-    case bitcoinAddress: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddress(bitcoinAddress)
-    case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-    case pr: PaymentRequest => for (ln <- lnOpt) ln.sendPayment(pr)
-    case _ =>
-  }
+  def checkTransData =
+    app.TransData.value match {
+      case request: PaymentRequest =>
+        for (ln <- lnOpt) ln.sendPayment(request)
+        walletPager.setCurrentItem(1, false)
+        app.TransData.value = null
+
+      case addr: Address =>
+        for (btc <- btcOpt) btc.sendBtcPopup.setAddress(addr)
+        walletPager.setCurrentItem(0, false)
+        app.TransData.value = null
+
+      case link: BitcoinURI =>
+        val amount: TryMSat = Try(link.getAmount)
+        // We have a bitcoin link which may contain a payment sum
+        for (btc <- btcOpt) btc.sendBtcPopup.set(amount, link.getAddress)
+        walletPager.setCurrentItem(0, false)
+        app.TransData.value = null
+
+      case _: NodeAnnouncement =>
+        // Don't clear trans data just yet
+        walletPager.setCurrentItem(1, false)
+        me goTo classOf[LNStartFundActivity]
+
+      case otherwise =>
+        // Do nothing here
+    }
 
   //BUTTONS REACTIONS
 
@@ -357,10 +380,51 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
     val menu = mkForm(me negBld dialog_ok, getString(read_settings).format(tokensLeft).html, form)
     val recoverChannelFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
+    val useFingerprint = form.findViewById(R.id.useFingerprint).asInstanceOf[Button]
     val createZygote = form.findViewById(R.id.createZygote).asInstanceOf[Button]
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
     val changePass = form.findViewById(R.id.changePass).asInstanceOf[Button]
+    lazy val gf = new Goldfinger.Builder(me).build
+
+    if (gf.hasEnrolledFingerprint) {
+      // Only if basic prerequisites are here
+      useFingerprint setVisibility View.VISIBLE
+      if (FingerPassCode.exists) setButtonDisable
+      else setButtonEnable
+
+      def setButtonEnable = {
+        // Offer user to enter a passcode and fingerprint
+        useFingerprint setOnClickListener onButtonTap(proceed)
+        useFingerprint setText fp_enable
+
+        def proceed = rm(menu) {
+          passWrap(me getString fp_enable) apply checkPass { pass =>
+            // The password is guaranteed to be correct here, proceed with auth
+            val content = getLayoutInflater.inflate(R.layout.frag_touch, null)
+            lazy val alert = mkForm(dlg, getString(fp_enable).html, content)
+            lazy val dlg = me negBld dialog_cancel
+
+            val callback = new Goldfinger.Callback {
+              def onWarning(warn: Warning) = FingerPassCode informUser warn
+              def onSuccess(cipher: String) = runAnd(alert.dismiss)(FingerPassCode record cipher)
+              def onError(err: GFError) = runAnd(alert.dismiss)(FingerPassCode informUser err)
+            }
+
+            dlg setOnDismissListener new OnDismissListener {
+              def onDismiss(dialog: DialogInterface) = gf.cancel
+              gf.encrypt(fileName, pass, callback)
+            }
+          }
+        }
+      }
+
+      def setButtonDisable = {
+        def proceed = rm(menu)(FingerPassCode.erase)
+        useFingerprint setOnClickListener onButtonTap(proceed)
+        useFingerprint setText fp_disable
+      }
+    }
 
     recoverChannelFunds setOnClickListener onButtonTap {
       // When wallet data is lost users may recover channel funds
@@ -449,9 +513,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
         def rotatePass = {
           app.kit.wallet decrypt oldPass
-          // Make sure we have alphabetical keyboard from now on
           app.encryptWallet(app.kit.wallet, field.getText.toString)
+          // Make sure we definitely have alphabetical keyboard for now
           app.prefs.edit.putBoolean(AbstractKit.PASS_INPUT, true).commit
+          // Remove an old encrypted passcode
+          FingerPassCode.erase
         }
       }
 
