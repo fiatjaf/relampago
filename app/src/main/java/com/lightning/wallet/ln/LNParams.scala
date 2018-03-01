@@ -22,7 +22,6 @@ object LNParams { me =>
 
   val chainHash = Block.TestnetGenesisBlock.hash
   val theirReserveToFundingRatio = 100 // times
-  val maxReserveToFundingRatio = 0.05 // 5%
   val localFeatures = "02"
   val globalFeatures = ""
   val minDepth = 1
@@ -59,8 +58,7 @@ object LNParams { me =>
   }
 
   // FEE RELATED
-
-  def isFeeNotOk(feeMsat: Long) = feeMsat > 50000000
+  def isFeeNotOk(lnFeeMsat: Long) = lnFeeMsat > 50000000
   def shouldUpdateFee(oldPerKw: Long, newPerKw: Long) = {
     val mismatch = (newPerKw - oldPerKw) / (oldPerKw + newPerKw)
     math.abs(2.0 * mismatch) > 0.25

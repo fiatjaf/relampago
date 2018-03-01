@@ -297,11 +297,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     type InfoVec = Vector[PaymentInfo]
 
     def updView(pays: InfoVec, showText: Boolean) = UITask {
-      val textVisibility = if (showText) View.VISIBLE else View.GONE
-      val listVisibility = if (showText) View.GONE else View.VISIBLE
       wrap(adapter.notifyDataSetChanged)(adapter set pays)
-      lnChanWarn setVisibility textVisibility
-      itemsList setVisibility listVisibility
+      lnChanWarn setVisibility viewMap(showText)
+      itemsList setVisibility viewMap(!showText)
     }
 
     def recentPays = new ReactLoader[PaymentInfo](host) {

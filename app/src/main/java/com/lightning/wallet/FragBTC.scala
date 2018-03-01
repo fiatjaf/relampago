@@ -168,9 +168,9 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   def updTitle = setTitle {
     val conf0 = app.kit.conf0Balance
     val conf1 = app.kit.conf1Balance
-    val pending = conf0 minus conf1
+    val zeroConf = conf0 minus conf1
 
-    if (pending.isPositive) s"${denom withSign conf1} + ${denom formatted pending}"
+    if (zeroConf.isPositive) s"${denom withSign conf1} + ${denom formatted zeroConf}"
     else if (conf0.isZero && conf1.isZero) host getString btc_wallet
     else denom withSign conf1
   }

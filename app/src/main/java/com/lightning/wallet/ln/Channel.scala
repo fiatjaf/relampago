@@ -56,10 +56,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         val acceptChannelValidator = Validator[AcceptChannel]
           .rule(_.minimumDepth <= 6L, "Their minimumDepth is too high")
-          .rule(_.htlcMinimumMsat <= 20000L, "Their htlcMinimumMsat too high")
+          .rule(_.htlcMinimumMsat <= 10000L, "Their htlcMinimumMsat too high")
           .rule(_.toSelfDelay <= cmd.localParams.toSelfDelay * 20, "Their toSelfDelay is too high")
-          .rule(_.maxHtlcValueInFlightMsat > UInt64(LNParams.maxHtlcValue.amount / 20), "Their maxHtlcValueInFlightMsat is too low")
-          .rule(_.channelReserveSatoshis.toDouble / cmd.realFundingAmountSat < LNParams.maxReserveToFundingRatio, "Our reserve is too high")
+          .rule(_.maxHtlcValueInFlightMsat > UInt64(10000L), "Their maxHtlcValueInFlightMsat is too low")
+          .rule(_.channelReserveSatoshis < cmd.realFundingAmountSat / 10, "Their proposed reserve is too high")
           .rule(_.maxAcceptedHtlcs > 0, "They can accept too few incoming HTLCs")
           .rule(_.dustLimitSatoshis >= 546L, "Their dust limit is too low")
 

@@ -282,10 +282,14 @@ trait TimerActivity extends AppCompatActivity { me =>
       case _: CouldNotAdjustDownwards => app getString err_empty_shrunk
       case notEnough: InsufficientMoneyException =>
 
+        val canSend = sumIn.format(denom withSign app.kit.conf1Balance)
         val sending = sumOut.format(denom withSign pay.cn)
+
+        val txt = getString(err_not_enough_funds)
+        val zeroConf = app.kit.conf0Balance minus app.kit.conf1Balance
         val missing = sumOut.format(denom withSign notEnough.missing)
-        val balance = sumIn.format(denom withSign app.kit.conf1Balance)
-        getString(err_not_enough_funds).format(balance, sending, missing).html
+        val pending = sumIn format denom.withSign(zeroConf)
+        txt.format(canSend, sending, missing, pending).html
 
       case _: KeyCrypterException => app getString err_secret
       case _: Throwable => app getString err_general

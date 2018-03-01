@@ -154,20 +154,14 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
       <<(MainActivity.prepareKit, throw _)(none)
       updateInputType
 
-      mainPassCheck setOnClickListener onButtonTap {
-        // Lazy Future has already been initialized so check a pass after it's done
-        <<(MainActivity.prepareKit map decrypt, wrongPass)(_ => app.kit.startAsync)
-        setVis(View.GONE, View.GONE, View.VISIBLE)
-        gf.cancel
-      }
-
+      mainPassCheck setOnClickListener onButtonTap(startLogin)
       if (gf.hasEnrolledFingerprint && FingerPassCode.exists) {
         // This device hase fingerprint support, prints registered
         // and user has saved an encrypted passcode in app prefs
 
         val callback = new Goldfinger.Callback {
           def onWarning(warn: Warning) = FingerPassCode informUser warn
-          def onSuccess(passcode: String) = runAnd(mainPassData setText passcode)(mainPassCheck.performClick)
+          def onSuccess(plainPasscode: String) = runAnd(mainPassData setText plainPasscode)(startLogin)
           def onError(err: GFError) = runAnd(mainFingerprint setVisibility View.GONE)(FingerPassCode informUser err)
         }
 
@@ -187,6 +181,13 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     val (inputType, id) = if (isPassword) (passNoSuggest, typePass) else (InputType.TYPE_CLASS_NUMBER, typePIN)
     wrap(mainPassData setInputType inputType)(mainPassData setTransformationMethod trans)
     mainPassKeysType check id
+  }
+
+  def startLogin = {
+    // Lazy Future has already been initialized so check a pass after it's done
+    <<(MainActivity.prepareKit map decrypt, wrongPass)(_ => app.kit.startAsync)
+    setVis(View.GONE, View.GONE, View.VISIBLE)
+    gf.cancel
   }
 
   def decrypt(some: Any) = {
