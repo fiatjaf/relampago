@@ -6,24 +6,6 @@ import android.content.Context
 import android.net.Uri
 
 
-object StorageTable extends Table {
-  val (table, key, value) = ("storage", "value", "key")
-  val updSql = s"UPDATE $table SET $value = ? WHERE $key = ?"
-  val selectSql = s"SELECT * FROM $table WHERE $key = ?"
-  val killSql = s"DELETE FROM $table WHERE $key = ?"
-
-  val newSql = s"""
-    INSERT OR IGNORE INTO $table
-    ($key, $value) VALUES (?, ?)"""
-
-  val createSql = s"""
-    CREATE TABLE $table(
-      $id INTEGER PRIMARY KEY AUTOINCREMENT,
-      $key TEXT NOT NULL UNIQUE,
-      $value TEXT NOT NULL
-    )"""
-}
-
 object ChannelTable extends Table {
   val (table, identifier, data) = ("channel", "identifier", "data")
   val updSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
@@ -44,8 +26,8 @@ object ChannelTable extends Table {
 
 object PaymentTable extends Table {
   import com.lightning.wallet.ln.PaymentInfo.{HIDDEN, SUCCESS, FAILURE, WAITING}
-  val Tuple11(table, hash, preimage, incoming, msat, status, stamp, description, pr, rd, search) =
-    ("payment", "hash", "preimage", "incoming", "msat", "status", "stamp", "description", "pr", "rd", "search")
+  val Tuple12(table, hash, preimage, incoming, msat, status, stamp, description, pr, rd, search, limit) =
+    ("payment", "hash", "preimage", "incoming", "msat", "status", "stamp", "description", "pr", "rd", "search", 24)
 
   // Inserting
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
@@ -53,7 +35,6 @@ object PaymentTable extends Table {
   val newSql = s"INSERT OR IGNORE INTO $table ($insert9) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
 
   // Selecting
-  val limit = 24
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
   val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
   val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT DISTINCT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
@@ -107,7 +88,6 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
   def onCreate(dbs: SQLiteDatabase) = {
     dbs execSQL PaymentTable.createVSql
     dbs execSQL PaymentTable.createSql
-    dbs execSQL StorageTable.createSql
     dbs execSQL ChannelTable.createSql
   }
 }

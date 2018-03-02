@@ -15,16 +15,9 @@ import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
 
 
-object StorageWrap extends ChannelListener {
-  def put(value: String, key: String) = db txWrap {
-    db.change(StorageTable.newSql, params = key, value)
-    db.change(StorageTable.updSql, params = value, key)
-  }
-
-  def get(key: String) = {
-    val cursor = db.select(StorageTable.selectSql, key)
-    RichCursor(cursor).headTry(_ string StorageTable.value)
-  }
+object GossipCatcher extends ChannelListener {
+  // Intended to catch ChannelUpdates to enable funds receiving
+  // as well as NodeAnnouncement in case if peer's parameters change
 
   override def onProcess = {
     case (chan, norm: NormalData, _: CMDBestHeight)
@@ -45,7 +38,7 @@ object StorageWrap extends ChannelListener {
       if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
       // Set a fresh update for this channel and process no further updates afterwards
       chan process upd.toHop(chan.data.announce.nodeId)
-      chan.listeners -= StorageWrap
+      chan.listeners -= GossipCatcher
   }
 }
 

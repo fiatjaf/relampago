@@ -4,11 +4,8 @@ import fr.acinq.bitcoin._
 import com.lightning.wallet.lnutils._
 import com.lightning.wallet.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
-
-import scala.util.{Failure, Success}
 import com.lightning.wallet.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
-import com.lightning.wallet.lnutils.CloudDataSaver.TryCloudData
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import fr.acinq.eclair.UInt64
 
@@ -46,15 +43,6 @@ object LNParams { me =>
     extendedCloudKey = derivePrivateKey(master, hardened(92) :: hardened(0) :: Nil)
     extendedNodeKey = derivePrivateKey(master, hardened(46) :: hardened(0) :: Nil)
     db = new CipherOpenHelper(app, dbFileName, sha256(seed).toString)
-    cloud = me getCloud CloudDataSaver.tryGetObject
-  }
-
-  // CLOUD
-
-  def getCloud(tryData: TryCloudData) = tryData match {
-    case Failure(why) => new PublicCloud(bag) { data = CloudDataSaver.empty }
-    case Success(saved) if saved.url.isEmpty => new PublicCloud(bag) { data = saved }
-    case Success(saved) => new PrivateCloud { data = saved }
   }
 
   // FEE RELATED

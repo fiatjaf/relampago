@@ -122,7 +122,7 @@ class WalletApp extends Application { me =>
   }
 
   object ChannelManager {
-    val operationalListeners = Set(broadcaster, bag, StorageWrap)
+    val operationalListeners = Set(broadcaster, bag, GossipCatcher)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
 

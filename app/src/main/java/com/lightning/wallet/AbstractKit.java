@@ -14,13 +14,16 @@ import javax.annotation.Nullable;
 
 
 public abstract class AbstractKit extends AbstractIdleService {
-    public static final String ENCRYPTED_PASSCODE = "fingerprintPasscode";
-    public static final String CHAN_VIEW_ALIVE_ONLY = "chanViewAlive";
-    public static final String DENOM_TYPE = "bitcoinDenomType";
-    public static final String FIAT_TYPE = "fiatCurrencyType";
+    public static final String CHAN_VIEW_ALIVE_ONLY = "chanViewAliveOnly";
+    public static final String ENCRYPTED_PASSCODE = "encryptedPasscode";
+    public static final String PASS_INPUT = "passInput"; // Alphanumeric or digital keys
+    public static final String RATES_DATA = "ratesData"; // Saved rates data from server
+    public static final String DENOM_TYPE = "denomType"; // Selected Bitcoin denomination
+    public static final String FIAT_TYPE = "fiatType"; // Selected fiat type to be shown
+    public static final String LANDING = "landing"; // Start with LN or BTC fragment
+
+    // Used to store and retrieve a detailed error message
     public static final String ERROR_REPORT = "errorReport";
-    public static final String PASS_INPUT = "passwordInput";
-    public static final String LANDING = "landing";
     
     // Bitcoin wallet core pieces
     public volatile BlockChain blockChain;

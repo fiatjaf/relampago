@@ -205,26 +205,29 @@ trait TimerActivity extends AppCompatActivity { me =>
     app toast secret_checking
   }
 
-  def viewMnemonic(view: View) = passWrap(me getString sets_mnemonic) apply checkPass(doViewMnemonic)
-  def doViewMnemonic(password: String) = <(app.kit decryptSeed password, onFail) { seed =>
-    // Warn user and proceed to export an encrypted mnemonic code using current password
+  def viewMnemonic(view: View) =
+    passWrap(me getString sets_mnemonic) apply checkPass { pass =>
+      // Warn user and proceed to export an encrypted mnemonic code
+      // using current wallet passcode if the user is fine with that
 
-    val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
-    lazy val bld = mkChoiceDialog(none, warnUser, dialog_ok, dialog_export)
-    lazy val alert = mkForm(bld, getString(sets_noscreen).html, wordsText)
-    alert
+      <(app.kit decryptSeed pass, onFail) { seed =>
+        val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
+        lazy val codeBld = mkChoiceDialog(none, warnUser, dialog_ok, dialog_export)
+        lazy val codeAlert = mkForm(codeBld, getString(sets_noscreen).html, wordsText)
+        codeAlert
 
-    def warnUser: Unit = rm(alert) {
-      lazy val bld1 = mkChoiceDialog(encryptAndExport, none, dialog_ok, dialog_cancel)
-      lazy val alert1 = mkForm(bld1, null, getString(mnemonic_export_details).html)
-      alert1
+        def warnUser: Unit = rm(codeAlert) {
+          lazy val okBld = mkChoiceDialog(encryptAndExport, none, dialog_ok, dialog_cancel)
+          lazy val okAlert = mkForm(okBld, null, getString(mnemonic_export_details).html)
+          okAlert
 
-      def encryptAndExport: Unit = rm(alert1) {
-        val hex = AES.encode(wordsText, Crypto sha256 password.binary)
-        me share s"Encrypted BIP32 mnemonic code ${new Date}: $hex"
+          def encryptAndExport: Unit = rm(okAlert) {
+            val hex = AES.encode(wordsText, Crypto sha256 pass.binary)
+            me share s"Encrypted BIP32 mnemonic code ${new Date}: $hex"
+          }
+        }
       }
     }
-  }
 
   abstract class TxProcessor {
     def processTx(pass: String, feePerKb: Coin)
@@ -245,7 +248,7 @@ trait TimerActivity extends AppCompatActivity { me =>
           val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
           // Prepare popup interface with fee options
-          val adp = new ArrayAdapter(me, singleChoice, feesOptions)
+          val adapter = new ArrayAdapter(me, singleChoice, feesOptions)
           val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
           val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
 
@@ -254,7 +257,7 @@ trait TimerActivity extends AppCompatActivity { me =>
             case 1 => processTx(pass, RatesSaver.rates.feeLive)
           }
 
-          lst.setAdapter(adp)
+          lst.setAdapter(adapter)
           lst.setItemChecked(0, true)
           lazy val dialog: Builder = mkChoiceDialog(rm(alert)(proceed), none, dialog_pay, dialog_cancel)
           lazy val alert = mkForm(dialog, getString(step_3).format(pay cute sumOut).html, form)

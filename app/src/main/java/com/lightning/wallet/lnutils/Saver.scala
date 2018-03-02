@@ -9,6 +9,8 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
 import rx.lang.scala.{Scheduler, Observable => Obs}
 import org.bitcoinj.core.Transaction.DEFAULT_TX_FEE
+import com.lightning.wallet.AbstractKit
+import com.lightning.wallet.Utils.app
 import org.bitcoinj.core.Coin
 import spray.json.JsonFormat
 import scala.util.Try
@@ -31,37 +33,26 @@ object JsonHttpUtils {
   def pickInc(error: Throwable, next: Int) = next.seconds
 }
 
-object CloudDataSaver {
-  def empty = CloudData(None, Set.empty, Set.empty, url = "")
-  def tryGetObject: TryCloudData = StorageWrap get KEY map to[CloudData]
-  def saveObject(data: CloudData) = StorageWrap.put(data.toJson.toString, KEY)
-  type TryCloudData = Try[CloudData]
-  val KEY = "cloudData"
-}
-
 object RatesSaver {
   type Fiat2Btc = Map[String, Double]
   type BlockNum2Fee = Map[String, Double]
   type Result = (BlockNum2Fee, Fiat2Btc)
-  val KEY = "feerateAndFiat"
 
-  // Either load saved rates data or create a new object from scratch
-  var rates = StorageWrap get KEY map to[Rates] getOrElse Rates(Nil, Map.empty, 0)
+  var rates = {
+    val raw = app.prefs.getString(AbstractKit.RATES_DATA, new String)
+    Try(raw) map to[Rates] getOrElse Rates(Nil, Map.empty, 0)
+  }
+
   def safe = retry(LNParams.cloud.connector.ask[Result]("rates/get"), pickInc, 3 to 4)
   def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
-    val fees = for (notZero <- newFee("6") +: rates.feeHistory if notZero > 0) yield notZero
-    rates = Rates(fees take 3, newFiat, System.currentTimeMillis)
-    StorageWrap.put(rates.toJson.toString, KEY)
+    val sensibleFees = for (notZero <- newFee("6") +: rates.feeHistory if notZero > 0) yield notZero
+    rates = Rates(feeHistory = sensibleFees take 3, exchange = newFiat, stamp = System.currentTimeMillis)
+    app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
   }
 }
 
 import com.lightning.wallet.lnutils.RatesSaver.Fiat2Btc
 case class Rates(feeHistory: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
-  // Bitcoin Core provides unreliable fees in testnet so just use default here
-  // TODO: remove for mainnet
-
-  lazy val feeLive = if (feeHistory.isEmpty) DEFAULT_TX_FEE else {
-    val mu: Coin = btcBigDecimal2MSat(feeHistory.sum / feeHistory.size)
-    if (mu isLessThan DEFAULT_TX_FEE) DEFAULT_TX_FEE else mu
-  }
+  lazy val meanFee: Coin = btcBigDecimal2MSat(feeHistory.sum / feeHistory.size)
+  lazy val feeLive = if (feeHistory.isEmpty) DEFAULT_TX_FEE else meanFee
 }
