@@ -15,52 +15,6 @@ import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
 
 
-object GossipCatcher extends ChannelListener {
-  // Intended to catch ChannelUpdates to enable funds receiving
-  // as well as NodeAnnouncement in case if peer's parameters change
-
-  override def onProcess = {
-    case (chan, norm: NormalData, _: CMDBestHeight)
-      // GUARD: don't have an extra hop, get the block
-      if norm.commitments.extraHop.isEmpty =>
-
-      val txid = Commitments fundingTxid norm.commitments
-      val outIdx = norm.commitments.commitInput.outPoint.index
-
-      for {
-        hash <- broadcaster getBlockHashString txid
-        height \ txIds <- retry(cloud.connector getBlock hash, pickInc, 4 to 5)
-        shortChannelId <- Tools.toShortIdOpt(height, txIds indexOf txid.toString, outIdx)
-      } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
-
-    case (chan, norm: NormalData, upd: ChannelUpdate)
-      // GUARD: we already have an old or empty Hop, replace it with a new one
-      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
-      // Set a fresh update for this channel and process no further updates afterwards
-      chan process upd.toHop(chan.data.announce.nodeId)
-      chan.listeners -= GossipCatcher
-  }
-}
-
-object ChannelWrap {
-  def doPut(chanId: String, data: String) = db txWrap {
-    db.change(ChannelTable.newSql, params = chanId, data)
-    db.change(ChannelTable.updSql, params = data, chanId)
-  }
-
-  def put(data: HasCommitments) = {
-    val chanId = data.commitments.channelId
-    val chanBody = "1" + data.toJson.toString
-    doPut(chanId.toString, chanBody)
-  }
-
-  def get = {
-    // Supports simple versioning: 1 is prepended
-    val rc = RichCursor(db select ChannelTable.selectAllSql)
-    rc.vec(_ string ChannelTable.data substring 1) map to[HasCommitments]
-  }
-}
-
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def updateStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
   def updateRouting(rpi: RuntimePaymentInfo) = db.change(PaymentTable.updRoutingSql, rpi.rd.toJson, rpi.pr.paymentHash)
@@ -164,5 +118,51 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
       cloud doProcess CMDStart
+  }
+}
+
+object GossipCatcher extends ChannelListener {
+  // Intended to catch ChannelUpdates to enable funds receiving
+  // as well as NodeAnnouncement in case if peer's parameters change
+
+  override def onProcess = {
+    case (chan, norm: NormalData, _: CMDBestHeight)
+      // GUARD: don't have an extra hop, get the block
+      if norm.commitments.extraHop.isEmpty =>
+
+      val txid = Commitments fundingTxid norm.commitments
+      val outIdx = norm.commitments.commitInput.outPoint.index
+
+      for {
+        hash <- broadcaster getBlockHashString txid
+        height \ txIds <- retry(cloud.connector getBlock hash, pickInc, 4 to 5)
+        shortChannelId <- Tools.toShortIdOpt(height, txIds indexOf txid.toString, outIdx)
+      } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
+
+    case (chan, norm: NormalData, upd: ChannelUpdate)
+      // GUARD: we already have an old or empty Hop, replace it with a new one
+      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
+      // Set a fresh update for this channel and process no further updates afterwards
+      chan process upd.toHop(chan.data.announce.nodeId)
+      chan.listeners -= GossipCatcher
+  }
+}
+
+object ChannelWrap {
+  def doPut(chanId: String, data: String) = db txWrap {
+    db.change(ChannelTable.newSql, params = chanId, data)
+    db.change(ChannelTable.updSql, params = data, chanId)
+  }
+
+  def put(data: HasCommitments) = {
+    val chanId = data.commitments.channelId
+    val chanBody = "1" + data.toJson.toString
+    doPut(chanId.toString, chanBody)
+  }
+
+  def get = {
+    // Supports simple versioning: 1 is prepended
+    val rc = RichCursor(db select ChannelTable.selectAllSql)
+    rc.vec(_ string ChannelTable.data substring 1) map to[HasCommitments]
   }
 }

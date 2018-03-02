@@ -168,7 +168,7 @@ class PrivateCloud extends Cloud { me =>
 }
 
 class Connector(val url: String) {
-  def http(way: String) = post(s"$url/$way", true)
+  def http(way: String) = post(s"$url/$way", true) connectTimeout 15000
   def ask[T : JsonFormat](command: String, params: HttpParam*): Obs[T] =
     obsOn(http(command).form(params.toMap.asJava).body.parseJson, IOScheduler.apply) map {
       case JsArray(JsString("error") +: JsString(why) +: _) => throw new ProtocolException(why)

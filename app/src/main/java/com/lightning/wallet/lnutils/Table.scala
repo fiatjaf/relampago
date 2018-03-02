@@ -6,6 +6,24 @@ import android.content.Context
 import android.net.Uri
 
 
+object OlympusTable extends Table {
+  val (table, url, data, auth, order, removable) = ("olympus", "url", "data", "auth", "order", "removable")
+  val newSql = s"INSERT OR IGNORE INTO $table ($url, $data, $auth, $order, $removable) VALUES (?, ?, ?, ?, ?)"
+  val updMetaSql = s"UPDATE $table SET $url = ?, $auth = ?, $order = ? WHERE $id = ?"
+  val updDataSql = s"UPDATE $table SET $data = ? WHERE $id = ?"
+  val killSql = s"DELETE FROM $table WHERE $id = ?"
+
+  val createSql = s"""
+    CREATE TABLE $table(
+      $id INTEGER PRIMARY KEY AUTOINCREMENT,
+      $url TEXT NOT NULL UNIQUE,
+      $data TEXT NOT NULL,
+      $auth INTEGER NOT NULL,
+      $order INTEGER NOT NULL,
+      $removable INTEGER NOT NULL
+    )"""
+}
+
 object ChannelTable extends Table {
   val (table, identifier, data) = ("channel", "identifier", "data")
   val updSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
