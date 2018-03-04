@@ -468,18 +468,18 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         val data = new java.util.ArrayList[Uri]
         data.add(Uri fromFile zygote)
 
-        // Explain all the caveates to user before procceding with zygote sharing
+        // Explain all the caveates before procceding with zygote sharing
         me startActivity share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, data)
-      }, none, dialog_ok, dialog_cancel).setMessage(zygote_details).create)
+      }, none, dialog_next, dialog_cancel).setMessage(getString(zygote_details).html).create)
 
       def createZygote = {
-        val backupFile = FileOps shell s"zygote ${new Date}.txt"
+        val zygote = FileOps shell s"zygote ${new Date}.txt"
         val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
         val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
         val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
         val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
-        Files.write(encoded.require.toByteArray, backupFile)
-        backupFile
+        Files.write(encoded.require.toByteArray, zygote)
+        zygote
       }
 
       rm(menu)(openForm)

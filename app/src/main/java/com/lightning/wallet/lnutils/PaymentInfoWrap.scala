@@ -124,8 +124,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 }
 
 object GossipCatcher extends ChannelListener {
-  // Intended to catch ChannelUpdates to enable funds receiving
-  // as well as NodeAnnouncement in case if peer's parameters change
+  // Catch ChannelUpdates to enable funds receiving
 
   override def onProcess = {
     case (chan, norm: NormalData, _: CMDBestHeight)
