@@ -44,6 +44,7 @@ dependencies {
 
     // Misc
     compile 'com.android.support:appcompat-v7:25.3.1'
+    compile 'com.android.support:recyclerview-v7:25.3.1'
     compile 'com.ogaclejapan.smarttablayout:library:1.6.1@aar'
     compile 'com.ogaclejapan.smarttablayout:utils-v4:1.6.1@aar'
     compile 'com.github.castorflex.smoothprogressbar:library:1.1.0'
