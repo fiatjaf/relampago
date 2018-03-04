@@ -8,7 +8,7 @@ import android.net.Uri
 
 object OlympusTable extends Table {
   val (table, identifier, url, data, auth, order, removable) = ("olympus", "identifier", "url", "data", "auth", "ord", "removable")
-  val newSql = s"INSERT OR IGNORE INTO $table ($url, $data, $auth, $order, $removable, $identifier) VALUES (?, ?, ?, ?, ?, ?)"
+  val newSql = s"INSERT OR IGNORE INTO $table ($identifier, $url, $data, $auth, $order, $removable) VALUES (?, ?, ?, ?, ?, ?)"
   val updMetaSql = s"UPDATE $table SET $url = ?, $auth = ? WHERE $identifier = ?"
   val updOrderSql = s"UPDATE $table SET $order = ? WHERE $identifier = ?"
   val updDataSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"

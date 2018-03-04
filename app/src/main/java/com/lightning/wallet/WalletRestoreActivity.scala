@@ -34,7 +34,7 @@ extends DatePicker(host) with OnDateChangedListener { me =>
   }
 }
 
-class WalletRestoreActivity extends TimerActivity with ViewSwitch { me =>
+class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActivity { me =>
   lazy val views = findViewById(R.id.restoreInfo) :: findViewById(R.id.restoreProgress) :: Nil
   lazy val restoreCode = findViewById(R.id.restoreCode).asInstanceOf[NachoTextView]
   lazy val restoreWallet = findViewById(R.id.restoreWallet).asInstanceOf[Button]
@@ -109,12 +109,7 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch { me =>
         // Must be initialized after checkpoints
         blockChain = new BlockChain(app.params, wallet, store)
         peerGroup = new PeerGroup(app.params, blockChain)
-
-        if (app.isAlive) {
-          setupAndStartDownload
-          wallet saveToFile app.walletFile
-          exitTo apply classOf[WalletActivity]
-        }
+        launch(wallet)
       }
     }
 }

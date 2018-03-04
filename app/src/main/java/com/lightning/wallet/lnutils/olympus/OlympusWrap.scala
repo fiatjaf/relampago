@@ -40,8 +40,8 @@ object OlympusWrap extends OlympusProvider {
   type BigIntegerVec = Vector[BigInteger]
   type CloudActVec = Vector[CloudAct]
   type StringVec = Vector[String]
-  type TxSeq = Seq[Transaction]
   type CloudVec = Vector[Cloud]
+  type TxSeq = Seq[Transaction]
 
   // BTC and fiat rates
   type Fiat2Btc = Map[String, Double]
@@ -70,9 +70,9 @@ object OlympusWrap extends OlympusProvider {
   def toServer(rc: RichCursor) = OlympusServer(rc string OlympusTable.identifier, rc string OlympusTable.url,
     to[CloudData](rc string OlympusTable.data), rc int OlympusTable.auth, rc int OlympusTable.removable)
 
-  def addServer(osr: OlympusServer) =
+  def addServer(osr: OlympusServer, order: Int) =
     db.change(OlympusTable.newSql, osr.identifier, osr.url,
-      osr.data.toJson.toString, osr.auth, osr.removable)
+      osr.data.toJson.toString, osr.auth, order, osr.removable)
 
   def toInstance(osr: OlympusServer) =
     new Cloud(osr.auth == 1, new Connector(osr.url),

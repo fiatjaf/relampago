@@ -178,7 +178,8 @@
 
     <string name="fp_touch">
         Please touch a sensor now to enable fingerprint unlock.\n\n
-        Also note: registering a new fingerprint in Android settings will automatically disable fingerprint unlock in this app.
+        Also note: registering a new fingerprint in Android settings
+        will automatically disable fingerprint unlock in this app.
     </string>
 
     <!-- LN QR and NFC related messages -->
