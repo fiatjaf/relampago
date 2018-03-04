@@ -394,10 +394,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       else setButtonEnable
 
       def setButtonEnable = {
-        // Offer user to enter a passcode and fingerprint
-        useFingerprint setOnClickListener onButtonTap(proceed)
-        useFingerprint setText fp_enable
-
         def proceed = rm(menu) {
           passWrap(me getString fp_enable) apply checkPass { pass =>
             // The password is guaranteed to be correct here, proceed with auth
@@ -408,7 +404,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
             val callback = new Goldfinger.Callback {
               def onWarning(warn: Warning) = FingerPassCode informUser warn
               def onSuccess(cipher: String) = runAnd(alert.dismiss)(FingerPassCode record cipher)
-              def onError(err: GFError) = runAnd(alert.dismiss)(FingerPassCode informUser err)
+              def onError(err: GFError) = wrap(FingerPassCode informUser err)(alert.dismiss)
             }
 
             dlg setOnDismissListener new OnDismissListener {
@@ -418,10 +414,21 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
             }
           }
         }
+
+        // Offer user to enter a passcode and then fingerprint
+        useFingerprint setOnClickListener onButtonTap(proceed)
+        useFingerprint setText fp_enable
       }
 
       def setButtonDisable = {
-        def proceed = rm(menu)(FingerPassCode.erase)
+        def proceed = rm(menu) {
+          passWrap(me getString fp_disable) apply checkPass { pass =>
+            // Ask user passcode before erasing fingerpring unlocking
+            runAnd(app toast fp_err_disabled)(FingerPassCode.erase)
+          }
+        }
+
+        // Disable fingerprint auth if user rememebers passcode
         useFingerprint setOnClickListener onButtonTap(proceed)
         useFingerprint setText fp_disable
       }

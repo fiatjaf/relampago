@@ -171,13 +171,14 @@
     <string name="fp_err_try_again">Try again</string>
     <string name="fp_err_dirty">Sensor is dirty</string>
     <string name="fp_err_failure">Fingerprint unlock failed</string>
+    <string name="fp_err_disabled">Fingerprint unlock disabled</string>
     <string name="fp_err_timeout">Fingerprint unlock timed out</string>
     <string name="fp_disable">Stop fingerprint unlock</string>
     <string name="fp_enable">Use fingerprint unlock</string>
 
     <string name="fp_touch">
-        Please touch a sensor\n
-        to complete procedure
+        Please touch a sensor now to enable fingerprint unlock.\n\n
+        Also note: registering a new fingerprint in Android settings will automatically disable fingerprint unlock in this app.
     </string>
 
     <!-- LN QR and NFC related messages -->

@@ -52,8 +52,8 @@ object FingerPassCode {
   }
 
   def informUser(e: GFError) = e match {
+    case GFError.CRYPTO_OBJECT_INIT => runAnd(FingerPassCode.erase)(app toast fp_err_disabled)
     case GFError.DECRYPTION_FAILED => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
-    case GFError.CRYPTO_OBJECT_INIT => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
     case GFError.ENCRYPTION_FAILED => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
     case GFError.TIMEOUT => app toast fp_err_timeout
     case otherwise => app toast fp_err_failure
@@ -148,7 +148,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
         val callback = new Goldfinger.Callback {
           def onWarning(warn: Warning) = FingerPassCode informUser warn
           def onSuccess(plainPasscode: String) = runAnd(mainPassData setText plainPasscode)(startLogin)
-          def onError(err: GFError) = runAnd(mainFingerprint setVisibility View.GONE)(FingerPassCode informUser err)
+          def onError(err: GFError) = wrap(FingerPassCode informUser err)(mainFingerprint setVisibility View.GONE)
         }
 
         mainFingerprint setVisibility View.VISIBLE
