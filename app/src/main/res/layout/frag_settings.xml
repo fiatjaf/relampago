@@ -9,6 +9,11 @@
 
     <Button
         style="@style/TransButton"
+        android:id="@+id/recoverChannelFunds"
+        android:text="@string/sets_chan_recover"/>
+
+    <Button
+        style="@style/TransButton"
         android:id="@+id/changePass"
         android:text="@string/sets_secret_change"/>
 
@@ -26,12 +31,6 @@
         style="@style/TransButton"
         android:id="@+id/createZygote"
         android:text="@string/sets_zygote"/>
-
-    <Button
-        android:visibility="gone"
-        style="@style/TransButton"
-        android:id="@+id/recoverChannelFunds"
-        android:text="@string/sets_chan_recover"/>
 
     <View style="@style/GrayDivider"/>
 </LinearLayout>

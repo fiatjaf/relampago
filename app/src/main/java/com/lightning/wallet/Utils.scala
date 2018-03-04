@@ -14,10 +14,10 @@ import com.lightning.wallet.Denomination._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import org.bitcoinj.wallet.Wallet.ExceededMaxTransactionSize
 import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
+import android.content.DialogInterface.OnDismissListener
 import android.widget.RadioGroup.OnCheckedChangeListener
 import android.widget.AdapterView.OnItemClickListener
 import info.hoang8f.android.segmented.SegmentedGroup
-
 import concurrent.ExecutionContext.Implicits.global
 import android.view.inputmethod.InputMethodManager
 import com.lightning.wallet.ln.LNParams.minDepth
@@ -27,12 +27,10 @@ import com.lightning.wallet.lnutils.RatesSaver
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
 import com.lightning.wallet.helper.AES
-
 import language.implicitConversions
 import android.util.DisplayMetrics
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.script.Script
-
 import scala.concurrent.Future
 import android.os.Bundle
 import java.util.Date
@@ -40,11 +38,10 @@ import java.util.Date
 import co.infinum.goldfinger.{Goldfinger, Warning, Error => GFError}
 import android.content.{Context, DialogInterface, Intent}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
-import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
+import com.lightning.wallet.ln.Tools.{none, wrap}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi}
-
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import java.util.{Timer, TimerTask}
@@ -52,7 +49,6 @@ import java.util.{Timer, TimerTask}
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import InputMethodManager.HIDE_NOT_ALWAYS
 import Context.INPUT_METHOD_SERVICE
-import android.content.DialogInterface.OnDismissListener
 
 
 object Utils {
@@ -213,10 +209,10 @@ trait TimerActivity extends AppCompatActivity { me =>
         def onWarning(nonFatalWarning: Warning) = FingerPassCode informUser nonFatalWarning
         def onError(err: GFError) = wrap(FingerPassCode informUser err)(image setVisibility View.GONE)
 
-        def onSuccess(cipher: String) = {
-          timer.schedule(next apply cipher, 350)
+        def onSuccess(plainPasscode: String) = {
+          timer.schedule(next apply plainPasscode, 350)
           timer.schedule(alert.dismiss, 350)
-          field setText cipher
+          field setText plainPasscode
         }
       }
 
