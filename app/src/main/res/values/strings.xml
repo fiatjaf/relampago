@@ -9,8 +9,6 @@
 
     <!-- app wide -->
     <string name="unlock">Unlock Wallet</string>
-    <string name="key_num">&#160;numeric&#160;</string>
-    <string name="key_alph">&#160;standard&#160;</string>
     <string name="sets_secret_ok">New passcode has been set</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch.</string>
     <string name="sets_noscreen"><![CDATA[Do not make a screenshot<br><br><small>A screenshot will be saved in your gallery where other apps can access it, which is not very safe</small>]]></string>
@@ -30,12 +28,6 @@
         <item><![CDATA[Bitcoin <font color=#999999><small>= 1 BTC</small></font>]]></item>
     </array>
 
-    <array name="info_storage_tokens">
-        <item><![CDATA[No <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>storage tokens</a> left]]></item>
-        <item><![CDATA[%1$d <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>storage token</a> left]]></item>
-        <item><![CDATA[%1$d <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>storage tokens</a> left]]></item>
-    </array>
-
     <array name="restore_mnemonic_options">
         <item>Use encrypted mnemonic</item>
         <item>Enter plain mnemonic</item>
@@ -50,7 +42,7 @@
     <string name="restore_hint">Your BIP32 mnemonic code</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>%1$s<br>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.06&#8211;23</small>]]></string>
+    <string name="read_settings"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.06&#8211;23</small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
     <string name="mnemonic_info"><font color="#E31300">Your mnemonic code is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.\n\nProperly secured mnemonic code protectes you from money loss.</string>
     <string name="mnemonic_export_details"><![CDATA[Mnemonic code will be encrypted and exported using <strong>your current passcode</strong>.<br><br>You are strongly advised to read a <a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>related section</a> of wallet manual before proceeding with this]]></string>
@@ -180,7 +172,7 @@
     <string name="fp_err_dirty">Sensor is dirty</string>
     <string name="fp_err_failure">Fingerprint unlock failed</string>
     <string name="fp_err_timeout">Fingerprint unlock timed out</string>
-    <string name="fp_disable">Disable fingerprint unlock</string>
+    <string name="fp_disable">Stop fingerprint unlock</string>
     <string name="fp_enable">Use fingerprint unlock</string>
 
     <string name="fp_touch">

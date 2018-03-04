@@ -9,7 +9,9 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import com.lightning.wallet.lnutils.Connector.CMDStart
+
+import com.lightning.wallet.lnutils.olympus.OlympusWrap.CMDStart
+import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.helper.RichCursor
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
@@ -97,7 +99,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       if (norm.commitments.localCommit.spec.fulfilled.nonEmpty) {
         // Let the cloud know since it may be waiting for a payment
         // also vibrate to let a user know that payment is fulfilled
-        cloud doProcess CMDStart
+        OlympusWrap doProcess CMDStart
         vibrate(lnSettled)
       }
 
@@ -117,7 +119,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
-      cloud doProcess CMDStart
+      OlympusWrap doProcess CMDStart
   }
 }
 
@@ -135,7 +137,7 @@ object GossipCatcher extends ChannelListener {
 
       for {
         hash <- broadcaster getBlockHashString txid
-        height \ txIds <- retry(cloud.connector getBlock hash, pickInc, 4 to 5)
+        height \ txIds <- retry(OlympusWrap getBlock hash, pickInc, 4 to 5)
         shortChannelId <- Tools.toShortIdOpt(height, txIds indexOf txid.toString, outIdx)
       } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
 

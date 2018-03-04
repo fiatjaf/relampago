@@ -1,7 +1,7 @@
-package com.lightning.wallet.lnutils
+package com.lightning.wallet.lnutils.olympus
 
-import com.lightning.wallet.ln.Tools.{random, Bytes}
-import org.bitcoinj.core.ECKey.CURVE.{getN, getG}
+import com.lightning.wallet.ln.Tools.{Bytes, random}
+import org.bitcoinj.core.ECKey.CURVE.{getG, getN}
 import org.spongycastle.math.ec.ECPoint
 import org.bitcoinj.core.Utils.HEX
 import org.bitcoinj.core.ECKey

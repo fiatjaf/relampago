@@ -23,26 +23,21 @@ object LNParams { me =>
   val globalFeatures = ""
   val minDepth = 1
 
+  var db: CipherOpenHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
   var extendedCloudKey: ExtendedPrivateKey = _
-  var cloud: StateMachine[CloudData] with Cloud = _
-  var db: CipherOpenHelper = _
 
-  lazy val nodePrivateKey: PrivateKey = extendedNodeKey.privateKey // Corresponding pubkey is node id
-  lazy val nodePublicKey: PublicKey = nodePrivateKey.publicKey // This is a node id
-
-  lazy val cloudPrivateKey: PrivateKey = extendedCloudKey.privateKey // Sign messages to private maintenance server
-  lazy val cloudPublicKey: PublicKey = cloudPrivateKey.publicKey // Check signed messages on private maintenance server
-
-  lazy val cloudSecret: BinaryData = sha256(cloudPrivateKey.toBin) // Secret for encrypting data for maintenance server
-  lazy val cloudId: BinaryData = sha256(cloudPublicKey.toBin) // ID for retrieving data from maintenance server
-  lazy val broadcaster: Broadcaster = LocalBroadcaster
   lazy val bag = PaymentInfoWrap
+  lazy val broadcaster: Broadcaster = LocalBroadcaster
+  lazy val nodePublicKey: PublicKey = nodePrivateKey.publicKey
+  lazy val nodePrivateKey: PrivateKey = extendedNodeKey.privateKey
+  lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin.data)
+  lazy val cloudId = sha256(cloudSecret.data)
 
-  def setup(seed: BinaryData) = generate(seed) match { case master =>
-    extendedCloudKey = derivePrivateKey(master, hardened(92) :: hardened(0) :: Nil)
-    extendedNodeKey = derivePrivateKey(master, hardened(46) :: hardened(0) :: Nil)
+  def setup(seed: BinaryData) = generate(seed) match { case m =>
     db = new CipherOpenHelper(app, dbFileName, sha256(seed).toString)
+    extendedNodeKey = derivePrivateKey(m, hardened(46) :: hardened(0) :: Nil)
+    extendedCloudKey = derivePrivateKey(m, hardened(92) :: hardened(0) :: Nil)
   }
 
   // FEE RELATED
@@ -94,7 +89,7 @@ trait Broadcaster extends ChannelListener { me =>
   def ratePerKwSat: Long
 
   // Parent state and next tier cltv delay
-  // Actual negative delay will be represented as 0L
+  // actual negative delay will be represented as 0L
   def cltv(parent: Transaction, child: Transaction) = {
     val parentDepth \ parentIsDead = getStatus(parent.txid)
     val cltvDelay = math.max(cltvBlocks(child) - currentHeight, 0L)
@@ -102,7 +97,7 @@ trait Broadcaster extends ChannelListener { me =>
   }
 
   // Parent state and cltv + next tier csv delay
-  // Actual negative delay will be represented as 0L
+  // actual negative delay will be represented as 0L
   def csv(parent: Transaction, child: Transaction) = {
     val parentDepth \ parentIsDead = getStatus(parent.txid)
     val cltvDelay = math.max(cltvBlocks(parent) - currentHeight, 0L)

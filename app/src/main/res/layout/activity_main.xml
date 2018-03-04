@@ -46,31 +46,6 @@
             android:layout_width="wrap_content"
             android:hint="@string/secret_wallet"/>
 
-        <info.hoang8f.android.segmented.SegmentedGroup
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:id="@+id/mainPassKeysType"
-            android:orientation="horizontal"
-            android:paddingTop="10dp">
-
-            <RadioButton
-                android:textSize="16sp"
-                android:id="@+id/typePass"
-                android:text="@string/key_alph"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                style="@style/RadioButton"/>
-
-            <RadioButton
-                android:textSize="16sp"
-                android:id="@+id/typePIN"
-                android:text="@string/key_num"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                style="@style/RadioButton"/>
-
-        </info.hoang8f.android.segmented.SegmentedGroup>
-
         <Button
             style="@style/MarginInfo"
             android:text="@string/unlock"

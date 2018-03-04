@@ -3,12 +3,12 @@ package com.lightning.wallet
 import com.lightning.wallet.ln._
 import com.lightning.wallet.Utils._
 import com.lightning.wallet.R.string._
+import com.lightning.wallet.lnutils.olympus.OlympusWrap._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.wire.LightningMessageCodecs._
 import android.widget.{BaseAdapter, ListView, TextView}
 import android.view.{Menu, View, ViewGroup}
 
-import com.lightning.wallet.lnutils.Connector.AnnounceChansNumVec
 import com.lightning.wallet.helper.ThrottledWork
 import com.lightning.wallet.ln.Tools.runAnd
 import com.lightning.wallet.ln.Tools.wrap
@@ -44,7 +44,7 @@ class LNStartActivity extends TimerActivity with SearchBar { me =>
   def INIT(state: Bundle) = if (app.isAlive) {
     new ThrottledWork[String, AnnounceChansNumVec] {
       def updateView = UITask(adapter.notifyDataSetChanged).run
-      def work(query: String) = LNParams.cloud.connector findNodes query
+      def work(queryAliasOrNodeKey: String) = findNodes(queryAliasOrNodeKey)
       def process(res: AnnounceChansNumVec) = wrap(updateView) { nodes = res }
       def error(err: Throwable) = Tools errlog err
       me.react = addWork

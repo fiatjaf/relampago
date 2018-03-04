@@ -18,7 +18,6 @@ object LightningMessageCodecs { me =>
   type BitVectorAttempt = Attempt[BitVector]
   type LNMessageVector = Vector[LightningMessage]
   type InetSocketAddressList = List[InetSocketAddress]
-  type AnnounceChansNum = (NodeAnnouncement, Int)
   type AddressPort = (InetAddress, Int)
   type RGB = (Byte, Byte, Byte)
 

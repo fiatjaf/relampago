@@ -56,7 +56,7 @@ object Utils {
   var fiatName: String = _
 
   val fileName = "Testnet"
-  val dbFileName = s"$fileName-3.db"
+  val dbFileName = s"$fileName-4.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
 
@@ -70,7 +70,6 @@ object Utils {
 
   // Mapping from text to Android id integer
   val Seq(strDollar, strEuro, strYen, strYuan) = Seq("dollar", "euro", "yen", "yuan")
-  val passNoSuggest = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
   val fiatMap = Map(typeUSD -> strDollar, typeEUR -> strEuro, typeJPY -> strYen, typeCNY -> strYuan)
   val revFiatMap = Map(strDollar -> typeUSD, strEuro -> typeEUR, strYen -> typeJPY, strYuan -> typeCNY)
   def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
@@ -182,19 +181,17 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   def onButtonTap(exec: => Unit) = new OnClickListener { def onClick(view: View) = me hideKeys exec }
-  def onFastTap(exec: => Unit) = new OnClickListener { def onClick(view: View) = exec }
+  def onFastTap(fastExec: => Unit) = new OnClickListener { def onClick(view: View) = fastExec }
 
-  def share(exportedTextData: String): Unit = startActivity {
+  def share(exportedTextData: String): Unit = {
     val share = new Intent setAction Intent.ACTION_SEND setType "text/plain"
-    share.putExtra(Intent.EXTRA_TEXT, exportedTextData)
+    me startActivity share.putExtra(Intent.EXTRA_TEXT, exportedTextData)
   }
 
-  // Password prompting popup
-  // but it does not actually check a password
   val passWrap = (title: CharSequence) => (next: String => Unit) => {
-    val isPasswordKeyboard = app.prefs.getBoolean(AbstractKit.PASS_INPUT, true)
-    val inputType = if (isPasswordKeyboard) passNoSuggest else InputType.TYPE_CLASS_NUMBER
-    val (view, field) = generatePromptView(inputType, secret_wallet, new PasswordTransformationMethod)
+    // Password prompting popup, but it does not actually check a password
+    val passNoSuggest = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
+    val (view, field) = generatePromptView(passNoSuggest, secret_wallet, new PasswordTransformationMethod)
     mkForm(mkChoiceDialog(next(field.getText.toString), none, dialog_next, dialog_cancel), title, view)
   }
 

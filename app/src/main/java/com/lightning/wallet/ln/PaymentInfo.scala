@@ -154,7 +154,7 @@ case class RoutingData(routes: Vector[PaymentRoute], usedRoute: PaymentRoute, ba
 case class RuntimePaymentInfo(rd: RoutingData, pr: PaymentRequest, firstMsat: Long) {
   // firstMsat is an amount I'm actually getting or an amount I'm paying without routing fees
   // incoming firstMsat is updated on fulfilling, outgoing firstMsat is updated on pay attempt
-  def searchText = pr.description + " " + paymentHashString
+  def searchText = s"${pr.description} ${pr.nodeId} $paymentHashString"
   lazy val paymentHashString = pr.paymentHash.toString
 }
 

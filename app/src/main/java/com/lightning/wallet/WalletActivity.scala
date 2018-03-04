@@ -26,6 +26,7 @@ import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, Fragme
 import com.lightning.wallet.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import android.content.DialogInterface.OnDismissListener
+import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import android.content.Context.LAYOUT_INFLATER_SERVICE
 import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -376,11 +377,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   // SETTINGS FORM
 
   def makeSettingsForm = {
-    val leftOps = getResources getStringArray R.array.info_storage_tokens
-    val tokensLeft = app.plurOrZero(leftOps, LNParams.cloud.data.tokens.size)
-
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
-    val menu = mkForm(me negBld dialog_ok, getString(read_settings).format(tokensLeft).html, form)
+    val menu = mkForm(me negBld dialog_ok, getString(read_settings).html, form)
     val recoverChannelFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
     val useFingerprint = form.findViewById(R.id.useFingerprint).asInstanceOf[Button]
     val createZygote = form.findViewById(R.id.createZygote).asInstanceOf[Button]
@@ -434,8 +432,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       // by fetching encrypted static channel params from server
 
       rm(menu)(app toast dialog_recovering)
-      cloud.connector.getBackup(cloudId).foreach(serverDataVec => {
-        // Decrypt channel recovery datas upon successful call and put
+      OlympusWrap.getBackup(cloudId).foreach(serverDataVec => {
+        // Decrypt channel recovery data upon successful call and put
         // them into an active channel list, then connect to peers
 
         for {
@@ -515,12 +513,9 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         }
 
         def rotatePass = {
-          app.kit.wallet decrypt oldPass
+          // Decrypt wallet and remove an old encrypted passcode
+          runAnd(app.kit.wallet decrypt oldPass)(FingerPassCode.erase)
           app.encryptWallet(app.kit.wallet, field.getText.toString)
-          // Make sure we definitely have alphabetical keyboard for now
-          app.prefs.edit.putBoolean(AbstractKit.PASS_INPUT, true).commit
-          // Remove an old encrypted passcode
-          FingerPassCode.erase
         }
       }
 

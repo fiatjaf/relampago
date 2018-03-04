@@ -11,20 +11,15 @@ import com.google.common.io.{ByteStreams, Files}
 import co.infinum.goldfinger.{Error => GFError}
 import scala.util.{Failure, Success, Try}
 import java.io.{File, FileInputStream}
-import R.id.{typePIN, typePass}
 
 import ln.wire.LightningMessageCodecs.walletZygoteCodec
-import android.widget.RadioGroup.OnCheckedChangeListener
-import android.text.method.PasswordTransformationMethod
 import org.ndeftools.util.activity.NfcReaderActivity
-import info.hoang8f.android.segmented.SegmentedGroup
 import concurrent.ExecutionContext.Implicits.global
 import org.bitcoinj.wallet.WalletProtobufSerializer
 import com.lightning.wallet.ln.LNParams
 import com.lightning.wallet.helper.AES
 import fr.acinq.bitcoin.Crypto
 import scala.concurrent.Future
-import android.text.InputType
 import android.content.Intent
 import org.ndeftools.Message
 import scodec.bits.BitVector
@@ -82,7 +77,6 @@ object MainActivity {
 }
 
 class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch { me =>
-  lazy val mainPassKeysType = findViewById(R.id.mainPassKeysType).asInstanceOf[SegmentedGroup]
   lazy val mainFingerprint = findViewById(R.id.mainFingerprint).asInstanceOf[ImageView]
   lazy val mainPassCheck = findViewById(R.id.mainPassCheck).asInstanceOf[Button]
   lazy val mainPassData = findViewById(R.id.mainPassData).asInstanceOf[EditText]
@@ -97,13 +91,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   def INIT(state: Bundle) = {
     wrap(me initNfc state)(me setContentView R.layout.activity_main)
     Utils clickableTextField findViewById(R.id.mainGreetings)
-
-    mainPassKeysType setOnCheckedChangeListener new OnCheckedChangeListener {
-      def onCheckedChanged(fancyRadioGroupView: RadioGroup, inputKeyType: Int) = {
-        app.prefs.edit.putBoolean(AbstractKit.PASS_INPUT, inputKeyType == typePass).commit
-        updateInputType
-      }
-    }
 
     MainActivity.proceed = UITask {
       // Unconditionally go to wallet
@@ -152,7 +139,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
       // Load Future in a background
       setVis(View.GONE, View.VISIBLE, View.GONE)
       <<(MainActivity.prepareKit, throw _)(none)
-      updateInputType
 
       mainPassCheck setOnClickListener onButtonTap(startLogin)
       if (gf.hasEnrolledFingerprint && FingerPassCode.exists) {
@@ -175,13 +161,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   }
 
   // MISC
-
-  def updateInputType = {
-    val (isPassword, trans) = (app.prefs.getBoolean(AbstractKit.PASS_INPUT, true), new PasswordTransformationMethod)
-    val (inputType, id) = if (isPassword) (passNoSuggest, typePass) else (InputType.TYPE_CLASS_NUMBER, typePIN)
-    wrap(mainPassData setInputType inputType)(mainPassData setTransformationMethod trans)
-    mainPassKeysType check id
-  }
 
   def startLogin = {
     // Lazy Future has already been initialized so check a pass after it's done

@@ -4,16 +4,16 @@ import spray.json._
 import com.lightning.wallet.ln._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Scripts._
+import com.lightning.wallet.lnutils.olympus.OlympusWrap._
 import com.lightning.wallet.ln.wire.LightningMessageCodecs._
-import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
 import com.lightning.wallet.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.wallet.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.wallet.ln.crypto.{Packet, SecretsAndPacket, ShaHashesWithIndex}
-import com.lightning.wallet.lnutils.Connector.{ClearToken, HttpParam, RequestAndMemo}
+import com.lightning.wallet.lnutils.olympus.{BlindMemo, BlindParam, CloudAct, CloudData}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
+import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
 import com.lightning.wallet.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.wallet.ln.crypto.Sphinx.BytesAndKey
-import com.lightning.wallet.lnutils.RatesSaver.Fiat2Btc
 import com.lightning.wallet.ln.crypto.ShaChain.Index
 import com.lightning.wallet.ln.Tools.Bytes
 import fr.acinq.eclair.UInt64
@@ -135,8 +135,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     CloudAct](CloudAct.apply, "data", "plus", "path")
 
   implicit val cloudDataFmt =
-    jsonFormat[Option[RequestAndMemo], Set[ClearToken], Set[CloudAct], String,
-      CloudData](CloudData.apply, "info", "tokens", "acts", "url")
+    jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct],
+      CloudData](CloudData.apply, "info", "tokens", "acts")
 
   // Channel data
 

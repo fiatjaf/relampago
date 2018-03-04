@@ -16,6 +16,8 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.muddzdev.styleabletoastlibrary.StyleableToast
 import collection.JavaConverters.seqAsJavaListConverter
+import com.lightning.wallet.lnutils.olympus.OlympusWrap
+import com.lightning.wallet.lnutils.olympus.CloudAct
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
@@ -58,18 +60,11 @@ class WalletApp extends Application { me =>
 
   // Various utilities
 
-  def isAlive = if (null == kit) false else kit.state match {
-    case STARTING | RUNNING => null != db && null != cloud
-    case _ => false
-  }
-
-  def plurOrZero(opts: Array[String], number: Long) =
-    if (number > 0) plur(opts, number) format number
-    else opts(0)
-
   def toast(code: Int): Unit = toast(me getString code)
   def toast(message: String): Unit = StyleableToast.makeText(me, message, R.style.infoToast).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+  def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => null != db case _ => false }
+  def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
   def getTo(base58: String) = Address.fromBase58(params, base58)
@@ -108,7 +103,7 @@ class WalletApp extends Application { me =>
 
     def mkNA(nodeId: PublicKey, hostName: String, port: Int) = {
       // Make a fake node announcement with a dummy signature so it can be serialized
-      val sig = Crypto encodeSignature Crypto.sign(random getBytes 32, LNParams.cloudPrivateKey)
+      val sig = Crypto encodeSignature Crypto.sign(random getBytes 32, LNParams.nodePrivateKey)
       NodeAnnouncement(sig, "", 0L, nodeId, (Byte.MinValue, Byte.MinValue, Byte.MinValue),
         hostName, new InetSocketAddress(hostName, port) :: Nil)
     }
@@ -122,11 +117,12 @@ class WalletApp extends Application { me =>
   }
 
   object ChannelManager {
+    type ChannelVec = Vector[Channel]
     val operationalListeners = Set(broadcaster, bag, GossipCatcher)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-    var all = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
+    var all: ChannelVec = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
 
-    def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
+    def fromNode(of: ChannelVec, ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
     def canSend(msat: Long) = for (c <- all if c.state == Channel.OPEN && isOperational(c) && estimateCanSend(c) > msat) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notRefunding = for (c <- all if c.state != Channel.REFUNDING) yield c
@@ -166,10 +162,10 @@ class WalletApp extends Application { me =>
       override def onTerminalError(ann: NodeAnnouncement) = fromNode(notClosing, ann).foreach(_ process CMDShutdown)
       override def onDisconnect(ann: NodeAnnouncement) = maybeReconnect(fromNode(notClosing, ann), ann)
 
-      def maybeReconnect(cs: Vector[Channel], ann: NodeAnnouncement) = if (cs.nonEmpty) {
+      def maybeReconnect(chans: ChannelVec, ann: NodeAnnouncement) = if (chans.nonEmpty) {
         // Immediately inform affected channels and try to reconnect back again in 5 seconds
         Obs.just(ann).delay(5.seconds).subscribe(ConnectionManager.connectTo, none)
-        cs.foreach(_ process CMDOffline)
+        chans.foreach(_ process CMDOffline)
       }
     }
 
@@ -185,12 +181,12 @@ class WalletApp extends Application { me =>
         // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
         kit.watchScripts(commits.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
         // Ask server for child txs which spend our commit txs outputs and extract preimages from them
-        cloud.connector.getChildTxs(commits).foreach(_ foreach bag.extractPreimage, Tools.errlog)
+        OlympusWrap.getChildTxs(commits).foreach(_ foreach bag.extractPreimage, Tools.errlog)
         BECOME(STORE(cd), CLOSING)
 
         cd.tier12States.map(_.txn) match {
           case Nil => Tools log "Closing channel does not have tier 1-2 transactions"
-          case txs => cloud doProcess CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
+          case txs => OlympusWrap doProcess CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
         }
       }
     }
@@ -214,7 +210,7 @@ class WalletApp extends Application { me =>
     }
 
     def completeRPI(sources: Set[PublicKey], rpi: RuntimePaymentInfo): Obs[FullOrEmptyRPI] = {
-      def findRemoteRoutes(target: PublicKey) = cloud.connector.findRoutes(rpi.rd, sources, target)
+      def findRemoteRoutes(targetNodeId: PublicKey) = OlympusWrap.findRoutes(rpi.rd, sources, targetNodeId)
       def findRoutes(target: PublicKey) = if (sources contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
       def findAssisted(tag: RoutingInfoTag) = findRoutes(tag.route.head.nodeId).map(rts => for (pub <- rts) yield pub ++ tag.route)
       // If payment request contains extra routing info then we ask for assisted routes, otherwise we directly ask for recipient id

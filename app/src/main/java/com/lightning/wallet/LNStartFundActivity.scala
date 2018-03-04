@@ -12,19 +12,20 @@ import com.lightning.wallet.Denomination._
 import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
+import org.bitcoinj.core.{Coin, TransactionOutput}
+import fr.acinq.bitcoin.{MilliSatoshi, Script}
+import android.widget.{ImageButton, TextView}
+import scala.util.{Failure, Success}
+
 import android.content.DialogInterface.BUTTON_POSITIVE
+import com.lightning.wallet.lnutils.olympus.OlympusWrap
+import com.lightning.wallet.lnutils.olympus.CloudAct
 import com.lightning.wallet.lnutils.RatesSaver
-import com.lightning.wallet.lnutils.CloudAct
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.script.ScriptBuilder
 import com.lightning.wallet.helper.AES
 import java.util.TimerTask
 import android.os.Bundle
-
-import org.bitcoinj.core.{Coin, TransactionOutput}
-import fr.acinq.bitcoin.{MilliSatoshi, Script}
-import android.widget.{ImageButton, TextView}
-import scala.util.{Failure, Success}
 
 
 class LNStartFundActivity extends TimerActivity { me =>
@@ -103,7 +104,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
           // Save a channel backup right away, don't wait until a channel becomes operational
           // in worst case it will be saved once channel becomes OPEN if there are no tokens currently
-          LNParams.cloud doProcess CloudAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
+          OlympusWrap doProcess CloudAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
           // Make this a fully established channel by attaching operational listeners and adding it to list
           freshChan.listeners = app.ChannelManager.operationalListeners
           app.ChannelManager.all +:= freshChan

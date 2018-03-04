@@ -7,15 +7,18 @@ import android.net.Uri
 
 
 object OlympusTable extends Table {
-  val (table, url, data, auth, order, removable) = ("olympus", "url", "data", "auth", "order", "removable")
-  val newSql = s"INSERT OR IGNORE INTO $table ($url, $data, $auth, $order, $removable) VALUES (?, ?, ?, ?, ?)"
-  val updMetaSql = s"UPDATE $table SET $url = ?, $auth = ?, $order = ? WHERE $id = ?"
-  val updDataSql = s"UPDATE $table SET $data = ? WHERE $id = ?"
-  val killSql = s"DELETE FROM $table WHERE $id = ?"
+  val (table, identifier, url, data, auth, order, removable) = ("olympus", "identifier", "url", "data", "auth", "ord", "removable")
+  val newSql = s"INSERT OR IGNORE INTO $table ($url, $data, $auth, $order, $removable, $identifier) VALUES (?, ?, ?, ?, ?, ?)"
+  val updMetaSql = s"UPDATE $table SET $url = ?, $auth = ? WHERE $identifier = ?"
+  val updOrderSql = s"UPDATE $table SET $order = ? WHERE $identifier = ?"
+  val updDataSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
+  val selectAllSql = s"SELECT * FROM $table ORDER BY $order DESC"
+  val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
   val createSql = s"""
     CREATE TABLE $table(
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
+      $identifier TEXT NOT NULL UNIQUE,
       $url TEXT NOT NULL UNIQUE,
       $data TEXT NOT NULL,
       $auth INTEGER NOT NULL,
@@ -107,5 +110,6 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     dbs execSQL PaymentTable.createVSql
     dbs execSQL PaymentTable.createSql
     dbs execSQL ChannelTable.createSql
+    dbs execSQL OlympusTable.createSql
   }
 }
