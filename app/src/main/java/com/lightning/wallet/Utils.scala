@@ -17,6 +17,7 @@ import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
 import android.widget.RadioGroup.OnCheckedChangeListener
 import android.widget.AdapterView.OnItemClickListener
 import info.hoang8f.android.segmented.SegmentedGroup
+
 import concurrent.ExecutionContext.Implicits.global
 import android.view.inputmethod.InputMethodManager
 import com.lightning.wallet.ln.LNParams.minDepth
@@ -26,20 +27,24 @@ import com.lightning.wallet.lnutils.RatesSaver
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
 import com.lightning.wallet.helper.AES
+
 import language.implicitConversions
 import android.util.DisplayMetrics
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.script.Script
+
 import scala.concurrent.Future
 import android.os.Bundle
 import java.util.Date
 
+import co.infinum.goldfinger.{Goldfinger, Warning, Error => GFError}
 import android.content.{Context, DialogInterface, Intent}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
-import com.lightning.wallet.ln.Tools.{none, wrap}
+import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi}
+
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import java.util.{Timer, TimerTask}
@@ -47,6 +52,7 @@ import java.util.{Timer, TimerTask}
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import InputMethodManager.HIDE_NOT_ALWAYS
 import Context.INPUT_METHOD_SERVICE
+import android.content.DialogInterface.OnDismissListener
 
 
 object Utils {
@@ -68,7 +74,8 @@ object Utils {
   val coloredIn: MilliSatoshi => String = amt => sumIn.format(denom withSign amt)
   val singleChoice = android.R.layout.select_dialog_singlechoice
 
-  // Mapping from text to Android id integer
+  // Mappings
+  val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
   val Seq(strDollar, strEuro, strYen, strYuan) = Seq("dollar", "euro", "yen", "yuan")
   val fiatMap = Map(typeUSD -> strDollar, typeEUR -> strEuro, typeJPY -> strYen, typeCNY -> strYuan)
   val revFiatMap = Map(strDollar -> typeUSD, strEuro -> typeEUR, strYen -> typeJPY, strYuan -> typeCNY)
@@ -114,13 +121,16 @@ trait TimerActivity extends AppCompatActivity { me =>
     view -> titleTextField
   }
 
-  def generatePromptView(inputType: Int, message: Int, transform: TransformationMethod) = {
+  def generatePromptView(inputType: Int, message: Int, transMethod: TransformationMethod) = {
     val passAsk = getLayoutInflater.inflate(R.layout.frag_changer, null).asInstanceOf[LinearLayout]
-    val secretInputField = passAsk.findViewById(R.id.secretInput).asInstanceOf[EditText]
-    passAsk.findViewById(R.id.secretTip).asInstanceOf[TextView] setText message
-    secretInputField setTransformationMethod transform
-    secretInputField setInputType inputType
-    passAsk -> secretInputField
+    val secretInput = passAsk.findViewById(R.id.secretInput).asInstanceOf[EditText]
+    val secretTip = passAsk.findViewById(R.id.secretTip).asInstanceOf[TextView]
+    val secretFingerprint = passAsk.findViewById(R.id.secretFingerprint)
+
+    secretTip setText message
+    secretInput setInputType inputType
+    secretInput setTransformationMethod transMethod
+    passAsk -> secretInput -> secretFingerprint
   }
 
   def finishMe(top: View) = finish
@@ -188,11 +198,34 @@ trait TimerActivity extends AppCompatActivity { me =>
     me startActivity share.putExtra(Intent.EXTRA_TEXT, exportedTextData)
   }
 
-  val passWrap = (title: CharSequence) => (next: String => Unit) => {
-    // Password prompting popup, but it does not actually check a password
+  def passWrap(title: CharSequence, fp: Boolean = true) = (next: String => Unit) => {
     val passNoSuggest = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
-    val (view, field) = generatePromptView(passNoSuggest, secret_wallet, new PasswordTransformationMethod)
-    mkForm(mkChoiceDialog(next(field.getText.toString), none, dialog_next, dialog_cancel), title, view)
+    val view \ field \ image = generatePromptView(passNoSuggest, secret_wallet, new PasswordTransformationMethod)
+    val dlg = mkChoiceDialog(ok = next apply field.getText.toString, none, dialog_next, dialog_cancel)
+    val alert = mkForm(dlg, title, view)
+
+    val gf = new Goldfinger.Builder(me).build
+    if (fp && gf.hasEnrolledFingerprint && FingerPassCode.exists) {
+      // This device hase fingerprint support, prints are registered
+      // and user has saved an encrypted passcode in app prefs
+
+      val callback = new Goldfinger.Callback {
+        def onWarning(nonFatalWarning: Warning) = FingerPassCode informUser nonFatalWarning
+        def onError(err: GFError) = wrap(FingerPassCode informUser err)(image setVisibility View.GONE)
+
+        def onSuccess(cipher: String) = {
+          timer.schedule(next apply cipher, 350)
+          timer.schedule(alert.dismiss, 350)
+          field setText cipher
+        }
+      }
+
+      alert setOnDismissListener new OnDismissListener {
+        def onDismiss(dialog: DialogInterface) = gf.cancel
+        gf.decrypt(fileName, FingerPassCode.get, callback)
+        image setVisibility View.VISIBLE
+      }
+    }
   }
 
   def checkPass(next: String => Unit)(pass: String) = {

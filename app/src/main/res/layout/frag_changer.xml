@@ -13,8 +13,16 @@
     <TextView
         style="@style/StdText"
         android:id="@+id/secretTip"
-        android:paddingBottom="25dp"
+        android:layout_marginBottom="25dp"
         android:layout_width="wrap_content"/>
+
+    <ImageView
+        android:visibility="gone"
+        android:layout_marginBottom="25dp"
+        android:id="@+id/secretFingerprint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_fingerprint_black_24dp"/>
 
     <View style="@style/GrayDivider"/>
 </LinearLayout>

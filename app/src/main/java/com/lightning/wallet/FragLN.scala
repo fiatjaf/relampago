@@ -65,7 +65,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
   val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   val expiryLeft = getResources getStringArray R.array.ln_status_expiry
-  val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
   val imageMap = Array(await, await, conf1, dead, frozen)
   val lnChanWarn = frag.findViewById(R.id.lnChanWarn)
   val noDesc = host getString ln_no_description

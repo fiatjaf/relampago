@@ -385,7 +385,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
     val changePass = form.findViewById(R.id.changePass).asInstanceOf[Button]
-    lazy val gf = new Goldfinger.Builder(me).build
+    val gf = new Goldfinger.Builder(me).build
 
     if (gf.hasEnrolledFingerprint) {
       // Only if basic prerequisites are here
@@ -403,8 +403,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
             val callback = new Goldfinger.Callback {
               def onWarning(warn: Warning) = FingerPassCode informUser warn
-              def onSuccess(cipher: String) = runAnd(alert.dismiss)(FingerPassCode record cipher)
               def onError(err: GFError) = wrap(FingerPassCode informUser err)(alert.dismiss)
+              def onSuccess(cipher: String) = runAnd(alert.dismiss)(FingerPassCode record cipher)
             }
 
             dlg setOnDismissListener new OnDismissListener {
@@ -422,8 +422,9 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
       def setButtonDisable = {
         def proceed = rm(menu) {
-          passWrap(me getString fp_disable) apply checkPass { pass =>
-            // Ask user passcode before erasing fingerpring unlocking
+          passWrap(me getString fp_disable, fp = false) apply checkPass { pass =>
+            // Always ask user for a passcode before disabling fingerprint unlocking
+            // and don't allow fingerprint unlocking this is special case
             runAnd(app toast fp_err_disabled)(FingerPassCode.erase)
           }
         }
@@ -509,7 +510,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     changePass setOnClickListener onButtonTap {
       def openForm = passWrap(me getString sets_secret_change) apply checkPass { oldPass =>
-        val view \ field = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_new, null)
+        val view \ field \ _ = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_new, null)
         mkForm(mkChoiceDialog(react, none, dialog_ok, dialog_cancel), getString(sets_secret_change), view)
         def react = if (field.getText.length >= 6) changePassword else app toast secret_too_short
 
