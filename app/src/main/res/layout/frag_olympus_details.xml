@@ -1,0 +1,25 @@
+<LinearLayout
+    style="@style/StandardLinearLayout"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <EditText
+        style="@style/Info"
+        android:minWidth="120dp"
+        android:paddingTop="20dp"
+        android:id="@+id/serverHostPort"
+        android:layout_width="wrap_content"
+        android:inputType="textVisiblePassword"/>
+
+    <TextView
+        style="@style/StdText"
+        android:text="@string/olympus_hint"
+        android:layout_width="wrap_content"/>
+
+    <CheckBox
+        style="@style/MarginInfo"
+        android:id="@+id/serverBackup"
+        android:layout_width="wrap_content"
+        android:text="@string/olympus_backup"/>
+
+    <View style="@style/GrayDivider"/>
+</LinearLayout>

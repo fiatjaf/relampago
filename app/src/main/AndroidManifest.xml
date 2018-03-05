@@ -83,5 +83,8 @@
         <activity android:launchMode="singleTask" android:name="LNStartFundActivity"
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
+        <activity android:launchMode="singleTask" android:name="OlympusActivity"
+            android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
+
     </application>
 </manifest>

@@ -1,0 +1,12 @@
+<LinearLayout
+    style="@style/StandardLinearLayoutPage"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <include layout="@layout/toolbar"/>
+
+    <android.support.v7.widget.RecyclerView
+        android:layout_height="match_parent"
+        android:layout_width="match_parent"
+        android:id="@+id/serverList"/>
+
+</LinearLayout>

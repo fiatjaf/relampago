@@ -29,6 +29,11 @@
 
     <Button
         style="@style/TransButton"
+        android:id="@+id/manageOlympus"
+        android:text="@string/sets_manage_olympus"/>
+
+    <Button
+        style="@style/TransButton"
         android:id="@+id/createZygote"
         android:text="@string/sets_zygote"/>
 

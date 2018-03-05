@@ -15,8 +15,8 @@ import com.lightning.wallet.ln.Tools.none
 import rx.lang.scala.{Observable => Obs}
 
 
-// Uses special paid tokens to store data on server
-class Cloud(var useAuth: Boolean, var connector: Connector, val identifier: String,
+// Uses special paid tokens to store data on server, is constructed directly from a database
+class Cloud(val identifier: String, var connector: Connector, var auth: Int, val removable: Int,
             val maxPriceMsat: Long = 10000000L) extends StateMachine[CloudData] { me =>
 
   private var isFree = true

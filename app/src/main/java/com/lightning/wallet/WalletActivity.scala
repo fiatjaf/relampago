@@ -381,11 +381,18 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val menu = mkForm(me negBld dialog_ok, getString(read_settings).html, form)
     val recoverChannelFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
     val useFingerprint = form.findViewById(R.id.useFingerprint).asInstanceOf[Button]
+    val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
     val createZygote = form.findViewById(R.id.createZygote).asInstanceOf[Button]
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
     val changePass = form.findViewById(R.id.changePass).asInstanceOf[Button]
     val gf = new Goldfinger.Builder(me).build
+
+    manageOlympus setOnClickListener onButtonTap {
+      // Just show a list of available Olympus servers
+      def proceed = me goTo classOf[OlympusActivity]
+      rm(menu)(proceed)
+    }
 
     if (gf.hasEnrolledFingerprint) {
       // Only if basic prerequisites are here

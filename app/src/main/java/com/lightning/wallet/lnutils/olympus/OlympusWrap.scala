@@ -23,7 +23,6 @@ import java.net.ProtocolException
 import java.math.BigInteger
 
 
-case class OlympusServer(identifier: String, url: String, data: CloudData, auth: Int, removable: Int)
 case class CloudData(info: Option[RequestAndMemo], tokens: Vector[ClearToken], acts: CloudActVec)
 case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
 
@@ -50,33 +49,29 @@ object OlympusWrap extends OlympusProvider {
   val CMDStart = "CMDStart"
   val BODY = "body"
 
-  var clouds = {
-    // All clouds for basic RPC queries
-    val cursor = db select OlympusTable.selectAllSql
-    RichCursor(cursor) vec toServer map toInstance
-  }
-
-  def doProcess(data: Any) = {
-    val backups = clouds.filter(_.useAuth)
-    for (cloud <- backups) cloud doProcess data
-  }
+  // All available clouds for RPC queries and backups
+  var clouds = RichCursor(db select OlympusTable.selectAllSql) vec toCloud
+  def doProcess(data: Any) = for (cloud <- clouds if cloud.auth == 1) cloud doProcess data
 
   // SQL interface
 
   def remove(identifier: String) = db.change(OlympusTable.killSql, identifier)
   def updData(data: String, identifier: String) = db.change(OlympusTable.updDataSql, data, identifier)
   def updOrder(order: Int, identifier: String) = db.change(OlympusTable.updOrderSql, order, identifier)
-  def updMeta(osr: OlympusServer) = db.change(OlympusTable.updMetaSql, osr.url, osr.auth, osr.identifier)
-  def toServer(rc: RichCursor) = OlympusServer(rc string OlympusTable.identifier, rc string OlympusTable.url,
-    to[CloudData](rc string OlympusTable.data), rc int OlympusTable.auth, rc int OlympusTable.removable)
+  def updMeta(cloud: Cloud) = db.change(OlympusTable.updMetaSql, cloud.connector.url, cloud.auth, cloud.identifier)
 
-  def addServer(osr: OlympusServer, order: Int) =
-    db.change(OlympusTable.newSql, osr.identifier, osr.url,
-      osr.data.toJson.toString, osr.auth, order, osr.removable)
+  def addServer(cloud: Cloud, order: Int) =
+    db.change(OlympusTable.newSql, cloud.identifier, cloud.connector.url,
+      cloud.data.toJson.toString, cloud.auth, order, cloud.removable)
 
-  def toInstance(osr: OlympusServer) =
-    new Cloud(osr.auth == 1, new Connector(osr.url),
-      osr.identifier) { this.data = osr.data }
+  def toCloud(rc: RichCursor) = {
+    val auth = rc int OlympusTable.auth
+    val id = rc string OlympusTable.identifier
+    val removable = rc int OlympusTable.removable
+    val saved = to[CloudData](rc string OlympusTable.data)
+    val connector = new Connector(rc string OlympusTable.url)
+    new Cloud(id, connector, auth, removable) { data = saved }
+  }
 
   // Olympus RPC interface
 
