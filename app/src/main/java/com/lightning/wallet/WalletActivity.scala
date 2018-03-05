@@ -464,12 +464,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     createZygote setOnClickListener onButtonTap {
       def openForm = showForm(mkChoiceDialog(ok = <(createZygote, onFail) { zygote =>
-        val share = new Intent setAction Intent.ACTION_SEND_MULTIPLE setType "text/plain"
-        val data = new java.util.ArrayList[Uri]
-        data.add(Uri fromFile zygote)
-
-        // Explain all the caveates before procceding with zygote sharing
-        me startActivity share.putParcelableArrayListExtra(Intent.EXTRA_STREAM, data)
+        val zygoteFileShare = new Intent setAction Intent.ACTION_SEND setType "text/plain"
+        me startActivity zygoteFileShare.putExtra(Intent.EXTRA_STREAM, Uri fromFile zygote)
       }, none, dialog_next, dialog_cancel).setMessage(getString(zygote_details).html).create)
 
       def createZygote = {

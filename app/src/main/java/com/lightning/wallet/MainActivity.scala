@@ -148,12 +148,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
         val callback = new Goldfinger.Callback {
           def onWarning(nonFatalWarning: Warning) = FingerPassCode informUser nonFatalWarning
           def onError(err: GFError) = wrap(FingerPassCode informUser err)(mainFingerprint setVisibility View.GONE)
-
-          def onSuccess(plainPasscode: String) = {
-            // Let user know a passcode has been set
-            mainPassData setText plainPasscode
-            timer.schedule(startLogin, 350)
-          }
+          def onSuccess(plainPasscode: String) = runAnd(mainPassData setText plainPasscode)(startLogin)
         }
 
         mainFingerprint setVisibility View.VISIBLE

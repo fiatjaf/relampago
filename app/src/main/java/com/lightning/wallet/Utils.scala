@@ -208,12 +208,7 @@ trait TimerActivity extends AppCompatActivity { me =>
       val callback = new Goldfinger.Callback {
         def onWarning(nonFatalWarning: Warning) = FingerPassCode informUser nonFatalWarning
         def onError(err: GFError) = wrap(FingerPassCode informUser err)(image setVisibility View.GONE)
-
-        def onSuccess(plainPasscode: String) = {
-          timer.schedule(next apply plainPasscode, 350)
-          timer.schedule(alert.dismiss, 350)
-          field setText plainPasscode
-        }
+        def onSuccess(plainPasscode: String) = field setText plainPasscode
       }
 
       alert setOnDismissListener new OnDismissListener {
