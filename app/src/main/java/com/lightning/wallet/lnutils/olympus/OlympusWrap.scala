@@ -80,10 +80,10 @@ object OlympusWrap extends OlympusProvider {
 
   // Olympus RPC interface
 
-  def failOver[T](run: Cloud => Obs[T], clouds: CloudVec): Obs[T] = {
-    def tryAgainWithNextCloud(failure: Throwable) = failOver(run, clouds.tail)
-    if (clouds.isEmpty) Obs error new ProtocolException("Run out of clouds")
-    else run(clouds.head) onErrorResumeNext tryAgainWithNextCloud
+  def failOver[T](run: Cloud => Obs[T], cs: CloudVec): Obs[T] = {
+    def tryAgainWithNextCloud(failure: Throwable) = failOver(run, cs.tail)
+    if (cs.isEmpty) Obs error new ProtocolException("Run out of clouds")
+    else run(cs.head) onErrorResumeNext tryAgainWithNextCloud
   }
 
   def getBackup(key: BinaryData) = {

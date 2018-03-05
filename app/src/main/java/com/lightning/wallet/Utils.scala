@@ -58,7 +58,7 @@ object Utils {
   var fiatName: String = _
 
   val fileName = "Testnet"
-  val dbFileName = s"$fileName-4.db"
+  val dbFileName = s"$fileName-8.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
 

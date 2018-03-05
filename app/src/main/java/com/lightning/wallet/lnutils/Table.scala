@@ -1,6 +1,10 @@
 package com.lightning.wallet.lnutils
 
+import spray.json._
+import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.ln.Tools.{none, runAnd}
+
+import com.lightning.wallet.lnutils.olympus.CloudData
 import net.sqlcipher.database.SQLiteDatabase
 import android.content.Context
 import android.net.Uri
@@ -12,7 +16,7 @@ object OlympusTable extends Table {
   val updMetaSql = s"UPDATE $table SET $url = ?, $auth = ? WHERE $identifier = ?"
   val updOrderSql = s"UPDATE $table SET $order = ? WHERE $identifier = ?"
   val updDataSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
-  val selectAllSql = s"SELECT * FROM $table ORDER BY $order DESC"
+  val selectAllSql = s"SELECT * FROM $table ORDER BY $order ASC"
   val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
   val createSql = s"""
@@ -111,5 +115,12 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     dbs execSQL PaymentTable.createSql
     dbs execSQL ChannelTable.createSql
     dbs execSQL OlympusTable.createSql
+
+    val emptyData = CloudData(None, Vector.empty, Vector.empty).toJson.toString
+    val main: Array[AnyRef] = Array("main-dev-server", "http://213.133.99.89:9002", emptyData, "1", "0", "0")
+    val fallback: Array[AnyRef] = Array("fallback-dev-server", "http://10.0.2.2:9002", emptyData, "0", "1", "0")
+
+    dbs.execSQL(OlympusTable.newSql, main)
+    dbs.execSQL(OlympusTable.newSql, fallback)
   }
 }
