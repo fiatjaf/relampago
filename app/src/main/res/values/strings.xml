@@ -60,14 +60,17 @@
     ]]></string>
 
     <!-- Olympus server -->
+    <string name="olympus_actions">Add, remove or reorder</string>
+    <string name="olympus_edit">Edit Olympus server</string>
     <string name="olympus_add">Add Olympus server</string>
     <string name="olympus_hint">Server host:port</string>
-    <string name="olympus_backup">Backup server</string>
+    <string name="olympus_backup">Upload backups</string>
 
     <array name="olympus_tokens_left">
         <item>No tokens</item>
         <item>%1$d token</item>
         <item>%1$d tokens</item>
+        <item>Basic API</item>
     </array>
 
     <!-- menu and fab -->

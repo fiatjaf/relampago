@@ -8,7 +8,9 @@ import android.view.View;
  * Base view holder class for gesture compatible items.
  * @author thesurix
  */
-public abstract class GestureViewHolder extends RecyclerView.ViewHolder {
+public class GestureViewHolder extends RecyclerView.ViewHolder {
+
+    public boolean swipable = false;
 
     public GestureViewHolder(final View itemView) {
         super(itemView);
@@ -71,11 +73,11 @@ public abstract class GestureViewHolder extends RecyclerView.ViewHolder {
      * Returns information if we can drag this view.
      * @return true if draggable, false otherwise
      */
-    public abstract boolean canDrag();
+    public boolean canDrag() { return true; }
 
     /**
      * Returns information if we can swipe this view.
      * @return true if swipeable, false otherwise
      */
-    public abstract boolean canSwipe();
+    public boolean canSwipe() { return swipable; }
 }

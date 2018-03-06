@@ -13,8 +13,7 @@ import android.net.Uri
 object OlympusTable extends Table {
   val (table, identifier, url, data, auth, order, removable) = ("olympus", "identifier", "url", "data", "auth", "ord", "removable")
   val newSql = s"INSERT OR IGNORE INTO $table ($identifier, $url, $data, $auth, $order, $removable) VALUES (?, ?, ?, ?, ?, ?)"
-  val updMetaSql = s"UPDATE $table SET $url = ?, $auth = ? WHERE $identifier = ?"
-  val updOrderSql = s"UPDATE $table SET $order = ? WHERE $identifier = ?"
+  val updMetaSql = s"UPDATE $table SET $url = ?, $auth = ?, $order = ? WHERE $identifier = ?"
   val updDataSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
   val selectAllSql = s"SELECT * FROM $table ORDER BY $order ASC"
   val killSql = s"DELETE FROM $table WHERE $identifier = ?"
@@ -116,7 +115,7 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     dbs execSQL ChannelTable.createSql
     dbs execSQL OlympusTable.createSql
 
-    val emptyData = CloudData(None, Vector.empty, Vector.empty).toJson.toString
+    val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
     val main: Array[AnyRef] = Array("main-dev-server", "http://213.133.99.89:9002", emptyData, "1", "0", "0")
     val fallback: Array[AnyRef] = Array("fallback-dev-server", "http://10.0.2.2:9002", emptyData, "0", "1", "0")
 

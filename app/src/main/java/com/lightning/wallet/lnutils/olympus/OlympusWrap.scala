@@ -57,12 +57,9 @@ object OlympusWrap extends OlympusProvider {
 
   def remove(identifier: String) = db.change(OlympusTable.killSql, identifier)
   def updData(data: String, identifier: String) = db.change(OlympusTable.updDataSql, data, identifier)
-  def updOrder(order: Int, identifier: String) = db.change(OlympusTable.updOrderSql, order, identifier)
-  def updMeta(cloud: Cloud) = db.change(OlympusTable.updMetaSql, cloud.connector.url, cloud.auth, cloud.identifier)
-
-  def addServer(cloud: Cloud, order: Int) =
-    db.change(OlympusTable.newSql, cloud.identifier, cloud.connector.url,
-      cloud.data.toJson.toString, cloud.auth, order, cloud.removable)
+  def updMeta(cd: Cloud, order: Int) = db.change(OlympusTable.updMetaSql, cd.connector.url, cd.auth, order, cd.identifier)
+  def addServer(cloud: Cloud, order: Int) = db.change(OlympusTable.newSql, cloud.identifier, cloud.connector.url,
+    cloud.data.toJson.toString, cloud.auth, order, cloud.removable)
 
   def toCloud(rc: RichCursor) = {
     val auth = rc int OlympusTable.auth
