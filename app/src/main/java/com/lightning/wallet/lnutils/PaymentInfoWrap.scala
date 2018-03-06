@@ -99,7 +99,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       if (norm.commitments.localCommit.spec.fulfilled.nonEmpty) {
         // Let the cloud know since it may be waiting for a payment
         // also vibrate to let a user know that payment is fulfilled
-        OlympusWrap doProcess CMDStart
+        OlympusWrap tellClouds CMDStart
         vibrate(lnSettled)
       }
 
@@ -119,7 +119,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
-      OlympusWrap doProcess CMDStart
+      OlympusWrap tellClouds CMDStart
   }
 }
 
@@ -131,6 +131,7 @@ object GossipCatcher extends ChannelListener {
       // GUARD: don't have an extra hop, get the block
       if norm.commitments.extraHop.isEmpty =>
 
+      // Extract funding txid and it's output index
       val txid = Commitments fundingTxid norm.commitments
       val outIdx = norm.commitments.commitInput.outPoint.index
 

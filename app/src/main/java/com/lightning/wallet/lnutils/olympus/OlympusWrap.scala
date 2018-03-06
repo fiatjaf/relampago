@@ -50,8 +50,10 @@ object OlympusWrap extends OlympusProvider {
   val BODY = "body"
 
   // All available clouds for RPC queries and backups
+  // backup upload requests are also sent to all the clounds
+  // and final filtering is done inside of each available cloud
   var clouds = RichCursor(db select OlympusTable.selectAllSql) vec toCloud
-  def doProcess(data: Any) = for (cloud <- clouds if cloud.auth == 1) cloud doProcess data
+  def tellClouds(data: Any) = for (cloud <- clouds) cloud doProcess data
 
   // SQL interface
 

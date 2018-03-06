@@ -36,14 +36,14 @@ class OlympusActivity extends TimerActivity { me =>
       val olympusTokens = holder.itemView.findViewById(R.id.olympusTokens).asInstanceOf[TextView]
 
       val cloud = getItem(pos)
-      val address = Uri.parse(cloud.connector.url)
-      val addrPort = s"${address.getHost}<i>:${address.getPort}</i>"
+      val serverAddress = Uri.parse(cloud.connector.url)
       val tokensLeftHuman = app.plurOrZero(tokensLeft, cloud.data.tokens.size)
-      val finalTokensLeft = if (cloud.auth == 1) tokensLeftHuman else tokensLeft.last
-      val finalAddress = if (cloud.auth == 1) s"<font color=#1AB31A>$addrPort</font>" else addrPort
+      val finalTokensLeft = if (cloud.isAuthEnabled) tokensLeftHuman else tokensLeft.last
+      val addrPort = s"${serverAddress.getHost}<i><small>:${serverAddress.getPort}</small></i>"
+      val finalAddr = if (cloud.isAuthEnabled) s"<font color=#1AB31A>$addrPort</font>" else addrPort
 
       olympusTokens setText finalTokensLeft
-      olympusAddress setText finalAddress.html
+      olympusAddress setText finalAddr.html
       holder.swipable = cloud.removable == 1
     }
   }
@@ -53,9 +53,6 @@ class OlympusActivity extends TimerActivity { me =>
       new FormManager(updateCloud(item), olympus_edit) set item
       false
     }
-
-    override def onItemLongPress(item: Cloud, position: Int) = none
-    override def onDoubleTap(item: Cloud, position: Int) = false
   }
 
   def INIT(savedInstanceState: Bundle) = {
@@ -122,14 +119,14 @@ class OlympusActivity extends TimerActivity { me =>
 
     def set(cloud: Cloud) = {
       serverHostPort setText cloud.connector.url
-      serverBackup setChecked cloud.auth == 1
+      serverBackup setChecked cloud.isAuthEnabled
     }
 
     def proceed: Unit = rm(alert) {
       val auth = if (serverBackup.isChecked) 1 else 0
       val checker = Uri parse serverHostPort.getText.toString
       val addressValid = checker.getHost != null || checker.getPort > 0
-      if (addressValid) next(serverHostPort.getText.toString, auth)
+      if (addressValid) next(checker.toString, auth)
       else app toast err_general
     }
   }

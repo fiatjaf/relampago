@@ -147,10 +147,8 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   }
 
   def updView(showText: Boolean) = {
-    val textVisibility = if (showText) View.VISIBLE else View.GONE
-    val listVisibility = if (showText) View.GONE else View.VISIBLE
-    mnemonicWarn setVisibility textVisibility
-    itemsList setVisibility listVisibility
+    mnemonicWarn setVisibility viewMap(showText)
+    itemsList setVisibility viewMap(!showText)
   }
 
   def onFragmentDestroy = {

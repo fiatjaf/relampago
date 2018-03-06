@@ -20,6 +20,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
             val maxPriceMsat: Long = 10000000L) extends StateMachine[CloudData] { me =>
 
   private var isFree = true
+  def isAuthEnabled = auth == 1 // For easy database compatibility
   def capableChannelExists = app.ChannelManager.canSend(maxPriceMsat).nonEmpty
   def withFree[T](obs: Obs[T] /* Adds side effect to control isFree state */) =
     obs doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
@@ -34,9 +35,9 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, tokens, actions) \ CMDStart
-      // We are free AND (no tokens left OR few tokens left AND no acts left) AND channel exists
-      if isFree && (tokens.isEmpty || actions.isEmpty && tokens.size < 5) && capableChannelExists =>
-      // This will intercept the next case only if we have no acts left which is desirable
+      // We are free AND backup is on AND (no tokens left OR few tokens left AND no acts left) AND a channel exists
+      if isFree && isAuthEnabled && (tokens.isEmpty || actions.isEmpty && tokens.size < 5) && capableChannelExists =>
+      // This guard will intercept the next branch only if we are not capable of sending or have nothing to send
       me withFree retry(getFreshData, pickInc, 4 to 5) foreach { case rpi \ info1 =>
         // If requested sum is low enough and tokens quantity is high enough
         // and info has not already been set by another request
@@ -54,7 +55,6 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         case "done" => me BECOME data.copy(acts = data.acts diff Vector(action), tokens = tokens)
         case err: Throwable if err.getMessage == "tokeninvalid" => me BECOME data.copy(tokens = tokens)
         case err: Throwable if err.getMessage == "tokenused" => me BECOME data.copy(tokens = tokens)
-        case err: Throwable => Tools errlog err
         case _ =>
       }
 
@@ -80,12 +80,15 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         case other => Tools log other
       }
 
-    case (_, act: CloudAct) =>
-      // Record new action and try to send
-      // recording happens irregardless of state
-      val actions1 = data.acts :+ act take 50
-      me BECOME data.copy(acts = actions1)
+    case (_, act: CloudAct) if isAuthEnabled =>
+      // This is an active backup server so try to send
+      me BECOME data.copy(acts = data.acts :+ act take 50)
       me doProcess CMDStart
+
+    case (_, act: CloudAct) if data.tokens.nonEmpty =>
+      // This is a disabled backup server with some tokens left
+      // store data in case of user changing mind at a later time
+      me BECOME data.copy(acts = data.acts :+ act take 10)
 
     case _ =>
   }
@@ -97,8 +100,6 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       case (signerMasterPubKey, signerSessionPubKey, quantity) =>
         val pubKeyQ = ECKey.fromPublicOnly(HEX decode signerMasterPubKey)
         val pubKeyR = ECKey.fromPublicOnly(HEX decode signerSessionPubKey)
-
-        // Prepare a list of BlindParam and a list of BigInteger clear tokens
         val blinder = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
         val memo = BlindMemo(blinder params quantity, blinder tokens quantity, pubKeyR.getPublicKeyAsHex)
         connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,

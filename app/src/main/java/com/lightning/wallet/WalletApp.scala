@@ -186,7 +186,7 @@ class WalletApp extends Application { me =>
 
         cd.tier12States.map(_.txn) match {
           case Nil => Tools log "Closing channel does not have tier 1-2 transactions"
-          case txs => OlympusWrap doProcess CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
+          case txs => OlympusWrap tellClouds CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
         }
       }
     }

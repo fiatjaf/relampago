@@ -104,7 +104,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
           // Save a channel backup right away, don't wait until a channel becomes operational
           // in worst case it will be saved once channel becomes OPEN if there are no tokens currently
-          OlympusWrap doProcess CloudAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
+          OlympusWrap tellClouds CloudAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
           // Make this a fully established channel by attaching operational listeners and adding it to list
           freshChan.listeners = app.ChannelManager.operationalListeners
           app.ChannelManager.all +:= freshChan
