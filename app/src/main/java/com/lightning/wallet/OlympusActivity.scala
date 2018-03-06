@@ -61,6 +61,7 @@ class OlympusActivity extends TimerActivity { me =>
   def INIT(savedInstanceState: Bundle) = {
     wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_olympus)
     wrap(getSupportActionBar setTitle sets_manage_olympus)(getSupportActionBar setSubtitle olympus_actions)
+    Utils clickableTextField findViewById(R.id.serverWhat)
 
     adapter setData clouds.asJava
     adapter setDataChangeListener new GestureAdapter.OnDataChangeListener[Cloud] {
