@@ -48,8 +48,9 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     // Execute anyway if we are free and have available tokens and actions
     case CloudData(_, (point, clear, signature) +: tokens, action +: _) \ CMDStart if isFree =>
       val params = Seq("point" -> point, "cleartoken" -> clear, "clearsig" -> signature, BODY -> action.data.toString)
-      val send = me withFree connector.ask[String](action.path, params ++ action.plus:_*).doOnCompleted(me doProcess CMDStart)
-      send.foreach(onResponse, onResponse)
+      // Be careful here: must make sure `doOnTerminate` changes `isFree` before `doOnCompleted` sends `CMDStart`
+      val send = me withFree connector.ask[String](action.path, params ++ action.plus:_*)
+      send.doOnCompleted(me doProcess CMDStart).foreach(onResponse, onResponse)
 
       def onResponse(response: Any) = response match {
         case "done" => me BECOME data.copy(acts = data.acts diff Vector(action), tokens = tokens)
@@ -80,15 +81,12 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         case other => Tools log other
       }
 
-    case (_, act: CloudAct) if isAuthEnabled =>
-      // This is an active backup server so try to send
+    case (_, act: CloudAct)
+      if isAuthEnabled || data.tokens.nonEmpty =>
+      // Backup is active or we have some tokens left
+      // Keep processing until run out of tokens in any case
       me BECOME data.copy(acts = data.acts :+ act take 50)
       me doProcess CMDStart
-
-    case (_, act: CloudAct) if data.tokens.nonEmpty =>
-      // This is a disabled backup server with some tokens left
-      // store data in case of user changing mind at a later time
-      me BECOME data.copy(acts = data.acts :+ act take 10)
 
     case _ =>
   }

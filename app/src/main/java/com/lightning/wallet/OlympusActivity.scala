@@ -40,10 +40,9 @@ class OlympusActivity extends TimerActivity { me =>
       val tokensLeftHuman = app.plurOrZero(tokensLeft, cloud.data.tokens.size)
       val finalTokensLeft = if (cloud.isAuthEnabled) tokensLeftHuman else tokensLeft.last
       val addrPort = s"${serverAddress.getHost}<i><small>:${serverAddress.getPort}</small></i>"
-      val finalAddr = if (cloud.isAuthEnabled) s"<font color=#1AB31A>$addrPort</font>" else addrPort
 
+      olympusAddress setText addrPort.html
       olympusTokens setText finalTokensLeft
-      olympusAddress setText finalAddr.html
       holder.swipable = cloud.removable == 1
     }
   }

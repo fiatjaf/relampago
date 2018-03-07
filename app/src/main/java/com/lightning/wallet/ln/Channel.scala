@@ -102,34 +102,22 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // FUNDING TX IS BROADCASTED AT THIS POINT
 
 
-      // We have not yet sent a FundingLocked but just got one from them so we save it and keep waiting
-      case (wait @ WaitFundingDoneData(_, None, _, _, _), their: FundingLocked, WAIT_FUNDING_DONE) =>
-        // Not storing since they will re-send on restart
-        val d1 = wait.modify(_.their) setTo Some(their)
-        me UPDATA d1
+      case (wait: WaitFundingDoneData, their: FundingLocked, WAIT_FUNDING_DONE) =>
+        // No need to store their FundingLocked because it gets re-sent on reconnect
+        if (wait.our.isEmpty) me UPDATA wait.copy(their = Some apply their)
+        else becomeOpen(wait, their)
 
 
-      // We have already sent them a FundingLocked and now we got one from them so can enter normal state
-      case (wait @ WaitFundingDoneData(_, Some(our), _, _, _), their: FundingLocked, WAIT_FUNDING_DONE) =>
-        val c1 = wait.commitments.modify(_.remoteNextCommitInfo) setTo Right(their.nextPerCommitmentPoint)
-        BECOME(me STORE NormalData(wait.announce, c1), OPEN)
+      case (wait: WaitFundingDoneData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE)
+        // GUARD: this funding transaction blongs to this exact channel
+        if wait.fundingTx.txid == fundTx.txid =>
 
-
-      // We got our lock but their is not yet present so we save ours and just keep waiting for their
-      case (wait @ WaitFundingDoneData(_, _, None, _, _), CMDConfirmed(tx), WAIT_FUNDING_DONE)
-        if wait.fundingTx.txid == tx.txid =>
-
+        // Create and store our FundingLocked
+        // since CMDConfirmed only happens once
         val our = makeFundingLocked(wait.commitments)
-        val d1 = wait.modify(_.our) setTo Some(our)
-        me UPDATA STORE(d1) SEND our
-
-
-      // We got our lock when their is already present so we can safely enter normal state now
-      case (wait @ WaitFundingDoneData(_, _, Some(their), _, _), CMDConfirmed(tx), WAIT_FUNDING_DONE)
-        if wait.fundingTx.txid == tx.txid =>
-
-        val c1 = wait.commitments.modify(_.remoteNextCommitInfo) setTo Right(their.nextPerCommitmentPoint)
-        BECOME(me STORE NormalData(wait.announce, c1), OPEN) SEND makeFundingLocked(wait.commitments)
+        val wait1 = me STORE wait.copy(our = Some apply our)
+        if (wait.their.isEmpty) me UPDATA wait1 SEND our
+        else becomeOpen(wait, wait.their.get) SEND our
 
 
       // OPEN MODE
@@ -497,6 +485,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   private def makeFundingLocked(cs: Commitments) = {
     val first = Generators.perCommitPoint(cs.localParams.shaSeed, 1L)
     FundingLocked(cs.channelId, nextPerCommitmentPoint = first)
+  }
+
+  private def becomeOpen(wait: WaitFundingDoneData, their: FundingLocked) = {
+    val c1 = wait.commitments.copy(remoteNextCommitInfo = Right apply their.nextPerCommitmentPoint)
+    BECOME(me STORE NormalData(wait.announce, c1), OPEN)
   }
 
   private def startShutdown(norm: NormalData) = {
