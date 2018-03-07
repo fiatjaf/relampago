@@ -117,7 +117,7 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
 
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
     val main: Array[AnyRef] = Array("main-dev-server", "http://213.133.99.89:9002", emptyData, "1", "0", "0")
-    val fallback: Array[AnyRef] = Array("fallback-dev-server", "http://10.0.2.2:9002", emptyData, "0", "1", "0")
+    val fallback: Array[AnyRef] = Array("fallback-dev-server", "http://213.133.103.56:9002", emptyData, "0", "1", "1")
 
     dbs.execSQL(OlympusTable.newSql, main)
     dbs.execSQL(OlympusTable.newSql, fallback)

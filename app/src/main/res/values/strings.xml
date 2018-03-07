@@ -42,7 +42,7 @@
     <string name="restore_hint">Your BIP32 mnemonic code</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.06&#8211;23</small>]]></string>
+    <string name="read_settings"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.07&#8211;24</small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
     <string name="mnemonic_export_details"><![CDATA[Mnemonic code will be encrypted and exported using <strong>your current passcode</strong>.<br><br>You are strongly advised to read a <a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>related section</a> of wallet manual before proceeding with this]]></string>
     <string name="mnemonic_info"><font color="#E31300">Mnemonic code is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.\n\nSaving and properly securing a mnemonic code is a single most important action to do once a fresh Bitcoin wallet is created.\n\nYou will need a mnemonic code in a case of various emergencies such as lost phone or forgotten passcode!</string>
@@ -248,7 +248,7 @@
     <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://testnet.smartbit.com.au/tx/%1$s>View closing status</a><br>%2$s<br>%3$s fee]]></string>
 
     <string name="ln_ops_unilateral_you"><![CDATA[<font color=#999999><i>started by your wallet</i></font>]]></string>
-    <string name="ln_ops_unilateral_peer"><![CDATA[<font color=#999999><i>started by peer\'s node<i></font>]]></string>
+    <string name="ln_ops_unilateral_peer"><![CDATA[<font color=#999999><i>started by peer\'s node</i></font>]]></string>
     <string name="ln_ops_chan_unilateral_status_dead"><![CDATA[%1$s<br>= %2$s cancelled]]></string>
     <string name="ln_ops_chan_unilateral_status_done"><![CDATA[%1$s<br>= %2$s received]]></string>
     <string name="ln_ops_chan_unilateral_status_left"><![CDATA[%2$s<br>= %3$s %1$s]]></string>

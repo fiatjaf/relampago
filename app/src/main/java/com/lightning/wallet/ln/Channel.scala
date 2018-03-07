@@ -459,8 +459,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         startLocalClose(some)
 
 
-      // CMDShutdown in WAIT_FUNDING_DONE and OPEN may be handled as a cooperative close
-      case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | OFFLINE) => startLocalClose(some)
+      case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | OFFLINE) =>
+        // CMDShutdown in WAIT_FUNDING_DONE and OPEN can be cooperative
+        startLocalClose(some)
+
       case other =>
     }
 

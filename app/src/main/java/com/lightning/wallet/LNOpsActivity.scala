@@ -213,8 +213,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def getStartedBy(c: ClosingData) = getString {
-      val byYou = c.localCommit.nonEmpty || c.refundRemoteCommit.nonEmpty
-      if (byYou) ln_ops_unilateral_you else ln_ops_unilateral_peer
+      val byThem = c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty
+      if (byThem) ln_ops_unilateral_peer else ln_ops_unilateral_you
     }
 
     val chanListener = new ChannelListener {
