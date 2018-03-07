@@ -43,7 +43,7 @@ object PaymentInfo {
   }
 
   def useRoute(route: PaymentRoute, rest: PaymentRouteVec, rpi: RuntimePaymentInfo): FullOrEmptyRPI = {
-    val firstExpiry = LNParams.broadcaster.currentHeight + rpi.pr.minFinalCltvExpiry.getOrElse(default = 9L) - 1000
+    val firstExpiry = LNParams.broadcaster.currentHeight + rpi.pr.minFinalCltvExpiry.getOrElse(default = 9L)
     val firstPayloadVector = PerHopPayload(shortChannelId = 0L, rpi.firstMsat, firstExpiry) +: Vector.empty
     val start = (firstPayloadVector, Vector.empty[PublicKey], rpi.firstMsat, firstExpiry)
 
