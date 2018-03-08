@@ -133,9 +133,12 @@ class WalletApp extends Application { me =>
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
     val chainEventsListener = new TxTracker with BlocksListener {
+      def tellHeight(left: Int) = runAnd(broadcaster.bestHeightObtained = true) {
+        // No matter how many blocks are left we only send a CMD once the last block is done
+        if (left < 1) for (chan <- all) chan process CMDBestHeight(broadcaster.currentHeight)
+      }
+
       override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
-      // No matter how many blocks are left on start, we only send a CMD once the last block has been processed
-      def tellHeight(left: Int) = if (left < 1) for (chan <- all) chan process CMDBestHeight(broadcaster.currentHeight)
       override def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
       override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
 

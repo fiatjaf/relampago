@@ -12,9 +12,13 @@ import fr.acinq.bitcoin.BinaryData
 
 
 object LocalBroadcaster extends Broadcaster {
-  def ratePerKwSat: Long = RatesSaver.rates.feeLive.value / 2
-  def currentHeight = math.max(app.kit.wallet.getLastBlockSeenHeight,
-    app.kit.peerGroup.getMostCommonChainHeight)
+  def ratePerKwSat = RatesSaver.rates.feeLive.value / 2
+
+  def currentHeight = {
+    val candidate1 = app.kit.wallet.getLastBlockSeenHeight
+    val candidate2 = app.kit.peerGroup.getMostCommonChainHeight
+    math.max(candidate1, candidate2)
+  }
 
   def getTx(txid: BinaryData) = {
     val wrapped = Sha256Hash wrap txid.toArray
