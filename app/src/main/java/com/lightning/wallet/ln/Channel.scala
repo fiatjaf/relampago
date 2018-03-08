@@ -154,7 +154,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA norm.copy(commitments = c1)
 
 
-      // We can only accept a new HTLC when channel is both operational and online
+      // We can only send a new HTLC when channel is both operational and online
       case (norm: NormalData, rpi: RuntimePaymentInfo, OPEN) if isOperational(me) =>
         val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, rpi)
         me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
@@ -180,9 +180,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // Fail or fulfill incoming HTLCs
       case (norm: NormalData, CMDHTLCProcess, OPEN) =>
-        val minExpiry = LNParams.broadcaster.currentHeight + 6L
-        for (Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs)
-          me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, minExpiry)
+        val minExpiry = LNParams.broadcaster.currentHeight
+        for (Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs) {
+          if (add.expiry < minExpiry) throw new LightningException("Payment expiry in past")
+          me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, minExpiry + 6L)
+        }
 
         // And sign once done
         doProcess(CMDProceed)

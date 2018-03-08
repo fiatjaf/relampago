@@ -119,7 +119,17 @@ class Connector(val url: String) extends OlympusProvider {
   def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getChildTxs(txs: TxSeq) = ask[TxSeq]("txs/get", "txids" -> txs.map(_.txid).toJson.toString.hex)
-  def findRoutes(rd: RoutingData, from: Set[PublicKey], to: PublicKey) = ask[PaymentRouteVec]("router/routes",
-    "froms" -> from.map(_.toBin).toJson.toString.hex, "tos" -> Set(to).map(_.toBin).toJson.toString.hex,
-    "xn" -> rd.badNodes.map(_.toBin).toJson.toString.hex, "xc" -> rd.badChans.toJson.toString.hex)
+  def findRoutes(rd: RoutingData, from: Set[PublicKey], to: PublicKey) = {
+
+    for (key <- from) println(s"FROM: $key")
+
+    ask[PaymentRouteVec]("router/routes",
+      "froms" -> from.map(_.toBin).toJson.toString.hex, "tos" -> Set(to).map(_.toBin).toJson.toString.hex,
+      "xn" -> rd.badNodes.map(_.toBin).toJson.toString.hex, "xc" -> rd.badChans.toJson.toString.hex).map { routes =>
+
+      for (route <- routes) println(route)
+
+      routes
+    }
+  }
 }

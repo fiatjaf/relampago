@@ -120,7 +120,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       val openStatus = humanStatus(LNParams.broadcaster getStatus fundingTxId)
       val threshold = math.max(wait.commitments.remoteParams.minimumDepth, LNParams.minDepth)
       lnOpsDescription setText getString(ln_ops_chan_opening).format(chan.state, started,
-        coloredIn(capacity), alias, app.plurOrZero(txsConfs, threshold),
+        coloredIn(capacity), app.plurOrZero(txsConfs, threshold), alias,
         fundingTxId.toString, openStatus).html
 
       // Initialize button
