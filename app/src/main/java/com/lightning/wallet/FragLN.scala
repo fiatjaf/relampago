@@ -237,7 +237,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     host.placeLoader match { case indeterminateLoader =>
       val request = app.ChannelManager.withRoutesAndOnionRPI(rpi)
       val request1 = request.doOnTerminate(host removeLoader indeterminateLoader)
-      request1.foreach(foeRPI => app.ChannelManager.sendEither(foeRPI, none), onFail)
+      def noRoutes(rpi: RuntimePaymentInfo) = onFail(host getString err_ln_no_route)
+      request1.foreach(app.ChannelManager.sendEither(_, noRoutes), onFail)
     }
 
   def makePaymentRequest = ifOperational { operationalChannels =>

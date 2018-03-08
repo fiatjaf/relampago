@@ -41,7 +41,7 @@
     <string name="restore_hint">Your BIP32 mnemonic code</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.07&#8211;24</small>]]></string>
+    <string name="read_settings"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.07&#8211;25</small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
     <string name="mnemonic_warn"><![CDATA[Please don\'t make a screenshot as it will be saved in a phone gallery where other apps can access it, which may not be safe.<br><br>Mnemonic code above can be written down plain or encrypted and exported using <strong>your current wallet passcode</strong>.]]></string>
     <string name="mnemonic_info"><font color="#E31300">Mnemonic code is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.\n\nSaving and properly securing a mnemonic code is a single most important action to do once a fresh Bitcoin wallet is created.\n\nYou will need a mnemonic code in a case of various emergencies such as lost phone or forgotten passcode!</string>
