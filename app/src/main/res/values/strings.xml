@@ -99,15 +99,15 @@
     <string name="action_ln_force">Force close</string>
 
     <!-- dialogs -->
-    <string name="spend_address_tip">Paste Bitcoin address\nfrom clipboard</string>
-    <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
-    <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
-    <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>can send %3$s</small>]]></string>
-
     <string name="amount_hint_sat"><![CDATA[Amount in Satoshi%1$s]]></string>
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
     <string name="amount_hint_fin"><![CDATA[Amount in Finney%1$s]]></string>
 
+    <string name="spend_address_tip">Paste Bitcoin address\nfrom clipboard</string>
+    <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
+    <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
+    <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>can send %3$s</small>]]></string>
+    <string name="dialog_chain_behind">Bitcoin wallet is offline: please wait a few seconds and try again</string>
     <string name="dialog_clipboard_absent">Nothing useful in clipboard</string>
     <string name="dialog_address_wrong">Bitcoin address is required</string>
     <string name="dialog_pr_making">Making payment request&#8230;</string>
