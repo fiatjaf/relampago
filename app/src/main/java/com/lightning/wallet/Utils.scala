@@ -232,20 +232,15 @@ trait TimerActivity extends AppCompatActivity { me =>
       // using current wallet passcode if the user is fine with that
 
       <(app.kit decryptSeed pass, onFail) { seed =>
+        val warningText = getString(mnemonic_warn).html
         val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
-        lazy val codeBld = mkChoiceDialog(none, warnUser, dialog_ok, dialog_export)
-        lazy val codeAlert = mkForm(codeBld, getString(sets_noscreen).html, wordsText)
-        codeAlert
+        lazy val bld = mkChoiceDialog(none, encryptAndExport, dialog_ok, dialog_export)
+        lazy val alert = showForm(bld.setCustomTitle(wordsText).setMessage(warningText).create)
+        alert
 
-        def warnUser: Unit = rm(codeAlert) {
-          lazy val okBld = mkChoiceDialog(encryptAndExport, none, dialog_ok, dialog_cancel)
-          lazy val okAlert = mkForm(okBld, null, getString(mnemonic_export_details).html)
-          okAlert
-
-          def encryptAndExport: Unit = rm(okAlert) {
-            val hex = AES.encode(wordsText, Crypto sha256 pass.binary)
-            me share s"Encrypted BIP32 mnemonic code ${new Date}: $hex"
-          }
+        def encryptAndExport: Unit = rm(alert) {
+          val hex = AES.encode(wordsText, Crypto sha256 pass.binary)
+          me share s"Encrypted BIP32 mnemonic code ${new Date}: $hex"
         }
       }
     }

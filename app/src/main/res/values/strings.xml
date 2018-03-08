@@ -11,7 +11,6 @@
     <string name="unlock">Unlock Wallet</string>
     <string name="sets_secret_ok">New passcode has been set</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch.</string>
-    <string name="sets_noscreen"><![CDATA[Do not make a screenshot<br><br><small>A screenshot will be saved in your gallery where other apps can access it, which is not very safe</small>]]></string>
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="password_info">This app uses encryption to protect your data so please pick a passcode which is at least 6 characters long</string>
     <string name="fee_risky"><![CDATA[<small>%1$s<br><small>Standard transaction fee</small></small>]]></string>
@@ -21,6 +20,8 @@
     <string name="btc_wallet">Empty Bitcoin wallet</string>
     <string name="wallet_restore">Restore Wallet</string>
     <string name="ln_wallet">Lightning wallet</string>
+
+
 
     <array name="denoms">
         <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 BTC</small></font>]]></item>
@@ -44,7 +45,7 @@
     <!-- headers with links -->
     <string name="read_settings"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.07&#8211;24</small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
-    <string name="mnemonic_export_details"><![CDATA[Mnemonic code will be encrypted and exported using <strong>your current passcode</strong>.<br><br>You are strongly advised to read a <a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code>related section</a> of wallet manual before proceeding with this]]></string>
+    <string name="mnemonic_warn"><![CDATA[Please don\'t make a screenshot as it will be saved in a phone gallery where other apps can access it, which may not be safe.<br><br>Mnemonic code above can be written down plain or encrypted and exported using <strong>your current wallet passcode</strong>.]]></string>
     <string name="mnemonic_info"><font color="#E31300">Mnemonic code is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.\n\nSaving and properly securing a mnemonic code is a single most important action to do once a fresh Bitcoin wallet is created.\n\nYou will need a mnemonic code in a case of various emergencies such as lost phone or forgotten passcode!</string>
     <string name="ln_ops_chan_none"><a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a> enables fast and secure off-chain Bitcoin transactions with low fees. Using it requires you to open a <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a> with a peer of your choice and then fund it with an on-chain Bitcoin transaction.\n\nThis app uses paid <a href="http://lightning-wallet.com/storage-tokens#storage-tokens">storage tokens</a> to secure channel backups. This is done to make sure that lost channel funds can always be recovered.</string>
     <string name="boost_details"><![CDATA[You can raise a fee for this transaction and thus get it confirmed faster<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
