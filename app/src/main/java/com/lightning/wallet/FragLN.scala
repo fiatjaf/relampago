@@ -63,7 +63,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
   val lnStatus = getResources getStringArray R.array.ln_status_online
   val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
-  val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   val expiryLeft = getResources getStringArray R.array.ln_status_expiry
   val imageMap = Array(await, await, conf1, dead, frozen)
   val lnChanWarn = frag.findViewById(R.id.lnChanWarn)
@@ -246,11 +245,11 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     if (extraRoutes.nonEmpty) withUpdates(goodChannels.map(estimateCanReceive).max)
     else mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
 
-    def withUpdates(maxReceive: Long) = {
-      val maxCanReceive = MilliSatoshi(maxReceive)
-      val reserveUnspent = getString(err_ln_reserve) format coloredOut(-maxCanReceive)
-      if (maxCanReceive.amount < 0L) mkForm(negBld(dialog_ok), reserveUnspent.html, null)
-      else withEnoughReserve(maxCanReceive)
+    def withUpdates(maxReceiveMsat: Long) = {
+      val maxReceive = MilliSatoshi(maxReceiveMsat)
+      val reserveUnspent = getString(err_ln_reserve) format coloredOut(-maxReceive)
+      if (maxReceive.amount < 0L) mkForm(negBld(dialog_ok), reserveUnspent.html, null)
+      else withEnoughReserve(maxReceive)
     }
 
     def withEnoughReserve(maxReceive: MilliSatoshi) = {

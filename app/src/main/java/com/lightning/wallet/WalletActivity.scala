@@ -446,27 +446,37 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       // When wallet data is lost users may recover channel funds
       // by fetching encrypted static channel params from server
 
-      rm(menu)(app toast dialog_recovering)
-      OlympusWrap.getBackup(cloudId).foreach(serverDataVec => {
-        // Decrypt channel recovery data upon successful call and put
-        // them into an active channel list, then connect to peers
+      rm(menu) {
+        lazy val bld = mkChoiceDialog(recover, none, dialog_next, dialog_cancel).setMessage(recovery_info)
+        lazy val alert = showForm(bld.setCustomTitle(me getString sets_chan_recover).create)
+        alert
 
-        for {
-          encrypted <- serverDataVec
-          jsonDecoded = AES.decode(encrypted, cloudSecret)
-          // This may be some garbage so omit this one if it fails
-          refundingData <- Try apply to[RefundingData](jsonDecoded)
-          // Now throw it away if it is already present in list of local channels
-          if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
-          chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
-          // Start watching this channel's funding tx output right away
-          isAdded = app.kit watchFunding refundingData.commitments
-        } app.ChannelManager.all +:= chan
+        def recover: Unit = rm(alert) {
+          OlympusWrap.getBackup(cloudId).foreach(backups => {
+            // Decrypt channel recovery data upon successful call and put
+            // them into an active channel list, then connect to peers
 
-        // New channels have been added
-        // so they need to be reconnected
-        app.ChannelManager.initConnect
-      }, none)
+            for {
+              encrypted <- backups
+              jsonDecoded = AES.decode(encrypted, cloudSecret)
+              // This may be some garbage so omit this one if it fails
+              refundingData <- Try apply to[RefundingData](jsonDecoded)
+              // Now throw it away if it is already present in list of local channels
+              if !app.ChannelManager.all.exists(_(_.channelId) contains refundingData.commitments.channelId)
+              chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
+              // Start watching this channel's funding tx output right away
+              isAdded = app.kit watchFunding refundingData.commitments
+            } app.ChannelManager.all +:= chan
+
+            // New channels have been added
+            // so they need to be reconnected
+            app.ChannelManager.initConnect
+          }, none)
+
+          // Let user know it's happening
+          app toast dialog_recovering
+        }
+      }
     }
 
     createZygote setOnClickListener onButtonTap {
