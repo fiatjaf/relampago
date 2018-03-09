@@ -447,8 +447,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       // by fetching encrypted static channel params from server
 
       rm(menu) {
-        lazy val bld = mkChoiceDialog(recover, none, dialog_next, dialog_cancel).setMessage(recovery_info)
-        lazy val alert = showForm(bld.setCustomTitle(me getString sets_chan_recover).create)
+        lazy val bld = mkChoiceDialog(recover, none, dialog_next, dialog_cancel)
+        lazy val alert = showForm(bld.setMessage(recovery_info).create)
         alert
 
         def recover: Unit = rm(alert) {

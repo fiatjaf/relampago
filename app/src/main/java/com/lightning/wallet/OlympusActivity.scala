@@ -12,6 +12,7 @@ import com.lightning.wallet.lnutils.ImplicitConversions._
 
 import android.view.{Menu, MenuItem, ViewGroup}
 import android.widget.{CheckBox, EditText, TextView}
+import android.content.DialogInterface.BUTTON_POSITIVE
 import android.support.v7.widget.helper.ItemTouchHelper
 import com.lightning.wallet.ln.LNParams
 import com.lightning.wallet.Utils.app
@@ -39,10 +40,10 @@ class OlympusActivity extends TimerActivity { me =>
       val serverAddress = Uri.parse(cloud.connector.url)
       val tokensLeftHuman = app.plurOrZero(tokensLeft, cloud.data.tokens.size)
       val finalTokensLeft = if (cloud.isAuthEnabled) tokensLeftHuman else tokensLeft.last
-      val addrPort = s"${serverAddress.getHost}<i><small>:${serverAddress.getPort}</small></i>"
+      val addressPort = s"${serverAddress.getHost}<i>:${serverAddress.getPort}</i>"
 
-      olympusAddress setText addrPort.html
-      olympusTokens setText finalTokensLeft
+      olympusAddress setText addressPort.html
+      olympusTokens setText finalTokensLeft.html
       holder.swipable = cloud.removable == 1
     }
   }
@@ -113,20 +114,22 @@ class OlympusActivity extends TimerActivity { me =>
     val content = getLayoutInflater.inflate(R.layout.frag_olympus_details, null, false)
     val serverHostPort = content.findViewById(R.id.serverHostPort).asInstanceOf[EditText]
     val serverBackup = content.findViewById(R.id.serverBackup).asInstanceOf[CheckBox]
-    val dlg = mkChoiceDialog(proceed, none, dialog_ok, dialog_cancel)
-    val alert = mkForm(dlg, getString(title), content)
+    val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), getString(title), content)
 
     def set(cloud: Cloud) = {
       serverHostPort setText cloud.connector.url
       serverBackup setChecked cloud.isAuthEnabled
     }
 
-    def proceed: Unit = rm(alert) {
+    def addAttempt = {
       val auth = if (serverBackup.isChecked) 1 else 0
       val checker = Uri parse serverHostPort.getText.toString
-      val addressValid = checker.getHost != null || checker.getPort > 0
+      val addressValid = checker.getHost != null && checker.getPort > 0
       if (addressValid) next(checker.toString, auth)
-      else app toast err_general
+      if (addressValid) alert.dismiss
     }
+
+    val ok = alert getButton BUTTON_POSITIVE
+    ok setOnClickListener onButtonTap(addAttempt)
   }
 }
