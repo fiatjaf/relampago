@@ -377,10 +377,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   app.kit.wallet addCoinsSentEventListener subtitleListener
   app.kit.wallet addCoinsReceivedEventListener subtitleListener
 
+  toolbar setOnClickListener onFastTap {
+    // Only display chooser if search is off
+    if (!showDescription) host.showDenomChooser
+  }
+
   // LN page toolbar will be an action bar
   add(getString(ln_status_none), Informer.LNSTATE).run
   Utils clickableTextField frag.findViewById(R.id.lnChanInfo)
-  toolbar setOnClickListener onFastTap(host.showDenomChooser)
   host setSupportActionBar toolbar
   react(new String)
 }

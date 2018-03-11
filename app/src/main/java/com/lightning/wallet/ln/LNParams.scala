@@ -13,8 +13,8 @@ import fr.acinq.eclair.UInt64
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
   val maxChannelCapacity = MilliSatoshi(16777216000L)
-  val maxHtlcValue = MilliSatoshi(419430400L)
-  val minHtlcValue = MilliSatoshi(100L)
+  val maxHtlcValue = MilliSatoshi(4194304000L)
+  val minHtlcValue = MilliSatoshi(1000L)
   val dustLimit = Satoshi(573L)
 
   val chainHash = Block.TestnetGenesisBlock.hash

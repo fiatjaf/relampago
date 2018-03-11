@@ -138,40 +138,24 @@ object CommitmentSpec {
     cs.htlcs.find(htlc => htlc.add.id == id && htlc.incoming == isIncoming)
 
   type HtlcAndFulfill = (Htlc, UpdateFulfillHtlc)
-  private def fulfill(cs: CommitmentSpec, in: Boolean, m: UpdateFulfillHtlc) =
-
-    findHtlcById(cs, m.id, in) match {
-      case Some(htlc) if htlc.incoming =>
-        cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat,
-          fulfilled = cs.fulfilled + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
-
-      case Some(htlc) =>
-        cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat,
-          fulfilled = cs.fulfilled + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
-
-      case None => cs
-    }
+  def fulfill(cs: CommitmentSpec, isIncoming: Boolean, m: UpdateFulfillHtlc) = findHtlcById(cs, m.id, isIncoming) match {
+    case Some(htlc) if htlc.incoming => cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat, fulfilled = cs.fulfilled + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
+    case Some(htlc) => cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat, fulfilled = cs.fulfilled + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
+    case None => cs
+  }
 
   type HtlcAndFail = (Htlc, LightningMessage)
-  private def fail(cs: CommitmentSpec, in: Boolean, m: HasHtlcId) =
+  def fail(cs: CommitmentSpec, isIncoming: Boolean, m: HasHtlcId) = findHtlcById(cs, m.id, isIncoming) match {
+    case Some(htlc) if htlc.incoming => cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat, failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
+    case Some(htlc) => cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat, failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
+    case None => cs
+  }
 
-    findHtlcById(cs, m.id, in) match {
-      case Some(htlc) if htlc.incoming =>
-        cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat,
-          failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
-
-      case Some(htlc) =>
-        cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat,
-          failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
-
-      case None => cs
-    }
-
-  private def plusOutgoing(data: UpdateAddHtlc, cs: CommitmentSpec) =
+  def plusOutgoing(data: UpdateAddHtlc, cs: CommitmentSpec) =
     cs.copy(htlcs = cs.htlcs + Htlc(incoming = false, add = data),
       toLocalMsat = cs.toLocalMsat - data.amountMsat)
 
-  private def plusIncoming(data: UpdateAddHtlc, cs: CommitmentSpec) =
+  def plusIncoming(data: UpdateAddHtlc, cs: CommitmentSpec) =
     cs.copy(htlcs = cs.htlcs + Htlc(incoming = true, add = data),
       toRemoteMsat = cs.toRemoteMsat - data.amountMsat)
 
@@ -183,18 +167,18 @@ object CommitmentSpec {
     val spec3 = (spec2 /: remoteChanges) { case (s, add: UpdateAddHtlc) => plusIncoming(add, s) case s \ _ => s }
 
     val spec4 = (spec3 /: localChanges) {
-      case (s, msg: UpdateFailHtlc) => fail(s, in = true, msg)
-      case (s, msg: UpdateFailMalformedHtlc) => fail(s, in = true, msg)
       case (s, msg: UpdateFee) => s.copy(feeratePerKw = msg.feeratePerKw)
-      case (s, msg: UpdateFulfillHtlc) => fulfill(s, in = true, msg)
+      case (s, msg: UpdateFulfillHtlc) => fulfill(s, isIncoming = true, msg)
+      case (s, msg: UpdateFailMalformedHtlc) => fail(s, isIncoming = true, msg)
+      case (s, msg: UpdateFailHtlc) => fail(s, isIncoming = true, msg)
       case s \ _ => s
     }
 
     (spec4 /: remoteChanges) {
-      case (s, msg: UpdateFailHtlc) => fail(s, in = false, msg)
-      case (s, msg: UpdateFailMalformedHtlc) => fail(s, in = false, msg)
       case (s, msg: UpdateFee) => s.copy(feeratePerKw = msg.feeratePerKw)
-      case (s, msg: UpdateFulfillHtlc) => fulfill(s, in = false, msg)
+      case (s, msg: UpdateFulfillHtlc) => fulfill(s, isIncoming = false, msg)
+      case (s, msg: UpdateFailMalformedHtlc) => fail(s, isIncoming = false, msg)
+      case (s, msg: UpdateFailHtlc) => fail(s, isIncoming = false, msg)
       case s \ _ => s
     }
   }
@@ -353,11 +337,9 @@ object Commitments {
     // Update commitment data
     val remoteChanges1 = c.remoteChanges.copy(acked = Vector.empty, signed = c.remoteChanges.acked)
     val localChanges1 = c.localChanges.copy(proposed = Vector.empty, signed = c.localChanges.proposed)
-    val remoteCommit1 = RemoteCommit(c.remoteCommit.index + 1, spec, remoteCommitTx.tx.txid, remoteNextPerCommitmentPoint)
     val commitSig = CommitSig(c.channelId, Scripts.sign(remoteCommitTx, c.localParams.fundingPrivKey), htlcSigs.toList)
-    val waiting = WaitingForRevocation(remoteCommit1, commitSig, c.localCommit.index)
-
-    val c1 = c.copy(remoteNextCommitInfo = Left apply waiting,
+    val remoteCommit1 = RemoteCommit(c.remoteCommit.index + 1, spec, remoteCommitTx.tx.txid, remoteNextPerCommitmentPoint)
+    val c1 = c.copy(remoteNextCommitInfo = Left apply WaitingForRevocation(remoteCommit1, commitSig, c.localCommit.index),
       localChanges = localChanges1, remoteChanges = remoteChanges1)
 
     c1 -> commitSig

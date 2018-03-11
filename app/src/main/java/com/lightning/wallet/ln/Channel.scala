@@ -492,7 +492,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   }
 
   private def becomeOpen(wait: WaitFundingDoneData, their: FundingLocked) = {
-    val c1 = wait.commitments.copy(remoteNextCommitInfo = Right apply their.nextPerCommitmentPoint)
+    val theirFirstPerCommitmentPoint = Right apply their.nextPerCommitmentPoint
+    val c1 = wait.commitments.copy(remoteNextCommitInfo = theirFirstPerCommitmentPoint)
     BECOME(me STORE NormalData(wait.announce, c1), OPEN)
   }
 
@@ -569,7 +570,7 @@ object Channel {
     val currentCommitFee = cs.localCommit.commitTx -- cs.localCommit.commitTx
     val currentTotalFee = cs.remoteParams.channelReserveSatoshis + currentCommitFee.amount
     // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
-    // Sending limit consists of unspendable channel reserve + current commit tx fee
+    // sending limit consists of unspendable channel reserve + current commit tx fee
     cs.localCommit.spec.toLocalMsat - currentTotalFee * 1000L
   } getOrElse 0L
 

@@ -51,7 +51,7 @@
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a></string>
 
     <string name="zygote_details"><![CDATA[
-        Migration tool create a full snapshot of current wallet state which can be
+        Migration tool creates a full snapshot of current wallet state which can be
         used to fully restore your wallet at a later time, possibly on another device.<br><br>
         <strong>Two use cases for this tool</strong><br>
         1. Moving wallet data from one phone to another.<br>
@@ -77,9 +77,9 @@
     <!-- menu and fab -->
     <string name="sets_manage_olympus">Manage Olympus servers</string>
     <string name="sets_chan_recover">Use channel recovery tool</string>
+    <string name="sets_zygote">Use wallet migration tool</string>
     <string name="sets_secret_change">Change passcode</string>
     <string name="sets_mnemonic">View mnemonic code</string>
-    <string name="sets_zygote">Use migration tool</string>
     <string name="sets_rescan">Rescan blockchain</string>
 
     <string name="secret_wallet">Passcode</string>
@@ -179,7 +179,7 @@
     <string name="err_ln_in_flight">Failed because this payment is already in-flight.</string>
     <string name="err_ln_frozen">Can not retry this payment because it is frozen.</string>
 
-    <string name="err_ln_6_confs">Can\'t ask for payments yet because a funding Bitcoin transaction has not got 6 confirmations.</string>
+    <string name="err_ln_6_confs">Can\'t ask for payments because a funding Bitcoin transaction has not got 6 confirmations yet.</string>
     <string name="err_ln_reserve">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving.</string>
     <string name="err_ln_fee_overflow"><![CDATA[Failed because this payment combined with Bitcoin <a href=http://lightning-wallet.com/using-lightning-wallet#commit-transaction-fee>commit transaction</a> fee exceeds your unspendable channel reserve<br><br>reserve %1$s<br>sending %2$s<br>missing %3$s.]]></string>
     <string name="err_ln_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br>for a payment channel<br><br>can send %1$s<br>min required %2$s<br>pending %3$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable.]]></string>
@@ -239,8 +239,8 @@
     <string name="ln_ops_chan_opening"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>total capacity %3$s<br>%4$s required<br>%5$s<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s]]></string>
     <string name="ln_ops_chan_open"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>total capacity %3$s<br>can send %4$s<br><a href=http://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>can receive</a> %5$s<br>%6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>closed at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br>%6$s<br><br>Refundable channel balance has been transferred to your Bitcoin wallet<br><br>%7$s]]></string>
-    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>%6$s<br><br>Refundable channel balance will be transferred to your Bitcoin wallet<br><br>%7$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>total capacity %3$s<br>refundable %4$s<br>%5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>
+    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>%6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>total capacity %2$s<br><font color=#999999>%3$s</font>%3$s]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
