@@ -89,11 +89,7 @@
     <string name="action_bitcoin_receive">Receive bitcoin</string>
     <string name="action_bitcoin_send">Send bitcoin</string>
 
-    <string name="action_ln_view">
-        Channel opening in progress\n
-        View details and status
-    </string>
-
+    <string name="action_ln_open_view">View opening status</string>
     <string name="action_ln_receive">Receive lightning</string>
     <string name="action_ln_open">Open new channel</string>
     <string name="action_ln_close">Close channel</string>

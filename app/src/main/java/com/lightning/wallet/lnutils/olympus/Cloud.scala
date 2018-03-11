@@ -73,7 +73,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         case "notfulfilled" if pr.isFresh && capableChannelExists =>
           // Retry an existing request instead of getting a new one until it expires
           val send = me withFree retry(withRoutesAndOnionRPIFromPR(pr), pickInc, 4 to 5)
-          send.foreach(foeRPI => app.ChannelManager.sendEither(foeRPI, none), none)
+          send.foreach(app.ChannelManager.sendEither(_, none), none)
 
         // Server can't find our tokens or request has expired
         case "notfulfilled" => me BECOME data.copy(info = None)

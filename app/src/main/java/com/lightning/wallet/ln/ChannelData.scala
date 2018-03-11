@@ -129,9 +129,9 @@ case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimPena
 // COMMITMENTS
 
 case class Htlc(incoming: Boolean, add: UpdateAddHtlc)
-case class CommitmentSpec(htlcs: Set[Htlc], fulfilled: Set[HtlcAndFulfill],
-                          failed: Set[HtlcAndFail], feeratePerKw: Long,
-                          toLocalMsat: Long, toRemoteMsat: Long)
+case class CommitmentSpec(feeratePerKw: Long, toLocalMsat: Long, toRemoteMsat: Long,
+                          htlcs: Set[Htlc] = Set.empty, fulfilled: Set[HtlcAndFulfill] = Set.empty,
+                          failed: Set[HtlcAndFail] = Set.empty, malformed: Set[Htlc] = Set.empty)
 
 object CommitmentSpec {
   def findHtlcById(cs: CommitmentSpec, id: Long, isIncoming: Boolean): Option[Htlc] =
@@ -144,10 +144,16 @@ object CommitmentSpec {
     case None => cs
   }
 
-  type HtlcAndFail = (Htlc, LightningMessage)
-  def fail(cs: CommitmentSpec, isIncoming: Boolean, m: HasHtlcId) = findHtlcById(cs, m.id, isIncoming) match {
+  type HtlcAndFail = (Htlc, UpdateFailHtlc)
+  def fail(cs: CommitmentSpec, isIncoming: Boolean, m: UpdateFailHtlc) = findHtlcById(cs, m.id, isIncoming) match {
     case Some(htlc) if htlc.incoming => cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat, failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
     case Some(htlc) => cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat, failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
+    case None => cs
+  }
+
+  def failMalformed(cs: CommitmentSpec, isIncoming: Boolean, m: UpdateFailMalformedHtlc) = findHtlcById(cs, m.id, isIncoming) match {
+    case Some(htlc) if htlc.incoming => cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat, malformed = cs.malformed + htlc, htlcs = cs.htlcs - htlc)
+    case Some(htlc) => cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat, malformed = cs.malformed + htlc, htlcs = cs.htlcs - htlc)
     case None => cs
   }
 
@@ -159,25 +165,23 @@ object CommitmentSpec {
     cs.copy(htlcs = cs.htlcs + Htlc(incoming = true, add = data),
       toRemoteMsat = cs.toRemoteMsat - data.amountMsat)
 
-  def reduce(cs: CommitmentSpec, localChanges: LNMessageVector, remoteChanges: LNMessageVector) = {
-    // Before reducing fresh changes we need to get rid of previous fulfilled and failed messages
+  def reduce(cs: CommitmentSpec, local: LNMessageVector, remote: LNMessageVector) = {
+    val spec1 = cs.copy(fulfilled = Set.empty, failed = Set.empty, malformed = Set.empty)
+    val spec2 = (spec1 /: local) { case (s, add: UpdateAddHtlc) => plusOutgoing(add, s) case s \ _ => s }
+    val spec3 = (spec2 /: remote) { case (s, add: UpdateAddHtlc) => plusIncoming(add, s) case s \ _ => s }
 
-    val spec1 = cs.copy(fulfilled = Set.empty, failed = Set.empty)
-    val spec2 = (spec1 /: localChanges) { case (s, add: UpdateAddHtlc) => plusOutgoing(add, s) case s \ _ => s }
-    val spec3 = (spec2 /: remoteChanges) { case (s, add: UpdateAddHtlc) => plusIncoming(add, s) case s \ _ => s }
-
-    val spec4 = (spec3 /: localChanges) {
+    val spec4 = (spec3 /: local) {
       case (s, msg: UpdateFee) => s.copy(feeratePerKw = msg.feeratePerKw)
       case (s, msg: UpdateFulfillHtlc) => fulfill(s, isIncoming = true, msg)
-      case (s, msg: UpdateFailMalformedHtlc) => fail(s, isIncoming = true, msg)
+      case (s, msg: UpdateFailMalformedHtlc) => failMalformed(s, isIncoming = true, msg)
       case (s, msg: UpdateFailHtlc) => fail(s, isIncoming = true, msg)
       case s \ _ => s
     }
 
-    (spec4 /: remoteChanges) {
+    (spec4 /: remote) {
       case (s, msg: UpdateFee) => s.copy(feeratePerKw = msg.feeratePerKw)
       case (s, msg: UpdateFulfillHtlc) => fulfill(s, isIncoming = false, msg)
-      case (s, msg: UpdateFailMalformedHtlc) => fail(s, isIncoming = false, msg)
+      case (s, msg: UpdateFailMalformedHtlc) => failMalformed(s, isIncoming = false, msg)
       case (s, msg: UpdateFailHtlc) => fail(s, isIncoming = false, msg)
       case s \ _ => s
     }

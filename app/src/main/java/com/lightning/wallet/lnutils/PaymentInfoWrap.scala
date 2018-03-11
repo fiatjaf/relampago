@@ -13,6 +13,7 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.olympus.OlympusWrap.CMDStart
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.helper.RichCursor
+import com.lightning.wallet.ln.Tools.runAnd
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
 
@@ -45,11 +46,19 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     updateRouting(rpi)
   }
 
+  def retry(reason: UpdateFailHtlc, hash: BinaryData) = for {
+    // This payment attempt has failed so get saved routing data,
+    // cut affected routes, try to re-send if any routes still left
+
+    info <- getPaymentInfo(hash)
+    restoredRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
+    updatedRPI = cutAffectedRoutes(fail = reason)(rpi = restoredRPI)
+  } app.ChannelManager.sendEither(useRoutesLeft(updatedRPI), stop)
+
   override def onError = {
     case (_, exc: CMDException) =>
-      // Needed for retry failures, prevents shutdown
-      updateStatus(FAILURE, exc.rpi.pr.paymentHash)
-      uiNotify
+      // Retry failures, prevents shutdown
+      runAnd(me stop exc.rpi)(uiNotify)
 
     case chan \ error =>
       // Close and log an error
@@ -60,7 +69,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def onProcess = {
     case (_, _: NormalData, rpi: RuntimePaymentInfo) =>
       // This may either be a new payment or an old payment retry attempt
-      // so either an insert or update should be executed successfully
+      // so either insert or update should be executed successfully
 
       db txWrap {
         updateRouting(rpi)
@@ -80,20 +89,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       db txWrap {
         for (Htlc(true, add) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(add)
         for (Htlc(false, _) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkOutgoing(fulfill)
-        for (Htlc(false, add) \ failure <- norm.commitments.localCommit.spec.failed) failure match {
-          // Malformed outgoing HTLC is a special case which can only come happen with direct peer
-          // in all other cases an onion error should be extracted and payment should be retried
-
-          case updateFailHtlc: UpdateFailHtlc =>
-            getPaymentInfo(add.paymentHash) foreach { info =>
-              val restoredRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
-              val updatedRPI = cutAffectedRoutes(updateFailHtlc)(restoredRPI)
-              app.ChannelManager.sendEither(useRoutesLeft(updatedRPI), stop)
-            }
-
-          case _: UpdateFailMalformedHtlc =>
-            updateStatus(FAILURE, add.paymentHash)
-        }
+        for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updateStatus(FAILURE, add.paymentHash)
+        for (Htlc(false, add) \ reason <- norm.commitments.localCommit.spec.failed) retry(reason, add.paymentHash)
       }
 
       if (norm.commitments.localCommit.spec.fulfilled.nonEmpty) {

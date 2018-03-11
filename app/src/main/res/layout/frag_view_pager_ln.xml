@@ -20,7 +20,7 @@
             android:onClick="goChanDetails"
             android:id="@+id/lnChanDetails"
             android:layout_width="wrap_content"
-            android:text="@string/action_ln_view"/>
+            android:text="@string/action_ln_open_view"/>
 
         <View
             style="@style/GrayDivider"

@@ -53,7 +53,7 @@ class TransactionsSpec {
         Htlc(incoming = true, UpdateAddHtlc("00" * 32, 0, MilliSatoshi(800000).amount, Hash.Zeroes, 551, BinaryData("")))
       )
 
-      val spec = CommitmentSpec(htlcs, Set.empty, Set.empty, feeratePerKw = 5000, toLocalMsat = 0, toRemoteMsat = 0)
+      val spec = CommitmentSpec(feeratePerKw = 5000, toLocalMsat = 0, toRemoteMsat = 0, htlcs)
       val fee = Scripts.commitTxFee(Satoshi(546), spec)
       assert(fee == Satoshi(5340))
     }
@@ -159,17 +159,15 @@ class TransactionsSpec {
       val paymentPreimage4 = BinaryData("44" * 32)
       val htlc4 = UpdateAddHtlc("00" * 32, 3, (localDustLimit + weight2fee(feeratePerKw, htlcSuccessWeight)).amount * 1000, sha256(paymentPreimage4), 300, BinaryData(""))
       val spec = CommitmentSpec(
+        feeratePerKw = feeratePerKw,
+        toLocalMsat = millibtc2satoshi(MilliBtc(400)).amount * 1000,
+        toRemoteMsat = millibtc2satoshi(MilliBtc(300)).amount * 1000,
         htlcs = Set(
           Htlc(incoming = false, htlc1),
           Htlc(incoming = true, htlc2),
           Htlc(incoming = false, htlc3),
           Htlc(incoming = true, htlc4)
-        ),
-        Set.empty,
-        Set.empty,
-        feeratePerKw = feeratePerKw,
-        toLocalMsat = millibtc2satoshi(MilliBtc(400)).amount * 1000,
-        toRemoteMsat = millibtc2satoshi(MilliBtc(300)).amount * 1000)
+        ))
 
       val commitTxNumber = 0x404142434445L
       val commitTx = {
@@ -305,7 +303,7 @@ class TransactionsSpec {
             case "received" => htlc(incoming = true, Satoshi(amount.toLong))
           }
         }).toSet
-        TestSetup(name, dustLimit, CommitmentSpec(htlcs, Set.empty, Set.empty, feerate_per_kw.toLong, to_local_msat.toLong, to_remote_msat.toLong), Satoshi(fee.toLong))
+        TestSetup(name, dustLimit, CommitmentSpec(feerate_per_kw.toLong, to_local_msat.toLong, to_remote_msat.toLong, htlcs), Satoshi(fee.toLong))
       })
 
       // simple non-reg test making sure we are not missing tests
