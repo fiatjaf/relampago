@@ -2,8 +2,7 @@ package com.lightning.wallet.lnutils
 
 import spray.json._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import com.lightning.wallet.ln.Tools.{none, runAnd}
-
+import com.lightning.wallet.ln.Tools.{none, random, runAnd}
 import com.lightning.wallet.lnutils.olympus.CloudData
 import net.sqlcipher.database.SQLiteDatabase
 import android.content.Context
@@ -115,9 +114,11 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     dbs execSQL ChannelTable.createSql
     dbs execSQL OlympusTable.createSql
 
+    // Randomize an order of two available default servers
+    val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val main: Array[AnyRef] = Array("main-dev-server", "http://213.133.99.89:9002", emptyData, "1", "0", "0")
-    val fallback: Array[AnyRef] = Array("fallback-dev-server", "http://213.133.103.56:9002", emptyData, "0", "1", "1")
+    val main: Array[AnyRef] = Array("main-dev-server", "http://213.133.99.89:9002", emptyData, "1", ord1, "0")
+    val fallback: Array[AnyRef] = Array("fallback-dev-server", "http://213.133.103.56:9002", emptyData, "0", ord2, "1")
 
     dbs.execSQL(OlympusTable.newSql, main)
     dbs.execSQL(OlympusTable.newSql, fallback)

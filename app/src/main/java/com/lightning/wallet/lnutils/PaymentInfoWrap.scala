@@ -13,7 +13,6 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.olympus.OlympusWrap.CMDStart
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.helper.RichCursor
-import com.lightning.wallet.ln.Tools.runAnd
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
 
@@ -39,7 +38,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     for (hash <- app.ChannelManager.frozenInFlightHashes) updateStatus(FROZEN, hash)
   }
 
-  def stop(rpi: RuntimePaymentInfo) = {
+  def halt(rpi: RuntimePaymentInfo) = {
     // This RPI has no routes but may have
     // new black nodes or channs so save it
     updateStatus(FAILURE, rpi.pr.paymentHash)
@@ -53,12 +52,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     info <- getPaymentInfo(hash)
     restoredRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
     updatedRPI = cutAffectedRoutes(fail = reason)(rpi = restoredRPI)
-  } app.ChannelManager.sendEither(useRoutesLeft(updatedRPI), stop)
+  } app.ChannelManager.sendEither(useRoutesLeft(updatedRPI), halt)
 
   override def onError = {
     case (_, exc: CMDException) =>
-      // Retry failures, prevents shutdown
-      runAnd(me stop exc.rpi)(uiNotify)
+      // Retry failures, also prevents shutdown
+      updateStatus(FAILURE, exc.rpi.pr.paymentHash)
+      uiNotify
 
     case chan \ error =>
       // Close and log an error
