@@ -14,6 +14,8 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
+
+import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
 import com.muddzdev.styleabletoastlibrary.StyleableToast
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
@@ -133,11 +135,6 @@ class WalletApp extends Application { me =>
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
     val chainEventsListener = new TxTracker with BlocksListener {
-      def tellHeight(left: Int) = runAnd(broadcaster.bestHeightObtained = true) {
-        // No matter how many blocks are left we only send a CMD once the last block is done
-        if (left < 1) for (chan <- all) chan process CMDBestHeight(broadcaster.currentHeight)
-      }
-
       override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
       override def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
       override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
@@ -149,6 +146,13 @@ class WalletApp extends Application { me =>
         val spent = CMDSpent(txj)
         bag.extractPreimage(spent.tx)
         all.foreach(_ process spent)
+      }
+
+      def tellHeight(left: Int) = {
+        // No matter how many blocks are left we only send a CMD once the last block is done
+        if (left < 1) for (chan <- all) chan process CMDBestHeight(broadcaster.currentHeight)
+        // The fact that we are downloading blocks means we know a best chain height
+        broadcaster.bestHeightObtained = true
       }
     }
 
@@ -209,18 +213,25 @@ class WalletApp extends Application { me =>
       if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
       else if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
       else if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      else completeRPI(sources, rpi)
+      else if (broadcaster.bestHeightObtained) addRoutesAndOnion(sources, rpi)
+      else Obs error new LightningException(me getString dialog_chain_behind)
     }
 
-    def completeRPI(sources: Set[PublicKey], rpi: RuntimePaymentInfo): Obs[FullOrEmptyRPI] = {
+    def addRoutesAndOnion(sources: Set[PublicKey], rpi: RuntimePaymentInfo) = {
       def findRemoteRoutes(targetNodeId: PublicKey) = OlympusWrap.findRoutes(rpi.rd, sources, targetNodeId)
+      // If source node contains target node then we are paying directly to our peer, otherwise fetch additional payment routes
       def findRoutes(target: PublicKey) = if (sources contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
-      def findAssisted(tag: RoutingInfoTag) = findRoutes(tag.route.head.nodeId).map(rts => for (pub <- rts) yield pub ++ tag.route)
+
+      def withExtraPart = for {
+        tag: RoutingInfoTag <- Obs from rpi.pr.routingInfo
+        partialRoutes: PaymentRouteVec <- findRoutes(tag.route.head.nodeId)
+        completeRoutes = partialRoutes.map(public => public ++ tag.route)
+      } yield Obs just completeRoutes
+
       // If payment request contains extra routing info then we ask for assisted routes, otherwise we directly ask for recipient id
-      val result = if (rpi.pr.routingInfo.isEmpty) findRoutes(rpi.pr.nodeId) else Obs from rpi.pr.routingInfo flatMap findAssisted
+      val routesObs = if (rpi.pr.routingInfo.isEmpty) findRoutes(rpi.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
       // Update RPI with routes and then we can make an onion out of the first available shortest route while saving the rest
-      if (broadcaster.bestHeightObtained) for (routes <- result) yield useFirstRoute(routes.sortBy(_.size), rpi)
-      else Obs error new LightningException(me getString dialog_chain_behind)
+      for (routes <- routesObs) yield useFirstRoute(routes.sortBy(_.size), rpi)
     }
 
     def send(rpi: RuntimePaymentInfo, noRouteLeft: RuntimePaymentInfo => Unit): Unit = {
