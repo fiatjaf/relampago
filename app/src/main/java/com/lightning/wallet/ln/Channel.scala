@@ -579,9 +579,9 @@ object Channel {
     math.min(unconstrainedCanSend, LNParams.maxHtlcValue.amount)
   }
 
-  def getHop(chan: Channel) = for {
+  def channelAndHop(chan: Channel) = for {
+    // Make sure this hop is the real one
     Some(extraHop) <- chan(_.extraHop)
-    // Ensure the hop is the final one
     if extraHop.htlcMinimumMsat > 0L
   } yield chan -> Vector(extraHop)
 }

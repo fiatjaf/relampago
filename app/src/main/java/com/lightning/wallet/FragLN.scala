@@ -241,40 +241,36 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     }
 
   def makePaymentRequest = ifOperational { operationalChannels =>
-    val goodChannels \ extraRoutes = operationalChannels.flatMap(getHop).unzip
-    if (extraRoutes.nonEmpty) withUpdates(goodChannels.map(estimateCanReceive).max)
-    else mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
+    val chansWithRoutes = operationalChannels.flatMap(channelAndHop).toMap
+    // Lazy because chansWithRoutes may contain no channels in which case max would throw
+    lazy val maxCanReceive = MilliSatoshi(chansWithRoutes.keys.map(estimateCanReceive).max)
+    lazy val reserveUnspent = getString(err_ln_reserve) format coloredOut(-maxCanReceive)
 
-    def withUpdates(maxReceiveMsat: Long) = {
-      val maxReceive = MilliSatoshi(maxReceiveMsat)
-      val reserveUnspent = getString(err_ln_reserve) format coloredOut(-maxReceive)
-      if (maxReceive.amount < 0L) mkForm(negBld(dialog_ok), reserveUnspent.html, null)
-      else withEnoughReserve(maxReceive)
-    }
+    if (chansWithRoutes.isEmpty) mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
+    else if (maxCanReceive.amount < 0L) mkForm(negBld(dialog_ok), reserveUnspent.html, null)
+    else {
 
-    def withEnoughReserve(maxReceive: MilliSatoshi) = {
       val content = getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
       val inputDescription = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
       val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), getString(action_ln_receive), content)
-      val hint = getString(amount_hint_can_receive).format(denom withSign maxReceive)
+      val hint = getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
       val rateManager = new RateManager(hint, content)
 
-      def makeRequest(requestedSum: MilliSatoshi, preimage: BinaryData) = {
-        val rpi = RuntimePaymentInfo(emptyRD, PaymentRequest(chainHash, Some(requestedSum),
-          Crypto sha256 preimage, nodePrivateKey, inputDescription.getText.toString.trim,
-          None, extraRoutes), requestedSum.amount)
+      def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
+        val routes = chansWithRoutes.filterKeys(chan => estimateCanReceive(chan) >= sum.amount).values.toVector
+        val rpi = RuntimePaymentInfo(emptyRD, PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage,
+          nodePrivateKey, inputDescription.getText.toString.trim, None, routes), sum.amount)
 
         db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.paymentHashString)
         db.change(PaymentTable.newSql, rpi.paymentHashString, preimage, 1, rpi.firstMsat,
           HIDDEN, System.currentTimeMillis, rpi.pr.description, rpi.pr.toJson, rpi.rd.toJson)
 
-        // Show to user
         showQR(rpi.pr)
       }
 
       def recAttempt = rateManager.result match {
         case Failure(_) => app toast dialog_sum_empty
-        case Success(ms) if maxReceive < ms => app toast dialog_sum_big
+        case Success(ms) if maxCanReceive < ms => app toast dialog_sum_big
         case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
 
         case Success(ms) => rm(alert) {

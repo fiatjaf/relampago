@@ -138,10 +138,13 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
       val canSpendHuman = if (canSpendMsat < 0L) coloredOut(canSpend) else coloredIn(canSpend)
+
+      val receiveNothingYet = sumOut format getString(ln_ops_chan_receive_wait)
       val canReceiveHuman = if (canReceiveMsat < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-      val canReceiveFinal = if (getHop(chan).isDefined) canReceiveHuman else sumOut format getString(ln_ops_chan_receive_wait)
-      lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, started, coloredIn(capacity), canSpendHuman,
-        canReceiveFinal, alias, inFlight, nodeId).html
+      val canReceiveFinal = if (channelAndHop(chan).isDefined) canReceiveHuman else receiveNothingYet
+
+      lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, started,
+        coloredIn(capacity), canSpendHuman, canReceiveFinal, alias, inFlight, nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
