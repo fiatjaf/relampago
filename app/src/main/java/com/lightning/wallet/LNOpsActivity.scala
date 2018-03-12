@@ -106,7 +106,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
     def closeOnClick(title: Int) = lnOpsAction setOnClickListener host.onButtonTap {
       // First closing attempt will be a cooperative one, the second try will be uncooperative
-      host.passWrap(getString(title).html) apply host.checkPass { pass => chan process CMDShutdown }
+      host.passWrap(getString(title).html) apply host.checkPass { _ => chan process CMDShutdown }
     }
 
     def manageOther = UITask {

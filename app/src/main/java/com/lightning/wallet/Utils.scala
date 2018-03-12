@@ -171,8 +171,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   // Run computation in Future, deal with results on UI thread
-  def <[T](fun: => T, no: Throwable => Unit)(ok: T => Unit) = <<(Future(fun), no)(ok)
-  def <<[T](future: Future[T], no: Throwable => Unit)(ok: T => Unit) = future onComplete {
+  def <[T](fun: => T, no: Throwable => Unit)(ok: T => Unit) = Future(fun) onComplete {
     case Success(rs) => UITask(ok apply rs).run case Failure(ex) => UITask(no apply ex).run
   }
 
@@ -286,11 +285,10 @@ trait TimerActivity extends AppCompatActivity { me =>
     def unsigned(pass: String, fee: Coin) = {
       // Create an unsigned transaction request
       val crypter = app.kit.wallet.getKeyCrypter
-      val keyParameter = crypter deriveKey pass
       val request = pay.sendRequest
 
       request.feePerKb = fee
-      request.aesKey = keyParameter
+      request.aesKey = crypter deriveKey pass
       app.kit.wallet assembleTx request
       request
     }

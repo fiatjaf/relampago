@@ -429,8 +429,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
       def setButtonDisable = {
         def proceed = rm(menu) {
-          passWrap(me getString fp_disable, fp = false) apply checkPass { pass =>
-            // Always ask user for a passcode before disabling fingerprint unlocking
+          passWrap(me getString fp_disable, fp = false) apply checkPass { _ =>
+            // Ask user for a passcode before disabling fingerprint unlocking
             // and don't allow fingerprint unlocking this is special case
             runAnd(app toast fp_err_disabled)(FingerPassCode.erase)
           }
@@ -499,9 +499,9 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     }
 
     rescanWallet setOnClickListener onButtonTap {
-      def openForm = passWrap(me getString sets_rescan) apply checkPass { pass =>
-        val dlg = mkChoiceDialog(go, none, dialog_ok, dialog_cancel).setMessage(sets_rescan_ok)
-        showForm(dlg.create)
+      def openForm = passWrap(me getString sets_rescan) apply checkPass { _ =>
+        val warningDialogPopup = mkChoiceDialog(go, none, dialog_ok, dialog_cancel)
+        showForm(warningDialogPopup.setMessage(sets_rescan_ok).create)
       }
 
       def go = try {
@@ -522,7 +522,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     }
 
     changePass setOnClickListener onButtonTap {
-      def openForm = passWrap(me getString sets_secret_change) apply checkPass { oldPass =>
+      def openForm = passWrap(me getString sets_secret_change) apply checkPass { pass =>
         val view \ field \ _ = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_new, null)
         mkForm(mkChoiceDialog(changePassword, none, dialog_ok, dialog_cancel), me getString sets_secret_change, view)
 
@@ -534,7 +534,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
         def rotatePass = {
           // Decrypt wallet and remove an old encrypted passcode
-          runAnd(app.kit.wallet decrypt oldPass)(FingerPassCode.erase)
+          runAnd(app.kit.wallet decrypt pass)(FingerPassCode.erase)
           app.encryptWallet(app.kit.wallet, field.getText.toString)
         }
       }

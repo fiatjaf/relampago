@@ -276,8 +276,11 @@ class WalletApp extends Application { me =>
       CheckpointManager.checkpoint(params, pts, store, time)
     }
 
-    def decryptSeed(pass: String) = wallet.getKeyCrypter match { case crypter =>
-      wallet.getKeyChainSeed.decrypt(crypter, pass, crypter deriveKey pass)
+    def decryptSeed(pass: String) = {
+      val crypter = wallet.getKeyCrypter
+      val aesKey = crypter deriveKey pass
+      val chainSeed = wallet.getKeyChainSeed
+      chainSeed.decrypt(crypter, pass, aesKey)
     }
 
     def setupAndStartDownload = {
