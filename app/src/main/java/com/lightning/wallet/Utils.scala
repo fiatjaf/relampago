@@ -232,13 +232,12 @@ trait TimerActivity extends AppCompatActivity { me =>
       // using current wallet passcode if the user is fine with that
 
       <(app.kit decryptSeed pass, onFail) { seed =>
-        val warningText = getString(mnemonic_warn).html
         val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
-        lazy val bld = mkChoiceDialog(none, encryptAndExport, dialog_ok, dialog_export)
-        lazy val alert = showForm(bld.setCustomTitle(wordsText).setMessage(warningText).create)
+        lazy val bld = mkChoiceDialog(none, proceed, dialog_ok, dialog_export)
+        lazy val alert = mkForm(bld, null, wordsText)
         alert
 
-        def encryptAndExport: Unit = rm(alert) {
+        def proceed: Unit = rm(alert) {
           val hex = AES.encode(wordsText, Crypto sha256 pass.binary)
           me share s"Encrypted BIP32 mnemonic code ${new Date}: $hex"
         }
@@ -305,9 +304,9 @@ trait TimerActivity extends AppCompatActivity { me =>
         val sending = sumOut.format(denom withSign pay.cn)
 
         val txt = getString(err_not_enough_funds)
-        val zeroConf = app.kit.conf0Balance minus app.kit.conf1Balance
+        val zeroConfs = app.kit.conf0Balance minus app.kit.conf1Balance
         val missing = sumOut.format(denom withSign notEnough.missing)
-        val pending = sumIn format denom.withSign(zeroConf)
+        val pending = sumIn format denom.withSign(zeroConfs)
         txt.format(canSend, sending, missing, pending).html
 
       case _: KeyCrypterException => app getString err_secret

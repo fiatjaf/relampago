@@ -1,6 +1,5 @@
 package com.lightning.wallet
 
-import R.string._
 import org.bitcoinj.core.{BlockChain, PeerGroup}
 import com.lightning.wallet.ln.Tools.wrap
 import org.bitcoinj.store.SPVBlockStore
@@ -12,11 +11,24 @@ import android.os.Bundle
 
 
 trait FirstActivity { me: TimerActivity =>
-  def launch(wallet: Wallet) = if (app.isAlive) {
-    // Common stuff to open a wallet for the first time
+  def prepare(kit: app.WalletKit, pass: CharSequence) = {
+    kit.store = new SPVBlockStore(app.params, app.chainFile)
+    kit.useCheckPoints(kit.wallet.getEarliestKeyCreationTime)
 
-    app.kit.setupAndStartDownload
-    wallet saveToFile app.walletFile
+    // Get seed and set everything up before encryption
+    LNParams.setup(kit.wallet.getKeyChainSeed.getSeedBytes)
+    if (pass.length > 0) app.encryptWallet(kit.wallet, pass)
+
+    // Complete initialization
+    kit.blockChain = new BlockChain(app.params, kit.wallet, kit.store)
+    kit.peerGroup = new PeerGroup(app.params, kit.blockChain)
+
+    // Make sure keys are rendered and save to disk
+    kit.wallet.currentAddress(org.bitcoinj.wallet.KeyChain.KeyPurpose.RECEIVE_FUNDS)
+    kit.wallet.currentAddress(org.bitcoinj.wallet.KeyChain.KeyPurpose.CHANGE)
+    kit.wallet.saveToFile(app.walletFile)
+
+    kit.setupAndStartDownload
     me exitTo classOf[WalletActivity]
   }
 }
@@ -25,15 +37,7 @@ class WalletCreateActivity extends TimerActivity with ViewSwitch with FirstActiv
   lazy val createPass = findViewById(R.id.createPass).asInstanceOf[android.widget.EditText]
   lazy val createWallet = findViewById(R.id.createWallet).asInstanceOf[android.widget.Button]
   lazy val views = findViewById(R.id.createInfo) :: findViewById(R.id.createProgress) :: Nil
-
-  def INIT(state: Bundle) = {
-    setContentView(R.layout.activity_create)
-    createPass addTextChangedListener new TextChangedWatcher {
-      override def onTextChanged(s: CharSequence, st: Int, n: Int, af: Int) =
-        if (s.length >= 6) wrap(createWallet setEnabled true)(createWallet setText wallet_create)
-        else wrap(createWallet setEnabled false)(createWallet setText secret_too_short)
-    }
-  }
+  def INIT(state: Bundle) = setContentView(R.layout.activity_create)
 
   def makeNewWallet =
     app.kit = new app.WalletKit {
@@ -41,17 +45,8 @@ class WalletCreateActivity extends TimerActivity with ViewSwitch with FirstActiv
       startAsync
 
       override def startUp = {
-        // Get seed before encryption
         wallet = new Wallet(app.params, true)
-        store = new SPVBlockStore(app.params, app.chainFile)
-        LNParams.setup(wallet.getKeyChainSeed.getSeedBytes)
-        useCheckPoints(wallet.getEarliestKeyCreationTime)
-        app.encryptWallet(wallet, createPass.getText)
-
-        // These should be initialized after checkpoints
-        blockChain = new BlockChain(app.params, wallet, store)
-        peerGroup = new PeerGroup(app.params, blockChain)
-        launch(wallet)
+        prepare(this, createPass.getText)
       }
     }
 

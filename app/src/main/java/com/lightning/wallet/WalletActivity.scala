@@ -524,8 +524,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     changePass setOnClickListener onButtonTap {
       def openForm = passWrap(me getString sets_secret_change) apply checkPass { oldPass =>
         val view \ field \ _ = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_new, null)
-        mkForm(mkChoiceDialog(react, none, dialog_ok, dialog_cancel), getString(sets_secret_change), view)
-        def react = if (field.getText.length >= 6) changePassword else app toast secret_too_short
+        mkForm(mkChoiceDialog(changePassword, none, dialog_ok, dialog_cancel), me getString sets_secret_change, view)
 
         def changePassword = {
           // Decrypt an old password and set a new one right away

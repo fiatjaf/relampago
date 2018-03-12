@@ -4,17 +4,13 @@ import android.widget._
 import collection.JavaConverters._
 import android.widget.DatePicker._
 import com.lightning.wallet.R.string._
-import org.bitcoinj.wallet.KeyChain.KeyPurpose._
 import com.hootsuite.nachos.terminator.ChipTerminatorHandler._
 import com.lightning.wallet.Utils.{app, isMnemonicCorrect}
 import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.wallet.{DeterministicSeed, Wallet}
-import org.bitcoinj.core.{BlockChain, PeerGroup}
 import android.view.{View, ViewGroup}
 
 import com.hootsuite.nachos.NachoTextView
-import org.bitcoinj.store.SPVBlockStore
-import com.lightning.wallet.ln.LNParams
 import org.bitcoinj.crypto.MnemonicCode
 import java.util.Calendar
 import android.os.Bundle
@@ -49,18 +45,13 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
     val adapter = new ArrayAdapter(me, lineStyle, allowed)
 
     val changeListener = new TextChangedWatcher {
-      override def onTextChanged(s: CharSequence, x: Int, y: Int, z: Int) =
-        // Both password and mnemonic should be valid in order to proceed
-        checkValidity
+      override def onTextChanged(s: CharSequence, x: Int, y: Int, z: Int) = {
+        // Both password and mnemonic should be valid in order to proceed here
 
-      private def checkValidity = {
-        val passIsOk = password.getText.length >= 6
         val mnemonicIsOk = isMnemonicCorrect(getMnemonicText)
-
-        restoreWallet.setEnabled(mnemonicIsOk & passIsOk)
-        if (!mnemonicIsOk) restoreWallet setText restore_mnemonic_wrong
-        else if (!passIsOk) restoreWallet setText secret_too_short
-        else restoreWallet setText wallet_restore
+        if (mnemonicIsOk) restoreWallet setText wallet_restore
+        else restoreWallet setText restore_mnemonic_wrong
+        restoreWallet.setEnabled(mnemonicIsOk)
       }
     }
 
@@ -93,23 +84,10 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
       startAsync
 
       def startUp = {
-        val seed = new DeterministicSeed(getMnemonicText,
-          null, "", datePicker.cal.getTimeInMillis / 1000)
-
-        // Recreate a wallet and use checkpoints
+        val creationTimeStamp = datePicker.cal.getTimeInMillis / 1000
+        val seed = new DeterministicSeed(getMnemonicText, null, "", creationTimeStamp)
         wallet = Wallet.fromSeed(app.params, seed, true)
-        store = new SPVBlockStore(app.params, app.chainFile)
-
-        LNParams.setup(seed.getSeedBytes)
-        useCheckPoints(seed.getCreationTimeSeconds)
-        app.encryptWallet(wallet, password.getText)
-        wallet currentAddress RECEIVE_FUNDS
-        wallet currentAddress CHANGE
-
-        // Must be initialized after checkpoints
-        blockChain = new BlockChain(app.params, wallet, store)
-        peerGroup = new PeerGroup(app.params, blockChain)
-        launch(wallet)
+        prepare(this, password.getText)
       }
     }
 }
