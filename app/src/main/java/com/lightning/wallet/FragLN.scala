@@ -156,7 +156,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     val activeChannels = app.ChannelManager.notClosingOrRefunding
     val online = activeChannels.count(_.state != Channel.OFFLINE)
     val openingChannelExist = activeChannels exists isOpening
-    val funds = activeChannels.map(myBalanceMsat).sum
+    val funds = activeChannels.map(estimateTotalCanSend).sum
     val total = activeChannels.size
 
     val subtitle =
@@ -199,10 +199,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     // We only can proceed if an operational (normal and online) channel exists,
     // this is not a payment to itself and this payment request has not expired
     if (pr.nodeId == nodePublicKey) app toast err_general
-    else if (pr.isFresh) withFreshPaymentRequest
-    else app toast dialog_pr_expired
+    else if (!pr.isFresh) app toast dialog_pr_expired
+    else {
 
-    def withFreshPaymentRequest = {
       val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSend).max)
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val popupTitle = getString(ln_send_title).format(me getDescription pr.description)

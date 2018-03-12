@@ -25,12 +25,12 @@ import fr.castorflex.android.smoothprogressbar.{SmoothProgressBar, SmoothProgres
 import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
 import com.lightning.wallet.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import android.support.v4.view.ViewPager.OnPageChangeListener
+import com.lightning.wallet.ln.Channel.estimateTotalCanSend
 import android.content.DialogInterface.OnDismissListener
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import android.content.Context.LAYOUT_INFLATER_SERVICE
 import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
-import com.lightning.wallet.ln.Channel.myBalanceMsat
 import android.widget.AbsListView.OnScrollListener
 import com.google.zxing.client.android.BeepManager
 import com.lightning.wallet.lnutils.RatesSaver
@@ -352,7 +352,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def showDenomChooser = {
     val btcFunds = coin2MSat(app.kit.conf0Balance)
-    val lnFunds = MilliSatoshi(app.ChannelManager.notClosingOrRefunding.map(myBalanceMsat).sum)
+    val lnFunds = MilliSatoshi(app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum)
     val btcPrettyFunds = humanFiat(sumIn format denom.withSign(btcFunds), btcFunds, " ")
     val lnPrettyFunds = humanFiat(sumIn format denom.withSign(lnFunds), lnFunds, " ")
     val title = getString(fiat_set_denom).format(btcPrettyFunds, lnPrettyFunds)

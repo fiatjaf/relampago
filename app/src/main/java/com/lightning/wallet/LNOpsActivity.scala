@@ -153,7 +153,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageNegotiations = UITask {
-      val refundable = Satoshi(myBalanceMsat(chan) / 1000L)
+      val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
       lnOpsDescription setText negotiations.format(chan.state, started, coloredIn(capacity),
         coloredIn(refundable), alias, inFlight).html
@@ -179,9 +179,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       best match {
         case Left(mutualTx) =>
-          val refundable = Satoshi(myBalanceMsat(chan) / 1000L)
           val status = humanStatus apply getStatus(mutualTx.txid)
           val myFee = coloredOut(capacity - mutualTx.allOutputsAmount)
+          val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
           val mutualView = commitStatus.format(mutualTx.txid.toString, status, myFee)
           lnOpsDescription setText bilateralClosing.format(chan.state, started, closed,
             coloredIn(capacity), coloredIn(refundable), alias, mutualView).html
