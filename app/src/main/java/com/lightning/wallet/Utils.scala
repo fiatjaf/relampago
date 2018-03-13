@@ -18,6 +18,7 @@ import android.content.DialogInterface.OnDismissListener
 import android.widget.RadioGroup.OnCheckedChangeListener
 import android.widget.AdapterView.OnItemClickListener
 import info.hoang8f.android.segmented.SegmentedGroup
+
 import concurrent.ExecutionContext.Implicits.global
 import android.view.inputmethod.InputMethodManager
 import com.lightning.wallet.ln.LNParams.minDepth
@@ -27,10 +28,12 @@ import com.lightning.wallet.lnutils.RatesSaver
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
 import com.lightning.wallet.helper.AES
+
 import language.implicitConversions
 import android.util.DisplayMetrics
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.script.Script
+
 import scala.concurrent.Future
 import android.os.Bundle
 import java.util.Date
@@ -39,9 +42,10 @@ import co.infinum.goldfinger.{Goldfinger, Warning, Error => GFError}
 import android.content.{Context, DialogInterface, Intent}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import com.lightning.wallet.ln.Tools.{none, wrap}
-import org.bitcoinj.wallet.{SendRequest, Wallet}
+import org.bitcoinj.wallet.{DeterministicSeed, SendRequest, Wallet}
 import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi}
+
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import java.util.{Timer, TimerTask}
@@ -225,23 +229,19 @@ trait TimerActivity extends AppCompatActivity { me =>
     app toast secret_checking
   }
 
-  def viewMnemonic(view: View) =
-    passWrap(me getString sets_mnemonic) apply checkPass { pass =>
-      // Warn user and proceed to export an encrypted mnemonic code
-      // using current wallet passcode if the user is fine with that
-
-      <(app.kit decryptSeed pass, onFail) { seed =>
-        val wordsText = TextUtils.join("\u0020", seed.getMnemonicCode)
-        lazy val bld = mkChoiceDialog(none, proceed, dialog_ok, dialog_export)
-        lazy val alert = mkForm(bld, null, wordsText)
-        alert
-
-        def proceed: Unit = rm(alert) {
-          val hex = AES.encode(wordsText, Crypto sha256 pass.binary)
-          me share s"Encrypted BIP32 mnemonic code ${new Date}: $hex"
-        }
-      }
+  def viewMnemonic(view: View) = {
+    def showCode(seed: DeterministicSeed): Unit = {
+      val plain = TextUtils.join("\u0020", seed.getMnemonicCode)
+      val bld = negBld(dialog_ok) setCustomTitle plain setMessage mnemonic_warn
+      showForm(bld.create)
     }
+
+    if (!app.kit.wallet.isEncrypted) showCode(app.kit.wallet.getKeyChainSeed)
+    else passWrap(me getString sets_mnemonic) apply checkPass { walletPasscode =>
+      // Wallet is encrypted so we need to try to decrypt a seed before proceeding
+      <(app.kit decryptSeed walletPasscode, onFail)(showCode)
+    }
+  }
 
   abstract class TxProcessor {
     def processTx(pass: String, feePerKb: Coin)

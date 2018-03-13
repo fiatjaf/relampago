@@ -1,7 +1,6 @@
 package com.lightning.wallet
 
 import android.widget._
-import collection.JavaConverters._
 import android.widget.DatePicker._
 import com.lightning.wallet.R.string._
 import com.hootsuite.nachos.terminator.ChipTerminatorHandler._
@@ -51,15 +50,8 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
         val mnemonicIsOk = isMnemonicCorrect(getMnemonicText)
         if (mnemonicIsOk) restoreWallet setText wallet_restore
         else restoreWallet setText restore_mnemonic_wrong
-        restoreWallet.setEnabled(mnemonicIsOk)
+        restoreWallet setEnabled mnemonicIsOk
       }
-    }
-
-    if (app.TransData.value != null) {
-      // Should be an unencrypted mnemonic string
-      val chips = app.TransData.value.toString split "\\s+"
-      timer.schedule(UITask(restoreCode setText chips.toList.asJava), 100)
-      app.TransData.value = null
     }
 
     restoreWhen setText datePicker.human

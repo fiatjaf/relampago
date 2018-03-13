@@ -3,7 +3,6 @@ package com.lightning.wallet
 import R.string._
 import android.widget._
 import com.lightning.wallet.Utils._
-import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
 import co.infinum.goldfinger.{Goldfinger, Warning}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
@@ -16,8 +15,6 @@ import ln.wire.LightningMessageCodecs.walletZygoteCodec
 import org.ndeftools.util.activity.NfcReaderActivity
 import org.bitcoinj.wallet.WalletProtobufSerializer
 import com.lightning.wallet.ln.LNParams
-import com.lightning.wallet.helper.AES
-import fr.acinq.bitcoin.Crypto
 import android.content.Intent
 import org.ndeftools.Message
 import scodec.bits.BitVector
@@ -184,39 +181,16 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   }
 
   def goRestoreWallet(view: View) = {
-    val mnemonicOptions = getResources getStringArray R.array.restore_mnemonic_options
+    val restoreOptions = getResources getStringArray R.array.restore_options
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, mnemonicOptions)
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, restoreOptions)
     val alert = mkForm(me negBld dialog_cancel, null, lst)
 
     lst setDivider null
     lst setDividerHeight 0
     lst setOnItemClickListener onTap {
-      case 0 => proceedWithEncryptedMnemonic
-      case 1 => rm(alert)(exitRestoreWallet)
-      case 2 => proceedWithMigrationFile
-    }
-
-    def proceedWithEncryptedMnemonic = rm(alert) {
-      val form = getLayoutInflater.inflate(R.layout.frag_encrypted_mnemonic, null)
-      val encryptedMnemonic = form.findViewById(R.id.encryptedMnemonic).asInstanceOf[EditText]
-      val oldWalletPassword = form.findViewById(R.id.oldWalletPassword).asInstanceOf[EditText]
-      lazy val dialog = mkChoiceDialog(attempt, none, dialog_ok, dialog_cancel)
-      lazy val alert1 = mkForm(dialog, getString(wallet_restore), form)
-      alert1
-
-      def attempt: Unit = rm(alert1) {
-        // Catch wrong password in Future
-        <(decryptAndImport, onFail)(none)
-      }
-
-      def decryptAndImport = {
-        val hash = Crypto sha256 oldWalletPassword.getText.toString.binary
-        val plain = AES.decode(encryptedMnemonic.getText.toString, hash)
-        require(isMnemonicCorrect(plain), "Wrong password")
-        app.TransData.value = plain
-        exitRestoreWallet
-      }
+      case 0 => rm(alert)(exitRestoreWallet)
+      case 1 => proceedWithMigrationFile
     }
 
     def proceedWithMigrationFile = rm(alert) {
