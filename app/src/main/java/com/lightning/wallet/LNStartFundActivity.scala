@@ -24,6 +24,7 @@ import com.lightning.wallet.lnutils.RatesSaver
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.script.ScriptBuilder
 import com.lightning.wallet.helper.AES
+import org.bitcoinj.wallet.SendRequest
 import java.util.TimerTask
 import android.os.Bundle
 
@@ -127,20 +128,19 @@ class LNStartFundActivity extends TimerActivity { me =>
       val rateManager = new RateManager(getString(amount_hint_newchan).format(denom withSign RatesSaver.rates.feeLive,
         denom withSign LNParams.maxChannelCapacity, denom withSign app.kit.conf1Balance), content)
 
-      def next(fundingMsat: MilliSatoshi) = new TxProcessor {
-        val dummyScriptPubKey = pubKeyScript(dummyKey, dummyKey)
-        val pay = P2WSHData(fundingMsat, dummyScriptPubKey)
+      def next(msat: MilliSatoshi) = new TxProcessor {
+        val dummyScript = pubKeyScript(dummyKey, dummyKey)
+        val pay = P2WSHData(msat, dummyScript)
 
-        def processTx(pass: String, feePerKb: Coin) =
-          <(unsigned(pass, feePerKb), onTxFail) { request =>
-            val outIndex = Scripts.findPubKeyScriptIndex(request.tx, dummyScriptPubKey)
-            val realChannelFundingAmountSat = request.tx.getOutput(outIndex).getValue.getValue
-            val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
-            val theirUnspendableReserveSat = realChannelFundingAmountSat / LNParams.theirReserveToFundingRatio
-            val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis)
-            freshChan process CMDOpenChannel(localParams, random getBytes 32, LNParams.broadcaster.ratePerKwSat, pushMsat = 0L,
-              their, request, outIndex, realChannelFundingAmountSat)
-          }
+        def futureProcess(unsignedRequest: SendRequest) = {
+          val outIndex = Scripts.findPubKeyScriptIndex(unsignedRequest.tx, dummyScript)
+          val realChannelFundingAmountSat = unsignedRequest.tx.getOutput(outIndex).getValue.getValue
+          val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
+          val theirUnspendableReserveSat = realChannelFundingAmountSat / LNParams.theirReserveToFundingRatio
+          val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis)
+          freshChan process CMDOpenChannel(localParams, random getBytes 32, LNParams.broadcaster.ratePerKwSat, pushMsat = 0L,
+            their, unsignedRequest, outIndex, realChannelFundingAmountSat)
+        }
 
         def onTxFail(fundingError: Throwable) =
           mkForm(mkChoiceDialog(me delayUI askForFunding(their), none,
@@ -151,7 +151,7 @@ class LNStartFundActivity extends TimerActivity { me =>
         case Failure(_) => app toast dialog_sum_empty
         case Success(ms) if ms < RatesSaver.rates.feeLive => app toast dialog_sum_small
         case Success(ms) if ms > LNParams.maxChannelCapacity => app toast dialog_sum_big
-        case Success(ms) => rm(alert)(next(ms).chooseFee)
+        case Success(ms) => rm(alert)(next(ms).start)
       }
 
       val ok = alert getButton BUTTON_POSITIVE

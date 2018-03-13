@@ -24,6 +24,7 @@ import com.lightning.wallet.lnutils.RatesSaver
 import android.support.v7.widget.Toolbar
 import android.app.AlertDialog.Builder
 import android.support.v4.app.Fragment
+import org.bitcoinj.wallet.SendRequest
 import fr.acinq.bitcoin.MilliSatoshi
 import android.content.Intent
 import android.os.Bundle
@@ -53,8 +54,8 @@ class FragBTC extends Fragment { me =>
 
 class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment { me =>
   val barMenuListener = new OnMenuItemClickListener { def onMenuItemClick(m: MenuItem) = host onOptionsItemSelected m }
+  import host.{timer, <, mkChoiceDialog, onButtonTap, onFastTap, onTap, onFail, showDenomChooser, passWrap, checkPass}
   import host.{getResources, getString, str2View, rm, mkForm, UITask, getLayoutInflater, negPosBld, TxProcessor}
-  import host.{timer, <, mkChoiceDialog, onButtonTap, onFastTap, onTap, onFail, showDenomChooser}
 
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
@@ -190,23 +191,23 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val rateManager = new RateManager(getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance), content)
     val spendManager = new BtcManager(rateManager)
 
-    def next(ms: MilliSatoshi) = new TxProcessor {
-      val pay = AddrData(ms, spendManager.getAddress)
-      def processTx(passcode: String, feePerKb: Coin) = {
-        add(host getString btc_announcing, Informer.BTCEVENT).run
-        <(app.kit blockingSend unsigned(passcode, feePerKb), onTxFail)(none)
+    def next(msat: MilliSatoshi) = new TxProcessor {
+      val pay = AddrData(msat, spendManager.getAddress)
+      def futureProcess(unsignedRequest: SendRequest) = {
+        add(getString(btc_announcing), Informer.BTCEVENT).run
+        app.kit blockingSend app.kit.sign(unsignedRequest).tx
       }
 
-      def onTxFail(generationError: Throwable) =
-        mkForm(mkChoiceDialog(host delayUI sendBtcPopup.set(Success(ms), pay.address),
-          none, dialog_ok, dialog_cancel), messageWhenMakingTx(generationError), null)
+      def onTxFail(sendingError: Throwable) =
+        mkForm(mkChoiceDialog(host delayUI sendBtcPopup.set(Success(msat), pay.address),
+          none, dialog_ok, dialog_cancel), messageWhenMakingTx(sendingError), null)
     }
 
     def sendAttempt = rateManager.result match {
       case Failure(why) => app toast dialog_sum_empty
       case _ if spendManager.getAddress == null => app toast dialog_address_wrong
       case Success(ms) if MIN_NONDUST_OUTPUT isGreaterThan ms => app toast dialog_sum_small
-      case Success(ms) => rm(alert)(next(ms).chooseFee)
+      case Success(ms) => rm(alert)(next(ms).start)
     }
 
     val ok = alert getButton BUTTON_POSITIVE
@@ -215,31 +216,33 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   }
 
   def boostIncoming(wrap: TxWrap) = {
-    val newFee = RatesSaver.rates.feeLive divide 2
-    val boost = coloredIn(wrap.valueDelta minus newFee)
     val current = coloredIn(wrap.valueDelta)
+    val increasedFee = RatesSaver.rates.feeLive divide 2
+    val boost = coloredIn(wrap.valueDelta minus increasedFee)
+    val userWarning = getString(boost_details).format(current, boost).html
 
-    val warning = getString(boost_details).format(current, boost)
-    host.passWrap(warning.html) apply host.checkPass { pass =>
-      // Try to send a CPFP tx and hide an old one
-      <(doSend(pass), onError)(none)
+    // Transaction hiding must always happen before replacement sending
+    lazy val unsignedBoost = childPaysForParent(app.kit.wallet, wrap.tx, increasedFee)
+    def doReplace = runAnd(wrap.tx setMemo HIDE)(app.kit blockingSend app.kit.sign(unsignedBoost).tx)
+    def replace = if (wrap.depth < 1 && !wrap.isDead) doReplace
+
+    def encReplace(pass: String) = {
+      val crypter = app.kit.wallet.getKeyCrypter
+      unsignedBoost.aesKey = crypter deriveKey pass
+      replace
     }
 
     def onError(err: Throwable) = {
-      // Place an old tx back to list
-      // and inform user about an error
+      // Make an old tx visible again
       wrap.tx setMemo null
       onFail(err)
     }
 
-    def doSend(pass: String) = runAnd(wrap.tx setMemo HIDE) {
-      val request = childPaysForParent(app.kit.wallet, wrap.tx, newFee)
-      request.aesKey = app.kit.wallet.getKeyCrypter deriveKey pass
-
-      // Check once again if tx should be re-sent before proceeding
-      if (wrap.depth < 1 && !wrap.isDead) app.kit blockingSend request
-      else throw new Exception(host getString err_general)
-    }
+    def replaceFuture = <(replace, onError)(none)
+    def encReplaceFuture(pass: String) = <(encReplace(pass), onError)(none)
+    val dlg = mkChoiceDialog(replaceFuture, none, dialog_next, dialog_cancel)
+    if (!app.kit.wallet.isEncrypted) mkForm(dlg, userWarning, null)
+    else passWrap(userWarning) apply checkPass(encReplaceFuture)
   }
 
   // INIT

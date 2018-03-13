@@ -255,7 +255,6 @@ class WalletApp extends Application { me =>
   abstract class WalletKit extends AbstractKit {
     type ScriptSeq = Seq[org.bitcoinj.script.Script]
     def blockingSend(tx: Transaction): String = nonBlockingSend(tx).get.toString
-    def blockingSend(unsigned: SendRequest): String = blockingSend(sign(unsigned).tx)
     def nonBlockingSend(tx: Transaction) = peerGroup.broadcastTransaction(tx, 1).broadcast
     def watchFunding(cs: Commitments) = watchScripts(cs.commitInput.txOut.publicKeyScript :: Nil)
     def watchScripts(scripts: ScriptSeq) = wallet addWatchedScripts scripts.asJava

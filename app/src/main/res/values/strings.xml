@@ -3,7 +3,7 @@
 
     <!-- stepper, emergency mode -->
     <string name="step_2"><![CDATA[<font color=#999999>Step 2 of 3: security</font><br><br>%1$s]]></string>
-    <string name="step_3"><![CDATA[<font color=#999999>Step 3 of 3: fees</font><br><br>%1$s]]></string>
+    <string name="step_3"><![CDATA[<font color=#999999>Final step: fees</font><br><br>%1$s]]></string>
     <string name="emerge_report">Show error report</string>
     <string name="emerge_mode">Emergency mode</string>
 

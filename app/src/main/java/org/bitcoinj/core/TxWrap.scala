@@ -10,7 +10,7 @@ import scala.util.Try
 
 
 object TxWrap {
-  val HIDE = "HIDE"
+  final val HIDE = "HIDE"
   def watchedWrap(wrap: TxWrap) = wrap.valueDelta.isZero
   def hiddenWrap(wrap: TxWrap) = wrap.tx.getMemo == HIDE
 }

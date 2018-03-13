@@ -6,7 +6,7 @@
         style="@style/MarginInfo"
         android:layout_width="wrap_content"
         android:id="@+id/actionTip"
-        android:maxWidth="230sp"/>
+        android:maxWidth="235sp"/>
 
     <View style="@style/GrayDivider"/>
 </LinearLayout>

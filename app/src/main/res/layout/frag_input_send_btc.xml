@@ -4,7 +4,7 @@
     <include layout="@layout/frag_input_fiat_converter"/>
 
     <TextView
-        android:maxWidth="230sp"
+        android:maxWidth="235sp"
         style="@style/MarginInfo"
         android:visibility="gone"
         android:id="@+id/addressData"

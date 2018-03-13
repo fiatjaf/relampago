@@ -18,7 +18,6 @@ import android.content.DialogInterface.OnDismissListener
 import android.widget.RadioGroup.OnCheckedChangeListener
 import android.widget.AdapterView.OnItemClickListener
 import info.hoang8f.android.segmented.SegmentedGroup
-
 import concurrent.ExecutionContext.Implicits.global
 import android.view.inputmethod.InputMethodManager
 import com.lightning.wallet.ln.LNParams.minDepth
@@ -27,25 +26,20 @@ import org.bitcoinj.crypto.KeyCrypterException
 import com.lightning.wallet.lnutils.RatesSaver
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
-import com.lightning.wallet.helper.AES
-
+import fr.acinq.bitcoin.MilliSatoshi
 import language.implicitConversions
 import android.util.DisplayMetrics
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.script.Script
-
 import scala.concurrent.Future
 import android.os.Bundle
-import java.util.Date
 
 import co.infinum.goldfinger.{Goldfinger, Warning, Error => GFError}
+import org.bitcoinj.wallet.{DeterministicSeed, SendRequest, Wallet}
 import android.content.{Context, DialogInterface, Intent}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import com.lightning.wallet.ln.Tools.{none, wrap}
-import org.bitcoinj.wallet.{DeterministicSeed, SendRequest, Wallet}
 import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
-import fr.acinq.bitcoin.{Crypto, MilliSatoshi}
-
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import java.util.{Timer, TimerTask}
@@ -200,7 +194,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   def passWrap(title: CharSequence, fp: Boolean = true) = (next: String => Unit) => {
     val passNoSuggest = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
     val view \ field \ image = generatePromptView(passNoSuggest, secret_wallet, new PasswordTransformationMethod)
-    val dlg = mkChoiceDialog(ok = next apply field.getText.toString, none, dialog_next, dialog_cancel)
+    val dlg = mkChoiceDialog(ok = next(field.getText.toString), none, dialog_next, dialog_cancel)
     val alert = mkForm(dlg, title, view)
 
     val gf = new Goldfinger.Builder(me).build
@@ -231,65 +225,67 @@ trait TimerActivity extends AppCompatActivity { me =>
 
   def viewMnemonic(view: View) = {
     def showCode(seed: DeterministicSeed): Unit = {
-      val plain = TextUtils.join("\u0020", seed.getMnemonicCode)
-      val bld = negBld(dialog_ok) setCustomTitle plain setMessage mnemonic_warn
-      showForm(bld.create)
+      val recoveryCode = TextUtils.join("\u0020", seed.getMnemonicCode)
+      val bld = negBld(dialog_ok).setCustomTitle(recoveryCode)
+      showForm(bld.setMessage(mnemonic_warn).create)
     }
 
+    def encShowCode(pass: String) = <(app.kit decryptSeed pass, onFail)(showCode)
     if (!app.kit.wallet.isEncrypted) showCode(app.kit.wallet.getKeyChainSeed)
-    else passWrap(me getString sets_mnemonic) apply checkPass { walletPasscode =>
-      // Wallet is encrypted so we need to try to decrypt a seed before proceeding
-      <(app.kit decryptSeed walletPasscode, onFail)(showCode)
-    }
+    else passWrap(me getString sets_mnemonic) apply checkPass(encShowCode)
   }
 
-  abstract class TxProcessor {
-    def processTx(pass: String, feePerKb: Coin)
-    def onTxFail(exc: Throwable): Unit
+  abstract class TxProcessor { self =>
+    def futureProcess(req: SendRequest)
+    def onTxFail(exc: Throwable)
     val pay: PayData
 
-    def chooseFee: Unit =
-      passWrap(getString(step_2).format(pay cute sumOut).html) { pass =>
-        <(app.kit sign unsigned(pass, RatesSaver.rates.feeLive), onTxFail) { signed =>
-          // Get signed live final fee and set a risky final fee to be two times less
+    def start = {
+      val estimateFee = RatesSaver.rates.feeLive
+      def encEstimate(pass: String) = <(app.kit sign encRequest(pass)(estimateFee), onTxFail)(self encChooseFee pass)
+      if (!app.kit.wallet.isEncrypted) <(app.kit sign plainRequest(estimateFee), onTxFail)(self chooseFee plainRequest)
+      else passWrap(getString(step_2).format(pay cute sumOut).html) apply encEstimate
+    }
 
-          val livePerTxFee: MilliSatoshi = signed.tx.getFee
-          val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
-          val markedLivePerTxFee = sumOut format denom.withSign(livePerTxFee)
-          val markedRiskyPerTxFee = sumOut format denom.withSign(riskyPerTxFee)
-          val txtFeeLive = getString(fee_live) format humanFiat(markedLivePerTxFee, livePerTxFee, " ")
-          val txtFeeRisky = getString(fee_risky) format humanFiat(markedRiskyPerTxFee, riskyPerTxFee, " ")
-          val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
+    def encChooseFee(pass: String) = chooseFee(self encRequest pass) _
+    def chooseFee(toRequest: Coin => SendRequest)(estimate: SendRequest): Unit = {
+      // Get signed live final fee and set a risky fee to be two times less than that
 
-          // Prepare popup interface with fee options
-          val adapter = new ArrayAdapter(me, singleChoice, feesOptions)
-          val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
-          val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
+      val livePerTxFee: MilliSatoshi = estimate.tx.getFee
+      val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
 
-          def proceed = lst.getCheckedItemPosition match {
-            case 0 => processTx(pass, RatesSaver.rates.feeLive div 2)
-            case 1 => processTx(pass, RatesSaver.rates.feeLive)
-          }
+      val markedLivePerTxFee = sumOut format denom.withSign(livePerTxFee)
+      val markedRiskyPerTxFee = sumOut format denom.withSign(riskyPerTxFee)
+      val txtFeeLive = getString(fee_live) format humanFiat(markedLivePerTxFee, livePerTxFee, " ")
+      val txtFeeRisky = getString(fee_risky) format humanFiat(markedRiskyPerTxFee, riskyPerTxFee, " ")
+      val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
+      val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
+      val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
-          lst.setAdapter(adapter)
-          lst.setItemChecked(0, true)
-          lazy val dialog: Builder = mkChoiceDialog(rm(alert)(proceed), none, dialog_pay, dialog_cancel)
-          lazy val alert = mkForm(dialog, getString(step_3).format(pay cute sumOut).html, form)
-          alert
-        }
-
-        // Let know something is on
-        app toast secret_checking
+      def proceed = {
+        val divider = if (lst.getCheckedItemPosition == 0) 2 else 1
+        val request = toRequest(RatesSaver.rates.feeLive div divider)
+        futureProcess(request)
       }
 
-    def unsigned(pass: String, fee: Coin) = {
-      // Create an unsigned transaction request
-      val crypter = app.kit.wallet.getKeyCrypter
-      val request = pay.sendRequest
+      lazy val dialog = mkChoiceDialog(ok = <(proceed, onTxFail)(none), none, dialog_pay, dialog_cancel)
+      lazy val alert = mkForm(dialog, getString(step_3).format(pay cute sumOut).html, form)
+      lst setAdapter new ArrayAdapter(me, singleChoice, feesOptions)
+      lst.setItemChecked(0, true)
+      alert
+    }
 
-      request.feePerKb = fee
-      request.aesKey = crypter deriveKey pass
+    def plainRequest(selectedFee: Coin) = {
+      // Unsigned request with all inputs assembled
+      val request = pay getRequestWithFee selectedFee
       app.kit.wallet assembleTx request
+      request
+    }
+
+    def encRequest(pass: String)(selectedFee: Coin) = {
+      val key = app.kit.wallet.getKeyCrypter deriveKey pass
+      val request = self plainRequest selectedFee
+      request.aesKey = key
       request
     }
 
@@ -372,12 +368,19 @@ class BtcManager(val man: RateManager) { me =>
 }
 
 trait PayData {
-  def isEmpty = app.kit.conf1Balance equals cn
-  def sendRequest: SendRequest
-  def destination: String
+  // Emptying a wallet needs special handling
+  def emptify = app.kit.conf1Balance equals cn
   def onClick: Unit
   def cn: Coin
 
+  def getRequest: SendRequest
+  def getRequestWithFee(fee: Coin) = {
+    val basicRequestWithFee = getRequest
+    basicRequestWithFee.feePerKb = fee
+    basicRequestWithFee
+  }
+
+  def destination: String
   def cute(direction: String) = {
     val msat: MilliSatoshi = coin2MSat(cn)
     val human = direction.format(denom withSign msat)
@@ -386,7 +389,7 @@ trait PayData {
 }
 
 case class AddrData(cn: Coin, address: Address) extends PayData {
-  def sendRequest = if (isEmpty) emptyWallet(address) else to(address, cn)
+  def getRequest = if (emptify) emptyWallet(address) else to(address, cn)
   def link = BitcoinURI.convertToBitcoinURI(address, cn, null, null)
   def onClick = app.setBuffer(address.toString)
   def destination = humanFour(address.toString)
@@ -394,7 +397,7 @@ case class AddrData(cn: Coin, address: Address) extends PayData {
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
   // This will only be used for funding of LN payment channels as destination is unreadable
-  def sendRequest = if (isEmpty) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
+  def getRequest = if (emptify) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
   def onClick = app.setBuffer(denom withSign cn)
   def destination = app getString txs_p2wsh
 }
