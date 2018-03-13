@@ -4,6 +4,7 @@
 
     <LinearLayout
         style="@style/StandardLinearLayout"
+        android:background="@color/bg"
         android:id="@+id/mainChoice"
         android:visibility="gone">
 
@@ -36,6 +37,7 @@
 
     <LinearLayout
         style="@style/StandardLinearLayout"
+        android:background="@color/bg"
         android:id="@+id/mainPassForm"
         android:visibility="gone">
 
@@ -60,11 +62,4 @@
             android:src="@drawable/ic_fingerprint_white_24dp"/>
 
     </LinearLayout>
-
-    <ImageView
-        android:id="@+id/mainProgress"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:src="@drawable/ic_launcher"/>
-
 </LinearLayout>

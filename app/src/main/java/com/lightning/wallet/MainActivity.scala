@@ -76,16 +76,12 @@ object MainActivity {
 }
 
 class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch { me =>
+  lazy val views = findViewById(R.id.mainChoice) :: findViewById(R.id.mainPassForm) :: Nil
   lazy val mainFingerprint = findViewById(R.id.mainFingerprint).asInstanceOf[ImageView]
   lazy val mainPassCheck = findViewById(R.id.mainPassCheck).asInstanceOf[Button]
   lazy val mainPassData = findViewById(R.id.mainPassData).asInstanceOf[EditText]
   lazy val gf = new Goldfinger.Builder(me).build
   private[this] val FILE_CODE = 101
-
-  lazy val views =
-    findViewById(R.id.mainChoice) ::
-      findViewById(R.id.mainPassForm) ::
-      findViewById(R.id.mainProgress) :: Nil
 
   def INIT(state: Bundle) = {
     runAnd(me setContentView R.layout.activity_main)(me initNfc state)
@@ -130,19 +126,18 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
   def popup(code: Int) = runAnd(app toast code)(next)
   def next: Unit = (app.walletFile.exists, app.isAlive) match {
-    case (false, _) => setVis(View.VISIBLE, View.GONE, View.GONE)
+    // Find out what exactly should be done once user opens an app
+    // depends on both wallet app file existence and runtime objects
+    case (false, _) => setVis(View.VISIBLE, View.GONE)
     case (true, true) => MainActivity.proceed.run
 
-    case (true, false) => <(MainActivity.prepareKit, throw _) { _ =>
-      // Load Bitcoin wallet in background so UI loader could be seen
-      // but throw an error on UI thread so malfunction is visible
-
-      if (!app.kit.wallet.isEncrypted) {
+    case (true, false) =>
+      MainActivity.prepareKit
+      if (app.kit.wallet.isEncrypted) whenEncrypted else {
         // Wallet is not encrypted so just proceed wuth setup
         val seed = app.kit.wallet.getKeyChainSeed.getSeedBytes
         runAnd(LNParams setup seed)(app.kit.startAsync)
-      } else whenEncrypted
-    }
+      }
 
     // Just should not ever happen
     // and when it does we just exit
@@ -152,7 +147,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   // MISC
 
   def whenEncrypted = {
-    setVis(View.GONE, View.VISIBLE, View.GONE)
+    setVis(View.GONE, View.VISIBLE)
     mainPassCheck setOnClickListener onButtonTap(checkPass)
     if (gf.hasEnrolledFingerprint && FingerPassCode.exists) {
       // This device hase fingerprint support with prints registered
@@ -177,12 +172,14 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
       }
 
       def wrong(authThrowable: Throwable) = {
-        setVis(View.GONE, View.VISIBLE, View.GONE)
+        // Passcode has failed, show form again
         app toast authThrowable.getMessage
+        setVis(View.GONE, View.VISIBLE)
       }
 
-      setVis(View.GONE, View.GONE, View.VISIBLE)
+      // Reveals background image again
       <(carryOutDecryption, wrong)(none)
+      setVis(View.GONE, View.GONE)
     }
   }
 

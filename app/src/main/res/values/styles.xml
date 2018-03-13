@@ -83,13 +83,19 @@
 
     <!-- overall theme style -->
 
+    <style name="NoBarMain" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@drawable/splash</item>
+        <item name="colorAccent">#34B4E3</item>
+    </style>
+
     <style name="NoBar" parent="Theme.AppCompat.NoActionBar">
-        <item name="colorAccent">#FF34B4E3</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="colorAccent">#34B4E3</item>
     </style>
 
     <style name="CustomBar" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="colorPrimaryDark">#FF000000</item>
-        <item name="colorAccent">#FF34B4E3</item>
+        <item name="colorAccent">#34B4E3</item>
     </style>
 
     <!-- floating buttons style -->
