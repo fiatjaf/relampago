@@ -17,7 +17,6 @@ import scala.collection.JavaConverters.mapAsJavaMapConverter
 import com.lightning.wallet.ln.wire.NodeAnnouncement
 import com.lightning.wallet.lnutils.OlympusTable
 import com.lightning.wallet.helper.RichCursor
-import rx.lang.scala.schedulers.IOScheduler
 import fr.acinq.bitcoin.Crypto.PublicKey
 import java.net.ProtocolException
 import java.math.BigInteger
@@ -107,8 +106,8 @@ trait OlympusProvider {
 
 class Connector(val url: String) extends OlympusProvider {
   def http(way: String) = post(s"$url/$way", true) connectTimeout 15000
-  def ask[Type: JsonFormat](command: String, params: HttpParam*): Obs[Type] =
-    obsOn(http(command).form(params.toMap.asJava).body.parseJson, IOScheduler.apply) map {
+  def ask[Type: JsonFormat](commandPath: String, parameters: HttpParam*): Obs[Type] =
+    obsOnIO.map(_ => http(commandPath).form(parameters.toMap.asJava).body.parseJson) map {
       case JsArray(JsString("error") +: JsString(why) +: _) => throw new ProtocolException(why)
       case JsArray(JsString("ok") +: response +: _) => response.convertTo[Type]
       case _ => throw new ProtocolException

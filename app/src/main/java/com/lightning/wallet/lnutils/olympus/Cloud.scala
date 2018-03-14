@@ -7,12 +7,12 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.olympus.OlympusWrap._
+import rx.lang.scala.{Observable => Obs}
 
 import org.bitcoinj.core.ECKey
 import org.bitcoinj.core.Utils.HEX
 import com.lightning.wallet.Utils.app
 import com.lightning.wallet.ln.Tools.none
-import rx.lang.scala.{Observable => Obs}
 
 
 // Uses special paid tokens to store data on server, is constructed directly from a database
@@ -71,9 +71,11 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
       def onError(err: Throwable) = err.getMessage match {
         case "notfulfilled" if pr.isFresh && capableChannelExists =>
-          // Retry an existing request instead of getting a new one until it expires
-          val send = me withFree retry(withRoutesAndOnionRPIFromPR(pr), pickInc, 4 to 5)
-          send.foreach(app.ChannelManager.sendEither(_, none), none)
+          val send = obsOnIO.flatMap(_ => me withRoutesAndOnionRPIFromPR pr)
+          me withFree retry(send, pickInc, 4 to 5) foreach { foeRPI =>
+            // Retry fresh request instead of getting a new one
+            app.ChannelManager.sendEither(foeRPI, none)
+          }
 
         // Server can't find our tokens or request has expired
         case "notfulfilled" => me BECOME data.copy(info = None)

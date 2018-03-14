@@ -107,7 +107,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     lnOpsAction setOnClickListener host.onButtonTap {
       // First closing attempt will be a cooperative one while the second attempt will always be an uncooperative one
       val msg = isOperationalOpen(chan) match { case true => ln_chan_close_details case false => ln_chan_force_details }
-      val dlg = host.mkChoiceDialog(chan process CMDShutdown, none, dialog_next, dialog_cancel)
+      val dlg = host.mkChoiceDialog(chan process CMDShutdown, none, dialog_ok, dialog_cancel)
       host showForm dlg.setMessage(getString(msg).html).create
     }
 

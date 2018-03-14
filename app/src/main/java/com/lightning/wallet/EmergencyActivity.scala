@@ -11,8 +11,11 @@ import android.os.Bundle
 import android.view.View
 
 
-class EmergencyActivity
-extends TimerActivity { me =>
+class EmergencyActivity extends TimerActivity { me =>
+  def viewReport(v: View) = Try(getIntent getStringExtra ERROR_REPORT) match {
+    case Success(report) => showForm(negBld(dialog_ok).setMessage(report).create)
+    case _ => app toast err_general
+  }
 
   def INIT(savedInstanceState: Bundle) = {
     me setContentView R.layout.activity_emergency
@@ -30,16 +33,4 @@ extends TimerActivity { me =>
       peerGroup = null
       store = null
     }
-
-  def viewReport(view: View) =
-    Try(getIntent getStringExtra ERROR_REPORT) match {
-      case Success(report: String) => showDetails(report)
-      case _ => showDetails(me getString err_general)
-    }
-
-  def showDetails(report: String) = {
-    val (view, field) = str2Tuple(report)
-    mkForm(me negBld dialog_ok, null, view)
-    field setTextIsSelectable true
-  }
 }

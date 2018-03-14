@@ -6,10 +6,11 @@ import scala.concurrent.duration._
 import com.lightning.wallet.Denomination._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import rx.lang.scala.{Scheduler, Observable => Obs}
+import rx.lang.scala.{Observable => Obs}
 
 import com.lightning.wallet.lnutils.olympus.OlympusWrap.Fiat2Btc
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
+import rx.lang.scala.schedulers.IOScheduler
 import com.lightning.wallet.AbstractKit
 import com.lightning.wallet.Utils.app
 import org.bitcoinj.core.Coin
@@ -24,9 +25,7 @@ object JsonHttpUtils {
     Obs.just(null).delay(delayLeft.millis).flatMap(_ => next)
   }
 
-  def obsOn[T](provider: => T, scheduler: Scheduler) =
-    Obs.just(null).subscribeOn(scheduler).map(_ => provider)
-
+  def obsOnIO = Obs just null subscribeOn IOScheduler.apply
   def retry[T](obs: Obs[T], pick: (Throwable, Int) => Duration, times: Range) =
     obs.retryWhen(_.zipWith(Obs from times)(pick) flatMap Obs.timer)
 

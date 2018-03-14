@@ -45,7 +45,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     updateRouting(rpi)
   }
 
-  def retry(reason: UpdateFailHtlc, hash: BinaryData) = for {
+  def resend(reason: UpdateFailHtlc, hash: BinaryData) = for {
     // This payment attempt has failed so get saved routing data,
     // cut affected routes, try to re-send if any routes still left
 
@@ -90,7 +90,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
         for (Htlc(true, add) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(add)
         for (Htlc(false, _) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkOutgoing(fulfill)
         for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updateStatus(FAILURE, add.paymentHash)
-        for (Htlc(false, add) \ reason <- norm.commitments.localCommit.spec.failed) retry(reason, add.paymentHash)
+        for (Htlc(false, add) \ reason <- norm.commitments.localCommit.spec.failed) resend(reason, add.paymentHash)
       }
 
       if (norm.commitments.localCommit.spec.fulfilled.nonEmpty) {
