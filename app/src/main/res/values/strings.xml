@@ -9,10 +9,10 @@
 
     <!-- app wide -->
     <string name="unlock">Unlock Wallet</string>
-    <string name="sets_secret_ok">New passcode has been set</string>
+    <string name="sets_secret_ok">Passcode has been updated</string>
+    <string name="secret_info">Pick a good passcode\nor just leave the field blank\nto have an unencrypted wallet</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch.</string>
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
-    <string name="password_info">Pick a reasonable passcode if you wish your wallet to be encrypted or leave the field blank to have a less secure wallet which is easier to use</string>
     <string name="fee_risky"><![CDATA[<small>%1$s<br><small>Standard transaction fee</small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s<br><small>Priority transaction fee</small></small>]]></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
@@ -81,7 +81,6 @@
     <string name="sets_rescan">Rescan blockchain</string>
 
     <string name="secret_wallet">Passcode</string>
-    <string name="secret_new">New passcode</string>
     <string name="secret_wrong">Wrong passcode</string>
     <string name="action_bitcoin_receive">Receive bitcoin</string>
     <string name="action_bitcoin_send">Send bitcoin</string>
@@ -226,9 +225,9 @@
         <item>Frozen</item>
     </array>
 
-    <string name="ln_chan_close_details">Channel closing results in an on-chain Bitcoin transaction which refunds the remaining Lightning balance back to your Bitcoin wallet</string>
-    <string name="ln_chan_force_details"><![CDATA[<a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>Forced channel closing</a> takes more fees and time than a cooperaive one]]></string>
     <string name="ln_ops_chan_opening"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>total capacity %3$s<br>%4$s required<br>%5$s<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s]]></string>
+    <string name="ln_chan_close_details"><![CDATA[Closing results in a regular Bitcoin transaction which refunds a current channel balance back into your Bitcoin wallet.<br><br>Channel itself becomes unusable once this action is initiated.]]></string>
+    <string name="ln_chan_force_details"><![CDATA[Please note that proceeding with this right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which takes additional fees and time!]]></string>
     <string name="ln_ops_chan_open"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>total capacity %3$s<br>can send %4$s<br><a href=http://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>can receive</a> %5$s<br>%6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>closed at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br>%6$s<br><br>Refundable channel balance has been transferred to your Bitcoin wallet<br><br>%7$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[%1$s<br>opened at <font color=#999999>%2$s</font><br>total capacity %3$s<br>refundable %4$s<br>%5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>

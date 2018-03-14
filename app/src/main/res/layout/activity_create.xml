@@ -8,15 +8,15 @@
 
         <EditText
             style="@style/Info"
+            android:minWidth="120dp"
             android:id="@+id/createPass"
-            android:hint="@string/secret_new"
             android:layout_width="wrap_content"
             android:inputType="textVisiblePassword"/>
 
         <TextView
             style="@style/Info"
             android:layout_width="wrap_content"
-            android:text="@string/password_info"/>
+            android:text="@string/secret_info"/>
 
         <Button
             style="@style/MarginInfo"

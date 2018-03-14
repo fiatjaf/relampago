@@ -1,11 +1,12 @@
 <resources>
-    <item name="bg" type="color">#000000</item>
+    <item name="bg" type="color">#282B30</item>
+    <item name="black" type="color">#000000</item>
     <item name="white" type="color">#EEEEEE</item>
     <item name="btc" type="color">#FF9900</item>
     <item name="ln" type="color">#0099FE</item>
 
     <integer-array name="bar_colors">
         <item>@color/white</item>
-        <item>@color/bg</item>
+        <item>@color/black</item>
     </integer-array>
 </resources>

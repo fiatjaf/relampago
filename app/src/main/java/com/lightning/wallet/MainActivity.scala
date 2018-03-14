@@ -145,21 +145,21 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
 
   def whenEncrypted = {
     setVis(View.GONE, View.VISIBLE)
-    mainPassCheck setOnClickListener onButtonTap(checkPass)
+    mainPassCheck setOnClickListener onButtonTap(doCheck)
     if (gf.hasEnrolledFingerprint && FingerPassCode.exists) {
       // This device hase fingerprint support with prints registered
 
       val callback = new Goldfinger.Callback {
         def onWarning(nonFatalWarning: Warning) = FingerPassCode informUser nonFatalWarning
         def onError(err: GFError) = wrap(FingerPassCode informUser err)(mainFingerprint setVisibility View.GONE)
-        def onSuccess(plainPasscode: String) = runAnd(mainPassData setText plainPasscode)(checkPass)
+        def onSuccess(plainPasscode: String) = runAnd(mainPassData setText plainPasscode)(doCheck)
       }
 
       mainFingerprint setVisibility View.VISIBLE
       gf.decrypt(fileName, FingerPassCode.get, callback)
     }
 
-    def checkPass = {
+    def doCheck = {
       def carryOutDecryption = {
         val passcode = mainPassData.getText.toString
         LNParams setup app.kit.decryptSeed(passcode).getSeedBytes

@@ -394,11 +394,9 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       rm(menu)(proceed)
     }
 
-    if (gf.hasEnrolledFingerprint) {
-      // Only if basic prerequisites are here
+    if (app.kit.wallet.isEncrypted && gf.hasEnrolledFingerprint) {
+      if (FingerPassCode.exists) setButtonDisable else setButtonEnable
       useFingerprint setVisibility View.VISIBLE
-      if (FingerPassCode.exists) setButtonDisable
-      else setButtonEnable
 
       def setButtonEnable = {
         def proceed = rm(menu) {
@@ -499,9 +497,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     }
 
     rescanWallet setOnClickListener onButtonTap {
-      def openForm = passWrap(me getString sets_rescan) apply checkPass { _ =>
-        val warningDialogPopup = mkChoiceDialog(go, none, dialog_ok, dialog_cancel)
-        showForm(warningDialogPopup.setMessage(sets_rescan_ok).create)
+      // May be needed in case of blockchain glitches
+
+      rm(menu) {
+        val dlg = mkChoiceDialog(go, none, dialog_ok, dialog_cancel)
+        showForm(dlg.setMessage(sets_rescan_ok).create)
       }
 
       def go = try {
@@ -511,35 +511,43 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         app.kit useCheckPoints app.kit.wallet.getEarliestKeyCreationTime
         app.kit.wallet saveToFile app.walletFile
       } catch none finally System exit 0
-
-      rm(menu)(openForm)
     }
 
     viewMnemonic setOnClickListener onButtonTap {
-      // Provided as an external function because
-      // it may be accessed directly from mainpage
+      // Can be accessed here and from page button
       rm(menu)(me viewMnemonic null)
     }
 
     changePass setOnClickListener onButtonTap {
-      def openForm = passWrap(me getString sets_secret_change) apply checkPass { pass =>
-        val view \ field \ _ = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_new, null)
-        mkForm(mkChoiceDialog(changePassword, none, dialog_ok, dialog_cancel), me getString sets_secret_change, view)
+      def decryptAndMaybeEncrypt(oldPass: CharSequence)(newPass: CharSequence) = {
+        // First decrypt a wallet using an old passcode and then encrypt with a new one
+        runAnd(app.kit.wallet decrypt oldPass)(FingerPassCode.erase)
+        maybeEncrypt(newPass)
+      }
 
-        def changePassword = {
-          // Decrypt an old password and set a new one right away
-          <(rotatePass, onFail)(_ => app toast sets_secret_ok)
-          app toast secret_changing
-        }
+      def maybeEncrypt(newPass: CharSequence) = {
+        // Leave the wallet decrypted if there is no new passcode
+        if (newPass.length > 0) app.encryptWallet(app.kit.wallet, newPass)
+      }
 
-        def rotatePass = {
-          // Decrypt wallet and remove an old encrypted passcode
-          runAnd(app.kit.wallet decrypt pass)(FingerPassCode.erase)
-          app.encryptWallet(app.kit.wallet, field.getText.toString)
+      def newPassForm(changePass: CharSequence => Unit) = {
+        val view \ field \ _ = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_info, null)
+        mkForm(mkChoiceDialog(changePasscode, none, dialog_ok, dialog_cancel), me getString sets_secret_change, view)
+
+        def changePasscode = runAnd(app toast secret_changing) {
+          // Do the required preliminary steps and encrypt with a new passcode
+          <(changePass(field.getText), onFail)(_ => app toast sets_secret_ok)
         }
       }
 
-      rm(menu)(openForm)
+      rm(menu) {
+        if (!app.kit.wallet.isEncrypted) newPassForm(maybeEncrypt)
+        else passWrap(me getString sets_secret_change) apply checkPass { pass =>
+          // Remember a correct passcode and use it later for wallet decryption
+          val decryptLoaded = decryptAndMaybeEncrypt(pass) _
+          newPassForm(decryptLoaded)
+        }
+      }
     }
   }
 }

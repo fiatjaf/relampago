@@ -10,6 +10,7 @@ import android.widget.RadioGroup.OnCheckedChangeListener
 import info.hoang8f.android.segmented.SegmentedGroup
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import me.relex.circleindicator.CircleIndicator
+import fr.acinq.bitcoin.MilliSatoshi
 import android.os.Bundle
 import java.util.Date
 
@@ -17,7 +18,6 @@ import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.widget.{Button, RadioButton, RadioGroup}
 import android.view.{LayoutInflater, View, ViewGroup}
 import com.lightning.wallet.ln.Tools.{none, wrap}
-import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 
 
 class LNOpsActivity extends TimerActivity { me =>
@@ -104,9 +104,11 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     val capacity = chan(_.commitInput.txOut.amount).get
     val alias = chan.data.announce.alias take 64
 
-    def closeOnClick(title: Int) = lnOpsAction setOnClickListener host.onButtonTap {
-      // First closing attempt will be a cooperative one, the second try will be uncooperative
-      host.passWrap(getString(title).html) apply host.checkPass { _ => chan process CMDShutdown }
+    lnOpsAction setOnClickListener host.onButtonTap {
+      // First closing attempt will be a cooperative one while the second attempt will always be an uncooperative one
+      val msg = isOperationalOpen(chan) match { case true => ln_chan_close_details case false => ln_chan_force_details }
+      val dlg = host.mkChoiceDialog(chan process CMDShutdown, none, dialog_next, dialog_cancel)
+      host showForm dlg.setMessage(getString(msg).html).create
     }
 
     def manageOther = UITask {
@@ -126,7 +128,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
       lnOpsAction setText action_ln_close
-      closeOnClick(ln_chan_close_details)
     }
 
     def manageOpen = UITask {
@@ -149,7 +150,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
       lnOpsAction setText action_ln_close
-      closeOnClick(ln_chan_close_details)
     }
 
     def manageNegotiations = UITask {
@@ -161,7 +161,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
       lnOpsAction setText action_ln_force
-      closeOnClick(ln_chan_force_details)
     }
 
     def manageClosing(close: ClosingData) = UITask {
