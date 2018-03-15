@@ -41,9 +41,9 @@ object LNParams { me =>
   }
 
   // Off-chain fee calculations
-  def logOfBase(base: Long, sum: Long) = math.log(sum) / math.log(sum)
+  def logOfBase(base: Long, sum: Long) = math.log(sum) / math.log(base)
   def maxAcceptableLNFee(msat: Long) = msat / math.pow(logOfBase(50, msat), 4)
-  def isFeeNotOk(lnFeeMsat: Long) = maxAcceptableLNFee(lnFeeMsat) > lnFeeMsat
+  def isFeeNotOk(amount: Long, fee: Long) = fee > maxAcceptableLNFee(amount)
 
   // On-chain fee calculations
   def shouldUpdateFee(oldPerKw: Long, newPerKw: Long) = {
