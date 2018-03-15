@@ -13,29 +13,35 @@ case class FinalIncorrectHtlcAmount(amountMsat: Long) extends FailureMessage
 
 sealed trait Perm extends FailureMessage
 sealed trait Node extends FailureMessage
-case object UnknownNextPeer extends Perm
-case object UnknownPaymentHash extends Perm
-case object IncorrectPaymentAmount extends Perm
-case object PermanentChannelFailure extends Perm
-case object RequiredChannelFeatureMissing extends Perm
-case object InvalidRealm extends Perm
+case object UnknownNextPeer extends Perm // exclude channel for 60 minutes, for all payments
+case object UnknownPaymentHash extends Perm // halt payment
+case object IncorrectPaymentAmount extends Perm // halt payment
+case object PermanentChannelFailure extends Perm // exclude channel for 60 minutes, for all payments
+case object RequiredChannelFeatureMissing extends Perm // exclude channel for 60 minutes, for all payments
+case object InvalidRealm extends Perm // halt payment
 
-case object TemporaryNodeFailure extends Node
-case object PermanentNodeFailure extends Perm with Node
-case object RequiredNodeFeatureMissing extends Perm with Node
+// shortChanIds drop 1 dropRight 1: exclude channels for 5 minutes, for target payment
+
+// resourceId, resourceType, targetNodeId, expiresAt, forAllPayments
+
+// SELECT resourceId, resourceType WHERE expiresAt > ? AND (forAllPayments = 1 OR targetNodeId = ?) ORDER BY id DESC LIMIT 250
+
+case object TemporaryNodeFailure extends Node // exclude node for 10 minutes, for all payments
+case object PermanentNodeFailure extends Perm with Node // exclude node for 60 minutes, for all payments
+case object RequiredNodeFeatureMissing extends Perm with Node // exclude node for 60 minutes, for all payments
 
 sealed trait BadOnion extends FailureMessage { def onionHash: BinaryData }
-case class InvalidOnionVersion(onionHash: BinaryData) extends BadOnion with Perm
-case class InvalidOnionHmac(onionHash: BinaryData) extends BadOnion with Perm
-case class InvalidOnionKey(onionHash: BinaryData) extends BadOnion with Perm
+case class InvalidOnionVersion(onionHash: BinaryData) extends BadOnion with Perm // halt payment
+case class InvalidOnionHmac(onionHash: BinaryData) extends BadOnion with Perm // halt payment
+case class InvalidOnionKey(onionHash: BinaryData) extends BadOnion with Perm // halt payment
 
 sealed trait Update extends FailureMessage { def update: ChannelUpdate }
-case class AmountBelowMinimum(amountMsat: Long, update: ChannelUpdate) extends Update
-case class ChannelDisabled(flags: BinaryData, update: ChannelUpdate) extends Update
-case class FeeInsufficient(amountMsat: Long, update: ChannelUpdate) extends Update
-case class IncorrectCltvExpiry(expiry: Long, update: ChannelUpdate) extends Update
-case class TemporaryChannelFailure(update: ChannelUpdate) extends Update
-case class ExpiryTooSoon(update: ChannelUpdate) extends Update
+case class AmountBelowMinimum(amountMsat: Long, update: ChannelUpdate) extends Update // halt payment
+case class ChannelDisabled(flags: BinaryData, update: ChannelUpdate) extends Update // exclude channel for 10 minutes, for all payments
+case class FeeInsufficient(amountMsat: Long, update: ChannelUpdate) extends Update // halt payment
+case class IncorrectCltvExpiry(expiry: Long, update: ChannelUpdate) extends Update // halt payment
+case class TemporaryChannelFailure(update: ChannelUpdate) extends Update // exclude channel for 10 minutes, for target payment
+case class ExpiryTooSoon(update: ChannelUpdate) extends Update // halt payment
 
 object FailureMessageCodecs {
   private val sha256Codec = binarydata(32) withContext "sha256Codec"

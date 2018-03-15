@@ -6,16 +6,14 @@ import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.LNParams.broadcaster.getStatus
-import android.widget.RadioGroup.OnCheckedChangeListener
-import info.hoang8f.android.segmented.SegmentedGroup
 import com.lightning.wallet.ln.LNParams.DepthAndDead
 import me.relex.circleindicator.CircleIndicator
 import fr.acinq.bitcoin.MilliSatoshi
+import android.widget.Button
 import android.os.Bundle
 import java.util.Date
 
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
-import android.widget.{Button, RadioButton, RadioGroup}
 import android.view.{LayoutInflater, View, ViewGroup}
 import com.lightning.wallet.ln.Tools.{none, wrap}
 
@@ -23,15 +21,12 @@ import com.lightning.wallet.ln.Tools.{none, wrap}
 class LNOpsActivity extends TimerActivity { me =>
   lazy val chanPager = findViewById(R.id.chanPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
-  lazy val viewFilter = findViewById(R.id.viewFilter).asInstanceOf[SegmentedGroup]
-  lazy val typeAlive = findViewById(R.id.typeAlive).asInstanceOf[RadioButton]
-  lazy val typeAll = findViewById(R.id.typeAll).asInstanceOf[RadioButton]
-  var cachedDisplayedChannels = Vector.empty[Channel]
+  lazy val localChanCache = for (c <- app.ChannelManager.all if c.state != Channel.REFUNDING) yield c
 
   val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
       def getItem(itemPosition: Int) = bundledFrag(itemPosition)
-      def getCount = cachedDisplayedChannels.size
+      def getCount = localChanCache.size
     }
 
   def bundledFrag(pos: Int) = {
@@ -42,29 +37,10 @@ class LNOpsActivity extends TimerActivity { me =>
     frag
   }
 
-  def updateCountView = {
-    typeAlive setText getString(ln_ops_type_alive).format(app.ChannelManager.notClosingOrRefunding.size).html
-    typeAll setText getString(ln_ops_type_all).format(app.ChannelManager.notRefunding.size).html
-  }
-
-  def reloadCacheAndView = {
-    val aliveOnly = viewFilter.getCheckedRadioButtonId == R.id.typeAlive
-    app.prefs.edit.putBoolean(AbstractKit.CHAN_VIEW_ALIVE_ONLY, aliveOnly).commit
-    if (aliveOnly) cachedDisplayedChannels = app.ChannelManager.notClosingOrRefunding
-    else cachedDisplayedChannels = app.ChannelManager.notRefunding
-    chanPager setAdapter slidingFragmentAdapter
-    chanPagerIndicator setViewPager chanPager
-    updateCountView
-  }
-
   def INIT(s: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_ln_ops)
-    viewFilter setOnCheckedChangeListener new OnCheckedChangeListener {
-      def onCheckedChanged(rg: RadioGroup, int: Int) = reloadCacheAndView
-    }
-
-    val aliveOnly = app.prefs.getBoolean(AbstractKit.CHAN_VIEW_ALIVE_ONLY, true)
-    if (aliveOnly) viewFilter check R.id.typeAlive else viewFilter check R.id.typeAll
+    chanPager setAdapter slidingFragmentAdapter
+    chanPagerIndicator setViewPager chanPager
   } else me exitTo classOf[MainActivity]
 }
 
@@ -86,6 +62,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
   lazy val refundStatus = getString(ln_ops_chan_refund_status)
   lazy val amountStatus = getString(ln_ops_chan_amount_status)
   lazy val commitStatus = getString(ln_ops_chan_commit_status)
+  lazy val nothingYet = getString(ln_ops_chan_receive_wait)
 
   val humanStatus: DepthAndDead => String = {
     case cfs \ false => app.plurOrZero(txsConfs, cfs)
@@ -99,7 +76,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
   override def onViewCreated(view: View, state: Bundle) = {
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
     val lnOpsDescription = Utils clickableTextField view.findViewById(R.id.lnOpsDescription)
-    val chan = host.cachedDisplayedChannels(getArguments getInt "position")
+
+    val chan = host.localChanCache(getArguments getInt "position")
+    val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
     val started = me time new Date(chan(_.startedAt).get)
     val capacity = chan(_.commitInput.txOut.amount).get
     val alias = chan.data.announce.alias take 64
@@ -119,11 +98,10 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
     def manageFunding(wait: WaitFundingDoneData) = UITask {
       val fundingTxId = Commitments fundingTxid wait.commitments
-      val openStatus = humanStatus(LNParams.broadcaster getStatus fundingTxId)
       val threshold = math.max(wait.commitments.remoteParams.minimumDepth, LNParams.minDepth)
-      lnOpsDescription setText getString(ln_ops_chan_opening).format(chan.state, started,
-        coloredIn(capacity), app.plurOrZero(txsConfs, threshold), alias,
-        fundingTxId.toString, openStatus).html
+      lnOpsDescription setText getString(ln_ops_chan_opening).format(chan.state, alias, started,
+        coloredIn(capacity), app.plurOrZero(txsConfs, threshold), fundingTxId.toString,
+        humanStatus(LNParams.broadcaster getStatus fundingTxId), nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -131,21 +109,15 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageOpen = UITask {
-      val canReceiveMsat = estimateCanReceive(chan)
-      val canSpendMsat = estimateTotalCanSend(chan)
-      val canReceive = MilliSatoshi(canReceiveMsat)
-      val canSpend = MilliSatoshi(canSpendMsat)
+      val canReceive = MilliSatoshi apply estimateCanReceive(chan)
+      val canSpend = MilliSatoshi apply estimateTotalCanSend(chan)
 
-      val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
-      val canSpendHuman = if (canSpendMsat < 0L) coloredOut(canSpend) else coloredIn(canSpend)
-
-      val receiveNothingYet = sumOut format getString(ln_ops_chan_receive_wait)
-      val canReceiveHuman = if (canReceiveMsat < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-      val canReceiveFinal = if (channelAndHop(chan).isDefined) canReceiveHuman else receiveNothingYet
-
-      lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, started,
-        coloredIn(capacity), canSpendHuman, canReceiveFinal, alias, inFlight, nodeId).html
+      val canSpendHuman = if (canSpend.amount < 0L) coloredOut(canSpend) else coloredIn(canSpend)
+      val canReceiveHuman = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
+      val canReceiveFinal = if (channelAndHop(chan).isDefined) canReceiveHuman else sumOut format nothingYet
+      lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, alias, started,
+        coloredIn(capacity), canSpendHuman, canReceiveFinal, inFlight, nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -155,8 +127,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageNegotiations = UITask {
       val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
-      lnOpsDescription setText negotiations.format(chan.state, started, coloredIn(capacity),
-        coloredIn(refundable), alias, inFlight).html
+      lnOpsDescription setText negotiations.format(chan.state, alias, started,
+        coloredIn(capacity), coloredIn(refundable), inFlight).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -168,8 +140,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       // since multiple different closings may be present at once
       val closed = me time new Date(close.closedAt)
       lnOpsAction setVisibility View.GONE
-      // If alive becomes closing
-      host.updateCountView
 
       val best = close.closings maxBy {
         case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ _ => cfs }
@@ -182,8 +152,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           val myFee = coloredOut(capacity - mutualTx.allOutputsAmount)
           val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
           val mutualView = commitStatus.format(mutualTx.txid.toString, status, myFee)
-          lnOpsDescription setText bilateralClosing.format(chan.state, started, closed,
-            coloredIn(capacity), coloredIn(refundable), alias, mutualView).html
+          lnOpsDescription setText bilateralClosing.format(chan.state, alias, started,
+            closed, coloredIn(capacity), coloredIn(refundable), mutualView).html
 
         case Right(info) =>
           val tier12View = info.getState collect {
@@ -210,7 +180,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
           val refundsView = if (tier12View.isEmpty) new String else refundStatus + tier12View
           lnOpsDescription setText unilateralClosing.format(chan.state, getStartedBy(close),
-            started, closed, coloredIn(capacity), alias, commitView + refundsView).html
+            alias, started, closed, coloredIn(capacity), commitView + refundsView).html
       }
     }
 

@@ -31,10 +31,10 @@ trait ViewSwitch {
 }
 
 object FingerPassCode {
-  def exists = app.prefs.contains(AbstractKit.ENCRYPTED_PASSCODE)
-  def erase = app.prefs.edit.remove(AbstractKit.ENCRYPTED_PASSCODE).commit
-  def record(base64: String) = app.prefs.edit.putString(AbstractKit.ENCRYPTED_PASSCODE, base64).commit
-  def get = app.prefs.getString(AbstractKit.ENCRYPTED_PASSCODE, "No encrypted passcode exists here")
+  def exists = app.prefs.contains(AbstractKit.ENC_PASSCODE)
+  def erase = app.prefs.edit.remove(AbstractKit.ENC_PASSCODE).commit
+  def record(base64: String) = app.prefs.edit.putString(AbstractKit.ENC_PASSCODE, base64).commit
+  def get = app.prefs.getString(AbstractKit.ENC_PASSCODE, "No encrypted passcode exists here")
 
   def informUser(w: Warning) = w match {
     case Warning.DIRTY => app toast fp_err_dirty

@@ -127,7 +127,6 @@ class WalletApp extends Application { me =>
     def fromNode(of: ChannelVec, ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
     def canSend(amount: Long) = for (c <- all if isOperationalOpen(c) && estimateCanSend(c) > amount) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
-    def notRefunding = for (c <- all if c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
     def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)
