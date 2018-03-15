@@ -41,6 +41,7 @@ object LNParams { me =>
   }
 
   // Off-chain fee calculations
+  // This is the max allowed upper bound for payee to not get screwed
   def logOfBase(base: Long, sum: Long) = math.log(sum) / math.log(base)
   def maxAcceptableLNFee(msat: Long) = msat / math.pow(logOfBase(50, msat), 4)
   def isFeeNotOk(amount: Long, fee: Long) = fee > maxAcceptableLNFee(amount)
