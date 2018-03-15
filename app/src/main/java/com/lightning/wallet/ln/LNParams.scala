@@ -14,8 +14,8 @@ object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
   val maxChannelCapacity = MilliSatoshi(16777216000L)
   val maxHtlcValue = MilliSatoshi(4194304000L)
-  val minHtlcValue = MilliSatoshi(1000L)
-  val dustLimit = Satoshi(573L)
+  val minHtlcValue = MilliSatoshi(10L)
+  val dustLimit = Satoshi(30000L)
 
   val chainHash = Block.TestnetGenesisBlock.hash
   val theirReserveToFundingRatio = 100
@@ -40,8 +40,12 @@ object LNParams { me =>
     extendedCloudKey = derivePrivateKey(m, hardened(92) :: hardened(0) :: Nil)
   }
 
-  // FEE RELATED
-  def isFeeNotOk(lnFeeMsat: Long) = lnFeeMsat > 50000000
+  // Off-chain fee calculations
+  def logOfBase(base: Long, sum: Long) = math.log(sum) / math.log(sum)
+  def maxAcceptableLNFee(msat: Long) = msat / math.pow(logOfBase(50, msat), 4)
+  def isFeeNotOk(lnFeeMsat: Long) = maxAcceptableLNFee(lnFeeMsat) > lnFeeMsat
+
+  // On-chain fee calculations
   def shouldUpdateFee(oldPerKw: Long, newPerKw: Long) = {
     val mismatch = (newPerKw - oldPerKw) / (oldPerKw + newPerKw)
     math.abs(2.0 * mismatch) > 0.25
