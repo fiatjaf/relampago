@@ -197,57 +197,57 @@ class WalletApp extends Application { me =>
       }
     }
 
-    def withRoutesAndOnionRPI(rpi: RuntimePaymentInfo) = {
-      val isFrozen = frozenInFlightHashes.contains(rpi.pr.paymentHash)
+    def withRoutesAndOnionRD(rd: RoutingData) = {
+      val isFrozen = frozenInFlightHashes.contains(rd.pr.paymentHash)
       if (isFrozen) Obs error new LightningException(me getString err_ln_frozen)
-      else withRoutesAndOnionRPIFrozenAllowed(rpi)
+      else withRoutesAndOnionRDFrozenAllowed(rd)
     }
 
-    def withRoutesAndOnionRPIFrozenAllowed(rpi: RuntimePaymentInfo) = {
-      val sources = canSend(rpi.firstMsat).map(_.data.announce.nodeId).toSet
-      val paymentRecordOpt = bag.getPaymentInfo(rpi.pr.paymentHash).toOption
-      val isFulfilled = paymentRecordOpt.exists(_.actualStatus == SUCCESS)
-      val isInFlight = activeInFlightHashes.contains(rpi.pr.paymentHash)
+    def withRoutesAndOnionRDFrozenAllowed(rd: RoutingData) = {
+      val isInFlight = activeInFlightHashes.contains(rd.pr.paymentHash)
+      val isFulfilled = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
+      val peerNodesSet = canSend(rd.firstMsat).map(_.data.announce.nodeId).toSet
 
       if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
-      else if (isFulfilled) Obs error new LightningException(me getString err_ln_fulfilled)
-      else if (sources.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      else if (broadcaster.bestHeightObtained) addRoutesAndOnion(sources, rpi)
+      else if (isFulfilled.isSuccess) Obs error new LightningException(me getString err_ln_fulfilled)
+      else if (peerNodesSet.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
+      else if (broadcaster.bestHeightObtained) addRoutesAndOnion(peerNodesSet, rd)
       else Obs error new LightningException(me getString dialog_chain_behind)
     }
 
-    def addRoutesAndOnion(sources: Set[PublicKey], rpi: RuntimePaymentInfo) = {
-      def findRemoteRoutes(targetNodeId: PublicKey) = OlympusWrap.findRoutes(rpi.rd, sources, targetNodeId)
+    def addRoutesAndOnion(peers: Set[PublicKey], rd: RoutingData) = {
+      def findRemoteRoutes(targetNodeId: PublicKey) = BadEntityWrap.findRoutes(peers, targetNodeId.toString)
       // If source node contains target node then we are paying directly to our peer, otherwise fetch additional payment routes
-      def getRoutes(target: PublicKey) = if (sources contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
+      def getRoutes(target: PublicKey) = if (peers contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
 
       def withExtraPart = for {
-        tag: RoutingInfoTag <- Obs from rpi.pr.routingInfo
+        tag: RoutingInfoTag <- Obs from rd.pr.routingInfo
         partialRoutes: PaymentRouteVec <- getRoutes(tag.route.head.nodeId)
         completeRoutes = partialRoutes.map(public => public ++ tag.route)
       } yield Obs just completeRoutes
 
-      // If payment request contains extra routing info then we ask for assisted routes, otherwise we directly ask for recipient id
-      val routesObs = if (rpi.pr.routingInfo.isEmpty) getRoutes(rpi.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
-      // Update RPI with routes and then we can make an onion out of the first available shortest route while saving the rest
-      for (routes <- routesObs) yield useFirstRoute(routes.sortBy(_.size), rpi)
+      // If payment request contains extra routing info then we ask for assisted routes, otherwise we directly ask for payee id
+      val routesObs = if (rd.pr.routingInfo.isEmpty) getRoutes(rd.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
+      // Update RD with routes and then we can make an onion out of the first available cheapest route while saving the rest
+      // remote call may return empty route here in which case `noRouteLeft` will be fired later
+      for (routes <- routesObs) yield useFirstRoute(routes, rd)
     }
 
-    def send(rpi: RuntimePaymentInfo, noRouteLeft: RuntimePaymentInfo => Unit): Unit = {
-      // Find a local channel which has enough funds, is online and belongs to a correct node
+    def send(rd: RoutingData, noRouteLeft: RoutingData => Unit): Unit = {
+      // Find a local channel which has enough funds, is online and belongs to a correct peer
       // empty used route means we're sending to our peer and should use it's nodeId as a target
-      val target = if (rpi.rd.usedRoute.isEmpty) rpi.pr.nodeId else rpi.rd.usedRoute.head.nodeId
-      val channelOpt = canSend(rpi.firstMsat).find(_.data.announce.nodeId == target)
+      val target = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
+      val channelOpt = canSend(rd.firstMsat).find(_.data.announce.nodeId == target)
 
       channelOpt match {
-        case Some(targetChannel) => targetChannel process rpi
-        case None => sendEither(useRoutesLeft(rpi), noRouteLeft)
+        case Some(targetChannel) => targetChannel process rd
+        case None => sendEither(useRoutesLeft(rd), noRouteLeft)
       }
     }
 
-    def sendEither(foeRPI: FullOrEmptyRPI, noRouteLeft: RuntimePaymentInfo => Unit) = foeRPI match {
-      case Right(rpiWithValidPaymentRoutePresent) => send(rpiWithValidPaymentRoutePresent, noRouteLeft)
-      case Left(rpiWithEmptyPaymentRoute) => noRouteLeft(rpiWithEmptyPaymentRoute)
+    def sendEither(foeRD: FullOrEmptyRD, noRouteLeft: RoutingData => Unit) = foeRD match {
+      case Right(rdValidPaymentRoutePresent) => send(rdValidPaymentRoutePresent, noRouteLeft)
+      case Left(rdEmptyPaymentRoute) => noRouteLeft(rdEmptyPaymentRoute)
     }
   }
 

@@ -228,16 +228,16 @@ object Commitments {
     } yield htlcIn.add
   }
 
-  def sendAdd(c: Commitments, rpi: RuntimePaymentInfo) =
-    if (rpi.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddExcept(rpi, ERR_REMOTE_AMOUNT_LOW)
-    else if (rpi.firstMsat > maxHtlcValue.amount) throw CMDAddExcept(rpi, ERR_AMOUNT_OVERFLOW)
-    else if (rpi.pr.paymentHash.size != 32) throw CMDAddExcept(rpi, ERR_FAILED)
+  def sendAdd(c: Commitments, rd: RoutingData) =
+    if (rd.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddExcept(rd, ERR_REMOTE_AMOUNT_LOW)
+    else if (rd.firstMsat > maxHtlcValue.amount) throw CMDAddExcept(rd, ERR_AMOUNT_OVERFLOW)
+    else if (rd.pr.paymentHash.size != 32) throw CMDAddExcept(rd, ERR_FAILED)
     else {
 
       // Let's compute the current commitment
       // *as seen by them* with this change taken into account
-      val add = UpdateAddHtlc(c.channelId, c.localNextHtlcId, rpi.rd.lastMsat,
-        rpi.pr.paymentHash, rpi.rd.lastExpiry, rpi.rd.onion.packet.serialize)
+      val add = UpdateAddHtlc(c.channelId, c.localNextHtlcId, rd.lastMsat,
+        rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet.serialize)
 
       val c1 = addLocalProposal(c, add).modify(_.localNextHtlcId).using(_ + 1)
       val reduced = CommitmentSpec.reduce(latestRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
@@ -251,9 +251,9 @@ object Commitments {
       val missingSat = reduced.toRemoteMsat / 1000L - reserveWithTxFeeSat
 
       // We should both check if WE can send another HTLC and if PEER can accept another HTLC
-      if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddExcept(rpi, ERR_TOO_MANY_HTLC)
-      if (outgoing.size > maxAllowedHtlcs | incoming.size > maxAllowedHtlcs) throw CMDAddExcept(rpi, ERR_TOO_MANY_HTLC)
-      if (missingSat < 0L) throw CMDReserveExcept(rpi, missingSat, reserveWithTxFeeSat)
+      if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddExcept(rd, ERR_TOO_MANY_HTLC)
+      if (outgoing.size > maxAllowedHtlcs | incoming.size > maxAllowedHtlcs) throw CMDAddExcept(rd, ERR_TOO_MANY_HTLC)
+      if (missingSat < 0L) throw CMDReserveExcept(rd, missingSat, reserveWithTxFeeSat)
       c1 -> add
     }
 

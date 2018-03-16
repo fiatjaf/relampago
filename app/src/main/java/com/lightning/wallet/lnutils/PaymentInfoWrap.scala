@@ -144,14 +144,14 @@ object BadEntityWrap {
     db.change(BadEntityTable.newSql, resId, resType, targetNodeId,
       System.currentTimeMillis + span)
 
-  def findRoutes(from: Set[PublicKey], toPubKey: String) = {
+  def findRoutes(from: Set[PublicKey], recipientKey: String) = {
     def toResult(rc: RichCursor) = (rc string BadEntityTable.resType, rc string BadEntityTable.resId)
-    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, toPubKey)
+    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, recipientKey)
     val res = RichCursor(cursor) vec toResult
 
     val badNodes = res collect { case TYPE_NODE \ nodeId => nodeId }
     val badChans = res collect { case TYPE_CHAN \ shortId => shortId }
-    OlympusWrap.findRoutes(badNodes, badChans, from, toPubKey)
+    OlympusWrap.findRoutes(badNodes, badChans, from, recipientKey)
   }
 }
 

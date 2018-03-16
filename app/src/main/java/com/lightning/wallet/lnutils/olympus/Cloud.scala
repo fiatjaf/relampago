@@ -38,11 +38,11 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       // We are free AND backup is on AND (no tokens left OR few tokens left AND no acts left) AND a channel exists
       if isFree && isAuthEnabled && (tokens.isEmpty || actions.isEmpty && tokens.size < 5) && capableChannelExists =>
       // This guard will intercept the next branch only if we are not capable of sending or have nothing to send
-      me withFree retry(getFreshData, pickInc, 4 to 5) foreach { case rpi \ info1 =>
+      me withFree retry(getFreshData, pickInc, 4 to 5) foreach { case rd \ info =>
         // If requested sum is low enough and tokens quantity is high enough
         // and info has not already been set by another request
-        app.ChannelManager.send(rpi, none)
-        me BECOME data.copy(info = info1)
+        app.ChannelManager.send(rd, none)
+        me BECOME data.copy(info = info)
       }
 
     // Execute anyway if we are free and have available tokens and actions
@@ -71,10 +71,10 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
       def onError(err: Throwable) = err.getMessage match {
         case "notfulfilled" if pr.isFresh && capableChannelExists =>
-          val send = obsOnIO.flatMap(_ => me withRoutesAndOnionRPIFromPR pr)
-          me withFree retry(send, pickInc, 4 to 5) foreach { foeRPI =>
+          val send = obsOnIO.flatMap(_ => me withRoutesAndOnionRDFromPR pr)
+          me withFree retry(send, pickInc, 4 to 5) foreach { foeRD =>
             // Retry fresh request instead of getting a new one
-            app.ChannelManager.sendEither(foeRPI, none)
+            app.ChannelManager.sendEither(foeRD, none)
           }
 
         // Server can't find our tokens or request has expired
@@ -111,14 +111,12 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def getFreshData = for {
     prAndMemo @ (pr, memo) <- getPaymentRequestBlindMemo
     if pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
-    Right(rpi) <- withRoutesAndOnionRPIFromPR(pr)
-    info1 = Some(prAndMemo)
+    Right(rd) <- withRoutesAndOnionRDFromPR(pr)
+    info = Some(prAndMemo)
     if data.info.isEmpty
-  } yield rpi -> info1
+  } yield rd -> info
 
-  def withRoutesAndOnionRPIFromPR(pr: PaymentRequest) = {
-    val emptyRPI = RuntimePaymentInfo(emptyRD, pr, pr.unsafeMsat)
-    // These payments will always be dust so frozen is not an issue
-    app.ChannelManager withRoutesAndOnionRPIFrozenAllowed emptyRPI
-  }
+  def withRoutesAndOnionRDFromPR(pr: PaymentRequest) =
+    // These payments will always be dust so frozen state is not an issue
+    app.ChannelManager withRoutesAndOnionRDFrozenAllowed emptyRD(pr, pr.unsafeMsat)
 }

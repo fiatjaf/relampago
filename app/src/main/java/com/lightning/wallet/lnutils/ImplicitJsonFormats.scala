@@ -8,12 +8,10 @@ import com.lightning.wallet.lnutils.olympus.OlympusWrap._
 import com.lightning.wallet.ln.wire.LightningMessageCodecs._
 import com.lightning.wallet.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.wallet.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
-import com.lightning.wallet.ln.crypto.{Packet, SecretsAndPacket, ShaHashesWithIndex}
 import com.lightning.wallet.lnutils.olympus.{BlindMemo, BlindParam, CloudAct, CloudData}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
-import com.lightning.wallet.ln.RoutingInfoTag.PaymentRoute
-import com.lightning.wallet.ln.crypto.Sphinx.BytesAndKey
+import com.lightning.wallet.ln.crypto.ShaHashesWithIndex
 import com.lightning.wallet.ln.crypto.ShaChain.Index
 import com.lightning.wallet.ln.Tools.Bytes
 import fr.acinq.eclair.UInt64
@@ -117,16 +115,6 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     PaymentRequest](PaymentRequest.apply, "prefix", "amount", "timestamp", "nodeId", "tags", "signature")
 
   // Rest
-
-  implicit val packetFmt = jsonFormat[Bytes, Bytes, Bytes, Bytes,
-    Packet](Packet.apply, "v", "publicKey", "routingInfo", "hmac")
-
-  implicit val secretsAndPacketFmt = jsonFormat[Vector[BytesAndKey], Packet,
-    SecretsAndPacket](SecretsAndPacket.apply, "sharedSecrets", "packet")
-
-  implicit val routingDataFmt =
-    jsonFormat[Vector[PaymentRoute], PaymentRoute, Set[PublicKey], Set[Long], SecretsAndPacket, Long, Long,
-      RoutingData](RoutingData.apply, "routes", "usedRoute", "badNodes", "badChans", "onion", "lastMsat", "lastExpiry")
 
   implicit val ratesFmt = jsonFormat[Seq[Double], Fiat2Btc, Long,
     Rates](Rates.apply, "feeHistory", "exchange", "stamp")

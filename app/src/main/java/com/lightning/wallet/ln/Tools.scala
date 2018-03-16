@@ -55,10 +55,10 @@ object Features {
       bitset.get(OPTION_DATA_LOSS_PROTECT_MANDATORY)
 }
 
-case class CMDAddExcept(rpi: RuntimePaymentInfo, code: Int) extends CMDException
-case class CMDReserveExcept(rpi: RuntimePaymentInfo, missingSat: Long, reserveSat: Long) extends CMDException
+trait CMDException extends LightningException { val rd: RoutingData }
+case class CMDAddExcept(rd: RoutingData, code: Int) extends CMDException
+case class CMDReserveExcept(rd: RoutingData, missingSat: Long, reserveSat: Long) extends CMDException
 class LightningException(reason: String = "Something went wrong") extends RuntimeException(reason)
-trait CMDException extends LightningException { val rpi: RuntimePaymentInfo }
 
 // STATE MACHINE
 

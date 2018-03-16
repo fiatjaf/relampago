@@ -154,9 +154,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA norm.copy(commitments = c1)
 
 
-      // We can only send a new HTLC when channel is both operational and online
-      case (norm: NormalData, rpi: RuntimePaymentInfo, OPEN) if isOperational(me) =>
-        val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, rpi)
+      // We can send a new HTLC when channel is both operational and online
+      case (norm: NormalData, rd: RoutingData, OPEN) if isOperational(me) =>
+        val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, rd)
         me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
         doProcess(CMDProceed)
 

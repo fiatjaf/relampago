@@ -1,6 +1,7 @@
 package com.lightning.wallet.lnutils
 
 import spray.json._
+import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.ln.Tools.{none, random, runAnd}
 import com.lightning.wallet.lnutils.olympus.CloudData
@@ -48,6 +49,7 @@ object BadEntityTable extends Table {
   val (table, resId, resType, targetNodeId, expires) = ("badentity", "resid", "restype", "targetnodeid", "expires")
   val selectSql = s"SELECT * FROM $table WHERE $expires > ? AND $targetNodeId IN (?, ?) ORDER BY $id DESC LIMIT 250"
   val newSql = s"INSERT INTO $table ($resId, $resType, $targetNodeId, $expires) VALUES (?, ?, ?, ?)"
+  val multIndex = s"CREATE INDEX idx1 ON $table ($expires, $targetNodeId)"
 
   val createSql = s"""
     CREATE TABLE $table (
@@ -57,49 +59,45 @@ object BadEntityTable extends Table {
       $targetNodeId TEXT NOT NULL,
       $expires INTEGER NOT NULL
     );
-    CREATE INDEX idx1 ON $table ($expires, $targetNodeId);
+    $multIndex;
     COMMIT"""
 }
 
 object PaymentTable extends Table {
-  import com.lightning.wallet.ln.PaymentInfo.{HIDDEN, SUCCESS, FAILURE, WAITING}
-  val (table, hash, preimage, incoming, msat, status, stamp, description, pr, rd, search, limit) =
-    ("payment", "hash", "preimage", "incoming", "msat", "status", "stamp", "description", "pr", "rd", "search", 24)
+  val (search, limit) = ("search", 24)
+  val (table, pr, preimage, incoming, status, stamp) = ("payment", "pr", "preimage", "incoming", "status", "stamp")
+  val (description, hash, firstMsat, lastMsat, lastExpiry) = ("description", "hash", "firstMsat", "lastMsat", "lastExpiry")
+  val insert10 = s"$pr, $preimage, $incoming, $status, $stamp, $description, $hash, $firstMsat, $lastMsat, $lastExpiry"
+  val innerSearch = s"SELECT DISTINCT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit"
 
-  // Inserting
+  // Inserting, selecting
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
-  val insert9 = s"$hash, $preimage, $incoming, $msat, $status, $stamp, $description, $pr, $rd"
-  val newSql = s"INSERT OR IGNORE INTO $table ($insert9) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-
-  // Selecting
-  val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
+  val newSql = s"INSERT OR IGNORE INTO $table ($insert10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
-  val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT DISTINCT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
+  val searchSql = s"SELECT * FROM $table WHERE $hash IN ($innerSearch)"
+  val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
-  // Updating
-  val updRoutingSql = s"UPDATE $table SET $rd = ? WHERE $hash = ?"
+  // Updating, creating
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
+  val updLastSql = s"UPDATE $table SET $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
   val updFailAllWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
-  val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ? WHERE $hash = ?"
-  val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $msat = ?, $stamp = ? WHERE $hash = ?"
-
-  // Creating
-  val createVSql = s"""
-    CREATE VIRTUAL TABLE $fts$table
-    USING $fts($search, $hash)"""
+  val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ?, $stamp = ? WHERE $hash = ?"
+  val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ? WHERE $hash = ?"
+  val createVSql = s"CREATE VIRTUAL TABLE $fts$table USING $fts($search, $hash)"
 
   val createSql = s"""
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
-      $hash STRING UNIQUE NOT NULL,
+      $pr STRING NOT NULL,
       $preimage STRING NOT NULL,
       $incoming INTEGER NOT NULL,
-      $msat INTEGER NOT NULL,
       $status INTEGER NOT NULL,
       $stamp INTEGER NOT NULL,
       $description STRING NOT NULL,
-      $pr STRING NOT NULL,
-      $rd STRING NOT NULL
+      $hash STRING UNIQUE NOT NULL,
+      $firstMsat INTEGER NOT NULL,
+      $lastMsat INTEGER NOT NULL,
+      $lastExpiry INTEGER NOT NULL
     );
     CREATE INDEX idx1 ON $table ($status);
     CREATE INDEX idx2 ON $table ($hash);
