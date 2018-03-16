@@ -219,16 +219,16 @@ class WalletApp extends Application { me =>
     def addRoutesAndOnion(sources: Set[PublicKey], rpi: RuntimePaymentInfo) = {
       def findRemoteRoutes(targetNodeId: PublicKey) = OlympusWrap.findRoutes(rpi.rd, sources, targetNodeId)
       // If source node contains target node then we are paying directly to our peer, otherwise fetch additional payment routes
-      def findRoutes(target: PublicKey) = if (sources contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
+      def getRoutes(target: PublicKey) = if (sources contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
 
       def withExtraPart = for {
         tag: RoutingInfoTag <- Obs from rpi.pr.routingInfo
-        partialRoutes: PaymentRouteVec <- findRoutes(tag.route.head.nodeId)
+        partialRoutes: PaymentRouteVec <- getRoutes(tag.route.head.nodeId)
         completeRoutes = partialRoutes.map(public => public ++ tag.route)
       } yield Obs just completeRoutes
 
       // If payment request contains extra routing info then we ask for assisted routes, otherwise we directly ask for recipient id
-      val routesObs = if (rpi.pr.routingInfo.isEmpty) findRoutes(rpi.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
+      val routesObs = if (rpi.pr.routingInfo.isEmpty) getRoutes(rpi.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
       // Update RPI with routes and then we can make an onion out of the first available shortest route while saving the rest
       for (routes <- routesObs) yield useFirstRoute(routes.sortBy(_.size), rpi)
     }

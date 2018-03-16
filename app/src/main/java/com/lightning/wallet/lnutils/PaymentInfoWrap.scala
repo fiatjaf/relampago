@@ -9,12 +9,12 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-
 import com.lightning.wallet.lnutils.olympus.OlympusWrap.CMDStart
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.helper.RichCursor
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
+import fr.acinq.bitcoin.Crypto.PublicKey
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
@@ -120,6 +120,41 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 }
 
+object ChannelWrap {
+  def doPut(chanId: String, data: String) = db txWrap {
+    db.change(ChannelTable.newSql, params = chanId, data)
+    db.change(ChannelTable.updSql, params = data, chanId)
+  }
+
+  def put(data: HasCommitments) = {
+    val chanId = data.commitments.channelId
+    val chanBody = "1" + data.toJson.toString
+    doPut(chanId.toString, chanBody)
+  }
+
+  def get = {
+    // Supports simple versioning: 1 is prepended
+    val rc = RichCursor(db select ChannelTable.selectAllSql)
+    rc.vec(_ string ChannelTable.data substring 1) map to[HasCommitments]
+  }
+}
+
+object BadEntityWrap {
+  def put(resId: String, resType: String, targetNodeId: String, span: Long) =
+    db.change(BadEntityTable.newSql, resId, resType, targetNodeId,
+      System.currentTimeMillis + span)
+
+  def findRoutes(from: Set[PublicKey], toPubKey: String) = {
+    def toResult(rc: RichCursor) = (rc string BadEntityTable.resType, rc string BadEntityTable.resId)
+    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, toPubKey)
+    val res = RichCursor(cursor) vec toResult
+
+    val badNodes = res collect { case TYPE_NODE \ nodeId => nodeId }
+    val badChans = res collect { case TYPE_CHAN \ shortId => shortId }
+    OlympusWrap.findRoutes(badNodes, badChans, from, toPubKey)
+  }
+}
+
 object GossipCatcher extends ChannelListener {
   // Catch ChannelUpdates to enable funds receiving
 
@@ -144,24 +179,5 @@ object GossipCatcher extends ChannelListener {
       // Set a fresh update for this channel and process no further updates afterwards
       chan process upd.toHop(chan.data.announce.nodeId)
       chan.listeners -= GossipCatcher
-  }
-}
-
-object ChannelWrap {
-  def doPut(chanId: String, data: String) = db txWrap {
-    db.change(ChannelTable.newSql, params = chanId, data)
-    db.change(ChannelTable.updSql, params = data, chanId)
-  }
-
-  def put(data: HasCommitments) = {
-    val chanId = data.commitments.channelId
-    val chanBody = "1" + data.toJson.toString
-    doPut(chanId.toString, chanBody)
-  }
-
-  def get = {
-    // Supports simple versioning: 1 is prepended
-    val rc = RichCursor(db select ChannelTable.selectAllSql)
-    rc.vec(_ string ChannelTable.data substring 1) map to[HasCommitments]
   }
 }

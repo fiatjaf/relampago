@@ -18,7 +18,7 @@ object OlympusTable extends Table {
   val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
   val createSql = s"""
-    CREATE TABLE $table(
+    CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $identifier TEXT NOT NULL UNIQUE,
       $url TEXT NOT NULL UNIQUE,
@@ -30,26 +30,40 @@ object OlympusTable extends Table {
 }
 
 object ChannelTable extends Table {
-  val (table, identifier, data) = ("channel", "identifier", "data")
+  val Tuple3(table, identifier, data) = Tuple3("channel", "identifier", "data")
+  val newSql = s"INSERT OR IGNORE INTO $table ($identifier, $data) VALUES (?, ?)"
   val updSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
   val selectAllSql = s"SELECT * FROM $table ORDER BY $id DESC"
   val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
-  val newSql = s"""
-    INSERT OR IGNORE INTO $table
-    ($identifier, $data) VALUES (?, ?)"""
-
   val createSql = s"""
-    CREATE TABLE $table(
+    CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $identifier TEXT NOT NULL UNIQUE,
       $data TEXT NOT NULL
     )"""
 }
 
+object BadEntityTable extends Table {
+  val (table, resId, resType, targetNodeId, expires) = ("badentity", "resid", "restype", "targetnodeid", "expires")
+  val selectSql = s"SELECT * FROM $table WHERE $expires > ? AND $targetNodeId IN (?, ?) ORDER BY $id DESC LIMIT 250"
+  val newSql = s"INSERT INTO $table ($resId, $resType, $targetNodeId, $expires) VALUES (?, ?, ?, ?)"
+
+  val createSql = s"""
+    CREATE TABLE $table (
+      $id INTEGER PRIMARY KEY AUTOINCREMENT,
+      $resId TEXT NOT NULL,
+      $resType TEXT NOT NULL,
+      $targetNodeId TEXT NOT NULL,
+      $expires INTEGER NOT NULL
+    );
+    CREATE INDEX idx1 ON $table ($expires, $targetNodeId);
+    COMMIT"""
+}
+
 object PaymentTable extends Table {
   import com.lightning.wallet.ln.PaymentInfo.{HIDDEN, SUCCESS, FAILURE, WAITING}
-  val Tuple12(table, hash, preimage, incoming, msat, status, stamp, description, pr, rd, search, limit) =
+  val (table, hash, preimage, incoming, msat, status, stamp, description, pr, rd, search, limit) =
     ("payment", "hash", "preimage", "incoming", "msat", "status", "stamp", "description", "pr", "rd", "search", 24)
 
   // Inserting
@@ -75,7 +89,7 @@ object PaymentTable extends Table {
     USING $fts($search, $hash)"""
 
   val createSql = s"""
-    CREATE TABLE $table(
+    CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $hash STRING UNIQUE NOT NULL,
       $preimage STRING NOT NULL,
@@ -109,6 +123,7 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
   } finally base.endTransaction
 
   def onCreate(dbs: SQLiteDatabase) = {
+    dbs execSQL BadEntityTable.createSql
     dbs execSQL PaymentTable.createVSql
     dbs execSQL PaymentTable.createSql
     dbs execSQL ChannelTable.createSql
