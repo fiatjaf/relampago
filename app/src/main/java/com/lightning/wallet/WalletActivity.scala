@@ -449,7 +449,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         lazy val alert = showForm(bld.setMessage(recovery_info).create)
         alert
 
-        def recover: Unit = rm(alert) {
+        def recover: Unit = {
           OlympusWrap.getBackup(cloudId).foreach(backups => {
             // Decrypt channel recovery data upon successful call and put
             // them into an active channel list, then connect to peers

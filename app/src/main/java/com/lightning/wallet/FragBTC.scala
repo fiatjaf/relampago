@@ -278,11 +278,10 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     // See if CPFP can be applied
     val hasEnoughValue = wrap.valueDelta isGreaterThan RatesSaver.rates.feeLive
     val isStale = wrap.tx.getUpdateTime.getTime < System.currentTimeMillis - 60000
-    val canBoost = wrap.depth < 1 && !wrap.isDead && isStale && hasEnoughValue
 
-    lazy val dlg: Builder = mkChoiceDialog(none, rm(alert)(me boostIncoming wrap), dialog_ok, dialog_boost)
-    lazy val alert = if (canBoost) mkForm(dlg, header.html, lst) else mkForm(host negBld dialog_ok, header.html, lst)
-    alert
+    lazy val dlg: Builder = mkChoiceDialog(none, boostIncoming(wrap), dialog_ok, dialog_boost)
+    if (wrap.depth < 1 && !wrap.isDead && isStale && hasEnoughValue) mkForm(dlg, header.html, lst)
+    else mkForm(host negBld dialog_ok, header.html, lst)
   }
 
   toggler setOnClickListener onFastTap {

@@ -407,6 +407,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // HANDLE FUNDING SPENT
 
+
       case (RefundingData(announce, Some(remoteLatestPoint), commitments), CMDSpent(spendTx), REFUNDING)
         // GUARD: we have got a remote commit which we asked them to spend and we have their point
         if spendTx.txIn.exists(_.outPoint == commitments.commitInput.outPoint) =>

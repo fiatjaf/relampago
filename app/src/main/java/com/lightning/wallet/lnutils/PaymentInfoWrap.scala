@@ -9,28 +9,31 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import com.lightning.wallet.lnutils.olympus.OlympusWrap.CMDStart
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.helper.RichCursor
+import com.lightning.wallet.ln.Tools.runAnd
+import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
-import fr.acinq.bitcoin.Crypto.PublicKey
+import scala.collection.mutable
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def updateStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
-  def updateRouting(rpi: RuntimePaymentInfo) = db.change(PaymentTable.updRoutingSql, rpi.rd.toJson, rpi.pr.paymentHash)
   def updOkIncoming(u: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, u.amountMsat, System.currentTimeMillis, u.paymentHash)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, fulfill.paymentPreimage, fulfill.paymentHash)
   def getPaymentInfo(paymentHash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, paymentHash) headTry toPaymentInfo
-  def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
 
-  def toPaymentInfo(rc: RichCursor) = PaymentInfo(rawRd = rc string PaymentTable.rd, rawPr = rc string PaymentTable.pr,
-    preimage = rc string PaymentTable.preimage, incoming = rc int PaymentTable.incoming, firstMsat = rc long PaymentTable.msat,
-    status = rc int PaymentTable.status, stamp = rc long PaymentTable.stamp, description = rc string PaymentTable.description,
-    hash = rc string PaymentTable.hash)
+  def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
+  var pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
+
+  def toPaymentInfo(rc: RichCursor) =
+    PaymentInfo(rawPr = rc string PaymentTable.pr, preimage = rc string PaymentTable.preimage, incoming = rc int PaymentTable.incoming,
+      status = rc int PaymentTable.status, stamp = rc long PaymentTable.stamp, description = rc string PaymentTable.description,
+      hash = rc string PaymentTable.hash, firstMsat = rc long PaymentTable.firstMsat, lastMsat = rc long PaymentTable.lastMsat,
+      lastExpiry = rc long PaymentTable.lastExpiry)
 
   def markFailedAndFrozen = db txWrap {
     db change PaymentTable.updFailAllWaitingSql
@@ -38,26 +41,23 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     for (hash <- app.ChannelManager.frozenInFlightHashes) updateStatus(FROZEN, hash)
   }
 
-  def halt(rpi: RuntimePaymentInfo) = {
-    // This RPI has no routes but may have
-    // new black nodes or channs so save it
-    updateStatus(FAILURE, rpi.pr.paymentHash)
-    updateRouting(rpi)
+  def resend(reason: UpdateFailHtlc, hash: BinaryData) = {
+    val rdOpt = pendingPayments get hash orElse getPaymentInfo(hash).map(emptyRDFromInfo).toOption
+    val rd1BadEntitiesOpt = for (rd <- rdOpt) yield parseFailureCutRoutes(reason)(rd)
+
+    rd1BadEntitiesOpt match {
+      case Some(rd1 \ badEntities) =>
+        badEntities foreach BadEntityWrap.put.tupled
+
+      case None =>
+        updateStatus(FAILURE, hash)
+    }
   }
-
-  def resend(reason: UpdateFailHtlc, hash: BinaryData) = for {
-    // This payment attempt has failed so get saved routing data,
-    // cut affected routes, try to re-send if any routes still left
-
-    info <- getPaymentInfo(hash)
-    restoredRPI = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
-    updatedRPI = cutAffectedRoutes(fail = reason)(rpi = restoredRPI)
-  } app.ChannelManager.sendEither(useRoutesLeft(updatedRPI), halt)
 
   override def onError = {
     case (_, exc: CMDException) =>
       // Retry failures, also prevents shutdown
-      updateStatus(FAILURE, exc.rpi.pr.paymentHash)
+      updateStatus(FAILURE, exc.rd.pr.paymentHash)
       uiNotify
 
     case chan \ error =>
@@ -67,19 +67,21 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onProcess = {
-    case (_, _: NormalData, rpi: RuntimePaymentInfo) =>
-      // This may either be a new payment or an old payment retry attempt
+    case (_, _: NormalData, rd: RoutingData) =>
+      // This may be a new payment or an old payment retry attempt
       // so either insert or update should be executed successfully
 
       db txWrap {
-        updateRouting(rpi)
-        updateStatus(WAITING, rpi.pr.paymentHash)
-        db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.paymentHashString)
-        db.change(PaymentTable.newSql, rpi.paymentHashString, NOIMAGE, 0, rpi.firstMsat,
-          WAITING, System.currentTimeMillis, rpi.pr.description, rpi.pr.toJson, rpi.rd.toJson)
+        pendingPayments(rd.pr.paymentHash) = rd.copy(callsLeft = rd.callsLeft - 1)
+        db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
+        updateStatus(WAITING, rd.pr.paymentHash)
+
+        db.change(PaymentTable.newVirtualSql, rd.searchText, rd.paymentHashString, rd.paymentHashString)
+        db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
+          rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
       }
 
-      // UI update
+      // Display
       uiNotify
 
     case (chan, norm: NormalData, _: CommitSig) =>
@@ -96,11 +98,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       if (norm.commitments.localCommit.spec.fulfilled.nonEmpty) {
         // Let the cloud know since it may be waiting for a payment
         // also vibrate to let a user know that payment is fulfilled
-        OlympusWrap tellClouds CMDStart
+        OlympusWrap tellClouds OlympusWrap.CMDStart
         vibrate(lnSettled)
       }
 
-      // UI update
+      // Display
       uiNotify
 
     case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
@@ -116,7 +118,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
-      OlympusWrap tellClouds CMDStart
+      OlympusWrap tellClouds OlympusWrap.CMDStart
   }
 }
 
@@ -133,24 +135,26 @@ object ChannelWrap {
   }
 
   def get = {
-    // Supports simple versioning: 1 is prepended
     val rc = RichCursor(db select ChannelTable.selectAllSql)
-    rc.vec(_ string ChannelTable.data substring 1) map to[HasCommitments]
+    val res = rc.vec(_ string ChannelTable.data substring 1)
+    res map to[HasCommitments]
   }
 }
 
 object BadEntityWrap {
-  def put(resId: String, resType: String, targetNodeId: String, span: Long) =
-    db.change(BadEntityTable.newSql, resId, resType, targetNodeId,
-      System.currentTimeMillis + span)
+  type NodeIdOrShortChanId = Either[PublicKey, Long]
+  val put = (resource: NodeIdOrShortChanId, target: String, span: Long) => resource match {
+    case Left(nodeId) => db.change(BadEntityTable.newSql, nodeId.toString, TYPE_NODE, target, System.currentTimeMillis + span)
+    case Right(shortId) => db.change(BadEntityTable.newSql, shortId.toString, TYPE_CHAN, target, System.currentTimeMillis + span)
+  }
 
   def findRoutes(from: Set[PublicKey], recipientKey: String) = {
-    def toResult(rc: RichCursor) = (rc string BadEntityTable.resType, rc string BadEntityTable.resId)
+    def toResult(rc: RichCursor) = (rc string BadEntityTable.resId, rc string BadEntityTable.resType)
     val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, recipientKey)
     val res = RichCursor(cursor) vec toResult
 
-    val badNodes = res collect { case TYPE_NODE \ nodeId => nodeId }
-    val badChans = res collect { case TYPE_CHAN \ shortId => shortId }
+    val badNodes = res collect { case nodeId \ TYPE_NODE => nodeId }
+    val badChans = res collect { case shortId \ TYPE_CHAN => shortId }
     OlympusWrap.findRoutes(badNodes, badChans, from, recipientKey)
   }
 }

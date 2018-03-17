@@ -194,7 +194,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   def passWrap(title: CharSequence, fp: Boolean = true) = (next: String => Unit) => {
     val passNoSuggest = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
     val view \ field \ image = generatePromptView(passNoSuggest, secret_wallet, new PasswordTransformationMethod)
-    val dlg = mkChoiceDialog(ok = next(field.getText.toString), none, dialog_next, dialog_cancel)
+    val dlg = mkChoiceDialog(ok = next(field.getText.toString), no = none, dialog_next, dialog_cancel)
     val alert = mkForm(dlg, title, view)
 
     val gf = new Goldfinger.Builder(me).build

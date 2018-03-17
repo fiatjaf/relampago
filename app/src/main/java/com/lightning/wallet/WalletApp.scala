@@ -14,8 +14,6 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-
-import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
 import com.muddzdev.styleabletoastlibrary.StyleableToast
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
@@ -206,12 +204,12 @@ class WalletApp extends Application { me =>
     def withRoutesAndOnionRDFrozenAllowed(rd: RoutingData) = {
       val isInFlight = activeInFlightHashes.contains(rd.pr.paymentHash)
       val isFulfilled = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
-      val peerNodesSet = canSend(rd.firstMsat).map(_.data.announce.nodeId).toSet
+      val capablePeerNodes = canSend(rd.firstMsat).map(_.data.announce.nodeId).toSet
 
       if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
       else if (isFulfilled.isSuccess) Obs error new LightningException(me getString err_ln_fulfilled)
-      else if (peerNodesSet.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      else if (broadcaster.bestHeightObtained) addRoutesAndOnion(peerNodesSet, rd)
+      else if (capablePeerNodes.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
+      else if (broadcaster.bestHeightObtained) addRoutesAndOnion(capablePeerNodes, rd)
       else Obs error new LightningException(me getString dialog_chain_behind)
     }
 
@@ -221,9 +219,9 @@ class WalletApp extends Application { me =>
       def getRoutes(target: PublicKey) = if (peers contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
 
       def withExtraPart = for {
-        tag: RoutingInfoTag <- Obs from rd.pr.routingInfo
-        partialRoutes: PaymentRouteVec <- getRoutes(tag.route.head.nodeId)
-        completeRoutes = partialRoutes.map(public => public ++ tag.route)
+        tag <- Obs from rd.pr.routingInfo
+        partialRoutes <- getRoutes(tag.route.head.nodeId)
+        completeRoutes = partialRoutes.map(_ ++ tag.route)
       } yield Obs just completeRoutes
 
       // If payment request contains extra routing info then we ask for assisted routes, otherwise we directly ask for payee id

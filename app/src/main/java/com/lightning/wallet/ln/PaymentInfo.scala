@@ -38,6 +38,7 @@ object PaymentInfo {
     RoutingData(pr, Vector.empty, Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat, 0L, 0L, 4)
   }
 
+  def emptyRDFromInfo(info: PaymentInfo) = emptyRD(info.pr, info.firstMsat)
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
     makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
@@ -80,14 +81,14 @@ object PaymentInfo {
   }
 
   def without(rs: PaymentRouteVec, fn: Hop => Boolean) = rs.filterNot(_ exists fn)
-  def withoutChans(bad: Vector[Long], rd: RoutingData, targetNodeId: String, span: Long) = {
-    val toBan = for (shortChannelId <- bad) yield (shortChannelId, TYPE_CHAN, targetNodeId, span)
+  def withoutChans(bad: Vector[Long], rd: RoutingData, targetId: String, span: Long) = {
+    val toBan = for (shortChannelId <- bad) yield (Right apply shortChannelId, targetId, span)
     val routesWithoutBadChans = without(rd.routes, bad contains _.shortChannelId)
     rd.copy(routes = routesWithoutBadChans) -> toBan
   }
 
   def withoutNodes(bad: PublicKeyVec, rd: RoutingData, span: Long) = {
-    val toBan = for (nodeId <- bad) yield (nodeId, TYPE_NODE, TARGET_ALL, span)
+    val toBan = for (nodeId <- bad) yield (Left apply nodeId, TARGET_ALL, span)
     val routesWithoutBadNodes = without(rd.routes, bad contains _.nodeId)
     rd.copy(routes = routesWithoutBadNodes) -> toBan
   }
@@ -103,25 +104,25 @@ object PaymentInfo {
     parsed map {
       case ErrorPacket(nodeKey, cd: ChannelDisabled) =>
         val isNodeHonest = Announcements.checkSig(cd.update, nodeKey)
-        if (!isNodeHonest) withoutNodes(bad = Vector(nodeKey), rd, 7200000)
-        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 600000)
+        if (!isNodeHonest) withoutNodes(bad = Vector(nodeKey), rd, 86400 * 1000)
+        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 600 * 1000)
 
       case ErrorPacket(nodeKey, tf: TemporaryChannelFailure) =>
         val isNodeHonest = Announcements.checkSig(tf.update, nodeKey)
-        if (!isNodeHonest) withoutNodes(bad = Vector(nodeKey), rd, 7200000)
+        if (!isNodeHonest) withoutNodes(bad = Vector(nodeKey), rd, 86400 * 1000)
         else withoutChans(Vector(tf.update.shortChannelId), rd,
-          rd.pr.nodeId.toString, 600000)
+          rd.pr.nodeId.toString, 600 * 1000)
 
-      case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNodes(Vector(nodeKey), rd, 600000)
-      case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 7200000)
-      case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 7200000)
-      case ErrorPacket(nKey, UnknownNextPeer) => withoutChanOrNode(nKey, rd, 7200000, 300000)
-      case ErrorPacket(nKey, _) => withoutChanOrNode(nKey, rd, 300000, 300000)
+      case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNodes(Vector(nodeKey), rd, 600 * 1000)
+      case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
+      case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
+      case ErrorPacket(nKey, UnknownNextPeer) => withoutChanOrNode(nKey, rd, 86400 * 1000, 60 * 1000)
+      case ErrorPacket(nKey, _) => withoutChanOrNode(nKey, rd, 300 * 1000, 120 * 1000)
 
     } getOrElse {
       val shortChanIds = rd.usedRoute.map(_.shortChannelId)
       withoutChans(shortChanIds drop 1 dropRight 1, rd,
-        rd.pr.nodeId.toString, 300000)
+        rd.pr.nodeId.toString, 120 * 1000)
     }
   }
 
@@ -164,10 +165,13 @@ object PaymentInfo {
 
 case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv: Long)
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
-                       onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long,
-                       lastExpiry: Long, callsLeft: Int)
+                       onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long, lastExpiry: Long,
+                       callsLeft: Int) {
 
-// PaymentInfo is constructed directly from database
+  lazy val paymentHashString = pr.paymentHash.toString
+  lazy val searchText = s"${pr.description} $paymentHashString"
+}
+
 case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int,
                        stamp: Long, description: String, hash: String, firstMsat: Long,
                        lastMsat: Long, lastExpiry: Long) {
@@ -187,7 +191,6 @@ case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, statu
 
 trait PaymentInfoBag { me =>
   def getPaymentInfo(hash: BinaryData): Try[PaymentInfo]
-  def updateLast(lastMsat: Long, lastExpiry: Long, hash: BinaryData)
   def updateStatus(paymentStatus: Int, hash: BinaryData)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc)
   def updOkIncoming(add: UpdateAddHtlc)

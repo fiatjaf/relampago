@@ -129,7 +129,7 @@ object Helpers { me =>
 
       val allTimeoutTxs = for {
         HtlcTxAndSigs(info: HtlcTimeoutTx, localSig, remoteSig) <- commitments.localCommit.htlcTxsAndSigs
-        timeout = Scripts.addSigs(info, localSig, remoteSig)
+        timeout = Scripts.addSigs(htlcTimeoutTx = info, localSig, remoteSig)
 
         // First transaction has CLTV timeout, subsequent one has CSV timeout
         delayedClaim <- Scripts checkSpendable makeClaimDelayedOutput(timeout.tx)

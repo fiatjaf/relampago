@@ -68,13 +68,14 @@ object PaymentTable extends Table {
   val (table, pr, preimage, incoming, status, stamp) = ("payment", "pr", "preimage", "incoming", "status", "stamp")
   val (description, hash, firstMsat, lastMsat, lastExpiry) = ("description", "hash", "firstMsat", "lastMsat", "lastExpiry")
   val insert10 = s"$pr, $preimage, $incoming, $status, $stamp, $description, $hash, $firstMsat, $lastMsat, $lastExpiry"
-  val innerSearch = s"SELECT DISTINCT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit"
+  val searchInner = s"SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit"
+  val searchGuard = s"SELECT 1 FROM $fts$table WHERE $hash = ?"
 
   // Inserting, selecting
-  val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
   val newSql = s"INSERT OR IGNORE INTO $table ($insert10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?) WHERE NOT EXISTS ($searchGuard)"
   val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
-  val searchSql = s"SELECT * FROM $table WHERE $hash IN ($innerSearch)"
+  val searchSql = s"SELECT * FROM $table WHERE $hash IN ($searchInner)"
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
   // Updating, creating
