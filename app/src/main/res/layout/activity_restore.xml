@@ -19,7 +19,7 @@
             android:layout_width="wrap_content"/>
 
         <com.hootsuite.nachos.NachoTextView
-            app:chipTextColor="@color/white"
+            app:chipTextColor="@android:color/white"
             app:chipVerticalSpacing="2dp"
             app:chipBackground="#656565"
             app:chipTextSize="18sp"
