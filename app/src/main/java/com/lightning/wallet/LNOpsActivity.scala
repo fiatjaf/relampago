@@ -19,6 +19,8 @@ import com.lightning.wallet.ln.Tools.{none, wrap}
 
 
 class LNOpsActivity extends TimerActivity { me =>
+  def resetIndicator = UITask(chanPagerIndicator setViewPager chanPager)
+  def INIT(s: Bundle) = if (app.isAlive) fillViewPager else me exitTo classOf[MainActivity]
   lazy val chanPager = findViewById(R.id.chanPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
   lazy val localChanCache = for (c <- app.ChannelManager.all if c.state != REFUNDING) yield c
@@ -45,20 +47,12 @@ class LNOpsActivity extends TimerActivity { me =>
     frag
   }
 
-  def resetIndicator = UITask {
-    chanPager setAdapter slidingFragmentAdapter
-    chanPagerIndicator setViewPager chanPager
-  }
-
   def fillViewPager = {
     setContentView(R.layout.activity_ln_ops)
     chanPagerIndicator.colorProvider = colors
+    chanPager setAdapter slidingFragmentAdapter
     resetIndicator.run
   }
-
-  def INIT(s: Bundle) =
-    if (app.isAlive) fillViewPager
-    else me exitTo classOf[MainActivity]
 }
 
 class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
