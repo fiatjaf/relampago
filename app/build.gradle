@@ -54,6 +54,5 @@ dependencies {
     compile 'com.hootsuite.android:nachos:1.1.1'
     compile 'com.muddzdev:styleabletoast:2.0.1'
     compile 'io.reactivex:rxscala_2.11:0.26.5'
-    compile 'me.relex:circleindicator:1.2.2'
     compile 'com.github.clans:fab:1.6.4'
 }

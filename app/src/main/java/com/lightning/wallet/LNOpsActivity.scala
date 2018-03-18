@@ -1,13 +1,13 @@
 package com.lightning.wallet
 
 import com.lightning.wallet.ln._
+import me.relex.circleindicator._
 import com.lightning.wallet.Utils._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.LNParams.broadcaster.getStatus
 import com.lightning.wallet.ln.LNParams.DepthAndDead
-import me.relex.circleindicator.CircleIndicator
 import fr.acinq.bitcoin.MilliSatoshi
 import android.widget.Button
 import android.os.Bundle
@@ -21,13 +21,21 @@ import com.lightning.wallet.ln.Tools.{none, wrap}
 class LNOpsActivity extends TimerActivity { me =>
   lazy val chanPager = findViewById(R.id.chanPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
-  lazy val localChanCache = for (c <- app.ChannelManager.all if c.state != Channel.REFUNDING) yield c
+  lazy val localChanCache = for (c <- app.ChannelManager.all if c.state != REFUNDING) yield c
 
   val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
       def getItem(itemPosition: Int) = bundledFrag(itemPosition)
       def getCount = localChanCache.size
     }
+
+  val colors = new IndicatorColorProvider {
+    def getColor(position: Int) = localChanCache(position) match {
+      case channel if isOperational(channel) => R.drawable.green_radius
+      case channel if isOpening(channel) => R.drawable.yellow_radius
+      case _ => R.drawable.white_radius
+    }
+  }
 
   def bundledFrag(pos: Int) = {
     val frag = new ChanDetailsFrag
@@ -37,11 +45,20 @@ class LNOpsActivity extends TimerActivity { me =>
     frag
   }
 
-  def INIT(s: Bundle) = if (app.isAlive) {
-    setContentView(R.layout.activity_ln_ops)
+  def resetIndicator = UITask {
     chanPager setAdapter slidingFragmentAdapter
     chanPagerIndicator setViewPager chanPager
-  } else me exitTo classOf[MainActivity]
+  }
+
+  def fillViewPager = {
+    setContentView(R.layout.activity_ln_ops)
+    chanPagerIndicator.colorProvider = colors
+    resetIndicator.run
+  }
+
+  def INIT(s: Bundle) =
+    if (app.isAlive) fillViewPager
+    else me exitTo classOf[MainActivity]
 }
 
 class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
@@ -189,8 +206,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       if (byThem) ln_ops_unilateral_peer else ln_ops_unilateral_you
     }
 
-    val chanListener = new ChannelListener {
-      // Updates UI accordingly to current chan state
+    val detailsListener = new ChannelListener {
+      // Updates chan details to current chan state
+      // must be removed once activity is finished
 
       override def onBecome = {
         case (_, waitFunding: WaitFundingDoneData, _, _) => manageFunding(waitFunding).run
@@ -208,8 +226,18 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       }
     }
 
-    // Wire up a local listener
-    whenDestroy = UITask(chan.listeners -= chanListener)
-    wrap(chanListener nullOnBecome chan)(chan.listeners += chanListener)
+    val transitionListener = new ChannelListener {
+      // Updates circle indicator to current chan state
+      // must also be removed once activity is finished
+
+      override def onBecome = {
+        case (_, _, from, CLOSING) if from != CLOSING => host.resetIndicator.run
+        case (_, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) => host.resetIndicator.run
+      }
+    }
+
+    val listeners = Vector(transitionListener, detailsListener)
+    wrap(chan.listeners ++= listeners)(detailsListener nullOnBecome chan)
+    whenDestroy = UITask(chan.listeners --= listeners)
   }
 }

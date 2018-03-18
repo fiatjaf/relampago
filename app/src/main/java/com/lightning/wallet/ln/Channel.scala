@@ -441,12 +441,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // HANDLE INITIALIZATION
 
 
-      case (null, ref: RefundingData, null) => BECOME(ref, REFUNDING)
-      case (null, close: ClosingData, null) => BECOME(close, CLOSING)
-      case (null, init: InitData, null) => BECOME(init, WAIT_FOR_INIT)
-      case (null, wait: WaitFundingDoneData, null) => BECOME(wait, OFFLINE)
-      case (null, neg: NegotiationsData, null) => BECOME(neg, OFFLINE)
-      case (null, norm: NormalData, null) => BECOME(norm, OFFLINE)
+      case (null, ref: RefundingData, null) => super.become(ref, REFUNDING)
+      case (null, close: ClosingData, null) => super.become(close, CLOSING)
+      case (null, init: InitData, null) => super.become(init, WAIT_FOR_INIT)
+      case (null, wait: WaitFundingDoneData, null) => super.become(wait, OFFLINE)
+      case (null, neg: NegotiationsData, null) => super.become(neg, OFFLINE)
+      case (null, norm: NormalData, null) => super.become(norm, OFFLINE)
 
 
       // MISC

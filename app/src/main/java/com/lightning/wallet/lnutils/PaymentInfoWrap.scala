@@ -112,8 +112,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onBecome = {
-    case (_, _, OFFLINE | OPEN | NEGOTIATIONS, CLOSING) =>
-      // WAITING will either be redeemed or refunded later
+    case (_, _, from, CLOSING) if from != CLOSING =>
+      // WAITING will either be redeemed or refunded
       markFailedAndFrozen
       uiNotify
 

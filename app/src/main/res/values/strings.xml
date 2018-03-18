@@ -233,7 +233,7 @@
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
 
     <string name="ln_chan_close_details"><![CDATA[Closing results in a regular Bitcoin transaction which refunds a current channel balance back into your Bitcoin wallet.<br><br>Channel itself becomes unusable once this action is initiated, would you like to proceed?]]></string>
-    <string name="ln_chan_force_details"><![CDATA[Please note that proceeding with this right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which takes additional fees and time, would you still like to proceed?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[Please note that proceeding with this right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a><brr><br>It takes additional fees and time, would you still like to proceed?]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Pending refunds</font><br>]]></string>
