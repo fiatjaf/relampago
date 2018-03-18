@@ -15,13 +15,6 @@
             android:layout_width="wrap_content"
             android:text="@string/action_ln_open"/>
 
-        <Button
-            style="@style/MarginInfo"
-            android:onClick="goChanDetails"
-            android:id="@+id/lnChanDetails"
-            android:layout_width="wrap_content"
-            android:text="@string/action_ln_open_view"/>
-
         <View
             style="@style/GrayDivider"
             android:id="@+id/lnDivider"/>

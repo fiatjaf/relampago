@@ -4,9 +4,9 @@
     android:checkableBehavior="single">
 
     <item
-        android:title="Search"
         app:showAsAction="always|collapseActionView"
         android:icon="@android:drawable/ic_menu_search"
+        android:title="Search by description or payment hash"
         app:actionViewClass="android.support.v7.widget.SearchView"
         android:id="@+id/action_search"/>
 

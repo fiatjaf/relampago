@@ -39,14 +39,14 @@
     <string name="restore_hint">Your BIP32 recovery code</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.07&#8211;25</small>]]></string>
+    <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.07&#8211;25<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
     <string name="recovery_info">Channel recovery tool asks Olympus servers for available channel backups and uses those to reimburse locked funds back into your Bitcoin wallet.\n\nYou should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds, otherwise nothing will happen.\n\nAlso, using this tool does not affect open channels currently present on this device.</string>
     <string name="mnemonic_info"><font color="#E31300">Mnemonic code is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.\n\nSaving and properly securing a mnemonic code is a single most important action to do once a fresh Bitcoin wallet is created.\n\nYou will need a mnemonic code in a case of various emergencies such as lost phone or forgotten passcode!</string>
     <string name="ln_ops_chan_none"><a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a> enables fast and secure off-chain Bitcoin transactions with low fees. Using it requires you to open a <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a> with a peer of your choice and then fund it with an on-chain Bitcoin transaction.\n\nThis app uses paid <a href="http://lightning-wallet.com/storage-tokens#storage-tokens">storage tokens</a> to secure channel backups. This is done to make sure that lost channel funds can always be recovered.</string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
-    <string name="mnemonic_warn">Don\'t make a screenshot as it will be saved in a phone gallery where other apps can access it, which may not be safe.</string>
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a></string>
+    <string name="mnemonic_warn">Don\'t make a screenshot as it will be saved in a phone gallery where other apps can access it, which may not be safe.</string>
 
     <string name="zygote_details"><![CDATA[
         Migration tool creates a full snapshot of current wallet state which can be
@@ -85,7 +85,6 @@
     <string name="action_bitcoin_receive">Receive bitcoin</string>
     <string name="action_bitcoin_send">Send bitcoin</string>
 
-    <string name="action_ln_open_view">View opening status</string>
     <string name="action_ln_receive">Receive lightning</string>
     <string name="action_ln_open">Open new channel</string>
     <string name="action_ln_close">Close channel</string>

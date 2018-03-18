@@ -291,6 +291,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def checkTransData =
     app.TransData.value match {
+      case _: NodeAnnouncement =>
+        // Don't clear trans data just yet
+        walletPager.setCurrentItem(1, false)
+        me goTo classOf[LNStartFundActivity]
+
       case request: PaymentRequest =>
         for (ln <- lnOpt) ln.sendPayment(request)
         walletPager.setCurrentItem(1, false)
@@ -307,11 +312,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         for (btc <- btcOpt) btc.sendBtcPopup.set(amount, link.getAddress)
         walletPager.setCurrentItem(0, false)
         app.TransData.value = null
-
-      case _: NodeAnnouncement =>
-        // Don't clear trans data just yet
-        walletPager.setCurrentItem(1, false)
-        me goTo classOf[LNStartFundActivity]
 
       case otherwise =>
         // Do nothing here
@@ -377,8 +377,9 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   // SETTINGS FORM
 
   def makeSettingsForm = {
+    val feePerKb = denom withSign RatesSaver.rates.feeLive
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
-    val menu = mkForm(me negBld dialog_ok, getString(read_settings).html, form)
+    val menu = mkForm(me negBld dialog_ok, getString(read_settings).format(feePerKb).html, form)
     val recoverChannelFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
     val useFingerprint = form.findViewById(R.id.useFingerprint).asInstanceOf[Button]
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]

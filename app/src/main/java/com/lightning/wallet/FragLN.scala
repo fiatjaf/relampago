@@ -57,7 +57,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-  val lnChanDetails = frag.findViewById(R.id.lnChanDetails)
   val lnAddChannel = frag.findViewById(R.id.lnAddChannel)
   val lnDivider = frag.findViewById(R.id.lnDivider)
 
@@ -155,7 +154,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   def updTitleSubtitleAndButtons = {
     val activeChannels = app.ChannelManager.notClosingOrRefunding
     val online = activeChannels.count(_.state != Channel.OFFLINE)
-    val openingChannelExist = activeChannels exists isOpening
     val funds = activeChannels.map(estimateTotalCanSend).sum
     val total = activeChannels.size
 
@@ -170,9 +168,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       else denom withSign MilliSatoshi(funds)
 
     val updateWarningAndTitle = UITask {
-      lnDivider setVisibility viewMap(total == 0 || openingChannelExist)
-      lnChanDetails setVisibility viewMap(openingChannelExist)
       lnAddChannel setVisibility viewMap(total == 0)
+      lnDivider setVisibility viewMap(total == 0)
       me setTitle title
     }
 
