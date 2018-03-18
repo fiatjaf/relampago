@@ -8,15 +8,14 @@ import com.lightning.wallet.ln.RoutingInfoTag._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.ln.wire.FailureMessageCodecs._
 import com.lightning.wallet.ln.wire.LightningMessageCodecs._
-
-import scala.util.{Success, Try}
-import fr.acinq.bitcoin.{BinaryData, Transaction}
-import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import com.lightning.wallet.lnutils.JsonHttpUtils.to
 import com.lightning.wallet.ln.Tools.random
-import fr.acinq.bitcoin.Crypto
 import scodec.bits.BitVector
 import scodec.Attempt
+
+import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Transaction}
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+import scala.util.{Success, Try}
 
 
 object PaymentInfo {
@@ -26,9 +25,9 @@ object PaymentInfo {
   final val FAILURE = 3
   final val FROZEN = 4
 
-  final val TARGET_ALL = "ALL"
-  final val TYPE_NODE = "NODE"
-  final val TYPE_CHAN = "CHAN"
+  final val TARGET_ALL = "TYPE_ALL"
+  final val TYPE_NODE = "TYPE_NODE"
+  final val TYPE_CHAN = "TYPE_CHAN"
 
   final val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
@@ -38,7 +37,9 @@ object PaymentInfo {
     RoutingData(pr, Vector.empty, Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat, 0L, 0L, 4)
   }
 
-  def emptyRDFromInfo(info: PaymentInfo) = emptyRD(info.pr, info.firstMsat)
+  def emptyRDFromPR(pr: PaymentRequest) = emptyRD(pr, pr.unsafeMsat) // Automatic requests like storage tokens
+  def emptyRDFromInfo(info: PaymentInfo) = emptyRD(info.pr, info.firstMsat) // Requests with option for custom amount
+
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
     makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
@@ -116,13 +117,13 @@ object PaymentInfo {
       case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNodes(Vector(nodeKey), rd, 600 * 1000)
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
       case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
-      case ErrorPacket(nKey, UnknownNextPeer) => withoutChanOrNode(nKey, rd, 86400 * 1000, 60 * 1000)
-      case ErrorPacket(nKey, _) => withoutChanOrNode(nKey, rd, 300 * 1000, 120 * 1000)
+      case ErrorPacket(nKey, UnknownNextPeer) => withoutChanOrNode(nKey, rd, 86400 * 1000, 180 * 1000)
+      case ErrorPacket(nKey, _) => withoutChanOrNode(nKey, rd, 300 * 1000, 180 * 1000)
 
     } getOrElse {
       val shortChanIds = rd.usedRoute.map(_.shortChannelId)
       withoutChans(shortChanIds drop 1 dropRight 1, rd,
-        rd.pr.nodeId.toString, 120 * 1000)
+        rd.pr.nodeId.toString, 180 * 1000)
     }
   }
 
@@ -165,11 +166,11 @@ object PaymentInfo {
 
 case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv: Long)
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
-                       onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long, lastExpiry: Long,
-                       callsLeft: Int) {
+                       onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long,
+                       lastExpiry: Long, callsLeft: Int) {
 
+  lazy val qryText = s"${pr.description} $paymentHashString"
   lazy val paymentHashString = pr.paymentHash.toString
-  lazy val searchText = s"${pr.description} $paymentHashString"
 }
 
 case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int,
@@ -186,6 +187,7 @@ case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, statu
   }
 
   // Keep serialized for performance
+  lazy val firstSum = MilliSatoshi(firstMsat)
   lazy val pr = to[PaymentRequest](rawPr)
 }
 

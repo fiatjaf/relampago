@@ -218,9 +218,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
         case Success(ms) => rm(alert) {
           // Outgoing payment needs to have an amount
-          // and this amount may be higher than requested
-          val rpi = RuntimePaymentInfo(emptyRD, pr, ms.amount)
-          me doSend rpi
+          // custom amount may be higher than requested
+          me doSend emptyRD(pr, ms.amount)
         }
       }
 
@@ -230,12 +229,12 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     }
   }
 
-  def doSend(rpi: RuntimePaymentInfo) =
+  def doSend(rd: RoutingData) =
     host.placeLoader match { case indeterminateLoader =>
-      val request = app.ChannelManager.withRoutesAndOnionRPI(rpi)
+      val request = app.ChannelManager.withRoutesAndOnionRD(rd)
       val request1 = request.doOnTerminate(host removeLoader indeterminateLoader)
-      def noRoutes(rpi: RuntimePaymentInfo) = onFail(host getString err_ln_no_route)
-      request1.foreach(app.ChannelManager.sendEither(_, noRoutes), onFail)
+      def noRoutes(emptyRoutes: RoutingData) = onFail(host getString err_ln_no_route)
+      request1.foreach(foeRD => app.ChannelManager.sendEither(foeRD, noRoutes), onFail)
     }
 
   def makePaymentRequest = ifOperational { operationalChannels =>
@@ -254,16 +253,17 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       val hint = getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
       val rateManager = new RateManager(hint, content)
 
-      def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
+      def makeRequest(sum: MilliSatoshi, pre: BinaryData) = {
+        val description = inputDescription.getText.toString.trim
         val routes = chansWithRoutes.filterKeys(chan => estimateCanReceive(chan) >= sum.amount).values.toVector
-        val rpi = RuntimePaymentInfo(emptyRD, PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage,
-          nodePrivateKey, inputDescription.getText.toString.trim, None, routes), sum.amount)
+        val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 pre, nodePrivateKey, description, None, routes)
+        val rd = emptyRD(pr, sum.amount)
 
-        db.change(PaymentTable.newVirtualSql, rpi.searchText, rpi.paymentHashString)
-        db.change(PaymentTable.newSql, rpi.paymentHashString, preimage, 1, rpi.firstMsat,
-          HIDDEN, System.currentTimeMillis, rpi.pr.description, rpi.pr.toJson, rpi.rd.toJson)
+        db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString, rd.paymentHashString)
+        db.change(PaymentTable.newSql, pr.toJson, pre, 1, HIDDEN, System.currentTimeMillis, pr.description,
+          rd.paymentHashString, sum.amount, 0L, 0L)
 
-        showQR(rpi.pr)
+        showQR(pr)
       }
 
       def recAttempt = rateManager.result match {
@@ -320,17 +320,18 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     val paymentHash = detailsWrapper.findViewById(R.id.paymentHash).asInstanceOf[Button]
 
     val info = adapter getItem pos
+    val rd = emptyRDFromInfo(info)
+
     val description = me getDescription info.description
-    val rpi = RuntimePaymentInfo(info.rd, info.pr, info.firstMsat)
     val humanStatus = s"<strong>${paymentStatesMap apply info.actualStatus}</strong>"
-    paymentHash setOnClickListener onButtonTap(host share rpi.paymentHashString)
+    paymentHash setOnClickListener onButtonTap(host share rd.paymentHashString)
 
     if (info.actualStatus == SUCCESS) {
       paymentHash setVisibility View.GONE
       paymentProof setVisibility View.VISIBLE
       paymentProof setOnClickListener onButtonTap {
         host share getString(ln_proof).format(write(info.pr),
-          rpi.paymentHashString, info.preimage.toString)
+          rd.paymentHashString, info.preimage.toString)
       }
     }
 
@@ -341,18 +342,18 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       mkForm(negBld(dialog_ok), title.html, detailsWrapper)
 
     } else {
-      val fee = MilliSatoshi(info.rd.lastMsat - info.firstMsat)
+      val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
       val humanOut = humanFiat(coloredOut(info.firstSum), info.firstSum)
       paymentDetails setText s"$description<br><br>$humanOut".html
 
-      // Will show title with expiry if payment is in-flight so user can make estimations
-      val expiry = app.plurOrZero(expiryLeft, info.rd.lastExpiry - broadcaster.currentHeight)
+      // Will show title with expiry if payment is in-flight
+      val expiry = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
       val title = humanFiat(getString(ln_outgoing_title).format(coloredOut(fee), humanStatus), fee)
       val title1 = if (info.actualStatus == WAITING) s"$expiry<br>$title" else title
 
       // Allow user to retry this payment using excluded nodes and channels if it is a failure and pr is not expired
       if (info.actualStatus != FAILURE || !info.pr.isFresh) mkForm(negBld(dialog_ok), title1.html, detailsWrapper)
-      else mkForm(mkChoiceDialog(none, doSend(rpi), dialog_ok, dialog_retry), title1.html, detailsWrapper)
+      else mkForm(mkChoiceDialog(none, doSend(rd), dialog_ok, dialog_retry), title1.html, detailsWrapper)
     }
   }
 

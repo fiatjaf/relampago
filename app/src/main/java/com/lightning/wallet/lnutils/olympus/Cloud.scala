@@ -111,12 +111,12 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def getFreshData = for {
     prAndMemo @ (pr, memo) <- getPaymentRequestBlindMemo
     if pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
-    Right(rd) <- withRoutesAndOnionRDFromPR(pr)
+    Right(rd) <- me withRoutesAndOnionRDFromPR pr
     info = Some(prAndMemo)
     if data.info.isEmpty
   } yield rd -> info
 
   def withRoutesAndOnionRDFromPR(pr: PaymentRequest) =
     // These payments will always be dust so frozen state is not an issue
-    app.ChannelManager withRoutesAndOnionRDFrozenAllowed emptyRD(pr, pr.unsafeMsat)
+    app.ChannelManager withRoutesAndOnionRDFrozenAllowed emptyRDFromPR(pr)
 }

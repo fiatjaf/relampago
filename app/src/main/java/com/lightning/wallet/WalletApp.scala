@@ -203,11 +203,11 @@ class WalletApp extends Application { me =>
 
     def withRoutesAndOnionRDFrozenAllowed(rd: RoutingData) = {
       val isInFlight = activeInFlightHashes.contains(rd.pr.paymentHash)
-      val isFulfilled = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
+      val isDone = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
       val capablePeerNodes = canSend(rd.firstMsat).map(_.data.announce.nodeId).toSet
 
       if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
-      else if (isFulfilled.isSuccess) Obs error new LightningException(me getString err_ln_fulfilled)
+      else if (isDone.isSuccess) Obs error new LightningException(me getString err_ln_fulfilled)
       else if (capablePeerNodes.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
       else if (broadcaster.bestHeightObtained) addRoutesAndOnion(capablePeerNodes, rd)
       else Obs error new LightningException(me getString dialog_chain_behind)

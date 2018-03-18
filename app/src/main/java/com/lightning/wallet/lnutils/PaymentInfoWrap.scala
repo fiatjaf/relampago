@@ -11,7 +11,6 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.helper.RichCursor
-import com.lightning.wallet.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.wallet.Utils.app
 import fr.acinq.bitcoin.BinaryData
@@ -19,15 +18,15 @@ import scala.collection.mutable
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
+  var pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
+
+  def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def updateStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
   def updOkIncoming(u: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, u.amountMsat, System.currentTimeMillis, u.paymentHash)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, fulfill.paymentPreimage, fulfill.paymentHash)
   def getPaymentInfo(paymentHash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, paymentHash) headTry toPaymentInfo
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
-
-  def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
-  var pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
 
   def toPaymentInfo(rc: RichCursor) =
     PaymentInfo(rawPr = rc string PaymentTable.pr, preimage = rc string PaymentTable.preimage, incoming = rc int PaymentTable.incoming,
@@ -41,29 +40,32 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     for (hash <- app.ChannelManager.frozenInFlightHashes) updateStatus(FROZEN, hash)
   }
 
+  def failRD(rd: RoutingData) = {
+    // Utility to let user know it's failed
+    updateStatus(FAILURE, rd.pr.paymentHash)
+    uiNotify
+  }
+
+  def reCall(rd: RoutingData) = if (rd.callsLeft > 0) {
+    val request = app.ChannelManager withRoutesAndOnionRD rd.copy(callsLeft = rd.callsLeft - 1)
+    request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, failRD), _ => me failRD rd)
+  } else me failRD rd
+
   def resend(reason: UpdateFailHtlc, hash: BinaryData) = {
-    val rdOpt = pendingPayments get hash orElse getPaymentInfo(hash).map(emptyRDFromInfo).toOption
-    val rd1BadEntitiesOpt = for (rd <- rdOpt) yield parseFailureCutRoutes(reason)(rd)
+    // May happen after an app is restarted so no runtime data
+    lazy val reCreated = me getPaymentInfo hash map emptyRDFromInfo
+    val rdOpt = pendingPayments get hash orElse reCreated.toOption
+    val rd1BadData = rdOpt map parseFailureCutRoutes(reason)
 
-    rd1BadEntitiesOpt match {
-      case Some(rd1 \ badEntities) =>
-        badEntities foreach BadEntityWrap.put.tupled
-
-      case None =>
-        updateStatus(FAILURE, hash)
+    for (rd1 \ badNodesAndChanIds <- rd1BadData) {
+      badNodesAndChanIds foreach BadEntityWrap.put.tupled
+      app.ChannelManager.sendEither(useRoutesLeft(rd1), reCall)
     }
   }
 
   override def onError = {
-    case (_, exc: CMDException) =>
-      // Retry failures, also prevents shutdown
-      updateStatus(FAILURE, exc.rd.pr.paymentHash)
-      uiNotify
-
-    case chan \ error =>
-      // Close and log an error
-      chan process CMDShutdown
-      Tools errlog error
+    case (_, exc: CMDException) => me failRD exc.rd
+    case chan \ error => chan process CMDShutdown
   }
 
   override def onProcess = {
@@ -72,11 +74,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       // so either insert or update should be executed successfully
 
       db txWrap {
-        pendingPayments(rd.pr.paymentHash) = rd.copy(callsLeft = rd.callsLeft - 1)
-        db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
+        pendingPayments(rd.pr.paymentHash) = rd
         updateStatus(WAITING, rd.pr.paymentHash)
-
-        db.change(PaymentTable.newVirtualSql, rd.searchText, rd.paymentHashString, rd.paymentHashString)
+        db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
+        db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString, rd.paymentHashString)
         db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
           rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
       }
