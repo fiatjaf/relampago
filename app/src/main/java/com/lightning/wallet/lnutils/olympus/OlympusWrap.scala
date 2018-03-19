@@ -74,7 +74,10 @@ object OlympusWrap extends OlympusProvider {
   // Olympus RPC interface
 
   def failOver[T](run: Cloud => Obs[T], cs: CloudVec): Obs[T] = {
-    def tryAgainWithNextCloud(failure: Throwable) = failOver(run, cs.tail)
+    def tryAgainWithNextCloud(failure: Throwable) = {
+      failure.printStackTrace
+      failOver(run, cs.tail)
+    }
     if (cs.isEmpty) Obs error new ProtocolException("Run out of clouds")
     else run(cs.head) onErrorResumeNext tryAgainWithNextCloud
   }
@@ -90,12 +93,12 @@ object OlympusWrap extends OlympusProvider {
   def findNodes(query: String) = failOver(_.connector findNodes query, clouds)
   def getChildTxs(txs: TxSeq) = failOver(_.connector getChildTxs txs, clouds)
 
-  def findRoutes(badNodes: StringVec, badChans: StringVec, from: Set[PublicKey], toPubKey: String) =
+  def findRoutes(badNodes: StringVec, badChans: Vector[Long], from: Set[PublicKey], toPubKey: String) =
     failOver(_.connector.findRoutes(badNodes, badChans, from, toPubKey), clouds)
 }
 
 trait OlympusProvider {
-  def findRoutes(badNodes: StringVec, badChans: StringVec,
+  def findRoutes(badNodes: StringVec, badChans: Vector[Long],
                  from: Set[PublicKey], toPubKey: String): Obs[PaymentRouteVec]
 
   def findNodes(query: String): Obs[AnnounceChansNumVec]
@@ -119,8 +122,7 @@ class Connector(val url: String) extends OlympusProvider {
   def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getChildTxs(txs: TxSeq) = ask[TxSeq]("txs/get", "txids" -> txs.map(_.txid).toJson.toString.hex)
-
-  def findRoutes(badNodes: StringVec, badChans: StringVec, from: Set[PublicKey], toPubKey: String) =
+  def findRoutes(badNodes: StringVec, badChans: Vector[Long], from: Set[PublicKey], toPubKey: String) =
     ask[PaymentRouteVec]("router/routes", "froms" -> from.map(_.toBin).toJson.toString.hex,
       "tos" -> Set(toPubKey).toJson.toString.hex, "xn" -> badNodes.toJson.toString.hex,
       "xc" -> badChans.toJson.toString.hex)

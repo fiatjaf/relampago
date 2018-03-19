@@ -34,7 +34,7 @@ object PaymentInfo {
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
-    RoutingData(pr, Vector.empty, Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat, 0L, 0L, 4)
+    RoutingData(pr, Vector.empty, Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat, 0L, 0L, 4, ok = true)
   }
 
   def emptyRDFromPR(pr: PaymentRequest) = emptyRD(pr, pr.unsafeMsat) // Automatic requests like storage tokens
@@ -66,11 +66,11 @@ object PaymentInfo {
     }
 
     val cltvDeltaFail = lastExpiry - firstExpiry > LNParams.maxCltvDelta
-    val lnFeeFail = LNParams.isFeeNotOk(lastMsat, lastMsat - rd.firstMsat)
+    val lnFeeFail = LNParams.isFeeNotOk(lastMsat, lastMsat - rd.firstMsat, route.size)
 
     if (cltvDeltaFail | lnFeeFail) useFirstRoute(rest, rd) else {
-      val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, allPayloads, rd.pr.paymentHash)
-      val rd1 = RoutingData(rd.pr, rest, route, onion, rd.firstMsat, lastMsat, lastExpiry, rd.callsLeft)
+      val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, allPayloads, assoc = rd.pr.paymentHash)
+      val rd1 = rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
       Right(rd1)
     }
   }
@@ -82,21 +82,17 @@ object PaymentInfo {
   }
 
   def without(rs: PaymentRouteVec, fn: Hop => Boolean) = rs.filterNot(_ exists fn)
-  def withoutChans(bad: Vector[Long], rd: RoutingData, targetId: String, span: Long) = {
-    val toBan = for (shortChannelId <- bad) yield (Right apply shortChannelId, targetId, span)
-    val routesWithoutBadChans = without(rd.routes, bad contains _.shortChannelId)
-    rd.copy(routes = routesWithoutBadChans) -> toBan
+  def withoutChans(ids: Vector[Long], rd: RoutingData, targetId: String, span: Long) = {
+    val toBan = for (shortChanId <- ids) yield Tuple3(Right apply shortChanId, targetId, span)
+    val withoutBadChans = without(rd.routes, hop => ids contains hop.shortChannelId)
+    rd.copy(routes = withoutBadChans) -> toBan
   }
 
-  def withoutNodes(bad: PublicKeyVec, rd: RoutingData, span: Long) = {
-    val toBan = for (nodeId <- bad) yield (Left apply nodeId, TARGET_ALL, span)
-    val routesWithoutBadNodes = without(rd.routes, bad contains _.nodeId)
-    rd.copy(routes = routesWithoutBadNodes) -> toBan
+  def withoutNode(badNode: PublicKey, rd: RoutingData, span: Long) = {
+    val withoutBadNodes = without(rd.routes, hop => badNode == hop.nodeId)
+    val toBan = Tuple3(Left apply badNode, TARGET_ALL, span)
+    rd.copy(routes = withoutBadNodes) -> Vector(toBan)
   }
-
-  def withoutChanOrNode(nodeKey: PublicKey, rd: RoutingData, chanSpan: Long, nodeSpan: Long) = rd.usedRoute.collectFirst {
-    case hopData if hopData.nodeId == nodeKey => withoutChans(bad = Vector(hopData.shortChannelId), rd, TARGET_ALL, chanSpan)
-  } getOrElse withoutNodes(bad = Vector(nodeKey), rd, nodeSpan)
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
     // Try to reduce remaining routes and also remember bad nodes and channels
@@ -105,20 +101,27 @@ object PaymentInfo {
     parsed map {
       case ErrorPacket(nodeKey, cd: ChannelDisabled) =>
         val isNodeHonest = Announcements.checkSig(cd.update, nodeKey)
-        if (!isNodeHonest) withoutNodes(bad = Vector(nodeKey), rd, 86400 * 1000)
+        if (!isNodeHonest) withoutNode(badNode = nodeKey, rd, span = 86400 * 2 * 1000)
         else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 600 * 1000)
 
       case ErrorPacket(nodeKey, tf: TemporaryChannelFailure) =>
         val isNodeHonest = Announcements.checkSig(tf.update, nodeKey)
-        if (!isNodeHonest) withoutNodes(bad = Vector(nodeKey), rd, 86400 * 1000)
-        else withoutChans(Vector(tf.update.shortChannelId), rd,
-          rd.pr.nodeId.toString, 600 * 1000)
+        if (!isNodeHonest) withoutNode(badNode = nodeKey, rd, span = 86400 * 2 * 1000)
+        else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString, 600 * 1000)
 
-      case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNodes(Vector(nodeKey), rd, 600 * 1000)
-      case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
-      case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
-      case ErrorPacket(nKey, UnknownNextPeer) => withoutChanOrNode(nKey, rd, 86400 * 1000, 180 * 1000)
-      case ErrorPacket(nKey, _) => withoutChanOrNode(nKey, rd, 300 * 1000, 180 * 1000)
+      case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNode(nodeKey, rd, 600 * 1000)
+      case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNode(nodeKey, rd, 86400 * 2 * 1000)
+      case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNode(nodeKey, rd, 86400 * 1000)
+
+      case ErrorPacket(nodeKey, UnknownNextPeer) =>
+        rd.usedRoute.collectFirst { case hop if hop.nodeId == nodeKey =>
+          // Node can not find a specified peer so we remove a failed channel
+          withoutChans(Vector(hop.shortChannelId), rd, TARGET_ALL, 86400 * 2 * 1000)
+        } getOrElse withoutNode(nodeKey, rd, 180 * 1000)
+
+      case ErrorPacket(nKey, _) =>
+        // Don't blacklist, halt a payment
+        rd.copy(ok = false) -> Vector.empty
 
     } getOrElse {
       val shortChanIds = rd.usedRoute.map(_.shortChannelId)
@@ -167,7 +170,7 @@ object PaymentInfo {
 case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv: Long)
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
                        onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long,
-                       lastExpiry: Long, callsLeft: Int) {
+                       lastExpiry: Long, callsLeft: Int, ok: Boolean) {
 
   lazy val qryText = s"${pr.description} $paymentHashString"
   lazy val paymentHashString = pr.paymentHash.toString
@@ -196,9 +199,5 @@ trait PaymentInfoBag { me =>
   def updateStatus(paymentStatus: Int, hash: BinaryData)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc)
   def updOkIncoming(add: UpdateAddHtlc)
-
-  def extractPreimage(tx: Transaction) = tx.txIn.map(_.witness.stack) collect {
-    case Seq(_, pre, _) if pre.size == 32 => me updOkOutgoing UpdateFulfillHtlc(null, 0L, pre)
-    case Seq(_, _, _, pre, _) if pre.size == 32 => me updOkOutgoing UpdateFulfillHtlc(null, 0L, pre)
-  }
+  def extractPreimg(tx: Transaction)
 }

@@ -58,7 +58,7 @@ object Utils {
   var fiatName: String = _
 
   val fileName = "Testnet"
-  val dbFileName = s"$fileName-11.db"
+  val dbFileName = s"$fileName-12.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
 
@@ -131,8 +131,7 @@ trait TimerActivity extends AppCompatActivity { me =>
 
   def finishMe(top: View) = finish
   def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
-  def rm(previous: Dialog)(exec: => Unit) = wrap(previous.dismiss)(me delayUI exec)
-
+  def rm(prev: Dialog)(exe: => Unit) = wrap(prev.dismiss)(me delayUI exe)
   def baseTextBuilder(msg: CharSequence) = new Builder(me).setMessage(msg)
   def baseBuilder(title: View, body: View) = new Builder(me).setCustomTitle(title).setView(body)
   def negTextBuilder(neg: Int, msg: CharSequence) = baseTextBuilder(msg).setNegativeButton(neg, null)
@@ -378,7 +377,7 @@ class BtcManager(val man: RateManager) { me =>
 
 trait PayData {
   // Emptying a wallet needs special handling
-  def emptify = app.kit.conf1Balance equals cn
+  def isAll = app.kit.conf1Balance equals cn
   def onClick: Unit
   def cn: Coin
 
@@ -398,7 +397,7 @@ trait PayData {
 }
 
 case class AddrData(cn: Coin, address: Address) extends PayData {
-  def getRequest = if (emptify) emptyWallet(address) else to(address, cn)
+  def getRequest = if (isAll) emptyWallet(address) else to(address, cn)
   def link = BitcoinURI.convertToBitcoinURI(address, cn, null, null)
   def onClick = app.setBuffer(address.toString)
   def destination = humanFour(address.toString)
@@ -406,7 +405,7 @@ case class AddrData(cn: Coin, address: Address) extends PayData {
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
   // This will only be used for funding of LN payment channels as destination is unreadable
-  def getRequest = if (emptify) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
+  def getRequest = if (isAll) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
   def onClick = app.setBuffer(denom withSign cn)
   def destination = app getString txs_p2wsh
 }

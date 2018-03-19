@@ -141,7 +141,7 @@ class WalletApp extends Application { me =>
         // just assuming any incoming tx may contain it
 
         val spent = CMDSpent(txj)
-        bag.extractPreimage(spent.tx)
+        bag.extractPreimg(spent.tx)
         all.foreach(_ process spent)
       }
 
@@ -185,7 +185,7 @@ class WalletApp extends Application { me =>
         // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
         kit.watchScripts(commits.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
         // Ask server for child txs which spend our commit txs outputs and extract preimages from them
-        OlympusWrap.getChildTxs(commits).foreach(_ foreach bag.extractPreimage, Tools.errlog)
+        OlympusWrap.getChildTxs(commits).foreach(_ foreach bag.extractPreimg, Tools.errlog)
         BECOME(STORE(cd), CLOSING)
 
         cd.tier12States.map(_.txn) match {

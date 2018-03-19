@@ -162,10 +162,10 @@
     <string name="err_ln_peer_offline">This remote peer could not be reached. Please try a different one.</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept.</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum.</string>
+    <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already.</string>
     <string name="err_ln_too_many">Failed because too many payments are already in-flight.</string>
     <string name="err_ln_no_route">Failed because no route to recipient could be found.</string>
-    <string name="err_ln_fulfilled">Failed because this payment is already fulfilled.</string>
-    <string name="err_ln_in_flight">Failed because this payment is already in-flight.</string>
+    <string name="err_ln_in_flight">Failed because this payment is currently in-flight.</string>
     <string name="err_ln_frozen">Can not retry this payment because it is frozen.</string>
 
     <string name="err_ln_6_confs">Can\'t ask for payments because a funding Bitcoin transaction has not got 6 confirmations yet.</string>
@@ -231,7 +231,7 @@
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
 
     <string name="ln_chan_close_details"><![CDATA[Closing results in a regular Bitcoin transaction which refunds a current channel balance back into your Bitcoin wallet.<br><br>Channel itself becomes unusable once this action is initiated, would you like to proceed?]]></string>
-    <string name="ln_chan_force_details"><![CDATA[Please note that proceeding with this right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a><brr><br>It takes additional fees and time, would you still like to proceed?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[Please note that proceeding with this right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a>.<br><br>It takes additional fees and time, would you still like to proceed?]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Pending refunds</font><br>]]></string>
@@ -263,9 +263,6 @@
     </array>
 
     <!-- opening a new channel -->
-    <string name="ln_ops_start_fund_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>Fund a payment channel]]></string>
-    <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
-
     <array name="ln_ops_start_node_channels">
         <item><![CDATA[<strong>No public channels</strong>]]></item>
         <item><![CDATA[<strong>%1$s</strong> public channel]]></item>
@@ -274,4 +271,6 @@
         <item><![CDATA[<i>Public channels unknown</i>]]></item>
     </array>
 
+    <string name="ln_ops_start_fund_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>Fund a payment channel]]></string>
+    <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
 </resources>

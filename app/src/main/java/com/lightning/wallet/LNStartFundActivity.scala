@@ -7,7 +7,6 @@ import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Tools._
 import com.lightning.wallet.ln.Channel._
-
 import scala.collection.JavaConverters._
 import com.lightning.wallet.Denomination._
 import fr.acinq.bitcoin.DeterministicWallet._

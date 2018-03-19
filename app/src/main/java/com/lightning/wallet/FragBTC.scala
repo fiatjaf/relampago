@@ -273,10 +273,10 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
     // See if CPFP can be applied
     val notEnoughValue = wrap.valueDelta isLessThan RatesSaver.rates.feeLive
-    val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 60000
-    val disableCPFP = wrap.depth > 0 || wrap.isDead || tooFresh || notEnoughValue
+    val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 3600L * 1000
+    val doNotOfferCPFP = wrap.depth > 0 || wrap.isDead || tooFresh || notEnoughValue
 
-    if (disableCPFP) showForm(negBuilder(dialog_ok, header.html, lst).create)
+    if (doNotOfferCPFP) showForm(negBuilder(dialog_ok, header.html, lst).create)
     else mkForm(none, boostIncoming(wrap), baseBuilder(header.html, lst), dialog_ok, dialog_boost)
   }
 

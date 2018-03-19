@@ -54,6 +54,7 @@ class FragLN extends Fragment { me =>
 class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment with SearchBar { me =>
   import host.{getResources, getString, onFail, UITask, getSupportLoaderManager, str2View, timer, getLayoutInflater, onTap}
   import host.{rm, <, onButtonTap, onFastTap, mkForm, showForm, mkCheckForm, baseBuilder, negBuilder, negTextBuilder}
+  def getDescription(rawText: String) = if (rawText.isEmpty) s"<i>$noDesc</i>" else rawText take 140
 
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
@@ -133,10 +134,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       def onViewAttachedToWindow(arg: View) = runAnd(showDescription = true)(adapter.notifyDataSetChanged)
     }
   }
-
-  def getDescription(txt: String) =
-    if (txt.isEmpty) s"<i>$noDesc</i>"
-    else txt take 140
 
   def onFragmentResume = {
     for (chan <- app.ChannelManager.all) chan.listeners += chanListener
@@ -254,9 +251,10 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 pre, nodePrivateKey, description, None, routes)
         val rd = emptyRD(pr, sum.amount)
 
-        db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString, rd.paymentHashString)
-        db.change(PaymentTable.newSql, pr.toJson, pre, 1, HIDDEN, System.currentTimeMillis, pr.description,
-          rd.paymentHashString, sum.amount, 0L, 0L)
+        db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
+        db.change(sql = PaymentTable.newSql, params = pr.toJson, pre, 1, HIDDEN,
+          System.currentTimeMillis, pr.description, rd.paymentHashString,
+          sum.amount, 0L, 0L)
 
         showQR(pr)
       }
@@ -348,7 +346,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
       // Allow user to retry this payment using excluded nodes and channels when it is a failure and pr is not expired yet
       if (info.actualStatus != FAILURE || !info.pr.isFresh) showForm(negBuilder(dialog_ok, title1.html, detailsWrapper).create)
-      else mkForm(doSend(rd), none, baseBuilder(title1.html, detailsWrapper), dialog_ok, dialog_cancel)
+      else mkForm(none, doSend(rd), baseBuilder(title1.html, detailsWrapper), dialog_ok, dialog_retry)
     }
   }
 

@@ -404,8 +404,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
           passWrap(me getString fp_enable) apply checkPass { pass =>
             // The password is guaranteed to be correct here so proceed
             val content = getLayoutInflater.inflate(R.layout.frag_touch, null)
-            val dlg = negBuilder(dialog_cancel, getString(fp_enable).html, content)
-            val alert = showForm(dlg.create)
+            val alert = showForm(negBuilder(dialog_cancel, getString(fp_enable).html, content).create)
 
             val callback = new Goldfinger.Callback {
               def onWarning(warn: Warning) = FingerPassCode informUser warn
@@ -446,7 +445,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
       rm(menu) {
         val bld = baseTextBuilder(me getString recovery_info)
-        mkForm(recover, none, bld, dialog_ok, dialog_cancel)
+        mkForm(recover, none, bld, dialog_next, dialog_cancel)
 
         def recover: Unit = {
           OlympusWrap.getBackup(cloudId).foreach(backups => {
@@ -480,7 +479,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       def openForm = mkForm(ok = <(createZygote, onFail) { zygote =>
         val zygoteFileShare = new Intent setAction Intent.ACTION_SEND setType "text/plain"
         me startActivity zygoteFileShare.putExtra(Intent.EXTRA_STREAM, Uri fromFile zygote)
-      }, none, baseTextBuilder(getString(zygote_details).html), dialog_ok, dialog_cancel)
+      }, none, baseTextBuilder(getString(zygote_details).html), dialog_next, dialog_cancel)
 
       def createZygote = {
         val zygote = FileOps shell s"zygote ${new Date}.txt"
