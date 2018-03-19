@@ -10,7 +10,7 @@
     <!-- app wide -->
     <string name="unlock">Unlock Wallet</string>
     <string name="sets_secret_ok">Passcode has been updated</string>
-    <string name="secret_info">Pick a good passcode\nor just leave the field blank\nto have an unencrypted wallet</string>
+    <string name="secret_info">pick a passcode\nor just leave the field blank\nto have an unencrypted wallet</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch.</string>
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="fee_risky"><![CDATA[<small>%1$s<br><small>Standard transaction fee</small></small>]]></string>
@@ -46,7 +46,6 @@
     <string name="ln_ops_chan_none"><a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a> enables fast and secure off-chain Bitcoin transactions with low fees. Using it requires you to open a <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a> with a peer of your choice and then fund it with an on-chain Bitcoin transaction.\n\nThis app uses paid <a href="http://lightning-wallet.com/storage-tokens#storage-tokens">storage tokens</a> to secure channel backups. This is done to make sure that lost channel funds can always be recovered.</string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a></string>
-    <string name="mnemonic_warn">Don\'t make a screenshot as it will be saved in a phone gallery where other apps can access it, which may not be safe.</string>
 
     <string name="zygote_details"><![CDATA[
         Migration tool creates a full snapshot of current wallet state which can be

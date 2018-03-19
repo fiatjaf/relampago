@@ -184,7 +184,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     val restoreOptions = getResources getStringArray R.array.restore_options
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, restoreOptions)
-    val alert = mkForm(me negBld dialog_cancel, null, lst)
+    val alert = showForm(negBuilder(dialog_cancel, null, lst).create)
 
     lst setDivider null
     lst setDividerHeight 0

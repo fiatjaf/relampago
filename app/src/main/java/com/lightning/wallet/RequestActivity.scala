@@ -189,7 +189,7 @@ class RequestActivity extends NfcBeamWriterActivity with TimerActivity with View
   def onNdefPushCompleted = none
   def onNfcStateEnabled = none
 
-  // When NFC is available we show a tip so users would know how they might use it
-  def showTip(v: View) = showForm(negBld(dialog_ok).setMessage(me getString nfc_payee_tip).create)
+  // When NFC is available we show a tip so users would know how exactly they might use it
+  def showTip(v: View) = showForm(negTextBuilder(dialog_ok, me getString nfc_payee_tip).create)
   def goSettings(v: View) = startNfcSharingSettingsActivity
 }

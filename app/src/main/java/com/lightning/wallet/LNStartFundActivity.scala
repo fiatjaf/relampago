@@ -7,6 +7,7 @@ import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.ln.Tools._
 import com.lightning.wallet.ln.Channel._
+
 import scala.collection.JavaConverters._
 import com.lightning.wallet.Denomination._
 import fr.acinq.bitcoin.DeterministicWallet._
@@ -17,7 +18,6 @@ import fr.acinq.bitcoin.{MilliSatoshi, Script}
 import android.widget.{ImageButton, TextView}
 import scala.util.{Failure, Success}
 
-import android.content.DialogInterface.BUTTON_POSITIVE
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.lnutils.olympus.CloudAct
 import com.lightning.wallet.lnutils.RatesSaver
@@ -25,6 +25,7 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.script.ScriptBuilder
 import com.lightning.wallet.helper.AES
 import org.bitcoinj.wallet.SendRequest
+import android.app.AlertDialog
 import java.util.TimerTask
 import android.os.Bundle
 
@@ -124,7 +125,6 @@ class LNStartFundActivity extends TimerActivity { me =>
     def askForFunding(their: Init): TimerTask = UITask {
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val dummyKey = derivePrivateKey(LNParams.extendedCloudKey, System.currentTimeMillis :: 0L :: Nil).publicKey
-      val alert = mkForm(negPosBld(dialog_cancel, dialog_next), getString(ln_ops_start_fund_title).html, content)
       val rateManager = new RateManager(getString(amount_hint_newchan).format(denom withSign RatesSaver.rates.feeLive,
         denom withSign LNParams.maxChannelCapacity, denom withSign app.kit.conf1Balance), content)
 
@@ -142,20 +142,19 @@ class LNStartFundActivity extends TimerActivity { me =>
             their, unsignedRequest, outIndex, realChannelFundingAmountSat)
         }
 
-        def onTxFail(fundingError: Throwable) =
-          mkForm(mkChoiceDialog(me delayUI askForFunding(their), none,
-            dialog_ok, dialog_cancel), messageWhenMakingTx(fundingError), null)
+        def onTxFail(fundingError: Throwable) = mkForm(askForFunding(their), none,
+          baseBuilder(messageWhenMakingTx(fundingError), null), dialog_ok, dialog_cancel)
       }
 
-      def askAttempt = rateManager.result match {
-        case Failure(_) => app toast dialog_sum_empty
+      def askAttempt(alert: AlertDialog) = rateManager.result match {
         case Success(ms) if ms < RatesSaver.rates.feeLive => app toast dialog_sum_small
         case Success(ms) if ms > LNParams.maxChannelCapacity => app toast dialog_sum_big
+        case Failure(reason) => app toast dialog_sum_empty
         case Success(ms) => rm(alert)(next(ms).start)
       }
 
-      val ok = alert getButton BUTTON_POSITIVE
-      ok setOnClickListener onButtonTap(askAttempt)
+      val bld = baseBuilder(getString(ln_ops_start_fund_title).html, content)
+      mkCheckForm(askAttempt, none, bld, dialog_next, dialog_cancel)
     }
 
     whenBackPressed = UITask {

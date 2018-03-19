@@ -44,6 +44,8 @@ import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import java.util.{Timer, TimerTask}
 
+import android.content.DialogInterface.BUTTON_POSITIVE
+import android.content.DialogInterface.BUTTON_NEGATIVE
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import InputMethodManager.HIDE_NOT_ALWAYS
 import Context.INPUT_METHOD_SERVICE
@@ -130,8 +132,12 @@ trait TimerActivity extends AppCompatActivity { me =>
   def finishMe(top: View) = finish
   def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
   def rm(previous: Dialog)(exec: => Unit) = wrap(previous.dismiss)(me delayUI exec)
-  def mkForm(bld: Builder, title: View, body: View) = showForm(bld.setCustomTitle(title).setView(body).create)
-  def onFail(error: CharSequence): Unit = UITask(mkForm(me negBld dialog_ok, null, error).show).run
+
+  def baseTextBuilder(msg: CharSequence) = new Builder(me).setMessage(msg)
+  def baseBuilder(title: View, body: View) = new Builder(me).setCustomTitle(title).setView(body)
+  def negTextBuilder(neg: Int, msg: CharSequence) = baseTextBuilder(msg).setNegativeButton(neg, null)
+  def negBuilder(neg: Int, title: View, body: View) = baseBuilder(title, body).setNegativeButton(neg, null)
+  def onFail(error: CharSequence): Unit = UITask(me showForm negBuilder(dialog_ok, null, error).create).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
 
   def showForm(alertDialog: AlertDialog) = {
@@ -144,12 +150,18 @@ trait TimerActivity extends AppCompatActivity { me =>
     alertDialog
   }
 
-  def negBld(neg: Int): Builder = new Builder(me).setNegativeButton(neg, null)
-  def negPosBld(neg: Int, pos: Int): Builder = negBld(neg).setPositiveButton(pos, null)
-  def mkChoiceDialog(ok: => Unit, no: => Unit, okResource: Int, noResource: Int): Builder = {
-    val cancel = new DialogInterface.OnClickListener { def onClick(x: DialogInterface, w: Int) = no }
-    val again = new DialogInterface.OnClickListener { def onClick(x: DialogInterface, w: Int) = ok }
-    new Builder(me).setPositiveButton(okResource, again).setNegativeButton(noResource, cancel)
+  def mkForm(ok: => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) =
+    // Used for forms which do not need to check user input and can be dismissed right away
+    mkCheckForm(alert => rm(alert)(ok), no, bld, okResource, noResource)
+
+  def mkCheckForm(ok: AlertDialog => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) = {
+    val builderWithOkCancelButtons = bld.setPositiveButton(okResource, null).setNegativeButton(noResource, null)
+    val alert = showForm(builderWithOkCancelButtons.create)
+    val noListener = me onButtonTap rm(alert)(no)
+
+    alert getButton BUTTON_POSITIVE setOnClickListener onButtonTap(ok apply alert)
+    alert getButton BUTTON_NEGATIVE setOnClickListener noListener
+    alert
   }
 
   def INIT(savedInstanceState: Bundle): Unit
@@ -194,8 +206,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   def passWrap(title: CharSequence, fp: Boolean = true) = (next: String => Unit) => {
     val passNoSuggest = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
     val view \ field \ image = generatePromptView(passNoSuggest, secret_wallet, new PasswordTransformationMethod)
-    val dlg = mkChoiceDialog(ok = next(field.getText.toString), no = none, dialog_next, dialog_cancel)
-    val alert = mkForm(dlg, title, view)
+    val alert = mkForm(next(field.getText.toString), none, baseBuilder(title, view), dialog_next, dialog_cancel)
 
     val gf = new Goldfinger.Builder(me).build
     if (fp && gf.hasEnrolledFingerprint && FingerPassCode.exists) {
@@ -226,8 +237,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   def viewMnemonic(view: View) = {
     def showCode(seed: DeterministicSeed): Unit = {
       val recoveryCode = TextUtils.join("\u0020", seed.getMnemonicCode)
-      val bld = negBld(dialog_ok).setCustomTitle(recoveryCode)
-      showForm(bld.setMessage(mnemonic_warn).create)
+      showForm(negBuilder(dialog_ok, recoveryCode, null).create)
     }
 
     def encShowCode(pass: String) = <(app.kit decryptSeed pass, onFail)(showCode)
@@ -268,11 +278,10 @@ trait TimerActivity extends AppCompatActivity { me =>
         futureProcess(request)
       }
 
-      lazy val dialog = mkChoiceDialog(ok = <(proceed, onTxFail)(none), none, dialog_pay, dialog_cancel)
-      lazy val alert = mkForm(dialog, getString(step_3).format(pay cute sumOut).html, form)
+      val bld = baseBuilder(getString(step_3).format(pay cute sumOut).html, form)
+      mkForm(ok = <(proceed, onTxFail)(none), none, bld, dialog_pay, dialog_cancel)
       lst setAdapter new ArrayAdapter(me, singleChoice, feesOptions)
       lst.setItemChecked(0, true)
-      alert
     }
 
     def plainRequest(selectedFee: Coin) = {

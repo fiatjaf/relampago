@@ -35,13 +35,11 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
   lazy val restoreWallet = findViewById(R.id.restoreWallet).asInstanceOf[Button]
   lazy val restoreWhen = findViewById(R.id.restoreWhen).asInstanceOf[Button]
   lazy val password = findViewById(R.id.restorePass).asInstanceOf[EditText]
-  lazy val datePicker = new WhenPicker(me, 1519862400L * 1000)
+  lazy val dp = new WhenPicker(me, 1519862400L * 1000)
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_restore)
-    val allowed = MnemonicCode.INSTANCE.getWordList
-    val lineStyle = android.R.layout.simple_list_item_1
-    val adapter = new ArrayAdapter(me, lineStyle, allowed)
+    val style = android.R.layout.simple_list_item_1
 
     val changeListener = new TextChangedWatcher {
       override def onTextChanged(s: CharSequence, x: Int, y: Int, z: Int) = {
@@ -54,21 +52,20 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
       }
     }
 
-    restoreWhen setText datePicker.human
+    restoreWhen setText dp.human
     password addTextChangedListener changeListener
     restoreCode addTextChangedListener changeListener
     restoreCode.addChipTerminator(' ', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode.addChipTerminator(',', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode.addChipTerminator('\n', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode setDropDownBackgroundResource R.color.button_material_dark
-    restoreCode setAdapter adapter
+    restoreCode setAdapter new ArrayAdapter(me, style, MnemonicCode.INSTANCE.getWordList)
   }
 
   override def onBackPressed = wrap(super.onBackPressed)(app.kit.stopAsync)
   def getMnemonicText = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")
-  def whenDialog = mkChoiceDialog(restoreWhen setText datePicker.human, none, dialog_ok, dialog_cancel)
-  def setWhen(top: View) = mkForm(whenDialog, null, datePicker.pure)
-  def recWallet(top: View) = hideKeys(doRecoverWallet)
+  def setWhen(v: View) = mkForm(restoreWhen setText dp.human, none, baseBuilder(null, dp.pure), dialog_ok, dialog_cancel)
+  def recWallet(v: View) = hideKeys(doRecoverWallet)
 
   def doRecoverWallet =
     app.kit = new app.WalletKit {
@@ -76,8 +73,8 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
       startAsync
 
       def startUp = {
-        val creationTimeStamp = datePicker.cal.getTimeInMillis / 1000
-        val seed = new DeterministicSeed(getMnemonicText, null, "", creationTimeStamp)
+        val stamp = dp.cal.getTimeInMillis / 1000
+        val seed = new DeterministicSeed(getMnemonicText, null, "", stamp)
         wallet = Wallet.fromSeed(app.params, seed, true)
         prepare(this, password.getText)
       }

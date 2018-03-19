@@ -10,10 +10,9 @@ import com.lightning.wallet.R.string._
 import com.lightning.wallet.Denomination._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.R.drawable.{await, conf1, dead}
-import com.lightning.wallet.ln.Tools.{none, wrap, runAnd}
+import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
 import scala.util.{Failure, Success}
 
-import android.content.DialogInterface.BUTTON_POSITIVE
 import org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT
 import android.support.v7.widget.Toolbar.OnMenuItemClickListener
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
@@ -22,10 +21,10 @@ import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import com.lightning.wallet.ln.LNParams.minDepth
 import com.lightning.wallet.lnutils.RatesSaver
 import android.support.v7.widget.Toolbar
-import android.app.AlertDialog.Builder
 import android.support.v4.app.Fragment
 import org.bitcoinj.wallet.SendRequest
 import fr.acinq.bitcoin.MilliSatoshi
+import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
@@ -54,8 +53,8 @@ class FragBTC extends Fragment { me =>
 
 class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment { me =>
   val barMenuListener = new OnMenuItemClickListener { def onMenuItemClick(m: MenuItem) = host onOptionsItemSelected m }
-  import host.{timer, <, mkChoiceDialog, onButtonTap, onFastTap, onTap, onFail, showDenomChooser, passWrap, checkPass}
-  import host.{getResources, getString, str2View, rm, mkForm, UITask, getLayoutInflater, negPosBld, TxProcessor}
+  import host.{timer, <, mkCheckForm, baseBuilder, onButtonTap, onFastTap, onTap, onFail, showDenomChooser, passWrap, checkPass}
+  import host.{getResources, showForm, negBuilder, getString, str2View, rm, mkForm, UITask, getLayoutInflater, TxProcessor}
 
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
@@ -187,8 +186,8 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
   def sendBtcPopup: BtcManager = {
     val content = getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
-    val alert = mkForm(negPosBld(dialog_cancel, dialog_next), host getString action_bitcoin_send, content)
-    val rateManager = new RateManager(getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance), content)
+    val title = getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
+    val rateManager = new RateManager(title, content)
     val spendManager = new BtcManager(rateManager)
 
     def next(msat: MilliSatoshi) = new TxProcessor {
@@ -198,20 +197,19 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
         app.kit blockingSend app.kit.sign(unsignedRequest).tx
       }
 
-      def onTxFail(sendingError: Throwable) =
-        mkForm(mkChoiceDialog(host delayUI sendBtcPopup.set(Success(msat), pay.address),
-          none, dialog_ok, dialog_cancel), messageWhenMakingTx(sendingError), null)
+      def onTxFail(sendingError: Throwable) = mkForm(sendBtcPopup.set(Success(msat), pay.address), none,
+        baseBuilder(messageWhenMakingTx(sendingError), body = null), dialog_ok, dialog_cancel)
     }
 
-    def sendAttempt = rateManager.result match {
-      case Failure(why) => app toast dialog_sum_empty
+    def sendAttempt(alert: AlertDialog) = rateManager.result match {
       case _ if spendManager.getAddress == null => app toast dialog_address_wrong
       case Success(ms) if MIN_NONDUST_OUTPUT isGreaterThan ms => app toast dialog_sum_small
+      case Failure(reason) => app toast dialog_sum_empty
       case Success(ms) => rm(alert)(next(ms).start)
     }
 
-    val ok = alert getButton BUTTON_POSITIVE
-    ok setOnClickListener onButtonTap(sendAttempt)
+    val bld = baseBuilder(getString(action_bitcoin_send), content)
+    mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
     spendManager
   }
 
@@ -219,7 +217,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val current = coloredIn(wrap.valueDelta)
     val increasedFee = RatesSaver.rates.feeLive divide 2
     val boost = coloredIn(wrap.valueDelta minus increasedFee)
-    val userWarning = getString(boost_details).format(current, boost).html
+    val userWarn = getString(boost_details).format(current, boost).html
 
     // Transaction hiding must always happen before replacement sending
     lazy val unsignedBoost = childPaysForParent(app.kit.wallet, wrap.tx, increasedFee)
@@ -238,11 +236,9 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
       onFail(err)
     }
 
-    def replaceFuture = <(replace, onError)(none)
     def encReplaceFuture(pass: String) = <(encReplace(pass), onError)(none)
-    val dlg = mkChoiceDialog(replaceFuture, none, dialog_next, dialog_cancel)
-    if (!app.kit.wallet.isEncrypted) mkForm(dlg, userWarning, null)
-    else passWrap(userWarning) apply checkPass(encReplaceFuture)
+    if (app.kit.wallet.isEncrypted) passWrap(userWarn) apply checkPass(encReplaceFuture)
+    else mkForm(ok = <(replace, onError)(none), none, baseBuilder(userWarn, null), dialog_next, dialog_cancel)
   }
 
   // INIT
@@ -276,12 +272,12 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     }
 
     // See if CPFP can be applied
-    val hasEnoughValue = wrap.valueDelta isGreaterThan RatesSaver.rates.feeLive
-    val isStale = wrap.tx.getUpdateTime.getTime < System.currentTimeMillis - 60000
+    val notEnoughValue = wrap.valueDelta isLessThan RatesSaver.rates.feeLive
+    val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 60000
+    val disableCPFP = wrap.depth > 0 || wrap.isDead || tooFresh || notEnoughValue
 
-    lazy val dlg: Builder = mkChoiceDialog(none, boostIncoming(wrap), dialog_ok, dialog_boost)
-    if (wrap.depth < 1 && !wrap.isDead && isStale && hasEnoughValue) mkForm(dlg, header.html, lst)
-    else mkForm(host negBld dialog_ok, header.html, lst)
+    if (disableCPFP) showForm(negBuilder(dialog_ok, header.html, lst).create)
+    else mkForm(none, boostIncoming(wrap), baseBuilder(header.html, lst), dialog_ok, dialog_boost)
   }
 
   toggler setOnClickListener onFastTap {

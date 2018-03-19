@@ -18,13 +18,13 @@ import scala.util.{Failure, Success, Try}
 import com.lightning.wallet.ln.Tools.{none, random, runAnd, wrap}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
 import com.lightning.wallet.R.drawable.{await, conf1, dead, frozen}
-import android.content.DialogInterface.BUTTON_POSITIVE
 import com.lightning.wallet.ln.PaymentRequest.write
 import android.support.v7.widget.Toolbar
 import com.lightning.wallet.ln.Channel
 import android.support.v4.app.Fragment
 import com.lightning.wallet.Utils.app
 import org.bitcoinj.core.Transaction
+import android.app.AlertDialog
 import android.os.Bundle
 import java.util.Date
 
@@ -53,7 +53,7 @@ class FragLN extends Fragment { me =>
 
 class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment with SearchBar { me =>
   import host.{getResources, getString, onFail, UITask, getSupportLoaderManager, str2View, timer, getLayoutInflater, onTap}
-  import host.{rm, <, onButtonTap, onFastTap, mkForm, negBld, negPosBld, mkChoiceDialog}
+  import host.{rm, <, onButtonTap, onFastTap, mkForm, showForm, mkCheckForm, baseBuilder, negBuilder, negTextBuilder}
 
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
@@ -199,19 +199,18 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     else {
 
       val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSend).max)
+      val popupTitle = getString(ln_send_title).format(me getDescription pr.description).html
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-      val popupTitle = getString(ln_send_title).format(me getDescription pr.description)
-      val alert = mkForm(negPosBld(dialog_cancel, dialog_pay), popupTitle.html, content)
       val hint = getString(amount_hint_can_send).format(denom withSign maxCanSend)
-      val rateManager = new RateManager(hint, content)
+      val rateManager = new RateManager(extra = hint, content)
 
-      def sendAttempt = rateManager.result match {
-        case Failure(_) => app toast dialog_sum_empty
+      def sendAttempt(alert: AlertDialog) = rateManager.result match {
         case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
         case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
         case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
         case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
         case _ if !broadcaster.bestHeightObtained => app toast dialog_chain_behind
+        case Failure(reason) => app toast dialog_sum_empty
 
         case Success(ms) => rm(alert) {
           // Outgoing payment needs to have an amount
@@ -220,9 +219,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         }
       }
 
-      val ok = alert getButton BUTTON_POSITIVE
-      ok setOnClickListener onButtonTap(sendAttempt)
-      for (sum <- pr.amount) rateManager setSum Try(sum)
+      val bld = baseBuilder(popupTitle, content)
+      mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
+      for (amountMsat <- pr.amount) rateManager setSum Try(amountMsat)
     }
   }
 
@@ -240,13 +239,12 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     lazy val maxCanReceive = MilliSatoshi(chansWithRoutes.keys.map(estimateCanReceive).max)
     lazy val reserveUnspent = getString(err_ln_reserve) format coloredOut(-maxCanReceive)
 
-    if (chansWithRoutes.isEmpty) mkForm(negBld(dialog_ok), getString(err_ln_6_confs), null)
-    else if (maxCanReceive.amount < 0L) mkForm(negBld(dialog_ok), reserveUnspent.html, null)
+    if (chansWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, host getString err_ln_6_confs).create)
+    else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(dialog_ok, reserveUnspent.html).create)
     else {
 
       val content = getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
       val inputDescription = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
-      val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), getString(action_ln_receive), content)
       val hint = getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
       val rateManager = new RateManager(hint, content)
 
@@ -263,10 +261,10 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         showQR(pr)
       }
 
-      def recAttempt = rateManager.result match {
-        case Failure(_) => app toast dialog_sum_empty
+      def recAttempt(alert: AlertDialog) = rateManager.result match {
         case Success(ms) if maxCanReceive < ms => app toast dialog_sum_big
         case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+        case Failure(reason) => app toast dialog_sum_empty
 
         case Success(ms) => rm(alert) {
           // Requests without amount are not allowed for now
@@ -275,8 +273,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         }
       }
 
-      val ok = alert getButton BUTTON_POSITIVE
-      ok setOnClickListener onButtonTap(recAttempt)
+      val bld = baseBuilder(getString(action_ln_receive), content)
+      mkCheckForm(recAttempt, none, bld, dialog_ok, dialog_cancel)
     }
   }
 
@@ -335,8 +333,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     if (info.incoming == 1) {
       val title = getString(ln_incoming_title).format(humanStatus)
       val humanIn = humanFiat(coloredIn(info.firstSum), info.firstSum)
+      showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
       paymentDetails setText s"$description<br><br>$humanIn".html
-      mkForm(negBld(dialog_ok), title.html, detailsWrapper)
 
     } else {
       val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
@@ -348,9 +346,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       val title = humanFiat(getString(ln_outgoing_title).format(coloredOut(fee), humanStatus), fee)
       val title1 = if (info.actualStatus == WAITING) s"$expiry<br>$title" else title
 
-      // Allow user to retry this payment using excluded nodes and channels if it is a failure and pr is not expired
-      if (info.actualStatus != FAILURE || !info.pr.isFresh) mkForm(negBld(dialog_ok), title1.html, detailsWrapper)
-      else mkForm(mkChoiceDialog(none, doSend(rd), dialog_ok, dialog_retry), title1.html, detailsWrapper)
+      // Allow user to retry this payment using excluded nodes and channels when it is a failure and pr is not expired yet
+      if (info.actualStatus != FAILURE || !info.pr.isFresh) showForm(negBuilder(dialog_ok, title1.html, detailsWrapper).create)
+      else mkForm(doSend(rd), none, baseBuilder(title1.html, detailsWrapper), dialog_ok, dialog_cancel)
     }
   }
 

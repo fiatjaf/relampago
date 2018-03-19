@@ -334,20 +334,18 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   def goAddChannel(top: View) = {
-    val minAmount = RatesSaver.rates.feeLive multiply 2
-    val isFine = app.kit.conf1Balance isGreaterThan minAmount
+    val minAmt = RatesSaver.rates.feeLive multiply 2
+    if (app.kit.conf1Balance isGreaterThan minAmt) me goTo classOf[LNStartActivity]
+    else showForm(negBuilder(dialog_ok, notEnoughToOpenChannel.html, null).create)
 
-    lazy val notEnough = {
+    lazy val notEnoughToOpenChannel = {
       val txt = getString(err_ln_not_enough_funds)
       val zeroConf = app.kit.conf0Balance minus app.kit.conf1Balance
       val canSend = sumIn format denom.withSign(app.kit.conf1Balance)
-      val minRequired = sumIn format denom.withSign(minAmount)
+      val minRequired = sumIn format denom.withSign(minAmt)
       val pending = sumIn format denom.withSign(zeroConf)
       txt.format(canSend, minRequired, pending)
     }
-
-    if (isFine) me goTo classOf[LNStartActivity]
-    else mkForm(me negBld dialog_ok, notEnough.html, null)
   }
 
   def showDenomChooser = {
@@ -371,15 +369,17 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
     lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    mkForm(me negBld dialog_ok, title.html, form)
+    showForm(negBuilder(dialog_ok, title.html, form).create)
   }
 
   // SETTINGS FORM
 
   def makeSettingsForm = {
     val feePerKb = denom withSign RatesSaver.rates.feeLive
+    val title = getString(read_settings).format(feePerKb).html
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
-    val menu = mkForm(me negBld dialog_ok, getString(read_settings).format(feePerKb).html, form)
+    val menu = showForm(negBuilder(dialog_ok, title, form).create)
+
     val recoverChannelFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
     val useFingerprint = form.findViewById(R.id.useFingerprint).asInstanceOf[Button]
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
@@ -402,10 +402,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       def setButtonEnable = {
         def proceed = rm(menu) {
           passWrap(me getString fp_enable) apply checkPass { pass =>
-            // The password is guaranteed to be correct here, proceed with auth
+            // The password is guaranteed to be correct here so proceed
             val content = getLayoutInflater.inflate(R.layout.frag_touch, null)
-            lazy val alert = mkForm(dlg, getString(fp_enable).html, content)
-            lazy val dlg = me negBld dialog_cancel
+            val dlg = negBuilder(dialog_cancel, getString(fp_enable).html, content)
+            val alert = showForm(dlg.create)
 
             val callback = new Goldfinger.Callback {
               def onWarning(warn: Warning) = FingerPassCode informUser warn
@@ -413,10 +413,9 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
               def onSuccess(cipher: String) = runAnd(alert.dismiss)(FingerPassCode record cipher)
             }
 
-            dlg setOnDismissListener new OnDismissListener {
+            alert setOnDismissListener new OnDismissListener {
               def onDismiss(dialog: DialogInterface) = gf.cancel
               gf.encrypt(fileName, pass, callback)
-              alert
             }
           }
         }
@@ -446,9 +445,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       // by fetching encrypted static channel params from server
 
       rm(menu) {
-        lazy val bld = mkChoiceDialog(recover, none, dialog_next, dialog_cancel)
-        lazy val alert = showForm(bld.setMessage(recovery_info).create)
-        alert
+        val bld = baseTextBuilder(me getString recovery_info)
+        mkForm(recover, none, bld, dialog_ok, dialog_cancel)
 
         def recover: Unit = {
           OlympusWrap.getBackup(cloudId).foreach(backups => {
@@ -479,10 +477,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     }
 
     createZygote setOnClickListener onButtonTap {
-      def openForm = showForm(mkChoiceDialog(ok = <(createZygote, onFail) { zygote =>
+      def openForm = mkForm(ok = <(createZygote, onFail) { zygote =>
         val zygoteFileShare = new Intent setAction Intent.ACTION_SEND setType "text/plain"
         me startActivity zygoteFileShare.putExtra(Intent.EXTRA_STREAM, Uri fromFile zygote)
-      }, none, dialog_next, dialog_cancel).setMessage(getString(zygote_details).html).create)
+      }, none, baseTextBuilder(getString(zygote_details).html), dialog_ok, dialog_cancel)
 
       def createZygote = {
         val zygote = FileOps shell s"zygote ${new Date}.txt"
@@ -499,10 +497,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     rescanWallet setOnClickListener onButtonTap {
       // May be needed in case of blockchain glitches
+      // warn user as this is a time consuming operation
 
       rm(menu) {
-        val dlg = mkChoiceDialog(go, none, dialog_ok, dialog_cancel)
-        showForm(dlg.setMessage(sets_rescan_ok).create)
+        val bld = baseTextBuilder(me getString sets_rescan_ok)
+        mkForm(go, none, bld, dialog_ok, dialog_cancel)
       }
 
       def go = try {
@@ -521,7 +520,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     changePass setOnClickListener onButtonTap {
       def decryptAndMaybeEncrypt(oldPass: CharSequence)(newPass: CharSequence) = {
-        // First decrypt a wallet using an old passcode and then encrypt with a new one
+        // First decrypt a wallet using an old passcode, then encrypt with a new one
         runAnd(app.kit.wallet decrypt oldPass)(FingerPassCode.erase)
         maybeEncrypt(newPass)
       }
@@ -531,9 +530,9 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         if (newPass.length > 0) app.encryptWallet(app.kit.wallet, newPass)
       }
 
-      def newPassForm(changePass: CharSequence => Unit) = {
+      val showNewPassForm = (changePass: CharSequence => Unit) => {
         val view \ field \ _ = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_info, null)
-        mkForm(mkChoiceDialog(changePasscode, none, dialog_ok, dialog_cancel), me getString sets_secret_change, view)
+        mkForm(changePasscode, none, baseBuilder(me getString sets_secret_change, view), dialog_ok, dialog_cancel)
 
         def changePasscode = runAnd(app toast secret_changing) {
           // Do the required preliminary steps and encrypt with a new passcode
@@ -542,11 +541,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       }
 
       rm(menu) {
-        if (!app.kit.wallet.isEncrypted) newPassForm(maybeEncrypt)
+        if (!app.kit.wallet.isEncrypted) showNewPassForm apply maybeEncrypt
         else passWrap(me getString sets_secret_change) apply checkPass { pass =>
           // Remember a correct passcode and use it later for wallet decryption
-          val decryptLoaded = decryptAndMaybeEncrypt(pass) _
-          newPassForm(decryptLoaded)
+          showNewPassForm apply decryptAndMaybeEncrypt(pass)
         }
       }
     }
@@ -590,8 +588,8 @@ class FragScan extends Fragment with BarcodeCallback { me =>
     host.checkTransData
 
   } catch app.TransData.onFail { code =>
-    val builder = host negBld dialog_ok setMessage code
+    val bld = host.negTextBuilder(dialog_ok, host getString code)
     host.walletPager.setCurrentItem(1, false)
-    host showForm builder.create
+    host showForm bld.create
   }
 }

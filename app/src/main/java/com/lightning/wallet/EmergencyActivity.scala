@@ -13,7 +13,7 @@ import android.view.View
 
 class EmergencyActivity extends TimerActivity { me =>
   def viewReport(v: View) = Try(getIntent getStringExtra ERROR_REPORT) match {
-    case Success(report) => showForm(negBld(dialog_ok).setMessage(report).create)
+    case Success(ereport) => showForm(negTextBuilder(dialog_ok, ereport).create)
     case _ => app toast err_general
   }
 

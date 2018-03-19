@@ -9,16 +9,16 @@ import scala.collection.JavaConverters._
 import com.lightning.wallet.lnutils.olympus._
 import com.lightning.wallet.lnutils.olympus.OlympusWrap._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-
-import android.view.{Menu, MenuItem, ViewGroup}
-import android.widget.{CheckBox, EditText, TextView}
-import android.content.DialogInterface.BUTTON_POSITIVE
 import android.support.v7.widget.helper.ItemTouchHelper
 import com.lightning.wallet.ln.LNParams
 import com.lightning.wallet.Utils.app
 import org.bitcoinj.core.Utils.HEX
+import android.app.AlertDialog
 import android.os.Bundle
 import android.net.Uri
+
+import android.widget.{CheckBox, EditText, TextView}
+import android.view.{Menu, MenuItem, ViewGroup}
 
 
 class OlympusActivity extends TimerActivity { me =>
@@ -114,22 +114,16 @@ class OlympusActivity extends TimerActivity { me =>
     val content = getLayoutInflater.inflate(R.layout.frag_olympus_details, null, false)
     val serverHostPort = content.findViewById(R.id.serverHostPort).asInstanceOf[EditText]
     val serverBackup = content.findViewById(R.id.serverBackup).asInstanceOf[CheckBox]
-    val alert = mkForm(negPosBld(dialog_cancel, dialog_ok), getString(title), content)
 
-    def set(cloud: Cloud) = {
-      serverHostPort setText cloud.connector.url
-      serverBackup setChecked cloud.isAuthEnabled
-    }
+    mkCheckForm(addAttempt, none, baseBuilder(getString(title), content), dialog_ok, dialog_cancel)
+    def set(c: Cloud) = wrap(serverHostPort setText c.connector.url)(serverBackup setChecked c.isAuthEnabled)
 
-    def addAttempt = {
+    def addAttempt(alert: AlertDialog) = {
       val auth = if (serverBackup.isChecked) 1 else 0
       val checker = Uri parse serverHostPort.getText.toString
       val addressValid = checker.getHost != null && checker.getPort > 0
       if (addressValid) next(checker.toString, auth)
       if (addressValid) alert.dismiss
     }
-
-    val ok = alert getButton BUTTON_POSITIVE
-    ok setOnClickListener onButtonTap(addAttempt)
   }
 }
