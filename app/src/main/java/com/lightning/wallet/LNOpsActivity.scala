@@ -56,9 +56,11 @@ class LNOpsActivity extends TimerActivity { me =>
 }
 
 class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
-  override def onCreateView(i: LayoutInflater, vg: ViewGroup, bn: Bundle) =
-    i.inflate(R.layout.frag_view_pager_chan, vg, false)
+  def startedByText(c: ClosingData) = if (c.startedByPeer) ln_ops_unilateral_peer else ln_ops_unilateral_you
+  override def onCreateView(i: LayoutInflater, vg: ViewGroup, bn: Bundle) = i.inflate(R.layout.frag_view_pager_chan, vg, false)
+  override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
 
+  var whenDestroy: Runnable = new Runnable { def run = none }
   lazy val inFlightPayments = getResources getStringArray R.array.ln_in_flight_payments
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
@@ -80,9 +82,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     case _ \ true => txsConfs.last
     case _ => txsConfs.head
   }
-
-  var whenDestroy: Runnable = new Runnable { def run = none }
-  override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
 
   override def onViewCreated(view: View, state: Bundle) = {
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
@@ -162,6 +161,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           val myFee = coloredOut(capacity - mutualTx.allOutputsAmount)
           val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
           val mutualView = commitStatus.format(mutualTx.txid.toString, status, myFee)
+
           lnOpsDescription setText bilateralClosing.format(chan.state, alias, started,
             closed, coloredIn(capacity), coloredIn(refundable), mutualView).html
 
@@ -183,20 +183,18 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
             case ShowDelayed(_ \ false \ left, _, fee, amt) =>
               val leftDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
               statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
-          } take 2 mkString "<br><br>"
+          }
 
+          val startedBy = getString(me startedByText close)
+          val humanTier12View = tier12View take 2 mkString "<br><br>"
           val status = humanStatus apply getStatus(info.commitTx.txid)
           val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
           val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
-          val refundsView = if (tier12View.isEmpty) new String else refundStatus + tier12View
-          lnOpsDescription setText unilateralClosing.format(chan.state, getStartedBy(close),
+          val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
+
+          lnOpsDescription setText unilateralClosing.format(chan.state, startedBy,
             alias, started, closed, coloredIn(capacity), commitView + refundsView).html
       }
-    }
-
-    def getStartedBy(c: ClosingData) = getString {
-      val byThem = c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty
-      if (byThem) ln_ops_unilateral_peer else ln_ops_unilateral_you
     }
 
     val detailsListener = new ChannelListener {

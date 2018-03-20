@@ -9,13 +9,19 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-
-import fr.acinq.bitcoin.{BinaryData, Transaction}
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
+import android.support.v4.app.NotificationCompat
 import com.lightning.wallet.helper.RichCursor
+import com.lightning.wallet.ln.Tools.none
 import fr.acinq.bitcoin.Crypto.PublicKey
+import com.lightning.wallet.MainActivity
 import com.lightning.wallet.Utils.app
 import scala.collection.mutable
+import com.lightning.wallet.R
+
+import android.app.{AlarmManager, NotificationManager, PendingIntent}
+import android.content.{BroadcastReceiver, Context, Intent}
+import fr.acinq.bitcoin.{BinaryData, Transaction}
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
@@ -83,7 +89,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
       db txWrap {
         pendingPayments(rd.pr.paymentHash) = rd
-        updateStatus(WAITING, rd.pr.paymentHash)
         db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
         db.change(sql = PaymentTable.newVirtualSql, params = rd.qryText, rd.paymentHashString)
         db.change(sql = PaymentTable.newSql, params = rd.pr.toJson, NOIMAGE, 0, WAITING,
@@ -121,8 +126,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onBecome = {
-    case (_, _, from, CLOSING) if from != CLOSING =>
-      // WAITING will either be redeemed or refunded
+    case (chan, _, from, CLOSING) if from != CLOSING =>
+      // Frozen non-dust payments may be fulfilled on-chain
+      Notificator chanClosed chan.data.announce.alias
       markFailedAndFrozen
       uiNotify
 
@@ -199,4 +205,32 @@ object GossipCatcher extends ChannelListener {
       chan process upd.toHop(chan.data.announce.nodeId)
       chan.listeners -= GossipCatcher
   }
+}
+
+// CLOSED CHANNEL NOTIFICATION
+
+object Notificator {
+  def chanClosed(alias: String) = try {
+    val notificatorClass = classOf[Notificator]
+    val parametersIntent = new Intent(app, notificatorClass).putExtra("extra", alias)
+    val alarmManager = app.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager]
+    val pendingIntent = PendingIntent.getBroadcast(app, 0, parametersIntent, 0)
+    alarmManager.set(AlarmManager.RTC_WAKEUP, 0, pendingIntent)
+  } catch none
+}
+
+class Notificator extends BroadcastReceiver {
+  def onReceive(ct: Context, intent: Intent) = try {
+    // Immediately let user know a channel has been closed
+    // used instead of toast so can be seen at later time
+
+    val target = classOf[MainActivity]
+    val title = ct getString R.string.chan_notice_title format intent.getExtras.getString("extra")
+    val targetIntent = PendingIntent.getActivity(ct, 0, new Intent(ct, target), PendingIntent.FLAG_UPDATE_CURRENT)
+    val builder = new NotificationCompat.Builder(ct).setContentIntent(targetIntent).setSmallIcon(R.drawable.dead)
+      .setAutoCancel(true).setContentTitle(title).setContentText(ct getString R.string.chan_notice_body)
+
+    val service = ct.getSystemService(Context.NOTIFICATION_SERVICE)
+    service.asInstanceOf[NotificationManager].notify(1, builder.build)
+  } catch none
 }

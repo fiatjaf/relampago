@@ -12,7 +12,7 @@ import fr.acinq.bitcoin.BinaryData
 
 
 object LocalBroadcaster extends Broadcaster {
-  def ratePerKwSat = RatesSaver.rates.feeLive.value / 2
+  def ratePerKwSat = RatesSaver.rates.feeLive.value / 4
 
   def currentHeight = {
     val candidate1 = app.kit.wallet.getLastBlockSeenHeight

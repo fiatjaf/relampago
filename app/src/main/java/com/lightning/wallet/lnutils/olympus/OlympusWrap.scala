@@ -8,7 +8,6 @@ import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.olympus.OlympusWrap._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.wire.LightningMessageCodecs._
-import com.lightning.wallet.ln.{PaymentRequest, RoutingData}
 import fr.acinq.bitcoin.{BinaryData, Transaction}
 import rx.lang.scala.{Observable => Obs}
 
@@ -16,6 +15,7 @@ import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 import com.lightning.wallet.ln.wire.NodeAnnouncement
 import com.lightning.wallet.lnutils.OlympusTable
+import com.lightning.wallet.ln.PaymentRequest
 import com.lightning.wallet.helper.RichCursor
 import fr.acinq.bitcoin.Crypto.PublicKey
 import java.net.ProtocolException

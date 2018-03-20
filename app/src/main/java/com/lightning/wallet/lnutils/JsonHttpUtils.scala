@@ -51,7 +51,7 @@ case class Rates(feeHistory: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
   // Bitcoin Core provides unreliable fees in testnet so just use default here
   // TODO: remove for mainnet
 
-  private val DEFAULT_TX_FEE = Coin valueOf 20000L
+  private val DEFAULT_TX_FEE = Coin valueOf 40000L
   lazy val feeLive = if (feeHistory.isEmpty) DEFAULT_TX_FEE else {
     val mu: Coin = btcBigDecimal2MSat(feeHistory.sum / feeHistory.size)
     if (mu isLessThan DEFAULT_TX_FEE) DEFAULT_TX_FEE else mu
