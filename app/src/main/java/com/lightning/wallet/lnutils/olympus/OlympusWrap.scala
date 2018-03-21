@@ -7,7 +7,6 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.olympus.OlympusWrap._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-import com.lightning.wallet.ln.wire.LightningMessageCodecs._
 import fr.acinq.bitcoin.{BinaryData, Transaction}
 import rx.lang.scala.{Observable => Obs}
 
@@ -74,10 +73,7 @@ object OlympusWrap extends OlympusProvider {
   // Olympus RPC interface
 
   def failOver[T](run: Cloud => Obs[T], cs: CloudVec): Obs[T] = {
-    def tryAgainWithNextCloud(failure: Throwable) = {
-      failure.printStackTrace
-      failOver(run, cs.tail)
-    }
+    def tryAgainWithNextCloud(failure: Throwable) = failOver(run, cs.tail)
     if (cs.isEmpty) Obs error new ProtocolException("Run out of clouds")
     else run(cs.head) onErrorResumeNext tryAgainWithNextCloud
   }

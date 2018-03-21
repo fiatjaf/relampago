@@ -111,16 +111,17 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     def write(internal: Tag): JsValue = internal.toInt5s.toJson
   }
 
-  implicit val paymentRequestFmt = jsonFormat[String, Option[MilliSatoshi], Long, PublicKey, Vector[Tag], BinaryData,
-    PaymentRequest](PaymentRequest.apply, "prefix", "amount", "timestamp", "nodeId", "tags", "signature")
+  implicit val paymentRequestFmt =
+    jsonFormat[String, Option[MilliSatoshi], Long, PublicKey, Vector[Tag], BinaryData,
+      PaymentRequest](PaymentRequest.apply, "prefix", "amount", "timestamp", "nodeId", "tags", "signature")
 
-  // Rest
+  implicit val ratesFmt =
+    jsonFormat[Seq[Double], Fiat2Btc, Long,
+      Rates](Rates.apply, "feeHistory", "exchange", "stamp")
 
-  implicit val ratesFmt = jsonFormat[Seq[Double], Fiat2Btc, Long,
-    Rates](Rates.apply, "feeHistory", "exchange", "stamp")
-
-  implicit val cloudActFmt = jsonFormat[BinaryData, Seq[HttpParam], String,
-    CloudAct](CloudAct.apply, "data", "plus", "path")
+  implicit val cloudActFmt =
+    jsonFormat[BinaryData, Seq[HttpParam], String,
+      CloudAct](CloudAct.apply, "data", "plus", "path")
 
   implicit val cloudDataFmt =
     jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct],

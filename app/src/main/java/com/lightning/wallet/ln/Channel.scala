@@ -1,7 +1,5 @@
 package com.lightning.wallet.ln
 
-import octopus.dsl._
-import octopus.syntax._
 import com.softwaremill.quicklens._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.Channel._
@@ -54,19 +52,15 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT)
         if accept.temporaryChannelId == cmd.tempChanId =>
 
-        val acceptChannelValidator = Validator[AcceptChannel]
-          .rule(_.minimumDepth <= 6L, "Their minimumDepth is too high")
-          .rule(_.htlcMinimumMsat <= 10000L, "Their htlcMinimumMsat too high")
-          .rule(_.toSelfDelay <= cmd.localParams.toSelfDelay * 20, "Their toSelfDelay is too high")
-          .rule(_.maxHtlcValueInFlightMsat > UInt64(10000L), "Their maxHtlcValueInFlightMsat is too low")
-          .rule(_.channelReserveSatoshis < cmd.realFundingAmountSat / 10, "Their proposed reserve is too high")
-          //.rule(_.maxAcceptedHtlcs < 483, "They can accept too many incoming HTLCs")
-          .rule(_.maxAcceptedHtlcs > 0, "They can accept too few incoming HTLCs")
-          .rule(_.dustLimitSatoshis >= 546L, "Their dust limit is too low")
-
-        val result = accept.validate(acceptChannelValidator)
-        if (result.isValid) BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
-        else throw new LightningException(result.toFieldErrMapping.map(_._2) mkString "\n")
+        if (accept.minimumDepth > 6L) throw new LightningException("Their minimumDepth is too high")
+        if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
+        if (accept.toSelfDelay > cmd.localParams.toSelfDelay * 20) throw new LightningException("Their toSelfDelay is too high")
+        if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
+        if (accept.channelReserveSatoshis > cmd.realFundingAmountSat / 10) throw new LightningException("Their proposed reserve is too high")
+        if (accept.maxAcceptedHtlcs > 483) throw new LightningException("They can accept too many payments")
+        if (accept.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
+        if (accept.dustLimitSatoshis < 546L) throw new LightningException("Their dust limit is too low")
+        BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
 
 
       case (WaitFundingData(announce, cmd, accept), CMDFunding(fundTx), WAIT_FOR_FUNDING) =>

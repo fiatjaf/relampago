@@ -214,7 +214,7 @@ class WalletApp extends Application { me =>
     }
 
     def addRoutesAndOnion(peers: Set[PublicKey], rd: RoutingData) = {
-      def findRemoteRoutes(targetNodeId: PublicKey) = BadEntityWrap.findRoutes(peers, targetNodeId.toString)
+      def findRemoteRoutes(targetNodeId: PublicKey) = BadEntityWrap.findRoutes(peers, targetNodeId)
       // If source node contains target node then we are paying directly to our peer, otherwise fetch additional payment routes
       def getRoutes(target: PublicKey) = if (peers contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
 

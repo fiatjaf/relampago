@@ -25,10 +25,7 @@ object PaymentInfo {
   final val FAILURE = 3
   final val FROZEN = 4
 
-  final val TARGET_ALL = "TYPE_ALL"
-  final val TYPE_NODE = "TYPE_NODE"
-  final val TYPE_CHAN = "TYPE_CHAN"
-
+  final val TARGET_ALL = "TARGET_ALL"
   final val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
 
@@ -83,41 +80,42 @@ object PaymentInfo {
 
   def without(rs: PaymentRouteVec, fn: Hop => Boolean) = rs.filterNot(_ exists fn)
   def withoutChans(ids: Vector[Long], rd: RoutingData, targetId: String, span: Long) = {
-    val toBan = for (shortChanId <- ids) yield Tuple3(Right apply shortChanId, targetId, span)
-    val withoutBadChans = without(rd.routes, hop => ids contains hop.shortChannelId)
-    rd.copy(routes = withoutBadChans) -> toBan
+    val routesWithoutBadChannels = without(rd.routes, hop => ids contains hop.shortChannelId)
+    val blacklisted = for (shortChanId <- ids) yield Tuple3(shortChanId, targetId, span)
+    rd.copy(routes = routesWithoutBadChannels) -> blacklisted
   }
 
-  def withoutNode(badNode: PublicKey, rd: RoutingData, span: Long) = {
-    val withoutBadNodes = without(rd.routes, hop => badNode == hop.nodeId)
-    val toBan = Tuple3(Left apply badNode, TARGET_ALL, span)
-    rd.copy(routes = withoutBadNodes) -> Vector(toBan)
+  def withoutNodes(badNodes: PublicKeyVec, rd: RoutingData, span: Long) = {
+    val routesWithoutBadNodes = without(rd.routes, hop => badNodes contains hop.nodeId)
+    val blacklisted = for (nodeId <- badNodes) yield Tuple3(nodeId, TARGET_ALL, span)
+    rd.copy(routes = routesWithoutBadNodes) -> blacklisted
   }
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
     // Try to reduce remaining routes and also remember bad nodes and channels
     val parsed = Try apply parseErrorPacket(rd.onion.sharedSecrets, fail.reason)
+    println(parsed)
 
     parsed map {
       case ErrorPacket(nodeKey, cd: ChannelDisabled) =>
         val isNodeHonest = Announcements.checkSig(cd.update, nodeKey)
-        if (!isNodeHonest) withoutNode(badNode = nodeKey, rd, span = 86400 * 2 * 1000)
+        if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, span = 86400 * 4 * 1000)
         else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 600 * 1000)
 
       case ErrorPacket(nodeKey, tf: TemporaryChannelFailure) =>
         val isNodeHonest = Announcements.checkSig(tf.update, nodeKey)
-        if (!isNodeHonest) withoutNode(badNode = nodeKey, rd, span = 86400 * 2 * 1000)
+        if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, span = 86400 * 4 * 1000)
         else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString, 600 * 1000)
 
-      case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNode(nodeKey, rd, 600 * 1000)
-      case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNode(nodeKey, rd, 86400 * 2 * 1000)
-      case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNode(nodeKey, rd, 86400 * 1000)
+      case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNodes(Vector(nodeKey), rd, 600 * 1000)
+      case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
+      case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 2 * 1000)
 
       case ErrorPacket(nodeKey, UnknownNextPeer) =>
         rd.usedRoute.collectFirst { case hop if hop.nodeId == nodeKey =>
           // Node can not find a specified peer so we remove a failed channel
-          withoutChans(Vector(hop.shortChannelId), rd, TARGET_ALL, 86400 * 2 * 1000)
-        } getOrElse withoutNode(nodeKey, rd, 180 * 1000)
+          withoutChans(Vector(hop.shortChannelId), rd, TARGET_ALL, 86400 * 4 * 1000)
+        } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nKey, _) =>
         // Don't blacklist, halt a payment

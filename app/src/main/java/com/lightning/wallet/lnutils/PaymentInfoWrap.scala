@@ -25,7 +25,7 @@ import fr.acinq.bitcoin.{BinaryData, Transaction}
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
-  var pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
+  val pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
 
   def extractPreimg(tx: Transaction) = {
     val fulfills = tx.txIn.map(txIn => txIn.witness.stack) collect {
@@ -37,10 +37,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (fulfills.nonEmpty) uiNotify
   }
 
-  def updateStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
+  def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
   def updOkIncoming(u: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, u.amountMsat, System.currentTimeMillis, u.paymentHash)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, fulfill.paymentPreimage, fulfill.paymentHash)
-  def getPaymentInfo(paymentHash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, paymentHash) headTry toPaymentInfo
+  def updateStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
@@ -56,17 +56,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def failRD(rd: RoutingData) = {
-    // Utility to let user know it's failed
     updateStatus(FAILURE, rd.pr.paymentHash)
     uiNotify
   }
 
-  def reCall(rd: RoutingData) = if (rd.callsLeft > 0) {
-    val request = app.ChannelManager withRoutesAndOnionRD rd.copy(callsLeft = rd.callsLeft - 1)
-    request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, failRD), _ => me failRD rd)
-  } else me failRD rd
-
   def resendMaybe(reason: UpdateFailHtlc, hash: BinaryData) = {
+    // Runtime RD will not be there after an app has been restarted
     lazy val reCreated = me getPaymentInfo hash map emptyRDFromInfo
     val rdOpt = pendingPayments get hash orElse reCreated.toOption
     val rd1BadData = rdOpt map parseFailureCutRoutes(reason)
@@ -74,6 +69,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     for (rd1 \ badsNodesChans <- rd1BadData) if (rd1.ok) {
       for (ban <- badsNodesChans) BadEntityWrap.put tupled ban
       app.ChannelManager.sendEither(useRoutesLeft(rd1), reCall)
+    } else me failRD rd1
+
+    def reCall(rd1: RoutingData) = if (rd1.callsLeft > 0) {
+      val request = app.ChannelManager withRoutesAndOnionRD rd1.copy(callsLeft = rd1.callsLeft - 1)
+      request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, failRD), _ => me failRD rd1)
     } else me failRD rd1
   }
 
@@ -85,15 +85,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def onProcess = {
     case (_, _: NormalData, rd: RoutingData) =>
       // This may be a new payment or an old payment retry attempt
-      // so either insert or update should be executed successfully
+      val freshRecord = getPaymentInfo(rd.pr.paymentHash).isFailure
+      pendingPayments(rd.pr.paymentHash) = rd
 
       db txWrap {
-        pendingPayments(rd.pr.paymentHash) = rd
+        // Either insert or update should be executed successfully
         db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
-        db.change(sql = PaymentTable.newVirtualSql, params = rd.qryText, rd.paymentHashString)
-        db.change(sql = PaymentTable.newSql, params = rd.pr.toJson, NOIMAGE, 0, WAITING,
-          System.currentTimeMillis, rd.pr.description, rd.paymentHashString,
-          rd.firstMsat, rd.lastMsat, rd.lastExpiry)
+        if (freshRecord) db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
+        db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
+          rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
       }
 
       // Display
@@ -158,25 +158,16 @@ object ChannelWrap {
 }
 
 object BadEntityWrap {
-  type NodeOrShortChanId = Either[PublicKey, Long]
-  val put = (res: NodeOrShortChanId, targetNodeId: String, span: Long) => res match {
-    case Right(shortChannelId) => rmAndPut(shortChannelId, TYPE_CHAN, targetNodeId, span)
-    case Left(nodeId) => rmAndPut(nodeId, TYPE_NODE, targetNodeId, span)
+  val put = (res: Any, targetNodeId: String, span: Long) => {
+    db.change(BadEntityTable.newSql, res, targetNodeId, System.currentTimeMillis + span)
+    db.change(BadEntityTable.updSql, System.currentTimeMillis + span, res, targetNodeId)
   }
 
-  private def rmAndPut(resId: Any, resType: String, targetNodeId: String, span: Long) = {
-    db.change(BadEntityTable.killSql, resId, targetNodeId, System.currentTimeMillis - 86400 * 3 * 1000)
-    db.change(BadEntityTable.newSql, resId, resType, targetNodeId, System.currentTimeMillis + span)
-  }
-
-  def findRoutes(from: Set[PublicKey], recipientKey: String) = {
-    def toResult(rc: RichCursor) = Tuple2(rc string BadEntityTable.resId, rc string BadEntityTable.resType)
-    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, recipientKey)
-    val res = RichCursor(cursor) vec toResult
-
-    val badNodes = res collect { case nodeId \ TYPE_NODE => nodeId }
-    val badChans = res collect { case sid \ TYPE_CHAN => sid.toLong }
-    OlympusWrap.findRoutes(badNodes, badChans, from, recipientKey)
+  def findRoutes(from: Set[PublicKey], targetNodeId: PublicKey) = {
+    // Hacky but acceptable: short cannel id length is 32 so anything larger than 60 is node id
+    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, targetNodeId)
+    val badNodes \ badChans = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
+    OlympusWrap.findRoutes(badNodes, badChans.map(_.toLong), from, targetNodeId.toString)
   }
 }
 

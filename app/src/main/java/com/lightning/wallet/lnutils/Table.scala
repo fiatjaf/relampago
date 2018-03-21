@@ -46,21 +46,21 @@ object ChannelTable extends Table {
 }
 
 object BadEntityTable extends Table {
-  val (table, resId, resType, targetNodeId, expires) = ("badentity", "resid", "restype", "targetnodeid", "expires")
-  val selectSql = s"SELECT * FROM $table WHERE $expires > ? AND $targetNodeId IN (?, ?) ORDER BY $id DESC LIMIT 250"
-  val newSql = s"INSERT INTO $table ($resId, $resType, $targetNodeId, $expires) VALUES (?, ?, ?, ?)"
-  val killSql = s"DELETE FROM $table WHERE ($resId = ? AND $targetNodeId = ?) OR $expires < ?"
+  val Tuple4(table, resId, targetNode, expire) = Tuple4("badentity", "resid", "targetnode", "expire")
+  val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $targetNode IN (?, ?) ORDER BY $id DESC LIMIT 250"
+  val newSql = s"INSERT OR IGNORE INTO $table ($resId, $targetNode, $expire) VALUES (?, ?, ?)"
+  val updSql = s"UPDATE $table SET $expire = ? WHERE $resId = ? AND $targetNode = ?"
 
   val createSql = s"""
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $resId TEXT NOT NULL,
-      $resType TEXT NOT NULL,
-      $targetNodeId TEXT NOT NULL,
-      $expires INTEGER NOT NULL
+      $targetNode TEXT NOT NULL,
+      $expire INTEGER NOT NULL,
+      UNIQUE($resId, $targetNode) ON CONFLICT IGNORE
     );
-    CREATE INDEX idx1 ON $table ($expires, $targetNodeId);
-    CREATE INDEX idx2 ON $table ($resId, $targetNodeId);
+    CREATE INDEX idx1 ON $table ($expire, $targetNode);
+    CREATE INDEX idx2 ON $table ($resId, $targetNode);
     COMMIT"""
 }
 
@@ -69,13 +69,12 @@ object PaymentTable extends Table {
   val (table, pr, preimage, incoming, status, stamp) = ("payment", "pr", "preimage", "incoming", "status", "stamp")
   val (description, hash, firstMsat, lastMsat, lastExpiry) = ("description", "hash", "firstMsat", "lastMsat", "lastExpiry")
   val insert10 = s"$pr, $preimage, $incoming, $status, $stamp, $description, $hash, $firstMsat, $lastMsat, $lastExpiry"
-  val searchInner = s"SELECT DISTINCT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit"
 
   // Inserting, selecting
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
   val newSql = s"INSERT OR IGNORE INTO $table ($insert10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
-  val searchSql = s"SELECT * FROM $table WHERE $hash IN ($searchInner)"
+  val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
   // Updating, creating
@@ -131,8 +130,8 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     // Randomize an order of two available default servers
     val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val main: Array[AnyRef] = Array("main-dev-server", "http://213.133.99.89:9002", emptyData, "1", ord1, "0")
-    val fallback: Array[AnyRef] = Array("fallback-dev-server", "http://213.133.103.56:9002", emptyData, "0", ord2, "1")
+    val main: Array[AnyRef] = Array("dev-server-1", "http://213.133.99.89:9002", emptyData, "1", ord1, "0")
+    val fallback: Array[AnyRef] = Array("dev-server-2", "http://213.133.103.56:9002", emptyData, "0", ord2, "1")
 
     dbs.execSQL(OlympusTable.newSql, main)
     dbs.execSQL(OlympusTable.newSql, fallback)
