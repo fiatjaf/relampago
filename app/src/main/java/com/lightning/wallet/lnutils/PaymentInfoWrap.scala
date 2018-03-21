@@ -9,6 +9,7 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
+import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import android.support.v4.app.NotificationCompat
 import com.lightning.wallet.helper.RichCursor
@@ -22,10 +23,12 @@ import com.lightning.wallet.R
 import android.app.{AlarmManager, NotificationManager, PendingIntent}
 import android.content.{BroadcastReceiver, Context, Intent}
 import fr.acinq.bitcoin.{BinaryData, Transaction}
+import rx.lang.scala.{Observable => Obs}
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
-  val pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
+  private[this] val pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
+  val goodRoutes = mutable.Map.empty[PublicKey, PaymentRouteVec]
 
   def extractPreimg(tx: Transaction) = {
     val fulfills = tx.txIn.map(txIn => txIn.witness.stack) collect {
@@ -99,6 +102,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       // Display
       uiNotify
 
+    case (_, _, fulfill: UpdateFulfillHtlc) =>
+      // Runtime optimization: record last successful route
+      pendingPayments.values.find(_.pr.paymentHash == fulfill.paymentHash)
+        .foreach(rd => goodRoutes(rd.pr.nodeId) = rd.usedRoute +: rd.routes)
+
     case (chan, norm: NormalData, _: CommitSig) =>
       // Update affected record states in a database
       // then retry failed payments where possible
@@ -163,7 +171,13 @@ object BadEntityWrap {
     db.change(BadEntityTable.updSql, System.currentTimeMillis + span, res, targetNodeId)
   }
 
-  def findRoutes(from: Set[PublicKey], targetNodeId: PublicKey) = {
+  def findRoutes(from: Set[PublicKey], targetNodeId: PublicKey) =
+    PaymentInfoWrap.goodRoutes get targetNodeId match {
+      case None => doFindRoutes(from, targetNodeId)
+      case Some(routes) => Obs just routes
+    }
+
+  private def doFindRoutes(from: Set[PublicKey], targetNodeId: PublicKey) = {
     // Hacky but acceptable: short cannel id length is 32 so anything larger than 60 is node id
     val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, targetNodeId)
     val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
