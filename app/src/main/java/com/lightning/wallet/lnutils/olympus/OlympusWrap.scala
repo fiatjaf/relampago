@@ -89,12 +89,12 @@ object OlympusWrap extends OlympusProvider {
   def findNodes(query: String) = failOver(_.connector findNodes query, clouds)
   def getChildTxs(txs: TxSeq) = failOver(_.connector getChildTxs txs, clouds)
 
-  def findRoutes(badNodes: StringVec, badChans: Vector[Long], from: Set[PublicKey], toPubKey: String) =
+  def findRoutes(badNodes: Set[String], badChans: Set[Long], from: Set[PublicKey], toPubKey: String) =
     failOver(_.connector.findRoutes(badNodes, badChans, from, toPubKey), clouds)
 }
 
 trait OlympusProvider {
-  def findRoutes(badNodes: StringVec, badChans: Vector[Long],
+  def findRoutes(badNodes: Set[String], badChans: Set[Long],
                  from: Set[PublicKey], toPubKey: String): Obs[PaymentRouteVec]
 
   def findNodes(query: String): Obs[AnnounceChansNumVec]
@@ -118,7 +118,7 @@ class Connector(val url: String) extends OlympusProvider {
   def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getChildTxs(txs: TxSeq) = ask[TxSeq]("txs/get", "txids" -> txs.map(_.txid).toJson.toString.hex)
-  def findRoutes(badNodes: StringVec, badChans: Vector[Long], from: Set[PublicKey], toPubKey: String) =
+  def findRoutes(badNodes: Set[String], badChans: Set[Long], from: Set[PublicKey], toPubKey: String) =
     ask[PaymentRouteVec]("router/routes", "froms" -> from.map(_.toBin).toJson.toString.hex,
       "tos" -> Set(toPubKey).toJson.toString.hex, "xn" -> badNodes.toJson.toString.hex,
       "xc" -> badChans.toJson.toString.hex)

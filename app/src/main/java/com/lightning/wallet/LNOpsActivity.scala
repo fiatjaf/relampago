@@ -56,7 +56,7 @@ class LNOpsActivity extends TimerActivity { me =>
 }
 
 class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
-  def startedByText(c: ClosingData) = if (c.startedByPeer) ln_ops_unilateral_peer else ln_ops_unilateral_you
+  def startedByText(close: ClosingData) = if (close.startedByPeer) ln_ops_unilateral_peer else ln_ops_unilateral_you
   override def onCreateView(i: LayoutInflater, vg: ViewGroup, bn: Bundle) = i.inflate(R.layout.frag_view_pager_chan, vg, false)
   override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
 
@@ -65,7 +65,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
   lazy val host = getActivity.asInstanceOf[LNOpsActivity]
-  import host.UITask
+  import host.{UITask, str2View}
 
   lazy val basic = getString(ln_ops_chan_basic)
   lazy val negotiations = getString(ln_ops_chan_negotiations)
@@ -96,7 +96,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     lnOpsAction setOnClickListener host.onButtonTap {
       // First closing attempt will be a cooperative one while the second attempt will always be an uncooperative one
       val msg = isOperationalOpen(chan) match { case true => ln_chan_close_details case false => ln_chan_force_details }
-      host.mkForm(chan process CMDShutdown, none, host baseTextBuilder getString(msg).html, dialog_ok, dialog_cancel)
+      val bld = host baseTextBuilder getString(msg).html setCustomTitle lnOpsAction.getText.toString
+      host.mkForm(chan process CMDShutdown, none, bld, dialog_ok, dialog_cancel)
     }
 
     def manageOther = UITask {

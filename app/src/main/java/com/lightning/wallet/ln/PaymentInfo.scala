@@ -94,7 +94,6 @@ object PaymentInfo {
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
     // Try to reduce remaining routes and also remember bad nodes and channels
     val parsed = Try apply parseErrorPacket(rd.onion.sharedSecrets, fail.reason)
-    println(parsed)
 
     parsed map {
       case ErrorPacket(nodeKey, cd: ChannelDisabled) =>

@@ -228,7 +228,7 @@ class WalletApp extends Application { me =>
       val routesObs = if (rd.pr.routingInfo.isEmpty) getRoutes(rd.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
       // Update RD with routes and then we can make an onion out of the first available cheapest route while saving the rest
       // remote call may return empty route here in which case `noRouteLeft` will be fired later
-      for (routes <- routesObs) yield useFirstRoute(routes, rd)
+      for (routes <- routesObs) yield useFirstRoute(routes.sortBy(_.size), rd)
     }
 
     def send(rd: RoutingData, noRouteLeft: RoutingData => Unit): Unit = {

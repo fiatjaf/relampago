@@ -90,8 +90,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
       db txWrap {
         // Either insert or update should be executed successfully
-        db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
         if (freshRecord) db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
+        else db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
         db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
           rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
       }
@@ -166,7 +166,7 @@ object BadEntityWrap {
   def findRoutes(from: Set[PublicKey], targetNodeId: PublicKey) = {
     // Hacky but acceptable: short cannel id length is 32 so anything larger than 60 is node id
     val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, targetNodeId)
-    val badNodes \ badChans = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
+    val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
     OlympusWrap.findRoutes(badNodes, badChans.map(_.toLong), from, targetNodeId.toString)
   }
 }

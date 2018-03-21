@@ -11,6 +11,7 @@ import scala.util.Try
 
 
 case class RichCursor(c: Cursor) extends Iterable[RichCursor] { me =>
+  def set[T](trans: RichCursor => T) = try map(trans).toSet finally c.close
   def vec[T](trans: RichCursor => T) = try map(trans).toVector finally c.close
   def headTry[T](trans: RichCursor => T) = try Try apply trans(head) finally c.close
   def string(stringKey: String) = c.getString(c getColumnIndex stringKey)
