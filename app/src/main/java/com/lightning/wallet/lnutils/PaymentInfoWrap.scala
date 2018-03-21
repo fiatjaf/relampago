@@ -103,6 +103,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       uiNotify
 
     case (_, _, fulfill: UpdateFulfillHtlc) =>
+      // Save preimage right away, don't wait for commitSig
+      // seceiving a preimage means a payment is fulfilled
+
+      updOkOutgoing(fulfill)
       // Runtime optimization: record last successful route
       pendingPayments.values.find(_.pr.paymentHash == fulfill.paymentHash)
         .foreach(rd => goodRoutes(rd.pr.nodeId) = rd.usedRoute +: rd.routes)
@@ -113,7 +117,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
       db txWrap {
         for (Htlc(true, add) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(add)
-        for (Htlc(false, _) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkOutgoing(fulfill)
         for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updateStatus(FAILURE, add.paymentHash)
         for (Htlc(false, add) \ reason <- norm.commitments.localCommit.spec.failed) resendMaybe(reason, add.paymentHash)
       }
