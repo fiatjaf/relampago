@@ -117,9 +117,9 @@ object PaymentInfo {
           withoutChans(Vector(hop.shortChannelId), rd, TARGET_ALL, 86400 * 4 * 1000)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
-      case ErrorPacket(nKey, _) =>
+      case ErrorPacket(nodeKey, _) =>
         // Halt a payment if error comes from recipient
-        if (nKey != rd.pr.nodeId) rd -> Vector.empty
+        if (nodeKey != rd.pr.nodeId) rd -> Vector.empty
         else rd.copy(ok = false) -> Vector.empty
 
     } getOrElse {

@@ -58,37 +58,25 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     for (hash <- app.ChannelManager.frozenInFlightHashes) updateStatus(FROZEN, hash)
   }
 
-  def failRD(rd: RoutingData) = {
+  def failOnUI(rd: RoutingData) = {
     updateStatus(FAILURE, rd.pr.paymentHash)
     uiNotify
   }
 
-  def resendMaybe(reason: UpdateFailHtlc, hash: BinaryData) = {
-    // Runtime RD will not be there after an app has been restarted
-    lazy val reCreated = me getPaymentInfo hash map emptyRDFromInfo
-    val rdOpt = pendingPayments get hash orElse reCreated.toOption
-    val rd1BadData = rdOpt map parseFailureCutRoutes(reason)
-
-    for (rd1 \ badsNodesChans <- rd1BadData) if (rd1.ok) {
-      for (ban <- badsNodesChans) BadEntityWrap.put tupled ban
-      app.ChannelManager.sendEither(useRoutesLeft(rd1), reCall)
-    } else me failRD rd1
-
-    def reCall(rd1: RoutingData) = if (rd1.callsLeft > 0) {
-      val request = app.ChannelManager withRoutesAndOnionRD rd1.copy(callsLeft = rd1.callsLeft - 1)
-      request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, failRD), _ => me failRD rd1)
-    } else me failRD rd1
-  }
+  def fetchNewRoutes(rd: RoutingData) = if (rd.callsLeft > 0) {
+    val request = app.ChannelManager withRoutesAndOnionRD rd.copy(callsLeft = rd.callsLeft - 1)
+    request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, failOnUI), _ => me failOnUI rd)
+  } else updateStatus(FAILURE, rd.pr.paymentHash)
 
   override def onError = {
-    case (_, exc: CMDException) => me failRD exc.rd
+    case (_, exc: CMDException) => me failOnUI exc.rd
     case chan \ error => chan process CMDShutdown
   }
 
   override def onProcess = {
     case (_, _: NormalData, rd: RoutingData) =>
       // This may be a new payment or an old payment retry attempt
-      val freshRecord = getPaymentInfo(rd.pr.paymentHash).isFailure
+      val freshRecord = getPaymentInfo(rd.pr.paymentHash).isFailure // TODO: change
       pendingPayments(rd.pr.paymentHash) = rd
 
       db txWrap {
@@ -118,7 +106,23 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       db txWrap {
         for (Htlc(true, add) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(add)
         for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updateStatus(FAILURE, add.paymentHash)
-        for (Htlc(false, add) \ reason <- norm.commitments.localCommit.spec.failed) resendMaybe(reason, add.paymentHash)
+        for (Htlc(false, add) \ why <- norm.commitments.localCommit.spec.failed) {
+
+          // Runtime RD will not be present after restart
+          val rdOpt = pendingPayments.get(add.paymentHash) orElse
+            getPaymentInfo(add.paymentHash).map(emptyRDFromInfo).toOption
+
+          rdOpt map parseFailureCutRoutes(why) match {
+            case Some(rd1 \ badNodesAndChans) if rd1.ok =>
+              // Not halted: try use the routes left or fetch new
+              for (ban <- badNodesAndChans) BadEntityWrap.put tupled ban
+              app.ChannelManager.sendEither(useRoutesLeft(rd1), fetchNewRoutes)
+
+            // Payment is either halted or not found at all
+            case _ => updateStatus(FAILURE, add.paymentHash)
+          }
+
+        }
       }
 
       if (norm.commitments.localCommit.spec.fulfilled.nonEmpty) {
