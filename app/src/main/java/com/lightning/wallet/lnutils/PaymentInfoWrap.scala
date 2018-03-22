@@ -104,7 +104,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     case (_, _, fulfill: UpdateFulfillHtlc) =>
       // Save preimage right away, don't wait for commitSig
-      // seceiving a preimage means a payment is fulfilled
+      // receiving a preimage means a payment is fulfilled
 
       updOkOutgoing(fulfill)
       // Runtime optimization: record last successful route

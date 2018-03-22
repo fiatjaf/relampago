@@ -21,6 +21,7 @@ import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import com.lightning.wallet.ln.LNParams.minDepth
 import com.lightning.wallet.lnutils.RatesSaver
 import android.support.v7.widget.Toolbar
+import com.lightning.wallet.ln.LNParams
 import android.support.v4.app.Fragment
 import org.bitcoinj.wallet.SendRequest
 import fr.acinq.bitcoin.MilliSatoshi
@@ -114,10 +115,16 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     }
   }
 
+  def peerStatus = {
+    val numPeers = app.kit.peerGroup.numConnectedPeers
+    // Additional measure in case if ChannelManager listener fails
+    if (numPeers > 3) LNParams.broadcaster.bestHeightObtained = true
+    if (numPeers < 1) btc_status_connecting else btc_status_online
+  }
+
   val constListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
-    def onPeerConnected(peer: Peer, peerCount: Int) = update(host getString status, Informer.PEER).run
-    def onPeerDisconnected(peer: Peer, peerCount: Int) = update(host getString status, Informer.PEER).run
-    def status = if (app.kit.peerGroup.numConnectedPeers < 1) btc_status_connecting else btc_status_online
+    def onPeerConnected(peer: Peer, peerCount: Int) = update(host getString peerStatus, Informer.PEER).run
+    def onPeerDisconnected(peer: Peer, peerCount: Int) = update(host getString peerStatus, Informer.PEER).run
   }
 
   val itemsListListener = new TxTracker {
@@ -308,9 +315,8 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     adapter set txs
   }
 
-  // Manually update title and subtitle once toolbar is there
+  add(host getString peerStatus, Informer.PEER).run
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
-  add(host getString constListener.status, Informer.PEER).run
   toolbar setOnClickListener onFastTap(showDenomChooser)
   toolbar setOnMenuItemClickListener barMenuListener
   toolbar inflateMenu R.menu.btc

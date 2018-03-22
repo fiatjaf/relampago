@@ -117,8 +117,9 @@ object PaymentInfo {
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nKey, _) =>
-        // Don't blacklist, halt a payment
-        rd.copy(ok = false) -> Vector.empty
+        // Halt a payment if error comes from recipient
+        if (nKey != rd.pr.nodeId) rd -> Vector.empty
+        else rd.copy(ok = false) -> Vector.empty
 
     } getOrElse {
       val shortChanIds = rd.usedRoute.map(_.shortChannelId)

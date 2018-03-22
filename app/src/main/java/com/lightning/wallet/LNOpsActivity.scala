@@ -96,7 +96,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     lnOpsAction setOnClickListener host.onButtonTap {
       // First closing attempt will be a cooperative one while the second attempt will always be an uncooperative one
       val msg = isOperationalOpen(chan) match { case true => ln_chan_close_details case false => ln_chan_force_details }
-      val bld = host baseTextBuilder getString(msg).html setCustomTitle lnOpsAction.getText.toString
+      val bld = host baseTextBuilder host.getString(msg).html setCustomTitle lnOpsAction.getText.toString
       host.mkForm(chan process CMDShutdown, none, bld, dialog_ok, dialog_cancel)
     }
 
@@ -109,8 +109,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageFunding(wait: WaitFundingDoneData) = UITask {
       val fundingTxId = Commitments fundingTxid wait.commitments
       val threshold = math.max(wait.commitments.remoteParams.minimumDepth, LNParams.minDepth)
-      lnOpsDescription setText getString(ln_ops_chan_opening).format(chan.state, alias, started,
-        coloredIn(capacity), app.plurOrZero(txsConfs, threshold), fundingTxId.toString,
+
+      lnOpsDescription setText host.getString(ln_ops_chan_opening).format(chan.state, alias,
+        started, coloredIn(capacity), app.plurOrZero(txsConfs, threshold), fundingTxId.toString,
         humanStatus(LNParams.broadcaster getStatus fundingTxId), nodeId).html
 
       // Initialize button
@@ -126,8 +127,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       val canSpendHuman = if (canSpend.amount < 0L) coloredOut(canSpend) else coloredIn(canSpend)
       val canReceiveHuman = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
       val canReceiveFinal = if (channelAndHop(chan).isDefined) canReceiveHuman else sumOut format nothingYet
-      lnOpsDescription setText getString(ln_ops_chan_open).format(chan.state, alias, started,
-        coloredIn(capacity), canSpendHuman, canReceiveFinal, inFlight, nodeId).html
+
+      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias,
+        started, coloredIn(capacity), canSpendHuman, canReceiveFinal, inFlight, nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -137,8 +139,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageNegotiations = UITask {
       val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
-      lnOpsDescription setText negotiations.format(chan.state, alias, started,
-        coloredIn(capacity), coloredIn(refundable), inFlight).html
+
+      lnOpsDescription setText negotiations.format(chan.state, alias,
+        started, coloredIn(capacity), coloredIn(refundable), inFlight).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -170,23 +173,23 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           val tier12View = info.getState collect {
             case ShowDelayed(_ \ true \ _, _, fee, amt) =>
               val deadDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              getString(ln_ops_chan_unilateral_status_dead).format(deadDetails, coloredIn apply amt)
+              host.getString(ln_ops_chan_unilateral_status_dead).format(deadDetails, coloredIn apply amt)
 
             case ShowReady(_, fee, amt) =>
               val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
+              host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
 
             case show @ ShowDelayed(_ \ false \ _, _, fee, amt) if show.isPublishable =>
               // This fails if input is spent by our peer, happens when we publish a revoked commit
               val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
+              host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
 
             case ShowDelayed(_ \ false \ left, _, fee, amt) =>
               val leftDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
               statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
           }
 
-          val startedBy = getString(me startedByText close)
+          val startedBy = host.getString(me startedByText close)
           val humanTier12View = tier12View take 2 mkString "<br><br>"
           val status = humanStatus apply getStatus(info.commitTx.txid)
           val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)

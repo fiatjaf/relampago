@@ -532,10 +532,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       val showNewPassForm = (changePass: CharSequence => Unit) => {
         val view \ field \ _ = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_info, null)
         mkForm(changePasscode, none, baseBuilder(me getString sets_secret_change, view), dialog_ok, dialog_cancel)
+        def inform = showForm(negTextBuilder(dialog_ok, getString(sets_secret_ok) format field.getText).create)
 
         def changePasscode = runAnd(app toast secret_changing) {
-          // Do the required preliminary steps and encrypt with a new passcode
-          <(changePass(field.getText), onFail)(_ => app toast sets_secret_ok)
+          // Maybe decrypt a wallet and set a new passcode, inform user afterwards
+          <(changePass(field.getText), onFail)(_ => if (field.getText.length > 0) inform)
         }
       }
 

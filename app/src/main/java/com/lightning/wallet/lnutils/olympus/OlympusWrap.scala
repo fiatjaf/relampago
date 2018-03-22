@@ -119,7 +119,7 @@ class Connector(val url: String) extends OlympusProvider {
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getChildTxs(txs: TxSeq) = ask[TxSeq]("txs/get", "txids" -> txs.map(_.txid).toJson.toString.hex)
   def findRoutes(badNodes: Set[String], badChans: Set[Long], from: Set[PublicKey], toPubKey: String) =
-      ask[PaymentRouteVec]("router/routes", "froms" -> from.map(_.toBin).toJson.toString.hex,
-        "tos" -> Set(toPubKey).toJson.toString.hex, "xn" -> badNodes.toJson.toString.hex,
-        "xc" -> badChans.toJson.toString.hex)
+    ask[PaymentRouteVec]("router/routes", "froms" -> from.map(_.toBin).toJson.toString.hex,
+      "tos" -> Set(toPubKey).toJson.toString.hex, "xn" -> badNodes.toJson.toString.hex,
+      "xc" -> badChans.toJson.toString.hex)
 }

@@ -9,8 +9,8 @@
 
     <!-- app wide -->
     <string name="unlock">Unlock Wallet</string>
-    <string name="sets_secret_ok">Passcode has been updated</string>
-    <string name="secret_info">pick a passcode\nor just leave the field blank\nto have an unencrypted wallet</string>
+    <string name="sets_secret_ok">Passcode has been set to «%1$s»</string>
+    <string name="secret_info">pick a good passcode\nor just leave the field blank\nto have an unencrypted wallet</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch.</string>
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="fee_risky"><![CDATA[<small>%1$s<br><small>Standard transaction fee</small></small>]]></string>

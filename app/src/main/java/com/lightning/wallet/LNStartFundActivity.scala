@@ -141,7 +141,7 @@ class LNStartFundActivity extends TimerActivity { me =>
             their, unsignedRequest, outIndex, realChannelFundingAmountSat)
         }
 
-        def onTxFail(fundingError: Throwable) = mkForm(askForFunding(their), none,
+        def onTxFail(fundingError: Throwable) = mkForm(askForFunding(their).run, none,
           baseBuilder(messageWhenMakingTx(fundingError), null), dialog_ok, dialog_cancel)
       }
 

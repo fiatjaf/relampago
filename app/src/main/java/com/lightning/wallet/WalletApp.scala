@@ -148,7 +148,6 @@ class WalletApp extends Application { me =>
       def tellHeight(left: Int) = {
         // No matter how many blocks are left we only send a CMD once the last block is done
         if (left < 1) for (chan <- all) chan process CMDBestHeight(broadcaster.currentHeight)
-        // The fact that we are downloading blocks means we know a best chain height
         broadcaster.bestHeightObtained = true
       }
     }
