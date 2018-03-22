@@ -215,7 +215,7 @@ object GossipCatcher extends ChannelListener {
   }
 }
 
-// CLOSED CHANNEL NOTIFICATION
+// CHANNEL CLOSED NOTIFICATION
 
 object Notificator {
   def chanClosed(alias: String) = try {
