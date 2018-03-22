@@ -79,14 +79,15 @@ case class ClosingData(announce: NodeAnnouncement,
   }
 
   def startedByPeer = localCommit.isEmpty && (remoteCommit.nonEmpty || nextRemoteCommit.nonEmpty)
-  def tier12States = localCommit.flatMap(_.getState) ++ remoteCommit.flatMap(_.getState) ++
-      nextRemoteCommit.flatMap(_.getState) ++ refundRemoteCommit.flatMap(_.getState) ++
-      revokedCommit.flatMap(_.getState)
+  def tier12States = localCommit.flatMap(_.getState) ++ revokedCommit.flatMap(_.getState) ++
+    remoteCommit.flatMap(_.getState) ++ nextRemoteCommit.flatMap(_.getState) ++
+    refundRemoteCommit.flatMap(_.getState)
+
 
   lazy val closings =
-    mutualClose.map(Left.apply) ++ localCommit.map(Right.apply) ++
-      remoteCommit.map(Right.apply) ++ nextRemoteCommit.map(Right.apply) ++
-      refundRemoteCommit.map(Right.apply) ++ revokedCommit.map(Right.apply)
+    mutualClose.map(Left.apply) ++ revokedCommit.map(Right.apply) ++
+      localCommit.map(Right.apply) ++ remoteCommit.map(Right.apply) ++
+      nextRemoteCommit.map(Right.apply) ++ refundRemoteCommit.map(Right.apply)
 }
 
 sealed trait CommitPublished {
