@@ -53,7 +53,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if accept.temporaryChannelId == cmd.tempChanId =>
 
         if (accept.minimumDepth > 6L) throw new LightningException("Their minimumDepth is too high")
-        if (accept.toSelfDelay > 1000) throw new LightningException("Their toSelfDelay is too high")
+        if (accept.toSelfDelay > 2000) throw new LightningException("Their toSelfDelay is too high")
         if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
         if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
         if (accept.channelReserveSatoshis > cmd.realFundingAmountSat / 10) throw new LightningException("Their proposed reserve is too high")

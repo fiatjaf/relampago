@@ -79,10 +79,9 @@ case class ClosingData(announce: NodeAnnouncement,
   }
 
   def startedByPeer = localCommit.isEmpty && (remoteCommit.nonEmpty || nextRemoteCommit.nonEmpty)
-  def tier12States = localCommit.flatMap(_.getState) ++ revokedCommit.flatMap(_.getState) ++
+  def tier12States = revokedCommit.flatMap(_.getState) ++ localCommit.flatMap(_.getState) ++
     remoteCommit.flatMap(_.getState) ++ nextRemoteCommit.flatMap(_.getState) ++
     refundRemoteCommit.flatMap(_.getState)
-
 
   lazy val closings =
     mutualClose.map(Left.apply) ++ revokedCommit.map(Right.apply) ++

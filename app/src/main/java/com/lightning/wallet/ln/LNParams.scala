@@ -15,7 +15,7 @@ object LNParams { me =>
   val maxChannelCapacity = MilliSatoshi(16777216000L)
   val maxHtlcValue = MilliSatoshi(4194304000L)
   val minHtlcValue = MilliSatoshi(10L)
-  val dustLimit = Satoshi(30000L)
+  val dustLimit = Satoshi(5000L)
   val maxCltvDelta = 28 * 144
 
   val chainHash = Block.TestnetGenesisBlock.hash
