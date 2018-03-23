@@ -32,7 +32,6 @@ import android.content.Context.LAYOUT_INFLATER_SERVICE
 import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
 import android.widget.AbsListView.OnScrollListener
-import com.google.zxing.client.android.BeepManager
 import com.lightning.wallet.lnutils.RatesSaver
 import android.view.ViewGroup.LayoutParams
 import android.support.v4.view.ViewPager
@@ -554,7 +553,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 class FragScan extends Fragment with BarcodeCallback { me =>
   type Points = java.util.List[com.google.zxing.ResultPoint]
   lazy val host = getActivity.asInstanceOf[WalletActivity]
-  lazy val beepManager = new BeepManager(host)
   var lastAttempt = System.currentTimeMillis
   var barcodeReader: BarcodeView = _
 
@@ -582,7 +580,6 @@ class FragScan extends Fragment with BarcodeCallback { me =>
     // This may throw which is expected and fine
 
     barcodeReader.pause
-    beepManager.playBeepSound
     lastAttempt = System.currentTimeMillis
     app.TransData recordValue scannedText
     host.checkTransData
