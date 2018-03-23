@@ -159,6 +159,7 @@
     </array>
 
     <!-- errors -->
+    <string name="err_ln_no_data_loss_protect">Data loss protection is not provided by this node.</string>
     <string name="err_ln_peer_offline">This remote peer could not be reached. Please try a different one.</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept.</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum.</string>
@@ -223,9 +224,8 @@
         <item>Frozen</item>
     </array>
 
-    <string name="chan_notice_title">Channel with %1$s has been closed</string>
-    <string name="chan_notice_body">More info can be found at channel details page</string>
-
+    <string name="chan_notice_title">Closed channel warning</string>
+    <string name="chan_notice_message">Channel with «%1$s» has been closed</string>
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FE6500>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_open"><![CDATA[<font color=#16A764>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>can send %5$s<br>can receive %6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FE6500>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>

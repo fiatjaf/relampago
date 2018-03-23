@@ -77,9 +77,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     case (_, _: NormalData, rd: RoutingData) =>
       // This may be a new payment or an old payment retry attempt
       // Either insert or update should be executed successfully
+      pendingPayments(rd.pr.paymentHash) = rd
 
       db txWrap {
-        pendingPayments(rd.pr.paymentHash) = rd
         db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
         db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
           rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
@@ -237,10 +237,10 @@ class Notificator extends BroadcastReceiver {
     // used instead of toast so can be seen at later time
 
     val target = classOf[MainActivity]
-    val title = ct getString R.string.chan_notice_title format intent.getExtras.getString("extra")
+    val message = ct getString R.string.chan_notice_message format intent.getExtras.getString("extra")
     val targetIntent = PendingIntent.getActivity(ct, 0, new Intent(ct, target), PendingIntent.FLAG_UPDATE_CURRENT)
     val builder = new NotificationCompat.Builder(ct).setContentIntent(targetIntent).setSmallIcon(R.drawable.dead)
-      .setAutoCancel(true).setContentTitle(title).setContentText(ct getString R.string.chan_notice_body)
+      .setAutoCancel(true).setContentTitle(ct getString R.string.chan_notice_title).setContentText(message)
 
     val service = ct.getSystemService(Context.NOTIFICATION_SERVICE)
     service.asInstanceOf[NotificationManager].notify(1, builder.build)

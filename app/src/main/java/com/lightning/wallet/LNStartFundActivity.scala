@@ -76,7 +76,9 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       val peerOffline = new LightningException(me getString err_ln_peer_offline)
+      val noLossProtect = new LightningException(me getString err_ln_no_data_loss_protect)
       override def onOperational(ann: NodeAnnouncement, their: Init) = if (ann == announce) askForFunding(their).run
+      override def onIncompatible(ann: NodeAnnouncement) = if (ann == announce) onError(freshChan -> noLossProtect)
       override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) onError(freshChan -> peerOffline)
       override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) onError(freshChan -> peerOffline)
 
