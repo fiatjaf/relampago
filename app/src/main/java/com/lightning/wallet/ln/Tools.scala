@@ -44,10 +44,8 @@ object Tools {
 object Features {
   val OPTION_DATA_LOSS_PROTECT_MANDATORY = 0
   val OPTION_DATA_LOSS_PROTECT_OPTIONAL = 1
-  val INITIAL_ROUTING_SYNC_BIT_OPTIONAL = 3
 
   implicit def binData2BitSet(data: BinaryData): util.BitSet = util.BitSet valueOf data.reverse.toArray
-  def initialRoutingSync(bitset: util.BitSet) = bitset.get(INITIAL_ROUTING_SYNC_BIT_OPTIONAL)
   def areSupported(bitset: util.BitSet) = !(0 until bitset.length by 2 exists bitset.get)
 
   def dataLossProtect(bitset: util.BitSet) =
