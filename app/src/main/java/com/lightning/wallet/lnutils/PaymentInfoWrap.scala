@@ -63,7 +63,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     uiNotify
   }
 
-  def fetchNewRoutes(rd: RoutingData) = if (rd.callsLeft > 0) {
+  def newRoutes(rd: RoutingData) = if (rd.callsLeft > 0) {
     val request = app.ChannelManager withRoutesAndOnionRD rd.copy(callsLeft = rd.callsLeft - 1)
     request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, failOnUI), _ => me failOnUI rd)
   } else updateStatus(FAILURE, rd.pr.paymentHash)
@@ -76,13 +76,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def onProcess = {
     case (_, _: NormalData, rd: RoutingData) =>
       // This may be a new payment or an old payment retry attempt
-      val freshRecord = getPaymentInfo(rd.pr.paymentHash).isFailure // TODO: change
-      pendingPayments(rd.pr.paymentHash) = rd
+      // Either insert or update should be executed successfully
 
       db txWrap {
-        // Either insert or update should be executed successfully
-        if (freshRecord) db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
-        else db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
+        pendingPayments(rd.pr.paymentHash) = rd
+        db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
         db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
           rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
       }
@@ -92,12 +90,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     case (_, _, fulfill: UpdateFulfillHtlc) =>
       // Save preimage right away, don't wait for commitSig
-      // seceiving a preimage means a payment is fulfilled
-
+      // receiving a preimage means a payment is fulfilled
       updOkOutgoing(fulfill)
-      // Runtime optimization: record last successful route
-      pendingPayments.values.find(_.pr.paymentHash == fulfill.paymentHash)
-        .foreach(rd => goodRoutes(rd.pr.nodeId) = rd.usedRoute +: rd.routes)
+
+      pendingPayments.values.find(_.pr.paymentHash == fulfill.paymentHash) foreach { rd =>
+        // Make payment searchable + runtime optimization: record last successful route
+        db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
+        goodRoutes(rd.pr.nodeId) = rd.usedRoute +: rd.routes
+      }
 
     case (chan, norm: NormalData, _: CommitSig) =>
       // Update affected record states in a database
@@ -116,7 +116,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
             case Some(rd1 \ badNodesAndChans) if rd1.ok =>
               // Not halted: try use the routes left or fetch new
               for (ban <- badNodesAndChans) BadEntityWrap.put tupled ban
-              app.ChannelManager.sendEither(useRoutesLeft(rd1), fetchNewRoutes)
+              app.ChannelManager.sendEither(useRoutesLeft(rd1), newRoutes)
 
             // Payment is either halted or not found at all
             case _ => updateStatus(FAILURE, add.paymentHash)

@@ -20,13 +20,9 @@ object OlympusTable extends Table {
 
   val createSql = s"""
     CREATE TABLE $table (
-      $id INTEGER PRIMARY KEY AUTOINCREMENT,
-      $identifier TEXT NOT NULL UNIQUE,
-      $url TEXT NOT NULL UNIQUE,
-      $data TEXT NOT NULL,
-      $auth INTEGER NOT NULL,
-      $order INTEGER NOT NULL,
-      $removable INTEGER NOT NULL
+      $id INTEGER PRIMARY KEY AUTOINCREMENT, $identifier TEXT NOT NULL UNIQUE,
+      $url STRING NOT NULL UNIQUE, $data STRING NOT NULL, $auth INTEGER NOT NULL,
+      $order INTEGER NOT NULL, $removable INTEGER NOT NULL
     )"""
 }
 
@@ -41,7 +37,7 @@ object ChannelTable extends Table {
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $identifier TEXT NOT NULL UNIQUE,
-      $data TEXT NOT NULL
+      $data STRING NOT NULL
     )"""
 }
 
@@ -53,10 +49,8 @@ object BadEntityTable extends Table {
 
   val createSql = s"""
     CREATE TABLE $table (
-      $id INTEGER PRIMARY KEY AUTOINCREMENT,
-      $resId TEXT NOT NULL,
-      $targetNode TEXT NOT NULL,
-      $expire INTEGER NOT NULL,
+      $id INTEGER PRIMARY KEY AUTOINCREMENT, $resId STRING NOT NULL,
+      $targetNode STRING NOT NULL, $expire INTEGER NOT NULL,
       UNIQUE($resId, $targetNode) ON CONFLICT IGNORE
     );
     CREATE INDEX idx1 ON $table ($expire, $targetNode);
@@ -73,8 +67,8 @@ object PaymentTable extends Table {
   // Inserting, selecting
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
   val newSql = s"INSERT OR IGNORE INTO $table ($insert10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
   val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
+  val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
   // Updating, creating
@@ -87,17 +81,9 @@ object PaymentTable extends Table {
 
   val createSql = s"""
     CREATE TABLE $table (
-      $id INTEGER PRIMARY KEY AUTOINCREMENT,
-      $pr STRING NOT NULL,
-      $preimage STRING NOT NULL,
-      $incoming INTEGER NOT NULL,
-      $status INTEGER NOT NULL,
-      $stamp INTEGER NOT NULL,
-      $description STRING NOT NULL,
-      $hash STRING UNIQUE NOT NULL,
-      $firstMsat INTEGER NOT NULL,
-      $lastMsat INTEGER NOT NULL,
-      $lastExpiry INTEGER NOT NULL
+      $id INTEGER PRIMARY KEY AUTOINCREMENT, $pr STRING NOT NULL, $preimage STRING NOT NULL,
+      $incoming INTEGER NOT NULL, $status INTEGER NOT NULL, $stamp INTEGER NOT NULL, $description STRING NOT NULL,
+      $hash STRING UNIQUE NOT NULL, $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL
     );
     CREATE INDEX idx1 ON $table ($status);
     CREATE INDEX idx2 ON $table ($hash);

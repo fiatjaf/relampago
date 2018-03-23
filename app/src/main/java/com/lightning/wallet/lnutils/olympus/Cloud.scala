@@ -118,5 +118,5 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   def withRoutesAndOnionRDFromPR(pr: PaymentRequest) =
     // These payments will always be dust so frozen state is not an issue
-    app.ChannelManager withRoutesAndOnionRDFrozenAllowed emptyRDFromPR(pr)
+    app.ChannelManager withRoutesAndOnionRDFrozenAllowed emptyRD(pr, pr.unsafeMsat)
 }

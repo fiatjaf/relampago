@@ -34,9 +34,7 @@ object PaymentInfo {
     RoutingData(pr, Vector.empty, Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat, 0L, 0L, 4, ok = true)
   }
 
-  def emptyRDFromPR(pr: PaymentRequest) = emptyRD(pr, pr.unsafeMsat) // Automatic requests like storage tokens
-  def emptyRDFromInfo(info: PaymentInfo) = emptyRD(info.pr, info.firstMsat) // Requests with option for custom amount
-
+  def emptyRDFromInfo(info: PaymentInfo) = emptyRD(info.pr, info.firstMsat)
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
     makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
