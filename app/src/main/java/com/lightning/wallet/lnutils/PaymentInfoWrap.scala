@@ -91,7 +91,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     case (_, _, fulfill: UpdateFulfillHtlc) =>
       // Save preimage right away, don't wait for commitSig
       // receiving a preimage means a payment is fulfilled
-      updOkOutgoing(fulfill)
+      db txWrap updOkOutgoing(fulfill)
 
       pendingPayments.values.find(_.pr.paymentHash == fulfill.paymentHash) foreach { rd =>
         // Make payment searchable + runtime optimization: record last successful route

@@ -5,13 +5,13 @@ import scala.concurrent.duration._
 import com.lightning.wallet.ln.wire._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.Features._
-
 import rx.lang.scala.{Observable => Obs}
 import com.lightning.wallet.ln.Tools.{Bytes, none}
 import com.lightning.wallet.ln.crypto.Noise.KeyPair
 import java.util.concurrent.Executors
+
 import fr.acinq.bitcoin.BinaryData
-import java.net.Socket
+import java.net.{InetSocketAddress, Socket}
 
 
 object ConnectionManager {
@@ -51,7 +51,9 @@ object ConnectionManager {
 
     val work = Future {
       // First blocking connect, then send data
-      socket.connect(ann.addresses.head, 7500)
+      val location1 = new InetSocketAddress("10.0.2.2", ann.addresses.head.getPort)
+      socket.connect(location1, 7500)
+      //socket.connect(ann.addresses.head, 7500)
       handler.init
 
       while (true) {

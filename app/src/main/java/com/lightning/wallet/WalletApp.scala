@@ -4,6 +4,7 @@ import R.string._
 import spray.json._
 import org.bitcoinj.core._
 import com.lightning.wallet.ln._
+
 import scala.concurrent.duration._
 import com.lightning.wallet.Utils._
 import com.lightning.wallet.lnutils._
@@ -15,10 +16,12 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.muddzdev.styleabletoastlibrary.StyleableToast
+
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.lnutils.olympus.CloudAct
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
@@ -26,20 +29,23 @@ import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
 import java.net.InetSocketAddress
+
 import android.app.Application
+
 import scala.util.Try
 import java.io.File
 
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import android.content.{ClipData, ClipboardManager, Context}
+import com.google.common.net.InetAddresses
 import org.bitcoinj.wallet.{Protos, SendRequest, Wallet}
 import fr.acinq.bitcoin.{BinaryData, Crypto}
 import rx.lang.scala.{Observable => Obs}
 
 
 class WalletApp extends Application { me =>
-  lazy val params = org.bitcoinj.params.TestNet3Params.get
+  lazy val params = org.bitcoinj.params.RegTestParams.get
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
   lazy val chainFile = new File(getFilesDir, chainFileName)
@@ -267,8 +273,8 @@ class WalletApp extends Application { me =>
     }
 
     def useCheckPoints(time: Long) = {
-      val pts = getAssets open "checkpoints-testnet.txt"
-      CheckpointManager.checkpoint(params, pts, store, time)
+//      val pts = getAssets open "checkpoints-testnet.txt"
+//      CheckpointManager.checkpoint(params, pts, store, time)
     }
 
     def decryptSeed(pass: String) = {
@@ -286,7 +292,10 @@ class WalletApp extends Application { me =>
       wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
       wallet.watchMode = true
 
-      peerGroup addPeerDiscovery new DnsDiscovery(params)
+      val trustedNode = InetAddresses forString "10.0.2.2"
+      peerGroup addAddress new PeerAddress(app.params, trustedNode, 8333)
+
+//      peerGroup addPeerDiscovery new DnsDiscovery(params)
       peerGroup.setMinRequiredProtocolVersion(70015)
       peerGroup.setDownloadTxDependencies(0)
       peerGroup.setPingIntervalMsec(10000)

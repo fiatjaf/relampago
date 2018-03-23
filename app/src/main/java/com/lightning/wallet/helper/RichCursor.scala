@@ -1,12 +1,9 @@
 package com.lightning.wallet.helper
 
-import android.database.{ContentObserver, Cursor}
-import com.lightning.wallet.ln.Tools.{none, runAnd}
-import android.support.v4.content.{AsyncTaskLoader, Loader}
-import android.support.v4.app.LoaderManager.LoaderCallbacks
+import android.support.v4.content.AsyncTaskLoader
+import com.lightning.wallet.ln.Tools.runAnd
 import android.content.Context
-import android.os.Handler
-import android.net.Uri
+import android.database.Cursor
 import scala.util.Try
 
 
@@ -37,21 +34,4 @@ extends AsyncTaskLoader[Cursor](ct) { me =>
   val consume: Vector[T] => Unit
   def createItem(wrap: RichCursor): T
   def getCursor: Cursor
-}
-
-// Watch data change events
-abstract class ReactCallback(ct: Context)
-extends LoaderCallbacks[Cursor] { me =>
-
-  val observeTablePath: Uri
-  type LoaderCursor = Loader[Cursor]
-  def getObserver(loader: LoaderCursor) = new ContentObserver(new Handler) {
-    override def onChange(self: Boolean) = if (null != loader) loader.forceLoad
-  }
-
-  def onLoaderReset(loader: LoaderCursor) = none
-  def onLoadFinished(loader: LoaderCursor, cursor: Cursor) = {
-    cursor.setNotificationUri(ct.getContentResolver, observeTablePath)
-    cursor.registerContentObserver(me getObserver loader)
-  }
 }

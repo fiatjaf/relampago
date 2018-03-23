@@ -14,18 +14,21 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
+import android.os.{Bundle, Handler}
 import scala.util.{Failure, Success, Try}
+import android.database.{ContentObserver, Cursor}
 import com.lightning.wallet.ln.Tools.{none, random, runAnd, wrap}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
 import com.lightning.wallet.R.drawable.{await, conf1, dead, frozen}
+import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.wallet.ln.PaymentRequest.write
+import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import com.lightning.wallet.ln.Channel
 import android.support.v4.app.Fragment
 import com.lightning.wallet.Utils.app
 import org.bitcoinj.core.Transaction
 import android.app.AlertDialog
-import android.os.Bundle
 import java.util.Date
 
 
@@ -278,15 +281,22 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
   // INIT
 
-  new ReactCallback(host) { self =>
-    val observeTablePath = db sqlPath PaymentTable.table
-    private[this] var lastQuery = new String
+  new LoaderCallbacks[Cursor] { self =>
+    def onLoadFinished(loader: LoaderCursor, c: Cursor) = none
+    def onLoaderReset(loader: LoaderCursor) = none
+    type LoaderCursor = Loader[Cursor]
     type InfoVec = Vector[PaymentInfo]
 
-    def updView(pays: InfoVec, showText: Boolean) = UITask {
+    private[this] var lastQuery = new String
+    private[this] val observer = new ContentObserver(new Handler) {
+      override def onChange(fromMe: Boolean) = if (!fromMe) react(lastQuery)
+    }
+
+    def updView(pays: InfoVec, showWarning: Boolean) = UITask {
+      // Update payments view and decide which part of UI to show
       wrap(adapter.notifyDataSetChanged)(adapter set pays)
-      lnChanWarn setVisibility viewMap(showText)
-      itemsList setVisibility viewMap(!showText)
+      lnChanWarn setVisibility viewMap(showWarning)
+      itemsList setVisibility viewMap(!showWarning)
     }
 
     def recentPays = new ReactLoader[PaymentInfo](host) {
@@ -296,14 +306,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     }
 
     def searchPays = new ReactLoader[PaymentInfo](host) {
-      val consume = (pays: InfoVec) => updView(pays, showText = false).run
+      val consume = (pays: InfoVec) => updView(pays, showWarning = false).run
       def createItem(rCursor: RichCursor) = bag toPaymentInfo rCursor
       def getCursor = bag byQuery lastQuery
     }
 
-    // Recent payment history and paymenr search combined
-    me.react = vs => runAnd(lastQuery = vs)(getSupportLoaderManager.restartLoader(1, null, self).forceLoad)
     def onCreateLoader(loaderId: Int, bundle: Bundle) = if (lastQuery.isEmpty) recentPays else searchPays
+    me.react = vs => runAnd(lastQuery = vs)(getSupportLoaderManager.restartLoader(1, null, self).forceLoad)
+    host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
   }
 
   itemsList setOnItemClickListener onTap { pos =>
