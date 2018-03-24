@@ -120,7 +120,7 @@ object PaymentRequest {
   type Int5Seq = Seq[Int5]
   type AmountOption = Option[MilliSatoshi]
 
-  private[this] val prefixes =
+  val prefixes =
     Map(Block.RegtestGenesisBlock.hash -> "lnbcrt",
       Block.TestnetGenesisBlock.hash -> "lntb",
       Block.LivenetGenesisBlock.hash -> "lnbc")

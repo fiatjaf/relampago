@@ -118,7 +118,4 @@ trait Broadcaster extends ChannelListener { me =>
 
   def csvShowDelayed(t1: TransactionWithInputInfo, t2: TransactionWithInputInfo) =
     ShowDelayed(csv(t1.tx, t2.tx), t2.tx, t1 -- t2, t2.tx.allOutputsAmount)
-
-  def cltvShowDelayed(commit: Transaction, t1: TransactionWithInputInfo) =
-    ShowDelayed(cltv(commit, t1.tx), t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
 }

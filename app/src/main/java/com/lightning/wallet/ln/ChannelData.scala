@@ -109,7 +109,7 @@ case class RemoteCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimHtlcS
                                  claimHtlcTimeout: Seq[ClaimHtlcTimeoutTx], commitTx: Transaction) extends CommitPublished {
 
   def getState = {
-    val timeout = for (t1 <- claimHtlcTimeout) yield cltvShowDelayed(commitTx, t1)
+    val timeout = for (t1 <- claimHtlcTimeout) yield ShowDelayed(cltv(commitTx, t1.tx), t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
     val success = for (t1 <- claimHtlcSuccess) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
     val main = for (t1 <- claimMain) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
     main ++ success ++ timeout
