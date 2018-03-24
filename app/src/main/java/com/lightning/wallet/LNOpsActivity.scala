@@ -93,10 +93,20 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     val capacity = chan(_.commitInput.txOut.amount).get
     val alias = chan.data.announce.alias take 64
 
+    // Order matters here!
+    def getCloseWarning = host getString {
+      val openAndOffline = isOperational(chan)
+      val openAndOnline = isOperationalOpen(chan)
+      val noPending = inFlightOutgoingHtlcs(chan).isEmpty
+      if (openAndOnline && noPending) ln_chan_close_details
+      else if (openAndOnline) ln_chan_close_inflight_details
+      else if (openAndOffline) ln_chan_force_offline_details
+      else ln_chan_force_details
+    }
+
     lnOpsAction setOnClickListener host.onButtonTap {
-      // First closing attempt will be a cooperative one while the second attempt will always be an uncooperative one
-      val msg = isOperationalOpen(chan) match { case true => ln_chan_close_details case false => ln_chan_force_details }
-      val bld = host baseTextBuilder host.getString(msg).html setCustomTitle lnOpsAction.getText.toString
+      // First closing attempt will be a cooperative one while the second attempt will be uncooperative
+      val bld = host baseTextBuilder getCloseWarning.html setCustomTitle lnOpsAction.getText.toString
       host.mkForm(chan process CMDShutdown, none, bld, dialog_ok, dialog_cancel)
     }
 
