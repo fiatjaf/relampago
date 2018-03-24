@@ -354,27 +354,6 @@ class RateManager(extra: String, val content: View) { me =>
   satInput.requestFocus
 }
 
-class BtcManager(val man: RateManager) { me =>
-  val addressData = man.content.findViewById(R.id.addressData).asInstanceOf[TextView]
-  val addressPaste = man.content.findViewById(R.id.addressPaste).asInstanceOf[Button]
-  def set(tm: TryMSat, adr: Address) = wrap(man setSum tm)(me setAddress adr)
-  def getAddress = addressData.getTag.asInstanceOf[Address]
-
-  addressPaste setOnClickListener new OnClickListener {
-    def onClick(button: View) = app.getBufferTry map app.getTo match {
-      case Success(validBitcoinAddress) => setAddress(validBitcoinAddress)
-      case _ => app toast dialog_clipboard_absent
-    }
-  }
-
-  def setAddress(addr: Address) = {
-    addressPaste setVisibility View.GONE
-    addressData setVisibility View.VISIBLE
-    addressData setText humanFour(addr.toString)
-    addressData setTag addr
-  }
-}
-
 trait PayData {
   // Emptying a wallet needs special handling
   def isAll = app.kit.conf1Balance equals cn

@@ -94,7 +94,7 @@
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
     <string name="amount_hint_fin"><![CDATA[Amount in Finney%1$s]]></string>
 
-    <string name="spend_address_tip">Paste Bitcoin address\nfrom clipboard</string>
+    <string name="spend_address_tip">Paste BTC address</string>
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>can send %3$s</small>]]></string>

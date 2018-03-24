@@ -119,7 +119,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val numPeers = app.kit.peerGroup.numConnectedPeers
     // Additional measure in case if ChannelManager listener fails
     if (numPeers > 3) LNParams.broadcaster.bestHeightObtained = true
-    if (numPeers > 0) btc_status_online else btc_status_connecting
+    if (numPeers < 1) btc_status_connecting else btc_status_online
   }
 
   val constListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
@@ -194,30 +194,33 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   def sendBtcPopup: BtcManager = {
     val content = getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
     val title = getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
-    val rateManager = new RateManager(title, content)
-    val spendManager = new BtcManager(rateManager)
+
+    lazy val bld = baseBuilder(getString(action_bitcoin_send), content)
+    lazy val alert = mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
+    lazy val formManager = new BtcManager(new RateManager(title, content), alert)
 
     def next(msat: MilliSatoshi) = new TxProcessor {
-      val pay = AddrData(msat, spendManager.getAddress)
+      val pay = AddrData(msat, formManager.getAddress)
+
       def futureProcess(unsignedRequest: SendRequest) = {
         add(getString(btc_announcing), Informer.BTCEVENT).run
         app.kit blockingSend app.kit.sign(unsignedRequest).tx
       }
 
-      def onTxFail(sendingError: Throwable) = mkForm(sendBtcPopup.set(Success(msat), pay.address), none,
-        baseBuilder(messageWhenMakingTx(sendingError), body = null), dialog_ok, dialog_cancel)
+      def onTxFail(sendingError: Throwable) = {
+        val bld = baseBuilder(title = messageWhenMakingTx(sendingError), body = null)
+        mkForm(sendBtcPopup.set(Success(msat), pay.address), none, bld, dialog_ok, dialog_cancel)
+      }
     }
 
-    def sendAttempt(alert: AlertDialog) = rateManager.result match {
-      case _ if spendManager.getAddress == null => app toast dialog_address_wrong
+    def sendAttempt(alert: AlertDialog): Unit = formManager.man.result match {
+      case _ if formManager.getAddress == null => app toast dialog_address_wrong
       case Success(ms) if MIN_NONDUST_OUTPUT isGreaterThan ms => app toast dialog_sum_small
       case Failure(reason) => app toast dialog_sum_empty
       case Success(ms) => rm(alert)(next(ms).start)
     }
 
-    val bld = baseBuilder(getString(action_bitcoin_send), content)
-    mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
-    spendManager
+    formManager
   }
 
   def boostIncoming(wrap: TxWrap) = {
@@ -246,6 +249,32 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     def encReplaceFuture(pass: String) = <(encReplace(pass), onError)(none)
     if (app.kit.wallet.isEncrypted) passWrap(userWarn) apply checkPass(encReplaceFuture)
     else mkForm(ok = <(replace, onError)(none), none, baseBuilder(userWarn, null), dialog_next, dialog_cancel)
+  }
+
+  class BtcManager(val man: RateManager, alert: AlertDialog) { me =>
+    val addressActions = man.content.findViewById(R.id.addressActions)
+    val addressData = man.content.findViewById(R.id.addressData).asInstanceOf[TextView]
+    val addressPaste = man.content.findViewById(R.id.addressPaste).asInstanceOf[Button]
+    val addressScanner = man.content.findViewById(R.id.addressScanner).asInstanceOf[Button]
+    def set(tm: TryMSat, adr: Address) = wrap(man setSum tm)(me setAddr adr)
+    def getAddress = addressData.getTag.asInstanceOf[Address]
+
+    addressPaste setOnClickListener onButtonTap {
+      def informNoAddress = app toast dialog_clipboard_absent
+      app.getBufferTry map app.getTo map setAddr getOrElse informNoAddress
+    }
+
+    addressScanner setOnClickListener onButtonTap {
+      def goQR = host.walletPager.setCurrentItem(2, true)
+      rm(alert)(goQR)
+    }
+
+    def setAddr(addr: Address) = {
+      addressData setText humanFour(addr.toString)
+      addressActions setVisibility View.GONE
+      addressData setVisibility View.VISIBLE
+      addressData setTag addr
+    }
   }
 
   // INIT

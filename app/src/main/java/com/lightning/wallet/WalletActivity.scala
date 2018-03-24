@@ -301,7 +301,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
         app.TransData.value = null
 
       case addr: Address =>
-        for (btc <- btcOpt) btc.sendBtcPopup.setAddress(addr)
+        for (btc <- btcOpt) btc.sendBtcPopup.setAddr(addr)
         walletPager.setCurrentItem(0, false)
         app.TransData.value = null
 
@@ -573,20 +573,17 @@ class FragScan extends Fragment with BarcodeCallback { me =>
   // Only try to decode result after 2 seconds
   override def possibleResultPoints(points: Points) = none
   override def barcodeResult(res: BarcodeResult) = Option(res.getText) foreach {
-    rawText => if (System.currentTimeMillis - lastAttempt > 2000) tryParseQR(rawText)
+    rawText => if (System.currentTimeMillis - lastAttempt > 3000) tryParseQR(rawText)
   }
 
   def tryParseQR(scannedText: String) = try {
     // This may throw which is expected and fine
-
-    barcodeReader.pause
     lastAttempt = System.currentTimeMillis
     app.TransData recordValue scannedText
     host.checkTransData
 
   } catch app.TransData.onFail { code =>
-    val bld = host.negTextBuilder(dialog_ok, host getString code)
-    host.walletPager.setCurrentItem(1, false)
-    host showForm bld.create
+    // Inform user about error details
+    app toast host.getString(code)
   }
 }

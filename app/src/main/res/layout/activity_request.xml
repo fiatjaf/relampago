@@ -11,14 +11,17 @@
             android:gravity="center">
 
             <ImageButton
-                android:src="@drawable/qr_18dp"
-                android:layout_height="60dp" android:layout_width="60dp"
-                android:id="@+id/shareQR" android:enabled="false"/>
+                android:enabled="false"
+                android:id="@+id/shareQR"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:src="@drawable/qr_18dp"/>
 
             <ImageButton
-                android:src="@drawable/ic_share_white_18dp"
-                android:layout_width="60dp" android:layout_height="60dp"
-                android:id="@+id/shareText"/>
+                android:id="@+id/shareText"
+                android:layout_width="60dp"
+                android:layout_height="60dp"
+                android:src="@drawable/ic_share_white_18dp"/>
 
         </LinearLayout>
 
