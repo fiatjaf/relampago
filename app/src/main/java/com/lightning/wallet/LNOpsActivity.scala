@@ -8,13 +8,14 @@ import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.LNParams.broadcaster.getStatus
 import com.lightning.wallet.ln.LNParams.DepthAndDead
+import android.view.View.OnTouchListener
 import fr.acinq.bitcoin.MilliSatoshi
 import android.widget.Button
 import android.os.Bundle
 import java.util.Date
 
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
-import android.view.{LayoutInflater, View, ViewGroup}
+import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
 import com.lightning.wallet.ln.Tools.{none, wrap}
 
 
@@ -39,6 +40,18 @@ class LNOpsActivity extends TimerActivity { me =>
     }
   }
 
+  val touchListener = new OnTouchListener {
+    def onTouch(view: View, event: MotionEvent) = {
+      if (event.getAction == MotionEvent.ACTION_DOWN) {
+        val coords = event.getX / chanPagerIndicator.getWidth
+        val position = (localChanCache.size * coords).toInt
+        chanPager.setCurrentItem(position, false)
+      }
+
+      false
+    }
+  }
+
   def bundledFrag(pos: Int) = {
     val frag = new ChanDetailsFrag
     val arguments: Bundle = new Bundle
@@ -50,6 +63,7 @@ class LNOpsActivity extends TimerActivity { me =>
   def fillViewPager = {
     setContentView(R.layout.activity_ln_ops)
     chanPagerIndicator.colorProvider = colors
+    chanPagerIndicator setOnTouchListener touchListener
     chanPager setAdapter slidingFragmentAdapter
     resetIndicator.run
   }

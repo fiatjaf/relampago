@@ -74,6 +74,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onProcess = {
+    case (chan, _: NormalData, err: Error) =>
+      val template = app getString R.string.chan_notice_unilateral
+      Notificator chanClosed template.format(chan.data.announce.alias, err.humanText)
+
+    case (chan, _: NormalData, _: Shutdown) =>
+      val template = app getString R.string.chan_notice_bilateral
+      Notificator chanClosed template.format(chan.data.announce.alias)
+
     case (_, _: NormalData, rd: RoutingData) =>
       // This may be a new payment or an old payment retry attempt
       // Either insert or update should be executed successfully
@@ -143,15 +151,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def onBecome = {
     case (chan, _, from, CLOSING) if from != CLOSING =>
       // Frozen non-dust payments may be fulfilled on-chain
-      Notificator chanClosed chan.data.announce.alias
       markFailedAndFrozen
-      goodRoutes.clear
       uiNotify
 
     case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
       OlympusWrap tellClouds OlympusWrap.CMDStart
-      goodRoutes.clear
   }
 }
 
@@ -180,11 +185,12 @@ object BadEntityWrap {
     db.change(BadEntityTable.updSql, System.currentTimeMillis + span, res, targetNodeId)
   }
 
-  def findRoutes(from: Set[PublicKey], targetNodeId: PublicKey) =
-    PaymentInfoWrap.goodRoutes get targetNodeId match {
-      case None => doFindRoutes(from, targetNodeId)
-      case Some(routes) => Obs just routes
-    }
+  def findRoutes(from: Set[PublicKey], targetNodeId: PublicKey) = {
+    // Make sure the first cached route starts at an operational node
+    val cachedLocalRoutes = PaymentInfoWrap.goodRoutes get targetNodeId
+    val good = cachedLocalRoutes.filter(from contains _.head.head.nodeId)
+    good.map(Obs just _) getOrElse doFindRoutes(from, targetNodeId)
+  }
 
   private def doFindRoutes(from: Set[PublicKey], targetNodeId: PublicKey) = {
     // Hacky but acceptable: short cannel id length is 32 so anything larger than 60 is node id
@@ -239,10 +245,10 @@ class Notificator extends BroadcastReceiver {
     // used instead of toast so can be seen at later time
 
     val target = classOf[MainActivity]
-    val message = ct getString R.string.chan_notice_message format intent.getExtras.getString("extra")
     val targetIntent = PendingIntent.getActivity(ct, 0, new Intent(ct, target), PendingIntent.FLAG_UPDATE_CURRENT)
     val builder = new NotificationCompat.Builder(ct).setContentIntent(targetIntent).setSmallIcon(R.drawable.dead)
-      .setAutoCancel(true).setContentTitle(ct getString R.string.chan_notice_title).setContentText(message)
+      .setAutoCancel(true).setContentTitle(ct getString R.string.chan_notice_title)
+      .setContentText(intent.getExtras getString "extra")
 
     val service = ct.getSystemService(Context.NOTIFICATION_SERVICE)
     service.asInstanceOf[NotificationManager].notify(1, builder.build)

@@ -8,9 +8,9 @@
         android:id="@+id/chanPager"/>
 
     <me.relex.circleindicator.CircleIndicator
+        android:layout_gravity="bottom|center"
         android:id="@+id/chanPagerIndicator"
-        android:layout_width="match_parent"
-        android:layout_gravity="bottom"
+        android:layout_width="wrap_content"
         android:layout_height="48dp"/>
 
     <ImageButton
