@@ -230,9 +230,9 @@ object GossipCatcher extends ChannelListener {
 // CHANNEL CLOSED NOTIFICATION
 
 object Notificator {
-  def chanClosed(alias: String) = try {
+  def chanClosed(extra: String) = try {
     val notificatorClass = classOf[Notificator]
-    val parametersIntent = new Intent(app, notificatorClass).putExtra("extra", alias)
+    val parametersIntent = new Intent(app, notificatorClass).putExtra("extra", extra)
     val alarmManager = app.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager]
     val pendingIntent = PendingIntent.getBroadcast(app, 0, parametersIntent, 0)
     alarmManager.set(AlarmManager.RTC_WAKEUP, 0, pendingIntent)
