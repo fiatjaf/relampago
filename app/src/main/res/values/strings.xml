@@ -176,11 +176,11 @@
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable.]]></string>
     <string name="err_transaction_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again.</string>
-    <string name="err_address">Failed because neither Bitcoin address nor Lightning payment request has been found.</string>
     <string name="err_secret">Failed because passcode did not match. Please make sure passcode is correct.</string>
     <string name="err_uri">Failed because request contains a malformed URI which could not be parsed.</string>
     <string name="err_different_net">Failed because payment request belongs to a different network.</string>
     <string name="err_general">Failed because an error has occurred.</string>
+    <string name="err_qr_parse">QR code is invalid.</string>
 
     <!-- fingerprint -->
     <string name="fp_err_try_again">Try again</string>

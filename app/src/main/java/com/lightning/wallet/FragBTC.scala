@@ -290,7 +290,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val humanOutputs = for (paymentData <- outputs) yield paymentData.cute(marking).html
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     lst setAdapter new ArrayAdapter(host, R.layout.frag_top_tip, R.id.actionTip, humanOutputs.toArray)
-    lst setOnItemClickListener onTap { pos1 => outputs(pos1 - 1).onClick /* -1 because header */ }
+    lst setOnItemClickListener onTap { pos1 => outputs(pos1 - 1).onClick }
     lst setHeaderDividersEnabled false
     lst addHeaderView detailsWrapper
 
@@ -309,7 +309,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
     // See if CPFP can be applied
     val notEnoughValue = wrap.valueDelta isLessThan RatesSaver.rates.feeLive
-    val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 3600L * 1000
+    val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 1800L * 1000
     val doNotOfferCPFP = wrap.depth > 0 || wrap.isDead || tooFresh || notEnoughValue
 
     if (doNotOfferCPFP) showForm(negBuilder(dialog_ok, header.html, lst).create)

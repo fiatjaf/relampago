@@ -91,7 +91,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     case (_, _, fulfill: UpdateFulfillHtlc) =>
       // Save preimage right away, don't wait for commitSig
       // receiving a preimage means a payment is fulfilled
-      db txWrap updOkOutgoing(fulfill)
+      updOkOutgoing(fulfill)
 
       pendingPayments.values.find(_.pr.paymentHash == fulfill.paymentHash) foreach { rd =>
         // Make payment searchable + runtime optimization: record last successful route
@@ -145,11 +145,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       // Frozen non-dust payments may be fulfilled on-chain
       Notificator chanClosed chan.data.announce.alias
       markFailedAndFrozen
+      goodRoutes.clear
       uiNotify
 
     case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
       OlympusWrap tellClouds OlympusWrap.CMDStart
+      goodRoutes.clear
   }
 }
 

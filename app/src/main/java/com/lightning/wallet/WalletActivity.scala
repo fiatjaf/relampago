@@ -307,7 +307,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
       case link: BitcoinURI =>
         val amount: TryMSat = Try(link.getAmount)
-        // We have a bitcoin link which may contain a payment sum
+        // We have a bitcoin link which MAY contain a payment sum
         for (btc <- btcOpt) btc.sendBtcPopup.set(amount, link.getAddress)
         walletPager.setCurrentItem(0, false)
         app.TransData.value = null
