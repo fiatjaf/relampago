@@ -275,12 +275,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SYNC and REFUNDING MODE
 
 
-      case (ref: RefundingData, cr: ChannelReestablish, REFUNDING)
-        // GUARD: We have explicitly started with a fresh REFUNDING data
-        // we need to make sure their commitment point can be saved only once
-        if cr.myCurrentPerCommitmentPoint.isDefined && ref.remoteLatestPoint.isEmpty =>
-        storeRefund(ref, cr.myCurrentPerCommitmentPoint.get)
-
+      case (ref: RefundingData, cr: ChannelReestablish, REFUNDING) =>
+        cr.myCurrentPerCommitmentPoint -> ref.remoteLatestPoint match {
+          case _ \ Some(ourSavedPoint) => storeRefund(ref, ourSavedPoint)
+          case Some(theirPoint) \ _ => storeRefund(ref, theirPoint)
+          case _ =>
+        }
 
       case (norm: NormalData, cr: ChannelReestablish, OFFLINE)
         // GUARD: we have started in NORMAL state but their nextRemoteRevocationNumber is too far away
@@ -460,7 +460,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // CMDShutdown in WAIT_FUNDING_DONE and OPEN can be cooperative
         startLocalClose(some)
 
-      case other =>
+      case _ =>
     }
 
     // Change has been successfully processed
