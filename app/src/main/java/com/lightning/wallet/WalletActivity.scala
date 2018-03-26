@@ -443,7 +443,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       // by fetching encrypted static channel params from server
 
       rm(menu) {
-        val bld = baseTextBuilder(me getString recovery_info)
+        val bld = baseTextBuilder(me getString channel_recovery_info)
         mkForm(recover, none, bld, dialog_next, dialog_cancel)
 
         def recover: Unit = {
@@ -460,7 +460,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
               if !app.ChannelManager.all.exists(_(_.channelId) contains refundingData.commitments.channelId)
               chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
               // Start watching this channel's funding tx output right away
-              isAdded = app.kit watchFunding refundingData.commitments
+              _ = app.kit watchFunding refundingData.commitments
             } app.ChannelManager.all +:= chan
 
             // New channels have been added

@@ -14,6 +14,7 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
+import com.lightning.wallet.ln.crypto.Sphinx.PublicKeyVec
 import com.muddzdev.styleabletoastlibrary.StyleableToast
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
@@ -23,7 +24,6 @@ import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import org.bitcoinj.crypto.KeyCrypterScrypt
-import com.google.common.net.InetAddresses
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
 import java.net.InetSocketAddress
@@ -131,27 +131,6 @@ class WalletApp extends Application { me =>
     def frozenInFlightHashes = all.diff(notClosingOrRefunding).flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
-    val chainEventsListener = new TxTracker with BlocksListener {
-      override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
-      override def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
-      override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
-
-      override def coinsSent(txj: Transaction) = {
-        // We always attempt to extract a payment preimage
-        // just assuming any incoming tx may contain it
-
-        val spent = CMDSpent(txj)
-        bag.extractPreimg(spent.tx)
-        all.foreach(_ process spent)
-      }
-
-      def tellHeight(left: Int) = {
-        // No matter how many blocks are left we only send a CMD once the last block is done
-        if (left < 1) for (chan <- all) chan process CMDBestHeight(broadcaster.currentHeight)
-        broadcaster.bestHeightObtained = true
-      }
-    }
-
     val socketEventsListener = new ConnectionListener {
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
         // Channel level Error will fall under ChannelMessage case but node level Error should be sent to all chans
@@ -172,6 +151,26 @@ class WalletApp extends Application { me =>
       }
     }
 
+    val chainEventsListener = new TxTracker with BlocksListener {
+      override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
+      override def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
+      override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
+
+      override def coinsSent(txj: Transaction) = {
+        // We always attempt to extract a payment preimage
+        // just assuming any incoming tx may contain it
+
+        val spent = CMDSpent(txj)
+        bag.extractPreimg(spent.tx)
+        all.foreach(_ process spent)
+      }
+
+      def tellHeight(left: Int) = runAnd(broadcaster.bestHeightObtained = true) {
+        // No matter how many blocks are left we only send a CMD once the last block is done
+        if (left < 1) for (chan <- all) chan process CMDBestHeight(broadcaster.currentHeight)
+      }
+    }
+
     def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel {
       def STORE(hasCommitmentsData: HasCommitments) = runAnd(hasCommitmentsData)(ChannelWrap put hasCommitmentsData)
       def SEND(msg: LightningMessage) = ConnectionManager.connections.get(data.announce).foreach(_.handler process msg)
@@ -188,7 +187,7 @@ class WalletApp extends Application { me =>
         BECOME(STORE(cd), CLOSING)
 
         cd.tier12States.map(_.txn) match {
-          case Nil => Tools log "Closing channel does not have tier 1-2 transactions"
+          case Nil => Tools log "This closing channel does not have tier 1-2 transactions"
           case txs => OlympusWrap tellClouds CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
         }
       }
@@ -203,7 +202,7 @@ class WalletApp extends Application { me =>
     def withRoutesAndOnionRDFrozenAllowed(rd: RoutingData) = {
       val isInFlight = activeInFlightHashes.contains(rd.pr.paymentHash)
       val isDone = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
-      val capablePeerNodes = canSend(rd.firstMsat).map(_.data.announce.nodeId).toSet
+      val capablePeerNodes = canSend(amount = rd.firstMsat).map(_.data.announce.nodeId)
 
       if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
       else if (isDone.isSuccess) Obs error new LightningException(me getString err_ln_fulfilled)
@@ -212,10 +211,11 @@ class WalletApp extends Application { me =>
       else Obs error new LightningException(me getString dialog_chain_behind)
     }
 
-    def addRoutesAndOnion(peers: Set[PublicKey], rd: RoutingData) = {
-      def findRemoteRoutes(targetNodeId: PublicKey) = BadEntityWrap.findRoutes(peers, targetNodeId)
-      // If source node contains target node then we are paying directly to our peer, otherwise fetch additional payment routes
-      def getRoutes(target: PublicKey) = if (peers contains target) Obs just Vector(Vector.empty) else findRemoteRoutes(target)
+    def addRoutesAndOnion(peers: PublicKeyVec, rd: RoutingData) = {
+      def getRoutes(targetId: PublicKey) = peers contains targetId match {
+        case false => BadEntityWrap.findRoutes(peers, targetId, rd.pr.nodeId)
+        case true => Obs just Vector(Vector.empty)
+      }
 
       def withExtraPart = for {
         tag <- Obs from rd.pr.routingInfo

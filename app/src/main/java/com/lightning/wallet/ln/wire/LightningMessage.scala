@@ -103,6 +103,6 @@ case class ChannelUpdate(signature: BinaryData, chainHash: BinaryData, shortChan
 }
 
 // Not in a spec
-
+case class OutRequest(badNodes: Vector[String], badChans: Vector[Long], from: Vector[PublicKey], to: PublicKey)
 case class WalletZygote(v: Int, db: BinaryData, wallet: BinaryData, chain: BinaryData)
 case class AESZygote(v: Int, iv: BinaryData, ciphertext: BinaryData)

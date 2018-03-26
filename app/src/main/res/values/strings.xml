@@ -9,16 +9,17 @@
 
     <!-- app wide -->
     <string name="unlock">Unlock Wallet</string>
-    <string name="sets_secret_ok">Passcode has been set to «%1$s»</string>
     <string name="secret_info">pick a good passcode\nor just leave the field blank\nto have an unencrypted wallet</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch.</string>
+    <string name="sets_secret_ok">Passcode has been set to «%1$s»\n\nMake sure that wallet mnemonic phrase is saved so you can use it in case if passcode gets lost.</string>
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="fee_risky"><![CDATA[<small>%1$s<br><small>Standard transaction fee</small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s<br><small>Priority transaction fee</small></small>]]></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
+
+    <string name="wallet_restore">Restore Wallet</string>
     <string name="wallet_create">New Bitcoin Wallet</string>
     <string name="btc_wallet">Empty Bitcoin wallet</string>
-    <string name="wallet_restore">Restore Wallet</string>
     <string name="ln_wallet">Lightning wallet</string>
 
     <array name="denoms">
@@ -28,24 +29,32 @@
     </array>
 
     <array name="restore_options">
-        <item>Enter recovery code</item>
+        <item>Enter mnemonic phrase</item>
         <item>Use migration file</item>
     </array>
 
     <string name="create_wallet_creating">Generating your wallet\nIt may take up to a few minutes</string>
     <string name="restore_when">When was Bitcoin wallet created?\nLeave date as is if not sure</string>
     <string name="restore_wallet_restoring">Restoring your wallet\nIt may take a while</string>
-    <string name="restore_mnemonic_wrong">Code must be 12 words long</string>
-    <string name="restore_hint">Your BIP32 recovery code</string>
+    <string name="restore_mnemonic_wrong">Phrase must be 12 words long</string>
+    <string name="restore_hint">Your BIP32 mnemonic phrase</string>
 
     <!-- headers with links -->
     <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.08&#8211;26<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
-    <string name="recovery_info">Channel recovery tool asks Olympus servers for available channel backups and uses those to reimburse locked funds back into your Bitcoin wallet.\n\nYou should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds, otherwise nothing will happen.\n\nAlso, using this tool does not affect open channels currently present on this device.</string>
-    <string name="mnemonic_info"><font color="#E31300">Mnemonic code is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.\n\nSaving and properly securing a mnemonic code is a single most important action to do once a fresh Bitcoin wallet is created.\n\nYou will need a mnemonic code in a case of various emergencies such as lost phone or forgotten passcode!</string>
-    <string name="ln_ops_chan_none"><a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a> enables fast and secure off-chain Bitcoin transactions with low fees. Using it requires you to open a <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a> with a peer of your choice and then fund it with an on-chain Bitcoin transaction.\n\nThis app uses paid <a href="http://lightning-wallet.com/storage-tokens#storage-tokens">storage tokens</a> to secure channel backups. This is done to make sure that lost channel funds can always be recovered.</string>
+    <string name="mnemonic_info"><font color="#E31300">Mnemonic phrase is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.\n\nSaving and properly securing a mnemonic phrase is a single most important action to do once a fresh Bitcoin wallet is created.\n\nYou will need it in case of various emergencies such as lost phone or forgotten passcode!</string>
+    <string name="channel_recovery_info">Channel recovery tool asks Olympus servers for available channel backups and uses those to reimburse locked funds back into your Bitcoin wallet.\n\nYou should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds, otherwise nothing will happen.\n\nAlso, using this tool does not affect open channels currently present on this device.</string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a></string>
+
+    <string name="ln_ops_chan_none">
+        <a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a>
+        enables fast and secure off-chain Bitcoin transactions with low fees. Using it requires you to open a
+        <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a>
+        with a peer of your choice and then fund it with an on-chain Bitcoin transaction.\n\n
+        This app uses paid <a href='http://lightning-wallet.com/storage-tokens#storage-tokens'>storage tokens</a>
+        to secure channel backups and thus makes sure that lost channel funds can always be recovered.
+    </string>
 
     <string name="zygote_details"><![CDATA[
         Migration tool creates a full snapshot of current wallet state which can be
@@ -76,14 +85,13 @@
     <string name="sets_chan_recover">Use channel recovery tool</string>
     <string name="sets_zygote">Use wallet migration tool</string>
     <string name="sets_secret_change">Change passcode</string>
-    <string name="sets_mnemonic">View mnemonic code</string>
+    <string name="sets_mnemonic">View mnemonic phrase</string>
     <string name="sets_rescan">Rescan blockchain</string>
 
     <string name="secret_wallet">Passcode</string>
     <string name="secret_wrong">Wrong passcode</string>
-    <string name="action_bitcoin_receive">Receive bitcoin</string>
     <string name="action_bitcoin_send">Send bitcoin</string>
-
+    <string name="action_bitcoin_receive">Receive bitcoin</string>
     <string name="action_ln_receive">Receive lightning</string>
     <string name="action_ln_open">Open new channel</string>
     <string name="action_ln_close">Close channel</string>
@@ -115,8 +123,8 @@
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
-    <string name="btc_status_online">Bitcoin wallet is online</string>
     <string name="btc_status_connecting">Connecting to Bitcoin peers&#8230;</string>
+    <string name="btc_status_online">Bitcoin wallet is online</string>
     <string name="ln_status_none">No open channel found</string>
     <string name="ln_status_peer">Select peer</string>
 
@@ -279,5 +287,6 @@
     </array>
 
     <string name="ln_ops_start_fund_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>Fund a payment channel]]></string>
+    <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>opening a channel</i></font><br><small>%2$s</small><br><br><font color=#999999>Peer node ID</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
 </resources>

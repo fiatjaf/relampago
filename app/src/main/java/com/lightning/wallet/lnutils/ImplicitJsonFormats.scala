@@ -57,6 +57,11 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     def write(internal: Transaction): JsValue = Transaction.write(internal).toString.toJson
   }
 
+  implicit object PublicKeyFmt extends JsonFormat[PublicKey] {
+    def read(json: JsValue): PublicKey = PublicKey(me json2String json)
+    def write(internal: PublicKey): JsValue = internal.toString.toJson
+  }
+
   implicit object ShaHashesWithIndexFmt
   extends JsonFormat[ShaHashesWithIndex] {
 
@@ -92,15 +97,16 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val hopFmt = sCodecJsonFmt(hopCodec)
   implicit val pointFmt = sCodecJsonFmt(point)
 
-  implicit val blindParamFmt = jsonFormat[Bytes, BigInteger, BigInteger, BigInteger, BigInteger,
-    BlindParam](BlindParam.apply, "point", "a", "b", "c", "bInv")
+  implicit val blindParamFmt =
+    jsonFormat[Bytes, BigInteger, BigInteger, BigInteger, BigInteger,
+      BlindParam](BlindParam.apply, "point", "a", "b", "c", "bInv")
 
-  implicit val blindMemoFmt = jsonFormat[List[BlindParam], List[BigInteger], String,
-    BlindMemo](BlindMemo.apply, "params", "clears", "sesPubKeyHex")
+  implicit val blindMemoFmt =
+    jsonFormat[List[BlindParam], List[BigInteger], String,
+      BlindMemo](BlindMemo.apply, "params", "clears", "sesPubKeyHex")
 
   implicit val scalarFmt = jsonFormat[BigInteger, Scalar](Scalar.apply, "value")
   implicit val privateKeyFmt = jsonFormat[Scalar, Boolean, PrivateKey](PrivateKey.apply, "value", "compressed")
-  implicit val publicKeyFmt = jsonFormat[Point, Boolean, PublicKey](PublicKey.apply, "value", "compressed")
   implicit val milliSatoshiFmt = jsonFormat[Long, MilliSatoshi](MilliSatoshi.apply, "amount")
   implicit val satoshiFmt = jsonFormat[Long, Satoshi](Satoshi.apply, "amount")
 
@@ -288,4 +294,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val waitFundingDoneDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Option[FundingLocked],
     Option[FundingLocked], Transaction, Commitments, WaitFundingDoneData](WaitFundingDoneData.apply,
     "announce", "our", "their", "fundingTx", "commitments"), tag = "WaitFundingDoneData")
+
+  implicit val routeRequestFmt = jsonFormat[Vector[String], Vector[Long], Vector[PublicKey], PublicKey,
+    OutRequest](OutRequest.apply, "badNodes", "badChans", "from", "to")
 }

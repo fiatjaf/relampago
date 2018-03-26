@@ -96,10 +96,10 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
-  def onUpgrade(db: SQLiteDatabase, oldVer: Int, newVer: Int) = none
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.wallet/table/$tbl"
+  def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = none
 
   def txWrap(process: => Unit) = try {
     runAnd(base.beginTransaction)(process)

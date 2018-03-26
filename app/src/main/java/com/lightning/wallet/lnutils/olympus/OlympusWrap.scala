@@ -7,18 +7,17 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.olympus.OlympusWrap._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-import fr.acinq.bitcoin.{BinaryData, Transaction}
-import rx.lang.scala.{Observable => Obs}
-
 import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
 import scala.collection.JavaConverters.mapAsJavaMapConverter
-import com.lightning.wallet.ln.wire.NodeAnnouncement
 import com.lightning.wallet.lnutils.OlympusTable
 import com.lightning.wallet.ln.PaymentRequest
 import com.lightning.wallet.helper.RichCursor
-import fr.acinq.bitcoin.Crypto.PublicKey
 import java.net.ProtocolException
 import java.math.BigInteger
+
+import com.lightning.wallet.ln.wire.{NodeAnnouncement, OutRequest}
+import fr.acinq.bitcoin.{BinaryData, Transaction}
+import rx.lang.scala.{Observable => Obs}
 
 
 case class CloudData(info: Option[RequestAndMemo], tokens: Vector[ClearToken], acts: CloudActVec)
@@ -86,18 +85,14 @@ object OlympusWrap extends OlympusProvider {
 
   def getRates = failOver(_.connector.getRates, clouds)
   def getBlock(hash: String) = failOver(_.connector getBlock hash, clouds)
-  def findNodes(query: String) = failOver(_.connector findNodes query, clouds)
   def getChildTxs(txs: TxSeq) = failOver(_.connector getChildTxs txs, clouds)
-
-  def findRoutes(badNodes: Set[String], badChans: Set[Long], from: Set[PublicKey], toPubKey: String) =
-    failOver(cloud => cloud.connector.findRoutes(badNodes, badChans, from, toPubKey), clouds)
+  def findNodes(query: String) = failOver(_.connector findNodes query, clouds)
+  def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, clouds)
 }
 
 trait OlympusProvider {
+  def findRoutes(out: OutRequest): Obs[PaymentRouteVec]
   def findNodes(query: String): Obs[AnnounceChansNumVec]
-  def findRoutes(badNodes: Set[String], badChans: Set[Long],
-                 from: Set[PublicKey], toPubKey: String): Obs[PaymentRouteVec]
-
   def getBlock(hash: String): Obs[BlockHeightAndTxs]
   def getBackup(key: BinaryData): Obs[StringVec]
   def getChildTxs(txs: TxSeq): Obs[TxSeq]
@@ -118,8 +113,5 @@ class Connector(val url: String) extends OlympusProvider {
   def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getChildTxs(txs: TxSeq) = ask[TxSeq]("txs/get", "txids" -> txs.map(_.txid).toJson.toString.hex)
-  def findRoutes(badNodes: Set[String], badChans: Set[Long], from: Set[PublicKey], toPubKey: String) =
-    ask[PaymentRouteVec]("router/routes", "froms" -> from.map(_.toBin).toJson.toString.hex,
-      "tos" -> Set(toPubKey).toJson.toString.hex, "xn" -> badNodes.toJson.toString.hex,
-      "xc" -> badChans.toJson.toString.hex)
+  def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routes", "params" -> out.toJson.toString.hex)
 }

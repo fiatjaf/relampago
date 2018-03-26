@@ -12,11 +12,6 @@ import com.lightning.wallet.Denomination._
 import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import org.bitcoinj.core.{Coin, TransactionOutput}
-import fr.acinq.bitcoin.{MilliSatoshi, Script}
-import android.widget.{ImageButton, TextView}
-import scala.util.{Failure, Success}
-
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.lnutils.olympus.CloudAct
 import com.lightning.wallet.lnutils.RatesSaver
@@ -28,13 +23,18 @@ import android.app.AlertDialog
 import java.util.TimerTask
 import android.os.Bundle
 
+import org.bitcoinj.core.{Coin, TransactionOutput}
+import fr.acinq.bitcoin.{MilliSatoshi, Script}
+import android.widget.{ImageButton, TextView}
+import scala.util.{Failure, Success}
+
 
 class LNStartFundActivity extends TimerActivity { me =>
   var whenBackPressed: Runnable = UITask(super.onBackPressed)
   lazy val lnStartFundCancel = findViewById(R.id.lnStartFundCancel).asInstanceOf[ImageButton]
   lazy val lnStartFundDetails = findViewById(R.id.lnStartFundDetails).asInstanceOf[TextView]
   lazy val chansNumber = getResources getStringArray R.array.ln_ops_start_node_channels
-  lazy val nodeView = getString(ln_ops_start_node_view)
+  lazy val nodeView = getString(ln_ops_start_fund_node_view)
   override def onBackPressed = whenBackPressed.run
 
   def INIT(state: Bundle) = if (app.isAlive) {
@@ -65,7 +65,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
   def proceed(pubChansNum: String, announce: NodeAnnouncement) = {
     val theirNodeHumanId = humanNode(announce.nodeId.toString, "<br>")
-    val detailsText = nodeView.format(announce.alias, pubChansNum, s"<br>$theirNodeHumanId").html
+    val detailsText = nodeView.format(announce.alias, pubChansNum, theirNodeHumanId).html
     val freshChan = app.ChannelManager.createChannel(Set.empty, InitData apply announce)
 
     lazy val openListener = new ConnectionListener with ChannelListener { self =>

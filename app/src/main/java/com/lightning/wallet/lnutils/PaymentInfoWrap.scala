@@ -10,6 +10,7 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
+import com.lightning.wallet.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import android.support.v4.app.NotificationCompat
 import com.lightning.wallet.helper.RichCursor
@@ -76,11 +77,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def onProcess = {
     case (chan, _: NormalData, err: Error) =>
       val template = app getString R.string.chan_notice_unilateral
-      Notificator chanClosed template.format(chan.data.announce.alias, err.humanText)
+      val msg = template.format(chan.data.announce.alias, err.humanText)
+      Notificator chanClosed msg
 
     case (chan, _: NormalData, _: Shutdown) =>
       val template = app getString R.string.chan_notice_bilateral
-      Notificator chanClosed template.format(chan.data.announce.alias)
+      val msg = template.format(chan.data.announce.alias)
+      Notificator chanClosed msg
 
     case (_, _: NormalData, rd: RoutingData) =>
       // This may be a new payment or an old payment retry attempt
@@ -122,8 +125,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
           rdOpt map parseFailureCutRoutes(why) match {
             case Some(rd1 \ badNodesAndChans) if rd1.ok =>
-              // Not halted: try use the routes left or fetch new
-              for (ban <- badNodesAndChans) BadEntityWrap.put tupled ban
+              // Clear cached routes so they don't get in the way
+              // Then try use the routes left or fetch new ones
+
+              goodRoutes -= rd1.pr.nodeId
+              badNodesAndChans foreach BadEntityWrap.putEntity.tupled
               app.ChannelManager.sendEither(useRoutesLeft(rd1), newRoutes)
 
             // Payment is either halted or not found at all
@@ -168,8 +174,8 @@ object ChannelWrap {
 
   def put(data: HasCommitments) = {
     val chanId = data.commitments.channelId
-    val chanBody = "1" + data.toJson.toString
-    doPut(chanId.toString, chanBody)
+    val raw = "1" + data.toJson.toString
+    doPut(chanId.toString, raw)
   }
 
   def get = {
@@ -180,23 +186,23 @@ object ChannelWrap {
 }
 
 object BadEntityWrap {
-  val put = (res: Any, targetNodeId: String, span: Long) => {
-    db.change(BadEntityTable.newSql, res, targetNodeId, System.currentTimeMillis + span)
-    db.change(BadEntityTable.updSql, System.currentTimeMillis + span, res, targetNodeId)
+  val putEntity = (entity: Any, targetNodeId: String, span: Long) => {
+    db.change(BadEntityTable.newSql, entity, targetNodeId, System.currentTimeMillis + span)
+    db.change(BadEntityTable.updSql, System.currentTimeMillis + span, entity, targetNodeId)
   }
 
-  def findRoutes(from: Set[PublicKey], targetNodeId: PublicKey) = {
-    // Make sure the first cached route starts at an operational node
-    val cachedLocalRoutes = PaymentInfoWrap.goodRoutes get targetNodeId
-    val good = cachedLocalRoutes.filter(from contains _.head.head.nodeId)
-    good.map(Obs just _) getOrElse doFindRoutes(from, targetNodeId)
+  def findRoutes(from: PublicKeyVec, targetId: PublicKey, payee: PublicKey) = {
+    // Make sure the first cached route starts at a node which is operational currently
+    val good = PaymentInfoWrap.goodRoutes.get(payee).filter(from contains _.head.head.nodeId)
+    // becuase of possible assisted routes target node may not equal payee node at this stage
+    good.map(Obs just _) getOrElse doFindRoutes(from, targetId)
   }
 
-  private def doFindRoutes(from: Set[PublicKey], targetNodeId: PublicKey) = {
-    // Hacky but acceptable: short cannel id length is 32 so anything larger than 60 is node id
-    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, targetNodeId)
-    val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
-    OlympusWrap.findRoutes(badNodes, badChans.map(_.toLong), from, targetNodeId.toString)
+  private def doFindRoutes(from: PublicKeyVec, targetId: PublicKey) = {
+    // shortChanId length is 32 so anything larger than 60 is definitely a nodeId
+    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, targetId)
+    val badNodes \ badChans = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
+    OlympusWrap findRoutes OutRequest(badNodes, for (chanId <- badChans) yield chanId.toLong, from, targetId)
   }
 }
 
