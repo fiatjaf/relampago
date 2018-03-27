@@ -93,7 +93,7 @@ object PaymentTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, name: String, secret: String)
-extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 4) {
+extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 2) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
@@ -116,19 +116,19 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 4) {
     // Randomize an order of two available default servers
     val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val main: Array[AnyRef] = Array("dev-server-1", "http://213.133.99.89:9003", emptyData, "1", ord1, "0")
-    val fallback: Array[AnyRef] = Array("dev-server-2", "http://213.133.103.56:9003", emptyData, "0", ord2, "1")
+    val dev1: Array[AnyRef] = Array("dev-server-1", "http://213.133.99.89:9003", emptyData, "1", ord1, "0")
+    val dev2: Array[AnyRef] = Array("dev-server-2", "http://213.133.103.56:9003", emptyData, "0", ord2, "1")
 
-    dbs.execSQL(OlympusTable.newSql, main)
-    dbs.execSQL(OlympusTable.newSql, fallback)
+    dbs.execSQL(OlympusTable.newSql, dev1)
+    dbs.execSQL(OlympusTable.newSql, dev2)
   }
 
   def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = {
-    val main: Array[AnyRef] = Array("http://213.133.99.89:9003", "dev-server-1")
-    val fallback: Array[AnyRef] = Array("http://213.133.103.56:9003", "dev-server-2")
+    val dev1: Array[AnyRef] = Array("http://213.133.99.89:9003", "dev-server-1")
+    val dev2: Array[AnyRef] = Array("http://213.133.103.56:9003", "dev-server-2")
 
-    dbs.execSQL(OlympusTable.upgradeSql, main)
-    dbs.execSQL(OlympusTable.upgradeSql, fallback)
+    dbs.execSQL(OlympusTable.upgradeSql, dev1)
+    dbs.execSQL(OlympusTable.upgradeSql, dev2)
     dbs.execSQL(s"DELETE FROM ${PaymentTable.table}")
   }
 }
