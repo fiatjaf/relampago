@@ -140,9 +140,10 @@ class WalletApp extends Application { me =>
         case _ =>
       }
 
+      override def onDisconnect(ann: NodeAnnouncement) = maybeReconnect(fromNode(notClosing, ann), ann)
       override def onOperational(ann: NodeAnnouncement, their: Init) = fromNode(notClosing, ann).foreach(_ process CMDOnline)
       override def onTerminalError(ann: NodeAnnouncement) = fromNode(notClosing, ann).foreach(_ process CMDShutdown)
-      override def onDisconnect(ann: NodeAnnouncement) = maybeReconnect(fromNode(notClosing, ann), ann)
+      override def onIncompatible(ann: NodeAnnouncement) = onTerminalError(ann)
 
       def maybeReconnect(chans: ChannelVec, ann: NodeAnnouncement) = if (chans.nonEmpty) {
         // Immediately inform affected channels and try to reconnect back again in 5 seconds
