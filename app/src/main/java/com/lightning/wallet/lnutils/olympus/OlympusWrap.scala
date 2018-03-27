@@ -73,7 +73,7 @@ object OlympusWrap extends OlympusProvider {
 
   def failOver[T](run: Cloud => Obs[T], cs: CloudVec): Obs[T] = {
     def tryAgainWithNextCloud(failure: Throwable) = failOver(run, cs.tail)
-    if (cs.isEmpty) Obs error new ProtocolException("Run out of clouds")
+    if (cs.isEmpty) Obs error new ProtocolException("Try again later")
     else run(cs.head) onErrorResumeNext tryAgainWithNextCloud
   }
 
@@ -100,13 +100,15 @@ trait OlympusProvider {
 }
 
 class Connector(val url: String) extends OlympusProvider {
-  def http(way: String) = post(s"$url/$way", true) connectTimeout 15000
   def ask[T: JsonFormat](commandPath: String, parameters: HttpParam*): Obs[T] =
     obsOnIO.map(_ => http(commandPath).form(parameters.toMap.asJava).body.parseJson) map {
       case JsArray(JsString("error") +: JsString(why) +: _) => throw new ProtocolException(why)
       case JsArray(JsString("ok") +: response +: _) => response.convertTo[T]
       case _ => throw new ProtocolException
     }
+
+  def http(way: String) = post(s"$url/$way", true)
+    .trustAllCerts.trustAllHosts.connectTimeout(15000)
 
   def getRates = ask[Result]("rates/get")
   def getBlock(hash: String) = ask[BlockHeightAndTxs]("block/get", "hash" -> hash)

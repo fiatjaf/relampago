@@ -7,23 +7,20 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.olympus.OlympusWrap._
-import rx.lang.scala.{Observable => Obs}
 
-import org.bitcoinj.core.ECKey
-import org.bitcoinj.core.Utils.HEX
-import com.lightning.wallet.Utils.app
+import rx.lang.scala.{Observable => Obs}
 import com.lightning.wallet.ln.Tools.none
+import com.lightning.wallet.Utils.app
+import org.bitcoinj.core.Utils.HEX
+import org.bitcoinj.core.ECKey
 
 
 // Uses special paid tokens to store data on server, is constructed directly from a database
 class Cloud(val identifier: String, var connector: Connector, var auth: Int, val removable: Int,
-            val maxPriceMsat: Long = 10000000L) extends StateMachine[CloudData] { me =>
+            val maxPriceMsat: Long = 5000000L) extends StateMachine[CloudData] { me =>
 
   private var isFree = true
-  def isAuthEnabled = auth == 1 // For easy database compatibility
-  def capableChannelExists = app.ChannelManager.canSend(maxPriceMsat).nonEmpty
-  def withFree[T](obs: Obs[T] /* Adds side effect to control isFree state */) =
-    obs doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
+  def isAuthEnabled = auth == 1
 
   // STATE MACHINE
 
@@ -37,10 +34,11 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     case CloudData(None, tokens, actions) \ CMDStart
       // We are free AND backup is on AND (no tokens left OR few tokens left AND no acts left) AND a channel exists
       if isFree && isAuthEnabled && (tokens.isEmpty || actions.isEmpty && tokens.size < 5) && capableChannelExists =>
+      val send = retry(getFreshData, pickInc, 4 to 5) doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
       // This guard will intercept the next branch only if we are not capable of sending or have nothing to send
-      me withFree retry(getFreshData, pickInc, 4 to 5) foreach { case rd \ info =>
-        // If requested sum is low enough and tokens quantity is high enough
-        // and info has not already been set by another request
+      // If requested sum is low enough and tokens quantity is high enough and no race conditions
+
+      send foreach { case rd \ info =>
         app.ChannelManager.send(rd, none)
         me BECOME data.copy(info = info)
       }
@@ -49,10 +47,12 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     case CloudData(_, (point, clear, signature) +: tokens, action +: _) \ CMDStart if isFree =>
       val params = Seq("point" -> point, "cleartoken" -> clear, "clearsig" -> signature, BODY -> action.data.toString)
       // Be careful here: must make sure `doOnTerminate` changes `isFree` before `doOnCompleted` sends `CMDStart`
-      val send = me withFree connector.ask[String](action.path, params ++ action.plus:_*)
-      send.doOnCompleted(me doProcess CMDStart).foreach(onResponse, onResponse)
 
-      def onResponse(response: Any) = response match {
+      val send = connector.ask[String](action.path, params ++ action.plus:_*)
+      val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
+      send1.doOnCompleted(me doProcess CMDStart).foreach(onGotResponse, onGotResponse)
+
+      def onGotResponse(response: Any) = response match {
         case "done" => me BECOME data.copy(acts = data.acts diff Vector(action), tokens = tokens)
         case err: Throwable if err.getMessage == "tokeninvalid" => me BECOME data.copy(tokens = tokens)
         case err: Throwable if err.getMessage == "tokenused" => me BECOME data.copy(tokens = tokens)
@@ -61,21 +61,25 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
     // We do not have any acts or tokens but have a memo
     case CloudData(Some(pr \ memo), _, _) \ CMDStart if isFree =>
-      // Our payment may still be in-flight or fulfilled or failed already
+      // Our payment may still be in-flight or fulfilled or maybe failed already
       val isInFlight = app.ChannelManager.activeInFlightHashes contains pr.paymentHash
-      if (isInFlight) Tools log "LNCloud payment is still in-flight, doing nothing" else {
-        val send = me withFree connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
-        val send1 = send.map(memo.makeClearSigs).map(memo.packEverything).doOnCompleted(me doProcess CMDStart)
-        send1.foreach(fresh => me BECOME data.copy(info = None, tokens = data.tokens ++ fresh), onError)
+
+      if (!isInFlight) {
+        // We assume payment has been fulfilled and try to get the tokens, retry on getting failure
+        val send = connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
+        val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
+
+        val send2 = send1.map(memo.makeClearSigs).map(memo.packEverything).doOnCompleted(me doProcess CMDStart)
+        send2.foreach(fresh => me BECOME data.copy(info = None, tokens = data.tokens ++ fresh), onError)
       }
 
       def onError(err: Throwable) = err.getMessage match {
         case "notfulfilled" if pr.isFresh && capableChannelExists =>
-          val send = obsOnIO.flatMap(_ => me withRoutesAndOnionRDFromPR pr)
-          me withFree retry(send, pickInc, 4 to 5) foreach { foeRD =>
-            // Retry fresh request instead of getting a new one
-            app.ChannelManager.sendEither(foeRD, none)
-          }
+          // Retry a fresh payment request instead of generating a new one
+          // delayed retry here since call may happen when app has just been opened and is offline
+          val send = retry(obsOnIO.flatMap(_ => me withRoutesAndOnionRDFromPR pr), pickInc, 4 to 5)
+          val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
+          send1.foreach(foeRD => app.ChannelManager.sendEither(foeRD, none), none)
 
         // Server can't find our tokens or request has expired
         case "notfulfilled" => me BECOME data.copy(info = None)
@@ -101,9 +105,11 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         val pubKeyQ = ECKey.fromPublicOnly(HEX decode signerMasterPubKey)
         val pubKeyR = ECKey.fromPublicOnly(HEX decode signerSessionPubKey)
         val blinder = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
+
         val memo = BlindMemo(blinder params quantity, blinder tokens quantity, pubKeyR.getPublicKeyAsHex)
         connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
-          "seskey" -> memo.sesPubKeyHex).map(PaymentRequest.read).map(pr => pr -> memo)
+          "lang" -> app.getString(com.lightning.wallet.R.string.lang), "seskey" -> memo.sesPubKeyHex)
+            .map(PaymentRequest.read).map(pr => pr -> memo)
     }
 
   // ADDING NEW TOKENS
@@ -119,4 +125,8 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def withRoutesAndOnionRDFromPR(pr: PaymentRequest) =
     // These payments will always be dust so frozen state is not an issue
     app.ChannelManager withRoutesAndOnionRDFrozenAllowed emptyRD(pr, pr.unsafeMsat)
+
+  def capableChannelExists =
+    // Estimate whethere we can send a MAX price
+    app.ChannelManager.canSend(maxPriceMsat).nonEmpty
 }

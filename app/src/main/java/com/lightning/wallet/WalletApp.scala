@@ -91,7 +91,7 @@ class WalletApp extends Application { me =>
   }
 
   object TransData {
-    var value: Any = _ // must be null at start
+    var value: Any = _
     val lnLink = "(?i)(lightning:)?([a-zA-Z0-9]+)\\W*".r
     val nodeLink = "([a-fA-F0-9]{66})@([a-zA-Z0-9:\\.\\-_]+):([0-9]+)".r
 
@@ -127,8 +127,8 @@ class WalletApp extends Application { me =>
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
-    def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)
     def frozenInFlightHashes = all.diff(notClosingOrRefunding).flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)
+    def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
     val socketEventsListener = new ConnectionListener {

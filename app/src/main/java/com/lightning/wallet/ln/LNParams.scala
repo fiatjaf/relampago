@@ -41,11 +41,8 @@ object LNParams { me =>
     extendedCloudKey = derivePrivateKey(m, hardened(92) :: hardened(0) :: Nil)
   }
 
-  // Off-chain fee calculations
-  // This is the max allowed upper bound for payee to not get screwed
-  def logOfBase(base: Long, sum: Long) = math.log(sum) / math.log(base)
-  def maxAcceptableLNFee(msat: Long) = msat / math.pow(x = logOfBase(500, msat), y = 4)
-  def isFeeNotOk(msat: Long, fee: Long, hops: Int) = fee > 10000 * hops + maxAcceptableLNFee(msat)
+  def isFeeNotOk(msat: Long, fee: Long, hops: Int) =
+    fee > 10000 * (hops + 1) + msat / 20
 
   // On-chain fee calculations
   def shouldUpdateFee(oldPerKw: Long, newPerKw: Long) = {

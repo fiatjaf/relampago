@@ -1,7 +1,5 @@
 <resources>
     <string name="lang">eng</string>
-
-    <!-- stepper, emergency mode -->
     <string name="step_2"><![CDATA[<font color=#999999>Step 2 of 3: security</font><br><br>%1$s]]></string>
     <string name="step_3"><![CDATA[<font color=#999999>Final step: fees</font><br><br>%1$s]]></string>
     <string name="emerge_report">Show error report</string>
@@ -42,18 +40,30 @@
     <!-- headers with links -->
     <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.08&#8211;26<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
-    <string name="mnemonic_info"><font color="#E31300">Mnemonic phrase is important</font>\n<a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.\n\nSaving and properly securing a mnemonic phrase is a single most important action to do once a fresh Bitcoin wallet is created.\n\nYou will need it in case of various emergencies such as lost phone or forgotten passcode!</string>
-    <string name="channel_recovery_info">Channel recovery tool asks Olympus servers for available channel backups and uses those to reimburse locked funds back into your Bitcoin wallet.\n\nYou should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds, otherwise nothing will happen.\n\nAlso, using this tool does not affect open channels currently present on this device.</string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a></string>
+
+    <string name="channel_recovery_info">
+        Channel recovery tool asks Olympus servers for available channel backups and uses those to reimburse locked funds back into
+        your Bitcoin wallet.\n\nYou should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels
+        with some locked funds, otherwise nothing will happen.\n\nAlso, using this tool does not affect open channels currently present
+        on this device.
+    </string>
+
+    <string name="mnemonic_info">
+        <font color="#E31300">Mnemonic phrase is important</font>\n
+        <a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and be sure to save it.
+        \n\nSaving and properly securing a mnemonic phrase is a single most important action to do once a fresh Bitcoin wallet is created.
+        \n\nYou will need it in case of various emergencies such as lost phone or forgotten passcode!
+    </string>
 
     <string name="ln_ops_chan_none">
         <a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a>
         enables fast and secure off-chain Bitcoin transactions with low fees. Using it requires you to open a
         <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a>
         with a peer of your choice and then fund it with an on-chain Bitcoin transaction.\n\n
-        This app uses paid <a href='http://lightning-wallet.com/storage-tokens#storage-tokens'>storage tokens</a>
-        to secure channel backups and thus makes sure that lost channel funds can always be recovered.
+        This app secures your channel backups by using special <a href='http://lightning-wallet.com/storage-tokens#storage-tokens'>storage tokens</a> so
+        lost channel funds can always be refunded if you have a <a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">mnemonic phrase</a>.
     </string>
 
     <string name="zygote_details"><![CDATA[

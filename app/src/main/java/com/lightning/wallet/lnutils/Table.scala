@@ -3,7 +3,7 @@ package com.lightning.wallet.lnutils
 import spray.json._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import com.lightning.wallet.ln.Tools.{none, random, runAnd}
+import com.lightning.wallet.ln.Tools.{random, runAnd}
 import com.lightning.wallet.lnutils.olympus.CloudData
 import net.sqlcipher.database.SQLiteDatabase
 import android.content.Context
@@ -15,6 +15,7 @@ object OlympusTable extends Table {
   val newSql = s"INSERT OR IGNORE INTO $table ($identifier, $url, $data, $auth, $order, $removable) VALUES (?, ?, ?, ?, ?, ?)"
   val updMetaSql = s"UPDATE $table SET $url = ?, $auth = ?, $order = ? WHERE $identifier = ?"
   val updDataSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
+  val upgradeSql = s"UPDATE $table SET $url = ? WHERE $identifier = ?"
   val selectAllSql = s"SELECT * FROM $table ORDER BY $order ASC"
   val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
@@ -92,14 +93,13 @@ object PaymentTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, name: String, secret: String)
-extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
+extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 4) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.wallet/table/$tbl"
-  def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = none
 
   def txWrap(process: => Unit) = try {
     runAnd(base.beginTransaction)(process)
@@ -116,10 +116,19 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     // Randomize an order of two available default servers
     val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val main: Array[AnyRef] = Array("dev-server-1", "http://213.133.99.89:9002", emptyData, "1", ord1, "0")
-    val fallback: Array[AnyRef] = Array("dev-server-2", "http://213.133.103.56:9002", emptyData, "0", ord2, "1")
+    val main: Array[AnyRef] = Array("dev-server-1", "http://213.133.99.89:9003", emptyData, "1", ord1, "0")
+    val fallback: Array[AnyRef] = Array("dev-server-2", "http://213.133.103.56:9003", emptyData, "0", ord2, "1")
 
     dbs.execSQL(OlympusTable.newSql, main)
     dbs.execSQL(OlympusTable.newSql, fallback)
+  }
+
+  def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = {
+    val main: Array[AnyRef] = Array("http://213.133.99.89:9003", "dev-server-1")
+    val fallback: Array[AnyRef] = Array("http://213.133.103.56:9003", "dev-server-2")
+
+    dbs.execSQL(OlympusTable.upgradeSql, main)
+    dbs.execSQL(OlympusTable.upgradeSql, fallback)
+    dbs.execSQL(s"DELETE FROM ${PaymentTable.table}")
   }
 }

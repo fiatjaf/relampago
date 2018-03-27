@@ -93,17 +93,18 @@ object PaymentInfo {
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
     // Try to reduce remaining routes and also remember bad nodes and channels
     val parsed = Try apply parseErrorPacket(rd.onion.sharedSecrets, fail.reason)
+    println(parsed)
 
     parsed map {
       case ErrorPacket(nodeKey, cd: ChannelDisabled) =>
         val isNodeHonest = Announcements.checkSig(cd.update, nodeKey)
         if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, span = 86400 * 4 * 1000)
-        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 600 * 1000)
+        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 300 * 1000)
 
       case ErrorPacket(nodeKey, tf: TemporaryChannelFailure) =>
         val isNodeHonest = Announcements.checkSig(tf.update, nodeKey)
         if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, span = 86400 * 4 * 1000)
-        else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString, 600 * 1000)
+        else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString, 300 * 1000)
 
       case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNodes(Vector(nodeKey), rd, 600 * 1000)
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
