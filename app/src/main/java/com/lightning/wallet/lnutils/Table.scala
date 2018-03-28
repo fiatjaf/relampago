@@ -43,18 +43,17 @@ object ChannelTable extends Table {
 }
 
 object BadEntityTable extends Table {
-  val Tuple4(table, resId, targetNode, expire) = Tuple4("badentity", "resid", "targetnode", "expire")
-  val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $targetNode IN (?, ?) ORDER BY $id DESC LIMIT 250"
-  val newSql = s"INSERT OR IGNORE INTO $table ($resId, $targetNode, $expire) VALUES (?, ?, ?)"
-  val updSql = s"UPDATE $table SET $expire = ? WHERE $resId = ? AND $targetNode = ?"
+  val Tuple5(table, resId, targetNode, expire, amount) = Tuple5("badentity", "resid", "targetnode", "expire", "amount")
+  val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $amount <= ? AND $targetNode IN (?, ?) ORDER BY $id DESC"
+  val newSql = s"INSERT OR IGNORE INTO $table ($resId, $targetNode, $expire, $amount) VALUES (?, ?, ?, ?)"
+  val updSql = s"UPDATE $table SET $expire = ?, $amount = ? WHERE $resId = ? AND $targetNode = ?"
 
   val createSql = s"""
     CREATE TABLE $table (
-      $id INTEGER PRIMARY KEY AUTOINCREMENT, $resId STRING NOT NULL,
-      $targetNode STRING NOT NULL, $expire INTEGER NOT NULL,
-      UNIQUE($resId, $targetNode) ON CONFLICT IGNORE
+      $id INTEGER PRIMARY KEY AUTOINCREMENT, $resId STRING NOT NULL, $targetNode STRING NOT NULL,
+      $expire INTEGER NOT NULL, $amount INTEGER NOT NULL, UNIQUE($resId, $targetNode) ON CONFLICT IGNORE
     );
-    CREATE INDEX idx1 ON $table ($expire, $targetNode);
+    CREATE INDEX idx1 ON $table ($expire, $amount, $targetNode);
     CREATE INDEX idx2 ON $table ($resId, $targetNode);
     COMMIT"""
 }
@@ -93,7 +92,7 @@ object PaymentTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, name: String, secret: String)
-extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 2) {
+extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 6) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
@@ -126,10 +125,11 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 2) {
   def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = {
     val dev1: Array[AnyRef] = Array("http://213.133.99.89:9003", "dev-server-1")
     val dev2: Array[AnyRef] = Array("http://213.133.103.56:9003", "dev-server-2")
-    val payTable = PaymentTable.table
 
     dbs.execSQL(OlympusTable.upgradeSql, dev1)
     dbs.execSQL(OlympusTable.upgradeSql, dev2)
-    dbs.execSQL(s"DELETE FROM $payTable")
+    dbs.execSQL(s"DROP TABLE ${BadEntityTable.table}")
+    dbs.execSQL(s"DELETE FROM ${PaymentTable.table}")
+    dbs execSQL BadEntityTable.createSql
   }
 }

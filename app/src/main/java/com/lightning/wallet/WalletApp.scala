@@ -124,7 +124,7 @@ class WalletApp extends Application { me =>
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: ChannelVec = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: ChannelVec, ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
-    def canSend(amount: Long) = for (c <- all if isOperationalOpen(c) && estimateCanSend(c) > amount) yield c
+    def canSend(amount: Long) = for (c <- all if isOperationalOpen(c) && estimateCanSend(c) >= amount) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
@@ -214,10 +214,12 @@ class WalletApp extends Application { me =>
     }
 
     def addRoutesAndOnion(peers: PublicKeyVec, rd: RoutingData) = {
-      def getRoutes(targetId: PublicKey) = peers contains targetId match {
-        case false => BadEntityWrap.findRoutes(peers, targetId, rd.pr.nodeId)
-        case true => Obs just Vector(Vector.empty)
-      }
+      // If payment request contains extra routing info then we request
+      // assisted routes, otherwise we directly ask for payee id
+
+      def getRoutes(targetId: PublicKey) =
+        if (peers contains targetId) Obs just Vector(Vector.empty)
+        else BadEntityWrap.findRoutes(peers, targetId, rd)
 
       def withExtraPart = for {
         tag <- Obs from rd.pr.routingInfo
@@ -225,7 +227,6 @@ class WalletApp extends Application { me =>
         completeRoutes = partialRoutes.map(_ ++ tag.route)
       } yield Obs just completeRoutes
 
-      // If payment request contains extra routing info then we ask for assisted routes, otherwise we directly ask for payee id
       val routesObs = if (rd.pr.routingInfo.isEmpty) getRoutes(rd.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
       // Update RD with routes and then we can make an onion out of the first available cheapest route while saving the rest
       // remote call may return empty route here in which case `noRouteLeft` will be fired later

@@ -64,7 +64,7 @@ object PaymentInfo {
     val cltvDeltaFail = lastExpiry - firstExpiry > LNParams.maxCltvDelta
     val lnFeeFail = LNParams.isFeeNotOk(lastMsat, lastMsat - rd.firstMsat, route.size)
 
-    if (cltvDeltaFail | lnFeeFail) useFirstRoute(rest, rd) else {
+    if (cltvDeltaFail || lnFeeFail) useFirstRoute(rest, rd) else {
       val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, allPayloads, assoc = rd.pr.paymentHash)
       val rd1 = rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
       Right(rd1)
@@ -78,15 +78,16 @@ object PaymentInfo {
   }
 
   def without(rs: PaymentRouteVec, fn: Hop => Boolean) = rs.filterNot(_ exists fn)
-  def withoutChans(ids: Vector[Long], rd: RoutingData, targetId: String, span: Long) = {
-    val routesWithoutBadChannels = without(rd.routes, hop => ids contains hop.shortChannelId)
-    val blacklisted = for (shortChanId <- ids) yield Tuple3(shortChanId, targetId, span)
+  def withoutChans(ids: Vector[Long], rd: RoutingData, targetId: String, span: Long, msat: Long) = {
+    // Clears routing data from affected routes and provides a blacklist to be saved in a single pass
+    val routesWithoutBadChannels = without(rd.routes, ids contains _.shortChannelId)
+    val blacklisted = for (shortId <- ids) yield (shortId, targetId, span, msat)
     rd.copy(routes = routesWithoutBadChannels) -> blacklisted
   }
 
   def withoutNodes(badNodes: PublicKeyVec, rd: RoutingData, span: Long) = {
-    val routesWithoutBadNodes = without(rd.routes, hop => badNodes contains hop.nodeId)
-    val blacklisted = for (nodeId <- badNodes) yield Tuple3(nodeId, TARGET_ALL, span)
+    val routesWithoutBadNodes = without(rd.routes, badNodes contains _.nodeId)
+    val blacklisted = for (nodeId <- badNodes) yield (nodeId, TARGET_ALL, span, 0L)
     rd.copy(routes = routesWithoutBadNodes) -> blacklisted
   }
 
@@ -99,21 +100,25 @@ object PaymentInfo {
       case ErrorPacket(nodeKey, cd: ChannelDisabled) =>
         val isNodeHonest = Announcements.checkSig(cd.update, nodeKey)
         if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, span = 86400 * 4 * 1000)
-        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 300 * 1000)
+        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 300 * 1000, 0L)
 
       case ErrorPacket(nodeKey, tf: TemporaryChannelFailure) =>
         val isNodeHonest = Announcements.checkSig(tf.update, nodeKey)
-        if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, span = 86400 * 4 * 1000)
-        else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString, 300 * 1000)
+        if (!isNodeHonest) withoutNodes(badNodes = Vector(nodeKey), rd, span = 86400 * 4 * 1000)
+        else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString, 600 * 1000, rd.firstMsat)
 
-      case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNodes(Vector(nodeKey), rd, 600 * 1000)
+      case ErrorPacket(nodeKey, TemporaryNodeFailure) =>
+        val fromPeer = rd.usedRoute.headOption.exists(_.nodeId == nodeKey)
+        if (fromPeer) withoutNodes(Vector(nodeKey), rd, 60 * 1000)
+        else withoutNodes(Vector(nodeKey), rd, 600 * 1000)
+
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
       case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 2 * 1000)
 
       case ErrorPacket(nodeKey, UnknownNextPeer) =>
         rd.usedRoute.collectFirst { case hop if hop.nodeId == nodeKey =>
-          // Node can not find a specified peer so we remove a failed channel
-          withoutChans(Vector(hop.shortChannelId), rd, TARGET_ALL, 86400 * 4 * 1000)
+          // Node can not find a specified peer so we remove a failed outgoing channel
+          withoutChans(Vector(hop.shortChannelId), rd, TARGET_ALL, 86400 * 4 * 1000, 0L)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nodeKey, _) =>
@@ -124,7 +129,7 @@ object PaymentInfo {
     } getOrElse {
       val shortChanIds = rd.usedRoute.map(_.shortChannelId)
       withoutChans(shortChanIds drop 1 dropRight 1, rd,
-        rd.pr.nodeId.toString, 180 * 1000)
+        rd.pr.nodeId.toString, 180 * 1000, 0L)
     }
   }
 

@@ -115,27 +115,24 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       // then retry failed payments where possible
 
       db txWrap {
-        for (Htlc(true, add) \ fulfill <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(add)
+        for (Htlc(true, add) \ fulfillMessage <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(add)
         for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updateStatus(FAILURE, add.paymentHash)
-        for (Htlc(false, add) \ why <- norm.commitments.localCommit.spec.failed) {
+        for (Htlc(false, add) \ failureReason <- norm.commitments.localCommit.spec.failed) {
 
-          // Runtime RD will not be present after restart
-          val rdOpt = pendingPayments.get(add.paymentHash) orElse
-            getPaymentInfo(add.paymentHash).map(emptyRDFromInfo).toOption
+          val rd1Opt = pendingPayments get add.paymentHash
+          rd1Opt map parseFailureCutRoutes(failureReason) match {
+            case Some(updatedRD \ badNodesAndChans) if updatedRD.ok =>
+              // Clear cached local routes so they don't get in the way
+              // then try use the routes left or fetch new ones
 
-          rdOpt map parseFailureCutRoutes(why) match {
-            case Some(rd1 \ badNodesAndChans) if rd1.ok =>
-              // Clear cached routes so they don't get in the way
-              // Then try use the routes left or fetch new ones
-
-              goodRoutes -= rd1.pr.nodeId
+              goodRoutes -= updatedRD.pr.nodeId
               badNodesAndChans foreach BadEntityWrap.putEntity.tupled
-              app.ChannelManager.sendEither(useRoutesLeft(rd1), newRoutes)
+              app.ChannelManager.sendEither(useRoutesLeft(updatedRD), newRoutes)
 
-            // Payment is either halted or not found at all
-            case _ => updateStatus(FAILURE, add.paymentHash)
+            case _ =>
+              // Either halted or not found at all
+              updateStatus(FAILURE, add.paymentHash)
           }
-
         }
       }
 
@@ -186,21 +183,21 @@ object ChannelWrap {
 }
 
 object BadEntityWrap {
-  val putEntity = (entity: Any, targetNodeId: String, span: Long) => {
-    db.change(BadEntityTable.newSql, entity, targetNodeId, System.currentTimeMillis + span)
-    db.change(BadEntityTable.updSql, System.currentTimeMillis + span, entity, targetNodeId)
+  val putEntity = (entity: Any, targetNodeId: String, span: Long, msat: Long) => {
+    db.change(BadEntityTable.newSql, entity, targetNodeId, System.currentTimeMillis + span, msat)
+    db.change(BadEntityTable.updSql, System.currentTimeMillis + span, msat, entity, targetNodeId)
   }
 
-  def findRoutes(from: PublicKeyVec, targetId: PublicKey, payee: PublicKey) = {
+  def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
     // Make sure the first cached route starts at a node which is operational currently
-    val good = PaymentInfoWrap.goodRoutes.get(payee).filter(from contains _.head.head.nodeId)
-    // becuase of possible assisted routes target node may not equal payee node at this stage
-    good.map(Obs just _) getOrElse doFindRoutes(from, targetId)
+    // becuase of possible assisted routes a target node may not equal a payee node at this stage
+    val good = PaymentInfoWrap.goodRoutes.get(rd.pr.nodeId).filter(from contains _.head.head.nodeId)
+    good.map(Obs just _) getOrElse doFindRoutes(from, targetId, rd.firstMsat)
   }
 
-  private def doFindRoutes(from: PublicKeyVec, targetId: PublicKey) = {
-    // shortChanId length is 32 so anything larger than 60 is definitely a nodeId
-    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, TARGET_ALL, targetId)
+  private def doFindRoutes(from: PublicKeyVec, targetId: PublicKey, msat: Long) = {
+    // Short channel id length is 32 so anything of length beyond 60 is definitely a node id
+    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, msat, TARGET_ALL, targetId)
     val badNodes \ badChans = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
     OlympusWrap findRoutes OutRequest(badNodes, for (chanId <- badChans) yield chanId.toLong, from, targetId)
   }
