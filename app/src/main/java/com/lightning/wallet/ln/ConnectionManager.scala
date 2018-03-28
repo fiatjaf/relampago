@@ -61,10 +61,10 @@ object ConnectionManager {
       }
     }
 
-    // Listener may trigger a reconnect
+    // Listener may trigger a reconnect after this
     work onComplete { _ => events onDisconnect ann }
-    def disconnect = try socket.close catch none
 
+    def disconnect = try socket.close catch none
     def intercept(message: LightningMessage) = {
       // Update liveness on each incoming message
       lastMsg = System.currentTimeMillis

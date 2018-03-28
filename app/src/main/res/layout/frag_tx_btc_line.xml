@@ -7,14 +7,14 @@
     <TextView
         android:maxLines="1"
         style="@style/BaseText"
-        android:layout_weight="16"
+        android:layout_weight="15"
         android:layout_width="0dp"
         android:id="@+id/transactSum"/>
 
     <TextView
         android:maxLines="1"
         style="@style/StdText"
-        android:layout_weight="22"
+        android:layout_weight="23"
         android:layout_width="0dp"
         android:id="@+id/transactWhen"/>
 

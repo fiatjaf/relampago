@@ -19,7 +19,7 @@ import scala.util.{Failure, Success, Try}
 import android.database.{ContentObserver, Cursor}
 import com.lightning.wallet.ln.Tools.{none, random, runAnd, wrap}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
-import com.lightning.wallet.R.drawable.{await, conf1, dead, frozen}
+import com.lightning.wallet.R.drawable.{await, conf1ln, dead, frozen}
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.wallet.ln.PaymentRequest.write
 import android.support.v4.content.Loader
@@ -67,7 +67,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   val lnStatus = getResources getStringArray R.array.ln_status_online
   val paymentStatesMap = getResources getStringArray R.array.ln_payment_states
   val expiryLeft = getResources getStringArray R.array.ln_status_expiry
-  val imageMap = Array(await, await, conf1, dead, frozen)
+  val imageMap = Array(await, await, conf1ln, dead, frozen)
   val lnChanWarn = frag.findViewById(R.id.lnChanWarn)
   val noDesc = host getString ln_no_description
 
@@ -87,12 +87,14 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
           case _ => sumOut.format(denom formatted -info.firstSum)
         }
 
-        val fastId = humanFour(info.hash.toUpperCase take 8)
-        transactSum setText s"$markedPayment <font color=#999999>$fastId</font>".html
+        val description = getDescription(info.description)
+        val humanHash = humanFour(info.hash.toUpperCase take 24)
+        val details = s"<font color=#999999>$humanHash</font><br>$description"
         transactWhen setText when(System.currentTimeMillis, timestamp).html
         transactCircle setImageResource imageMap(info.actualStatus)
-        transactWhat setText getDescription(info.description).html
         transactWhat setVisibility viewMap(showDescription)
+        transactSum setText markedPayment.html
+        transactWhat setText details.html
       }
     }
   }

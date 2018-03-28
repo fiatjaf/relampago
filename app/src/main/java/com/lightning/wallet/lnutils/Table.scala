@@ -126,9 +126,10 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 2) {
   def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = {
     val dev1: Array[AnyRef] = Array("http://213.133.99.89:9003", "dev-server-1")
     val dev2: Array[AnyRef] = Array("http://213.133.103.56:9003", "dev-server-2")
+    val payTable = PaymentTable.table
 
     dbs.execSQL(OlympusTable.upgradeSql, dev1)
     dbs.execSQL(OlympusTable.upgradeSql, dev2)
-    dbs.execSQL(s"DELETE FROM ${PaymentTable.table}")
+    dbs.execSQL(s"DELETE FROM $payTable")
   }
 }

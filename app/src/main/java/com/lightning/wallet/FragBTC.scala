@@ -9,7 +9,7 @@ import com.lightning.wallet.Utils._
 import com.lightning.wallet.R.string._
 import com.lightning.wallet.Denomination._
 import com.lightning.wallet.lnutils.ImplicitConversions._
-import com.lightning.wallet.R.drawable.{await, conf1, dead}
+import com.lightning.wallet.R.drawable.{await, conf1btc, dead}
 import com.lightning.wallet.ln.Tools.{none, runAnd, wrap}
 import scala.util.{Failure, Success}
 
@@ -71,7 +71,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
       def fillView(wrap: TxWrap) = {
         val timestamp = when(System.currentTimeMillis, wrap.tx.getUpdateTime)
-        val status = if (wrap.isDead) dead else if (wrap.depth >= minDepth) conf1 else await
+        val status = if (wrap.isDead) dead else if (wrap.depth >= minDepth) conf1btc else await
 
         val markedPaymentSum = wrap.visibleValue.isPositive match {
           case true => sumIn.format(denom formatted wrap.visibleValue)

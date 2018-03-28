@@ -22,7 +22,7 @@
         android:id="@+id/secretFingerprint"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:src="@drawable/ic_fingerprint_black_24dp"/>
+        android:src="@drawable/ic_fingerprint_24dp"/>
 
     <View style="@style/GrayDivider"/>
 </LinearLayout>
