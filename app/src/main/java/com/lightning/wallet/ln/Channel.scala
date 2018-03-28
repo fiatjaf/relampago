@@ -562,7 +562,7 @@ object Channel {
   } getOrElse 0L
 
   def estimateTotalCanSend(chan: Channel) = chan { cs =>
-    val currentLimit = cs.remoteParams.channelReserveSatoshis + LNParams.broadcaster.ratePerKwSat
+    val currentLimit = cs.remoteParams.channelReserveSatoshis + cs.localCommit.spec.feeratePerKw
     // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
     // sending limit consists of unspendable channel reserve + current commit tx fee
     cs.localCommit.spec.toLocalMsat - currentLimit * 1000L
