@@ -87,13 +87,13 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
   val catchListener = new BlocksListener {
     def getNextTracker(initBlocksLeft: Int) = new BlocksListener { self =>
-      def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) =
-        if (left < 1) notifyFinish else if (left % blocksPerDay == 0) notifyDaysLeft(left)
+      def onBlocksDownloaded(peer: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) =
+        if (left < 1) notifyFinish else if (left % LNParams.broadcaster.blocksPerDay == 0) notifyDaysLeft(left)
 
       def notifyDaysLeft(blocksLeft: Int) = {
-        val daysLeft = blocksLeft / blocksPerDay
-        val text = app.plurOrZero(syncOps, daysLeft)
-        update(text, Informer.CHAINSYNC).run
+        val daysLeft = blocksLeft / LNParams.broadcaster.blocksPerDay
+        val humanDaysLeft = app.plurOrZero(syncOps, daysLeft)
+        update(humanDaysLeft, Informer.CHAINSYNC).run
       }
 
       def notifyFinish = {
@@ -105,8 +105,8 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
       // We only add a SYNC item if we have a large enough
       // lag (more than a day), otherwise no updates are visible
       private val syncOps = app.getResources getStringArray R.array.info_progress
-      private val text = app.plurOrZero(syncOps, initBlocksLeft / blocksPerDay)
-      if (initBlocksLeft > blocksPerDay) add(text, Informer.CHAINSYNC).run
+      private val text = app.plurOrZero(syncOps, initBlocksLeft / LNParams.broadcaster.blocksPerDay)
+      if (initBlocksLeft > LNParams.broadcaster.blocksPerDay) add(text, Informer.CHAINSYNC).run
     }
 
     def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = {

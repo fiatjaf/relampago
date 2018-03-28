@@ -14,6 +14,12 @@ import fr.acinq.bitcoin.BinaryData
 object LocalBroadcaster extends Broadcaster {
   def ratePerKwSat = RatesSaver.rates.feeLive.value / 4
 
+  def isSynchronized = {
+    val candidate1 = app.kit.wallet.getLastBlockSeenHeight
+    val candidate2 = app.kit.peerGroup.getMostCommonChainHeight
+    bestHeightObtained & candidate2 - candidate1 < blocksPerDay
+  }
+
   def currentHeight = {
     val candidate1 = app.kit.wallet.getLastBlockSeenHeight
     val candidate2 = app.kit.peerGroup.getMostCommonChainHeight

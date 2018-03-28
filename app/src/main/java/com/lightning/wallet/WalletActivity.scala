@@ -334,7 +334,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def goAddChannel(top: View) = {
     val minAmt = RatesSaver.rates.feeLive multiply 2
-    if (app.kit.conf1Balance isGreaterThan minAmt) me goTo classOf[LNStartActivity]
+    if (!broadcaster.isSynchronized) app toast dialog_chain_behind
+    else if (app.kit.conf1Balance isGreaterThan minAmt) me goTo classOf[LNStartActivity]
     else showForm(negBuilder(dialog_ok, notEnoughToOpenChannel.html, null).create)
 
     lazy val notEnoughToOpenChannel = {
@@ -443,8 +444,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       // by fetching encrypted static channel params from server
 
       rm(menu) {
-        val bld = baseTextBuilder(me getString channel_recovery_info)
-        mkForm(recover, none, bld, dialog_next, dialog_cancel)
+        if (!broadcaster.isSynchronized) app toast dialog_chain_behind else {
+          // We only allow recovering once BTC is synchronized to avoid issues
+          val bld = baseTextBuilder(me getString channel_recovery_info)
+          mkForm(recover, none, bld, dialog_next, dialog_cancel)
+        }
 
         def recover: Unit = {
           OlympusWrap.getBackup(cloudId).foreach(backups => {
@@ -462,9 +466,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
               // Start watching this channel's funding tx output right away
               _ = app.kit watchFunding refundingData.commitments
             } app.ChannelManager.all +:= chan
-
-            // New channels have been added
-            // so they need to be reconnected
             app.ChannelManager.initConnect
           }, none)
 

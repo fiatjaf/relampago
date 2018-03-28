@@ -88,11 +88,12 @@ trait Broadcaster extends ChannelListener { me =>
   // Indicates whether any of peers have told us the best height
   // this is required to not send HTLCs with expiry in past
   var bestHeightObtained = false
+  val blocksPerDay = 144
 
   def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
   def getBlockHashString(txid: BinaryData): Option[String]
   def getStatus(txid: BinaryData): DepthAndDead
-  // May return outdated height if not synced
+  def isSynchronized: Boolean
   def currentHeight: Long
   def ratePerKwSat: Long
 

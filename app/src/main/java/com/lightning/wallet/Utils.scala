@@ -398,7 +398,6 @@ trait BlocksListener extends PeerDataEventListener {
   def getData(peer: Peer, message: GetDataMessage) = null
   def onChainDownloadStarted(peer: Peer, blocksLeft: Int) = none
   def onPreMessageReceived(peer: Peer, message: Message) = message
-  val blocksPerDay = 144
 }
 
 abstract class TxTracker extends WalletCoinsSentEventListener
