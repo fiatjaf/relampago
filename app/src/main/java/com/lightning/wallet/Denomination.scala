@@ -49,7 +49,7 @@ object SatDenomination extends Denomination {
 
   fmt setDecimalFormatSymbols symbols
   def withSign(msat: MilliSatoshi) =
-    "ⓢ\u00A0" + formatted(msat)
+    formatted(msat) + "\u00A0SAT"
 }
 
 object FinDenomination extends Denomination {

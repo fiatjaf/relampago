@@ -14,7 +14,7 @@ object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
   val maxChannelCapacity = MilliSatoshi(16777216000L)
   val maxHtlcValue = MilliSatoshi(1000000000L)
-  val minHtlcValue = MilliSatoshi(10L)
+  val minHtlcValue = MilliSatoshi(1000L)
   val dustLimit = Satoshi(5000L)
   val maxCltvDelta = 28 * 144
 

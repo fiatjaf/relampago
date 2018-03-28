@@ -15,15 +15,15 @@ object LocalBroadcaster extends Broadcaster {
   def ratePerKwSat = RatesSaver.rates.feeLive.value / 4
 
   def isSynchronized = {
-    val candidate1 = app.kit.wallet.getLastBlockSeenHeight
-    val candidate2 = app.kit.peerGroup.getMostCommonChainHeight
-    bestHeightObtained & candidate2 - candidate1 < blocksPerDay
+    val processed = app.kit.wallet.getLastBlockSeenHeight
+    val reported = app.kit.peerGroup.getMostCommonChainHeight
+    bestHeightObtained & reported - processed < blocksPerDay
   }
 
   def currentHeight = {
-    val candidate1 = app.kit.wallet.getLastBlockSeenHeight
-    val candidate2 = app.kit.peerGroup.getMostCommonChainHeight
-    math.max(candidate1, candidate2)
+    val processed = app.kit.wallet.getLastBlockSeenHeight
+    val reported = app.kit.peerGroup.getMostCommonChainHeight
+    math.max(processed, reported)
   }
 
   def getTx(txid: BinaryData) = {

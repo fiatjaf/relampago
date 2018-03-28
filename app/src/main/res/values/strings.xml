@@ -62,7 +62,7 @@
         enables fast and secure off-chain Bitcoin transactions with low fees. Using it requires you to open a
         <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a>
         with a peer of your choice and then fund it with an on-chain Bitcoin transaction.\n\n
-        This app secures your channel backups by using special <a href='http://lightning-wallet.com/storage-tokens#storage-tokens'>storage tokens</a> so
+        This app secures your channel backups by using paid <a href='http://lightning-wallet.com/storage-tokens#storage-tokens'>storage tokens</a> so
         lost channel funds can always be refunded if you have a <a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">mnemonic phrase</a>.
     </string>
 
