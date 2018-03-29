@@ -38,7 +38,7 @@
     <string name="restore_hint">Your BIP32 mnemonic phrase</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.08&#8211;27<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
+    <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.08&#8211;28<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a></string>
@@ -66,8 +66,8 @@
 
     <string name="tokens_warn"><![CDATA[
         Please note: this wallet uses paid <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>storage tokens</a>
-        to secure your encrypted channel backups.<br><br>An automatic Lightning payment of <i>%1$s</i> will acquire 50 storage tokens
-        once your first channel becomes open.<br><br>These tokens will safeguard you from money loss for the next 50 payment channels.
+        to secure your encrypted channel backups.<br><br>An automatic Lightning payment of <i>%1$s</i> will acquire 50 storage tokens once
+        your first channel becomes open.<br><br>These tokens will safeguard you from accidental money loss for the next 50 payment channels.
     ]]></string>
 
     <string name="zygote_details"><![CDATA[

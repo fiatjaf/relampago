@@ -99,21 +99,19 @@ object PaymentInfo {
     parsed map {
       case ErrorPacket(nodeKey, cd: ChannelDisabled) =>
         val isNodeHonest = Announcements.checkSig(cd.update, nodeKey)
-        if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, span = 86400 * 4 * 1000)
-        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 300 * 1000, 0L)
+        if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
+        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL,
+          300 * 1000, 0L)
 
       case ErrorPacket(nodeKey, tf: TemporaryChannelFailure) =>
         val isNodeHonest = Announcements.checkSig(tf.update, nodeKey)
-        if (!isNodeHonest) withoutNodes(badNodes = Vector(nodeKey), rd, span = 86400 * 4 * 1000)
-        else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString, 600 * 1000, rd.firstMsat)
+        if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
+        else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString,
+          600 * 1000, rd.firstMsat)
 
-      case ErrorPacket(nodeKey, TemporaryNodeFailure) =>
-        val fromPeer = rd.usedRoute.headOption.exists(_.nodeId == nodeKey)
-        if (fromPeer) withoutNodes(Vector(nodeKey), rd, 60 * 1000)
-        else withoutNodes(Vector(nodeKey), rd, 600 * 1000)
-
+      case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNodes(Vector(nodeKey), rd, 60 * 1000)
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
-      case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 2 * 1000)
+      case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
 
       case ErrorPacket(nodeKey, UnknownNextPeer) =>
         rd.usedRoute.collectFirst { case hop if hop.nodeId == nodeKey =>

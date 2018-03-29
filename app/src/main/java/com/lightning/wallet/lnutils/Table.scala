@@ -92,7 +92,7 @@ object PaymentTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, name: String, secret: String)
-extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 6) {
+extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 10) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
@@ -123,13 +123,9 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 6) {
   }
 
   def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = {
-    val dev1: Array[AnyRef] = Array("http://213.133.99.89:9003", "dev-server-1")
-    val dev2: Array[AnyRef] = Array("http://213.133.103.56:9003", "dev-server-2")
 
-    dbs.execSQL(OlympusTable.upgradeSql, dev1)
-    dbs.execSQL(OlympusTable.upgradeSql, dev2)
-    dbs.execSQL(s"DROP TABLE ${BadEntityTable.table}")
-    dbs.execSQL(s"DELETE FROM ${PaymentTable.table}")
+    val tableName = BadEntityTable.table
+    dbs.execSQL(s"DROP TABLE $tableName")
     dbs execSQL BadEntityTable.createSql
   }
 }

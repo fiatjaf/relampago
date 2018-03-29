@@ -353,7 +353,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     if (!broadcaster.isSynchronized) app toast dialog_chain_behind
     else if (app.kit.conf1Balance isLessThan minAmt) showForm(negBuilder(dialog_ok, notEnoughFunds.html, null).create)
-    else if (app.ChannelManager.all.nonEmpty) mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
+    else if (app.ChannelManager.all.isEmpty) mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
     else me goTo classOf[LNStartActivity]
 
     lazy val notEnoughFunds = {
