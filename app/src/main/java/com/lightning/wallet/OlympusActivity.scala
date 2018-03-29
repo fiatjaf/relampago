@@ -40,7 +40,7 @@ class OlympusActivity extends TimerActivity { me =>
       val serverAddress = Uri.parse(cloud.connector.url)
       val tokensLeftHuman = app.plurOrZero(tokensLeft, cloud.data.tokens.size)
       val finalTokensLeft = if (cloud.isAuthEnabled) tokensLeftHuman else tokensLeft.last
-      val addressPort = s"${serverAddress.getHost}<i>:${serverAddress.getPort}</i>"
+      val addressPort = s"${serverAddress.getHost}<small>:${serverAddress.getPort}</small>"
 
       olympusAddress setText addressPort.html
       olympusTokens setText finalTokensLeft.html

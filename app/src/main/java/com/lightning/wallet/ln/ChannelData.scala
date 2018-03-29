@@ -78,7 +78,7 @@ case class ClosingData(announce: NodeAnnouncement,
     isOk || closedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
   }
 
-  def startedByPeer = localCommit.isEmpty && (remoteCommit.nonEmpty || nextRemoteCommit.nonEmpty)
+  def startedByPeer = remoteCommit.nonEmpty || nextRemoteCommit.nonEmpty
   def tier12States = revokedCommit.flatMap(_.getState) ++ localCommit.flatMap(_.getState) ++
     remoteCommit.flatMap(_.getState) ++ nextRemoteCommit.flatMap(_.getState) ++
     refundRemoteCommit.flatMap(_.getState)

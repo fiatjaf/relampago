@@ -317,7 +317,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def checkTransData = app.getBufferTry match {
     case Success(pr) if app.TransData.lnLink.findFirstIn(pr).isDefined =>
-      // Only LN payment requests since autopasing other stuff is dangerous
+      // Only LN payment requests since autopasting other stuff is dangerous
       <(app.TransData recordValue pr, doTheCheck)(doTheCheck)
       app.setBuffer(new String, andNotify = false)
 
@@ -328,8 +328,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // BUTTONS REACTIONS
 
-  def goPastePR(top: View) = for (ln <- lnOpt) ln.makePaymentRequest
-  def goSendBTC(top: View) = for (btc <- btcOpt) btc.sendBtcPopup
+  def goSendBTC(top: View) =
+    for (btc <- btcOpt) btc.sendBtcPopup
 
   def goReceiveBTC(top: View) = {
     app.TransData.value = app.kit.currentAddress
@@ -343,12 +343,20 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   def goAddChannel(top: View) = {
+    val tokens = MilliSatoshi(500000L)
     val minAmt = RatesSaver.rates.feeLive multiply 2
-    if (!broadcaster.isSynchronized) app toast dialog_chain_behind
-    else if (app.kit.conf1Balance isGreaterThan minAmt) me goTo classOf[LNStartActivity]
-    else showForm(negBuilder(dialog_ok, notEnoughToOpenChannel.html, null).create)
+    val humanIn = humanFiat(coloredIn(tokens), tokens, " ")
+    val warningMessage = getString(tokens_warn).format(humanIn)
 
-    lazy val notEnoughToOpenChannel = {
+    val warn = baseTextBuilder(warningMessage.html)
+      .setCustomTitle(me getString action_ln_open)
+
+    if (!broadcaster.isSynchronized) app toast dialog_chain_behind
+    else if (app.kit.conf1Balance isLessThan minAmt) showForm(negBuilder(dialog_ok, notEnoughFunds.html, null).create)
+    else if (app.ChannelManager.all.nonEmpty) mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
+    else me goTo classOf[LNStartActivity]
+
+    lazy val notEnoughFunds = {
       val txt = getString(err_ln_not_enough_funds)
       val zeroConf = app.kit.conf0Balance minus app.kit.conf1Balance
       val canSend = sumIn format denom.withSign(app.kit.conf1Balance)

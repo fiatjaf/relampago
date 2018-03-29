@@ -75,11 +75,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onProcess = {
-    case (chan, _: NormalData, err: Error) =>
+    case (chan, _, err: Error) =>
       val template = app getString R.string.chan_notice_unilateral
       Notificator chanClosed template.format(chan.data.announce.alias, err.humanText)
 
-    case (chan, _: NormalData, _: Shutdown) =>
+    case (chan, _, _: Shutdown) =>
       val template = app getString R.string.chan_notice_bilateral
       Notificator chanClosed template.format(chan.data.announce.alias)
 

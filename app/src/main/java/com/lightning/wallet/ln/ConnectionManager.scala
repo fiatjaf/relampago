@@ -61,8 +61,8 @@ object ConnectionManager {
       }
     }
 
-    // Listener may trigger a reconnect after this
-    work onComplete { _ => events onDisconnect ann }
+    // Listener may trigger a reconnect after this happens
+    work onComplete { reason => events onDisconnect ann }
 
     def disconnect = try socket.close catch none
     def intercept(message: LightningMessage) = {

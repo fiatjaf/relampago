@@ -64,6 +64,12 @@
         with a peer of your choice and then fund it with an on-chain Bitcoin transaction.
     </string>
 
+    <string name="tokens_warn"><![CDATA[
+        Please note: this wallet uses paid <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>storage tokens</a>
+        to secure your encrypted channel backups.<br><br>An automatic Lightning payment of <i>%1$s</i> will acquire 50 storage tokens
+        once your first channel becomes open.<br><br>These tokens will safeguard you from money loss for the next 50 payment channels.
+    ]]></string>
+
     <string name="zygote_details"><![CDATA[
         Migration tool creates a full snapshot of current wallet state which can be
         used to fully restore your wallet at a later time, possibly on another device.<br><br>
