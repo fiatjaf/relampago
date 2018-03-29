@@ -142,9 +142,8 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
   def onFragmentResume = {
     for (chan <- app.ChannelManager.all) chan.listeners += chanListener
-    // We may have opening channels here so get their funding tx broadcasted
-    for (chan <- app.ChannelManager.notClosing) broadcaster nullOnBecome chan
-    wrap(host.checkTransData)(updTitleSubtitleAndButtons)
+    // Calling host.checkTransData when this fragment is definitely created
+    runAnd(updTitleSubtitleAndButtons)(host.checkTransData)
   }
 
   def onFragmentDestroy = {
@@ -276,7 +275,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         }
       }
 
-      val bld = baseBuilder(getString(action_ln_receive), content)
+      val bld = baseBuilder(getString(action_ln_details), content)
       mkCheckForm(recAttempt, none, bld, dialog_ok, dialog_cancel)
     }
   }
@@ -349,12 +348,10 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     } else {
       val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
       val humanOut = humanFiat(coloredOut(info.firstSum), info.firstSum)
-      paymentDetails setText s"$description<br><br>$humanOut".html
-
-      // Will show title with expiry if payment is in-flight
       val expiry = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
       val title = humanFiat(getString(ln_outgoing_title).format(coloredOut(fee), humanStatus), fee)
       val title1 = if (info.actualStatus == WAITING) s"$expiry<br>$title" else title
+      paymentDetails setText s"$description<br><br>$humanOut".html
 
       // Allow user to retry this payment using excluded nodes and channels when it is a failure and pr is not expired yet
       if (info.actualStatus != FAILURE || !info.pr.isFresh) showForm(negBuilder(dialog_ok, title1.html, detailsWrapper).create)

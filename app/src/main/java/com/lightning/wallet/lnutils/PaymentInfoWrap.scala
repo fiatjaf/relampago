@@ -77,13 +77,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def onProcess = {
     case (chan, _: NormalData, err: Error) =>
       val template = app getString R.string.chan_notice_unilateral
-      val msg = template.format(chan.data.announce.alias, err.humanText)
-      Notificator chanClosed msg
+      Notificator chanClosed template.format(chan.data.announce.alias, err.humanText)
 
     case (chan, _: NormalData, _: Shutdown) =>
       val template = app getString R.string.chan_notice_bilateral
-      val msg = template.format(chan.data.announce.alias)
-      Notificator chanClosed msg
+      Notificator chanClosed template.format(chan.data.announce.alias)
 
     case (_, _: NormalData, rd: RoutingData) =>
       // This may be a new payment or an old payment retry attempt
@@ -115,7 +113,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       // then retry failed payments where possible
 
       db txWrap {
-        for (Htlc(true, add) \ fulfillMessage <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(add)
+        for (Htlc(true, addHtlc) \ _ <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(addHtlc)
         for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updateStatus(FAILURE, add.paymentHash)
         for (Htlc(false, add) \ failureReason <- norm.commitments.localCommit.spec.failed) {
 

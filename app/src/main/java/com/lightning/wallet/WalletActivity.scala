@@ -15,6 +15,7 @@ import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 
+import scala.util.{Success, Try}
 import co.infinum.goldfinger.{Error => GFError}
 import android.content.{DialogInterface, Intent}
 import co.infinum.goldfinger.{Goldfinger, Warning}
@@ -49,7 +50,6 @@ import android.text.InputType
 import org.ndeftools.Message
 import android.os.Bundle
 import android.net.Uri
-import scala.util.Try
 import java.util.Date
 import java.io.File
 
@@ -175,6 +175,7 @@ trait ListToggler extends HumanTimeDisplay {
 }
 
 object WalletActivity {
+  val REDIRECT = "goLnOps"
   val frags = mutable.Set.empty[Fragment]
   def lnOpt = frags collectFirst { case ln: FragLN => ln.worker }
   def btcOpt = frags collectFirst { case btc: FragBTC => btc.worker }
@@ -232,7 +233,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   override def onDestroy = wrap(super.onDestroy)(stopDetecting)
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionSettings) makeSettingsForm
-    if (m.getItemId == R.id.actionLNOps) goChanDetails(null)
   }
 
   override def onCreateOptionsMenu(menu: Menu) = {
@@ -277,8 +277,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   def onNfcStateEnabled = none
 
   def readNdefMessage(msg: Message) = try {
-    val asText = readFirstTextNdefMessage(msg)
-    app.TransData recordValue asText
+    val data: String = readFirstTextNdefMessage(msg)
+    app.TransData recordValue data
     checkTransData
 
   } catch { case _: Throwable =>
@@ -288,37 +288,47 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData =
+  private def doTheCheck(ok: Any) = {
+    // Find out what to do depending on
+    // what kind of TransData we have
+
     app.TransData.value match {
-      case _: NodeAnnouncement =>
-        // Don't clear trans data just yet
-        walletPager.setCurrentItem(1, false)
-        me goTo classOf[LNStartFundActivity]
-
-      case request: PaymentRequest =>
-        for (ln <- lnOpt) ln.sendPayment(request)
-        walletPager.setCurrentItem(1, false)
-        app.TransData.value = null
-
-      case addr: Address =>
-        for (btc <- btcOpt) btc.sendBtcPopup.setAddr(addr)
-        walletPager.setCurrentItem(0, false)
-        app.TransData.value = null
-
-      case link: BitcoinURI =>
-        val amount: TryMSat = Try(link.getAmount)
-        // We have a bitcoin link which MAY contain a payment sum
-        for (btc <- btcOpt) btc.sendBtcPopup.set(amount, link.getAddress)
-        walletPager.setCurrentItem(0, false)
-        app.TransData.value = null
-
-      case otherwise =>
-        // Do nothing here
+      case _: NodeAnnouncement => walletPager.setCurrentItem(1, false)
+      case _: PaymentRequest => walletPager.setCurrentItem(1, false)
+      case _: BitcoinURI => walletPager.setCurrentItem(0, false)
+      case _: Address => walletPager.setCurrentItem(0, false)
+      case _ =>
     }
 
-  //BUTTONS REACTIONS
+    app.TransData.value match {
+      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+      case lnPaymentRequest: PaymentRequest => for (ln <- lnOpt) ln.sendPayment(lnPaymentRequest)
+      case bu: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(bu.getAmount), bu.getAddress)
+      case addr: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddr(addr)
+      case WalletActivity.REDIRECT => goChanDetails(null)
+      case _ =>
+    }
 
-  def goReceiveLN(top: View) = for (ln <- lnOpt) ln.makePaymentRequest
+    app.TransData.value match {
+      case _: NodeAnnouncement => // nope
+      case _ => app.TransData.value = null
+    }
+  }
+
+  def checkTransData = app.getBufferTry match {
+    case Success(pr) if app.TransData.lnLink.findFirstIn(pr).isDefined =>
+      // Only LN payment requests since autopasing other stuff is dangerous
+      <(app.TransData recordValue pr, doTheCheck)(doTheCheck)
+      app.setBuffer(new String, andNotify = false)
+
+    case _ =>
+      // Not interesting
+      doTheCheck(null)
+  }
+
+  // BUTTONS REACTIONS
+
+  def goPastePR(top: View) = for (ln <- lnOpt) ln.makePaymentRequest
   def goSendBTC(top: View) = for (btc <- btcOpt) btc.sendBtcPopup
 
   def goReceiveBTC(top: View) = {
@@ -577,10 +587,10 @@ class FragScan extends Fragment with BarcodeCallback { me =>
     rawText => if (System.currentTimeMillis - lastAttempt > 3000) tryParseQR(rawText)
   }
 
-  def tryParseQR(scannedText: String) = try {
-    // This may throw which is expected and fine
+  def tryParseQR(text: String) = try {
+    // May throw which is expected and fine
     lastAttempt = System.currentTimeMillis
-    app.TransData recordValue scannedText
+    app.TransData recordValue text
     host.checkTransData
 
   } catch app.TransData.onFail { code =>

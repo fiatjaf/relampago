@@ -77,10 +77,10 @@ class WalletApp extends Application { me =>
     Utils.fiatName = prefs.getString(AbstractKit.FIAT_TYPE, Utils.strDollar)
   }
 
-  def setBuffer(text: String) = {
+  def setBuffer(text: String, andNotify: Boolean = true) = {
     // Set clipboard contents to given text and notify user via toast
     clipboardManager setPrimaryClip ClipData.newPlainText("wallet", text)
-    me toast getString(copied_to_clipboard).format(text)
+    if (andNotify) me toast getString(copied_to_clipboard).format(text)
   }
 
   def encryptWallet(wallet: Wallet, pass: CharSequence) = {
@@ -253,8 +253,7 @@ class WalletApp extends Application { me =>
 
   abstract class WalletKit extends AbstractKit {
     type ScriptSeq = Seq[org.bitcoinj.script.Script]
-    def blockingSend(tx: Transaction): String = nonBlockingSend(tx).get.toString
-    def nonBlockingSend(tx: Transaction) = peerGroup.broadcastTransaction(tx, 1).broadcast
+    def blockingSend(tx: Transaction) = peerGroup.broadcastTransaction(tx, 1).broadcast.get.toString
     def watchFunding(cs: Commitments) = watchScripts(cs.commitInput.txOut.publicKeyScript :: Nil)
     def watchScripts(scripts: ScriptSeq) = wallet addWatchedScripts scripts.asJava
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE

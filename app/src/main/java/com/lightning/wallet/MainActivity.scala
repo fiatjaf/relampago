@@ -8,7 +8,6 @@ import co.infinum.goldfinger.{Goldfinger, Warning}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
 import com.google.common.io.{ByteStreams, Files}
 import co.infinum.goldfinger.{Error => GFError}
-import scala.util.{Failure, Success, Try}
 import java.io.{File, FileInputStream}
 
 import ln.wire.LightningMessageCodecs.walletZygoteCodec
@@ -95,20 +94,23 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent) =
     if (requestCode == FILE_CODE & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
 
-  override def onNoNfcIntentFound = {
-    // Filter out failures and nulls, try to set value, proceed if successful and inform if not
-    val attempts = Try(getIntent.getDataString) :: Try(getIntent getStringExtra Intent.EXTRA_TEXT) :: Nil
-    val valid = attempts collectFirst { case res @ Success(nonNull: String) => res map app.TransData.recordValue }
-    if (valid.isEmpty) next else valid foreach { case Failure(err) => app.TransData.onFail(popup)(err) case _ => next }
-  }
-
-  def readNdefMessage(msg: Message) = try {
-    val asText = readFirstTextNdefMessage(msg)
-    app.TransData recordValue asText
+  override def onNoNfcIntentFound = try {
+    val data: String = getIntent.getDataString
+    if (null != data) app.TransData recordValue data
     next
 
-  } catch { case err: Throwable =>
-    // Could not process a message
+    // We have some data in intent
+    // but could not parse the content
+  } catch app.TransData onFail popup
+
+  def readNdefMessage(msg: Message) = try {
+    val data: String = readFirstTextNdefMessage(msg)
+    if (null != data) app.TransData recordValue data
+    next
+
+  } catch { case _: Throwable =>
+    // We have some data in NFC intent
+    // but could not parse the content
     me popup nfc_error
   }
 

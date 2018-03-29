@@ -10,10 +10,4 @@
         app:actionViewClass="android.support.v7.widget.SearchView"
         android:id="@+id/action_search"/>
 
-    <item
-        android:title="Channel details"
-        app:showAsAction="always|collapseActionView"
-        android:icon="@drawable/ic_info_outline_white_24dp"
-        android:id="@+id/actionLNOps"/>
-
 </menu>

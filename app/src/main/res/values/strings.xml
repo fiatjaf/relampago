@@ -61,9 +61,7 @@
         <a href='http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet'>Lightning Network</a>
         enables fast and secure off-chain Bitcoin transactions with low fees. Using it requires you to open a
         <a href='http://lightning-wallet.com/using-lightning-wallet#payment-channel'>payment channel</a>
-        with a peer of your choice and then fund it with an on-chain Bitcoin transaction.\n\n
-        This app secures your channel backups by using paid <a href='http://lightning-wallet.com/storage-tokens#storage-tokens'>storage tokens</a> so
-        lost channel funds can always be refunded if you have a <a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">mnemonic phrase</a>.
+        with a peer of your choice and then fund it with an on-chain Bitcoin transaction.
     </string>
 
     <string name="zygote_details"><![CDATA[
@@ -102,7 +100,7 @@
     <string name="secret_wrong">Wrong passcode</string>
     <string name="action_bitcoin_send">Send bitcoin</string>
     <string name="action_bitcoin_receive">Receive bitcoin</string>
-    <string name="action_ln_receive">Receive lightning</string>
+    <string name="action_ln_details">View channel details</string>
     <string name="action_ln_open">Open new channel</string>
     <string name="action_ln_close">Close channel</string>
     <string name="action_ln_force">Force close</string>
@@ -225,7 +223,7 @@
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
     <string name="ln_description_hint">add some description</string>
-    <string name="ln_send_title"><![CDATA[Send lightning<br><br><small>%1$s</small>]]></string>
+    <string name="ln_send_title"><![CDATA[Send lightning payment<br><br><small>%1$s</small>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#1BA2E0>Incoming payment</font><br>%1$s]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>

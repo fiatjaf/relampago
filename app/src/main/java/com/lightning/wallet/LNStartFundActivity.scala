@@ -100,8 +100,8 @@ class LNStartFundActivity extends TimerActivity { me =>
           freshChan.listeners -= self
           freshChan STORE wait
 
-          // Error while saving will halt any further progress here
-          // Pressing back at this point but it won't affect anything
+          // Error while saving will halt any further progress
+          // Pressing back at this point will not affect anything
           val refund = RefundingData(wait.announce, None, wait.commitments)
           val encrypted = AES.encode(refund.toJson.toString, LNParams.cloudSecret)
 
@@ -111,6 +111,11 @@ class LNStartFundActivity extends TimerActivity { me =>
           // Make this a fully established channel by attaching operational listeners and adding it to list
           freshChan.listeners = app.ChannelManager.operationalListeners
           app.ChannelManager.all +:= freshChan
+
+          // Broadcast a funding transaction
+          // Tell wallet activity to redirect to ops
+          LNParams.broadcaster nullOnBecome freshChan
+          app.TransData.value = WalletActivity.REDIRECT
           me exitTo classOf[WalletActivity]
       }
 

@@ -17,7 +17,7 @@ object LocalBroadcaster extends Broadcaster {
   def isSynchronized = {
     val processed = app.kit.wallet.getLastBlockSeenHeight
     val reported = app.kit.peerGroup.getMostCommonChainHeight
-    bestHeightObtained & reported - processed < blocksPerDay
+    reported - processed < blocksPerDay
   }
 
   def currentHeight = {
@@ -48,8 +48,8 @@ object LocalBroadcaster extends Broadcaster {
   override def onBecome = {
     case (_, wait: WaitFundingDoneData, _, _) =>
       // Watch funding script, broadcast funding tx
-      app.kit nonBlockingSend wait.fundingTx
       app.kit watchFunding wait.commitments
+      app.kit blockingSend wait.fundingTx
 
     case (chan, norm: NormalData, OFFLINE, OPEN) =>
       // Check for fee changes once when channel becomes online
