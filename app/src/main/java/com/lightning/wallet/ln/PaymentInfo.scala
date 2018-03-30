@@ -107,11 +107,16 @@ object PaymentInfo {
         val isNodeHonest = Announcements.checkSig(tf.update, nodeKey)
         if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
         else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString,
-          600 * 1000, rd.firstMsat)
+          300 * 1000, rd.firstMsat)
 
-      case ErrorPacket(nodeKey, TemporaryNodeFailure) => withoutNodes(Vector(nodeKey), rd, 60 * 1000)
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
       case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
+
+      case ErrorPacket(nodeKey, TemporaryNodeFailure) =>
+        rd.usedRoute.collectFirst { case hop if hop.nodeId == nodeKey =>
+          // Error at processing node which may indicate problems with it's peer so remove a channel
+          withoutChans(Vector(hop.shortChannelId), rd, rd.pr.nodeId.toString, 600 * 1000, rd.firstMsat)
+        } getOrElse withoutNodes(Vector(nodeKey), rd, 60 * 1000)
 
       case ErrorPacket(nodeKey, UnknownNextPeer) =>
         rd.usedRoute.collectFirst { case hop if hop.nodeId == nodeKey =>
