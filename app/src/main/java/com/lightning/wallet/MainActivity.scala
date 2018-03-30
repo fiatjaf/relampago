@@ -20,6 +20,7 @@ import scodec.bits.BitVector
 import android.app.Activity
 import android.os.Bundle
 import android.view.View
+import com.lightning.wallet.test.TransactionsSpec
 
 
 trait ViewSwitch {
@@ -87,6 +88,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
       // Unconditionally go to wallet
       me exitTo classOf[WalletActivity]
     }
+
+    //(new TransactionsSpec).allTests
   }
 
   // NFC AND SHARE

@@ -65,7 +65,7 @@ object Scripts { me =>
     OP_CHECKSIG :: Nil
 
   def htlcOffered(localHtlcPubkey: PublicKey, remoteHtlcPubkey: PublicKey,
-                  revocationPubKey: PublicKey, paymentHash: BinaryData) =
+                  revocationPubKey: PublicKey, payHash160: BinaryData) =
 
     OP_DUP :: OP_HASH160 ::
     OP_PUSHDATA(revocationPubKey.hash160) ::
@@ -82,13 +82,13 @@ object Scripts { me =>
         OP_PUSHDATA(localHtlcPubkey) ::
         OP_2 :: OP_CHECKMULTISIG ::
       OP_ELSE ::
-        OP_HASH160 :: OP_PUSHDATA(paymentHash) ::
+        OP_HASH160 :: OP_PUSHDATA(payHash160) ::
         OP_EQUALVERIFY :: OP_CHECKSIG ::
       OP_ENDIF ::
     OP_ENDIF :: Nil
 
   def htlcReceived(localHtlcPubkey: PublicKey, remoteHtlcPubkey: PublicKey,
-                   revocationPubKey: PublicKey, paymentHash: BinaryData,
+                   revocationPubKey: PublicKey, payHash160: BinaryData,
                    lockTime: Long): ScriptEltSeq =
 
     OP_DUP :: OP_HASH160 ::
@@ -102,7 +102,7 @@ object Scripts { me =>
       OP_SIZE :: encodeNumber(32) :: OP_EQUAL ::
       OP_IF ::
         // To me via HTLC-success transaction
-        OP_HASH160 :: OP_PUSHDATA(paymentHash) :: OP_EQUALVERIFY ::
+        OP_HASH160 :: OP_PUSHDATA(payHash160) :: OP_EQUALVERIFY ::
         OP_2 :: OP_SWAP :: OP_PUSHDATA(localHtlcPubkey) ::
         OP_2 :: OP_CHECKMULTISIG ::
       OP_ELSE ::
@@ -169,6 +169,7 @@ object Scripts { me =>
   val claimHtlcSuccessWeight = 570
   val claimHtlcTimeoutWeight = 544
   val mainPenaltyWeight = 483
+  val htlcPenaltyWeight = 577
 
   // Fee calculation
   def weight2fee(feeratePerKw: Long, weight: Int) =
@@ -281,14 +282,14 @@ object Scripts { me =>
     val toRemoteOutput = if (toRemoteAmount < localDustLimit) Nil else
       TxOut(toRemoteAmount, Script pay2wpkh remotePaymentPubkey) :: Nil
 
-    val htlcOfferedOutputs = trimOfferedHtlcs(localDustLimit, spec) map { add =>
-      TxOut(publicKeyScript = Script pay2wsh htlcOffered(localHtlcPubkey, remoteHtlcPubkey,
-        localRevocationPubkey, Crypto ripemd160 add.paymentHash), amount = add.amount)
+    val htlcOfferedOutputs = trimOfferedHtlcs(dustLimit = localDustLimit, spec) map { add =>
+      val offered = htlcOffered(localHtlcPubkey, remoteHtlcPubkey, localRevocationPubkey, add.hash160)
+      TxOut(add.amount, Script pay2wsh offered)
     }
 
-    val htlcReceivedOutputs = trimReceivedHtlcs(localDustLimit, spec) map { add =>
-      TxOut(publicKeyScript = Script pay2wsh htlcReceived(localHtlcPubkey, remoteHtlcPubkey,
-        localRevocationPubkey, Crypto ripemd160 add.paymentHash, add.expiry), amount = add.amount)
+    val htlcReceivedOutputs = trimReceivedHtlcs(dustLimit = localDustLimit, spec) map { add =>
+      val received = htlcReceived(localHtlcPubkey, remoteHtlcPubkey, localRevocationPubkey, add.hash160, add.expiry)
+      TxOut(add.amount, Script pay2wsh received)
     }
 
     // Make an obscured tx number as defined in BOLT #3 (a 48 bits integer) which we can use in case of contract breach
@@ -320,12 +321,12 @@ object Scripts { me =>
   }
 
   def makeClaimHtlcTx[T](fun: (InputInfo, Transaction) => T, parent: Transaction,
-                         redeemScript: ScriptEltSeq, pubKeyScript: ScriptEltSeq,
+                         redeemScript: BinaryData, pubKeyScript: ScriptEltSeq,
                          localFinalScriptPubKey: BinaryData, fee: Satoshi,
                          expiry: Long, sequence: Long) = {
 
-    val index: Int = findPubKeyScriptIndex(script = Script.write(pubKeyScript), tx = parent)
-    val inputInfo = InputInfo(OutPoint(parent, index), parent.txOut(index), Script write redeemScript)
+    val index: Int = findPubKeyScriptIndex(parent, Script write pubKeyScript)
+    val inputInfo = InputInfo(OutPoint(parent, index), parent.txOut(index), redeemScript)
     val txOut = TxOut(tier2Amount(inputInfo.txOut.amount, fee), localFinalScriptPubKey) :: Nil
     val txIn = TxIn(inputInfo.outPoint, Array.emptyByteArray, sequence) :: Nil
     val tx = Transaction(2, txIn, txOut, expiry)
@@ -339,19 +340,17 @@ object Scripts { me =>
                   remoteHtlcPubkey: PublicKey, spec: CommitmentSpec) = {
 
     def makeHtlcTimeoutTx(add: UpdateAddHtlc) = {
-      val paymentHash160 = Crypto ripemd160 add.paymentHash
-      val offered = htlcOffered(localHtlcPubkey, remoteHtlcPubkey, localRevPubkey, paymentHash160)
+      val fee = weight2fee(spec.feeratePerKw, htlcTimeoutWeight)
+      val offered = htlcOffered(localHtlcPubkey, remoteHtlcPubkey, localRevPubkey, add.hash160)
       val pubKeyScript = Script pay2wsh toLocalDelayed(localRevPubkey, toLocalDelay, localDelayedPaymentPubkey)
-      makeHtlcTx(HtlcTimeoutTx(_, _, add), commitTx, offered, pubKeyScript, add.amount,
-        weight2fee(spec.feeratePerKw, htlcTimeoutWeight), add.expiry, 0x00000000L)
+      makeHtlcTx(HtlcTimeoutTx(_, _, add), commitTx, offered, pubKeyScript, add.amount, fee, add.expiry, 0x00000000L)
     }
 
     def makeHtlcSuccessTx(add: UpdateAddHtlc) = {
-      val paymentHash160 = Crypto ripemd160 add.paymentHash
+      val fee = weight2fee(spec.feeratePerKw, htlcSuccessWeight)
+      val received = htlcReceived(localHtlcPubkey, remoteHtlcPubkey, localRevPubkey, add.hash160, add.expiry)
       val pubKeyScript = Script pay2wsh toLocalDelayed(localRevPubkey, toLocalDelay, localDelayedPaymentPubkey)
-      val received = htlcReceived(localHtlcPubkey, remoteHtlcPubkey, localRevPubkey, paymentHash160, add.expiry)
-      makeHtlcTx(HtlcSuccessTx(_, _, add), commitTx, received, pubKeyScript, add.amount,
-        weight2fee(spec.feeratePerKw, htlcSuccessWeight), 0L, 0x00000000L)
+      makeHtlcTx(HtlcSuccessTx(_, _, add), commitTx, received, pubKeyScript, add.amount, fee, 0L, 0x00000000L)
     }
 
     // Dusty HTLCs are filtered out and thus go to fees
@@ -364,9 +363,8 @@ object Scripts { me =>
                              remoteRevocationPubkey: PublicKey, localFinalScriptPubKey: BinaryData,
                              add: UpdateAddHtlc, feeratePerKw: Long): ClaimHtlcTimeoutTx = {
 
-    val paymentHash = Crypto ripemd160 add.paymentHash
-    val redeem = htlcReceived(remoteHtlcPubkey, localHtlcPubkey, remoteRevocationPubkey, paymentHash, add.expiry)
-    makeClaimHtlcTx(ClaimHtlcTimeoutTx, commitTx, redeem, Script pay2wsh redeem, localFinalScriptPubKey,
+    val redeem = htlcReceived(remoteHtlcPubkey, localHtlcPubkey, remoteRevocationPubkey, add.hash160, add.expiry)
+    makeClaimHtlcTx(ClaimHtlcTimeoutTx, commitTx, Script write redeem, Script pay2wsh redeem, localFinalScriptPubKey,
       weight2fee(feeratePerKw, claimHtlcTimeoutWeight), add.expiry, sequence = 0x00000000L)
   }
 
@@ -374,24 +372,25 @@ object Scripts { me =>
                              remoteRevocationPubkey: PublicKey, localFinalScriptPubKey: BinaryData,
                              add: UpdateAddHtlc, feeratePerKw: Long): ClaimHtlcSuccessTx = {
 
-    val paymentHash = Crypto ripemd160 add.paymentHash
-    val redeem = htlcOffered(remoteHtlcPubkey, localHtlcPubkey, remoteRevocationPubkey, paymentHash)
-    makeClaimHtlcTx(ClaimHtlcSuccessTx, commitTx, redeem, Script pay2wsh redeem, localFinalScriptPubKey,
-      weight2fee(feeratePerKw, claimHtlcSuccessWeight), expiry = 0L, sequence = 0xffffffffL)
+    val redeem = htlcOffered(remoteHtlcPubkey, localHtlcPubkey, remoteRevocationPubkey, add.hash160)
+    makeClaimHtlcTx(ClaimHtlcSuccessTx, commitTx, Script write redeem, Script pay2wsh redeem,
+      localFinalScriptPubKey, weight2fee(feeratePerKw, claimHtlcSuccessWeight),
+      expiry = 0L, sequence = 0xffffffffL)
   }
 
   def makeClaimP2WPKHOutputTx(delayedOutputTx: Transaction, localPaymentPubkey: PublicKey,
                               localFinalScriptPubKey: BinaryData, feeratePerKw: Long) =
 
-    makeClaimHtlcTx(ClaimP2WPKHOutputTx, delayedOutputTx, Script pay2pkh localPaymentPubkey, Script pay2wpkh localPaymentPubkey,
-      localFinalScriptPubKey, weight2fee(feeratePerKw, claimP2WPKHOutputWeight), expiry = 0L, sequence = 0x00000000L)
+    makeClaimHtlcTx(ClaimP2WPKHOutputTx, delayedOutputTx, Script.write(Script pay2pkh localPaymentPubkey),
+      Script pay2wpkh localPaymentPubkey, localFinalScriptPubKey, weight2fee(feeratePerKw, claimP2WPKHOutputWeight),
+      expiry = 0L, sequence = 0x00000000L)
 
   def makeClaimDelayedOutputTx(delayedOutputTx: Transaction, localRevocationPubkey: PublicKey, toLocalDelay: Int,
                                remoteDelayedPaymentPubkey: PublicKey, localFinalScriptPubKey: BinaryData,
                                feeratePerKw: Long): ClaimDelayedOutputTx = {
 
     val redeem = toLocalDelayed(localRevocationPubkey, toLocalDelay, remoteDelayedPaymentPubkey)
-    makeClaimHtlcTx(ClaimDelayedOutputTx, delayedOutputTx, redeem, Script pay2wsh redeem,
+    makeClaimHtlcTx(ClaimDelayedOutputTx, delayedOutputTx, Script write redeem, Script pay2wsh redeem,
       localFinalScriptPubKey, weight2fee(feeratePerKw, claimHtlcDelayedWeight),
       expiry = 0L, sequence = toLocalDelay)
   }
@@ -400,7 +399,14 @@ object Scripts { me =>
                         toRemoteDelay: Int, remoteDelayedPaymentPubkey: PublicKey, feeratePerKw: Long): MainPenaltyTx = {
 
     val redeem = toLocalDelayed(remoteRevocationPubkey, toRemoteDelay, remoteDelayedPaymentPubkey)
-    makeClaimHtlcTx(MainPenaltyTx, commitTx, redeem, Script pay2wsh redeem, localFinalScriptPubKey,
-      weight2fee(feeratePerKw, mainPenaltyWeight), expiry = 0L, sequence = 0xffffffffL)
+    makeClaimHtlcTx(MainPenaltyTx, commitTx, Script write redeem, Script pay2wsh redeem,
+      localFinalScriptPubKey, weight2fee(feeratePerKw, mainPenaltyWeight),
+      expiry = 0L, sequence = 0xffffffffL)
   }
+
+  def makeHtlcPenaltyTx(commitTx: Transaction, redeem: BinaryData,
+                        localFinalScriptPubKey: BinaryData, feeratePerKw: Long): HtlcPenaltyTx =
+
+    makeClaimHtlcTx(HtlcPenaltyTx, commitTx, redeem, Script pay2wsh redeem, localFinalScriptPubKey,
+      weight2fee(feeratePerKw, htlcPenaltyWeight), expiry = 0L, sequence = 0xffffffffL)
 }

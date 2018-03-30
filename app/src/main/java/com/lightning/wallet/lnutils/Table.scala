@@ -43,7 +43,7 @@ object ChannelTable extends Table {
 }
 
 object BadEntityTable extends Table {
-  val Tuple5(table, resId, targetNode, expire, amount) = Tuple5("badentity", "resid", "targetnode", "expire", "amount")
+  val Tuple5(table, resId, targetNode, expire, amount) = Tuple5("badentity", "resId", "targetNode", "expire", "amount")
   val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $amount <= ? AND $targetNode IN (?, ?) ORDER BY $id DESC"
   val newSql = s"INSERT OR IGNORE INTO $table ($resId, $targetNode, $expire, $amount) VALUES (?, ?, ?, ?)"
   val updSql = s"UPDATE $table SET $expire = ?, $amount = ? WHERE $resId = ? AND $targetNode = ?"
@@ -59,22 +59,27 @@ object BadEntityTable extends Table {
 }
 
 object PaymentTable extends Table {
-  val (search, limit) = ("search", 24)
-  val (table, pr, preimage, incoming, status, stamp) = ("payment", "pr", "preimage", "incoming", "status", "stamp")
-  val (description, hash, firstMsat, lastMsat, lastExpiry) = ("description", "hash", "firstMsat", "lastMsat", "lastExpiry")
-  val insert10 = s"$pr, $preimage, $incoming, $status, $stamp, $description, $hash, $firstMsat, $lastMsat, $lastExpiry"
+  val (table, search, limit) = ("payment", "search", 24)
+  val (pr, preimage, incoming, status, stamp) = ("pr", "preimage", "incoming", "status", "stamp")
+  val (description, hash, firstMsat, lastMsat) = ("description", "hash", "firstMsat", "lastMsat")
+  val (lastExpiry, commitNumber) = ("lastExpiry", "commitNumber")
 
-  // Inserting, selecting
+  // Inserting
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
-  val newSql = s"INSERT OR IGNORE INTO $table ($insert10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  val newSql = s"""INSERT OR IGNORE INTO $table ($pr, $preimage, $incoming, $status, $stamp, $description,
+    $hash, $firstMsat, $lastMsat, $lastExpiry, $commitNumber) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+
+  // Selecting
   val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
   val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
+  val selectRevokedSql = s"SELECT * FROM $table WHERE $commitNumber = ?"
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
   // Updating, creating
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
+  val updCommitNumberSql = s"UPDATE $table SET $commitNumber = ? WHERE $hash = ?"
   val updFailAllWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
-  val updLastSql = s"UPDATE $table SET $status = $WAITING, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
+  val updLastParamsSql = s"UPDATE $table SET $status = $WAITING, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ? WHERE $hash = ?"
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ? WHERE $hash = ?"
   val createVSql = s"CREATE VIRTUAL TABLE $fts$table USING $fts($search, $hash)"
@@ -83,16 +88,19 @@ object PaymentTable extends Table {
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $pr STRING NOT NULL, $preimage STRING NOT NULL,
       $incoming INTEGER NOT NULL, $status INTEGER NOT NULL, $stamp INTEGER NOT NULL, $description STRING NOT NULL,
-      $hash STRING UNIQUE NOT NULL, $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL
+      $hash STRING UNIQUE NOT NULL, $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL,
+      $commitNumber INTEGER NOT NULL
     );
+    CREATE INDEX idx1 ON $table ($commitNumber);
     CREATE INDEX idx1 ON $table ($status);
     CREATE INDEX idx2 ON $table ($hash);
     COMMIT"""
 }
 
+
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, name: String, secret: String)
-extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 10) {
+extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 11) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
@@ -100,8 +108,8 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 10) {
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.wallet/table/$tbl"
 
-  def txWrap(process: => Unit) = try {
-    runAnd(base.beginTransaction)(process)
+  def txWrap(run: => Unit) = try {
+    runAnd(base.beginTransaction)(run)
     base.setTransactionSuccessful
   } finally base.endTransaction
 
@@ -124,8 +132,8 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 10) {
 
   def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = {
 
-    val tableName = BadEntityTable.table
+    val tableName = PaymentTable.table
     dbs.execSQL(s"DROP TABLE $tableName")
-    dbs execSQL BadEntityTable.createSql
+    dbs execSQL PaymentTable.createSql
   }
 }

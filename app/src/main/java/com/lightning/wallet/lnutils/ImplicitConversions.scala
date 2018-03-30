@@ -15,7 +15,7 @@ object ImplicitConversions {
     new org.bitcoinj.script.Script(pubKeyScript, 1501538400L) // 2017-09-01
 
   implicit def bitcoinjTx2bitcoinLibTx(bitcoinjTx: org.bitcoinj.core.Transaction): fr.acinq.bitcoin.Transaction =
-  fr.acinq.bitcoin.Transaction.read(bitcoinjTx.unsafeBitcoinSerialize)
+    fr.acinq.bitcoin.Transaction.read(bitcoinjTx.unsafeBitcoinSerialize)
 
   implicit def bitcoinLibTx2bitcoinjTx(bitcoinLibTx: fr.acinq.bitcoin.Transaction): org.bitcoinj.core.Transaction =
     new org.bitcoinj.core.Transaction(app.params, fr.acinq.bitcoin.Transaction write bitcoinLibTx)

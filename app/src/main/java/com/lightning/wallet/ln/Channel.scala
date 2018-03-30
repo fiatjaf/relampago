@@ -28,6 +28,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   }
 
   def SEND(msg: LightningMessage): Unit
+  def ONCOMMITSENT(c: Commitments): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def STORE(content: HasCommitments): HasCommitments
   def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
@@ -195,7 +196,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val c1 \ commitSig = Commitments.sendCommit(norm.commitments, nextRemotePoint)
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 SEND commitSig
-
+        me ONCOMMITSENT c1
 
       case (norm: NormalData, sig: CommitSig, OPEN) =>
         // We received a commit sig from them, now we can update our local commit

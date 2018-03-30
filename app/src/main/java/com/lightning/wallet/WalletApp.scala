@@ -15,7 +15,6 @@ import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.crypto.Sphinx.PublicKeyVec
-import com.muddzdev.styleabletoastlibrary.StyleableToast
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
 import com.lightning.wallet.lnutils.olympus.CloudAct
@@ -28,6 +27,7 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import com.google.protobuf.ByteString
 import java.net.InetSocketAddress
 import android.app.Application
+import android.widget.Toast
 import scala.util.Try
 import java.io.File
 
@@ -62,7 +62,7 @@ class WalletApp extends Application { me =>
   // Various utilities
 
   def toast(code: Int): Unit = toast(me getString code)
-  def toast(message: String): Unit = StyleableToast.makeText(me, message, R.style.infoToast).show
+  def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => null != db case _ => false }
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
@@ -176,9 +176,14 @@ class WalletApp extends Application { me =>
     def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel {
       def STORE(hasCommitmentsData: HasCommitments) = runAnd(hasCommitmentsData)(ChannelWrap put hasCommitmentsData)
       def SEND(msg: LightningMessage) = ConnectionManager.connections.get(data.announce).foreach(_.handler process msg)
-      // First add listeners, then specifically call doProcess so it runs on current thread
-      listeners = initialListeners
-      doProcess(bootstrap)
+
+      def ONCOMMITSENT(c: Commitments) = db txWrap {
+        c.remoteNextCommitInfo.left.foreach { waitRev =>
+          val nextCommitNumber = waitRev.nextRemoteCommit.index
+          for (Htlc(_, add) <- waitRev.nextRemoteCommit.spec.htlcs)
+            bag.updCommitNumber(nextCommitNumber, add.paymentHash)
+        }
+      }
 
       def CLOSEANDWATCH(cd: ClosingData) = {
         val commits = cd.localCommit.map(_.commitTx) ++ cd.remoteCommit.map(_.commitTx) ++ cd.nextRemoteCommit.map(_.commitTx)
@@ -193,6 +198,11 @@ class WalletApp extends Application { me =>
           case txs => OlympusWrap tellClouds CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
         }
       }
+
+      // First add listeners, then call
+      // doProcess on current thread
+      listeners = initialListeners
+      doProcess(bootstrap)
     }
 
     def withRoutesAndOnionRD(rd: RoutingData) = {

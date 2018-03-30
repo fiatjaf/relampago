@@ -41,33 +41,39 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (fulfills.nonEmpty) uiNotify
   }
 
+  def getRevokedInfos(number: Long) = RichCursor apply db.select(PaymentTable.selectRevokedSql, number) vec toPaymentInfo
   def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
+
   def updOkIncoming(u: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, u.amountMsat, System.currentTimeMillis, u.paymentHash)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, fulfill.paymentPreimage, fulfill.paymentHash)
-  def updateStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
+  def updCommitNumber(number: Long, hash: BinaryData) = db.change(PaymentTable.updCommitNumberSql, number, hash)
+  def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
+
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
 
-  def toPaymentInfo(rc: RichCursor) = PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage,
-    rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
-    rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
+  def toPaymentInfo(rc: RichCursor) =
+    PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage, rc int PaymentTable.incoming,
+      rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
+      rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat,
+      rc long PaymentTable.lastExpiry, rc long PaymentTable.commitNumber)
 
   def markFailedAndFrozen = db txWrap {
     db change PaymentTable.updFailAllWaitingSql
-    for (hash <- app.ChannelManager.activeInFlightHashes) updateStatus(WAITING, hash)
-    for (hash <- app.ChannelManager.frozenInFlightHashes) updateStatus(FROZEN, hash)
+    for (hash <- app.ChannelManager.activeInFlightHashes) updStatus(WAITING, hash)
+    for (hash <- app.ChannelManager.frozenInFlightHashes) updStatus(FROZEN, hash)
   }
 
   def failOnUI(rd: RoutingData) = {
-    updateStatus(FAILURE, rd.pr.paymentHash)
+    updStatus(FAILURE, rd.pr.paymentHash)
     uiNotify
   }
 
   def newRoutes(rd: RoutingData) = if (rd.callsLeft > 0) {
     val request = app.ChannelManager withRoutesAndOnionRD rd.copy(callsLeft = rd.callsLeft - 1)
     request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, failOnUI), _ => me failOnUI rd)
-  } else updateStatus(FAILURE, rd.pr.paymentHash)
+  } else updStatus(FAILURE, rd.pr.paymentHash)
 
   override def onError = {
     case (_, exc: CMDException) => me failOnUI exc.rd
@@ -89,9 +95,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       pendingPayments(rd.pr.paymentHash) = rd
 
       db txWrap {
-        db.change(PaymentTable.updLastSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
+        db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
         db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
-          rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
+          rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry, 0L)
       }
 
       // Display
@@ -114,7 +120,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
       db txWrap {
         for (Htlc(true, addHtlc) \ _ <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(addHtlc)
-        for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updateStatus(FAILURE, add.paymentHash)
+        for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
         for (Htlc(false, add) \ failureReason <- norm.commitments.localCommit.spec.failed) {
 
           val rd1Opt = pendingPayments get add.paymentHash
@@ -129,7 +135,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
             case _ =>
               // Either halted or not found at all
-              updateStatus(FAILURE, add.paymentHash)
+              updStatus(FAILURE, add.paymentHash)
           }
         }
       }

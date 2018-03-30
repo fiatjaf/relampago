@@ -184,7 +184,7 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
 
 case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int,
                        stamp: Long, description: String, hash: String, firstMsat: Long,
-                       lastMsat: Long, lastExpiry: Long) {
+                       lastMsat: Long, lastExpiry: Long, commitNumber: Long) {
 
   def actualStatus = incoming match {
     // Once we have a preimage it is a SUCCESS
@@ -201,8 +201,11 @@ case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, statu
 }
 
 trait PaymentInfoBag { me =>
+  def getRevokedInfos(number: Long): Vector[PaymentInfo]
   def getPaymentInfo(hash: BinaryData): Try[PaymentInfo]
-  def updateStatus(paymentStatus: Int, hash: BinaryData)
+
+  def updStatus(paymentStatus: Int, hash: BinaryData)
+  def updCommitNumber(number: Long, hash: BinaryData)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc)
   def updOkIncoming(add: UpdateAddHtlc)
   def extractPreimg(tx: Transaction)

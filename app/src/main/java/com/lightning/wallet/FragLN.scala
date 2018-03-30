@@ -255,10 +255,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 pre, nodePrivateKey, description, None, routes)
         val rd = emptyRD(pr, sum.amount)
 
-        db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
-        db.change(sql = PaymentTable.newSql, params = pr.toJson, pre, 1, HIDDEN,
-          System.currentTimeMillis, pr.description, rd.paymentHashString,
-          sum.amount, 0L, 0L)
+        db.change(PaymentTable.newVirtualSql, params = rd.qryText, rd.paymentHashString)
+        db.change(PaymentTable.newSql, pr.toJson, pre, 1, HIDDEN, System.currentTimeMillis,
+          pr.description, rd.paymentHashString, sum.amount, 0L, 0L, 0L)
 
         showQR(pr)
       }

@@ -112,7 +112,7 @@ object Helpers { me =>
 
       def makeClaimDelayedOutput(tx: Transaction): ClaimDelayedOutputTx = {
         val claimDelayed = Scripts.makeClaimDelayedOutputTx(tx, localRevocationPubkey, commitments.remoteParams.toSelfDelay,
-          localDelayedPrivkey.publicKey, commitments.localParams.defaultFinalScriptPubKey, commitments.localCommit.spec.feeratePerKw)
+          localDelayedPrivkey.publicKey, commitments.localParams.defaultFinalScriptPubKey, LNParams.broadcaster.ratePerKwSat)
 
         val sig = Scripts.sign(claimDelayed, localDelayedPrivkey)
         Scripts.addSigs(claimDelayed, sig)
@@ -157,7 +157,7 @@ object Helpers { me =>
         paymentInfo <- bag.getPaymentInfo(add.paymentHash).toOption
         claimHtlcSuccessTx = Scripts.makeClaimHtlcSuccessTx(remoteCommitTx.tx, localHtlcPrivkey.publicKey,
           remoteHtlcPubkey, remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey,
-          add, remoteCommit.spec.feeratePerKw)
+          add, LNParams.broadcaster.ratePerKwSat)
 
         signature = Scripts.sign(claimHtlcSuccessTx, localHtlcPrivkey)
         signed = Scripts.addSigs(claimHtlcSuccessTx, signature, paymentInfo.preimage)
@@ -168,7 +168,7 @@ object Helpers { me =>
         HtlcSuccessTx(_, _, add) <- successTxs
         claimHtlcTimeoutTx = Scripts.makeClaimHtlcTimeoutTx(remoteCommitTx.tx, localHtlcPrivkey.publicKey,
           remoteHtlcPubkey, remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey,
-          add, remoteCommit.spec.feeratePerKw)
+          add, LNParams.broadcaster.ratePerKwSat)
 
         sig = Scripts.sign(claimHtlcTimeoutTx, localHtlcPrivkey)
         signed = Scripts.addSigs(claimHtlcTimeoutTx, sig)

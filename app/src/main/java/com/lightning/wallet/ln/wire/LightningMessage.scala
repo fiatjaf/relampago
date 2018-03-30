@@ -5,6 +5,7 @@ import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import com.lightning.wallet.ln.Tools.fromShortId
 import com.lightning.wallet.ln.Hop
+import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
 
 
@@ -50,6 +51,7 @@ case class UpdateAddHtlc(channelId: BinaryData, id: Long,
                          amountMsat: Long, paymentHash: BinaryData, expiry: Long,
                          onionRoutingPacket: BinaryData) extends ChannelMessage {
 
+  lazy val hash160 = Crypto ripemd160 paymentHash
   val amount = MilliSatoshi(amountMsat)
 }
 
@@ -57,7 +59,7 @@ case class UpdateFailHtlc(channelId: BinaryData, id: Long, reason: BinaryData) e
 case class UpdateFailMalformedHtlc(channelId: BinaryData, id: Long, onionHash: BinaryData, failureCode: Int) extends ChannelMessage
 case class UpdateFulfillHtlc(channelId: BinaryData, id: Long, paymentPreimage: BinaryData) extends ChannelMessage {
 
-  val paymentHash = fr.acinq.bitcoin.Crypto sha256 paymentPreimage.data
+  val paymentHash = Crypto sha256 paymentPreimage.data
 }
 
 case class UpdateFee(channelId: BinaryData, feeratePerKw: Long) extends ChannelMessage
