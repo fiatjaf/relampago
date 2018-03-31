@@ -130,9 +130,8 @@ object PaymentInfo {
         else rd.copy(ok = false) -> Vector.empty
 
     } getOrElse {
-      val shortChanIds = rd.usedRoute.map(_.shortChannelId)
-      withoutChans(shortChanIds drop 1 dropRight 1, rd,
-        rd.pr.nodeId.toString, 180 * 1000, 0L)
+      val cut = rd.usedRoute drop 1 dropRight 1
+      withoutNodes(cut.map(_.nodeId), rd, 60 * 1000)
     }
   }
 
@@ -196,6 +195,7 @@ case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, statu
   }
 
   // Keep serialized for performance
+  lazy val hash160 = Crypto ripemd160 BinaryData(hash)
   lazy val firstSum = MilliSatoshi(firstMsat)
   lazy val pr = to[PaymentRequest](rawPr)
 }

@@ -20,7 +20,6 @@ import scodec.bits.BitVector
 import android.app.Activity
 import android.os.Bundle
 import android.view.View
-import com.lightning.wallet.test.TransactionsSpec
 
 
 trait ViewSwitch {
@@ -88,8 +87,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
       // Unconditionally go to wallet
       me exitTo classOf[WalletActivity]
     }
-
-    //(new TransactionsSpec).allTests
   }
 
   // NFC AND SHARE
@@ -98,8 +95,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
     if (requestCode == FILE_CODE & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
 
   override def onNoNfcIntentFound = try {
-    val data: String = getIntent.getDataString
-    if (null != data) app.TransData recordValue data
+    val data = Seq(getIntent.getDataString, getIntent getStringExtra Intent.EXTRA_TEXT)
+    data.find(text => null != text) foreach app.TransData.recordValue
     next
 
     // We have some data in intent

@@ -3,7 +3,7 @@ package com.lightning.wallet.lnutils
 import spray.json._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import com.lightning.wallet.ln.Tools.{random, runAnd}
+import com.lightning.wallet.ln.Tools.{random, runAnd, none}
 import com.lightning.wallet.lnutils.olympus.CloudData
 import net.sqlcipher.database.SQLiteDatabase
 import android.content.Context
@@ -100,10 +100,11 @@ object PaymentTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, name: String, secret: String)
-extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 11) {
+extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
+  def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = none
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.wallet/table/$tbl"
@@ -128,12 +129,5 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 11) {
 
     dbs.execSQL(OlympusTable.newSql, dev1)
     dbs.execSQL(OlympusTable.newSql, dev2)
-  }
-
-  def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = {
-
-    val tableName = PaymentTable.table
-    dbs.execSQL(s"DROP TABLE $tableName")
-    dbs execSQL PaymentTable.createSql
   }
 }

@@ -18,7 +18,7 @@ import fr.acinq.bitcoin.{Satoshi, Transaction}
 abstract class Channel extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
   def apply[T](ex: Commitments => T) = Some(data) collect { case some: HasCommitments => ex apply some.commitments }
-  def process(change: Any) = Future(me doProcess change) onFailure { case err => events onError me -> err }
+  def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onError me -> err }
   var listeners: Set[ChannelListener] = _
 
   private[this] val events = new ChannelListener {
@@ -153,7 +153,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (norm: NormalData, rd: RoutingData, OPEN) if isOperational(me) =>
         val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, rd)
         me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
-        doProcess(CMDProceed)
+        // Important: CMD commands are continued with doProcess
+        // external messages are continued with process
+        process(CMDProceed)
 
 
       // We're fulfilling an HTLC we got earlier
@@ -203,14 +205,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val c1 \ revokeAndAck = Commitments.receiveCommit(norm.commitments, sig)
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 SEND revokeAndAck
-        doProcess(CMDProceed)
+        process(CMDProceed)
 
 
       case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
         // We received a revocation because we sent a commit sig
         val c1 = Commitments.receiveRevocation(norm.commitments, rev)
         val d1 = me STORE norm.copy(commitments = c1)
-        me UPDATA d1 doProcess CMDHTLCProcess
+        me UPDATA d1 process CMDHTLCProcess
 
 
       case (norm: NormalData, CMDBestHeight(height), OPEN | OFFLINE)
@@ -238,7 +240,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val norm1 = norm.modify(_.remoteShutdown) setTo Some(remote)
         // We have their Shutdown so we add ours and start negotiations
         me startShutdown norm1
-        doProcess(CMDProceed)
+        process(CMDProceed)
 
 
       case (norm @ NormalData(_, commitments, our, their), CMDShutdown, OPEN) =>
@@ -254,7 +256,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val nope = Commitments.remoteHasUnsignedOutgoing(commitments)
         // Can't close cooperatively if they have unsigned outgoing HTLCs
         // we should clear our unsigned outgoing HTLCs and then start a shutdown
-        if (nope) startLocalClose(norm) else me UPDATA d1 doProcess CMDProceed
+        if (nope) startLocalClose(norm) else me UPDATA d1 process CMDProceed
 
 
       case (norm @ NormalData(_, _, None, their), CMDProceed, OPEN)
@@ -329,7 +331,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         BECOME(norm.copy(commitments = c1), OPEN)
         norm.localShutdown foreach SEND
-        doProcess(CMDHTLCProcess)
+        process(CMDHTLCProcess)
 
 
       // We may get this message any time so just save it here
@@ -416,10 +418,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (some: HasCommitments, CMDSpent(tx), _)
         // GUARD: tx which spends our funding is broadcasted, must react
         if tx.txIn.exists(_.outPoint == some.commitments.commitInput.outPoint) =>
-        val revokedCommitOpt = Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, tx)
+        val revokedOpt = Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, tx, LNParams.bag)
         val nextRemoteCommitEither = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
 
-        Tuple3(revokedCommitOpt, nextRemoteCommitEither, some) match {
+        Tuple3(revokedOpt, nextRemoteCommitEither, some) match {
           case (_, _, close: ClosingData) if close.refundRemoteCommit.nonEmpty => Tools log s"Existing refund"
           case (_, _, close: ClosingData) if close.mutualClose.exists(_.txid == tx.txid) => Tools log s"Existing mutual $tx"
           case (_, _, close: ClosingData) if close.localCommit.exists(_.commitTx.txid == tx.txid) => Tools log s"Existing local $tx"

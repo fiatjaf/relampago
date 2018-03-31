@@ -15,6 +15,7 @@ import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import com.lightning.wallet.ln.wire.LightningMessageCodecs.LNMessageVector
 import org.bitcoinj.wallet.SendRequest
 import fr.acinq.eclair.UInt64
+import language.postfixOps
 
 
 sealed trait Command
@@ -116,13 +117,14 @@ case class RemoteCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimHtlcS
   }
 }
 
-case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimPenalty: Seq[MainPenaltyTx],
-                                  commitTx: Transaction) extends CommitPublished {
+case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimTheirMainPenalty: Seq[MainPenaltyTx],
+                                  htlcPenalty: Seq[HtlcPenaltyTx], commitTx: Transaction) extends CommitPublished {
 
   def getState = {
-    val penalty = for (t1 <- claimPenalty) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
     val main = for (t1 <- claimMain) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
-    main ++ penalty
+    val their = for (t1 <- claimTheirMainPenalty) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
+    val penalty = for (t1 <- htlcPenalty) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
+    main ++ their ++ penalty
   }
 }
 
@@ -139,21 +141,21 @@ object CommitmentSpec {
 
   type HtlcAndFulfill = (Htlc, UpdateFulfillHtlc)
   def fulfill(cs: CommitmentSpec, isIncoming: Boolean, m: UpdateFulfillHtlc) = findHtlcById(cs, m.id, isIncoming) match {
-    case Some(htlc) if htlc.incoming => cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat, fulfilled = cs.fulfilled + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
-    case Some(htlc) => cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat, fulfilled = cs.fulfilled + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
+    case Some(h) if h.incoming => cs.copy(toLocalMsat = cs.toLocalMsat + h.add.amountMsat, fulfilled = cs.fulfilled + Tuple2(h, m), htlcs = cs.htlcs - h)
+    case Some(h) => cs.copy(toRemoteMsat = cs.toRemoteMsat + h.add.amountMsat, fulfilled = cs.fulfilled + Tuple2(h, m), htlcs = cs.htlcs - h)
     case None => cs
   }
 
   type HtlcAndFail = (Htlc, UpdateFailHtlc)
   def fail(cs: CommitmentSpec, isIncoming: Boolean, m: UpdateFailHtlc) = findHtlcById(cs, m.id, isIncoming) match {
-    case Some(htlc) if htlc.incoming => cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat, failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
-    case Some(htlc) => cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat, failed = cs.failed + Tuple2(htlc, m), htlcs = cs.htlcs - htlc)
+    case Some(h) if h.incoming => cs.copy(toRemoteMsat = cs.toRemoteMsat + h.add.amountMsat, failed = cs.failed + Tuple2(h, m), htlcs = cs.htlcs - h)
+    case Some(h) => cs.copy(toLocalMsat = cs.toLocalMsat + h.add.amountMsat, failed = cs.failed + Tuple2(h, m), htlcs = cs.htlcs - h)
     case None => cs
   }
 
   def failMalformed(cs: CommitmentSpec, isIncoming: Boolean, m: UpdateFailMalformedHtlc) = findHtlcById(cs, m.id, isIncoming) match {
-    case Some(htlc) if htlc.incoming => cs.copy(toRemoteMsat = cs.toRemoteMsat + htlc.add.amountMsat, malformed = cs.malformed + htlc, htlcs = cs.htlcs - htlc)
-    case Some(htlc) => cs.copy(toLocalMsat = cs.toLocalMsat + htlc.add.amountMsat, malformed = cs.malformed + htlc, htlcs = cs.htlcs - htlc)
+    case Some(h) if h.incoming => cs.copy(toRemoteMsat = cs.toRemoteMsat + h.add.amountMsat, malformed = cs.malformed + h, htlcs = cs.htlcs - h)
+    case Some(h) => cs.copy(toLocalMsat = cs.toLocalMsat + h.add.amountMsat, malformed = cs.malformed + h, htlcs = cs.htlcs - h)
     case None => cs
   }
 
@@ -251,8 +253,8 @@ object Commitments {
       val missingSat = reduced.toRemoteMsat / 1000L - reserveWithTxFeeSat
 
       // We should both check if WE can send another HTLC and if PEER can accept another HTLC
-      if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddExcept(rd, ERR_TOO_MANY_HTLC)
-      if (outgoing.size > maxAllowedHtlcs | incoming.size > maxAllowedHtlcs) throw CMDAddExcept(rd, ERR_TOO_MANY_HTLC)
+      if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddExcept(rd, ERR_REMOTE_AMOUNT_HIGH)
+      if (outgoing.size > maxAllowedHtlcs || incoming.size > maxAllowedHtlcs) throw CMDAddExcept(rd, ERR_TOO_MANY_HTLC)
       if (missingSat < 0L) throw CMDReserveExcept(rd, missingSat, reserveWithTxFeeSat)
       c1 -> add
     }

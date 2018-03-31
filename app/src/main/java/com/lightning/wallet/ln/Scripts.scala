@@ -2,12 +2,12 @@ package com.lightning.wallet.ln
 
 import fr.acinq.bitcoin._
 import com.softwaremill.quicklens._
-import com.lightning.wallet.ln.wire.UpdateAddHtlc
-import scala.language.postfixOps
-import java.nio.ByteOrder
-import scala.util.Try
-
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey}
+
+import scala.util.Try
+import java.nio.ByteOrder
+import scala.language.postfixOps
+import com.lightning.wallet.ln.wire.UpdateAddHtlc
 import fr.acinq.bitcoin.SigVersion.SIGVERSION_WITNESS_V0
 import fr.acinq.bitcoin.SigVersion.SIGVERSION_BASE
 import ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
@@ -208,16 +208,19 @@ object Scripts { me =>
   def encodeTxNumber(txnumber: Long) = (0x80000000L | (txnumber >> 24), (txnumber & 0xffffffL) | 0x20000000)
   def decodeTxNumber(sequence: Long, locktime: Long) = (sequence & 0xffffffL).<<(24) + (locktime & 0xffffffL)
 
-  // Tx siging and checking
   def addSigs(commit: CommitTx, localKey: PublicKey, remoteKey: PublicKey, localSig: BinaryData, remoteSig: BinaryData): CommitTx =
     commit.modify(_.tx).using(_ updateWitnesses witness2of2(localSig, remoteSig, localKey, remoteKey) :: Nil)
 
   def addSigs(closing: ClosingTx, localFunding: PublicKey, remoteFunding: PublicKey, localSig: BinaryData, remoteSig: BinaryData): ClosingTx =
     closing.modify(_.tx).using(_ updateWitnesses witness2of2(localSig, remoteSig, localFunding, remoteFunding) :: Nil)
 
-  def addSigs(claimMainDelayedRevokedTx: MainPenaltyTx, revocationSig: BinaryData): MainPenaltyTx =
-    claimMainDelayedRevokedTx.modify(_.tx).using(_ updateWitnesses ScriptWitness(revocationSig :: BinaryData("01") ::
-      claimMainDelayedRevokedTx.input.redeemScript :: Nil) :: Nil)
+  def addSigs(mainPenaltyTx: MainPenaltyTx, revocationSig: BinaryData): MainPenaltyTx =
+    mainPenaltyTx.modify(_.tx).using(_ updateWitnesses ScriptWitness(revocationSig :: BinaryData("01") ::
+      mainPenaltyTx.input.redeemScript :: Nil) :: Nil)
+
+  def addSigs(htlcPenaltyTx: HtlcPenaltyTx, revocationSig: BinaryData, revocationPubkey: PublicKey): HtlcPenaltyTx =
+    htlcPenaltyTx.modify(_.tx).using(_ updateWitnesses ScriptWitness(revocationSig :: revocationPubkey.toBin ::
+      htlcPenaltyTx.input.redeemScript :: Nil) :: Nil)
 
   def addSigs(htlcSuccessTx: HtlcSuccessTx, localSig: BinaryData, remoteSig: BinaryData, paymentPreimage: BinaryData): HtlcSuccessTx =
     htlcSuccessTx.modify(_.tx).using(_ updateWitnesses ScriptWitness(BinaryData.empty :: remoteSig :: localSig :: paymentPreimage ::
@@ -235,7 +238,7 @@ object Scripts { me =>
     claimHtlcTimeoutTx.modify(_.tx).using(_ updateWitnesses ScriptWitness(localSig :: BinaryData.empty ::
       claimHtlcTimeoutTx.input.redeemScript :: Nil) :: Nil)
 
-  def addSigs(claimP2WPKHOutputTx: ClaimP2WPKHOutputTx, localPaymentPubkey: BinaryData, localSig: BinaryData): ClaimP2WPKHOutputTx =
+  def addSigs(claimP2WPKHOutputTx: ClaimP2WPKHOutputTx, localSig: BinaryData, localPaymentPubkey: BinaryData): ClaimP2WPKHOutputTx =
     claimP2WPKHOutputTx.modify(_.tx).using(_ updateWitnesses ScriptWitness(localSig :: localPaymentPubkey :: Nil) :: Nil)
 
   def addSigs(claimHtlcDelayed: ClaimDelayedOutputTx, localSig: BinaryData): ClaimDelayedOutputTx =
@@ -249,7 +252,7 @@ object Scripts { me =>
     Transaction.signInput(tx, inputIndex, redeemScript, SIGHASH_ALL, Satoshi(0), SIGVERSION_BASE, key)
 
   def sign(txinfo: TransactionWithInputInfo, key: PrivateKey): BinaryData =
-    sign(txinfo.tx, inputIndex = 0, txinfo.input.redeemScript, txinfo.input.txOut.amount, key)
+    sign(txinfo.tx, 0, txinfo.input.redeemScript, txinfo.input.txOut.amount, key)
 
   def checkSpendable[T <: TransactionWithInputInfo](txWithInputInfo: => T) = Try {
     if (txWithInputInfo.tx.txOut.isEmpty) throw new Exception("Empty transaction found")

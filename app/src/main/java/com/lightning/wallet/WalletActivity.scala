@@ -322,7 +322,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       app.setBuffer(new String, andNotify = false)
 
     case _ =>
-      // Not interesting
+      // Go as usual
       doTheCheck(null)
   }
 

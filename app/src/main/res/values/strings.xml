@@ -8,8 +8,8 @@
     <!-- app wide -->
     <string name="unlock">Unlock Wallet</string>
     <string name="secret_info">pick a good passcode\nor just leave the field blank\nto have an unencrypted wallet</string>
-    <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch.</string>
-    <string name="sets_secret_ok">Passcode has been set to «%1$s»\n\nMake sure that wallet mnemonic phrase is saved so you can use it in case if passcode gets lost.</string>
+    <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be triggered on next launch</string>
+    <string name="sets_secret_ok">Passcode has been set to «%1$s»\n\nMake sure that wallet mnemonic phrase is saved so you can use it in case if passcode gets lost</string>
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="fee_risky"><![CDATA[<small>%1$s<br><small>Standard transaction fee</small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s<br><small>Priority transaction fee</small></small>]]></string>
@@ -120,7 +120,8 @@
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>can send %3$s</small>]]></string>
-    <string name="dialog_chain_behind">Bitcoin wallet is catching up: please wait a bit and try again</string>
+
+    <string name="dialog_chain_behind">Bitcoin wallet is catching up: please wait a bit</string>
     <string name="dialog_clipboard_absent">Nothing useful in clipboard</string>
     <string name="dialog_address_wrong">Bitcoin address is required</string>
     <string name="dialog_pr_making">Making payment request&#8230;</string>
@@ -173,36 +174,37 @@
     <string name="txs_p2wsh">Payment channel funding</string>
 
     <array name="txs_confs">
-        <item><![CDATA[<strong>Awaiting&#160;confirmation</strong>]]></item>
+        <item><![CDATA[<strong>awaiting&#160;confirmation</strong>]]></item>
         <item><![CDATA[<strong>%1$s&#160;confirmation</strong>]]></item>
         <item><![CDATA[<strong>%1$s&#160;confirmations</strong>]]></item>
         <!-- special case, won't be used in plurOrZero method -->
-        <item><![CDATA[<strong>Cancelled</strong>]]></item>
+        <item><![CDATA[<strong>cancelled</strong>]]></item>
     </array>
 
     <!-- errors -->
-    <string name="err_ln_peer_offline">This remote peer could not be reached.</string>
-    <string name="err_ln_no_data_loss_protect">Data loss protection is not provided by this peer.</string>
-    <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept.</string>
-    <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum.</string>
-    <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already.</string>
-    <string name="err_ln_too_many">Failed because too many payments are already in-flight.</string>
-    <string name="err_ln_no_route">Failed because no route to recipient could be found.</string>
-    <string name="err_ln_in_flight">Failed because this payment is currently in-flight.</string>
-    <string name="err_ln_frozen">Can not retry this payment because it is frozen.</string>
+    <string name="err_ln_peer_offline">This remote peer could not be reached</string>
+    <string name="err_ln_no_data_loss_protect">Data loss protection is not provided by this peer</string>
+    <string name="err_ln_remote_amount_high">Failed because payment amount is too high for your peer to accept</string>
+    <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
+    <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum</string>
+    <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already</string>
+    <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
+    <string name="err_ln_no_route">Failed because no route to recipient could be found</string>
+    <string name="err_ln_in_flight">Failed because this payment is currently in-flight</string>
+    <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 
-    <string name="err_ln_6_confs">Can\'t ask for payments because a funding Bitcoin transaction has not got 6 confirmations yet.</string>
-    <string name="err_ln_reserve">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving.</string>
-    <string name="err_ln_fee_overflow"><![CDATA[Failed because this payment combined with Bitcoin <a href=http://lightning-wallet.com/using-lightning-wallet#commit-transaction-fee>commit transaction</a> fee exceeds your unspendable channel reserve<br><br>reserve %1$s<br>sending %2$s<br>missing %3$s.]]></string>
-    <string name="err_ln_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br>for a payment channel<br><br>can send %1$s<br>min required %2$s<br>pending %3$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable.]]></string>
-    <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable.]]></string>
+    <string name="err_ln_6_confs">Can\'t ask for payments because a funding Bitcoin transaction has not got 6 confirmations yet</string>
+    <string name="err_ln_reserve">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving</string>
+    <string name="err_ln_fee_overflow"><![CDATA[Failed because this payment combined with Bitcoin <a href=http://lightning-wallet.com/using-lightning-wallet#commit-transaction-fee>commit transaction</a> fee exceeds your unspendable channel reserve<br><br>reserve %1$s<br>sending %2$s<br>missing %3$s]]></string>
+    <string name="err_ln_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br>for a payment channel<br><br>can send %1$s<br>min required %2$s<br>pending %3$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
+    <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
     <string name="err_transaction_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
-    <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again.</string>
-    <string name="err_secret">Failed because passcode did not match. Please make sure passcode is correct.</string>
-    <string name="err_uri">Failed because request contains a malformed URI which could not be parsed.</string>
-    <string name="err_different_net">Failed because payment request belongs to a different network.</string>
-    <string name="err_general">Failed because an error has occurred.</string>
-    <string name="err_qr_parse">QR code is invalid.</string>
+    <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
+    <string name="err_secret">Failed because passcode did not match. Please make sure passcode is correct</string>
+    <string name="err_uri">Failed because request contains a malformed URI which could not be parsed</string>
+    <string name="err_different_net">Failed because payment request belongs to a different network</string>
+    <string name="err_general">Failed because an error has occurred</string>
+    <string name="err_qr_parse">QR code is invalid</string>
 
     <!-- fingerprint -->
     <string name="fp_err_try_again">Try again</string>
@@ -239,11 +241,11 @@
 
     <!-- see PaymentInfo.scala -->
     <array name="ln_payment_states">
-        <item>Waiting for payee</item>
-        <item>In progress&#8230;</item>
-        <item>Paid and settled</item>
-        <item>Cancelled</item>
-        <item>Frozen</item>
+        <item>waiting for payee</item>
+        <item>in progress</item>
+        <item>paid and settled</item>
+        <item>cancelled</item>
+        <item>frozen</item>
     </array>
 
     <string name="chan_notice_title">Closed channel warning</string>

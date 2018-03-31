@@ -121,13 +121,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     jsonFormat[String, Option[MilliSatoshi], Long, PublicKey, Vector[Tag], BinaryData,
       PaymentRequest](PaymentRequest.apply, "prefix", "amount", "timestamp", "nodeId", "tags", "signature")
 
-  implicit val ratesFmt =
-    jsonFormat[Seq[Double], Fiat2Btc, Long,
-      Rates](Rates.apply, "feeHistory", "exchange", "stamp")
-
-  implicit val cloudActFmt =
-    jsonFormat[BinaryData, Seq[HttpParam], String,
-      CloudAct](CloudAct.apply, "data", "plus", "path")
+  implicit val ratesFmt = jsonFormat[Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feeHistory", "exchange", "stamp")
+  implicit val cloudActFmt = jsonFormat[BinaryData, Seq[HttpParam], String, CloudAct](CloudAct.apply, "data", "plus", "path")
 
   implicit val cloudDataFmt =
     jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct],
@@ -135,14 +130,10 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   // Channel data
 
-  implicit val outPointFmt = jsonFormat[BinaryData, Long,
-    OutPoint](OutPoint.apply, "hash", "index")
-
-  implicit val txOutFmt = jsonFormat[Satoshi, BinaryData,
-    TxOut](TxOut.apply, "amount", "publicKeyScript")
-
-  implicit val inputInfoFmt = jsonFormat[OutPoint, TxOut, BinaryData,
-    InputInfo](InputInfo.apply, "outPoint", "txOut", "redeemScript")
+  implicit val outPointFmt = jsonFormat[BinaryData, Long, OutPoint](OutPoint.apply, "hash", "index")
+  implicit val txOutFmt = jsonFormat[Satoshi, BinaryData, TxOut](TxOut.apply, "amount", "publicKeyScript")
+  implicit val inputInfoFmt = jsonFormat[OutPoint, TxOut, BinaryData, InputInfo](InputInfo.apply,
+    "outPoint", "txOut", "redeemScript")
 
   implicit object TransactionWithInputInfoFmt
   extends JsonFormat[TransactionWithInputInfo] {
@@ -241,14 +232,18 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val localCommitPublishedFmt =
     jsonFormat[Seq[ClaimDelayedOutputTx], Seq[SuccessAndClaim], Seq[TimeoutAndClaim], Transaction,
-      LocalCommitPublished](LocalCommitPublished.apply, "claimMainDelayed", "claimHtlcSuccess", "claimHtlcTimeout", "commitTx")
+      LocalCommitPublished](LocalCommitPublished.apply, "claimMainDelayed", "claimHtlcSuccess",
+      "claimHtlcTimeout", "commitTx")
 
   implicit val remoteCommitPublishedFmt =
     jsonFormat[Seq[ClaimP2WPKHOutputTx], Seq[ClaimHtlcSuccessTx], Seq[ClaimHtlcTimeoutTx], Transaction,
-      RemoteCommitPublished](RemoteCommitPublished.apply, "claimMain", "claimHtlcSuccess", "claimHtlcTimeout", "commitTx")
+      RemoteCommitPublished](RemoteCommitPublished.apply, "claimMain", "claimHtlcSuccess",
+      "claimHtlcTimeout", "commitTx")
 
-  implicit val revokedCommitPublishedFmt = jsonFormat[Seq[ClaimP2WPKHOutputTx], Seq[MainPenaltyTx], Transaction,
-    RevokedCommitPublished](RevokedCommitPublished.apply, "claimMain", "claimPenalty", "commitTx")
+  implicit val revokedCommitPublishedFmt =
+    jsonFormat[Seq[ClaimP2WPKHOutputTx], Seq[MainPenaltyTx], Seq[HtlcPenaltyTx], Transaction,
+      RevokedCommitPublished](RevokedCommitPublished.apply, "claimMain", "claimTheirMainPenalty",
+      "htlcPenalty", "commitTx")
 
   implicit object HasCommitmentsFmt
   extends JsonFormat[HasCommitments] {

@@ -121,17 +121,17 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       db txWrap {
         for (Htlc(true, addHtlc) \ _ <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(addHtlc)
         for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
-        for (Htlc(false, add) \ failureReason <- norm.commitments.localCommit.spec.failed) {
+        for (Htlc(false, add) \ failReason <- norm.commitments.localCommit.spec.failed) {
 
           val rd1Opt = pendingPayments get add.paymentHash
-          rd1Opt map parseFailureCutRoutes(failureReason) match {
-            case Some(updatedRD \ badNodesAndChans) if updatedRD.ok =>
-              // Clear cached local routes so they don't get in the way
+          rd1Opt map parseFailureCutRoutes(failReason) match {
+            case Some(updRD1 \ badNodesAndChans) if updRD1.ok =>
+              // Clear cached routes so they don't get in the way
               // then try use the routes left or fetch new ones
 
-              goodRoutes -= updatedRD.pr.nodeId
+              goodRoutes -= updRD1.pr.nodeId
               badNodesAndChans foreach BadEntityWrap.putEntity.tupled
-              app.ChannelManager.sendEither(useRoutesLeft(updatedRD), newRoutes)
+              app.ChannelManager.sendEither(useRoutesLeft(updRD1), newRoutes)
 
             case _ =>
               // Either halted or not found at all
@@ -168,15 +168,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 }
 
 object ChannelWrap {
-  def doPut(chanId: String, data: String) = db txWrap {
-    db.change(ChannelTable.newSql, params = chanId, data)
-    db.change(ChannelTable.updSql, params = data, chanId)
+  def doPut(chanId: BinaryData, data: String) = db txWrap {
+    // Insert and then update because of INSERT IGNORE effects
+    db.change(ChannelTable.newSql, chanId, data)
+    db.change(ChannelTable.updSql, data, chanId)
   }
 
   def put(data: HasCommitments) = {
-    val chanId = data.commitments.channelId
     val raw = "1" + data.toJson.toString
-    doPut(chanId.toString, raw)
+    doPut(data.commitments.channelId, raw)
   }
 
   def get = {

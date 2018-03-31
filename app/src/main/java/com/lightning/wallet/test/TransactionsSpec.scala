@@ -78,7 +78,7 @@ class TransactionsSpec {
         val commitTx = Transaction(version = 0, txIn = Nil, txOut = TxOut(Satoshi(20000), pubKeyScript) :: Nil, lockTime = 0)
         val claimP2WPKHOutputTx = makeClaimP2WPKHOutputTx(commitTx, localPaymentPriv.publicKey, finalPubKeyScript, feeratePerKw)
         // we use dummy signatures to compute the weight
-        val weight = Transaction.weight(addSigs(claimP2WPKHOutputTx, localPaymentPriv.publicKey, "bb" * 71).tx)
+        val weight = Transaction.weight(addSigs(claimP2WPKHOutputTx, "bb" * 71, localPaymentPriv.publicKey).tx)
         assert(claimP2WPKHOutputWeight == weight)
       }
 
@@ -102,6 +102,20 @@ class TransactionsSpec {
         // we use dummy signatures to compute the weight
         val weight = Transaction.weight(addSigs(mainPenaltyTx, "bb" * 71).tx)
         assert(mainPenaltyWeight == weight)
+      }
+
+      {
+        // HtlcPenaltyTx
+        // first we create a fake commitTx tx, containing only the output that will be spent by the ClaimHtlcSuccessTx
+        val paymentPreimage = BinaryData("42" * 32)
+        val htlc = UpdateAddHtlc("00" * 32, 0, Satoshi(20000).amount * 1000, sha256(paymentPreimage), expiry = 400144, BinaryData.empty)
+        val redeemScript = htlcReceived(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, ripemd160(htlc.paymentHash), htlc.expiry)
+        val pubKeyScript = write(pay2wsh(redeemScript))
+        val commitTx = Transaction(version = 0, txIn = Nil, txOut = TxOut(Satoshi(htlc.amountMsat / 1000), pubKeyScript) :: Nil, lockTime = 0)
+        val htlcPenaltyTx = makeHtlcPenaltyTx(commitTx, Script.write(redeemScript), finalPubKeyScript, feeratePerKw)
+        // we use dummy signatures to compute the weight
+        val weight = Transaction.weight(addSigs(htlcPenaltyTx, "bb" * 71, localRevocationPriv.publicKey).tx)
+        assert(htlcPenaltyWeight == weight)
       }
 
       {
@@ -225,7 +239,7 @@ class TransactionsSpec {
         // remote spends main output
         val claimP2WPKHOutputTx = makeClaimP2WPKHOutputTx(commitTx.tx, remotePaymentPriv.publicKey, finalPubKeyScript, feeratePerKw)
         val localSig = sign(claimP2WPKHOutputTx, remotePaymentPriv)
-        val signedTx = addSigs(claimP2WPKHOutputTx, remotePaymentPriv.publicKey, localSig)
+        val signedTx = addSigs(claimP2WPKHOutputTx, localSig, remotePaymentPriv.publicKey)
         assert(checkSpendable(signedTx).isDefined)
       }
 
@@ -239,30 +253,20 @@ class TransactionsSpec {
 
       {
         // remote spends offered HTLC output with revocation key
-        val script = Scripts.htlcOffered(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, Crypto.ripemd160(htlc1.paymentHash))
-        val index = commitTx.tx.txOut.indexWhere(_.publicKeyScript == Script.write(Script.pay2wsh(script)))
-        val tx = Transaction(
-          version = 2,
-          txIn = TxIn(OutPoint(commitTx.tx, index), signatureScript = Nil, sequence = TxIn.SEQUENCE_FINAL) :: Nil,
-          txOut = TxOut(commitTx.tx.txOut(index).amount, Script.pay2wpkh(remotePaymentPriv.publicKey)) :: Nil,
-          lockTime = 0)
-        val sig = Transaction.signInput(tx, 0, script, SIGHASH_ALL, commitTx.tx.txOut(index).amount, SigVersion.SIGVERSION_WITNESS_V0, localRevocationPriv)
-        val tx1 = tx.updateWitness(0, ScriptWitness(sig :: localRevocationPriv.publicKey.toBin :: Script.write(script) :: Nil))
-        Transaction.correctlySpends(tx1, Seq(commitTx.tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        val script = Script.write(Scripts.htlcOffered(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, Crypto.ripemd160(htlc1.paymentHash)))
+        val htlcPenaltyTx = makeHtlcPenaltyTx(commitTx.tx, script, finalPubKeyScript, feeratePerKw)
+        val sig = sign(htlcPenaltyTx, localRevocationPriv)
+        val signed = addSigs(htlcPenaltyTx, sig, localRevocationPriv.publicKey)
+        assert(checkSpendable(signed).isDefined)
       }
 
       {
         // remote spends received HTLC output with revocation key
-        val script = Scripts.htlcReceived(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, Crypto.ripemd160(htlc2.paymentHash), htlc2.expiry)
-        val index = commitTx.tx.txOut.indexWhere(_.publicKeyScript == Script.write(Script.pay2wsh(script)))
-        val tx = Transaction(
-          version = 2,
-          txIn = TxIn(OutPoint(commitTx.tx, index), signatureScript = Nil, sequence = TxIn.SEQUENCE_FINAL) :: Nil,
-          txOut = TxOut(commitTx.tx.txOut(index).amount, Script.pay2wpkh(remotePaymentPriv.publicKey)) :: Nil,
-          lockTime = 0)
-        val sig = Transaction.signInput(tx, 0, script, SIGHASH_ALL, commitTx.tx.txOut(index).amount, SigVersion.SIGVERSION_WITNESS_V0, localRevocationPriv)
-        val tx1 = tx.updateWitness(0, ScriptWitness(sig :: localRevocationPriv.publicKey.toBin :: Script.write(script) :: Nil))
-        Transaction.correctlySpends(tx1, Seq(commitTx.tx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+        val script = Script.write(Scripts.htlcReceived(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, Crypto.ripemd160(htlc2.paymentHash), htlc2.expiry))
+        val htlcPenaltyTx = makeHtlcPenaltyTx(commitTx.tx, script, finalPubKeyScript, feeratePerKw)
+        val sig = sign(htlcPenaltyTx, localRevocationPriv)
+        val signed = addSigs(htlcPenaltyTx, sig, localRevocationPriv.publicKey)
+        assert(checkSpendable(signed).isDefined)
       }
 
     }

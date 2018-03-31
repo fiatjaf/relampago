@@ -15,7 +15,7 @@ object LNParams { me =>
   val maxChannelCapacity = MilliSatoshi(16777216000L)
   val maxHtlcValue = MilliSatoshi(1000000000L)
   val minHtlcValue = MilliSatoshi(1000L)
-  val dustLimit = Satoshi(5000L)
+  val dustLimit = Satoshi(5460L)
   val maxCltvDelta = 28 * 144
 
   val chainHash = Block.TestnetGenesisBlock.hash
@@ -62,6 +62,7 @@ object LNParams { me =>
 object AddErrorCodes {
   import com.lightning.wallet.R.string._
   val ERR_AMOUNT_OVERFLOW = err_ln_amount_overflow
+  val ERR_REMOTE_AMOUNT_HIGH = err_ln_remote_amount_high
   val ERR_REMOTE_AMOUNT_LOW = err_ln_remote_amount_low
   val ERR_TOO_MANY_HTLC = err_ln_too_many
   val ERR_FAILED = err_general
