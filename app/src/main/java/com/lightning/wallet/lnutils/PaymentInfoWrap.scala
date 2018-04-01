@@ -76,9 +76,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onError = {
     case (_, exc: CMDException) => me failOnUI exc.rd
-    case chan \ error =>
-      error.printStackTrace
-      chan process CMDShutdown
+    case chan \ error => chan process CMDShutdown
   }
 
   override def onProcess = {

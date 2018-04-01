@@ -134,8 +134,8 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     // Randomize an order of two available default servers
     val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val dev1: Array[AnyRef] = Array("dev-server-1", "http://213.133.99.89:9003", emptyData, "1", ord1, "0")
-    val dev2: Array[AnyRef] = Array("dev-server-2", "http://213.133.103.56:9003", emptyData, "0", ord2, "1")
+    val dev1: Array[AnyRef] = Array("dev-server-1", "https://a.lightning-wallet.com:9003", emptyData, "1", ord1, "0")
+    val dev2: Array[AnyRef] = Array("dev-server-2", "https://b.lightning-wallet.com:9003", emptyData, "0", ord2, "1")
 
     dbs.execSQL(OlympusTable.newSql, dev1)
     dbs.execSQL(OlympusTable.newSql, dev2)
