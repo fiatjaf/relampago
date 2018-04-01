@@ -180,7 +180,7 @@ class WalletApp extends Application { me =>
       def ONCOMMITSENT(c: Commitments) = db txWrap {
         for (waitRevocation <- c.remoteNextCommitInfo.left) {
           val htlcs = waitRevocation.nextRemoteCommit.spec.htlcs
-          for (Htlc(_, add) <- htlcs if add.amount >= LNParams.revokedSaveTolerance)
+          for (Htlc(_, add) <- htlcs if add.amount >= c.localParams.revokedSaveTolerance)
             bag.saveRevoked(add.hash160, add.expiry, waitRevocation.nextRemoteCommit.index)
         }
       }
@@ -194,7 +194,7 @@ class WalletApp extends Application { me =>
         BECOME(STORE(cd), CLOSING)
 
         val txs = for (tier12 <- cd.tier12States) yield tier12.txn
-        if (txs.isEmpty) Tools log "This closing channel does not have tier 1-2 transactions"
+        if (txs.isEmpty) Tools log "Closing channel does not have tier 1-2 transactions"
         else OlympusWrap tellClouds CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
       }
 

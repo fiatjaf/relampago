@@ -19,11 +19,9 @@ object LNParams { me =>
   val minDepth = 1
 
   val maxCltvDelta = 28 * 144
-  val dustLimit = Satoshi(5460L)
-  val minHtlcValue = MilliSatoshi(1000L)
-  val maxHtlcValue = MilliSatoshi(1000000000L)
-  val maxChannelCapacity = MilliSatoshi(16777216000L)
-  val revokedSaveTolerance = satoshi2millisatoshi(dustLimit * 2)
+  final val minHtlcValue = MilliSatoshi(1000L)
+  final val maxHtlcValue = MilliSatoshi(2000000000L)
+  final val maxChannelCapacity = MilliSatoshi(16777216000L)
 
   var db: CipherOpenHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
@@ -53,10 +51,11 @@ object LNParams { me =>
 
   // MISC
 
-  def makeLocalParams(reserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {
+  def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (n <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: n :: Nil)
-    LocalParams(UInt64(1000000000L), reserve, toSelfDelay = 144, maxAcceptedHtlcs = 25, fund.privateKey, revoke.privateKey,
-      pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey, sha256(sha.privateKey.toBin), isFunder = true)
+    LocalParams(maxHtlcValueInFlightMsat = UInt64(4000000000L), theirReserve, toSelfDelay = 144, maxAcceptedHtlcs = 25,
+      fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey,
+      dustLimit = Satoshi(5460L), shaSeed = sha256(sha.privateKey.toBin), isFunder = true)
   }
 }
 

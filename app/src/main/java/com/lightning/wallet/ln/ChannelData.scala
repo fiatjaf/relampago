@@ -7,8 +7,7 @@ import com.lightning.wallet.ln.Scripts._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.AddErrorCodes._
 import com.lightning.wallet.ln.LNParams.broadcaster._
-
-import fr.acinq.bitcoin.{BinaryData, Transaction}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi, Transaction}
 import com.lightning.wallet.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.wallet.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.wallet.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
@@ -190,10 +189,13 @@ object CommitmentSpec {
   }
 }
 
-case class LocalParams(maxHtlcValueInFlightMsat: UInt64, channelReserveSat: Long, toSelfDelay: Int, maxAcceptedHtlcs: Int,
-                       fundingPrivKey: PrivateKey, revocationSecret: Scalar, paymentKey: Scalar, delayedPaymentKey: Scalar,
-                       htlcKey: Scalar, defaultFinalScriptPubKey: BinaryData, shaSeed: BinaryData, isFunder: Boolean) {
+case class LocalParams(maxHtlcValueInFlightMsat: UInt64, channelReserveSat: Long, toSelfDelay: Int,
+                       maxAcceptedHtlcs: Int, fundingPrivKey: PrivateKey, revocationSecret: Scalar,
+                       paymentKey: Scalar, delayedPaymentKey: Scalar, htlcKey: Scalar,
+                       defaultFinalScriptPubKey: BinaryData, dustLimit: Satoshi,
+                       shaSeed: BinaryData, isFunder: Boolean) {
 
+  lazy val revokedSaveTolerance: MilliSatoshi = dustLimit * 2
   lazy val delayedPaymentBasepoint = delayedPaymentKey.toPoint
   lazy val revocationBasepoint = revocationSecret.toPoint
   lazy val paymentBasepoint = paymentKey.toPoint
@@ -268,7 +270,7 @@ object Commitments {
       val c1 = addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(_ + 1)
       // Let's compute the current commitment *as seen by us* with this change taken into account
       val reduced = CommitmentSpec.reduce(c1.localCommit.spec, c1.localChanges.acked, c1.remoteChanges.proposed)
-      val feesSat = if (c.localParams.isFunder) 0L else Scripts.commitTxFee(dustLimit, reduced).amount
+      val feesSat = if (c.localParams.isFunder) 0L else Scripts.commitTxFee(c.localParams.dustLimit, reduced).amount
       val totalInFlightMsat = UInt64(reduced.htlcs.map(_.add.amountMsat).sum)
 
       // We should both check if WE can accept another HTLC and if PEER can send another HTLC
@@ -279,9 +281,9 @@ object Commitments {
     }
 
   def sendFulfill(c: Commitments, cmd: CMDFulfillHtlc) = {
-    val fulfill = UpdateFulfillHtlc(c.channelId, cmd.id, cmd.preimage)
+    val ok = UpdateFulfillHtlc(c.channelId, cmd.id, cmd.preimage)
     getHtlcCrossSigned(commitments = c, incomingRelativeToLocal = true, cmd.id) match {
-      case Some(add) if fulfill.paymentHash == add.paymentHash => addLocalProposal(c, fulfill) -> fulfill
+      case Some(add) if ok.paymentHash == add.paymentHash => addLocalProposal(c, ok) -> ok
       case None => throw new LightningException
     }
   }

@@ -198,10 +198,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     ClosingTx](ClosingTx.apply, "input", "tx"), tag = "ClosingTx")
 
   implicit val localParamsFmt =
-    jsonFormat[UInt64, Long, Int, Int, PrivateKey, Scalar, Scalar, Scalar, Scalar, BinaryData, BinaryData, Boolean,
-    LocalParams](LocalParams.apply, "maxHtlcValueInFlightMsat", "channelReserveSat", "toSelfDelay", "maxAcceptedHtlcs",
-      "fundingPrivKey", "revocationSecret", "paymentKey", "delayedPaymentKey", "htlcKey", "defaultFinalScriptPubKey",
-      "shaSeed", "isFunder")
+    jsonFormat[UInt64, Long, Int, Int, PrivateKey, Scalar, Scalar, Scalar, Scalar, BinaryData, Satoshi, BinaryData, Boolean,
+      LocalParams](LocalParams.apply, "maxHtlcValueInFlightMsat", "channelReserveSat", "toSelfDelay", "maxAcceptedHtlcs", "fundingPrivKey",
+      "revocationSecret", "paymentKey", "delayedPaymentKey", "htlcKey", "defaultFinalScriptPubKey", "dustLimit", "shaSeed", "isFunder")
 
   implicit val htlcFmt = jsonFormat[Boolean, UpdateAddHtlc, Htlc](Htlc.apply, "incoming", "add")
   implicit val commitmentSpecFmt = jsonFormat[Long, Long, Long, Set[Htlc], Set[HtlcAndFulfill], Set[HtlcAndFail], Set[Htlc],

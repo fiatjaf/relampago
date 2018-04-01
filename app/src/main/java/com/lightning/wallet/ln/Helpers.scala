@@ -20,14 +20,14 @@ object Helpers { me =>
     val remotePaymentPubkey = derivePubKey(remoteParams.paymentBasepoint, localPerCommitmentPoint)
     val remoteHtlcPubkey = derivePubKey(remoteParams.htlcBasepoint, localPerCommitmentPoint)
 
-    val commitTx = Scripts.makeCommitTx(commitmentInput, commitTxNumber, localParams.paymentBasepoint,
-      remoteParams.paymentBasepoint, localParams.isFunder, LNParams.dustLimit, localRevocationPubkey,
-      remoteParams.toSelfDelay, localDelayedPaymentPubkey, remotePaymentPubkey, localHtlcPubkey,
-      remoteHtlcPubkey, spec)
+    val commitTx =
+      Scripts.makeCommitTx(commitmentInput, commitTxNumber, localParams.paymentBasepoint, remoteParams.paymentBasepoint,
+        localParams.isFunder, localParams.dustLimit, localRevocationPubkey, remoteParams.toSelfDelay, localDelayedPaymentPubkey,
+        remotePaymentPubkey, localHtlcPubkey, remoteHtlcPubkey, spec)
 
-    val htlcTimeoutTxs \ htlcSuccessTxs = Scripts.makeHtlcTxs(commitTx.tx, LNParams.dustLimit,
-      localRevocationPubkey, remoteParams.toSelfDelay, localDelayedPaymentPubkey, localHtlcPubkey,
-      remoteHtlcPubkey, spec)
+    val htlcTimeoutTxs \ htlcSuccessTxs =
+      Scripts.makeHtlcTxs(commitTx.tx, localParams.dustLimit, localRevocationPubkey,
+        remoteParams.toSelfDelay, localDelayedPaymentPubkey, localHtlcPubkey, remoteHtlcPubkey, spec)
 
     (commitTx, htlcTimeoutTxs, htlcSuccessTxs)
   }
@@ -83,8 +83,8 @@ object Helpers { me =>
       require(isValidFinalScriptPubkey(local), "Invalid localScriptPubkey")
       require(isValidFinalScriptPubkey(remote), "Invalid remoteScriptPubkey")
 
-      val theirDustIsHigherThanOurs = LNParams.dustLimit < commitments.remoteParams.dustLimitSat
-      val dustLimit = if (theirDustIsHigherThanOurs) commitments.remoteParams.dustLimitSat else LNParams.dustLimit
+      val theirDustIsHigherThanOurs = commitments.localParams.dustLimit < commitments.remoteParams.dustLimitSat
+      val dustLimit = if (theirDustIsHigherThanOurs) commitments.remoteParams.dustLimitSat else commitments.localParams.dustLimit
       val closing = makeFunderClosingTx(commitments.commitInput, local, remote, dustLimit, closingFee, commitments.localCommit.spec)
 
       val localClosingSig = Scripts.sign(closing, commitments.localParams.fundingPrivKey)

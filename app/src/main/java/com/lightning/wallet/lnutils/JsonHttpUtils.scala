@@ -10,6 +10,7 @@ import rx.lang.scala.{Observable => Obs}
 
 import com.lightning.wallet.lnutils.olympus.OlympusWrap.Fiat2Btc
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
+import org.bitcoinj.core.Transaction.DEFAULT_TX_FEE
 import rx.lang.scala.schedulers.IOScheduler
 import com.lightning.wallet.AbstractKit
 import com.lightning.wallet.Utils.app
@@ -48,12 +49,6 @@ object RatesSaver {
 }
 
 case class Rates(feeHistory: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
-  // Bitcoin Core provides unreliable fees in testnet so just use default here
-  // TODO: remove for mainnet
-
-  private val DEFAULT_TX_FEE = Coin valueOf 40000L
-  val feeLive = if (feeHistory.isEmpty) DEFAULT_TX_FEE else {
-    val mu: Coin = btcBigDecimal2MSat(feeHistory.sum / feeHistory.size)
-    if (mu isLessThan DEFAULT_TX_FEE) DEFAULT_TX_FEE else mu
-  }
+  def averageFee: Coin = btcBigDecimal2MSat(feeHistory.sum / feeHistory.size)
+  val feeLive = if (feeHistory.isEmpty) DEFAULT_TX_FEE else averageFee
 }

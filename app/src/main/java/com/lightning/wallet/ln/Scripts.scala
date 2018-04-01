@@ -307,8 +307,8 @@ object Scripts { me =>
 
   // General templates
 
-  def tier2Amount(amt: Satoshi, fee: Satoshi): Satoshi = if (amt - fee < LNParams.dustLimit) amt / 2 else amt - fee
-  def findPubKeyScriptIndex(tx: Transaction, script: BinaryData): Int = tx.txOut.indexWhere(_.publicKeyScript == script)
+  def findPubKeyScriptIndex(tx: Transaction, script: BinaryData): Int =
+    tx.txOut.indexWhere(_.publicKeyScript == script)
 
   def makeHtlcTx[T](fun: (InputInfo, Transaction) => T, parent: Transaction,
                     redeemScript: ScriptEltSeq, pubKeyScript: ScriptEltSeq,
@@ -330,7 +330,7 @@ object Scripts { me =>
 
     val index: Int = findPubKeyScriptIndex(parent, Script write pubKeyScript)
     val inputInfo = InputInfo(OutPoint(parent, index), parent.txOut(index), redeemScript)
-    val txOut = TxOut(tier2Amount(inputInfo.txOut.amount, fee), localFinalScriptPubKey) :: Nil
+    val txOut = TxOut(inputInfo.txOut.amount - fee, localFinalScriptPubKey) :: Nil
     val txIn = TxIn(inputInfo.outPoint, Array.emptyByteArray, sequence) :: Nil
     val tx = Transaction(2, txIn, txOut, expiry)
     fun(inputInfo, tx)
