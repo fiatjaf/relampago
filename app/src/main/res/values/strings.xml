@@ -21,9 +21,9 @@
     <string name="ln_wallet">Lightning wallet</string>
 
     <array name="denoms">
-        <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 BTC</small></font>]]></item>
-        <item><![CDATA[Finney <font color=#999999><small>= 0.0001 BTC</small></font>]]></item>
-        <item><![CDATA[Bitcoin <font color=#999999><small>= 1 BTC</small></font>]]></item>
+        <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 btc</small></font>]]></item>
+        <item><![CDATA[Finney <font color=#999999><small>= 0.0001 btc</small></font>]]></item>
+        <item><![CDATA[Bitcoin <font color=#999999><small>= 1 btc</small></font>]]></item>
     </array>
 
     <array name="restore_options">
@@ -249,11 +249,10 @@
     </array>
 
     <string name="chan_notice_title">Closed channel warning</string>
-    <string name="chan_notice_unilateral">«%1$s» sent a remote error: %2$s</string>
-    <string name="chan_notice_bilateral">«%1$s» started a cooperative closing</string>
+    <string name="chan_notice_body">«%1$s» has closed a channel</string>
 
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[<font color=#16A764>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>can send %5$s<br>can receive %6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[<font color=#16A764>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>can send %5$s<br><br>%6$s<br><br><font color=#999999>Peer node ID</font><br><small>%7$s</small>]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>cooperative</i></font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>refundable %6$s<br><br>Refundable channel balance has been transferred to your Bitcoin wallet<br><br>%7$s]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>opened at <font color=#999999>%4$s</font><br>closed at <font color=#999999>%5$s</font><br>total capacity %6$s<br><br>%7$s]]></string>
@@ -273,7 +272,6 @@
     <string name="ln_ops_chan_unilateral_status_dead"><![CDATA[%1$s<br>= %2$s cancelled]]></string>
     <string name="ln_ops_chan_unilateral_status_done"><![CDATA[%1$s<br>= %2$s received]]></string>
     <string name="ln_ops_chan_unilateral_status_left"><![CDATA[%2$s<br>= %3$s %1$s]]></string>
-    <string name="ln_ops_chan_receive_wait">nothing yet</string>
 
     <array name="ln_status_left_blocks">
         <item><![CDATA[in progress&#8230;]]></item>

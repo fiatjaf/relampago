@@ -60,24 +60,21 @@ object BadEntityTable extends Table {
 
 object PaymentTable extends Table {
   val (table, search, limit) = ("payment", "search", 24)
-  val (pr, preimage, incoming, status, stamp) = ("pr", "preimage", "incoming", "status", "stamp")
-  val (description, hash, firstMsat, lastMsat) = ("description", "hash", "firstMsat", "lastMsat")
-  val (lastExpiry, commitNumber) = ("lastExpiry", "commitNumber")
+  val Tuple10(pr, preimage, incoming, status, stamp, description, hash, firstMsat, lastMsat, lastExpiry) =
+    ("pr", "preimage", "incoming", "status", "stamp", "description", "hash", "firstMsat", "lastMsat", "lastExpiry")
 
   // Inserting
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
-  val newSql = s"""INSERT OR IGNORE INTO $table ($pr, $preimage, $incoming, $status, $stamp, $description,
-    $hash, $firstMsat, $lastMsat, $lastExpiry, $commitNumber) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
+  val newSql = s"""INSERT OR IGNORE INTO $table ($pr, $preimage, $incoming, $status, $stamp,
+    $description, $hash, $firstMsat, $lastMsat, $lastExpiry) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
   // Selecting
   val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
   val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
-  val selectRevokedSql = s"SELECT * FROM $table WHERE $commitNumber = ?"
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
   // Updating, creating
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
-  val updCommitNumberSql = s"UPDATE $table SET $commitNumber = ? WHERE $hash = ?"
   val updFailAllWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
   val updLastParamsSql = s"UPDATE $table SET $status = $WAITING, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ? WHERE $hash = ?"
@@ -88,12 +85,24 @@ object PaymentTable extends Table {
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $pr STRING NOT NULL, $preimage STRING NOT NULL,
       $incoming INTEGER NOT NULL, $status INTEGER NOT NULL, $stamp INTEGER NOT NULL, $description STRING NOT NULL,
-      $hash STRING UNIQUE NOT NULL, $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL,
-      $commitNumber INTEGER NOT NULL
+      $hash STRING UNIQUE NOT NULL, $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL
     );
-    CREATE INDEX idx1 ON $table ($commitNumber);
     CREATE INDEX idx1 ON $table ($status);
     CREATE INDEX idx2 ON $table ($hash);
+    COMMIT"""
+}
+
+object RevokedTable extends Table {
+  val (table, h160, expiry, number) = ("revoked", "h160", "expiry", "number")
+  val newSql = s"INSERT INTO $table ($h160, $expiry, $number) VALUES (?, ?, ?)"
+  val selectSql = s"SELECT * FROM $table WHERE $number = ?"
+
+  val createSql = s"""
+    CREATE TABLE $table (
+      $id INTEGER PRIMARY KEY AUTOINCREMENT, $h160 STRING NOT NULL,
+      $expiry INTEGER NOT NULL, $number INTEGER NOT NULL
+    );
+    CREATE INDEX idx1 ON $table ($number);
     COMMIT"""
 }
 
@@ -120,6 +129,7 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     dbs execSQL PaymentTable.createSql
     dbs execSQL ChannelTable.createSql
     dbs execSQL OlympusTable.createSql
+    dbs execSQL RevokedTable.createSql
 
     // Randomize an order of two available default servers
     val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")

@@ -120,7 +120,7 @@ class WalletApp extends Application { me =>
 
   object ChannelManager {
     type ChannelVec = Vector[Channel]
-    val operationalListeners = Set(broadcaster, bag, GossipCatcher)
+    val operationalListeners = Set(broadcaster, bag)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: ChannelVec = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: ChannelVec, ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
@@ -179,9 +179,9 @@ class WalletApp extends Application { me =>
 
       def ONCOMMITSENT(c: Commitments) = db txWrap {
         for (waitRevocation <- c.remoteNextCommitInfo.left) {
-          val nextCommitNumber = waitRevocation.nextRemoteCommit.index
-          for (Htlc(_, add) <- waitRevocation.nextRemoteCommit.spec.htlcs)
-            bag.updCommitNumber(nextCommitNumber, add.paymentHash)
+          val htlcs = waitRevocation.nextRemoteCommit.spec.htlcs
+          for (Htlc(_, add) <- htlcs if add.amount >= LNParams.revokedSaveTolerance)
+            bag.saveRevoked(add.hash160, add.expiry, waitRevocation.nextRemoteCommit.index)
         }
       }
 
@@ -193,10 +193,9 @@ class WalletApp extends Application { me =>
         OlympusWrap.getChildTxs(commits).foreach(_ foreach bag.extractPreimg, Tools.errlog)
         BECOME(STORE(cd), CLOSING)
 
-        cd.tier12States.map(_.txn) match {
-          case Nil => Tools log "This closing channel does not have tier 1-2 transactions"
-          case txs => OlympusWrap tellClouds CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
-        }
+        val txs = for (tier12 <- cd.tier12States) yield tier12.txn
+        if (txs.isEmpty) Tools log "This closing channel does not have tier 1-2 transactions"
+        else OlympusWrap tellClouds CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
       }
 
       // First add listeners, then call

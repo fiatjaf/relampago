@@ -12,17 +12,18 @@ import fr.acinq.eclair.UInt64
 
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
-  val maxChannelCapacity = MilliSatoshi(16777216000L)
-  val maxHtlcValue = MilliSatoshi(1000000000L)
-  val minHtlcValue = MilliSatoshi(1000L)
-  val dustLimit = Satoshi(5460L)
-  val maxCltvDelta = 28 * 144
-
   val chainHash = Block.TestnetGenesisBlock.hash
   val theirReserveToFundingRatio = 100
   val localFeatures = "02"
   val globalFeatures = ""
   val minDepth = 1
+
+  val maxCltvDelta = 28 * 144
+  val dustLimit = Satoshi(5460L)
+  val minHtlcValue = MilliSatoshi(1000L)
+  val maxHtlcValue = MilliSatoshi(1000000000L)
+  val maxChannelCapacity = MilliSatoshi(16777216000L)
+  val revokedSaveTolerance = satoshi2millisatoshi(dustLimit * 2)
 
   var db: CipherOpenHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
@@ -92,7 +93,6 @@ trait Broadcaster extends ChannelListener { me =>
   val blocksPerDay = 144
 
   def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
-  def getBlockHashString(txid: BinaryData): Option[String]
   def getStatus(txid: BinaryData): DepthAndDead
   def isSynchronized: Boolean
   def currentHeight: Long

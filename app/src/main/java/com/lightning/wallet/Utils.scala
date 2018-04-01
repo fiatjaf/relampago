@@ -58,7 +58,7 @@ object Utils {
   var fiatName: String = _
 
   val fileName = "Testnet"
-  val dbFileName = s"$fileName.db"
+  val dbFileName = s"$fileName-1.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
 
@@ -88,10 +88,10 @@ object Utils {
   def currentRate = Try(RatesSaver.rates exchange fiatName)
   def msatInFiat(msat: MilliSatoshi) = currentRate.map(_ * msat.amount / BtcDenomination.factor)
   def humanFiat(prefix: String, ms: MilliSatoshi, div: String = "<br>"): String = msatInFiat(ms) match {
-    case Success(amt) if fiatName == strYuan => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} CNY</font>"
-    case Success(amt) if fiatName == strEuro => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} EUR</font>"
-    case Success(amt) if fiatName == strYen => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} JPY</font>"
-    case Success(amt) => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} USD</font>"
+    case Success(amt) if fiatName == strYuan => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} cny</font>"
+    case Success(amt) if fiatName == strEuro => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} eur</font>"
+    case Success(amt) if fiatName == strYen => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} jpy</font>"
+    case Success(amt) => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} usd</font>"
     case _ => prefix
   }
 }

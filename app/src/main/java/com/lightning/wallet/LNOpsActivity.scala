@@ -89,7 +89,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
   lazy val refundStatus = getString(ln_ops_chan_refund_status)
   lazy val amountStatus = getString(ln_ops_chan_amount_status)
   lazy val commitStatus = getString(ln_ops_chan_commit_status)
-  lazy val nothingYet = getString(ln_ops_chan_receive_wait)
 
   val humanStatus: DepthAndDead => String = {
     case cfs \ false => app.plurOrZero(txsConfs, cfs)
@@ -144,16 +143,12 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageOpen = UITask {
-      val canReceive = MilliSatoshi apply estimateCanReceive(chan)
       val canSpend = MilliSatoshi apply estimateTotalCanSend(chan)
-
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
-      val canSpendHuman = if (canSpend.amount < 0L) coloredOut(canSpend) else coloredIn(canSpend)
-      val canReceiveHuman = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-      val canReceiveFinal = if (channelAndHop(chan).isDefined) canReceiveHuman else sumOut format nothingYet
+      val finalCanSend = if (canSpend.amount < 0L) coloredOut(canSpend) else coloredIn(canSpend)
 
       lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias,
-        started, coloredIn(capacity), canSpendHuman, canReceiveFinal, inFlight, nodeId).html
+        started, coloredIn(capacity), finalCanSend, inFlight, nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE

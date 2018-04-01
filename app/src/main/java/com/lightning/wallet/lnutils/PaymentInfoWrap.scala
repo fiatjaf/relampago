@@ -31,6 +31,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   private[this] val pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
   val goodRoutes = mutable.Map.empty[PublicKey, PaymentRouteVec]
 
+  private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
+  def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
+  def getAllRevoked(number: Long) = RichCursor apply db.select(RevokedTable.selectSql, number) vec toRevoked
+
   def extractPreimg(tx: Transaction) = {
     val fulfills = tx.txIn.map(txIn => txIn.witness.stack) collect {
       case Seq(_, pre, _) if pre.size == 32 => UpdateFulfillHtlc(null, 0L, pre)
@@ -41,23 +45,18 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (fulfills.nonEmpty) uiNotify
   }
 
-  def getRevokedInfos(number: Long) = RichCursor apply db.select(PaymentTable.selectRevokedSql, number) vec toPaymentInfo
   def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
-
   def updOkIncoming(u: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, u.amountMsat, System.currentTimeMillis, u.paymentHash)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, fulfill.paymentPreimage, fulfill.paymentHash)
-  def updCommitNumber(number: Long, hash: BinaryData) = db.change(PaymentTable.updCommitNumberSql, number, hash)
   def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
 
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
 
-  def toPaymentInfo(rc: RichCursor) =
-    PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage, rc int PaymentTable.incoming,
-      rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
-      rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat,
-      rc long PaymentTable.lastExpiry, rc long PaymentTable.commitNumber)
+  def toPaymentInfo(rc: RichCursor) = PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage,
+    rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
+    rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
   def markFailedAndFrozen = db txWrap {
     db change PaymentTable.updFailAllWaitingSql
@@ -77,16 +76,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onError = {
     case (_, exc: CMDException) => me failOnUI exc.rd
-    case chan \ error => chan process CMDShutdown
+    case chan \ error =>
+      error.printStackTrace
+      chan process CMDShutdown
   }
 
   override def onProcess = {
-    case (chan, _, err: Error) =>
-      val template = app getString R.string.chan_notice_unilateral
-      Notificator chanClosed template.format(chan.data.announce.alias, err.humanText)
-
-    case (chan, _, _: Shutdown) =>
-      val template = app getString R.string.chan_notice_bilateral
+    case (chan, _, _: Error | _: Shutdown) =>
+      val template = app getString R.string.chan_notice_body
       Notificator chanClosed template.format(chan.data.announce.alias)
 
     case (_, _: NormalData, rd: RoutingData) =>
@@ -97,7 +94,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       db txWrap {
         db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
         db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
-          rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry, 0L)
+          rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
       }
 
       // Display
@@ -188,6 +185,7 @@ object ChannelWrap {
 
 object BadEntityWrap {
   val putEntity = (entity: Any, targetNodeId: String, span: Long, msat: Long) => {
+    // Insert and then update because of INSERT IGNORE effects on entity:targetNodeId key
     db.change(BadEntityTable.newSql, entity, targetNodeId, System.currentTimeMillis + span, msat)
     db.change(BadEntityTable.updSql, System.currentTimeMillis + span, msat, entity, targetNodeId)
   }
@@ -204,33 +202,6 @@ object BadEntityWrap {
     val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, msat, TARGET_ALL, targetId)
     val badNodes \ badChans = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
     OlympusWrap findRoutes OutRequest(badNodes, for (chanId <- badChans) yield chanId.toLong, from, targetId)
-  }
-}
-
-object GossipCatcher extends ChannelListener {
-  // Catch ChannelUpdates to enable funds receiving
-
-  override def onProcess = {
-    case (chan, norm: NormalData, _: CMDBestHeight)
-      // GUARD: don't have an extra hop, get the block
-      if norm.commitments.extraHop.isEmpty =>
-
-      // Extract funding txid and it's output index
-      val txid = Commitments fundingTxid norm.commitments
-      val outIdx = norm.commitments.commitInput.outPoint.index
-
-      for {
-        hash <- broadcaster getBlockHashString txid
-        height \ txIds <- retry(OlympusWrap getBlock hash, pickInc, 4 to 5)
-        shortChannelId <- Tools.toShortIdOpt(height, txIds indexOf txid.toString, outIdx)
-      } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
-
-    case (chan, norm: NormalData, upd: ChannelUpdate)
-      // GUARD: we already have an old or empty Hop, replace it with a new one
-      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
-      // Set a fresh update for this channel and process no further updates afterwards
-      chan process upd.toHop(chan.data.announce.nodeId)
-      chan.listeners -= GossipCatcher
   }
 }
 

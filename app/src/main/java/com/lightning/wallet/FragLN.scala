@@ -257,7 +257,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
         db.change(PaymentTable.newVirtualSql, params = rd.qryText, rd.paymentHashString)
         db.change(PaymentTable.newSql, pr.toJson, pre, 1, HIDDEN, System.currentTimeMillis,
-          pr.description, rd.paymentHashString, sum.amount, 0L, 0L, 0L)
+          pr.description, rd.paymentHashString, sum.amount, 0L, 0L)
 
         showQR(pr)
       }
@@ -354,7 +354,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
 
       // Allow user to retry this payment using excluded nodes and channels when it is a failure and pr is not expired yet
       if (info.actualStatus != FAILURE || !info.pr.isFresh) showForm(negBuilder(dialog_ok, title1.html, detailsWrapper).create)
-      else mkForm(none, doSend(rd), baseBuilder(title1.html, detailsWrapper), dialog_ok, dialog_retry)
+      else mkForm(doSend(rd), none, baseBuilder(title1.html, detailsWrapper), dialog_retry, dialog_cancel)
     }
   }
 

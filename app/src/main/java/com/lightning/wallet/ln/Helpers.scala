@@ -223,16 +223,16 @@ object Helpers { me =>
         val remoteHtlc = derivePubKey(commitments.remoteParams.htlcBasepoint, remotePerCommitmentPoint)
         val remoteRev = revocationPubKey(commitments.localParams.revocationBasepoint, remotePerCommitmentPoint)
 
-        val infos = bag getRevokedInfos txNumber
-        val offered = for (info <- infos) yield Scripts.htlcOffered(remoteHtlc, localHtlc, remoteRev, info.hash160)
-        val received = for (info <- infos) yield Scripts.htlcReceived(remoteHtlc, localHtlc, remoteRev, info.hash160, info.lastExpiry)
+        val matching = bag getAllRevoked txNumber
+        val offered = for (h160 \ _ <- matching) yield Scripts.htlcOffered(remoteHtlc, localHtlc, remoteRev, h160)
+        val received = for (h160 \ expiry <- matching) yield Scripts.htlcReceived(remoteHtlc, localHtlc, remoteRev, h160, expiry)
         val redeemScripts = for (redeem <- offered ++ received) yield Script.write(Script pay2wsh redeem) -> Script.write(redeem)
         val redeemMap = redeemScripts.toMap
 
         val htlcPenaltyTxs = for {
           TxOut(_, publicKeyScript) <- tx.txOut
           redeemScript <- redeemMap get publicKeyScript
-          htlcPenaltyTx = Scripts.makeHtlcPenaltyTx(tx, redeemScript, finalScriptPubKey, feeratePerKw = feeRate * 4)
+          htlcPenaltyTx = Scripts.makeHtlcPenaltyTx(tx, redeemScript, finalScriptPubKey, feeratePerKw = feeRate * 2)
           signed = Scripts.addSigs(htlcPenaltyTx, Scripts.sign(htlcPenaltyTx, remoteRevocationPrivkey), remoteRevocationPubkey)
           penalty <- Scripts checkSpendable signed
         } yield penalty

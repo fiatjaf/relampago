@@ -113,15 +113,15 @@ object PaymentInfo {
       case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
 
       case ErrorPacket(nodeKey, TemporaryNodeFailure) =>
-        rd.usedRoute.collectFirst { case hop if hop.nodeId == nodeKey =>
+        rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
           // Error at processing node which may indicate problems with it's peer so remove a channel
-          withoutChans(Vector(hop.shortChannelId), rd, rd.pr.nodeId.toString, 600 * 1000, rd.firstMsat)
+          withoutChans(Vector(payHop.shortChannelId), rd, rd.pr.nodeId.toString, 600 * 1000, rd.firstMsat)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 60 * 1000)
 
-      case ErrorPacket(nodeKey, UnknownNextPeer) =>
-        rd.usedRoute.collectFirst { case hop if hop.nodeId == nodeKey =>
+      case ErrorPacket(nodeKey, UnknownNextPeer | PermanentChannelFailure) =>
+        rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
           // Node can not find a specified peer so we remove a failed outgoing channel
-          withoutChans(Vector(hop.shortChannelId), rd, TARGET_ALL, 86400 * 4 * 1000, 0L)
+          withoutChans(Vector(payHop.shortChannelId), rd, TARGET_ALL, 86400 * 4 * 1000, 0L)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nodeKey, _) =>
@@ -183,7 +183,7 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
 
 case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int,
                        stamp: Long, description: String, hash: String, firstMsat: Long,
-                       lastMsat: Long, lastExpiry: Long, commitNumber: Long) {
+                       lastMsat: Long, lastExpiry: Long) {
 
   def actualStatus = incoming match {
     // Once we have a preimage it is a SUCCESS
@@ -195,17 +195,19 @@ case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, statu
   }
 
   // Keep serialized for performance
-  lazy val hash160 = Crypto ripemd160 BinaryData(hash)
   lazy val firstSum = MilliSatoshi(firstMsat)
   lazy val pr = to[PaymentRequest](rawPr)
 }
 
 trait PaymentInfoBag { me =>
-  def getRevokedInfos(number: Long): Vector[PaymentInfo]
-  def getPaymentInfo(hash: BinaryData): Try[PaymentInfo]
+  // Manage Revoked HTLC parameters
+  type RevokedHashExpiry = (BinaryData, Long)
+  def getAllRevoked(number: Long): Vector[RevokedHashExpiry]
+  def saveRevoked(hash: BinaryData, expiry: Long, number: Long)
 
+  // Manage payments list
+  def getPaymentInfo(hash: BinaryData): Try[PaymentInfo]
   def updStatus(paymentStatus: Int, hash: BinaryData)
-  def updCommitNumber(number: Long, hash: BinaryData)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc)
   def updOkIncoming(add: UpdateAddHtlc)
   def extractPreimg(tx: Transaction)

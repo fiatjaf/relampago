@@ -49,7 +49,7 @@ object SatDenomination extends Denomination {
 
   fmt setDecimalFormatSymbols symbols
   def withSign(msat: MilliSatoshi) =
-    formatted(msat) + "\u00A0SAT"
+    formatted(msat) + "\u00A0sat"
 }
 
 object FinDenomination extends Denomination {
@@ -59,7 +59,7 @@ object FinDenomination extends Denomination {
 
   fmt setDecimalFormatSymbols symbols
   def withSign(msat: MilliSatoshi) =
-    formatted(msat) + "\u00A0FIN"
+    formatted(msat) + "\u00A0fin"
 }
 
 object BtcDenomination extends Denomination {
@@ -69,5 +69,5 @@ object BtcDenomination extends Denomination {
 
   fmt setDecimalFormatSymbols symbols
   def withSign(msat: MilliSatoshi) =
-    formatted(msat) + "\u00A0BTC"
+    formatted(msat) + "\u00A0btc"
 }
