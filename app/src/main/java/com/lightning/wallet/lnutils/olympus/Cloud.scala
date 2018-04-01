@@ -39,8 +39,8 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       // If requested sum is low enough and tokens quantity is high enough and no race conditions
 
       send foreach { case rd \ info =>
-        app.ChannelManager.send(rd, none)
         me BECOME data.copy(info = info)
+        app.ChannelManager.send(rd, none)
       }
 
     // Execute anyway if we are free and have available tokens and actions
@@ -65,26 +65,25 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       val isInFlight = app.ChannelManager.activeInFlightHashes contains pr.paymentHash
 
       if (!isInFlight) {
-        // We assume payment has been fulfilled and try to get the tokens, retry on getting failure
+        // Assume that payment has been fulfilled and try to get some storage tokens from server
         val send = connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
         val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
 
+        // Save fresh tokens if successful, try to reuse a payment request if not, clear memo data if expired
         val send2 = send1.map(memo.makeClearSigs).map(memo.packEverything).doOnCompleted(me doProcess CMDStart)
         send2.foreach(fresh => me BECOME data.copy(info = None, tokens = data.tokens ++ fresh), onError)
       }
 
       def onError(err: Throwable) = err.getMessage match {
-        case "notfulfilled" if pr.isFresh && capableChannelExists =>
-          // Retry a fresh payment request instead of generating a new one
-          // delayed retry here since call may happen when app has just been opened and is offline
+        case "notfulfilled" => if (!pr.isFresh) me BECOME data.copy(info = None) else {
+          // Delayed retry here since call may happen when app has just been opened and is offline
           val send = retry(obsOnIO.flatMap(_ => me withRoutesAndOnionRDFromPR pr), pickInc, 4 to 5)
           val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
           send1.foreach(foeRD => app.ChannelManager.sendEither(foeRD, none), none)
+        }
 
-        // Server can't find our tokens or request has expired
-        case "notfulfilled" => me BECOME data.copy(info = None)
         case "notfound" => me BECOME data.copy(info = None)
-        case other => Tools log other
+        case serverMalfunction => Tools log serverMalfunction
       }
 
     case (_, act: CloudAct)
@@ -114,7 +113,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   // ADDING NEW TOKENS
 
-  def getFreshData = for {
+  private def getFreshData = for {
     prAndMemo @ (pr, memo) <- getPaymentRequestBlindMemo
     if pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
     Right(rd) <- me withRoutesAndOnionRDFromPR pr
@@ -122,11 +121,11 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     if data.info.isEmpty
   } yield rd -> info
 
-  def withRoutesAndOnionRDFromPR(pr: PaymentRequest) =
+  private def withRoutesAndOnionRDFromPR(pr: PaymentRequest) =
     // These payments will always be dust so frozen state is not an issue
     app.ChannelManager withRoutesAndOnionRDFrozenAllowed emptyRD(pr, pr.unsafeMsat)
 
-  def capableChannelExists =
+  private def capableChannelExists =
     // Estimate whethere we can send a MAX price
     app.ChannelManager.canSend(maxPriceMsat).nonEmpty
 }

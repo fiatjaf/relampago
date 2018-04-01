@@ -304,9 +304,11 @@ class WalletApp extends Application { me =>
       peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
-      // Mark all abandoned payments as failed right away
       ConnectionManager.listeners += ChannelManager.socketEventsListener
+      // Passing bitcoinj listener ensures onChainDownloadStarted is called
       startBlocksDownload(ChannelManager.chainEventsListener)
+      // Try to clear act leftovers if not channels left
+      OlympusWrap tellClouds OlympusWrap.CMDStart
       PaymentInfoWrap.markFailedAndFrozen
       ChannelManager.initConnect
       RatesSaver.initialize
