@@ -40,7 +40,7 @@ import rx.lang.scala.{Observable => Obs}
 
 
 class WalletApp extends Application { me =>
-  lazy val params = org.bitcoinj.params.RegTestParams.get
+  lazy val params = org.bitcoinj.params.TestNet3Params.get
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
   lazy val chainFile = new File(getFilesDir, chainFileName)
@@ -279,8 +279,8 @@ class WalletApp extends Application { me =>
     }
 
     def useCheckPoints(time: Long) = {
-//      val pts = getAssets open "checkpoints-testnet.txt"
-//      CheckpointManager.checkpoint(params, pts, store, time)
+      val pts = getAssets open "checkpoints-testnet.txt"
+      CheckpointManager.checkpoint(params, pts, store, time)
     }
 
     def decryptSeed(pass: String) = {

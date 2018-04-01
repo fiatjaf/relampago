@@ -182,7 +182,7 @@
     </array>
 
     <!-- errors -->
-    <string name="err_ln_peer_offline">This remote peer could not be reached</string>
+    <string name="err_ln_peer_offline">Could not connect to remote peer at %1$s</string>
     <string name="err_ln_no_data_loss_protect">Data loss protection is not provided by this peer</string>
     <string name="err_ln_remote_amount_high">Failed because payment amount is too high for your peer to accept</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
