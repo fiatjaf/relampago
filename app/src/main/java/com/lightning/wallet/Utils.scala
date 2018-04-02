@@ -158,6 +158,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     val alert = showForm(builderWithOkCancelButtons.create)
     val noListener = me onButtonTap rm(alert)(no)
 
+    try clickableTextField(alert findViewById android.R.id.message) catch none
     alert getButton BUTTON_POSITIVE setOnClickListener onButtonTap(ok apply alert)
     alert getButton BUTTON_NEGATIVE setOnClickListener noListener
     alert

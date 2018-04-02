@@ -74,12 +74,15 @@ object PaymentTable extends Table {
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
   // Updating, creating
-  val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
-  val updFailAllWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
   val updLastParamsSql = s"UPDATE $table SET $status = $WAITING, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ? WHERE $hash = ?"
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ? WHERE $hash = ?"
-  val createVSql = s"CREATE VIRTUAL TABLE $fts$table USING $fts($search, $hash)"
+  val updFailAllWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
+  val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
+
+  val createVSql = s"""
+    CREATE VIRTUAL TABLE $fts$table
+    USING $fts($search, $hash)"""
 
   val createSql = s"""
     CREATE TABLE $table (
@@ -109,13 +112,11 @@ object RevokedTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, name: String, secret: String)
-extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 44) {
+extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
-  def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = {
-    dbs.execSQL(s"DELETE FROM ${BadEntityTable.table}")
-  }
+  def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = none
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.wallet/table/$tbl"
