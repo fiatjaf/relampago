@@ -40,8 +40,8 @@
     <!-- headers with links -->
     <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.08&#8211;28<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
     <string name="fiat_set_denom"><![CDATA[<small>฿ %1$s<br>&#9735; %2$s<br><br><a href=http://lightning-wallet.com/setting-up-bitcoin-wallet#how-bitcoin-wallet-displays-a-balance>Read about Bitcoin balances</a></small><br><br>Set Bitcoin unit]]></string>
+    <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a>\n<small>Don\'t change these settings unless\nyou know what you are doing</small></string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
-    <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a></string>
 
     <string name="channel_recovery_info">
         Channel recovery tool asks Olympus servers for available channel backups and uses those to reimburse locked funds back into
@@ -248,7 +248,7 @@
     </array>
 
     <string name="chan_notice_title">Closed channel warning</string>
-    <string name="chan_notice_body">«%1$s» has closed a channel</string>
+    <string name="chan_notice_body">A channel with «%1$s» has been closed</string>
 
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_open"><![CDATA[<font color=#16A764>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>can send %5$s<br><br>%6$s<br><br><font color=#999999>Peer node ID</font><br><small>%7$s</small>]]></string>

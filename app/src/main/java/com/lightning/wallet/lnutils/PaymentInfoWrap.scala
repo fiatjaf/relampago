@@ -35,7 +35,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
   def getAllRevoked(number: Long) = RichCursor apply db.select(RevokedTable.selectSql, number) vec toRevoked
 
-  def extractPreimg(tx: Transaction) = {
+  def extractPreimage(tx: Transaction) = {
     val fulfills = tx.txIn.map(txIn => txIn.witness.stack) collect {
       case Seq(_, pre, _) if pre.size == 32 => UpdateFulfillHtlc(null, 0L, pre)
       case Seq(_, _, _, pre, _) if pre.size == 32 => UpdateFulfillHtlc(null, 0L, pre)
@@ -79,80 +79,84 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     case chan \ error => chan process CMDShutdown
   }
 
-  override def onProcess = {
-    case (chan, _, _: Error | _: Shutdown) =>
-      val template = app getString R.string.chan_notice_body
-      Notificator chanClosed template.format(chan.data.announce.alias)
+  override def outPaymentAccepted(rd: RoutingData) = {
+    // This may be a new payment or an old payment retry attempt
+    // Either insert or update should be executed successfully
+    pendingPayments(rd.pr.paymentHash) = rd
 
-    case (_, _: NormalData, rd: RoutingData) =>
-      // This may be a new payment or an old payment retry attempt
-      // Either insert or update should be executed successfully
-      pendingPayments(rd.pr.paymentHash) = rd
+    db txWrap {
+      db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
+      db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
+        rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
+    }
 
-      db txWrap {
-        db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
-        db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
-          rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
-      }
+    uiNotify
+  }
 
-      // Display
-      uiNotify
+  override def fulfillReceived(ok: UpdateFulfillHtlc) = {
+    // Save preimage right away, don't wait for their commitSig
+    // receiving a preimage means that payment is fulfilled
+    updOkOutgoing(ok)
 
-    case (_, _, fulfill: UpdateFulfillHtlc) =>
-      // Save preimage right away, don't wait for commitSig
-      // receiving a preimage means a payment is fulfilled
-      updOkOutgoing(fulfill)
+    pendingPayments.values.find(_.pr.paymentHash == ok.paymentHash) foreach { rd =>
+      // Make payment searchable + runtime optimization: record last successful route
+      db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
+      goodRoutes(rd.pr.nodeId) = rd.usedRoute +: rd.routes
+    }
+  }
 
-      pendingPayments.values.find(_.pr.paymentHash == fulfill.paymentHash) foreach { rd =>
-        // Make payment searchable + runtime optimization: record last successful route
-        db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
-        goodRoutes(rd.pr.nodeId) = rd.usedRoute +: rd.routes
-      }
+  override def sentSig(cs: Commitments) = db txWrap {
+    for (waitRevocation <- cs.remoteNextCommitInfo.left) {
+      val htlcs = waitRevocation.nextRemoteCommit.spec.htlcs
+      for (Htlc(_, add) <- htlcs if add.amount >= cs.localParams.revokedSaveTolerance)
+        saveRevoked(add.hash160, add.expiry, waitRevocation.nextRemoteCommit.index)
+    }
+  }
 
-    case (chan, norm: NormalData, _: CommitSig) =>
-      // Update affected record states in a database
-      // then retry failed payments where possible
+  override def settled(cs: Commitments) = {
+    // Update affected record states in a database
+    // then retry failed payments where possible
 
-      db txWrap {
-        for (Htlc(true, addHtlc) \ _ <- norm.commitments.localCommit.spec.fulfilled) updOkIncoming(addHtlc)
-        for (Htlc(false, add) <- norm.commitments.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
-        for (Htlc(false, add) \ failReason <- norm.commitments.localCommit.spec.failed) {
+    db txWrap {
+      for (Htlc(true, addHtlc) \ _ <- cs.localCommit.spec.fulfilled) updOkIncoming(addHtlc)
+      for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
+      for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
 
-          val rd1Opt = pendingPayments get add.paymentHash
-          rd1Opt map parseFailureCutRoutes(failReason) match {
-            case Some(updRD1 \ badNodesAndChans) if updRD1.ok =>
-              // Clear cached routes so they don't get in the way
-              // then try use the routes left or fetch new ones
+        val rd1Opt = pendingPayments get add.paymentHash
+        rd1Opt map parseFailureCutRoutes(failReason) match {
+          case Some(updRD1 \ badNodesAndChans) if updRD1.ok =>
+            // Clear cached routes so they don't get in the way
+            // then try use the routes left or fetch new ones
 
-              goodRoutes -= updRD1.pr.nodeId
-              badNodesAndChans foreach BadEntityWrap.putEntity.tupled
-              app.ChannelManager.sendEither(useRoutesLeft(updRD1), newRoutes)
+            goodRoutes -= updRD1.pr.nodeId
+            badNodesAndChans foreach BadEntityWrap.putEntity.tupled
+            app.ChannelManager.sendEither(useRoutesLeft(updRD1), newRoutes)
 
-            case _ =>
-              // Either halted or not found at all
-              updStatus(FAILURE, add.paymentHash)
-          }
+          case _ =>
+            // Either halted or not found at all
+            updStatus(FAILURE, add.paymentHash)
         }
       }
+    }
 
-      if (norm.commitments.localCommit.spec.fulfilled.nonEmpty) {
-        // Let the cloud know since it may be waiting for a payment
-        // also vibrate to let a user know that payment is fulfilled
-        OlympusWrap tellClouds OlympusWrap.CMDStart
-        vibrate(lnSettled)
-      }
+    if (cs.localCommit.spec.fulfilled.nonEmpty) {
+      // Let the clouds know since they may be waiting
+      // also vibrate to let a user know it's fulfilled
+      OlympusWrap tellClouds OlympusWrap.CMDStart
+      vibrate(lnSettled)
+    }
 
-      // Display
-      uiNotify
-
-    case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
-      // Mutual tx has enough confirmations or hard timeout has passed out
-      db.change(ChannelTable.killSql, close.commitments.channelId)
+    uiNotify
   }
+
+  override def chanCanBeRemoved(close: ClosingData) =
+    // Mutual has enough confirmations or hard timeout has run out
+    db.change(ChannelTable.killSql, close.commitments.channelId)
 
   override def onBecome = {
     case (chan, _, from, CLOSING) if from != CLOSING =>
-      // Frozen non-dust payments may be fulfilled on-chain
+      val template = app getString R.string.chan_notice_body
+      Notificator chanClosed template.format(chan.data.announce.alias)
       markFailedAndFrozen
       uiNotify
 

@@ -109,11 +109,13 @@ object RevokedTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, name: String, secret: String)
-extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
+extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 44) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
-  def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = none
+  def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = {
+    dbs.execSQL(s"DELETE FROM ${BadEntityTable.table}")
+  }
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.wallet/table/$tbl"

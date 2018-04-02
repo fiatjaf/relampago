@@ -221,6 +221,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     val detailsListener = new ChannelListener {
+      override def gotBestHeight = nullOnBecome(chan)
       // Updates chan details to current chan state
       // must be removed once activity is finished
 
@@ -231,12 +232,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         case (_, _: NegotiationsData, _, _) => manageNegotiations.run
         case (_, _: NormalData, _, _) => manageNegotiations.run
         case otherwise => manageOther.run
-      }
-
-      override def onProcess = {
-        case (_, _, _: CMDBestHeight) =>
-          // Need to update UI on each block
-          nullOnBecome(chan)
       }
     }
 

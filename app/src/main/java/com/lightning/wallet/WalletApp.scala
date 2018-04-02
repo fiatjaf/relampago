@@ -154,8 +154,8 @@ class WalletApp extends Application { me =>
     }
 
     val chainEventsListener = new TxTracker with BlocksListener {
-      override def txConfirmed(tx: Transaction) = for (chan <- notClosing) chan process CMDConfirmed(tx)
-      override def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
+      override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
+      override def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
       override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
 
       override def coinsSent(txj: Transaction) = {
@@ -163,13 +163,13 @@ class WalletApp extends Application { me =>
         // just assuming any incoming tx may contain it
 
         val spent = CMDSpent(txj)
-        bag.extractPreimg(spent.tx)
-        all.foreach(_ process spent)
+        bag.extractPreimage(spent.tx)
+        for (c <- all) c process spent
       }
 
       def tellHeight(left: Int) = runAnd(broadcaster.bestHeightObtained = true) {
-        // No matter how many blocks are left we only send a CMD once the last block is done
-        if (left < 1) for (chan <- all) chan process CMDBestHeight(broadcaster.currentHeight)
+        // No matter how many are left, we only send a CMD once the last block is done
+        if (left < 1) for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
       }
     }
 
@@ -177,20 +177,12 @@ class WalletApp extends Application { me =>
       def STORE(hasCommitmentsData: HasCommitments) = runAnd(hasCommitmentsData)(ChannelWrap put hasCommitmentsData)
       def SEND(msg: LightningMessage) = ConnectionManager.connections.get(data.announce).foreach(_.handler process msg)
 
-      def ONCOMMITSENT(c: Commitments) = db txWrap {
-        for (waitRevocation <- c.remoteNextCommitInfo.left) {
-          val htlcs = waitRevocation.nextRemoteCommit.spec.htlcs
-          for (Htlc(_, add) <- htlcs if add.amount >= c.localParams.revokedSaveTolerance)
-            bag.saveRevoked(add.hash160, add.expiry, waitRevocation.nextRemoteCommit.index)
-        }
-      }
-
       def CLOSEANDWATCH(cd: ClosingData) = {
         val commits = cd.localCommit.map(_.commitTx) ++ cd.remoteCommit.map(_.commitTx) ++ cd.nextRemoteCommit.map(_.commitTx)
         // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
         kit.watchScripts(commits.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
         // Ask server for child txs which spend our commit txs outputs and extract preimages from them
-        OlympusWrap.getChildTxs(commits).foreach(_ foreach bag.extractPreimg, Tools.errlog)
+        OlympusWrap.getChildTxs(commits).foreach(_ foreach bag.extractPreimage, Tools.errlog)
         BECOME(STORE(cd), CLOSING)
 
         val txs = for (tier12 <- cd.tier12States) yield tier12.txn
@@ -307,7 +299,7 @@ class WalletApp extends Application { me =>
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       // Passing bitcoinj listener ensures onChainDownloadStarted is called
       startBlocksDownload(ChannelManager.chainEventsListener)
-      // Try to clear act leftovers if not channels left
+      // Try to clear act leftovers if no channels left
       OlympusWrap tellClouds OlympusWrap.CMDStart
       PaymentInfoWrap.markFailedAndFrozen
       ChannelManager.initConnect

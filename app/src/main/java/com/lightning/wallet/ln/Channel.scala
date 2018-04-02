@@ -24,11 +24,18 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   private[this] val events = new ChannelListener {
     override def onError = { case malfunction => for (lst <- listeners if lst.onError isDefinedAt malfunction) lst onError malfunction }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
-    override def onProcess = { case incoming => for (lst <- listeners if lst.onProcess isDefinedAt incoming) lst onProcess incoming }
+
+    override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
+    override def fulfillReceived(ok: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived ok
+    override def sentSig(cs: Commitments) = for (lst <- listeners) lst sentSig cs
+    override def settled(cs: Commitments) = for (lst <- listeners) lst settled cs
+
+    override def chanCanBeRemoved(close: ClosingData) = for (lst <- listeners) lst chanCanBeRemoved close
+    override def txsShouldBeSent(close: ClosingData) = for (lst <- listeners) lst txsShouldBeSent close
+    override def gotBestHeight = for (lst <- listeners) lst.gotBestHeight
   }
 
   def SEND(msg: LightningMessage): Unit
-  def ONCOMMITSENT(c: Commitments): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def STORE(content: HasCommitments): HasCommitments
   def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
@@ -135,7 +142,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // Got a fulfill for an outgoing HTLC we have sent them earlier
         val c1 = Commitments.receiveFulfill(norm.commitments, fulfill)
         me UPDATA norm.copy(commitments = c1)
-
+        events fulfillReceived fulfill
 
       case (norm: NormalData, fail: UpdateFailHtlc, OPEN) =>
         // Got a failure for an outgoing HTLC we sent earlier
@@ -151,11 +158,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // We can send a new HTLC when channel is both operational and online
       case (norm: NormalData, rd: RoutingData, OPEN) if isOperational(me) =>
+        println("GOT ROUTING DATA")
         val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, rd)
         me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
-        // Important: CMD commands are continued with doProcess
-        // external messages are continued with process
-        process(CMDProceed)
+        events outPaymentAccepted rd
+        doProcess(CMDProceed)
 
 
       // We're fulfilling an HTLC we got earlier
@@ -198,21 +205,24 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val c1 \ commitSig = Commitments.sendCommit(norm.commitments, nextRemotePoint)
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 SEND commitSig
-        me ONCOMMITSENT c1
+        events sentSig c1
+
 
       case (norm: NormalData, sig: CommitSig, OPEN) =>
         // We received a commit sig from them, now we can update our local commit
         val c1 \ revokeAndAck = Commitments.receiveCommit(norm.commitments, sig)
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 SEND revokeAndAck
-        process(CMDProceed)
+        // Clear remote commit first
+        doProcess(CMDProceed)
+        events settled c1
 
 
       case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
         // We received a revocation because we sent a commit sig
         val c1 = Commitments.receiveRevocation(norm.commitments, rev)
         val d1 = me STORE norm.copy(commitments = c1)
-        me UPDATA d1 process CMDHTLCProcess
+        me UPDATA d1 doProcess CMDHTLCProcess
 
 
       case (norm: NormalData, CMDBestHeight(height), OPEN | OFFLINE)
@@ -240,7 +250,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val norm1 = norm.modify(_.remoteShutdown) setTo Some(remote)
         // We have their Shutdown so we add ours and start negotiations
         me startShutdown norm1
-        process(CMDProceed)
+        doProcess(CMDProceed)
 
 
       case (norm @ NormalData(_, commitments, our, their), CMDShutdown, OPEN) =>
@@ -256,7 +266,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val nope = Commitments.remoteHasUnsignedOutgoing(commitments)
         // Can't close cooperatively if they have unsigned outgoing HTLCs
         // we should clear our unsigned outgoing HTLCs and then start a shutdown
-        if (nope) startLocalClose(norm) else me UPDATA d1 process CMDProceed
+        if (nope) startLocalClose(norm) else me UPDATA d1 doProcess CMDProceed
 
 
       case (norm @ NormalData(_, _, None, their), CMDProceed, OPEN)
@@ -331,7 +341,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         BECOME(norm.copy(commitments = c1), OPEN)
         norm.localShutdown foreach SEND
-        process(CMDHTLCProcess)
+        doProcess(CMDHTLCProcess)
 
 
       // We may get this message any time so just save it here
@@ -466,8 +476,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case _ =>
     }
 
-    // Change has been successfully processed
-    events onProcess Tuple3(me, data, change)
+    Tuple2(data, change) match {
+      case (close: ClosingData, _: CMDBestHeight) if close.isOutdated => events chanCanBeRemoved close
+      case (close: ClosingData, _: CMDSpent | _: CMDBestHeight) => events txsShouldBeSent close
+      case (_, _: CMDBestHeight) => events.gotBestHeight
+      case _ =>
+    }
   }
 
   def sendFeeUpdate(norm: NormalData, updatedFeeRate: Long) =
@@ -584,16 +598,23 @@ object Channel {
 }
 
 trait ChannelListener {
-  def nullOnBecome(chan: Channel): Unit = {
+  def nullOnBecome(chan: Channel) = {
     // For listener to reload itself without affecting others
     val nullTransition = Tuple4(chan, chan.data, null, chan.state)
     if (onBecome isDefinedAt nullTransition) onBecome(nullTransition)
   }
 
   type Malfunction = (Channel, Throwable)
-  type Incoming = (Channel, ChannelData, Any)
   type Transition = (Channel, ChannelData, String, String)
   def onError: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
-  def onProcess: PartialFunction[Incoming, Unit] = none
+
+  def outPaymentAccepted(rd: RoutingData): Unit = none
+  def fulfillReceived(ok: UpdateFulfillHtlc): Unit = none
+  def sentSig(cs: Commitments): Unit = none
+  def settled(cs: Commitments): Unit = none
+
+  def chanCanBeRemoved(close: ClosingData): Unit = none
+  def txsShouldBeSent(close: ClosingData): Unit = none
+  def gotBestHeight: Unit = none
 }

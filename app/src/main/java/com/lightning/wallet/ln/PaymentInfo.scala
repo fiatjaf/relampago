@@ -210,5 +210,5 @@ trait PaymentInfoBag { me =>
   def updStatus(paymentStatus: Int, hash: BinaryData)
   def updOkOutgoing(fulfill: UpdateFulfillHtlc)
   def updOkIncoming(add: UpdateAddHtlc)
-  def extractPreimg(tx: Transaction)
+  def extractPreimage(tx: Transaction)
 }

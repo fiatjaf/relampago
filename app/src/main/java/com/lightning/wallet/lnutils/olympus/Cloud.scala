@@ -61,15 +61,13 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
     // We do not have any acts or tokens but have a memo
     case CloudData(Some(pr \ memo), _, _) \ CMDStart if isFree =>
-      // Our payment may still be in-flight or fulfilled or maybe failed already
+      // Payment may still be in-flight or fulfilled or maybe failed already
       val isInFlight = app.ChannelManager.activeInFlightHashes contains pr.paymentHash
+      val send = connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
 
       if (!isInFlight) {
-        // Assume that payment has been fulfilled and try to get some storage tokens from server
-        val send = connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
+        // Assume that payment has been fulfilled and try to obtain storage tokens
         val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
-
-        // Save fresh tokens if successful, try to reuse a payment request if not, clear memo data if expired
         val send2 = send1.map(memo.makeClearSigs).map(memo.packEverything).doOnCompleted(me doProcess CMDStart)
         send2.foreach(fresh => me BECOME data.copy(info = None, tokens = data.tokens ++ fresh), onError)
       }
@@ -77,7 +75,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       def onError(err: Throwable) = err.getMessage match {
         case "notfulfilled" => if (!pr.isFresh) me BECOME data.copy(info = None) else {
           // Delayed retry here since call may happen when app has just been opened and is offline
-          val send = retry(obsOnIO.flatMap(_ => me withRoutesAndOnionRDFromPR pr), pickInc, 4 to 5)
+          val send = retry(obsOnIO.flatMap(_ => me withRoutesAndOnionRDFromPR pr), pickInc, 6 to 7)
           val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
           send1.foreach(foeRD => app.ChannelManager.sendEither(foeRD, none), none)
         }
