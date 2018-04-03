@@ -72,23 +72,19 @@ object Helpers { me =>
         remoteScriptPubkey, Satoshi(0), Satoshi(0), commitments.localCommit.spec), commitments.localParams.fundingPrivKey.publicKey,
         commitments.remoteParams.fundingPubkey, "aa" * 71, "bb" * 71).tx)
 
-      // We don't need an extra high fee for a closing transaction so we offer an economical one
-      val closingFee = Scripts.weight2fee(commitments.localCommit.spec.feeratePerKw / 2, estimatedWeight)
+      val closingFee = Scripts.weight2fee(commitments.localCommit.spec.feeratePerKw, estimatedWeight)
       makeClosing(commitments, closingFee, localScriptPubkey, remoteScriptPubkey)
     }
 
-    def makeClosing(commitments: Commitments, closingFee: Satoshi,
-                    local: BinaryData, remote: BinaryData) = {
-
-      require(isValidFinalScriptPubkey(local), "Invalid localScriptPubkey")
-      require(isValidFinalScriptPubkey(remote), "Invalid remoteScriptPubkey")
-
+    def makeClosing(commitments: Commitments, closingFee: Satoshi, local: BinaryData, remote: BinaryData) = {
       val theirDustIsHigherThanOurs = commitments.localParams.dustLimit < commitments.remoteParams.dustLimitSat
       val dustLimit = if (theirDustIsHigherThanOurs) commitments.remoteParams.dustLimitSat else commitments.localParams.dustLimit
       val closing = makeFunderClosingTx(commitments.commitInput, local, remote, dustLimit, closingFee, commitments.localCommit.spec)
 
       val localClosingSig = Scripts.sign(closing, commitments.localParams.fundingPrivKey)
       val closingSigned = ClosingSigned(commitments.channelId, closingFee.amount, localClosingSig)
+      require(isValidFinalScriptPubkey(remote), "Invalid remoteScriptPubkey")
+      require(isValidFinalScriptPubkey(local), "Invalid localScriptPubkey")
       ClosingTxProposed(closing, closingSigned)
     }
 
@@ -123,14 +119,14 @@ object Helpers { me =>
         paymentInfo <- bag.getPaymentInfo(hash = info.add.paymentHash).toOption
         success = Scripts.addSigs(info, local, remote, paymentInfo.preimage)
         delayed <- Scripts checkSpendable makeClaimDelayedOutput(success.tx)
-        // First tx can be spent immediately, next one has CSV timeout
+      // First tx can be spent immediately, next one has CSV timeout
       } yield success -> delayed
 
       val allTimeoutTxs = for {
         HtlcTxAndSigs(info: HtlcTimeoutTx, local, remote) <- commitments.localCommit.htlcTxsAndSigs
         timeout = Scripts.addSigs(htlcTimeoutTx = info, localSig = local, remoteSig = remote)
         delayed <- Scripts checkSpendable makeClaimDelayedOutput(timeout.tx)
-        // First tx has CLTV timeout, next one has CSV timeout
+      // First tx has CLTV timeout, next one has CSV timeout
       } yield timeout -> delayed
 
       val claimMainDelayedTx = Scripts.checkSpendable {
