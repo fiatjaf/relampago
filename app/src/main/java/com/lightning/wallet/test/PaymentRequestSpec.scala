@@ -156,7 +156,7 @@ class PaymentRequestSpec {
       assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
       assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
-      assert(pr.description == Left(Crypto.sha256("One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon".getBytes)))
+      assert(pr.description == Crypto.sha256("One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon".getBytes).toString)
       assert(pr.minFinalCltvExpiry == Some(12))
       assert(pr.tags.size == 4)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
