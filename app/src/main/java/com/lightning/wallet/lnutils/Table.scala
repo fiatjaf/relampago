@@ -16,7 +16,6 @@ object OlympusTable extends Table {
   val newSql = s"INSERT OR IGNORE INTO $table ($identifier, $url, $data, $auth, $order, $removable) VALUES (?, ?, ?, ?, ?, ?)"
   val updMetaSql = s"UPDATE $table SET $url = ?, $auth = ?, $order = ? WHERE $identifier = ?"
   val updDataSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
-  val upgradeSql = s"UPDATE $table SET $url = ? WHERE $identifier = ?"
   val selectAllSql = s"SELECT * FROM $table ORDER BY $order ASC"
   val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
@@ -44,34 +43,31 @@ object ChannelTable extends Table {
 }
 
 object BadEntityTable extends Table {
-  val Tuple5(table, resId, targetNode, expire, amount) = Tuple5("badentity", "resId", "targetNode", "expire", "amount")
-  val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $amount <= ? AND $targetNode IN (?, ?) ORDER BY $id DESC"
+  val (table, resId, targetNode, expire, amount) = ("badentity", "resId", "targetNode", "expire", "amount")
+  val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $amount <= ? AND $targetNode IN (?, ?) LIMIT 320"
   val newSql = s"INSERT OR IGNORE INTO $table ($resId, $targetNode, $expire, $amount) VALUES (?, ?, ?, ?)"
   val updSql = s"UPDATE $table SET $expire = ?, $amount = ? WHERE $resId = ? AND $targetNode = ?"
 
   val createSql = s"""
     CREATE TABLE $table (
-      $id INTEGER PRIMARY KEY AUTOINCREMENT, $resId STRING NOT NULL, $targetNode STRING NOT NULL,
-      $expire INTEGER NOT NULL, $amount INTEGER NOT NULL, UNIQUE($resId, $targetNode) ON CONFLICT IGNORE
-    );
-    CREATE INDEX idx1 ON $table ($expire, $amount, $targetNode);
-    CREATE INDEX idx2 ON $table ($resId, $targetNode);
+      $id INTEGER PRIMARY KEY AUTOINCREMENT,
+      $resId STRING NOT NULL, $targetNode STRING NOT NULL, $expire INTEGER NOT NULL,
+      $amount INTEGER NOT NULL, UNIQUE($resId, $targetNode) ON CONFLICT IGNORE
+    ); CREATE INDEX idx1$table ON $table ($expire, $amount, $targetNode);
     COMMIT"""
 }
 
 object PaymentTable extends Table {
-  val (table, search, limit) = ("payment", "search", 24)
-  val Tuple10(pr, preimage, incoming, status, stamp, description, hash, firstMsat, lastMsat, lastExpiry) =
-    ("pr", "preimage", "incoming", "status", "stamp", "description", "hash", "firstMsat", "lastMsat", "lastExpiry")
-
-  // Inserting
+  val (search, limit) = ("search", 24)
+  val (table, pr, preimage, incoming, status, stamp) = ("payment", "pr", "preimage", "incoming", "status", "stamp")
+  val (description, hash, firstMsat, lastMsat, lastExpiry) = ("description", "hash", "firstMsat", "lastMsat", "lastExpiry")
+  val insert10 = s"$pr, $preimage, $incoming, $status, $stamp, $description, $hash, $firstMsat, $lastMsat, $lastExpiry"
+  val newSql = s"INSERT OR IGNORE INTO $table ($insert10) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
-  val newSql = s"""INSERT OR IGNORE INTO $table ($pr, $preimage, $incoming, $status, $stamp,
-    $description, $hash, $firstMsat, $lastMsat, $lastExpiry) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"""
 
-  // Selecting
+  // Selecting: no need for `hash` and `id` indexes because system autogenerates those
+  val selectRecentSql = s"SELECT * FROM $table WHERE $status IN ($WAITING, $SUCCESS, $FAILURE, $FROZEN) ORDER BY $id DESC LIMIT $limit"
   val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT $limit)"
-  val selectRecentSql = s"SELECT * FROM $table WHERE $status <> $HIDDEN ORDER BY $id DESC LIMIT $limit"
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
   // Updating, creating
@@ -87,12 +83,11 @@ object PaymentTable extends Table {
 
   val createSql = s"""
     CREATE TABLE $table (
-      $id INTEGER PRIMARY KEY AUTOINCREMENT, $pr STRING NOT NULL, $preimage STRING NOT NULL,
-      $incoming INTEGER NOT NULL, $status INTEGER NOT NULL, $stamp INTEGER NOT NULL, $description STRING NOT NULL,
-      $hash STRING UNIQUE NOT NULL, $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL
-    );
-    CREATE INDEX idx1 ON $table ($status);
-    CREATE INDEX idx2 ON $table ($hash);
+      $id INTEGER PRIMARY KEY AUTOINCREMENT, $pr STRING NOT NULL,
+      $preimage STRING NOT NULL,$incoming INTEGER NOT NULL, $status INTEGER NOT NULL,
+      $stamp INTEGER NOT NULL, $description STRING NOT NULL, $hash STRING UNIQUE NOT NULL,
+      $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL
+    ); CREATE INDEX idx1$table ON $table ($status);
     COMMIT"""
 }
 
@@ -105,15 +100,14 @@ object RevokedTable extends Table {
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $h160 STRING NOT NULL,
       $expiry INTEGER NOT NULL, $number INTEGER NOT NULL
-    );
-    CREATE INDEX idx1 ON $table ($number);
+    ); CREATE INDEX idx1$table ON $table ($number);
     COMMIT"""
 }
 
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class CipherOpenHelper(context: Context, name: String, secret: String)
-extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
+  extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
 
   SQLiteDatabase loadLibs context
   val base = getWritableDatabase(secret)
@@ -136,9 +130,7 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     dbs execSQL RevokedTable.createSql
 
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val main1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9003", emptyData, "1", "0", "0")
-    val main2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9003", emptyData, "0", "1", "1")
-    dbs.execSQL(OlympusTable.newSql, main1)
-    dbs.execSQL(OlympusTable.newSql, main2)
+    val test1: Array[AnyRef] = Array("test-server-1", "http://192.210.203.16:9003", emptyData, "1", "0", "0")
+    dbs.execSQL(OlympusTable.newSql, test1)
   }
 }
