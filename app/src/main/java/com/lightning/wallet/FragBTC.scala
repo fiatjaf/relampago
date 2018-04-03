@@ -295,7 +295,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     lst addHeaderView detailsWrapper
 
     outside setOnClickListener onButtonTap {
-      val smartbit = "https://testnet.smartbit.com.au/tx/"
+      val smartbit = "https://smartbit.com.au/tx/"
       val uri = Uri.parse(smartbit + wrap.tx.getHashAsString)
       host startActivity new Intent(Intent.ACTION_VIEW, uri)
     }

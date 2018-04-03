@@ -19,11 +19,11 @@
         android:normalScreens="true"/>
 
     <application
-        android:label="Testnet"
+        android:label="Bitcoin"
         android:name="WalletApp"
         android:allowBackup="false"
         android:fullBackupContent="false"
-        android:icon="@drawable/ic_launcher_testnet">
+        android:icon="@drawable/ic_launcher">
 
         <receiver
             android:process=":remote"

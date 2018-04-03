@@ -264,7 +264,7 @@
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Pending refunds</font><br>]]></string>
-    <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://testnet.smartbit.com.au/tx/%1$s>View closing status</a><br>%2$s<br>%3$s fee]]></string>
+    <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://smartbit.com.au/tx/%1$s>View closing status</a><br>%2$s<br>%3$s fee]]></string>
 
     <string name="ln_ops_unilateral_you"><![CDATA[<font color=#999999><i>by your wallet</i></font>]]></string>
     <string name="ln_ops_unilateral_peer"><![CDATA[<font color=#999999><i>by remote peer</i></font>]]></string>

@@ -136,7 +136,9 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     dbs execSQL RevokedTable.createSql
 
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val test1: Array[AnyRef] = Array("test-server-1", "http://192.210.203.16:9003", emptyData, "1", "0", "0")
-    dbs.execSQL(OlympusTable.newSql, test1)
+    val main1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9003", emptyData, "1", "0", "0")
+    val main2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9003", emptyData, "0", "1", "1")
+    dbs.execSQL(OlympusTable.newSql, main1)
+    dbs.execSQL(OlympusTable.newSql, main2)
   }
 }
