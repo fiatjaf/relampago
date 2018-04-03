@@ -118,9 +118,9 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         onFail(host getString code)
 
       case chan \ error =>
-        // Display stack trace to user
         val content = UncaughtHandler toText error
-        showForm(negTextBuilder(dialog_ok, content).create)
+        val dlg = negTextBuilder(dialog_ok, content)
+        UITask(host showForm dlg.create).run
     }
 
     override def onBecome = {
