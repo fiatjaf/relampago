@@ -44,12 +44,13 @@ object LNParams { me =>
     fee > 10000 * (hops + 1) + msat / 20
 
   // On-chain fee calculations
-  def shouldUpdateFee(oldPerKw: Long, newPerKw: Long) = {
-    val mismatch = (newPerKw - oldPerKw) / (oldPerKw + newPerKw)
-    math.abs(2.0 * mismatch) > 0.25
-  }
+  def shouldUpdateFee(network: Long, commit: Long) = {
+    val mismatch = 2.0 * (network - commit) / (commit + network)
 
-  // MISC
+    if (mismatch < -0.25 && mismatch > -0.95) true
+    else if (mismatch > 0.25 && mismatch < 0.95) true
+    else false
+  }
 
   def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (n <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: n :: Nil)

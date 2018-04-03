@@ -50,8 +50,8 @@ object LocalBroadcaster extends Broadcaster {
 
     case (chan, norm: NormalData, OFFLINE, OPEN) =>
       // Check for fee changes once when channel becomes online
-      val currentFee = norm.commitments.localCommit.spec.feeratePerKw
-      val shouldUpdate = LNParams.shouldUpdateFee(currentFee, ratePerKwSat)
+      val commitFee = norm.commitments.localCommit.spec.feeratePerKw
+      val shouldUpdate = LNParams.shouldUpdateFee(ratePerKwSat, commitFee)
       if (shouldUpdate) chan.sendFeeUpdate(norm, ratePerKwSat)
   }
 }
