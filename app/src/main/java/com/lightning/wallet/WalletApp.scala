@@ -14,6 +14,7 @@ import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
+import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
 import com.lightning.wallet.ln.crypto.Sphinx.PublicKeyVec
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.wallet.lnutils.olympus.OlympusWrap
@@ -230,8 +231,13 @@ class WalletApp extends Application { me =>
 
       val routesObs = if (rd.pr.routingInfo.isEmpty) getRoutes(rd.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
       // Update RD with routes and then we can make an onion out of the first available cheapest route while saving the rest
-      // remote call may return empty route here in which case `noRouteLeft` will be fired later
-      for (routes <- routesObs) yield useFirstRoute(routes.sortBy(_.size), rd)
+      for (routes <- routesObs) yield useFirstRoute(sortByPathAndInFlight(routes), rd)
+    }
+
+    def sortByPathAndInFlight(routes: PaymentRouteVec) = {
+      // Runtime optimization: prioritize routes of shorter length and fewer pending payments in target channels
+      val chanMap = notClosingOrRefunding.map(c => c.data.announce.nodeId -> inFlightOutgoingHtlcs(c).size).toMap
+      routes.sortBy(route => route.headOption.flatMap(hop => chanMap get hop.nodeId).getOrElse(0) + route.size)
     }
 
     def send(rd: RoutingData, noRouteLeft: RoutingData => Unit): Unit = {

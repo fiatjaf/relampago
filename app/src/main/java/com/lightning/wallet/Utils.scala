@@ -143,8 +143,10 @@ trait TimerActivity extends AppCompatActivity { me =>
     alertDialog setCanceledOnTouchOutside false
     alertDialog.getWindow.getAttributes.windowAnimations = R.style.SlidingDialog
     // This may be called after a host activity is destroyed and thus it may throw
-    try alertDialog.show catch none finally if (scrWidth > 2.3) alertDialog.getWindow
-      .setLayout(maxDialog.toInt, WRAP_CONTENT)
+
+    try alertDialog.show catch none finally if (scrWidth > 2.3) {
+      alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
+    }
 
     alertDialog
   }
@@ -237,7 +239,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   def viewMnemonic(view: View) = {
     def showCode(seed: DeterministicSeed): Unit = {
       val recoveryCode = TextUtils.join("\u0020", seed.getMnemonicCode)
-      showForm(negBuilder(dialog_ok, recoveryCode, null).create)
+      showForm(negBuilder(dialog_ok, me getString sets_mnemonic, recoveryCode).create)
     }
 
     def encShowCode(pass: String) = <(app.kit decryptSeed pass, onFail)(showCode)

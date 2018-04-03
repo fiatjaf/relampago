@@ -59,7 +59,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
   def markFailedAndFrozen = db txWrap {
-    db change PaymentTable.updFailAllWaitingSql
+    db change PaymentTable.updFailWaitingSql
     for (hash <- app.ChannelManager.activeInFlightHashes) updStatus(WAITING, hash)
     for (hash <- app.ChannelManager.frozenInFlightHashes) updStatus(FROZEN, hash)
   }

@@ -3,7 +3,8 @@ package com.lightning.wallet.lnutils
 import spray.json._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-import com.lightning.wallet.ln.Tools.{random, runAnd, none}
+
+import com.lightning.wallet.ln.Tools.{runAnd, none}
 import com.lightning.wallet.lnutils.olympus.CloudData
 import net.sqlcipher.database.SQLiteDatabase
 import android.content.Context
@@ -77,7 +78,7 @@ object PaymentTable extends Table {
   val updLastParamsSql = s"UPDATE $table SET $status = $WAITING, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ? WHERE $hash = ?"
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ? WHERE $hash = ?"
-  val updFailAllWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
+  val updFailWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
 
   val createVSql = s"""
@@ -134,13 +135,8 @@ extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
     dbs execSQL OlympusTable.createSql
     dbs execSQL RevokedTable.createSql
 
-    // Randomize an order of two available default servers
-    val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val dev1: Array[AnyRef] = Array("dev-server-1", "https://a.lightning-wallet.com:9003", emptyData, "1", ord1, "0")
-    val dev2: Array[AnyRef] = Array("dev-server-2", "https://b.lightning-wallet.com:9003", emptyData, "0", ord2, "1")
-
-    dbs.execSQL(OlympusTable.newSql, dev1)
-    dbs.execSQL(OlympusTable.newSql, dev2)
+    val test1: Array[AnyRef] = Array("test-server-1", "http://192.210.203.16:9003", emptyData, "1", "0", "0")
+    dbs.execSQL(OlympusTable.newSql, test1)
   }
 }
