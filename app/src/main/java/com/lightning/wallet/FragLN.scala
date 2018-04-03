@@ -116,6 +116,11 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       case _ \ CMDAddExcept(_, code) =>
         // Display detailed description
         onFail(host getString code)
+
+      case chan \ error =>
+        // Display stack trace to user
+        val content = UncaughtHandler toText error
+        showForm(negTextBuilder(dialog_ok, content).create)
     }
 
     override def onBecome = {
