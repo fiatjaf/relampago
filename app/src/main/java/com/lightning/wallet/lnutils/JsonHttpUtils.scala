@@ -49,9 +49,11 @@ object RatesSaver {
 }
 
 case class Rates(feeHistory: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
-  // Testnet was not accepting  transaction with too low fee so use some hard min
+  // Testnet was not accepting transactions with too low fee so use some hard min
 
-  private[this] val min = Coin valueOf 6000L
-  private[this] val average: Coin = btcBigDecimal2MSat(feeHistory.sum / feeHistory.size)
-  val feeLive = if (feeHistory.isEmpty) DEFAULT_TX_FEE else if (average isLessThan min) min else average
+  private[this] val minAllowedFee = Coin valueOf 6000L
+  val feeLive = if (feeHistory.isEmpty) DEFAULT_TX_FEE else {
+    val averageFee: Coin = btcBigDecimal2MSat(feeHistory.sum / feeHistory.size)
+    if (averageFee isLessThan minAllowedFee) minAllowedFee else averageFee
+  }
 }
