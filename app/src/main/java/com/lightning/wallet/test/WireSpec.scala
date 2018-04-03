@@ -48,9 +48,9 @@ class WireSpec {
 
       val color = (47.toByte, 255.toByte, 142.toByte)
       val bin = rgb.encode(color).toOption.get
-      println(bin == hex"2f ff 8e".toBitVector)
+      assert(bin == hex"2f ff 8e".toBitVector)
       val color2 = rgb.decode(bin).toOption.get.value
-      println(color == color2)
+      assert(color == color2)
     }
 
     {
@@ -60,17 +60,17 @@ class WireSpec {
         val ipv4addr = InetAddress.getByAddress(Array[Byte](192.toByte, 168.toByte, 1.toByte, 42.toByte))
         val isa = new InetSocketAddress(ipv4addr, 4231)
         val bin = socketaddress.encode(isa).toOption.get
-        println(bin == hex"01 C0 A8 01 2A 10 87".toBitVector)
+        assert(bin == hex"01 C0 A8 01 2A 10 87".toBitVector)
         val isa2 = socketaddress.decode(bin).toOption.get.value
-        println(isa == isa2)
+        assert(isa == isa2)
       }
       {
         val ipv6addr = InetAddress.getByAddress(hex"2001 0db8 0000 85a3 0000 0000 ac1f 8001".toArray)
         val isa = new InetSocketAddress(ipv6addr, 4231)
         val bin = socketaddress.encode(isa).toOption.get
-        println(bin == hex"02 2001 0db8 0000 85a3 0000 0000 ac1f 8001 1087".toBitVector)
+        assert(bin == hex"02 2001 0db8 0000 85a3 0000 0000 ac1f 8001 1087".toBitVector)
         val isa2 = socketaddress.decode(bin).toOption.get.value
-        println(isa == isa2)
+        assert(isa == isa2)
       }
     }
 
@@ -80,7 +80,7 @@ class WireSpec {
       val sig = randomSignature
       val wire = LightningMessageCodecs.signature.encode(sig).toOption.get
       val sig1 = LightningMessageCodecs.signature.decode(wire).toOption.get.value
-      println(sig1 == sig)
+      assert(sig1 == sig)
     }
 
     {
@@ -88,9 +88,9 @@ class WireSpec {
 
       val value = Scalar(randomBytes(32))
       val wire = LightningMessageCodecs.scalar.encode(value).toOption.get
-      println(wire.length == 256)
+      assert(wire.length == 256)
       val value1 = LightningMessageCodecs.scalar.decode(wire).toOption.get.value
-      println(value1 == value)
+      assert(value1 == value)
     }
 
     {
@@ -98,9 +98,9 @@ class WireSpec {
 
       val value = Scalar(randomBytes(32)).toPoint
       val wire = LightningMessageCodecs.point.encode(value).toOption.get
-      println(wire.length == 33 * 8)
+      assert(wire.length == 33 * 8)
       val value1 = LightningMessageCodecs.point.decode(wire).toOption.get.value
-      println(value1 == value)
+      assert(value1 == value)
     }
 
     {
@@ -108,9 +108,9 @@ class WireSpec {
 
       val value = PrivateKey(randomBytes(32), true).publicKey
       val wire = LightningMessageCodecs.publicKey.encode(value).toOption.get
-      println(wire.length == 33 * 8)
+      assert(wire.length == 33 * 8)
       val value1 = LightningMessageCodecs.publicKey.decode(wire).toOption.get.value
-      println(value1 == value)
+      assert(value1 == value)
     }
 
     {
@@ -121,22 +121,22 @@ class WireSpec {
       {
         val alias = "IRATEMONK"
         val bin = c.encode(alias).toOption.get
-        println(bin == BitVector(alias.getBytes("UTF-8") ++ Array.fill[Byte](32 - alias.size)(0)))
+        assert(bin == BitVector(alias.getBytes("UTF-8") ++ Array.fill[Byte](32 - alias.size)(0)))
         val alias2 = c.decode(bin).toOption.get.value
-        println(alias == alias2)
+        assert(alias == alias2)
       }
 
       {
         val alias = "this-alias-is-exactly-32-B-long."
         val bin = c.encode(alias).toOption.get
-        println(bin == BitVector(alias.getBytes("UTF-8") ++ Array.fill[Byte](32 - alias.size)(0)))
+        assert(bin == BitVector(alias.getBytes("UTF-8") ++ Array.fill[Byte](32 - alias.size)(0)))
         val alias2 = c.decode(bin).toOption.get.value
-        println(alias == alias2)
+        assert(alias == alias2)
       }
 
       {
         val alias = "this-alias-is-far-too-long-because-we-are-limited-to-32-bytes"
-        println(c.encode(alias).isFailure)
+        assert(c.encode(alias).isFailure)
       }
     }
 
@@ -172,7 +172,7 @@ class WireSpec {
       msgs.foreach { msg => {
           val encoded = lightningMessageCodec.encode(msg)
           val decoded = encoded.flatMap(lightningMessageCodec.decode)
-          println(msg == decoded.toOption.get.value)
+        assert(msg == decoded.toOption.get.value)
         }
       }
     }
@@ -181,17 +181,17 @@ class WireSpec {
       println("encode/decode per-hop payload")
       val payload = PerHopPayload(shortChannelId = 42, amtToForward = 142000, outgoingCltv = 500000)
       val bin = LightningMessageCodecs.perHopPayloadCodec.encode(payload).require
-      println(bin.toByteVector.size == 33)
+      assert(bin.toByteVector.size == 33)
       val payload1 = LightningMessageCodecs.perHopPayloadCodec.decode(bin).require.value
-      println(payload == payload1)
+      assert(payload == payload1)
 
       // realm (the first byte) should be 0
       val bin1 = bin.toByteVector.update(0, 1)
       try {
         val payload2 = LightningMessageCodecs.perHopPayloadCodec.decode(bin1.toBitVector).require.value
-        println(payload2 == payload1)
+        assert(payload2 == payload1)
       } catch {
-        case e: Throwable => println(true)
+        case e: Throwable => assert(true)
       }
     }
   }

@@ -68,7 +68,7 @@ class ShaChainSpec {
 
   def generateHashes = {
     val result = for (i <- 0 until 50) yield ShaChain.shaChainFromSeed(seed, largestIndex - i)
-    println("generateHashes: " + byteSeqsEqual(expected, result))
+    assert(byteSeqsEqual(expected, result))
   }
 
   def receiveHashes = {
@@ -76,17 +76,17 @@ class ShaChainSpec {
 
     for (i <- 0 until 100) {
       receiver = ShaChain.addHash(receiver, ShaChain.shaChainFromSeed(seed, largestIndex - i), largestIndex - i)
-      println("receiveHashes knownHashes.size <= 64: " + (receiver.hashes.size <= 64))
+      assert(receiver.hashes.size <= 64)
 
       var j: Long = ShaChain.largestIndex - i
       while (j != ShaChain.largestIndex) {
         val ho = ShaChain.getHash(receiver.hashes)(ShaChain moves j)
-        println("receiveHashes ho.isDefined: " + ho.isDefined)
+        assert(ho.isDefined)
         val k = (ShaChain.largestIndex - j).toInt
         if (k < 50) println("receiveHashes sameElements: " + ho.map(ho1 => java.util.Arrays.equals(expected(k), ho1)) )
         j = j + 1
       }
-      println("receiveHashes final: " + ShaChain.getHash(receiver.hashes)(ShaChain moves ShaChain.largestIndex - i - 1).isEmpty)
+      assert(ShaChain.getHash(receiver.hashes)(ShaChain moves ShaChain.largestIndex - i - 1).isEmpty)
     }
 
     import spray.json._

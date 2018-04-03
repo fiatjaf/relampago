@@ -60,24 +60,24 @@ class AnnouncementsSpec {
       val node1_priv = PrivateKey("5f447b05d86de82de6b245a65359d22f844ae764e2ae3824ac4ace7d8e1c749b01")
       val node2_priv = PrivateKey("eff467c5b601fdcc07315933767013002cd0705223d8e526cbb0c1bc75ccb62901")
       // NB: node1 < node2 (public keys)
-      println(isNode1(node1_priv.publicKey.toBin, node2_priv.publicKey.toBin))
-      println(!isNode1(node2_priv.publicKey.toBin, node1_priv.publicKey.toBin))
+      assert(isNode1(node1_priv.publicKey.toBin, node2_priv.publicKey.toBin))
+      assert(!isNode1(node2_priv.publicKey.toBin, node1_priv.publicKey.toBin))
       val channelUpdate1 = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node1_priv, node2_priv.publicKey, 0, 0, 0, 0, 0, isEnabled = true, System.currentTimeMillis / 1000)
       val channelUpdate1_disabled = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node1_priv, node2_priv.publicKey, 0, 0, 0, 0, 0, isEnabled = false, System.currentTimeMillis / 1000)
       val channelUpdate2 = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node2_priv, node1_priv.publicKey, 0, 0, 0, 0, 0, isEnabled = true, System.currentTimeMillis / 1000)
       val channelUpdate2_disabled = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node2_priv, node1_priv.publicKey, 0, 0, 0, 0, 0, isEnabled = false, System.currentTimeMillis / 1000)
-      println(channelUpdate1.flags == BinaryData("0000")) // ....00
-      println(channelUpdate1_disabled.flags == BinaryData("0002")) // ....10
-      println(channelUpdate2.flags == BinaryData("0001")) // ....01
-      println(channelUpdate2_disabled.flags == BinaryData("0003")) // ....11
-      println(isNode1(channelUpdate1.flags))
-      println(isNode1(channelUpdate1_disabled.flags))
-      println(!isNode1(channelUpdate2.flags))
-      println(!isNode1(channelUpdate2_disabled.flags))
-      println(!isDisabled(channelUpdate1.flags))
-      println(isDisabled(channelUpdate1_disabled.flags))
-      println(!isDisabled(channelUpdate2.flags))
-      println(isDisabled(channelUpdate2_disabled.flags))
+      assert(channelUpdate1.flags == BinaryData("0000")) // ....00
+      assert(channelUpdate1_disabled.flags == BinaryData("0002")) // ....10
+      assert(channelUpdate2.flags == BinaryData("0001")) // ....01
+      assert(channelUpdate2_disabled.flags == BinaryData("0003")) // ....11
+      assert(isNode1(channelUpdate1.flags))
+      assert(isNode1(channelUpdate1_disabled.flags))
+      assert(!isNode1(channelUpdate2.flags))
+      assert(!isNode1(channelUpdate2_disabled.flags))
+      assert(!isDisabled(channelUpdate1.flags))
+      assert(isDisabled(channelUpdate1_disabled.flags))
+      assert(!isDisabled(channelUpdate2.flags))
+      assert(isDisabled(channelUpdate2_disabled.flags))
     }
 
   }
