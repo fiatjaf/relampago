@@ -19,7 +19,7 @@
             android:layout_width="wrap_content"/>
 
         <com.hootsuite.nachos.NachoTextView
-            app:chipTextColor="@android:color/white"
+            app:chipTextColor="#FFFFFFFF"
             app:chipVerticalSpacing="2dp"
             app:chipBackground="#656565"
             app:chipTextSize="18sp"
@@ -49,7 +49,6 @@
             style="@style/MarginInfo"
             android:onClick="recWallet"
             android:id="@+id/restoreWallet"
-            android:layout_marginTop="25dp"
             android:layout_width="wrap_content"
             android:text="@string/wallet_restore"
             android:enabled="false"/>
