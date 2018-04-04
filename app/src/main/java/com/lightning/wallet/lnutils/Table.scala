@@ -3,8 +3,7 @@ package com.lightning.wallet.lnutils
 import spray.json._
 import com.lightning.wallet.ln.PaymentInfo._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
-
-import com.lightning.wallet.ln.Tools.{runAnd, none}
+import com.lightning.wallet.ln.Tools.{random, runAnd, none}
 import com.lightning.wallet.lnutils.olympus.CloudData
 import net.sqlcipher.database.SQLiteDatabase
 import android.content.Context
@@ -129,8 +128,13 @@ class CipherOpenHelper(context: Context, name: String, secret: String)
     dbs execSQL OlympusTable.createSql
     dbs execSQL RevokedTable.createSql
 
+    // Randomize an order of two available default servers
+    val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val test1: Array[AnyRef] = Array("test-server-1", "http://192.210.203.16:9003", emptyData, "1", "0", "0")
-    dbs.execSQL(OlympusTable.newSql, test1)
+    val dev1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9103", emptyData, "1", ord1, "0")
+    val dev2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9103", emptyData, "0", ord2, "1")
+
+    dbs.execSQL(OlympusTable.newSql, dev1)
+    dbs.execSQL(OlympusTable.newSql, dev2)
   }
 }
