@@ -57,7 +57,7 @@ object Utils {
   var denom: Denomination = _
   var fiatName: String = _
 
-  val fileName = "Bitcoin"
+  val fileName = "Testnet"
   val dbFileName = s"$fileName.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
@@ -287,10 +287,10 @@ trait TimerActivity extends AppCompatActivity { me =>
     }
 
     def plainRequest(selectedFee: Coin) = {
-      // Unsigned request with all inputs assembled
-      val request = pay getRequestWithFee selectedFee
-      app.kit.wallet assembleTx request
-      request
+      val unsignedRequestWithFee = pay.getRequest
+      unsignedRequestWithFee.feePerKb = selectedFee
+      app.kit.wallet assembleTx unsignedRequestWithFee
+      unsignedRequestWithFee
     }
 
     def encRequest(pass: String)(selectedFee: Coin) = {
@@ -360,15 +360,9 @@ class RateManager(extra: String, val content: View) { me =>
 trait PayData {
   // Emptying a wallet needs special handling
   def isAll = app.kit.conf1Balance equals cn
+  def getRequest: SendRequest
   def onClick: Unit
   def cn: Coin
-
-  def getRequest: SendRequest
-  def getRequestWithFee(fee: Coin) = {
-    val basicRequestWithFee = getRequest
-    basicRequestWithFee.feePerKb = fee
-    basicRequestWithFee
-  }
 
   def destination: String
   def cute(direction: String) = {

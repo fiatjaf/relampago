@@ -41,17 +41,10 @@ class LNStartFundActivity extends TimerActivity { me =>
     setContentView(R.layout.activity_ln_start_fund)
 
     app.TransData.value match {
-      case (announce: NodeAnnouncement, num: Int) =>
-        // We've got this announcement from a search list
-        proceed(app.plurOrZero(chansNumber, num), announce)
-
-      case announce: NodeAnnouncement =>
-        // We've got this announcement from qr
-        proceed(chansNumber.last, announce)
-
-      case _ =>
-        // Nothing
-        finish
+      // We may get peer info either from built-in list of from user scanned qr code
+      case (ann: NodeAnnouncement, num: Int) => proceed(app.plurOrZero(chansNumber, num), ann)
+      case ann: NodeAnnouncement => proceed(chansNumber.last, ann)
+      case _ => finish
     }
 
     app.TransData.value = null
