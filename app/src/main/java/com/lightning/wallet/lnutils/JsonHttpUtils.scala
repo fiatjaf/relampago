@@ -27,11 +27,14 @@ object JsonHttpUtils {
   }
 
   def obsOnIO = Obs just null subscribeOn IOScheduler.apply
+  def repeat[T](obs: Obs[T], pick: (Unit, Int) => Duration, times: Range) =
+    obs.repeatWhen(_.zipWith(Obs from times)(pick) flatMap Obs.timer)
+
   def retry[T](obs: Obs[T], pick: (Throwable, Int) => Duration, times: Range) =
     obs.retryWhen(_.zipWith(Obs from times)(pick) flatMap Obs.timer)
 
   def to[T : JsonFormat](raw: String): T = raw.parseJson.convertTo[T]
-  def pickInc(error: Throwable, next: Int) = next.seconds
+  def pickInc(errorOrUnit: Any, next: Int) = next.seconds
 }
 
 object RatesSaver {
@@ -51,7 +54,7 @@ object RatesSaver {
 case class Rates(feeHistory: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
   // Testnet was not accepting transactions with too low fee so use some hard min
 
-  private[this] val minAllowedFee = Coin valueOf 6000L
+  private[this] val minAllowedFee = Coin valueOf 5000L
   val feeLive = if (feeHistory.isEmpty) DEFAULT_TX_FEE else {
     val averageFee: Coin = btcBigDecimal2MSat(feeHistory.sum / feeHistory.size)
     if (averageFee isLessThan minAllowedFee) minAllowedFee else averageFee

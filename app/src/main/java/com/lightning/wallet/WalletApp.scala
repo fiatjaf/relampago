@@ -12,6 +12,7 @@ import com.lightning.wallet.ln.Tools._
 import com.lightning.wallet.ln.Channel._
 import com.lightning.wallet.ln.LNParams._
 import com.lightning.wallet.ln.PaymentInfo._
+import com.lightning.wallet.lnutils.JsonHttpUtils._
 import com.lightning.wallet.lnutils.ImplicitJsonFormats._
 import com.lightning.wallet.lnutils.ImplicitConversions._
 import com.lightning.wallet.ln.RoutingInfoTag.PaymentRouteVec
@@ -181,9 +182,8 @@ class WalletApp extends Application { me =>
       def CLOSEANDWATCH(cd: ClosingData) = {
         val commits = cd.localCommit.map(_.commitTx) ++ cd.remoteCommit.map(_.commitTx) ++ cd.nextRemoteCommit.map(_.commitTx)
         // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
+        repeat(OlympusWrap getChildTxs commits, pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, Tools.errlog)
         kit.watchScripts(commits.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
-        // Ask server for child txs which spend our commit txs outputs and extract preimages from them
-        OlympusWrap.getChildTxs(commits).foreach(_ foreach bag.extractPreimage, Tools.errlog)
         BECOME(STORE(cd), CLOSING)
 
         val txs = for (tier12 <- cd.tier12States) yield tier12.txn

@@ -47,8 +47,8 @@ object LNParams { me =>
   def shouldUpdateFee(network: Long, commit: Long) = {
     val mismatch = 2.0 * (network - commit) / (commit + network)
 
-    if (mismatch < -0.25 && mismatch > -0.95) true
-    else if (mismatch > 0.25 && mismatch < 0.95) true
+    if (mismatch < -0.25 && mismatch > -1) true
+    else if (mismatch > 0.25 && mismatch < 1) true
     else false
   }
 
