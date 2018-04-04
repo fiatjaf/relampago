@@ -41,7 +41,7 @@ object LNParams { me =>
   }
 
   def isFeeNotOk(msat: Long, fee: Long, hops: Int) =
-    fee > 10000 * (hops + 1) + msat / 20
+    fee > 10000 * (hops + 1) + msat / 25
 
   // On-chain fee calculations
   def shouldUpdateFee(network: Long, commit: Long) = {
