@@ -1,9 +1,9 @@
 package org.bitcoinj.core
 
-import com.lightning.wallet.ln._
-import com.lightning.wallet.Utils._
+import com.lightning.walletapp.ln._
+import com.lightning.walletapp.Utils._
 import scala.collection.JavaConverters._
-import com.lightning.wallet.{AddrData, P2WSHData}
+import com.lightning.walletapp.{AddrData, P2WSHData}
 import org.bitcoinj.wallet.WalletTransaction.Pool.{UNSPENT, SPENT, PENDING}
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import scala.util.Try

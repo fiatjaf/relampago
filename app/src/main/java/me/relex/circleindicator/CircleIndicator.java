@@ -5,10 +5,7 @@ import android.animation.AnimatorInflater;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.res.TypedArray;
-import android.database.DataSetObserver;
 import android.os.Build;
-import android.support.annotation.AnimatorRes;
-import android.support.annotation.DrawableRes;
 import android.support.v4.view.ViewPager;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -16,7 +13,7 @@ import android.view.View;
 import android.view.animation.Interpolator;
 import android.widget.LinearLayout;
 
-import com.lightning.wallet.R;
+import com.lightning.walletapp.R;
 
 import static android.support.v4.view.ViewPager.OnPageChangeListener;
 

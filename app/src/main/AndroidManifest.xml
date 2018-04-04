@@ -1,5 +1,5 @@
 <manifest
-    package="com.lightning.wallet"
+    package="com.lightning.walletapp"
     xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-feature android:name="android.hardware.fingerprint" android:required="false"/>
@@ -20,17 +20,17 @@
 
     <application
         android:label="Bitcoin"
-        android:name="WalletApp"
+        android:name="com.lightning.walletapp.WalletApp"
         android:allowBackup="false"
         android:fullBackupContent="false"
         android:icon="@drawable/ic_launcher">
 
         <receiver
             android:process=":remote"
-            android:name=".lnutils.Notificator"/>
+            android:name="com.lightning.walletapp.lnutils.Notificator"/>
 
         <activity
-            android:name="MainActivity"
+            android:name="com.lightning.walletapp.MainActivity"
             android:theme="@style/NoBarMain"
             android:screenOrientation="portrait">
 
@@ -62,32 +62,32 @@
             </intent-filter>
         </activity>
 
-        <activity android:launchMode="singleTask" android:name="WalletCreateActivity"
+        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.WalletCreateActivity"
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
-        <activity android:launchMode="singleTask" android:name="WalletRestoreActivity"
+        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.WalletRestoreActivity"
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
-        <activity android:launchMode="singleTask" android:name="WalletActivity"
+        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.WalletActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"
             android:windowSoftInputMode="adjustNothing"/>
 
-        <activity android:launchMode="singleTask" android:name="EmergencyActivity"
+        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.EmergencyActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
-        <activity android:launchMode="singleTask" android:name="RequestActivity"
+        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.RequestActivity"
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
-        <activity android:launchMode="singleTask" android:name="LNOpsActivity"
+        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.LNOpsActivity"
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
-        <activity android:launchMode="singleTask" android:name="LNStartActivity"
+        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.LNStartActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
-        <activity android:launchMode="singleTask" android:name="LNStartFundActivity"
+        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.LNStartFundActivity"
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
-        <activity android:launchMode="singleTask" android:name="OlympusActivity"
+        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.OlympusActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
     </application>
