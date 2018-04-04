@@ -32,6 +32,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
     override def chanCanBeRemoved(close: ClosingData) = for (lst <- listeners) lst chanCanBeRemoved close
     override def txsShouldBeSent(close: ClosingData) = for (lst <- listeners) lst txsShouldBeSent close
+    override def gotRemoteError(err: Error) = for (lst <- listeners) lst gotRemoteError err
     override def gotBestHeight = for (lst <- listeners) lst.gotBestHeight
   }
 
@@ -465,6 +466,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
         // REFUNDING is an exception here, we CAN NOT start a local close in that state
+        events gotRemoteError err
         startLocalClose(some)
 
 
@@ -615,5 +617,6 @@ trait ChannelListener {
 
   def chanCanBeRemoved(close: ClosingData): Unit = none
   def txsShouldBeSent(close: ClosingData): Unit = none
+  def gotRemoteError(err: Error): Unit = none
   def gotBestHeight: Unit = none
 }

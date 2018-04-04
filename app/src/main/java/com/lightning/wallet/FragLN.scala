@@ -22,6 +22,7 @@ import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
 import com.lightning.wallet.R.drawable.{await, conf1ln, dead, frozen}
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.wallet.ln.PaymentRequest.write
+import com.lightning.wallet.ln.wire.Error
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import com.lightning.wallet.ln.Channel
@@ -100,11 +101,13 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   val chanListener = new ChannelListener {
-    // Should be removed on activity destroyed
+    override def gotRemoteError(error: Error) = {
+      val dlg = negTextBuilder(dialog_ok, error.humanText)
+      UITask(host showForm dlg.create).run
+    }
 
     override def onError = {
-      // Commit tx fee + channel reserve forbid sending of this payment
-      // inform user with all the details laid out as cleanly as possible
+      // Commit tx fee + channel reserve forbid sending
       case _ \ CMDReserveExcept(rpi, missingSat, reserveSat) =>
 
         val message = getString(err_ln_fee_overflow)
