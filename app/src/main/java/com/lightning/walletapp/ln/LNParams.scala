@@ -12,7 +12,7 @@ import fr.acinq.eclair.UInt64
 
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
-  val chainHash = Block.TestnetGenesisBlock.hash
+  val chainHash = Block.LivenetGenesisBlock.hash
   val theirReserveToFundingRatio = 100
   val localFeatures = "02"
   val globalFeatures = ""
