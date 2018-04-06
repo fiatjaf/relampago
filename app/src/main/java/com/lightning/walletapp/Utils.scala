@@ -57,7 +57,7 @@ object Utils {
   var denom: Denomination = _
   var fiatName: String = _
 
-  val fileName = "Bitcoin"
+  val fileName = "Test"
   val dbFileName = s"$fileName.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"

@@ -201,7 +201,6 @@
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
     <string name="err_secret">Failed because passcode did not match. Please make sure passcode is correct</string>
     <string name="err_uri">Failed because request contains a malformed URI which could not be parsed</string>
-    <string name="err_different_net">Failed because payment request belongs to a different network</string>
     <string name="err_general">Failed because an error has occurred</string>
     <string name="err_qr_parse">QR code is invalid</string>
 

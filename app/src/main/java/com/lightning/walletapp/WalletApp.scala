@@ -43,7 +43,7 @@ import rx.lang.scala.{Observable => Obs}
 
 
 class WalletApp extends Application { me =>
-  lazy val params = org.bitcoinj.params.MainNetParams.get
+  lazy val params = org.bitcoinj.params.TestNet3Params.get
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
   lazy val chainFile = new File(getFilesDir, chainFileName)
@@ -71,7 +71,7 @@ class WalletApp extends Application { me =>
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
-  def getTo(base58: String) = Address.fromBase58(params, base58)
+  def getTo(raw: String) = Address.fromString(params, raw)
 
   Utils.appReference = me
   override def onCreate = wrap(super.onCreate) {
@@ -114,7 +114,6 @@ class WalletApp extends Application { me =>
     }
 
     def onFail(err: Int => Unit): PartialFunction[Throwable, Unit] = {
-      case _: org.bitcoinj.core.WrongNetworkException => err(err_different_net)
       case _: org.bitcoinj.core.AddressFormatException => err(err_qr_parse)
       case _: BitcoinURIParseException => err(err_uri)
       case _: Throwable => err(err_general)
@@ -277,7 +276,7 @@ class WalletApp extends Application { me =>
     }
 
     def useCheckPoints(time: Long) = {
-      val pts = getAssets open "checkpoints.txt"
+      val pts = getAssets open "checkpoints-testnet.txt"
       CheckpointManager.checkpoint(params, pts, store, time)
     }
 
