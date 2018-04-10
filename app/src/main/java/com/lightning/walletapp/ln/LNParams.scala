@@ -88,6 +88,7 @@ case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, fee: Sato
 
 trait Broadcaster extends ChannelListener { me =>
   def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
+  def getBlockHashString(txid: BinaryData): Option[String]
   def getStatus(txid: BinaryData): DepthAndDead
   def isSynchronized: Boolean
   def currentHeight: Long

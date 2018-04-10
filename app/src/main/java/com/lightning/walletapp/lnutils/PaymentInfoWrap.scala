@@ -150,8 +150,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onProcessSuccess = {
-    case (close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
-      // Mutual tx has enough confirmations or hard timeout passed out
+    case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
+      // Mutual tx has enough confirmations or hard timeout has passed out
       db.change(ChannelTable.killSql, close.commitments.channelId)
   }
 
@@ -206,6 +206,33 @@ object BadEntityWrap {
     val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, msat, TARGET_ALL, targetId)
     val badNodes \ badChans = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
     OlympusWrap findRoutes OutRequest(badNodes, for (chanId <- badChans) yield chanId.toLong, from, targetId)
+  }
+}
+
+object GossipCatcher extends ChannelListener {
+  // Catch ChannelUpdates to enable funds receiving
+
+  override def onProcessSuccess = {
+    case (chan, norm: NormalData, _: CMDBestHeight)
+      // GUARD: don't have an extra hop, get the block
+      if norm.commitments.extraHop.isEmpty =>
+
+      // Extract funding txid and it's output index
+      val txid = Commitments fundingTxid norm.commitments
+      val outIdx = norm.commitments.commitInput.outPoint.index
+
+      for {
+        hash <- broadcaster getBlockHashString txid
+        height \ txIds <- retry(OlympusWrap getBlock hash, pickInc, 4 to 5)
+        shortChannelId <- Tools.toShortIdOpt(height, txIds indexOf txid.toString, outIdx)
+      } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
+
+    case (chan, norm: NormalData, upd: ChannelUpdate)
+      // GUARD: we already have an old or empty Hop, replace it with a new one
+      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
+      // Set a fresh update for this channel and process no further updates afterwards
+      chan process upd.toHop(chan.data.announce.nodeId)
+      chan.listeners -= GossipCatcher
   }
 }
 

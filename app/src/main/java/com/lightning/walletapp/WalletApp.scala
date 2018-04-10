@@ -122,7 +122,7 @@ class WalletApp extends Application { me =>
 
   object ChannelManager {
     type ChannelVec = Vector[Channel]
-    val operationalListeners = Set(broadcaster, bag)
+    val operationalListeners = Set(broadcaster, bag, GossipCatcher)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: ChannelVec = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: ChannelVec, ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c

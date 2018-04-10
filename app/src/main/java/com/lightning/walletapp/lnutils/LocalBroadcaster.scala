@@ -36,8 +36,17 @@ object LocalBroadcaster extends Broadcaster {
     tx.getConfidence.getDepthInBlocks -> isTxDead
   } getOrElse 0 -> false
 
+  def getBlockHashString(txid: BinaryData) = for {
+    // Given a txid return a hash of containing block
+    // this will return a single block hash
+
+    transaction <- getTx(txid)
+    hashes <- Option(transaction.getAppearsInHashes)
+    firstBlockHash = hashes.keySet.iterator.next
+  } yield firstBlockHash.toString
+
   override def onProcessSuccess = {
-    case (close: ClosingData, _: Command) =>
+    case (_, close: ClosingData, _: Command) =>
       val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockingSend tx catch none

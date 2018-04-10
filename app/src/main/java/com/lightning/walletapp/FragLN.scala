@@ -128,7 +128,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
       // Remote peer has sent an error message
       // display contents to user to clarify
 
-      case (_, error: Error) =>
+      case (_, _, error: Error) =>
         val message = error.exception.getMessage
         val dlg = negTextBuilder(dialog_ok, message)
         UITask(host showForm dlg.create).run

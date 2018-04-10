@@ -476,7 +476,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     }
 
     // Change has been successfully processed
-    events onProcessSuccess Tuple2(data, change)
+    events onProcessSuccess Tuple3(me, data, change)
   }
 
   def sendFeeUpdate(norm: NormalData, updatedFeeRate: Long) =
@@ -599,8 +599,8 @@ trait ChannelListener {
     if (onBecome isDefinedAt nullTransition) onBecome(nullTransition)
   }
 
-  type Incoming = (ChannelData, Any)
   type Malfunction = (Channel, Throwable)
+  type Incoming = (Channel, ChannelData, Any)
   type Transition = (Channel, ChannelData, String, String)
   def onProcessSuccess: PartialFunction[Incoming, Unit] = none
   def onError: PartialFunction[Malfunction, Unit] = none

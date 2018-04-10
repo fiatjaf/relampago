@@ -225,8 +225,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       // must be removed once fragment is finished
 
       override def onProcessSuccess = {
-        // SImply update current UI on each new block
-        case (_, _: CMDBestHeight) => nullOnBecome(chan)
+        // Simply update current UI on each new block
+        case (_, _, _: CMDBestHeight) => nullOnBecome(chan)
       }
 
       override def onBecome = {
