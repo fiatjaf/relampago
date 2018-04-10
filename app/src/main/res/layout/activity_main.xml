@@ -34,32 +34,4 @@
             android:text="@string/wallet_restore"/>
 
     </LinearLayout>
-
-    <LinearLayout
-        style="@style/StandardLinearLayout"
-        android:background="@color/bg"
-        android:id="@+id/mainPassForm"
-        android:visibility="gone">
-
-        <EditText
-            style="@style/Info"
-            android:id="@+id/mainPassData"
-            android:inputType="textPassword"
-            android:layout_width="wrap_content"
-            android:hint="@string/secret_wallet"/>
-
-        <Button
-            style="@style/MarginInfo"
-            android:text="@string/unlock"
-            android:id="@+id/mainPassCheck"
-            android:layout_width="wrap_content"/>
-
-        <ImageView
-            android:visibility="gone"
-            android:id="@+id/mainFingerprint"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:src="@drawable/ic_fingerprint_24dp"/>
-
-    </LinearLayout>
 </LinearLayout>

@@ -19,9 +19,8 @@
             android:layout_width="wrap_content"/>
 
         <com.hootsuite.nachos.NachoTextView
-            app:chipTextColor="#FFFFFFFF"
+            app:chipBackground="@android:color/white"
             app:chipVerticalSpacing="2dp"
-            app:chipBackground="#656565"
             app:chipTextSize="18sp"
             app:chipHeight="26dp"
             app:chipSpacing="3dp"
@@ -32,18 +31,6 @@
             android:hint="@string/restore_hint"
             android:id="@+id/restoreCode"
             style="@style/MarginInfo"/>
-
-        <EditText
-            style="@style/Info"
-            android:minWidth="120dp"
-            android:id="@+id/restorePass"
-            android:layout_width="wrap_content"
-            android:inputType="textVisiblePassword"/>
-
-        <TextView
-            style="@style/Info"
-            android:layout_width="wrap_content"
-            android:text="@string/secret_info"/>
 
         <Button
             style="@style/MarginInfo"

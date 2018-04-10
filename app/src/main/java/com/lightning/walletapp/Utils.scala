@@ -14,7 +14,6 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.wallet.Wallet.ExceededMaxTransactionSize
 import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
-import android.content.DialogInterface.OnDismissListener
 import android.widget.RadioGroup.OnCheckedChangeListener
 import android.widget.AdapterView.OnItemClickListener
 import info.hoang8f.android.segmented.SegmentedGroup
@@ -23,7 +22,6 @@ import concurrent.ExecutionContext.Implicits.global
 import android.view.inputmethod.InputMethodManager
 import com.lightning.walletapp.lnutils.RatesSaver
 import android.support.v7.app.AppCompatActivity
-import org.bitcoinj.crypto.KeyCrypterException
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
 import fr.acinq.bitcoin.MilliSatoshi
@@ -34,14 +32,13 @@ import org.bitcoinj.script.Script
 import scala.concurrent.Future
 import android.os.Bundle
 
-import co.infinum.goldfinger.{Goldfinger, Warning, Error => GFError}
-import org.bitcoinj.wallet.{DeterministicSeed, SendRequest, Wallet}
-import android.content.{Context, DialogInterface, Intent}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
 import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
+import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
+import android.content.{Context, Intent}
 import java.util.{Timer, TimerTask}
 
 import android.content.DialogInterface.BUTTON_POSITIVE
@@ -57,7 +54,7 @@ object Utils {
   var denom: Denomination = _
   var fiatName: String = _
 
-  val fileName = "Bitcoin"
+  val fileName = "Testnet"
   val dbFileName = s"$fileName.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
@@ -76,7 +73,6 @@ object Utils {
   val fiatMap = Map(typeUSD -> strDollar, typeEUR -> strEuro, typeJPY -> strYen, typeCNY -> strYuan)
   val revFiatMap = Map(strDollar -> typeUSD, strEuro -> typeEUR, strYen -> typeJPY, strYuan -> typeCNY)
   def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
-  def isMnemonicCorrect(mnemonicCode: String) = mnemonicCode.split("\\s+").length > 11
   def humanFour(adr: String) = adr grouped 4 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {
@@ -115,18 +111,6 @@ trait TimerActivity extends AppCompatActivity { me =>
     val titleTextField = Utils clickableTextField view.findViewById(R.id.actionTip)
     titleTextField setText textFieldData
     view -> titleTextField
-  }
-
-  def generatePromptView(inputType: Int, message: Int, transMethod: TransformationMethod) = {
-    val passAsk = getLayoutInflater.inflate(R.layout.frag_changer, null).asInstanceOf[LinearLayout]
-    val secretInput = passAsk.findViewById(R.id.secretInput).asInstanceOf[EditText]
-    val secretTip = passAsk.findViewById(R.id.secretTip).asInstanceOf[TextView]
-    val secretFingerprint = passAsk.findViewById(R.id.secretFingerprint)
-
-    secretTip setText message
-    secretInput setInputType inputType
-    secretInput setTransformationMethod transMethod
-    passAsk -> secretInput -> secretFingerprint
   }
 
   def finishMe(top: View) = finish
@@ -205,46 +189,10 @@ trait TimerActivity extends AppCompatActivity { me =>
     me startActivity share.putExtra(Intent.EXTRA_TEXT, exportedTextData)
   }
 
-  def passWrap(title: CharSequence, fp: Boolean = true) = (next: String => Unit) => {
-    val passNoSuggest = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD
-    val view \ field \ image = generatePromptView(passNoSuggest, secret_wallet, new PasswordTransformationMethod)
-    val alert = mkForm(next(field.getText.toString), none, baseBuilder(title, view), dialog_next, dialog_cancel)
-
-    val gf = new Goldfinger.Builder(me).build
-    if (fp && gf.hasEnrolledFingerprint && FingerPassCode.exists) {
-      // This device hase fingerprint support, prints are registered
-      // and user has saved an encrypted passcode in app prefs
-
-      val callback = new Goldfinger.Callback {
-        def onWarning(nonFatalWarning: Warning) = FingerPassCode informUser nonFatalWarning
-        def onError(err: GFError) = wrap(FingerPassCode informUser err)(image setVisibility View.GONE)
-        def onSuccess(plainPasscode: String) = field setText plainPasscode
-      }
-
-      alert setOnDismissListener new OnDismissListener {
-        def onDismiss(dialog: DialogInterface) = gf.cancel
-        gf.decrypt(fileName, FingerPassCode.get, callback)
-        image setVisibility View.VISIBLE
-      }
-    }
-  }
-
-  def checkPass(next: String => Unit)(pass: String) = {
-    // Takes a method to be executed after a pass check is successful, also shows a toast
-    def proceed(isCorrect: Boolean) = if (isCorrect) next(pass) else app toast secret_wrong
-    <(app.kit.wallet checkPassword pass, _ => app toast err_general)(proceed)
-    app toast secret_checking
-  }
-
   def viewMnemonic(view: View) = {
-    def showCode(seed: DeterministicSeed): Unit = {
-      val recoveryCode = TextUtils.join("\u0020", seed.getMnemonicCode)
-      showForm(negBuilder(dialog_ok, me getString sets_mnemonic, recoveryCode).create)
-    }
-
-    def encShowCode(pass: String) = <(app.kit decryptSeed pass, onFail)(showCode)
-    if (!app.kit.wallet.isEncrypted) showCode(app.kit.wallet.getKeyChainSeed)
-    else passWrap(me getString sets_mnemonic) apply checkPass(encShowCode)
+    val seed = app.kit.wallet.getKeyChainSeed
+    val recoveryCode = TextUtils.join("\u0020", seed.getMnemonicCode)
+    showForm(negBuilder(dialog_ok, me getString sets_mnemonic, recoveryCode).create)
   }
 
   abstract class TxProcessor { self =>
@@ -254,15 +202,10 @@ trait TimerActivity extends AppCompatActivity { me =>
 
     def start = {
       val estimateFee = RatesSaver.rates.feeLive
-      def encEstimate(pass: String) = <(app.kit sign encRequest(pass)(estimateFee), onTxFail)(self encChooseFee pass)
-      if (!app.kit.wallet.isEncrypted) <(app.kit sign plainRequest(estimateFee), onTxFail)(self chooseFee plainRequest)
-      else passWrap(getString(step_2).format(pay cute sumOut).html) apply encEstimate
+      <(app.kit sign plainRequest(estimateFee), onFail)(chooseFee)
     }
 
-    def encChooseFee(pass: String) = chooseFee(self encRequest pass) _
-    def chooseFee(toRequest: Coin => SendRequest)(estimate: SendRequest): Unit = {
-      // Get signed live final fee and set a risky fee to be two times less than that
-
+    def chooseFee(estimate: SendRequest): Unit = {
       val livePerTxFee: MilliSatoshi = estimate.tx.getFee
       val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
 
@@ -276,11 +219,11 @@ trait TimerActivity extends AppCompatActivity { me =>
 
       def proceed = {
         val divider = if (lst.getCheckedItemPosition == 0) 2 else 1
-        val request = toRequest(RatesSaver.rates.feeLive div divider)
+        val request = plainRequest(RatesSaver.rates.feeLive div divider)
         futureProcess(request)
       }
 
-      val bld = baseBuilder(getString(step_3).format(pay cute sumOut).html, form)
+      val bld = baseBuilder(getString(step_fees).format(pay cute sumOut).html, form)
       mkForm(ok = <(proceed, onTxFail)(none), none, bld, dialog_pay, dialog_cancel)
       lst setAdapter new ArrayAdapter(me, singleChoice, feesOptions)
       lst.setItemChecked(0, true)
@@ -291,13 +234,6 @@ trait TimerActivity extends AppCompatActivity { me =>
       unsignedRequestWithFee.feePerKb = selectedFee
       app.kit.wallet assembleTx unsignedRequestWithFee
       unsignedRequestWithFee
-    }
-
-    def encRequest(pass: String)(selectedFee: Coin) = {
-      val key = app.kit.wallet.getKeyCrypter deriveKey pass
-      val request = self plainRequest selectedFee
-      request.aesKey = key
-      request
     }
 
     def messageWhenMakingTx: PartialFunction[Throwable, CharSequence] = {
@@ -314,8 +250,8 @@ trait TimerActivity extends AppCompatActivity { me =>
         val pending = sumIn format denom.withSign(zeroConfs)
         txt.format(canSend, sending, missing, pending).html
 
-      case _: KeyCrypterException => app getString err_secret
-      case _: Throwable => app getString err_general
+      case _: Throwable =>
+        app getString err_general
     }
   }
 }

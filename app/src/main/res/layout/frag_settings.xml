@@ -3,16 +3,6 @@
     xmlns:android="http://schemas.android.com/apk/res/android">
 
     <Button
-        android:visibility="gone"
-        style="@style/TransButton"
-        android:id="@+id/useFingerprint"/>
-
-    <Button
-        style="@style/TransButton"
-        android:id="@+id/changePass"
-        android:text="@string/sets_secret_change"/>
-
-    <Button
         style="@style/TransButton"
         android:id="@+id/rescanWallet"
         android:text="@string/sets_rescan"/>

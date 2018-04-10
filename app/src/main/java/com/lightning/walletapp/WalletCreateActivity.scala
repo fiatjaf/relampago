@@ -6,18 +6,14 @@ import com.lightning.walletapp.ln.LNParams
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.store.SPVBlockStore
 import org.bitcoinj.wallet.Wallet
-import android.view.View
 import android.os.Bundle
 
 
 trait FirstActivity { me: TimerActivity =>
-  def prepare(kit: app.WalletKit, pass: CharSequence) = {
+  def prepareFreshWallet(kit: app.WalletKit) = {
     kit.store = new SPVBlockStore(app.params, app.chainFile)
     kit.useCheckPoints(kit.wallet.getEarliestKeyCreationTime)
-
-    // Get seed and set everything up before encryption
     LNParams.setup(kit.wallet.getKeyChainSeed.getSeedBytes)
-    if (pass.length > 0) app.encryptWallet(kit.wallet, pass)
 
     // Complete initialization
     kit.blockChain = new BlockChain(app.params, kit.wallet, kit.store)
@@ -33,23 +29,19 @@ trait FirstActivity { me: TimerActivity =>
   }
 }
 
-class WalletCreateActivity extends TimerActivity with ViewSwitch with FirstActivity { me =>
-  lazy val createPass = findViewById(R.id.createPass).asInstanceOf[android.widget.EditText]
-  lazy val createWallet = findViewById(R.id.createWallet).asInstanceOf[android.widget.Button]
-  lazy val views = findViewById(R.id.createInfo) :: findViewById(R.id.createProgress) :: Nil
-  def INIT(state: Bundle) = setContentView(R.layout.activity_create)
+class WalletCreateActivity extends TimerActivity with FirstActivity {
+  override def onBackPressed = wrap(super.onBackPressed)(app.kit.stopAsync)
 
-  def makeNewWallet =
+  def INIT(state: Bundle) = {
     app.kit = new app.WalletKit {
-      setVis(View.GONE, View.VISIBLE)
-      startAsync
-
-      override def startUp = {
-        wallet = new Wallet(app.params, true)
-        prepare(this, createPass.getText)
+      override def startUp: Unit = {
+        wallet = new Wallet(app.params)
+        prepareFreshWallet(this)
       }
     }
 
-  override def onBackPressed = wrap(super.onBackPressed)(app.kit.stopAsync)
-  def newWallet(view: View) = hideKeys(makeNewWallet)
+    // Fill view and immediately create a wallet
+    setContentView(R.layout.activity_create)
+    app.kit.startAsync
+  }
 }

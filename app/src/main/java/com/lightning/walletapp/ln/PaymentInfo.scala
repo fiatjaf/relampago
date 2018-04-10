@@ -31,7 +31,7 @@ object PaymentInfo {
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
-    RoutingData(pr, Vector.empty, Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat, 0L, 0L, 4, ok = true)
+    RoutingData(pr, Vector.empty, Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat, 0L, 0L, 4)
   }
 
   def emptyRDFromInfo(info: PaymentInfo) = emptyRD(info.pr, info.firstMsat)
@@ -99,24 +99,16 @@ object PaymentInfo {
     parsed map {
       case ErrorPacket(nodeKey, cd: ChannelDisabled) =>
         val isNodeHonest = Announcements.checkSig(cd.update, nodeKey)
-        if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
-        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL,
-          300 * 1000, 0L)
+        if (!isNodeHonest) withoutNodes(badNodes = Vector(nodeKey), rd, 86400 * 4 * 1000)
+        else withoutChans(Vector(cd.update.shortChannelId), rd, TARGET_ALL, 300 * 1000, 0L)
 
       case ErrorPacket(nodeKey, tf: TemporaryChannelFailure) =>
         val isNodeHonest = Announcements.checkSig(tf.update, nodeKey)
-        if (!isNodeHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
-        else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString,
-          300 * 1000, rd.firstMsat)
+        if (!isNodeHonest) withoutNodes(badNodes = Vector(nodeKey), rd, 86400 * 4 * 1000)
+        else withoutChans(Vector(tf.update.shortChannelId), rd, rd.pr.nodeId.toString, 300 * 1000, rd.firstMsat)
 
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 4 * 1000)
       case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
-
-      case ErrorPacket(nodeKey, TemporaryNodeFailure) =>
-        rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
-          // Error at processing node which may indicate problems with it's peer so remove a channel
-          withoutChans(Vector(payHop.shortChannelId), rd, rd.pr.nodeId.toString, 600 * 1000, rd.firstMsat)
-        } getOrElse withoutNodes(Vector(nodeKey), rd, 60 * 1000)
 
       case ErrorPacket(nodeKey, UnknownNextPeer | PermanentChannelFailure) =>
         rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
@@ -125,9 +117,10 @@ object PaymentInfo {
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nodeKey, _) =>
-        // Halt a payment if error comes from recipient
-        if (nodeKey != rd.pr.nodeId) rd -> Vector.empty
-        else rd.copy(ok = false) -> Vector.empty
+        rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
+          // Something is wrong at processing node which may be due to channel so exlude it
+          withoutChans(Vector(payHop.shortChannelId), rd, TARGET_ALL, 600 * 1000, rd.firstMsat)
+        } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
     } getOrElse {
       val cut = rd.usedRoute drop 1 dropRight 1
@@ -175,7 +168,7 @@ object PaymentInfo {
 case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv: Long)
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
                        onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long,
-                       lastExpiry: Long, callsLeft: Int, ok: Boolean) {
+                       lastExpiry: Long, callsLeft: Int) {
 
   lazy val qryText = s"${pr.description} $paymentHashString"
   lazy val paymentHashString = pr.paymentHash.toString

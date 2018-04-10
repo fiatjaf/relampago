@@ -1,10 +1,10 @@
 package com.lightning.walletapp.ln.wire
 
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
+import com.lightning.walletapp.ln.{Hop, LightningException}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import com.lightning.walletapp.ln.Tools.fromShortId
-import com.lightning.walletapp.ln.Hop
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
 
@@ -67,7 +67,14 @@ case class CommitSig(channelId: BinaryData, signature: BinaryData, htlcSignature
 case class RevokeAndAck(channelId: BinaryData, perCommitmentSecret: Scalar, nextPerCommitmentPoint: Point) extends ChannelMessage
 
 case class Error(channelId: BinaryData, data: BinaryData) extends ChannelMessage {
-  def humanText = new String(data, "UTF-8") match { case txt if txt.isEmpty => "no details" case txt => txt }
+  // Error from remote peer means we need to close a channel, may contain some details
+
+  def exception = {
+    val text = new String(data, "UTF-8")
+    val default = "Remote peer has sent an error"
+    val finalText = if (text.isEmpty) default else text
+    new LightningException(finalText)
+  }
 }
 
 case class ChannelReestablish(channelId: BinaryData, nextLocalCommitmentNumber: Long,

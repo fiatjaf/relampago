@@ -16,9 +16,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import scala.util.{Success, Try}
-import co.infinum.goldfinger.{Error => GFError}
 import android.content.{DialogInterface, Intent}
-import co.infinum.goldfinger.{Goldfinger, Warning}
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
@@ -342,29 +340,16 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     else me goTo classOf[LNOpsActivity]
   }
 
-  def goAddChannel(top: View) = {
-    val tokens = MilliSatoshi(500000L)
-    val minAmt = RatesSaver.rates.feeLive multiply 2
-    val humanIn = humanFiat(coloredIn(tokens), tokens, " ")
-    val warningMessage = getString(tokens_warn).format(humanIn)
-
-    val warn = baseTextBuilder(warningMessage.html)
-      .setCustomTitle(me getString action_ln_open)
-
+  def goAddChannel(top: View) =
     if (!broadcaster.isSynchronized) app toast dialog_chain_behind
-    else if (app.kit.conf1Balance isLessThan minAmt) showForm(negBuilder(dialog_ok, notEnoughFunds.html, null).create)
-    else if (app.ChannelManager.all.isEmpty) mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
-    else me goTo classOf[LNStartActivity]
-
-    lazy val notEnoughFunds = {
-      val txt = getString(err_ln_not_enough_funds)
-      val zeroConf = app.kit.conf0Balance minus app.kit.conf1Balance
-      val canSend = sumIn format denom.withSign(app.kit.conf1Balance)
-      val minRequired = sumIn format denom.withSign(minAmt)
-      val pending = sumIn format denom.withSign(zeroConf)
-      txt.format(canSend, minRequired, pending)
+    else if (app.ChannelManager.all.nonEmpty) me goTo classOf[LNStartActivity]
+    else {
+      val tokens = MilliSatoshi(500000L)
+      val humanIn = humanFiat(coloredIn(tokens), tokens, " ")
+      val warning = getString(tokens_warn).format(humanIn).html
+      val warn = baseTextBuilder(warning).setCustomTitle(me getString action_ln_open)
+      mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
     }
-  }
 
   def showDenomChooser = {
     val btcFunds = coin2MSat(app.kit.conf0Balance)
@@ -398,14 +383,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
     val menu = showForm(negBuilder(dialog_ok, title, form).create)
 
-    val recoverChannelFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
-    val useFingerprint = form.findViewById(R.id.useFingerprint).asInstanceOf[Button]
+    val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
     val createZygote = form.findViewById(R.id.createZygote).asInstanceOf[Button]
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
-    val changePass = form.findViewById(R.id.changePass).asInstanceOf[Button]
-    val gf = new Goldfinger.Builder(me).build
 
     manageOlympus setOnClickListener onButtonTap {
       // Just show a list of available Olympus servers
@@ -413,51 +395,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       rm(menu)(proceed)
     }
 
-    if (app.kit.wallet.isEncrypted && gf.hasEnrolledFingerprint) {
-      if (FingerPassCode.exists) setButtonDisable else setButtonEnable
-      useFingerprint setVisibility View.VISIBLE
-
-      def setButtonEnable = {
-        def proceed = rm(menu) {
-          passWrap(me getString fp_enable) apply checkPass { pass =>
-            // The password is guaranteed to be correct here so proceed
-            val content = getLayoutInflater.inflate(R.layout.frag_touch, null)
-            val alert = showForm(negBuilder(dialog_cancel, getString(fp_enable).html, content).create)
-
-            val callback = new Goldfinger.Callback {
-              def onWarning(warn: Warning) = FingerPassCode informUser warn
-              def onError(err: GFError) = wrap(FingerPassCode informUser err)(alert.dismiss)
-              def onSuccess(cipher: String) = runAnd(alert.dismiss)(FingerPassCode record cipher)
-            }
-
-            alert setOnDismissListener new OnDismissListener {
-              def onDismiss(dialog: DialogInterface) = gf.cancel
-              gf.encrypt(fileName, pass, callback)
-            }
-          }
-        }
-
-        // Offer user to enter a passcode and then fingerprint
-        useFingerprint setOnClickListener onButtonTap(proceed)
-        useFingerprint setText fp_enable
-      }
-
-      def setButtonDisable = {
-        def proceed = rm(menu) {
-          passWrap(me getString fp_disable, fp = false) apply checkPass { _ =>
-            // Ask user for a passcode before disabling fingerprint unlocking
-            // and don't allow fingerprint unlocking this is special case
-            runAnd(app toast fp_err_disabled)(FingerPassCode.erase)
-          }
-        }
-
-        // Disable fingerprint auth if user rememebers passcode
-        useFingerprint setOnClickListener onButtonTap(proceed)
-        useFingerprint setText fp_disable
-      }
-    }
-
-    recoverChannelFunds setOnClickListener onButtonTap {
+    recoverFunds setOnClickListener onButtonTap {
       // When wallet data is lost users may recover channel funds
       // by fetching encrypted static channel params from server
 
@@ -533,38 +471,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     viewMnemonic setOnClickListener onButtonTap {
       // Can be accessed here and from page button
       rm(menu)(me viewMnemonic null)
-    }
-
-    changePass setOnClickListener onButtonTap {
-      def decryptAndMaybeEncrypt(oldPass: CharSequence)(newPass: CharSequence) = {
-        // First decrypt a wallet using an old passcode, then encrypt with a new one
-        runAnd(app.kit.wallet decrypt oldPass)(FingerPassCode.erase)
-        maybeEncrypt(newPass)
-      }
-
-      def maybeEncrypt(newPass: CharSequence) = {
-        // Leave the wallet decrypted if there is no new passcode
-        if (newPass.length > 0) app.encryptWallet(app.kit.wallet, newPass)
-      }
-
-      val showNewPassForm = (changePass: CharSequence => Unit) => {
-        val view \ field \ _ = generatePromptView(InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, secret_info, null)
-        mkForm(changePasscode, none, baseBuilder(me getString sets_secret_change, view), dialog_ok, dialog_cancel)
-        def inform = showForm(negTextBuilder(dialog_ok, getString(sets_secret_ok) format field.getText).create)
-
-        def changePasscode = runAnd(app toast secret_changing) {
-          // Maybe decrypt a wallet and set a new passcode, inform user afterwards
-          <(changePass(field.getText), onFail)(_ => if (field.getText.length > 0) inform)
-        }
-      }
-
-      rm(menu) {
-        if (!app.kit.wallet.isEncrypted) showNewPassForm apply maybeEncrypt
-        else passWrap(me getString sets_secret_change) apply checkPass { pass =>
-          // Remember a correct passcode and use it later for wallet decryption
-          showNewPassForm apply decryptAndMaybeEncrypt(pass)
-        }
-      }
     }
   }
 }

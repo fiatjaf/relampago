@@ -28,7 +28,6 @@
             style="@style/MarginInfo"
             android:id="@+id/addressScanner"
             android:layout_width="wrap_content"
-            android:drawableLeft="@drawable/qr_18dp"
             android:text="QR"/>
 
     </LinearLayout>

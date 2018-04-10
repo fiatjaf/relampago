@@ -64,7 +64,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     lazy val openListener = new ConnectionListener with ChannelListener { self =>
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
         case setupMsg: ChannelSetupMessage if ann == announce => freshChan process setupMsg
-        case err: Error if ann == announce => freshChan process err
+        case err: Error if ann == announce => onError(freshChan -> err.exception)
         case _ =>
       }
 
@@ -114,8 +114,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
       override def onError = {
         case _ \ errorWhileOpening =>
-          // If anything at all goes wrong here
-          // inform user, disconnect this channel, go back
+          // Inform user, disconnect this channel, go back
           UITask(app toast errorWhileOpening.getMessage).run
           whenBackPressed.run
       }

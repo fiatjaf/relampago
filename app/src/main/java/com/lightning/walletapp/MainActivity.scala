@@ -3,11 +3,9 @@ package com.lightning.walletapp
 import R.string._
 import android.widget._
 import com.lightning.walletapp.Utils._
-import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
-import co.infinum.goldfinger.{Goldfinger, Warning}
+import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
 import com.google.common.io.{ByteStreams, Files}
-import co.infinum.goldfinger.{Error => GFError}
 import java.io.{File, FileInputStream}
 
 import ln.wire.LightningMessageCodecs.walletZygoteCodec
@@ -29,31 +27,6 @@ trait ViewSwitch {
   }
 }
 
-object FingerPassCode {
-  def exists = app.prefs.contains(AbstractKit.ENC_PASSCODE)
-  def erase = app.prefs.edit.remove(AbstractKit.ENC_PASSCODE).commit
-  def record(base64: String) = app.prefs.edit.putString(AbstractKit.ENC_PASSCODE, base64).commit
-  def get = app.prefs.getString(AbstractKit.ENC_PASSCODE, "No encrypted passcode exists here")
-
-  def informUser(w: Warning) = w match {
-    case Warning.DIRTY => app toast fp_err_dirty
-    case Warning.FAILURE => app toast fp_err_try_again
-    case Warning.INSUFFICIENT => app toast fp_err_try_again
-    case Warning.TOO_SLOW => app toast fp_err_try_again
-    case Warning.TOO_FAST => app toast fp_err_try_again
-    case Warning.PARTIAL => app toast fp_err_try_again
-    case otherwise =>
-  }
-
-  def informUser(e: GFError) = e match {
-    case GFError.CRYPTO_OBJECT_INIT => runAnd(FingerPassCode.erase)(app toast fp_err_disabled)
-    case GFError.DECRYPTION_FAILED => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
-    case GFError.ENCRYPTION_FAILED => runAnd(FingerPassCode.erase)(app toast fp_err_failure)
-    case GFError.TIMEOUT => app toast fp_err_timeout
-    case otherwise => app toast fp_err_failure
-  }
-}
-
 object MainActivity {
   var proceed: Runnable = _
 
@@ -71,12 +44,8 @@ object MainActivity {
   }
 }
 
-class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch { me =>
-  lazy val views = findViewById(R.id.mainChoice) :: findViewById(R.id.mainPassForm) :: Nil
-  lazy val mainFingerprint = findViewById(R.id.mainFingerprint).asInstanceOf[ImageView]
-  lazy val mainPassCheck = findViewById(R.id.mainPassCheck).asInstanceOf[Button]
-  lazy val mainPassData = findViewById(R.id.mainPassData).asInstanceOf[EditText]
-  lazy val gf = new Goldfinger.Builder(me).build
+class MainActivity extends NfcReaderActivity with TimerActivity { me =>
+  lazy val mainChoice = findViewById(R.id.mainChoice)
   private[this] val FILE_CODE = 101
 
   def INIT(state: Bundle) = {
@@ -127,16 +96,13 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   def next: Unit = (app.walletFile.exists, app.isAlive) match {
     // Find out what exactly should be done once user opens an app
     // depends on both wallet app file existence and runtime objects
-    case (false, _) => setVis(View.VISIBLE, View.GONE)
+    case (false, _) => mainChoice setVisibility View.VISIBLE
     case (true, true) => MainActivity.proceed.run
 
     case (true, false) =>
       MainActivity.prepareKit
-      if (app.kit.wallet.isEncrypted) whenEncrypted else {
-        // Wallet is not encrypted so just proceed wuth setup
-        val seed = app.kit.wallet.getKeyChainSeed.getSeedBytes
-        runAnd(LNParams setup seed)(app.kit.startAsync)
-      }
+      val seed = app.kit.wallet.getKeyChainSeed.getSeedBytes
+      runAnd(LNParams setup seed)(app.kit.startAsync)
 
     // Just should not ever happen
     // and when it does we just exit
@@ -144,43 +110,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity with ViewSwitch 
   }
 
   // MISC
-
-  def whenEncrypted = {
-    setVis(View.GONE, View.VISIBLE)
-    mainPassCheck setOnClickListener onButtonTap(doCheck)
-    if (gf.hasEnrolledFingerprint && FingerPassCode.exists) {
-      // This device hase fingerprint support with prints registered
-
-      val callback = new Goldfinger.Callback {
-        def onWarning(nonFatalWarning: Warning) = FingerPassCode informUser nonFatalWarning
-        def onError(err: GFError) = wrap(FingerPassCode informUser err)(mainFingerprint setVisibility View.GONE)
-        def onSuccess(plainPasscode: String) = runAnd(mainPassData setText plainPasscode)(doCheck)
-      }
-
-      mainFingerprint setVisibility View.VISIBLE
-      gf.decrypt(fileName, FingerPassCode.get, callback)
-    }
-
-    def doCheck = {
-      def carryOutDecryption = {
-        val passcode = mainPassData.getText.toString
-        LNParams setup app.kit.decryptSeed(passcode).getSeedBytes
-        // Decryption may throw thus preventing further execution
-        app.kit.startAsync
-        gf.cancel
-      }
-
-      def wrong(authThrowable: Throwable) = {
-        // Passcode has failed, show form again
-        app toast authThrowable.getMessage
-        setVis(View.GONE, View.VISIBLE)
-      }
-
-      // Reveals background image again
-      <(carryOutDecryption, wrong)(none)
-      setVis(View.GONE, View.GONE)
-    }
-  }
 
   def goRestoreWallet(view: View) = {
     val restoreOptions = getResources getStringArray R.array.restore_options

@@ -4,12 +4,12 @@ import android.widget._
 import android.widget.DatePicker._
 import com.lightning.walletapp.R.string._
 import com.hootsuite.nachos.terminator.ChipTerminatorHandler._
-import com.lightning.walletapp.Utils.{app, isMnemonicCorrect}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.wallet.{DeterministicSeed, Wallet}
 import android.view.{View, ViewGroup}
 
 import com.hootsuite.nachos.NachoTextView
+import com.lightning.walletapp.Utils.app
 import org.bitcoinj.crypto.MnemonicCode
 import java.util.Calendar
 import android.os.Bundle
@@ -34,36 +34,32 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
   lazy val restoreCode = findViewById(R.id.restoreCode).asInstanceOf[NachoTextView]
   lazy val restoreWallet = findViewById(R.id.restoreWallet).asInstanceOf[Button]
   lazy val restoreWhen = findViewById(R.id.restoreWhen).asInstanceOf[Button]
-  lazy val password = findViewById(R.id.restorePass).asInstanceOf[EditText]
-  lazy val dp = new WhenPicker(me, 1519862400L * 1000)
+  lazy val dp = new WhenPicker(me, 1525132800 * 1000)
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_restore)
     val style = android.R.layout.simple_list_item_1
 
-    val changeListener = new TextChangedWatcher {
+    restoreCode addTextChangedListener new TextChangedWatcher {
       override def onTextChanged(s: CharSequence, x: Int, y: Int, z: Int) = {
-        // Both password and mnemonic should be valid in order to proceed here
-
-        val mnemonicIsOk = isMnemonicCorrect(getMnemonicText)
-        if (mnemonicIsOk) restoreWallet setText wallet_restore
+        val mnemonicPhraseIsCorrect = getMnemonicText.split("\\s+").length > 11
+        if (mnemonicPhraseIsCorrect) restoreWallet setText wallet_restore
         else restoreWallet setText restore_mnemonic_wrong
-        restoreWallet setEnabled mnemonicIsOk
+        restoreWallet setEnabled mnemonicPhraseIsCorrect
       }
     }
 
     restoreWhen setText dp.human
-    password addTextChangedListener changeListener
-    restoreCode addTextChangedListener changeListener
     restoreCode.addChipTerminator(' ', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode.addChipTerminator(',', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode.addChipTerminator('\n', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode setDropDownBackgroundResource R.color.button_material_dark
-    restoreCode setAdapter new ArrayAdapter(me, style, MnemonicCode.INSTANCE.getWordList)
+    restoreCode setAdapter new ArrayAdapter(me, style,
+      MnemonicCode.INSTANCE.getWordList)
   }
 
   override def onBackPressed = wrap(super.onBackPressed)(app.kit.stopAsync)
-  def getMnemonicText = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")
+  def getMnemonicText: String = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")
   def setWhen(v: View) = mkForm(restoreWhen setText dp.human, none, baseBuilder(null, dp.pure), dialog_ok, dialog_cancel)
   def recWallet(v: View) = hideKeys(doRecoverWallet)
 
@@ -73,10 +69,10 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
       startAsync
 
       def startUp = {
-        val stamp = dp.cal.getTimeInMillis / 1000
-        val seed = new DeterministicSeed(getMnemonicText, null, "", stamp)
-        wallet = Wallet.fromSeed(app.params, seed, true)
-        prepare(this, password.getText)
+        // Make a seed from user provided mnemonic code and restore a wallet using it
+        val seed = new DeterministicSeed(getMnemonicText, null, "", dp.cal.getTimeInMillis / 1000)
+        wallet = Wallet.fromSeed(app.params, seed)
+        prepareFreshWallet(this)
       }
     }
 }

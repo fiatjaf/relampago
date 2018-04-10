@@ -12,18 +12,18 @@ import fr.acinq.eclair.UInt64
 
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
-  val chainHash = Block.LivenetGenesisBlock.hash
+  val chainHash = Block.TestnetGenesisBlock.hash
   val theirReserveToFundingRatio = 100
   val localFeatures = "02"
   val globalFeatures = ""
   val minDepth = 1
 
-  val maxCltvDelta = 28 * 144
+  val maxCltvDelta = 7 * 144L
   final val minHtlcValue = MilliSatoshi(1000L)
   final val maxHtlcValue = MilliSatoshi(1000000000L)
   final val maxChannelCapacity = MilliSatoshi(16777216000L)
 
-  var db: CipherOpenHelper = _
+  var db: LNOpenHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
   var extendedCloudKey: ExtendedPrivateKey = _
 
@@ -35,9 +35,9 @@ object LNParams { me =>
   lazy val cloudId = sha256(cloudSecret.data)
 
   def setup(seed: BinaryData) = generate(seed) match { case m =>
-    db = new CipherOpenHelper(app, dbFileName, sha256(seed).toString)
     extendedNodeKey = derivePrivateKey(m, hardened(46) :: hardened(0) :: Nil)
     extendedCloudKey = derivePrivateKey(m, hardened(92) :: hardened(0) :: Nil)
+    db = new LNOpenHelper(app, dbFileName)
   }
 
   def isFeeNotOk(msat: Long, fee: Long, hops: Int) =
@@ -54,7 +54,7 @@ object LNParams { me =>
 
   def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (n <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: n :: Nil)
-    LocalParams(maxHtlcValueInFlightMsat = UInt64(1000000000L), theirReserve, toSelfDelay = 144, maxAcceptedHtlcs = 25,
+    LocalParams(maxHtlcValueInFlightMsat = UInt64(1000000000L), theirReserve, toSelfDelay = 144 * 60, maxAcceptedHtlcs = 25,
       fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey,
       dustLimit = Satoshi(5460L), shaSeed = sha256(sha.privateKey.toBin), isFunder = true)
   }

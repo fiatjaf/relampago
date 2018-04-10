@@ -1,5 +1,6 @@
 package com.lightning.walletapp.ln
 
+import scala.concurrent.duration._
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Channel._
@@ -13,6 +14,7 @@ import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
+import rx.lang.scala.{Observable => Obs}
 
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
@@ -22,6 +24,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   var listeners: Set[ChannelListener] = _
 
   private[this] val events = new ChannelListener {
+    override def onProcessSuccess = { case ps => for (lst <- listeners if lst.onProcessSuccess isDefinedAt ps) lst onProcessSuccess ps }
     override def onError = { case malfunction => for (lst <- listeners if lst.onError isDefinedAt malfunction) lst onError malfunction }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
 
@@ -29,11 +32,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     override def fulfillReceived(ok: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived ok
     override def sentSig(cs: Commitments) = for (lst <- listeners) lst sentSig cs
     override def settled(cs: Commitments) = for (lst <- listeners) lst settled cs
-
-    override def chanCanBeRemoved(close: ClosingData) = for (lst <- listeners) lst chanCanBeRemoved close
-    override def txsShouldBeSent(close: ClosingData) = for (lst <- listeners) lst txsShouldBeSent close
-    override def gotRemoteError(err: Error) = for (lst <- listeners) lst gotRemoteError err
-    override def gotBestHeight = for (lst <- listeners) lst.gotBestHeight
   }
 
   def SEND(msg: LightningMessage): Unit
@@ -62,7 +60,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if accept.temporaryChannelId == cmd.tempChanId =>
 
         if (accept.minimumDepth > 6L) throw new LightningException("Their minimumDepth is too high")
-        if (accept.toSelfDelay > 1000) throw new LightningException("Their toSelfDelay is too high")
+        if (accept.toSelfDelay > 2016) throw new LightningException("Their toSelfDelay is too high")
         if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
         if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
         if (accept.channelReserveSatoshis > cmd.realFundingAmountSat / 10) throw new LightningException("Their proposed reserve is too high")
@@ -456,17 +454,16 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (null, norm: NormalData, null) => super.become(norm, OFFLINE)
 
 
-      // MISC
-
-
-      case (_, err: Error, WAIT_FOR_INIT | WAIT_FOR_ACCEPT | WAIT_FOR_FUNDING | WAIT_FUNDING_SIGNED) =>
-        // May happen if remote peer does not like any of our proposed parameters, nothing to lose here
-        throw new LightningException(err.humanText)
+      // ENDING A CHANNEL
 
 
       case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
-        // REFUNDING is an exception here, we CAN NOT start a local close in that state
-        events gotRemoteError err
+        // Wait for 5 seconds to catch their remote commit, CMDForceClose won't work in that case
+        Obs.just(CMDForceClose).delay(5.seconds).foreach(force => me process force)
+
+
+      case (some: HasCommitments, CMDForceClose, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
+        // REFUNDING is an exception here: no matter what happens we can't spend local in that state
         startLocalClose(some)
 
 
@@ -474,15 +471,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // CMDShutdown in WAIT_FUNDING_DONE and OPEN can be cooperative
         startLocalClose(some)
 
+
       case _ =>
     }
 
-    Tuple2(data, change) match {
-      case (close: ClosingData, _: CMDBestHeight) if close.isOutdated => events chanCanBeRemoved close
-      case (close: ClosingData, _: CMDSpent | _: CMDBestHeight) => events txsShouldBeSent close
-      case (_, _: CMDBestHeight) => events.gotBestHeight
-      case _ =>
-    }
+    // Change has been successfully processed
+    events onProcessSuccess Tuple2(data, change)
   }
 
   def sendFeeUpdate(norm: NormalData, updatedFeeRate: Long) =
@@ -523,7 +517,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     case _ => BECOME(me STORE ClosingData(some.announce, some.commitments, Nil, tx :: Nil), CLOSING)
   }
 
-  private def startLocalClose(some: HasCommitments) =
+  private def startLocalClose(some: HasCommitments): Unit =
     // Something went wrong and we decided to spend our CURRENT commit transaction
     // BUT if we're at negotiations AND we have a signed mutual closing tx then send it
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
@@ -605,18 +599,15 @@ trait ChannelListener {
     if (onBecome isDefinedAt nullTransition) onBecome(nullTransition)
   }
 
+  type Incoming = (ChannelData, Any)
   type Malfunction = (Channel, Throwable)
   type Transition = (Channel, ChannelData, String, String)
+  def onProcessSuccess: PartialFunction[Incoming, Unit] = none
   def onError: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
 
-  def outPaymentAccepted(rd: RoutingData): Unit = none
   def fulfillReceived(ok: UpdateFulfillHtlc): Unit = none
+  def outPaymentAccepted(rd: RoutingData): Unit = none
   def sentSig(cs: Commitments): Unit = none
   def settled(cs: Commitments): Unit = none
-
-  def chanCanBeRemoved(close: ClosingData): Unit = none
-  def txsShouldBeSent(close: ClosingData): Unit = none
-  def gotRemoteError(err: Error): Unit = none
-  def gotBestHeight: Unit = none
 }

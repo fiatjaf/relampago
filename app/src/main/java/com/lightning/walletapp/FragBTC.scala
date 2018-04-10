@@ -54,8 +54,8 @@ class FragBTC extends Fragment { me =>
 
 class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment { me =>
   val barMenuListener = new OnMenuItemClickListener { def onMenuItemClick(m: MenuItem) = host onOptionsItemSelected m }
-  import host.{timer, <, mkCheckForm, baseBuilder, onButtonTap, onFastTap, onTap, onFail, showDenomChooser, passWrap, checkPass}
   import host.{getResources, showForm, negBuilder, getString, str2View, rm, mkForm, UITask, getLayoutInflater, TxProcessor}
+  import host.{timer, <, mkCheckForm, baseBuilder, onButtonTap, onFastTap, onTap, onFail, showDenomChooser}
 
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
@@ -228,16 +228,13 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val increasedFee = RatesSaver.rates.feeLive divide 2
     val boost = coloredIn(wrap.valueDelta minus increasedFee)
     val userWarn = getString(boost_details).format(current, boost).html
+    mkForm(ok = <(replace, onError)(none), none, baseBuilder(userWarn, null),
+      dialog_next, dialog_cancel)
 
     // Transaction hiding must always happen before replacement sending
-    lazy val unsignedBoost = childPaysForParent(app.kit.wallet, wrap.tx, increasedFee)
-    def doReplace = runAnd(wrap.tx setMemo HIDE)(app.kit blockingSend app.kit.sign(unsignedBoost).tx)
-    def replace = if (wrap.depth < 1 && !wrap.isDead) doReplace
-
-    def encReplace(pass: String) = {
-      val crypter = app.kit.wallet.getKeyCrypter
-      unsignedBoost.aesKey = crypter deriveKey pass
-      replace
+    def replace = if (wrap.depth < 1 && !wrap.isDead) runAnd(wrap.tx setMemo HIDE) {
+      val unsignedBoost = childPaysForParent(app.kit.wallet, wrap.tx, increasedFee)
+      app.kit blockingSend app.kit.sign(unsignedBoost).tx
     }
 
     def onError(err: Throwable) = {
@@ -245,10 +242,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
       wrap.tx setMemo null
       onFail(err)
     }
-
-    def encReplaceFuture(pass: String) = <(encReplace(pass), onError)(none)
-    if (app.kit.wallet.isEncrypted) passWrap(userWarn) apply checkPass(encReplaceFuture)
-    else mkForm(ok = <(replace, onError)(none), none, baseBuilder(userWarn, null), dialog_next, dialog_cancel)
   }
 
   class BtcManager(val man: RateManager, alert: AlertDialog) { me =>

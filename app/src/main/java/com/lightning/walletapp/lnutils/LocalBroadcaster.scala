@@ -36,10 +36,11 @@ object LocalBroadcaster extends Broadcaster {
     tx.getConfidence.getDepthInBlocks -> isTxDead
   } getOrElse 0 -> false
 
-  override def txsShouldBeSent(close: ClosingData) = {
-    val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
-    val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
-    for (tx <- toSend) try app.kit blockingSend tx catch none
+  override def onProcessSuccess = {
+    case (close: ClosingData, _: Command) =>
+      val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
+      val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
+      for (tx <- toSend) try app.kit blockingSend tx catch none
   }
 
   override def onBecome = {

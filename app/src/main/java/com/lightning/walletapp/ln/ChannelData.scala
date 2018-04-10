@@ -23,6 +23,7 @@ case class CMDBestHeight(height: Long) extends Command
 case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
 case object CMDHTLCProcess extends Command
+case object CMDForceClose extends Command
 case object CMDShutdown extends Command
 case object CMDOffline extends Command
 case object CMDProceed extends Command

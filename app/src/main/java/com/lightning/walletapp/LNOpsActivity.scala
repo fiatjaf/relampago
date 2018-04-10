@@ -221,9 +221,13 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     val detailsListener = new ChannelListener {
-      override def gotBestHeight = nullOnBecome(chan)
       // Updates chan details to current chan state
-      // must be removed once activity is finished
+      // must be removed once fragment is finished
+
+      override def onProcessSuccess = {
+        // SImply update current UI on each new block
+        case (_, _: CMDBestHeight) => nullOnBecome(chan)
+      }
 
       override def onBecome = {
         case (_, waitFunding: WaitFundingDoneData, _, _) => manageFunding(waitFunding).run
@@ -237,7 +241,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
     val transitionListener = new ChannelListener {
       // Updates circle indicator to current chan state
-      // must also be removed once activity is finished
+      // must also be removed once fragment is finished
 
       override def onBecome = {
         case (_, _, from, CLOSING) if from != CLOSING => host.resetIndicator.run

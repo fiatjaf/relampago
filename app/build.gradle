@@ -10,7 +10,7 @@ android {
         multiDexEnabled true
         versionName "0.08"
         minSdkVersion 21
-        versionCode 29
+        versionCode 30
     }
 
     buildTypes {
@@ -32,15 +32,12 @@ android {
 dependencies {
     // Bitcoin and crypto
     compile files('libs/bitcoinj-core-0.15-SNAPSHOT-bundled.jar')
-    compile 'net.zetetic:android-database-sqlcipher:3.5.4@aar'
-
-    // Working with data formats
-    compile 'com.google.zxing:core:3.3.0'
+    compile 'com.google.code.ndef-tools-for-android:ndeftools:1.2.4'
     compile 'com.journeyapps:zxing-android-embedded:3.5.0@aar'
     compile 'com.softwaremill.quicklens:quicklens_2.11:1.4.11'
-    compile 'com.google.code.ndef-tools-for-android:ndeftools:1.2.4'
     compile 'org.scodec:scodec-core_2.11:1.10.3'
     compile 'io.spray:spray-json_2.11:1.3.4'
+    compile 'com.google.zxing:core:3.3.0'
 
     // Misc
     compile 'com.android.support:appcompat-v7:25.3.1'

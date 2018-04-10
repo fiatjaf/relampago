@@ -101,14 +101,11 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   val chanListener = new ChannelListener {
-    override def gotRemoteError(error: Error) = {
-      val dlg = negTextBuilder(dialog_ok, error.humanText)
-      UITask(host showForm dlg.create).run
-    }
+    // Inform user about important chan events
 
     override def onError = {
-      // Commit tx fee + channel reserve forbid sending
       case _ \ CMDReserveExcept(rpi, missingSat, reserveSat) =>
+        // Commit tx fee + channel reserve forbid payment sending
 
         val message = getString(err_ln_fee_overflow)
         val reserve = coloredIn apply Satoshi(reserveSat)
@@ -121,8 +118,19 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         onFail(host getString code)
 
       case chan \ error =>
+        // Inner exception has been thrown
         val content = UncaughtHandler toText error
         val dlg = negTextBuilder(dialog_ok, content)
+        UITask(host showForm dlg.create).run
+    }
+
+    override def onProcessSuccess = {
+      // Remote peer has sent an error message
+      // display contents to user to clarify
+
+      case (_, error: Error) =>
+        val message = error.exception.getMessage
+        val dlg = negTextBuilder(dialog_ok, message)
         UITask(host showForm dlg.create).run
     }
 

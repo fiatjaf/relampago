@@ -1,11 +1,11 @@
 package com.lightning.walletapp.lnutils
 
 import spray.json._
+import android.database.sqlite._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import com.lightning.walletapp.ln.Tools.{random, runAnd, none}
+import com.lightning.walletapp.ln.Tools.{none, random, runAnd}
 import com.lightning.walletapp.lnutils.olympus.CloudData
-import net.sqlcipher.database.SQLiteDatabase
 import android.content.Context
 import android.net.Uri
 
@@ -105,15 +105,14 @@ object RevokedTable extends Table {
 
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
-class CipherOpenHelper(context: Context, name: String, secret: String)
-  extends net.sqlcipher.database.SQLiteOpenHelper(context, name, null, 1) {
+class LNOpenHelper(context: Context, name: String)
+  extends SQLiteOpenHelper(context, name, null, 1) {
 
-  SQLiteDatabase loadLibs context
-  val base = getWritableDatabase(secret)
+  val base = getWritableDatabase
   def onUpgrade(dbs: SQLiteDatabase, oldVer: Int, newVer: Int) = none
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
-  def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.wallet/table/$tbl"
+  def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.walletapp/table/$tbl"
 
   def txWrap(run: => Unit) = try {
     runAnd(base.beginTransaction)(run)

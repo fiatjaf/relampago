@@ -124,13 +124,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
         val rd1Opt = pendingPayments get add.paymentHash
         rd1Opt map parseFailureCutRoutes(failReason) match {
-          case Some(updRD1 \ badNodesAndChans) if updRD1.ok =>
-            // Clear cached routes so they don't get in the way
-            // then try use the routes left or fetch new ones
+          // Clear cached routes so they don't get in the way
+          // then try use the routes left or fetch new ones
 
-            goodRoutes -= updRD1.pr.nodeId
-            badNodesAndChans foreach BadEntityWrap.putEntity.tupled
-            app.ChannelManager.sendEither(useRoutesLeft(updRD1), newRoutes)
+          case Some(prunedRD \ exclude) =>
+            goodRoutes -= prunedRD.pr.nodeId
+            for (entity <- exclude) BadEntityWrap.putEntity tupled entity
+            app.ChannelManager.sendEither(useRoutesLeft(prunedRD), newRoutes)
 
           case _ =>
             // Either halted or not found at all
@@ -149,9 +149,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     uiNotify
   }
 
-  override def chanCanBeRemoved(close: ClosingData) =
-    // Mutual has enough confirmations or hard timeout has run out
-    db.change(ChannelTable.killSql, close.commitments.channelId)
+  override def onProcessSuccess = {
+    case (close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
+      // Mutual tx has enough confirmations or hard timeout passed out
+      db.change(ChannelTable.killSql, close.commitments.channelId)
+  }
 
   override def onBecome = {
     case (chan, _, from, CLOSING) if from != CLOSING =>
