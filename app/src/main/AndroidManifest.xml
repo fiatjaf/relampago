@@ -2,9 +2,8 @@
     package="com.lightning.walletapp"
     xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-feature android:name="android.hardware.fingerprint" android:required="false"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
@@ -19,20 +18,27 @@
         android:normalScreens="true"/>
 
     <application
-        android:label="Bitcoin"
         android:name="com.lightning.walletapp.WalletApp"
-        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
         android:fullBackupContent="false"
-        android:icon="@drawable/ic_launcher">
+        android:allowBackup="false"
+        android:label="Bitcoin">
 
-        <receiver
-            android:process=":remote"
-            android:name="com.lightning.walletapp.lnutils.Notificator"/>
+        <receiver android:enabled="true" android:process=":remote"
+            android:name="com.lightning.walletapp.lnutils.Notificator">
+
+            <intent-filter>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.QUICKBOOT_POWERON"/>
+            </intent-filter>
+
+        </receiver>
 
         <activity
             android:name="com.lightning.walletapp.MainActivity"
-            android:theme="@style/NoBarMain"
-            android:screenOrientation="portrait">
+            android:screenOrientation="portrait"
+            android:theme="@style/NoBarMain">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>

@@ -303,6 +303,10 @@ class WalletApp extends Application { me =>
       PaymentInfoWrap.markFailedAndFrozen
       ChannelManager.initConnect
       RatesSaver.initialize
+
+      Notificator.removeResyncNotification
+      if (ChannelManager.notClosingOrRefunding.nonEmpty)
+        Notificator.scheduleResyncNotificationOnceAgain
     }
   }
 }

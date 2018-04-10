@@ -157,13 +157,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onBecome = {
     case (chan, _, from, CLOSING) if from != CLOSING =>
-      val template = app getString R.string.chan_notice_body
-      Notificator chanClosed template.format(chan.data.announce.alias)
+      // Mark dropped and frozen payments, visually notify
       markFailedAndFrozen
       uiNotify
 
     case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
       // We may need to send an LN payment in -> OPEN unless it is a shutdown
+      Notificator.scheduleResyncNotificationOnceAgain
       OlympusWrap tellClouds OlympusWrap.CMDStart
   }
 }
@@ -209,30 +209,24 @@ object BadEntityWrap {
   }
 }
 
-// CHANNEL CLOSED NOTIFICATION
+// RESYNC NOTIFICATION
 
 object Notificator {
-  def chanClosed(extra: String) = try {
-    val notificatorClass = classOf[Notificator]
-    val parametersIntent = new Intent(app, notificatorClass).putExtra("extra", extra)
-    val alarmManager = app.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager]
-    val pendingIntent = PendingIntent.getBroadcast(app, 0, parametersIntent, 0)
-    alarmManager.set(AlarmManager.RTC_WAKEUP, 0, pendingIntent)
-  } catch none
+  private[this] val notificatorClass = classOf[Notificator]
+  def getIntent = PendingIntent.getBroadcast(app, 0, new Intent(app, notificatorClass), 0)
+  def getAlarmManager = app.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager]
+  def removeResyncNotification = getAlarmManager cancel getIntent
+
+  def scheduleResyncNotificationOnceAgain =
+    try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
+      System.currentTimeMillis + 1000 * 3600 * 24 * 21, getIntent) catch none
 }
 
 class Notificator extends BroadcastReceiver {
-  def onReceive(ct: Context, intent: Intent) = try {
-    // Immediately let user know a channel has been closed
-    // used instead of toast so can be seen at later time
-
-    val target = classOf[MainActivity]
+  def onReceive(ct: Context, intent: Intent) = classOf[MainActivity] match { case target =>
     val targetIntent = PendingIntent.getActivity(ct, 0, new Intent(ct, target), PendingIntent.FLAG_UPDATE_CURRENT)
-    val builder = new NotificationCompat.Builder(ct).setContentIntent(targetIntent).setSmallIcon(R.drawable.dead)
-      .setAutoCancel(true).setContentTitle(ct getString R.string.chan_notice_title)
-      .setContentText(intent.getExtras getString "extra")
-
-    val service = ct.getSystemService(Context.NOTIFICATION_SERVICE)
-    service.asInstanceOf[NotificationManager].notify(1, builder.build)
-  } catch none
+    try ct.getSystemService(Context.NOTIFICATION_SERVICE).asInstanceOf[NotificationManager].notify(1, new NotificationCompat.Builder(ct)
+      .setContentIntent(targetIntent).setSmallIcon(R.drawable.dead).setContentTitle(ct getString R.string.notice_sync_title)
+      .setContentText(ct getString R.string.notice_sync_body).setAutoCancel(true).build) catch none
+  }
 }
