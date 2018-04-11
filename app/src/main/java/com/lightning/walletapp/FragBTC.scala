@@ -117,8 +117,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
   def peerStatus = {
     val numPeers = app.kit.peerGroup.numConnectedPeers
-    // Additional measure in case if ChannelManager listener fails
-    if (numPeers > 3) LNParams.broadcaster.bestHeightObtained = true
     if (numPeers < 1) btc_status_connecting else btc_status_online
   }
 

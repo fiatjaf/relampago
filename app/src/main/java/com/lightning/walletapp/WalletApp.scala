@@ -157,6 +157,7 @@ class WalletApp extends Application { me =>
 
     val chainEventsListener = new TxTracker with BlocksListener {
       override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
+      def tellHeight(left: Int) = if (left < 1) for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
       override def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
       override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
 
@@ -167,11 +168,6 @@ class WalletApp extends Application { me =>
         val spent = CMDSpent(txj)
         bag.extractPreimage(spent.tx)
         for (c <- all) c process spent
-      }
-
-      def tellHeight(left: Int) = runAnd(broadcaster.bestHeightObtained = true) {
-        // No matter how many are left, we only send a CMD once the last block is done
-        if (left < 1) for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
       }
     }
 
@@ -211,8 +207,7 @@ class WalletApp extends Application { me =>
       if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
       else if (isDone.isSuccess) Obs error new LightningException(me getString err_ln_fulfilled)
       else if (capablePeerNodes.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      else if (broadcaster.bestHeightObtained) addRoutesAndOnion(capablePeerNodes, rd)
-      else Obs error new LightningException(me getString dialog_chain_behind)
+      else addRoutesAndOnion(capablePeerNodes, rd)
     }
 
     def addRoutesAndOnion(peers: PublicKeyVec, rd: RoutingData) = {

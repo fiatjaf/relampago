@@ -323,15 +323,13 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   def goAddChannel(top: View) =
-    if (!broadcaster.isSynchronized) app toast dialog_chain_behind
-    else if (app.ChannelManager.all.nonEmpty) me goTo classOf[LNStartActivity]
-    else {
-      val tokens = MilliSatoshi(500000L)
+    if (app.ChannelManager.all.isEmpty) {
+      val tokens = MilliSatoshi(amount = 500000L)
       val humanIn = humanFiat(coloredIn(tokens), tokens, " ")
       val warning = getString(tokens_warn).format(humanIn).html
       val warn = baseTextBuilder(warning).setCustomTitle(me getString action_ln_open)
       mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
-    }
+    } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
     val btcFunds = coin2MSat(app.kit.conf0Balance)
@@ -382,11 +380,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       // by fetching encrypted static channel params from server
 
       rm(menu) {
-        if (!broadcaster.isSynchronized) app toast dialog_chain_behind else {
-          // We only allow recovering once BTC is synchronized to avoid issues
-          val bld = baseTextBuilder(me getString channel_recovery_info)
-          mkForm(recover, none, bld, dialog_next, dialog_cancel)
-        }
+        val bld = baseTextBuilder(me getString channel_recovery_info)
+        mkForm(recover, none, bld, dialog_next, dialog_cancel)
 
         def recover: Unit = {
           OlympusWrap.getBackup(cloudId).foreach(backups => {

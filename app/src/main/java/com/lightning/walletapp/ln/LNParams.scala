@@ -93,10 +93,6 @@ trait Broadcaster extends ChannelListener { me =>
   def isSynchronized: Boolean
   def currentHeight: Long
   def ratePerKwSat: Long
-
-  // Indicates whether any of peers have told us the best height
-  // this is required to not send HTLCs with expiry in past
-  var bestHeightObtained = false
   val blocksPerDay = 144
 
   // Parent state and next tier cltv delay

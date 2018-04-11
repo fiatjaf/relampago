@@ -1,4 +1,4 @@
-<FrameLayout
+<LinearLayout
     style="@style/StandardLinearLayoutPage"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android">
@@ -23,4 +23,4 @@
         android:layout_height="wrap_content"
         android:id="@+id/walletPager"/>
 
-</FrameLayout>
+</LinearLayout>

@@ -226,7 +226,6 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
         case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
         case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
         case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
-        case _ if !broadcaster.bestHeightObtained => app toast dialog_chain_behind
         case Failure(reason) => app toast dialog_sum_empty
 
         case Success(ms) => rm(alert) {
