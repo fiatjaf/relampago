@@ -34,7 +34,7 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
   lazy val restoreCode = findViewById(R.id.restoreCode).asInstanceOf[NachoTextView]
   lazy val restoreWallet = findViewById(R.id.restoreWallet).asInstanceOf[Button]
   lazy val restoreWhen = findViewById(R.id.restoreWhen).asInstanceOf[Button]
-  lazy val dp = new WhenPicker(me, 1525132800 * 1000)
+  lazy val dp = new WhenPicker(me, 1519862400L * 1000)
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_restore)

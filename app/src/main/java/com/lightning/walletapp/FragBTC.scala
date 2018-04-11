@@ -201,7 +201,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
 
     def next(msat: MilliSatoshi) = new TxProcessor {
       val pay = AddrData(msat, formManager.getAddress)
-
       def futureProcess(unsignedRequest: SendRequest) = {
         add(getString(btc_announcing), Informer.BTCEVENT).run
         app.kit blockingSend app.kit.sign(unsignedRequest).tx

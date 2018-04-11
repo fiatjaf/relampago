@@ -56,6 +56,20 @@ object BadEntityTable extends Table {
     COMMIT"""
 }
 
+object RouteTable extends Table {
+  val (table, path, targetNode, expire) = Tuple4("route", "path", "targetNode", "expire")
+  val newSql = s"INSERT OR IGNORE INTO $table ($path, $targetNode, $expire) VALUES (?, ?, ?)"
+  val updSql = s"UPDATE $table SET $path = ?, $expire = ? WHERE $targetNode = ?"
+  val selectSql = s"SELECT * FROM $table WHERE $targetNode = ? AND $expire > ?"
+
+  val createSql = s"""
+    CREATE TABLE $table (
+      $id INTEGER PRIMARY KEY AUTOINCREMENT, $path STRING NOT NULL,
+      $targetNode STRING UNIQUE NOT NULL, $expire INTEGER NOT NULL
+    ); CREATE INDEX idx1$table ON $table ($targetNode, $expire);
+    COMMIT"""
+}
+
 object PaymentTable extends Table {
   val (search, limit) = ("search", 24)
   val (table, pr, preimage, incoming, status, stamp) = ("payment", "pr", "preimage", "incoming", "status", "stamp")
@@ -126,6 +140,7 @@ class LNOpenHelper(context: Context, name: String)
     dbs execSQL ChannelTable.createSql
     dbs execSQL OlympusTable.createSql
     dbs execSQL RevokedTable.createSql
+    //dbs execSQL RouteTable.createSql
 
     // Randomize an order of two available default servers
     val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")

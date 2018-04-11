@@ -190,8 +190,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   def viewMnemonic(view: View) = {
-    val seed = app.kit.wallet.getKeyChainSeed
-    val recoveryCode = TextUtils.join("\u0020", seed.getMnemonicCode)
+    val recoveryCode = TextUtils.join("\u0020", app.kit.wallet.getKeyChainSeed.getMnemonicCode)
     showForm(negBuilder(dialog_ok, me getString sets_mnemonic, recoveryCode).create)
   }
 
@@ -232,7 +231,8 @@ trait TimerActivity extends AppCompatActivity { me =>
     def plainRequest(selectedFee: Coin) = {
       val unsignedRequestWithFee = pay.getRequest
       unsignedRequestWithFee.feePerKb = selectedFee
-      app.kit.wallet assembleTx unsignedRequestWithFee
+      app.kit.wallet addLocalInputsToTx unsignedRequestWithFee
+      app.kit.wallet maybeAddOpReturnPubKeyHash unsignedRequestWithFee
       unsignedRequestWithFee
     }
 

@@ -16,17 +16,14 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import scala.util.{Success, Try}
-import android.content.{DialogInterface, Intent}
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
-import fr.castorflex.android.smoothprogressbar.{SmoothProgressBar, SmoothProgressDrawable}
 import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.ln.Channel.estimateTotalCanSend
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import android.content.DialogInterface.OnDismissListener
 import android.content.Context.LAYOUT_INFLATER_SERVICE
 import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -44,7 +41,7 @@ import com.google.common.io.Files
 import java.text.SimpleDateFormat
 import org.bitcoinj.core.Address
 import scala.collection.mutable
-import android.text.InputType
+import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import android.net.Uri
@@ -182,9 +179,7 @@ object WalletActivity {
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
   lazy val walletPagerTab = findViewById(R.id.walletPagerTab).asInstanceOf[SmartTabLayout]
-  lazy val layoutInflater = app.getSystemService(LAYOUT_INFLATER_SERVICE).asInstanceOf[LayoutInflater]
   lazy val viewParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-  lazy val container = findViewById(R.id.container).asInstanceOf[FrameLayout]
   private[this] var listState = OnScrollListener.SCROLL_STATE_IDLE
   private[this] var pagerState = ViewPager.SCROLL_STATE_IDLE
   import WalletActivity.{lnOpt, btcOpt}
@@ -208,19 +203,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val items = FragmentPagerItems `with` me
     val ready = items.add("bitcoin", fragBTC).add("lightning", fragLN).add("scanner", fragScan)
     new FragmentPagerItemAdapter(getSupportFragmentManager, ready.create)
-  }
-
-  def placeLoader = {
-    val loader = layoutInflater.inflate(R.layout.frag_progress_bar, null).asInstanceOf[SmoothProgressBar]
-    val drawable: SmoothProgressDrawable = loader.getIndeterminateDrawable.asInstanceOf[SmoothProgressDrawable]
-    timer.schedule(drawable.setColors(getResources getIntArray R.array.bar_colors), 100)
-    container.addView(loader, viewParams)
-    loader
-  }
-
-  def removeLoader(loader: SmoothProgressBar) = {
-    timer.schedule(container removeView loader, 3000)
-    timer.schedule(loader.progressiveStop, 200)
   }
 
   override def onResume = wrap(super.onResume) {

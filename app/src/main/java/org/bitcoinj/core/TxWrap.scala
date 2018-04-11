@@ -33,7 +33,7 @@ class TxWrap(val tx: Transaction) {
   val visibleValue =
     if (valueDelta.isPositive) valueDelta // This is an incoming tx, we don't care about fee
     else if (valueWithoutFee.isZero) nativeSentToMe // This is a to-itself transaction, hide the fee
-    else valueWithoutFee // This is an outgoing tx, remove the fee part
+    else valueWithoutFee // This is an outgoing tx, subtract the fee
 
   // Depending on whether this is an incoming or outgoing transaction
   // we collect either outputs which belong to us or the foreign ones

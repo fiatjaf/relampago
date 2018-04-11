@@ -2,9 +2,4 @@
     <item name="bg" type="color">#282B30</item>
     <item name="btc" type="color">#FF9900</item>
     <item name="ln" type="color">#0099FE</item>
-
-    <integer-array name="bar_colors">
-        <item>@android:color/white</item>
-        <item>@android:color/black</item>
-    </integer-array>
 </resources>

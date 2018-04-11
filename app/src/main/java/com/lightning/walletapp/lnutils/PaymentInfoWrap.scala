@@ -29,8 +29,6 @@ import rx.lang.scala.{Observable => Obs}
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   private[this] val pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
-  val goodRoutes = mutable.Map.empty[PublicKey, PaymentRouteVec]
-
   private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
   def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
   def getAllRevoked(number: Long) = RichCursor apply db.select(RevokedTable.selectSql, number) vec toRevoked
@@ -93,15 +91,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     uiNotify
   }
 
-  override def fulfillReceived(ok: UpdateFulfillHtlc) = {
-    // Save preimage right away, don't wait for their commitSig
+  override def fulfillReceived(ok: UpdateFulfillHtlc) = db txWrap {
+    // Save preimage right away, don't wait for their next commitSig
     // receiving a preimage means that payment is fulfilled
     updOkOutgoing(ok)
 
     pendingPayments.values.find(_.pr.paymentHash == ok.paymentHash) foreach { rd =>
-      // Make payment searchable + runtime optimization: record last successful route
+      // Make payment searchable + routing optimization: record subroutes in database
       db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
-      goodRoutes(rd.pr.nodeId) = rd.usedRoute +: rd.routes
+      if (rd.usedRoute.nonEmpty) RouteWrap putSubRoutes rd
     }
   }
 
@@ -127,9 +125,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
           // Clear cached routes so they don't get in the way
           // then try use the routes left or fetch new ones
 
-          case Some(prunedRD \ exclude) =>
-            goodRoutes -= prunedRD.pr.nodeId
-            for (entity <- exclude) BadEntityWrap.putEntity tupled entity
+          case Some(prunedRD \ excludes) =>
+            for (entity <- excludes) BadEntityWrap.putEntity tupled entity
             app.ChannelManager.sendEither(useRoutesLeft(prunedRD), newRoutes)
 
           case _ =>
@@ -187,30 +184,48 @@ object ChannelWrap {
   }
 }
 
+object RouteWrap {
+  def putSubRoutes(rd: RoutingData) = {
+    // This will only work if we have at least one hop, should check if route vector is empty
+    // then merge each of generated subroutes with a respected routing node or recipient node key
+    val subs = (rd.usedRoute drop 1).scanLeft(rd.usedRoute take 1) { case rs \ hop => rs :+ hop }
+
+    for (_ \ node \ path <- rd.onion.sharedSecrets drop 1 zip subs) {
+      val expiration = System.currentTimeMillis + 1000 * 3600 * 24 * 7
+      val subPathJson = Vector(path).toJson.toString
+      val subNodeString = node.toString
+
+      db.change(RouteTable.newSql, subPathJson, subNodeString, expiration)
+      db.change(RouteTable.updSql, subPathJson, expiration, subNodeString)
+    }
+  }
+
+  def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
+    val cursor = db.select(RouteTable.selectSql, targetId, System.currentTimeMillis)
+    val routeTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRouteVec]
+    val validRouteTry = routeTry.filter(from contains _.head.head.nodeId).map(rs => Obs just rs)
+    validRouteTry getOrElse BadEntityWrap.findRoutes(from, targetId, rd)
+  }
+}
+
 object BadEntityWrap {
+  // entity is either nodeId or shortChannelId
+  // targetNodeId is either nodeId or TARGET_ALL to match all nodes
   val putEntity = (entity: Any, targetNodeId: String, span: Long, msat: Long) => {
-    // Insert and then update because of INSERT IGNORE effects on entity:targetNodeId key
     db.change(BadEntityTable.newSql, entity, targetNodeId, System.currentTimeMillis + span, msat)
     db.change(BadEntityTable.updSql, System.currentTimeMillis + span, msat, entity, targetNodeId)
   }
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
-    // Make sure the first cached route starts at a node which is operational currently
-    // becuase of possible assisted routes a target node may not equal a payee node at this stage
-    val good = PaymentInfoWrap.goodRoutes.get(rd.pr.nodeId).filter(from contains _.head.head.nodeId)
-    good.map(Obs just _) getOrElse doFindRoutes(from, targetId, rd.firstMsat)
-  }
-
-  private def doFindRoutes(from: PublicKeyVec, targetId: PublicKey, msat: Long) = {
-    // Short channel id length is 32 so anything of length beyond 60 is definitely a node id
-    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, msat, TARGET_ALL, targetId)
-    val badNodes \ badChans = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
-    OlympusWrap findRoutes OutRequest(badNodes, for (chanId <- badChans) yield chanId.toLong, from, targetId)
+    // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
+    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, rd.firstMsat, TARGET_ALL, targetId)
+    val badNodes \ badChanIds = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
+    OlympusWrap findRoutes OutRequest(badNodes, for (id <- badChanIds) yield id.toLong, from, targetId)
   }
 }
 
 object GossipCatcher extends ChannelListener {
-  // Catch ChannelUpdates to enable funds receiving
+  // Catch ChannelUpdate to enable funds receiving
 
   override def onProcessSuccess = {
     case (chan, norm: NormalData, _: CMDBestHeight)

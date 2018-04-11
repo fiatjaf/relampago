@@ -242,13 +242,11 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
     }
   }
 
-  def doSend(rd: RoutingData) =
-    host.placeLoader match { case indeterminateLoader =>
-      val request = app.ChannelManager.withRoutesAndOnionRD(rd)
-      val request1 = request.doOnTerminate(host removeLoader indeterminateLoader)
-      def noRoutes(emptyRoutes: RoutingData) = onFail(host getString err_ln_no_route)
-      request1.foreach(foeRD => app.ChannelManager.sendEither(foeRD, noRoutes), onFail)
-    }
+  def doSend(rd: RoutingData) = {
+    val request = app.ChannelManager.withRoutesAndOnionRD(rd)
+    def noRoutes(emptyRoutes: RoutingData) = onFail(host getString err_ln_no_route)
+    request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, noRoutes), onFail)
+  }
 
   def makePaymentRequest = ifOperational { operationalChannels =>
     val chansWithRoutes = operationalChannels.flatMap(channelAndHop).toMap
