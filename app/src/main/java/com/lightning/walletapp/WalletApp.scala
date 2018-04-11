@@ -193,30 +193,32 @@ class WalletApp extends Application { me =>
       doProcess(bootstrap)
     }
 
-    def withRoutesAndOnionRD(rd: RoutingData) = {
-      val isFrozen = frozenInFlightHashes.contains(rd.pr.paymentHash)
-      if (isFrozen) Obs error new LightningException(me getString err_ln_frozen)
-      else withRoutesAndOnionRDFrozenAllowed(rd)
+    def withRoutesAndOnionRD(rd: RoutingData, useCache: Boolean) = {
+      val isPaymentFrozen = frozenInFlightHashes.contains(rd.pr.paymentHash)
+      if (isPaymentFrozen) Obs error new LightningException(me getString err_ln_frozen)
+      else withRoutesAndOnionRDFrozenAllowed(rd, useCache)
     }
 
-    def withRoutesAndOnionRDFrozenAllowed(rd: RoutingData) = {
-      val isInFlight = activeInFlightHashes.contains(rd.pr.paymentHash)
+    def withRoutesAndOnionRDFrozenAllowed(rd: RoutingData, useCache: Boolean) = {
       val isDone = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
       val capablePeerNodes = canSend(amount = rd.firstMsat).map(_.data.announce.nodeId)
+      val isInFlight = activeInFlightHashes.contains(rd.pr.paymentHash)
 
       if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
       else if (isDone.isSuccess) Obs error new LightningException(me getString err_ln_fulfilled)
       else if (capablePeerNodes.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      else addRoutesAndOnion(capablePeerNodes, rd)
+      else addRoutesAndOnion(capablePeerNodes, rd, useCache)
     }
 
-    def addRoutesAndOnion(peers: PublicKeyVec, rd: RoutingData) = {
-      // If payment request contains some routing info then we request
-      // assisted routes, otherwise we directly ask for payee id
+    def addRoutesAndOnion(peers: PublicKeyVec, rd: RoutingData, useCache: Boolean) = {
+      // If payment request contains assisted routing info then we request assisted routes,
+      // otherwise we directly ask for recipient nodeId
 
-      def getRoutes(targetId: PublicKey) =
-        if (peers contains targetId) Obs just Vector(Vector.empty)
-        else BadEntityWrap.findRoutes(peers, targetId, rd)
+      def getRoutes(targetId: PublicKey) = peers contains targetId match {
+        case false if useCache => RouteWrap.findRoutes(peers, targetId, rd)
+        case false => BadEntityWrap.findRoutes(peers, targetId, rd)
+        case true => Obs just Vector(Vector.empty)
+      }
 
       def withExtraPart = for {
         tag <- Obs from rd.pr.routingInfo

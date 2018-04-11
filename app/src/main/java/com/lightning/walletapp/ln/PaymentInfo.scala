@@ -31,7 +31,8 @@ object PaymentInfo {
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
-    RoutingData(pr, Vector.empty, Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat, 0L, 0L, 4)
+    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
+      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4)
   }
 
   def emptyRDFromInfo(info: PaymentInfo) = emptyRD(info.pr, info.firstMsat)

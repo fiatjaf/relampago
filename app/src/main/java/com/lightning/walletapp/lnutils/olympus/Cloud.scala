@@ -74,10 +74,9 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
       def onError(err: Throwable) = err.getMessage match {
         case "notfulfilled" => if (!pr.isFresh) me BECOME data.copy(info = None) else {
-          // Delayed retry here since call may happen when app has just been opened and is offline
-          val send = retry(obsOnIO.flatMap(_ => me withRoutesAndOnionRDFromPR pr), pickInc, 6 to 7)
-          val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
-          send1.foreach(foeRD => app.ChannelManager.sendEither(foeRD, none), none)
+          // Apparently payment has been failed but request is still fresh so retry it instead of getting a new request
+          val send = withRoutesAndOnionRDFromPR(pr) doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
+          send.foreach(foeRD => app.ChannelManager.sendEither(foeRD, none), none)
         }
 
         case "notfound" => me BECOME data.copy(info = None)
@@ -114,14 +113,14 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   private def getFreshData = for {
     prAndMemo @ (pr, memo) <- getPaymentRequestBlindMemo
     if pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
-    Right(rd) <- me withRoutesAndOnionRDFromPR pr
+    Right(rd) <- withRoutesAndOnionRDFromPR(pr)
     info = Some(prAndMemo)
     if data.info.isEmpty
   } yield rd -> info
 
   private def withRoutesAndOnionRDFromPR(pr: PaymentRequest) =
-    // These payments will always be dust so frozen state is not an issue
-    app.ChannelManager withRoutesAndOnionRDFrozenAllowed emptyRD(pr, pr.unsafeMsat)
+    // These payments will always be near dust so it is safe to retry them even if they are frozen
+    app.ChannelManager.withRoutesAndOnionRDFrozenAllowed(emptyRD(pr, pr.unsafeMsat), useCache = true)
 
   private def capableChannelExists =
     // Estimate whethere we can send a MAX price

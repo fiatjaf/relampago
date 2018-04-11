@@ -68,7 +68,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def newRoutes(rd: RoutingData) = if (rd.callsLeft > 0) {
-    val request = app.ChannelManager withRoutesAndOnionRD rd.copy(callsLeft = rd.callsLeft - 1)
+    val rdMinusOneCall = rd.copy(callsLeft = rd.callsLeft - 1)
+    val request = app.ChannelManager.withRoutesAndOnionRD(rdMinusOneCall, useCache = false)
     request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, failOnUI), _ => me failOnUI rd)
   } else updStatus(FAILURE, rd.pr.paymentHash)
 

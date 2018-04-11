@@ -242,7 +242,7 @@ class FragLNWorker(val host: WalletActivity, frag: View) extends ListToggler wit
   }
 
   def doSend(rd: RoutingData) = {
-    val request = app.ChannelManager.withRoutesAndOnionRD(rd)
+    val request = app.ChannelManager.withRoutesAndOnionRD(rd, useCache = true)
     def noRoutes(emptyRoutes: RoutingData) = onFail(host getString err_ln_no_route)
     request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, noRoutes), onFail)
   }
