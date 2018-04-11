@@ -122,8 +122,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
         val rd1Opt = pendingPayments get add.paymentHash
         rd1Opt map parseFailureCutRoutes(failReason) match {
-          // Clear cached routes so they don't get in the way
-          // then try use the routes left or fetch new ones
+          // Try use the routes left or fetch new ones if empty
 
           case Some(prunedRD \ excludes) =>
             for (entity <- excludes) BadEntityWrap.putEntity tupled entity
@@ -210,15 +209,14 @@ object RouteWrap {
 
 object BadEntityWrap {
   // entity is either nodeId or shortChannelId
-  // targetNodeId is either nodeId or TARGET_ALL to match all nodes
-  val putEntity = (entity: Any, targetNodeId: String, span: Long, msat: Long) => {
-    db.change(BadEntityTable.newSql, entity, targetNodeId, System.currentTimeMillis + span, msat)
-    db.change(BadEntityTable.updSql, System.currentTimeMillis + span, msat, entity, targetNodeId)
+  val putEntity = (entity: String, span: Long, msat: Long) => {
+    db.change(BadEntityTable.newSql, entity, System.currentTimeMillis + span, msat)
+    db.change(BadEntityTable.updSql, System.currentTimeMillis + span, msat, entity)
   }
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
-    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, rd.firstMsat, TARGET_ALL, targetId)
+    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChanIds = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
     OlympusWrap findRoutes OutRequest(badNodes, for (id <- badChanIds) yield id.toLong, from, targetId)
   }

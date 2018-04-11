@@ -73,4 +73,3 @@ object FailureMessageCodecs {
     .typecase(cr = disabled.as[ChannelDisabled], tag = UPDATE | 20)
     .typecase(cr = provide(ExpiryTooFar), tag = 21)
 }
-

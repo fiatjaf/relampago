@@ -42,17 +42,19 @@ object ChannelTable extends Table {
 }
 
 object BadEntityTable extends Table {
-  val (table, resId, targetNode, expire, amount) = ("badentity", "resId", "targetNode", "expire", "amount")
-  val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $amount <= ? AND $targetNode IN (?, ?) LIMIT 320"
-  val newSql = s"INSERT OR IGNORE INTO $table ($resId, $targetNode, $expire, $amount) VALUES (?, ?, ?, ?)"
-  val updSql = s"UPDATE $table SET $expire = ?, $amount = ? WHERE $resId = ? AND $targetNode = ?"
+  val (table, resId, expire, amount) = ("badentity", "resId", "expire", "amount")
+  val newSql = s"INSERT OR IGNORE INTO $table ($resId, $expire, $amount) VALUES (?, ?, ?)"
+  val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $amount <= ? LIMIT 320"
+  val updSql = s"UPDATE $table SET $expire = ?, $amount = ? WHERE $resId = ?"
+  val createIndex = s"CREATE INDEX idx1$table ON $table ($expire, $amount)"
 
   val createSql = s"""
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
-      $resId STRING NOT NULL, $targetNode STRING NOT NULL, $expire INTEGER NOT NULL,
-      $amount INTEGER NOT NULL, UNIQUE($resId, $targetNode) ON CONFLICT IGNORE
-    ); CREATE INDEX idx1$table ON $table ($expire, $amount, $targetNode);
+      $resId STRING NOT NULL UNIQUE,
+      $expire INTEGER NOT NULL,
+      $amount INTEGER NOT NULL
+    ); $createIndex;
     COMMIT"""
 }
 
@@ -65,7 +67,7 @@ object RouteTable extends Table {
   val createSql = s"""
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $path STRING NOT NULL,
-      $targetNode STRING UNIQUE NOT NULL, $expire INTEGER NOT NULL
+      $targetNode STRING NOT NULL UNIQUE, $expire INTEGER NOT NULL
     ); CREATE INDEX idx1$table ON $table ($targetNode, $expire);
     COMMIT"""
 }
@@ -98,7 +100,7 @@ object PaymentTable extends Table {
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $pr STRING NOT NULL,
       $preimage STRING NOT NULL,$incoming INTEGER NOT NULL, $status INTEGER NOT NULL,
-      $stamp INTEGER NOT NULL, $description STRING NOT NULL, $hash STRING UNIQUE NOT NULL,
+      $stamp INTEGER NOT NULL, $description STRING NOT NULL, $hash STRING NOT NULL UNIQUE,
       $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL
     ); CREATE INDEX idx1$table ON $table ($status);
     COMMIT"""

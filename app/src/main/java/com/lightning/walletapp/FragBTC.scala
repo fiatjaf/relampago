@@ -226,7 +226,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val boost = coloredIn(wrap.valueDelta minus increasedFee)
     val userWarn = getString(boost_details).format(current, boost).html
     mkForm(ok = <(replace, onError)(none), none, baseBuilder(userWarn, null),
-      dialog_next, dialog_cancel)
+      dialog_ok, dialog_cancel)
 
     // Transaction hiding must always happen before replacement sending
     def replace = if (wrap.depth < 1 && !wrap.isDead) runAnd(wrap.tx setMemo HIDE) {
