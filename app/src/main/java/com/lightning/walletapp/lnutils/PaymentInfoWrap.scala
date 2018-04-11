@@ -2,7 +2,6 @@ package com.lightning.walletapp.lnutils
 
 import spray.json._
 import com.lightning.walletapp.ln._
-import com.lightning.walletapp.Vibr._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
@@ -141,7 +140,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       // Let the clouds know since they may be waiting
       // also vibrate to let a user know it's fulfilled
       OlympusWrap tellClouds OlympusWrap.CMDStart
-      vibrate(lnSettled)
+      com.lightning.walletapp.Vibr.vibrate
     }
 
     uiNotify

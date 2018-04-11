@@ -309,11 +309,8 @@ class WalletApp extends Application { me =>
 }
 
 object Vibr extends TxTracker {
-  override def coinsSent(tx: Transaction) = vibrate(btcBroadcasted)
-  override def coinsReceived(tx: Transaction) = vibrate(btcBroadcasted)
-  def vibrate(pattern: Pattern) = if (null != vib && vib.hasVibrator) vib.vibrate(pattern, -1)
+  override def coinsSent(tx: Transaction) = vibrate
+  override def coinsReceived(tx: Transaction) = vibrate
+  def vibrate = if (null != vib && vib.hasVibrator) vib.vibrate(Array(0L, 85, 200), -1)
   lazy val vib = app.getSystemService(Context.VIBRATOR_SERVICE).asInstanceOf[android.os.Vibrator]
-  val btcBroadcasted = Array(0L, 75, 250, 75, 250)
-  val lnSettled = Array(0L, 85, 200)
-  type Pattern = Array[Long]
 }
