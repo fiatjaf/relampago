@@ -46,7 +46,7 @@ object BadEntityTable extends Table {
   val newSql = s"INSERT OR IGNORE INTO $table ($resId, $expire, $amount) VALUES (?, ?, ?)"
   val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $amount <= ? LIMIT 320"
   val updSql = s"UPDATE $table SET $expire = ?, $amount = ? WHERE $resId = ?"
-  val createIndex = s"CREATE INDEX idx1$table ON $table ($expire, $amount)"
+  val makeIdx = s"CREATE INDEX idx1$table ON $table ($expire, $amount)"
 
   val createSql = s"""
     CREATE TABLE $table (
@@ -54,7 +54,7 @@ object BadEntityTable extends Table {
       $resId STRING NOT NULL UNIQUE,
       $expire INTEGER NOT NULL,
       $amount INTEGER NOT NULL
-    ); $createIndex;
+    ); $makeIdx;
     COMMIT"""
 }
 
@@ -119,7 +119,6 @@ object RevokedTable extends Table {
     COMMIT"""
 }
 
-
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
   extends SQLiteOpenHelper(context, name, null, 1) {
@@ -142,7 +141,7 @@ class LNOpenHelper(context: Context, name: String)
     dbs execSQL ChannelTable.createSql
     dbs execSQL OlympusTable.createSql
     dbs execSQL RevokedTable.createSql
-    //dbs execSQL RouteTable.createSql
+    dbs execSQL RouteTable.createSql
 
     // Randomize an order of two available default servers
     val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")

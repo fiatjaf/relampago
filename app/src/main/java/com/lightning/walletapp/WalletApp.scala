@@ -15,7 +15,6 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -25,9 +24,8 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
-import org.bitcoinj.crypto.KeyCrypterScrypt
 import fr.acinq.bitcoin.Crypto.PublicKey
-import com.google.protobuf.ByteString
+import org.bitcoinj.wallet.SendRequest
 import java.net.InetSocketAddress
 import android.app.Application
 import android.widget.Toast
@@ -37,7 +35,6 @@ import java.io.File
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import android.content.{ClipData, ClipboardManager, Context}
-import org.bitcoinj.wallet.{Protos, SendRequest, Wallet}
 import fr.acinq.bitcoin.{BinaryData, Crypto}
 import rx.lang.scala.{Observable => Obs}
 
@@ -84,13 +81,6 @@ class WalletApp extends Application { me =>
     // Set clipboard contents to given text and notify user via toast
     clipboardManager setPrimaryClip ClipData.newPlainText("wallet", text)
     if (andNotify) me toast getString(copied_to_clipboard).format(text)
-  }
-
-  def encryptWallet(wallet: Wallet, pass: CharSequence) = {
-    val salt = ByteString copyFrom KeyCrypterScrypt.randomSalt
-    val builder = Protos.ScryptParameters.newBuilder.setSalt(salt)
-    val crypter = new KeyCrypterScrypt(builder.setN(65536).build)
-    wallet.encrypt(crypter, crypter deriveKey pass)
   }
 
   object TransData {
@@ -182,9 +172,9 @@ class WalletApp extends Application { me =>
         kit.watchScripts(commits.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
         BECOME(STORE(cd), CLOSING)
 
-        val txs = for (tier12 <- cd.tier12States) yield tier12.txn
-        if (txs.isEmpty) Tools log "Closing channel does not have tier 1-2 transactions"
-        else OlympusWrap tellClouds CloudAct(txs.toJson.toString.hex, Nil, "txs/schedule")
+        val tier12txs = for (state <- cd.tier12States) yield state.txn
+        if (tier12txs.isEmpty) Tools log "Closing channel does not have tier 1-2 transactions"
+        else OlympusWrap tellClouds CloudAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
       }
 
       // First add listeners, then call
@@ -240,7 +230,7 @@ class WalletApp extends Application { me =>
     def send(rd: RoutingData, noRouteLeft: RoutingData => Unit): Unit = {
       // Find a local channel which has enough funds, is online and belongs to a correct peer
       // empty used route means we're sending to our peer and should use it's nodeId as a target
-      val target = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
+      val target = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
       val channelOpt = canSend(rd.firstMsat).find(_.data.announce.nodeId == target)
 
       channelOpt match {
@@ -292,6 +282,10 @@ class WalletApp extends Application { me =>
       peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
+      Notificator.removeResyncNotification
+      if (ChannelManager.notClosingOrRefunding.nonEmpty)
+        Notificator.scheduleResyncNotificationOnceAgain
+
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       // Passing bitcoinj listener ensures onChainDownloadStarted is called
       startBlocksDownload(ChannelManager.chainEventsListener)
@@ -300,10 +294,6 @@ class WalletApp extends Application { me =>
       PaymentInfoWrap.markFailedAndFrozen
       ChannelManager.initConnect
       RatesSaver.initialize
-
-      Notificator.removeResyncNotification
-      if (ChannelManager.notClosingOrRefunding.nonEmpty)
-        Notificator.scheduleResyncNotificationOnceAgain
     }
   }
 }

@@ -99,7 +99,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     pendingPayments.values.find(_.pr.paymentHash == ok.paymentHash) foreach { rd =>
       // Make payment searchable + routing optimization: record subroutes in database
       db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
-      if (rd.usedRoute.nonEmpty) RouteWrap putSubRoutes rd
+      if (rd.usedRoute.nonEmpty) RouteWrap cacheSubRoutes rd
     }
   }
 
@@ -184,7 +184,7 @@ object ChannelWrap {
 }
 
 object RouteWrap {
-  def putSubRoutes(rd: RoutingData) = {
+  def cacheSubRoutes(rd: RoutingData) = {
     // This will only work if we have at least one hop, should check if route vector is empty
     // then merge each of generated subroutes with a respected routing node or recipient node key
     val subs = (rd.usedRoute drop 1).scanLeft(rd.usedRoute take 1) { case rs \ hop => rs :+ hop }
@@ -257,9 +257,9 @@ object Notificator {
   def getAlarmManager = app.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager]
   def removeResyncNotification = getAlarmManager cancel getIntent
 
-  def scheduleResyncNotificationOnceAgain =
+  def scheduleResyncNotificationOnceAgain = // TODO: make 21 days
     try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-      System.currentTimeMillis + 1000 * 3600 * 24 * 21, getIntent) catch none
+      System.currentTimeMillis + 1000 * 3600 * 24, getIntent) catch none
 }
 
 class Notificator extends BroadcastReceiver {

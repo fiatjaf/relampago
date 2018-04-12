@@ -70,7 +70,7 @@ class LNOpsActivity extends TimerActivity { me =>
 }
 
 class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
-  def startedByText(close: ClosingData) = if (close.startedByPeer) ln_ops_unilateral_peer else ln_ops_unilateral_you
+  def startedBy(c: ClosingData) = if (c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty) ln_ops_unilateral_peer else ln_ops_unilateral_you
   override def onCreateView(i: LayoutInflater, vg: ViewGroup, bn: Bundle) = i.inflate(R.layout.frag_view_pager_chan, vg, false)
   override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
 
@@ -132,9 +132,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageFunding(wait: WaitFundingDoneData) = UITask {
       val fundingTxId = Commitments fundingTxid wait.commitments
       val threshold = math.max(wait.commitments.remoteParams.minimumDepth, LNParams.minDepth)
-
-      lnOpsDescription setText host.getString(ln_ops_chan_opening).format(chan.state, alias,
-        started, coloredIn(capacity), app.plurOrZero(txsConfs, threshold), fundingTxId.toString,
+      lnOpsDescription setText host.getString(ln_ops_chan_opening).format(chan.state, alias, started,
+        coloredIn(capacity), app.plurOrZero(txsConfs, threshold), fundingTxId.toString,
         humanStatus(LNParams.broadcaster getStatus fundingTxId), nodeId).html
 
       // Initialize button
@@ -146,9 +145,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       val canSpend = MilliSatoshi apply estimateTotalCanSend(chan)
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
       val finalCanSend = if (canSpend.amount < 0L) coloredOut(canSpend) else coloredIn(canSpend)
-
-      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias,
-        started, coloredIn(capacity), finalCanSend, inFlight, nodeId).html
+      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, started,
+        coloredIn(capacity), finalCanSend, inFlight, nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -158,9 +156,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageNegotiations = UITask {
       val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
-
-      lnOpsDescription setText negotiations.format(chan.state, alias,
-        started, coloredIn(capacity), coloredIn(refundable), inFlight).html
+      lnOpsDescription setText negotiations.format(chan.state, alias, started,
+        coloredIn(capacity), coloredIn(refundable), inFlight).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -173,20 +170,14 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       val closed = me time new Date(close.closedAt)
       lnOpsAction setVisibility View.GONE
 
-      val best = close.closings maxBy {
-        case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ _ => cfs }
-        case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
-      }
-
-      best match {
-        case Left(mutualTx) =>
-          val status = humanStatus apply getStatus(mutualTx.txid)
-          val myFee = coloredOut(capacity - mutualTx.allOutputsAmount)
+      close.bestClosing match {
+        case Left(mutualClosingTx) =>
           val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
-          val mutualView = commitStatus.format(mutualTx.txid.toString, status, myFee)
-
+          val status = humanStatus apply getStatus(mutualClosingTx.txid)
+          val myFee = coloredOut(capacity - mutualClosingTx.allOutputsAmount)
+          val view = commitStatus.format(mutualClosingTx.txid.toString, status, myFee)
           lnOpsDescription setText bilateralClosing.format(chan.state, alias, started,
-            closed, coloredIn(capacity), coloredIn(refundable), mutualView).html
+            closed, coloredIn(capacity), coloredIn(refundable), view).html
 
         case Right(info) =>
           val tier12View = info.getState collect {
@@ -208,15 +199,14 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
               statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
           }
 
-          val startedBy = host.getString(me startedByText close)
+          val startedBy = host.getString(me startedBy close)
           val humanTier12View = tier12View take 2 mkString "<br><br>"
           val status = humanStatus apply getStatus(info.commitTx.txid)
           val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
           val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
           val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
-
-          lnOpsDescription setText unilateralClosing.format(chan.state, startedBy,
-            alias, started, closed, coloredIn(capacity), commitView + refundsView).html
+          lnOpsDescription setText unilateralClosing.format(chan.state, startedBy, alias, started,
+            closed, coloredIn(capacity), commitView + refundsView).html
       }
     }
 
@@ -230,9 +220,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       }
 
       override def onBecome = {
-        case (_, waitFunding: WaitFundingDoneData, _, _) => manageFunding(waitFunding).run
-        case (_, close: ClosingData, _, _) if close.closings.nonEmpty => manageClosing(close).run
+        case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
         case (_, _: NormalData, _, _) if isOperational(chan) => manageOpen.run
+        case (_, close: ClosingData, _, _) => manageClosing(close).run
         case (_, _: NegotiationsData, _, _) => manageNegotiations.run
         case (_, _: NormalData, _, _) => manageNegotiations.run
         case otherwise => manageOther.run

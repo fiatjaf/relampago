@@ -94,7 +94,7 @@ object PaymentInfo {
   def replaceRoute(rd: RoutingData, upd: ChannelUpdate) = {
     // In some cases we can just replace a faulty hop with a supplied one, but only do this once per channel to avoid infinite loops
     val route1 = rd.usedRoute map { case hop if hop.shortChannelId == upd.shortChannelId => upd toHop hop.nodeId case hop => hop }
-    val result = rd.copy(routes = route1 +: rd.routes, usedRoute = Vector.empty) -> Vector.empty
+    val result = rd.copy(routes = route1 +: rd.routes) -> Vector.empty
     replacedChans += upd.shortChannelId
     result
   }

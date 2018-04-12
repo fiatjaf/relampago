@@ -73,21 +73,33 @@ case class ClosingData(announce: NodeAnnouncement,
                        refundRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
                        closedAt: Long = System.currentTimeMillis) extends HasCommitments {
 
-  def isOutdated: Boolean = {
-    val mutualClosingStates = for (tx <- mutualClose) yield getStatus(tx.txid)
-    val isOk = mutualClosingStates exists { case cfs \ _ => cfs > minDepth }
-    isOk || closedAt + 1000 * 3600 * 24 * 14 < System.currentTimeMillis
+  def tier12States =
+    revokedCommit.flatMap(_.getState) ++ localCommit.flatMap(_.getState) ++
+      remoteCommit.flatMap(_.getState) ++ nextRemoteCommit.flatMap(_.getState) ++
+      refundRemoteCommit.flatMap(_.getState)
+
+  def bestClosing = {
+    val allClosings = mutualClose.map(Left.apply) ++
+      revokedCommit.map(Right.apply) ++ localCommit.map(Right.apply) ++
+        remoteCommit.map(Right.apply) ++ nextRemoteCommit.map(Right.apply) ++
+        refundRemoteCommit.map(Right.apply)
+
+    allClosings maxBy {
+      case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ _ => cfs }
+      case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
+    }
   }
 
-  def startedByPeer = remoteCommit.nonEmpty || nextRemoteCommit.nonEmpty
-  def tier12States = revokedCommit.flatMap(_.getState) ++ localCommit.flatMap(_.getState) ++
-    remoteCommit.flatMap(_.getState) ++ nextRemoteCommit.flatMap(_.getState) ++
-    refundRemoteCommit.flatMap(_.getState)
+  def isOutdated = {
+    val allConfirmed = bestClosing match {
+      case Left(mutualClosingTx) => getStatus(mutualClosingTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }
+      case Right(info) => info.getState.map(_.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
+    }
 
-  lazy val closings =
-    mutualClose.map(Left.apply) ++ revokedCommit.map(Right.apply) ++
-      localCommit.map(Right.apply) ++ remoteCommit.map(Right.apply) ++
-      nextRemoteCommit.map(Right.apply) ++ refundRemoteCommit.map(Right.apply)
+    // Either everything including tier12 tx is confirmed or hard timeout has passed
+    val hardTimeout = closedAt + 1000 * 3600 * 24 * 60 < System.currentTimeMillis
+    allConfirmed || hardTimeout
+  }
 }
 
 sealed trait CommitPublished {
