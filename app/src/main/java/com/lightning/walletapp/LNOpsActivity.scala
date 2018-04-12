@@ -26,6 +26,20 @@ class LNOpsActivity extends TimerActivity { me =>
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
   lazy val localChanCache = for (c <- app.ChannelManager.all if c.state != REFUNDING) yield c
 
+  lazy val inFlightPayments = getResources getStringArray R.array.ln_in_flight_payments
+  lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
+  lazy val txsConfs = getResources getStringArray R.array.txs_confs
+
+  lazy val basic = getString(ln_ops_chan_basic)
+  lazy val negotiations = getString(ln_ops_chan_negotiations)
+  lazy val nothingYet = getString(ln_ops_chan_receive_nothing_yet)
+  lazy val unilateralClosing = getString(ln_ops_chan_unilateral_closing)
+  lazy val bilateralClosing = getString(ln_ops_chan_bilateral_closing)
+  lazy val statusLeft = getString(ln_ops_chan_unilateral_status_left)
+  lazy val refundStatus = getString(ln_ops_chan_refund_status)
+  lazy val amountStatus = getString(ln_ops_chan_amount_status)
+  lazy val commitStatus = getString(ln_ops_chan_commit_status)
+
   val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
       def getItem(itemPosition: Int) = bundledFrag(itemPosition)
@@ -70,25 +84,13 @@ class LNOpsActivity extends TimerActivity { me =>
 }
 
 class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
-  def startedBy(c: ClosingData) = if (c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty) ln_ops_unilateral_peer else ln_ops_unilateral_you
-  override def onCreateView(i: LayoutInflater, vg: ViewGroup, bn: Bundle) = i.inflate(R.layout.frag_view_pager_chan, vg, false)
+  override def onCreateView(i: LayoutInflater, vg: ViewGroup, bn: Bundle) =
+    i.inflate(R.layout.frag_view_pager_chan, vg, false)
+
   override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
-
   var whenDestroy: Runnable = new Runnable { def run = none }
-  lazy val inFlightPayments = getResources getStringArray R.array.ln_in_flight_payments
-  lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
-  lazy val txsConfs = getResources getStringArray R.array.txs_confs
   lazy val host = getActivity.asInstanceOf[LNOpsActivity]
-  import host.{UITask, str2View}
-
-  lazy val basic = getString(ln_ops_chan_basic)
-  lazy val negotiations = getString(ln_ops_chan_negotiations)
-  lazy val unilateralClosing = getString(ln_ops_chan_unilateral_closing)
-  lazy val bilateralClosing = getString(ln_ops_chan_bilateral_closing)
-  lazy val statusLeft = getString(ln_ops_chan_unilateral_status_left)
-  lazy val refundStatus = getString(ln_ops_chan_refund_status)
-  lazy val amountStatus = getString(ln_ops_chan_amount_status)
-  lazy val commitStatus = getString(ln_ops_chan_commit_status)
+  import host._
 
   val humanStatus: DepthAndDead => String = {
     case cfs \ false => app.plurOrZero(txsConfs, cfs)
@@ -142,11 +144,14 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageOpen = UITask {
-      val canSpend = MilliSatoshi apply estimateTotalCanSend(chan)
-      val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
-      val finalCanSend = if (canSpend.amount < 0L) coloredOut(canSpend) else coloredIn(canSpend)
-      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, started,
-        coloredIn(capacity), finalCanSend, inFlight, nodeId).html
+      val canReceive = MilliSatoshi apply estimateCanReceive(chan)
+      val canReceiveHuman = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
+      val finalCanReceive = if (channelAndHop(chan).isDefined) canReceiveHuman else sumOut format nothingYet
+
+      val canSend = MilliSatoshi apply estimateTotalCanSend(chan)
+      val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
+      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, started, coloredIn(capacity),
+        finalCanSend, finalCanReceive, app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size), nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -242,5 +247,10 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     val listeners = Vector(transitionListener, detailsListener)
     wrap(chan.listeners ++= listeners)(detailsListener nullOnBecome chan)
     whenDestroy = UITask(chan.listeners --= listeners)
+  }
+
+  def startedBy(c: ClosingData) = {
+    val byRemote = c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty
+    if (byRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
   }
 }
