@@ -222,16 +222,16 @@ object Helpers { me =>
         val remoteRev = revocationPubKey(commitments.localParams.revocationBasepoint, remotePerCommitmentPoint)
 
         val matching = bag getAllRevoked txNumber
+        val finder = new PubKeyScriptIndexFinder(tx)
         val offered = for (h160 \ _ <- matching) yield Scripts.htlcOffered(remoteHtlc, localHtlc, remoteRev, h160)
         val received = for (h160 \ expiry <- matching) yield Scripts.htlcReceived(remoteHtlc, localHtlc, remoteRev, h160, expiry)
         val redeemScripts = for (redeem <- offered ++ received) yield Script.write(Script pay2wsh redeem) -> Script.write(redeem)
-        val finder = new PubKeyScriptIndexFinder(tx)
         val redeemMap = redeemScripts.toMap
 
         val htlcPenaltyTxs = for {
           TxOut(_, publicKeyScript) <- tx.txOut
           redeemScript <- redeemMap get publicKeyScript
-          htlcPenaltyTx <- Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, feeRate * 2).toOption
+          htlcPenaltyTx <- Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, feeRate * 4).toOption
           signed = Scripts.addSigs(htlcPenaltyTx, Scripts.sign(htlcPenaltyTx, remoteRevocationPrivkey), remoteRevocationPubkey)
           htlcPenalty <- Scripts.checkSpendable(signed).toOption
         } yield htlcPenalty

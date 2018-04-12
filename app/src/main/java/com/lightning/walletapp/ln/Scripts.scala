@@ -272,19 +272,17 @@ object Scripts { me =>
                    remoteHtlcPubkey: PublicKey, spec: CommitmentSpec): CommitTx = {
 
     val commitFee = commitTxFee(localDustLimit, spec)
-    val toRemote: Satoshi = MilliSatoshi(spec.toRemoteMsat)
-    val toLocal: Satoshi = MilliSatoshi(spec.toLocalMsat)
+    val toRemote = Satoshi(spec.toRemoteMsat / 1000L)
+    val toLocal = Satoshi(spec.toLocalMsat / 1000L)
 
-    val toLocalAmount \ toRemoteAmount =
-      if (localIsFunder) Tuple2(toLocal - commitFee, toRemote)
-      else Tuple2(toLocal, toRemote - commitFee)
+    val localSat \ remoteSat = localIsFunder match {
+      case true => Tuple2(toLocal - commitFee, toRemote)
+      case false => Tuple2(toLocal, toRemote - commitFee)
+    }
 
-    val toLocalDelayedOutput = if (toLocalAmount < localDustLimit) Nil else
-      TxOut(publicKeyScript = Script pay2wsh toLocalDelayed(localRevocationPubkey,
-        toLocalDelay, localDelayedPaymentPubkey), amount = toLocalAmount) :: Nil
-
-    val toRemoteOutput = if (toRemoteAmount < localDustLimit) Nil else
-      TxOut(toRemoteAmount, Script pay2wpkh remotePaymentPubkey) :: Nil
+    val redeem = toLocalDelayed(localRevocationPubkey, toLocalDelay, localDelayedPaymentPubkey)
+    val toLocalDelayedOutput = if (localSat < localDustLimit) Nil else TxOut(localSat, Script pay2wsh redeem) :: Nil
+    val toRemoteOutput = if (remoteSat < localDustLimit) Nil else TxOut(remoteSat, Script pay2wpkh remotePaymentPubkey) :: Nil
 
     val htlcOfferedOutputs = trimOfferedHtlcs(dustLimit = localDustLimit, spec) map { add =>
       val offered = htlcOffered(localHtlcPubkey, remoteHtlcPubkey, localRevocationPubkey, add.hash160)
@@ -306,42 +304,39 @@ object Scripts { me =>
     CommitTx(commitTxInput, LexicographicalOrdering sort tx)
   }
 
-  // General templates
-
-  def makeHtlcTx[T](fun: (InputInfo, Transaction) => T, finder: PubKeyScriptIndexFinder, redeemScript: ScriptEltSeq,
-                    pubKeyScript: ScriptEltSeq, amount: Satoshi, fee: Satoshi, expiry: Long, sequence: Long) = {
-
-    val index = finder.findPubKeyScriptIndex(Script.write(Script pay2wsh redeemScript), Option apply amount)
-    val inputInfo = InputInfo(OutPoint(finder.tx, index), finder.tx.txOut(index), Script write redeemScript)
-    val txIn = TxIn(inputInfo.outPoint, Array.emptyByteArray, sequence) :: Nil
-    val txOut = TxOut(amount - fee, pubKeyScript) :: Nil
-    val tx = Transaction(2, txIn, txOut, expiry)
-    fun(inputInfo, tx)
-  }
-
   // Concrete templates
 
   def makeHtlcTxs(commitTx: Transaction, dustLimit: Satoshi, localRevPubkey: PublicKey,
                   toLocalDelay: Int, localDelayedPaymentPubkey: PublicKey, localHtlcPubkey: PublicKey,
                   remoteHtlcPubkey: PublicKey, spec: CommitmentSpec) = {
 
-    // Dusty HTLCs are filtered out and go to fees
     val finder = new PubKeyScriptIndexFinder(commitTx)
+    def makeHtlcTx[T](fun: (InputInfo, Transaction) => T, redeemScript: ScriptEltSeq,
+                      pubKeyScript: ScriptEltSeq, amount: Satoshi, fee: Satoshi, expiry: Long) = {
+
+      val index = finder.findPubKeyScriptIndex(Script.write(Script pay2wsh redeemScript), Option apply amount)
+      val inputInfo = InputInfo(OutPoint(commitTx, index), commitTx.txOut(index), Script write redeemScript)
+      val txIn = TxIn(inputInfo.outPoint, Array.emptyByteArray, 0x00000000L) :: Nil
+      val txOut = TxOut(amount - fee, pubKeyScript) :: Nil
+      val tx = Transaction(2, txIn, txOut, expiry)
+      fun(inputInfo, tx)
+    }
 
     def makeHtlcTimeoutTx(add: UpdateAddHtlc) = {
       val fee = weight2fee(spec.feeratePerKw, htlcTimeoutWeight)
       val offered = htlcOffered(localHtlcPubkey, remoteHtlcPubkey, localRevPubkey, add.hash160)
       val pubKeyScript = Script pay2wsh toLocalDelayed(localRevPubkey, toLocalDelay, localDelayedPaymentPubkey)
-      makeHtlcTx(HtlcTimeoutTx(_, _, add), finder, offered, pubKeyScript, add.amount, fee, add.expiry, 0x00000000L)
+      makeHtlcTx(HtlcTimeoutTx(_, _, add), offered, pubKeyScript, add.amount, fee, expiry = add.expiry)
     }
 
     def makeHtlcSuccessTx(add: UpdateAddHtlc) = {
       val fee = weight2fee(spec.feeratePerKw, htlcSuccessWeight)
       val received = htlcReceived(localHtlcPubkey, remoteHtlcPubkey, localRevPubkey, add.hash160, add.expiry)
       val pubKeyScript = Script pay2wsh toLocalDelayed(localRevPubkey, toLocalDelay, localDelayedPaymentPubkey)
-      makeHtlcTx(HtlcSuccessTx(_, _, add), finder, received, pubKeyScript, add.amount, fee, 0L, 0x00000000L)
+      makeHtlcTx(HtlcSuccessTx(_, _, add), received, pubKeyScript, add.amount, fee, expiry = 0L)
     }
 
+    // Dusty HTLCs are filtered out and go to fees
     val htlcTimeoutTxs = trimOfferedHtlcs(dustLimit, spec) map makeHtlcTimeoutTx
     val htlcSuccessTxs = trimReceivedHtlcs(dustLimit, spec) map makeHtlcSuccessTx
     htlcTimeoutTxs -> htlcSuccessTxs
@@ -452,7 +447,7 @@ class PubKeyScriptIndexFinder(val tx: Transaction) {
       !isOutputUsedAlready & amountMatches & scriptOk
     }
 
-    if (index >= 0) runAnd(index)(indexesAlreadyUsed += index)
+    if (index >= 0) runAnd(index) { indexesAlreadyUsed += index }
     else throw new LightningException("Script index was not found")
   }
 }
