@@ -131,13 +131,17 @@ class LNStartFundActivity extends TimerActivity { me =>
         val pay = P2WSHData(msat, dummyScript)
 
         def futureProcess(unsignedRequest: SendRequest) = {
-          val outIndex = Scripts.findPubKeyScriptIndex(unsignedRequest.tx, dummyScript)
+          val finder = new PubKeyScriptIndexFinder(unsignedRequest.tx)
+          val outIndex = finder.findPubKeyScriptIndex(dummyScript, None)
+
           val realChannelFundingAmountSat = unsignedRequest.tx.getOutput(outIndex).getValue.getValue
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val theirUnspendableReserveSat = realChannelFundingAmountSat / LNParams.theirReserveToFundingRatio
           val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis)
-          freshChan process CMDOpenChannel(localParams, random getBytes 32, LNParams.broadcaster.ratePerKwSat, pushMsat = 0L,
-            their, unsignedRequest, outIndex, realChannelFundingAmountSat)
+
+          freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32,
+            LNParams.broadcaster.ratePerKwSat, pushMsat = 0L, their, unsignedRequest,
+            outIndex, realChannelFundingAmountSat)
         }
 
         def onTxFail(fundingError: Throwable) = mkForm(askForFunding(their).run, none,

@@ -15,6 +15,7 @@ import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
 import rx.lang.scala.{Observable => Obs}
+import scala.util.{Failure, Success}
 
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
@@ -87,7 +88,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val signedLocalCommitTx = Scripts.addSigs(wait.localCommitTx, wait.localParams.fundingPrivKey.publicKey,
           wait.remoteParams.fundingPubkey, Scripts.sign(wait.localCommitTx, wait.localParams.fundingPrivKey), remote.signature)
 
-        if (Scripts.checkSpendable(signedLocalCommitTx).isEmpty) BECOME(wait, CLOSING) else {
+        if (Scripts.checkSpendable(signedLocalCommitTx).isFailure) BECOME(wait, CLOSING) else {
           val localCommit = LocalCommit(0L, wait.localSpec, htlcTxsAndSigs = Nil, signedLocalCommitTx)
           val commits = Commitments(wait.localParams, wait.remoteParams, localCommit, wait.remoteCommit,
             localChanges = Changes(proposed = Vector.empty, signed = Vector.empty, acked = Vector.empty),
@@ -395,12 +396,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           commitments.remoteParams.fundingPubkey, closingSigned.signature, remoteClosingSig)
 
         Scripts checkSpendable signedClose match {
-          case None => throw new LightningException
-          case Some(okClose) if remoteClosingFee == localClosingSigned.feeSatoshis =>
+          case Failure(why) => throw new LightningException(why.getMessage)
+          case Success(okClose) if remoteClosingFee == localClosingSigned.feeSatoshis =>
             // Our current and their proposed fees are equal for this tx, can broadcast
             startMutualClose(neg, okClose.tx)
 
-          case Some(okClose) =>
+          case Success(okClose) =>
             val nextCloseFee = Satoshi(localClosingSigned.feeSatoshis + remoteClosingFee) / 4 * 2
             val nextProposed = Closing.makeClosing(commitments, nextCloseFee, localShutdown.scriptPubKey, remoteShutdown.scriptPubKey)
             if (remoteClosingFee == nextCloseFee.amount) startMutualClose(neg, okClose.tx) SEND nextProposed.localClosingSigned else {

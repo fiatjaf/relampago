@@ -45,8 +45,8 @@ object MainActivity {
 }
 
 class MainActivity extends NfcReaderActivity with TimerActivity { me =>
-  lazy val mainChoice = findViewById(R.id.mainChoice)
-  private[this] val FILE_CODE = 101
+  override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent) =
+    if (requestCode == 101 & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
 
   def INIT(state: Bundle) = {
     runAnd(me setContentView R.layout.activity_main)(me initNfc state)
@@ -59,9 +59,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   // NFC AND SHARE
-
-  override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent) =
-    if (requestCode == FILE_CODE & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
 
   override def onNoNfcIntentFound = try {
     val data = Seq(getIntent.getDataString, getIntent getStringExtra Intent.EXTRA_TEXT)
@@ -95,8 +92,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   def popup(code: Int) = runAnd(app toast code)(next)
   def next: Unit = (app.walletFile.exists, app.isAlive) match {
     // Find out what exactly should be done once user opens an app
-    // depends on both wallet app file existence and runtime objects
-    case (false, _) => mainChoice setVisibility View.VISIBLE
+    // depends on both wallet app file existence and runtime objects presence
+    case (false, _) => findViewById(R.id.mainChoice) setVisibility View.VISIBLE
     case (true, true) => MainActivity.proceed.run
 
     case (true, false) =>
@@ -126,7 +123,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
     def proceedWithMigrationFile = rm(alert) {
       val intent = new Intent(Intent.ACTION_OPEN_DOCUMENT) setType "text/plain"
-      startActivityForResult(intent addCategory Intent.CATEGORY_OPENABLE, FILE_CODE)
+      startActivityForResult(intent addCategory Intent.CATEGORY_OPENABLE, 101)
     }
   }
 
