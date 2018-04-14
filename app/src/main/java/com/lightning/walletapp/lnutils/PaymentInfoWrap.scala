@@ -98,7 +98,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     pendingPayments.values.find(_.pr.paymentHash == ok.paymentHash) foreach { rd =>
       // Make payment searchable + routing optimization: record subroutes in database
-      db.change(PaymentTable.newVirtualSql, rd.qryText, rd.paymentHashString)
+      db.change(PaymentTable.newVirtualSql, rd.queryText, rd.paymentHashString)
       if (rd.usedRoute.nonEmpty) RouteWrap cacheSubRoutes rd
     }
   }

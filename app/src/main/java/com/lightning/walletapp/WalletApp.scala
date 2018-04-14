@@ -111,11 +111,10 @@ class WalletApp extends Application { me =>
   }
 
   object ChannelManager {
-    type ChannelVec = Vector[Channel]
     val operationalListeners = Set(broadcaster, bag, GossipCatcher)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-    var all: ChannelVec = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
-    def fromNode(of: ChannelVec, ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
+    var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
+    def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
     def canSend(amount: Long) = for (c <- all if isOperationalOpen(c) && estimateCanSend(c) >= amount) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
@@ -138,10 +137,10 @@ class WalletApp extends Application { me =>
       override def onTerminalError(ann: NodeAnnouncement) = fromNode(notClosing, ann).foreach(_ process CMDShutdown)
       override def onIncompatible(ann: NodeAnnouncement) = onTerminalError(ann)
 
-      def maybeReconnect(chans: ChannelVec, ann: NodeAnnouncement) = if (chans.nonEmpty) {
+      def maybeReconnect(cs: Vector[Channel], ann: NodeAnnouncement) = if (cs.nonEmpty) {
         // Immediately inform affected channels and try to reconnect back again in 5 seconds
         Obs.just(ann).delay(5.seconds).subscribe(ConnectionManager.connectTo, none)
-        chans.foreach(_ process CMDOffline)
+        cs.foreach(_ process CMDOffline)
       }
     }
 

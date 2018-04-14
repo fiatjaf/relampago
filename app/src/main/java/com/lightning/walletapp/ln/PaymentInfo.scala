@@ -176,7 +176,8 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long,
                        lastExpiry: Long, callsLeft: Int) {
 
-  lazy val qryText = s"${pr.description} $paymentHashString"
+  // Allow users to search by payment description, recipient nodeId, payment hash
+  lazy val queryText = s"${pr.description} ${pr.nodeId.toString} $paymentHashString"
   lazy val paymentHashString = pr.paymentHash.toString
 }
 

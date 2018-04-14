@@ -308,10 +308,10 @@ object Scripts { me =>
                   remoteHtlcPubkey: PublicKey, spec: CommitmentSpec) = {
 
     val finder = new PubKeyScriptIndexFinder(commitTx)
-    def makeHtlcTx[T](redeem: ScriptEltSeq, pubKey: ScriptEltSeq, amount: Satoshi, fee: Satoshi, expiry: Long) = {
+    def makeHtlcTx(redeem: ScriptEltSeq, pubKey: ScriptEltSeq, amount: Satoshi, fee: Satoshi, expiry: Long) = {
       val index = finder.findPubKeyScriptIndex(pubkeyScript = Script.write(Script pay2wsh redeem), Option apply amount)
       val inputInfo = InputInfo(OutPoint(commitTx, index), commitTx.txOut(index), Script write redeem)
-      val txIn = TxIn(inputInfo.outPoint, Array.emptyByteArray, 0x00000000L) :: Nil
+      val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, 0x00000000L) :: Nil
       val txOut = TxOut(amount - fee, pubKey) :: Nil
       val tx = Transaction(2, txIn, txOut, expiry)
       inputInfo -> tx
@@ -440,7 +440,8 @@ class PubKeyScriptIndexFinder(val tx: Transaction) {
       !isOutputUsedAlready & amountMatches & scriptOk
     }
 
-    if (index >= 0) runAnd(index) { indexesAlreadyUsed += index }
-    else throw new LightningException("Script index was not found")
+    if (index < 0) throw new LightningException
+    indexesAlreadyUsed += index
+    index
   }
 }

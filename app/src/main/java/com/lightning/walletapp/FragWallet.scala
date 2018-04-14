@@ -1,34 +1,39 @@
 package com.lightning.walletapp
 
+import spray.json._
 import android.view._
 import android.widget._
 import org.bitcoinj.core._
 import org.bitcoinj.core.TxWrap._
+
 import collection.JavaConverters._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.R.drawable.{await, conf1btc, dead}
-import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
-import scala.util.{Failure, Success}
+import com.lightning.walletapp.ln.Tools.{none, random, runAnd}
 
+import scala.util.{Failure, Success}
 import org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
-import com.lightning.walletapp.ln.LNParams.minDepth
-import com.lightning.walletapp.lnutils.RatesSaver
-import com.lightning.walletapp.ln.LNParams
+import com.lightning.walletapp.ln.PaymentInfo._
+import com.lightning.walletapp.ln.LNParams._
+import com.lightning.walletapp.lnutils.{PaymentTable, RatesSaver}
+import com.lightning.walletapp.ln.{Channel, Hop, PaymentRequest}
 import android.support.v7.widget.Toolbar
 import android.support.v4.app.Fragment
 import org.bitcoinj.wallet.SendRequest
-import fr.acinq.bitcoin.MilliSatoshi
+import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import android.app.AlertDialog
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
+import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 
 
 class FragWallet extends Fragment { me =>
@@ -75,7 +80,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends ListToggler
 
   val catchListener = new BlocksListener {
     def onBlocksDownloaded(sourcePeerNode: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) = {
-      if (left > LNParams.broadcaster.blocksPerDay) app.kit.peerGroup addBlocksDownloadedEventListener getNextTracker(left)
+      if (left > broadcaster.blocksPerDay) app.kit.peerGroup addBlocksDownloadedEventListener getNextTracker(left)
       app.kit.peerGroup removeBlocksDownloadedEventListener this
     }
 
@@ -95,7 +100,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends ListToggler
     val btcFunds = if (btcTotalSum.value < 1) btcEmpty else denom withSign btcTotalSum
     val lnTotalSum = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
     val lnFunds = if (lnTotalSum < 1) lnEmpty else denom withSign MilliSatoshi(lnTotalSum)
-    val daysLeft = currentBlocksLeft / LNParams.broadcaster.blocksPerDay
+    val daysLeft = currentBlocksLeft / broadcaster.blocksPerDay
 
     val subtitleText =
       if (currentBlocksLeft > 1) app.plurOrZero(syncOps, daysLeft)
@@ -295,4 +300,62 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends ListToggler
   toolbar setOnClickListener onFastTap(showDenomChooser)
   host setSupportActionBar toolbar
   updTitle
+
+  def showQR(pr: PaymentRequest) = {
+    host goTo classOf[RequestActivity]
+    app.TransData.value = pr
+  }
+
+  def ifOperational(next: Vector[Channel] => Unit) = {
+    val operational = app.ChannelManager.notClosingOrRefunding filter isOperational
+    if (operational.isEmpty) app toast ln_status_none else next(operational)
+  }
+
+  def makePaymentRequest = ifOperational { operationalChannels =>
+    // Get channels which contain assisted routes which can be used to receive a payment
+    val chansWithRoutes: Map[Channel, PaymentRoute] = operationalChannels.flatMap(channelAndHop).toMap
+    if (chansWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, host getString err_ln_6_confs).create)
+    else {
+
+      // Check that enough room has been made in selected channels
+      val maxCanReceive = MilliSatoshi(chansWithRoutes.keys.map(estimateCanReceive).max)
+      val reserveUnspent = host getString err_ln_reserve_unspent format coloredOut(maxCanReceive)
+      if (maxCanReceive < minHtlcValue) showForm(negTextBuilder(dialog_ok, reserveUnspent.html).create)
+      else {
+
+        val content = getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
+        val hint = getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
+        val desc = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
+        val rateManager = new RateManager(hint, content)
+
+        def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
+          // Once again filter out those channels which can received a supplied amount
+          val routes = chansWithRoutes.filterKeys(channel => estimateCanReceive(channel) >= sum.amount).values.toVector
+          val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, desc.getText.toString.trim, None, routes)
+          val rd = emptyRD(pr, sum.amount)
+
+          db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.paymentHashString)
+          db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN, System.currentTimeMillis,
+            pr.description, rd.paymentHashString, sum.amount, 0L, 0L)
+
+          showQR(pr)
+        }
+
+        def recAttempt(alert: AlertDialog) = rateManager.result match {
+          case Success(ms) if maxCanReceive < ms => app toast dialog_sum_big
+          case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+          case Failure(reason) => app toast dialog_sum_empty
+
+          case Success(ms) => rm(alert) {
+            // Requests without amount are not allowed for now
+            <(makeRequest(ms, random getBytes 32), onFail)(none)
+            app toast dialog_pr_making
+          }
+        }
+
+        val bld = baseBuilder(getString(action_ln_details), content)
+        mkCheckForm(recAttempt, none, bld, dialog_ok, dialog_cancel)
+      }
+    }
+  }
 }
