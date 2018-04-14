@@ -14,12 +14,10 @@ import javax.annotation.Nullable;
 
 
 public abstract class AbstractKit extends AbstractIdleService {
-    public static final String ENC_PASSCODE = "encryptedPasscode";
     public static final String ERROR_REPORT = "errorReport";
     public static final String RATES_DATA = "ratesData";
     public static final String DENOM_TYPE = "denomType";
     public static final String FIAT_TYPE = "fiatType";
-    public static final String LANDING = "landing";
 
     // Bitcoin wallet core pieces
     public volatile BlockChain blockChain;

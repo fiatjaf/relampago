@@ -14,38 +14,36 @@ import android.support.v4.view.MenuItemCompat._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-
-import scala.util.{Success, Try}
 import android.support.v7.widget.{SearchView, Toolbar}
 import android.provider.Settings.{System => FontSystem}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
-import com.ogaclejapan.smarttablayout.utils.v4.{FragmentPagerItemAdapter, FragmentPagerItems}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.ln.Channel.estimateTotalCanSend
 import android.support.v4.view.ViewPager.OnPageChangeListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import android.content.Context.LAYOUT_INFLATER_SERVICE
-import com.ogaclejapan.smarttablayout.SmartTabLayout
 import org.ndeftools.util.activity.NfcReaderActivity
 import android.widget.AbsListView.OnScrollListener
 import com.lightning.walletapp.lnutils.RatesSaver
-import android.view.ViewGroup.LayoutParams
 import com.lightning.walletapp.helper.AES
 import android.support.v4.view.ViewPager
 import org.bitcoinj.store.SPVBlockStore
-import android.support.v4.app.Fragment
+import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import com.google.common.io.Files
 import java.text.SimpleDateFormat
+
 import org.bitcoinj.core.Address
+
 import scala.collection.mutable
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
+
+import scala.util.Try
 import java.io.File
 
 
@@ -97,34 +95,6 @@ trait HumanTimeDisplay {
   }
 }
 
-trait ToolbarFragment extends HumanTimeDisplay { me =>
-  // Manages multiple info tickers in toolbar subtitle
-  var infos = List.empty[Informer]
-  val toolbar: Toolbar
-
-  // Informer CRUD
-  def delete(tag: Int) = host UITask {
-    infos = infos.filterNot(_.tag == tag)
-    toolbar setSubtitle infos.head.value
-  }
-
-  def add(text: String, tag: Int) = host UITask {
-    infos = new Informer(text, tag) :: infos
-    toolbar setSubtitle infos.head.value
-  }
-
-  def update(text: String, tag: Int) = host UITask {
-    for (vs <- infos if vs.tag == tag) vs.value = text
-    toolbar setSubtitle infos.head.value
-  }
-
-  def setTitle(titleText: String) = {
-    // A workaround to prevent ellipsis
-    toolbar setTitle titleText
-    toolbar setTitle titleText
-  }
-}
-
 trait ListToggler extends HumanTimeDisplay {
   lazy val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   lazy val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
@@ -169,46 +139,20 @@ trait ListToggler extends HumanTimeDisplay {
   }
 }
 
+
 object WalletActivity {
-  val REDIRECT = "goLnOps"
-  val frags = mutable.Set.empty[Fragment]
-  def lnOpt = frags collectFirst { case ln: FragLN => ln.worker }
-  def btcOpt = frags collectFirst { case btc: FragBTC => btc.worker }
+  val REDIRECT = "goToLnOpsActivity"
+  var walletFrag = Option.empty[FragWallet]
 }
 
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
-  lazy val walletPagerTab = findViewById(R.id.walletPagerTab).asInstanceOf[SmartTabLayout]
-  lazy val viewParams = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT)
-  private[this] var listState = OnScrollListener.SCROLL_STATE_IDLE
-  private[this] var pagerState = ViewPager.SCROLL_STATE_IDLE
-  import WalletActivity.{lnOpt, btcOpt}
 
-  val listListener = new OnScrollListener {
-    def onScroll(view: AbsListView, first: Int, vis: Int, total: Int) = none
-    def onScrollStateChanged(view: AbsListView, state: Int) = listState = state
-  }
-
-  val pagerListener = new OnPageChangeListener {
-    def onPageSelected(pos: Int) = app.prefs.edit.putInt(AbstractKit.LANDING, pos).commit
-    def onPageScrolled(pos: Int, positionOffset: Float, offsetPixels: Int) = none
-    def onPageScrollStateChanged (state: Int) = pagerState = state
-  }
-
-  lazy val adapter = {
-    val fragScan = classOf[FragScan]
-    val fragBTC = classOf[FragBTC]
-    val fragLN = classOf[FragLN]
-
-    val items = FragmentPagerItems `with` me
-    val ready = items.add("bitcoin", fragBTC).add("lightning", fragLN).add("scanner", fragScan)
-    new FragmentPagerItemAdapter(getSupportFragmentManager, ready.create)
-  }
-
-  override def onResume = wrap(super.onResume) {
-    val pos = app.prefs.getInt(AbstractKit.LANDING, 0)
-    walletPager.setCurrentItem(math.min(pos, 1), false)
-  }
+  lazy val slidingFragmentAdapter =
+    new FragmentStatePagerAdapter(getSupportFragmentManager) {
+      def getItem(pos: Int) = if (pos == 0) new FragWallet else new FragScan
+      def getCount = 2
+    }
 
   override def onDestroy = wrap(super.onDestroy)(stopDetecting)
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
@@ -217,34 +161,14 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   override def onCreateOptionsMenu(menu: Menu) = {
     // Called after fragLN sets toolbar as actionbar
-    getMenuInflater.inflate(R.menu.ln, menu)
-    for (ln <- lnOpt) ln setupSearch menu
+    getMenuInflater.inflate(R.menu.wallet, menu)
     true
-  }
-
-  override def onBackPressed =
-    if (walletPager.getCurrentItem < 2) super.onBackPressed
-    else walletPager.setCurrentItem(walletPager.getCurrentItem - 1)
-
-  def updateListsTime = {
-    val notPaging = ViewPager.SCROLL_STATE_IDLE == pagerState
-    val notScrolling = OnScrollListener.SCROLL_STATE_IDLE == listState
-    if (notPaging && notScrolling) for (ln <- lnOpt) ln.adapter.notifyDataSetChanged
-    if (notPaging && notScrolling) for (btc <- btcOpt) btc.adapter.notifyDataSetChanged
   }
 
   def INIT(state: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_wallet
-
-    walletPager setAdapter adapter
-    walletPager setOffscreenPageLimit 2
-    walletPagerTab setViewPager walletPager
-    walletPagerTab setOnPageChangeListener pagerListener
-
-    // NFC will happen while app is open so
-    // there is no need to run it from fragment
     wrap(me setDetecting true)(me initNfc state)
-    timer.schedule(updateListsTime, 10000, 10000)
+    walletPager setAdapter slidingFragmentAdapter
   } else me exitTo classOf[MainActivity]
 
   // NFC
@@ -268,26 +192,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  private def doTheCheck(ok: Any) = {
-    // Find out what to do depending on
-    // what kind of TransData we have
-
-    app.TransData.value match {
-      case _: NodeAnnouncement => walletPager.setCurrentItem(1, false)
-      case _: PaymentRequest => walletPager.setCurrentItem(1, false)
-      case _: BitcoinURI => walletPager.setCurrentItem(0, false)
-      case _: Address => walletPager.setCurrentItem(0, false)
-      case _ =>
-    }
-
-    app.TransData.value match {
-      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-      case lnPaymentRequest: PaymentRequest => for (ln <- lnOpt) ln.sendPayment(lnPaymentRequest)
-      case bu: BitcoinURI => for (btc <- btcOpt) btc.sendBtcPopup.set(Try(bu.getAmount), bu.getAddress)
-      case addr: Address => for (btc <- btcOpt) btc.sendBtcPopup.setAddr(addr)
-      case WalletActivity.REDIRECT => goChanDetails(null)
-      case _ =>
-    }
+  def checkTransData = {
+    walletPager.setCurrentItem(1, false)
 
     app.TransData.value match {
       case _: NodeAnnouncement => // nope
@@ -295,21 +201,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     }
   }
 
-  def checkTransData = app.getBufferTry match {
-    case Success(pr) if app.TransData.lnLink.findFirstIn(pr).isDefined =>
-      // Only LN payment requests since autopasting other stuff is dangerous
-      <(app.TransData recordValue pr, doTheCheck)(doTheCheck)
-      app.setBuffer(new String, andNotify = false)
-
-    case _ =>
-      // Go as usual
-      doTheCheck(null)
-  }
-
   // BUTTONS REACTIONS
-
-  def goSendBTC(top: View) =
-    for (btc <- btcOpt) btc.sendBtcPopup
 
   def goReceiveBTC(top: View) = {
     app.TransData.value = app.kit.currentAddress
@@ -332,27 +224,19 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
-    val btcFunds = coin2MSat(app.kit.conf0Balance)
-    val lnFunds = MilliSatoshi(app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum)
-    val btcPrettyFunds = humanFiat(sumIn format denom.withSign(btcFunds), btcFunds, " ")
-    val lnPrettyFunds = humanFiat(sumIn format denom.withSign(lnFunds), lnFunds, " ")
-    val title = getString(fiat_set_denom).format(btcPrettyFunds, lnPrettyFunds)
-    val denominations = getResources.getStringArray(R.array.denoms).map(_.html)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
-    val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
+    val denomChoiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
+    val allDenominations = getResources.getStringArray(R.array.denoms).map(_.html)
 
-    lst setOnItemClickListener onTap { pos =>
-      // Persist user setting first and update view
 
-      denom = denoms(pos)
+    denomChoiceList setOnItemClickListener onTap { pos =>
       app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
-      for (btc <- btcOpt) wrap(btc.adapter.notifyDataSetChanged)(btc.updTitle)
-      for (ln <- lnOpt) wrap(ln.adapter.notifyDataSetChanged)(ln.updTitleSubtitleAndButtons)
+      denom = denoms(pos)
     }
 
-    lst setAdapter new ArrayAdapter(me, singleChoice, denominations)
-    lst.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    showForm(negBuilder(dialog_ok, title.html, form).create)
+    denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
+    denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
+    showForm(negBuilder(dialog_ok, getString(wallet_unit), form).create)
   }
 
   // SETTINGS FORM
@@ -391,10 +275,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
             for {
               encrypted <- backups
               jsonDecoded = AES.decode(encrypted, cloudSecret)
-              // This may be some garbage so omit this one if it fails
-              refundingData <- Try apply to[RefundingData](jsonDecoded)
-              // Now throw it away if it is already present in list of local channels
-              if !app.ChannelManager.all.exists(_(_.channelId) contains refundingData.commitments.channelId)
+              refundingData = to[RefundingData](jsonDecoded)
+
+              // Now throw it away if it is already present in a list of local channels
+              if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
               chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
               // Start watching this channel's funding tx output right away
               _ = app.kit watchFunding refundingData.commitments
@@ -467,8 +351,12 @@ class FragScan extends Fragment with BarcodeCallback { me =>
   }
 
   override def setUserVisibleHint(isVisibleToUser: Boolean) = {
-    if (barcodeReader != null) if (isVisibleToUser) barcodeReader.resume else barcodeReader.pause
-    if (!isVisibleToUser) getFragmentManager.beginTransaction.detach(me).attach(me).commit
+    if (isAdded) if (isVisibleToUser) barcodeReader.resume else {
+      getFragmentManager.beginTransaction.detach(me).attach(me).commit
+      barcodeReader.pause
+    }
+
+    // Remove snapshot traces if stopped
     super.setUserVisibleHint(isVisibleToUser)
   }
 

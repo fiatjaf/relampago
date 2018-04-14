@@ -6,7 +6,31 @@
     <LinearLayout
         android:baselineAligned="true"
         style="@style/StandardLinearLayout">
-        <include layout="@layout/toolbar"/>
+
+        <android.support.v7.widget.Toolbar
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+            android:background="@android:color/black"
+            android:layout_width="match_parent"
+            android:layout_height="74sp"
+            android:id="@+id/toolbar"
+
+            app:contentInsetLeft="@dimen/app_padding"
+            app:contentInsetStart="@dimen/app_padding"
+            app:contentInsetRight="@dimen/app_padding"
+            app:contentInsetEnd="@dimen/app_padding">
+
+            <TextView
+                style="@style/BaseText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@android:color/white"
+                android:id="@+id/customTitle"
+                android:maxLines="3"/>
+
+        </android.support.v7.widget.Toolbar>
 
         <ListView
             android:layout_weight="1"
@@ -22,8 +46,6 @@
 
             <Button
                 style="@style/MarginInfo"
-                android:drawablePadding="5dp"
-                android:drawableLeft="@drawable/ic_verified_user_black_18dp"
                 android:text="@string/sets_mnemonic"
                 android:layout_width="wrap_content"
                 android:onClick="viewMnemonic"/>
@@ -43,28 +65,48 @@
 
     <com.github.clans.fab.FloatingActionMenu
         fab:menu_icon="@drawable/ic_btc_24dp"
-        fab:menu_colorPressed="@color/btc"
-        fab:menu_colorNormal="@color/btc"
-        fab:menu_colorRipple="@color/btc"
+        fab:menu_colorPressed="@color/ln"
+        fab:menu_colorNormal="@color/ln"
+        fab:menu_colorRipple="@color/ln"
         style="@style/FloatingMenu">
 
         <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_arrow_upward_white_18dp"
-            fab:fab_label="@string/action_bitcoin_send"
-            fab:fab_colorPressed="@color/btc"
-            fab:fab_colorNormal="@color/btc"
-            fab:fab_colorRipple="@color/btc"
-            android:onClick="goSendBTC"
+            android:src="@drawable/ic_add_white_18dp"
+            fab:fab_label="@string/action_ln_open"
+            fab:fab_colorPressed="@color/ln"
+            fab:fab_colorNormal="@color/ln"
+            fab:fab_colorRipple="@color/ln"
+            android:onClick="goAddChannel"
+            style="@style/FabButton"
+            fab:fab_size="mini"/>
+
+        <com.github.clans.fab.FloatingActionButton
+            android:src="@drawable/ic_info_outline_white_18dp"
+            fab:fab_label="@string/action_ln_details"
+            fab:fab_colorPressed="@color/ln"
+            fab:fab_colorNormal="@color/ln"
+            fab:fab_colorRipple="@color/ln"
+            android:onClick="goChanDetails"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"
-            fab:fab_label="@string/action_bitcoin_receive"
+            fab:fab_label="@string/action_coins_receive"
             fab:fab_colorPressed="@color/btc"
             fab:fab_colorNormal="@color/btc"
             fab:fab_colorRipple="@color/btc"
             android:onClick="goReceiveBTC"
+            style="@style/FabButton"
+            fab:fab_size="mini"/>
+
+        <com.github.clans.fab.FloatingActionButton
+            android:src="@drawable/ic_arrow_upward_white_18dp"
+            fab:fab_label="@string/action_coins_send"
+            fab:fab_colorPressed="@color/btc"
+            fab:fab_colorNormal="@color/btc"
+            fab:fab_colorRipple="@color/btc"
+            android:onClick="goSendBTC"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 

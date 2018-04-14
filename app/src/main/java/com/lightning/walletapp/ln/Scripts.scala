@@ -161,6 +161,7 @@ object Scripts { me =>
   case class MainPenaltyTx(input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
   case class HtlcPenaltyTx(input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
   case class ClosingTx(input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
+  def weight2fee(perKw: Long, weight: Int) = Satoshi(perKw * weight / 1000L)
 
   val commitWeight = 724
   val htlcTimeoutWeight = 663
@@ -171,10 +172,6 @@ object Scripts { me =>
   val claimHtlcTimeoutWeight = 544
   val mainPenaltyWeight = 483
   val htlcPenaltyWeight = 577
-
-  // Fee calculation
-  def weight2fee(feeratePerKw: Long, weight: Int) =
-    Satoshi(feeratePerKw * weight / 1000L)
 
   private def trimOfferedHtlcs(dustLimit: Satoshi, spec: CommitmentSpec) = {
     val htlcTimeoutFee: MilliSatoshi = weight2fee(spec.feeratePerKw, htlcTimeoutWeight) + dustLimit

@@ -90,7 +90,6 @@ trait Broadcaster extends ChannelListener { me =>
   def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
   def getBlockHashString(txid: BinaryData): Option[String]
   def getStatus(txid: BinaryData): DepthAndDead
-  def isSynchronized: Boolean
   def currentHeight: Long
   def ratePerKwSat: Long
   val blocksPerDay = 144

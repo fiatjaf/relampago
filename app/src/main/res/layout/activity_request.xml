@@ -32,22 +32,6 @@
             android:layout_width="@dimen/bitmap_qr_wrap_width"
             android:layout_height="@dimen/bitmap_qr_wrap_height"/>
 
-        <Button
-            style="@style/Info"
-            android:visibility="gone"
-            android:onClick="showTip"
-            android:id="@+id/reqNfcEnabled"
-            android:text="@string/nfc_enabled"
-            android:layout_width="wrap_content"/>
-
-        <Button
-            style="@style/Info"
-            android:visibility="gone"
-            android:onClick="goSettings"
-            android:id="@+id/reqNfcSettings"
-            android:text="@string/nfc_settings"
-            android:layout_width="wrap_content"/>
-
     </LinearLayout>
 
     <ImageButton

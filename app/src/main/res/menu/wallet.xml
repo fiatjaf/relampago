@@ -10,4 +10,10 @@
         app:actionViewClass="android.support.v7.widget.SearchView"
         android:id="@+id/action_search"/>
 
+    <item
+        android:title="Wallet settings"
+        app:showAsAction="always|collapseActionView"
+        android:icon="@drawable/ic_settings_white_24dp"
+        android:id="@+id/actionSettings"/>
+
 </menu>

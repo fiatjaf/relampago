@@ -124,7 +124,6 @@ trait TimerActivity extends AppCompatActivity { me =>
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
 
   def showForm(alertDialog: AlertDialog) = {
-    alertDialog setCanceledOnTouchOutside false
     alertDialog.getWindow.getAttributes.windowAnimations = R.style.SlidingDialog
     // This may be called after a host activity is destroyed and thus it may throw
 
@@ -297,7 +296,6 @@ trait PayData {
   // Emptying a wallet needs special handling
   def isAll = app.kit.conf1Balance equals cn
   def getRequest: SendRequest
-  def onClick: Unit
   def cn: Coin
 
   def destination: String
@@ -311,14 +309,12 @@ trait PayData {
 case class AddrData(cn: Coin, address: Address) extends PayData {
   def getRequest = if (isAll) emptyWallet(address) else to(address, cn)
   def link = BitcoinURI.convertToBitcoinURI(address, cn, null, null)
-  def onClick = app.setBuffer(address.toString)
   def destination = humanFour(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
   // This will only be used for funding of LN payment channels as destination is unreadable
   def getRequest = if (isAll) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
-  def onClick = app.setBuffer(denom withSign cn)
   def destination = app getString txs_p2wsh
 }
 

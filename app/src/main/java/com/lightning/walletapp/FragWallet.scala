@@ -7,6 +7,7 @@ import org.bitcoinj.core.TxWrap._
 import collection.JavaConverters._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.R.drawable.{await, conf1btc, dead}
@@ -14,7 +15,6 @@ import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import scala.util.{Failure, Success}
 
 import org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT
-import android.support.v7.widget.Toolbar.OnMenuItemClickListener
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
@@ -31,38 +31,90 @@ import android.os.Bundle
 import android.net.Uri
 
 
-class FragBTC extends Fragment { me =>
+class FragWallet extends Fragment { me =>
   override def onCreateView(inflator: LayoutInflater, vg: ViewGroup, bn: Bundle) =
     inflator.inflate(R.layout.frag_view_pager_btc, vg, false)
 
-  var worker: FragBTCWorker = _
+  var worker: FragWalletWorker = _
   override def onViewCreated(view: View, savedInstanceState: Bundle) =
-    worker = new FragBTCWorker(getActivity.asInstanceOf[WalletActivity], view)
+    worker = new FragWalletWorker(getActivity.asInstanceOf[WalletActivity], view)
 
   override def onResume = {
-    WalletActivity.frags += me
+    // Parent now has a reference to me
+    WalletActivity.walletFrag = Some(me)
     super.onResume
   }
 
   override def onDestroy = {
-    WalletActivity.frags -= me
+    WalletActivity.walletFrag = None
     // This may be nullified hence a null check
     if (worker != null) worker.onFragmentDestroy
     super.onDestroy
   }
 }
 
-class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler with ToolbarFragment { me =>
-  val barMenuListener = new OnMenuItemClickListener { def onMenuItemClick(m: MenuItem) = host onOptionsItemSelected m }
-  import host.{getResources, showForm, negBuilder, getString, str2View, rm, mkForm, UITask, getLayoutInflater, TxProcessor}
-  import host.{timer, <, mkCheckForm, baseBuilder, onButtonTap, onFastTap, onTap, onFail, showDenomChooser}
-
-  val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-  val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
+class FragWalletWorker(val host: WalletActivity, frag: View) extends ListToggler { me =>
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
-  val txsConfs = getResources getStringArray R.array.txs_confs
+  val customTitle = frag.findViewById(R.id.customTitle).asInstanceOf[TextView]
+  val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
+  val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
 
-  val adapter = new CutAdapter[TxWrap](24, R.layout.frag_tx_btc_line) {
+  val syncOps = app.getResources getStringArray R.array.info_progress
+  val txsConfs = app.getResources getStringArray R.array.txs_confs
+  val statusConnecting = app getString btc_status_connecting
+  val statusOnline = app getString btc_status_online
+  val btcEmpty = app getString btc_empty
+  val lnEmpty = app getString ln_empty
+
+  var currentBlocksLeft = 0
+  var currentPeerCount = 0
+
+  import host._
+
+  // UPDATING TITLE
+
+  val catchListener = new BlocksListener {
+    def onBlocksDownloaded(sourcePeerNode: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) = {
+      if (left > LNParams.broadcaster.blocksPerDay) app.kit.peerGroup addBlocksDownloadedEventListener getNextTracker(left)
+      app.kit.peerGroup removeBlocksDownloadedEventListener this
+    }
+
+    def getNextTracker(initBlocksLeft: Int) = new BlocksListener { self =>
+      def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) =
+        runAnd(currentBlocksLeft = left)(updTitle)
+    }
+  }
+
+  val constListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
+    def onPeerDisconnected(peer: Peer, peerCount: Int) = runAnd(currentPeerCount = peerCount)(updTitle)
+    def onPeerConnected(peer: Peer, peerCount: Int) = runAnd(currentPeerCount = peerCount)(updTitle)
+  }
+
+  def updTitle = {
+    val btcTotalSum = app.kit.conf1Balance
+    val btcFunds = if (btcTotalSum.value < 1) btcEmpty else denom withSign btcTotalSum
+    val lnTotalSum = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
+    val lnFunds = if (lnTotalSum < 1) lnEmpty else denom withSign MilliSatoshi(lnTotalSum)
+    val daysLeft = currentBlocksLeft / LNParams.broadcaster.blocksPerDay
+
+    val subtitleText =
+      if (currentBlocksLeft > 1) app.plurOrZero(syncOps, daysLeft)
+      else if (currentPeerCount < 1) statusConnecting
+      else statusOnline
+
+    val titleText = s"""
+      &#3647; <strong>$btcFunds</strong><br>
+      &#9735; <strong>$lnFunds</strong><br>
+      $subtitleText
+    """.html
+
+    // Update all the data in one pass
+    UITask(customTitle setText titleText).run
+  }
+
+  // END UPDATING TITLE
+
+  val adapter = new CutAdapter[TxWrap](24, R.layout.frag_tx_line) {
     // BTC line has a wider timestamp section because there is no payment info
     // amount of history is low here because displaying each tx is costly
 
@@ -85,49 +137,7 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     }
   }
 
-  val catchListener = new BlocksListener {
-    def getNextTracker(initBlocksLeft: Int) = new BlocksListener { self =>
-      def onBlocksDownloaded(peer: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) =
-        if (left < 1) notifyFinish else if (left % LNParams.broadcaster.blocksPerDay == 0) notifyDaysLeft(left)
-
-      def notifyDaysLeft(blocksLeft: Int) = {
-        val daysLeft = blocksLeft / LNParams.broadcaster.blocksPerDay
-        val humanDaysLeft = app.plurOrZero(syncOps, daysLeft)
-        update(humanDaysLeft, Informer.CHAINSYNC).run
-      }
-
-      def notifyFinish = {
-        app.kit.peerGroup removeBlocksDownloadedEventListener self
-        add(host getString btc_progress_done, Informer.CHAINSYNC).run
-        timer.schedule(delete(Informer.CHAINSYNC), 5000)
-      }
-
-      // We only add a SYNC item if we have a large enough
-      // lag (more than a day), otherwise no updates are visible
-      private val syncOps = app.getResources getStringArray R.array.info_progress
-      private val text = app.plurOrZero(syncOps, initBlocksLeft / LNParams.broadcaster.blocksPerDay)
-      if (initBlocksLeft > LNParams.broadcaster.blocksPerDay) add(text, Informer.CHAINSYNC).run
-    }
-
-    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = {
-      app.kit.peerGroup addBlocksDownloadedEventListener getNextTracker(left)
-      app.kit.peerGroup removeBlocksDownloadedEventListener this
-    }
-  }
-
-  def peerStatus = {
-    val numPeers = app.kit.peerGroup.numConnectedPeers
-    if (numPeers < 1) btc_status_connecting else btc_status_online
-  }
-
-  val constListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
-    def onPeerConnected(peer: Peer, peerCount: Int) = update(host getString peerStatus, Informer.PEER).run
-    def onPeerDisconnected(peer: Peer, peerCount: Int) = update(host getString peerStatus, Informer.PEER).run
-  }
-
   val itemsListListener = new TxTracker {
-    def whenConfirmed = wrap(updTitle)(adapter.notifyDataSetChanged)
-    override def txConfirmed(tx: Transaction) = UITask(whenConfirmed).run
     override def coinsReceived(tx: Transaction) = guard(tx)
     override def coinsSent(tx: Transaction) = guard(tx)
 
@@ -146,11 +156,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     }
   }
 
-  val subtitleListener = new TxTracker {
-    override def coinsSent(tx: Transaction) = notifyBtcEvent(host getString btc_sent)
-    override def coinsReceived(tx: Transaction) = notifyBtcEvent(host getString btc_received)
-  }
-
   def updView(showText: Boolean) = {
     mnemonicWarn setVisibility viewMap(showText)
     itemsList setVisibility viewMap(!showText)
@@ -164,24 +169,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     app.kit.wallet removeCoinsSentEventListener itemsListListener
     app.kit.wallet removeCoinsReceivedEventListener itemsListListener
     app.kit.wallet removeTransactionConfidenceEventListener itemsListListener
-    app.kit.wallet removeCoinsReceivedEventListener subtitleListener
-    app.kit.wallet removeCoinsSentEventListener subtitleListener
-  }
-
-  def updTitle = setTitle {
-    val conf0 = app.kit.conf0Balance
-    val conf1 = app.kit.conf1Balance
-    val zeroConf = conf0 minus conf1
-
-    if (zeroConf.isPositive) s"${denom withSign conf1} + ${denom formatted zeroConf}"
-    else if (conf0.isZero && conf1.isZero) host getString btc_wallet
-    else denom withSign conf1
-  }
-
-  def notifyBtcEvent(message: String) = {
-    timer.schedule(delete(Informer.BTCEVENT), 8000)
-    add(message, Informer.BTCEVENT).run
-    UITask(updTitle).run
   }
 
   def nativeTransactions = {
@@ -189,35 +176,35 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     raw.toVector map bitcoinjTx2Wrap filterNot hiddenWrap filterNot watchedWrap
   }
 
-  def sendBtcPopup: BtcManager = {
-    val content = getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
-    val title = getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
-
-    lazy val bld = baseBuilder(getString(action_bitcoin_send), content)
-    lazy val alert = mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
-    lazy val formManager = new BtcManager(new RateManager(title, content), alert)
+  def sendBtcPopup(addr: Address): RateManager = {
+    val hint = getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
+    val form = getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
+    val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
+    val bld = baseBuilder(getString(action_coins_send), form)
+    val rateManager = new RateManager(hint, form)
 
     def next(msat: MilliSatoshi) = new TxProcessor {
-      val pay = AddrData(msat, formManager.getAddress)
       def futureProcess(unsignedRequest: SendRequest) = {
-        add(getString(btc_announcing), Informer.BTCEVENT).run
-        app.kit blockingSend app.kit.sign(unsignedRequest).tx
+        val signedRequest = app.kit.sign(unsignedRequest).tx
+        app.kit blockingSend signedRequest
       }
 
+      val pay = AddrData(msat, addr)
       def onTxFail(sendingError: Throwable) = {
-        val bld = baseBuilder(title = messageWhenMakingTx(sendingError), body = null)
-        mkForm(sendBtcPopup.set(Success(msat), pay.address), none, bld, dialog_ok, dialog_cancel)
+        val bld = baseBuilder(messageWhenMakingTx(sendingError), null)
+        mkForm(sendBtcPopup(addr), none, bld, dialog_ok, dialog_cancel)
       }
     }
 
-    def sendAttempt(alert: AlertDialog): Unit = formManager.man.result match {
-      case _ if formManager.getAddress == null => app toast dialog_address_wrong
+    def sendAttempt(alert: AlertDialog): Unit = rateManager.result match {
       case Success(ms) if MIN_NONDUST_OUTPUT isGreaterThan ms => app toast dialog_sum_small
-      case Failure(reason) => app toast dialog_sum_empty
+      case Failure(probablyEmptySum) => app toast dialog_sum_empty
       case Success(ms) => rm(alert)(next(ms).start)
     }
 
-    formManager
+    mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
+    addressData setText humanFour(addr.toString)
+    rateManager
   }
 
   def boostIncoming(wrap: TxWrap) = {
@@ -241,32 +228,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     }
   }
 
-  class BtcManager(val man: RateManager, alert: AlertDialog) { me =>
-    val addressActions = man.content.findViewById(R.id.addressActions)
-    val addressData = man.content.findViewById(R.id.addressData).asInstanceOf[TextView]
-    val addressPaste = man.content.findViewById(R.id.addressPaste).asInstanceOf[Button]
-    val addressScanner = man.content.findViewById(R.id.addressScanner).asInstanceOf[Button]
-    def set(tm: TryMSat, adr: Address) = wrap(man setSum tm)(me setAddr adr)
-    def getAddress = addressData.getTag.asInstanceOf[Address]
-
-    addressPaste setOnClickListener onButtonTap {
-      def informNoAddress = app toast dialog_clipboard_absent
-      app.getBufferTry map app.getTo map setAddr getOrElse informNoAddress
-    }
-
-    addressScanner setOnClickListener onButtonTap {
-      def goQR = host.walletPager.setCurrentItem(2, true)
-      rm(alert)(goQR)
-    }
-
-    def setAddr(addr: Address) = {
-      addressData setText humanFour(addr.toString)
-      addressActions setVisibility View.GONE
-      addressData setVisibility View.VISIBLE
-      addressData setTag addr
-    }
-  }
-
   // INIT
 
   itemsList setOnItemClickListener onTap { pos =>
@@ -280,7 +241,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     val humanOutputs = for (paymentData <- outputs) yield paymentData.cute(marking).html
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     lst setAdapter new ArrayAdapter(host, R.layout.frag_top_tip, R.id.actionTip, humanOutputs.toArray)
-    lst setOnItemClickListener onTap { pos1 => outputs(pos1 - 1).onClick }
     lst setHeaderDividersEnabled false
     lst addHeaderView detailsWrapper
 
@@ -317,7 +277,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   itemsList setAdapter adapter
   itemsList addFooterView allTxsWrapper
   itemsList setFooterDividersEnabled false
-  itemsList setOnScrollListener host.listListener
   app.kit.peerGroup addConnectedEventListener constListener
   app.kit.peerGroup addDisconnectedEventListener constListener
   app.kit.peerGroup addBlocksDownloadedEventListener catchListener
@@ -325,8 +284,6 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
   app.kit.wallet addCoinsSentEventListener itemsListListener
   app.kit.wallet addCoinsReceivedEventListener itemsListListener
   app.kit.wallet addTransactionConfidenceEventListener itemsListListener
-  app.kit.wallet addCoinsReceivedEventListener subtitleListener
-  app.kit.wallet addCoinsSentEventListener subtitleListener
 
   <(nativeTransactions, onFail) { txs =>
     // Fill list with bitcoin transactions
@@ -334,10 +291,8 @@ class FragBTCWorker(val host: WalletActivity, frag: View) extends ListToggler wi
     adapter set txs
   }
 
-  add(host getString peerStatus, Informer.PEER).run
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
   toolbar setOnClickListener onFastTap(showDenomChooser)
-  toolbar setOnMenuItemClickListener barMenuListener
-  toolbar inflateMenu R.menu.btc
+  host setSupportActionBar toolbar
   updTitle
 }

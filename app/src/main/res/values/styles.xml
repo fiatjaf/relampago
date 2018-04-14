@@ -121,12 +121,11 @@
 
     <style name="ToolbarTitleAppearance" parent="@style/TextAppearance.Widget.AppCompat.Toolbar.Title">
         <item name="android:textColor">#FFFFFFFF</item>
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">19sp</item>
     </style>
 
     <style name="ToolbarSubtitleAppearance" parent="@style/TextAppearance.Widget.AppCompat.Toolbar.Subtitle">
-        <item name="android:textColor">#DDFFFFFF</item>
+        <item name="android:textColor">#FFFFFFFF</item>
         <item name="android:textSize">18sp</item>
     </style>
-
 </resources>

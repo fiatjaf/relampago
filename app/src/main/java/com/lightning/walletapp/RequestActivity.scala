@@ -7,26 +7,19 @@ import com.lightning.walletapp.Denomination._
 
 import java.io.{File, FileOutputStream}
 import android.os.{Bundle, Environment}
-import android.view.View.{GONE, VISIBLE}
-import android.nfc.{NdefMessage, NfcEvent}
 import android.text.{StaticLayout, TextPaint}
 import android.widget.{ImageButton, ImageView}
-import com.lightning.walletapp.ln.Tools.{none, wrap}
 import com.google.zxing.{BarcodeFormat, EncodeHintType}
 
 import com.lightning.walletapp.lnutils.ImplicitConversions.string2Ops
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
-import org.ndeftools.util.activity.NfcBeamWriterActivity
 import android.text.Layout.Alignment.ALIGN_NORMAL
 import com.lightning.walletapp.ln.PaymentRequest
 import android.graphics.Bitmap.Config.ARGB_8888
 import com.google.zxing.qrcode.QRCodeWriter
 import android.graphics.Bitmap.createBitmap
-import org.ndeftools.wellknown.TextRecord
 import org.bitcoinj.core.Address
 import android.content.Intent
-import org.ndeftools.Message
-import android.view.View
 import android.net.Uri
 
 
@@ -61,8 +54,7 @@ object FileOps {
   }
 }
 
-class RequestActivity extends NfcBeamWriterActivity with TimerActivity with ViewSwitch { me =>
-  lazy val views = findViewById(R.id.reqNfcEnabled) :: findViewById(R.id.reqNfcSettings) :: Nil
+class RequestActivity extends TimerActivity { me =>
   lazy val shareText = findViewById(R.id.shareText).asInstanceOf[ImageButton]
   lazy val shareQR = findViewById(R.id.shareQR).asInstanceOf[ImageButton]
   lazy val reqCode = findViewById(R.id.reqCode).asInstanceOf[ImageView]
@@ -72,18 +64,8 @@ class RequestActivity extends NfcBeamWriterActivity with TimerActivity with View
   lazy val topSize = getResources getDimensionPixelSize R.dimen.bitmap_top_size
   lazy val qrSize = getResources getDimensionPixelSize R.dimen.bitmap_qr_size
 
-  case class NFCData(data: String) {
-    def getNfcMessage: NdefMessage = {
-      val textRecord = new TextRecord(data)
-      val message = new Message
-      message add textRecord
-      message.getNdefMessage
-    }
-  }
-
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_request)
-    wrap(me setDetecting true)(me initNfc state)
 
     app.TransData.value match {
       // Payment requests without amount are disabled for now
@@ -98,7 +80,6 @@ class RequestActivity extends NfcBeamWriterActivity with TimerActivity with View
     <(QRGen.get(data, qrSize), onFail)(renderBitmap andThen setView)
     reqCode setOnClickListener onButtonTap(app setBuffer data)
     shareText setOnClickListener onButtonTap(me share data)
-    app.TransData.value = NFCData(data)
   }
 
   def setView(displayedImage: Bitmap) = {
@@ -169,27 +150,4 @@ class RequestActivity extends NfcBeamWriterActivity with TimerActivity with View
     stream.close
     imageFile
   }
-
-  // No NFC reading in this activity
-  def readNdefMessage(m: Message) = none
-  def readEmptyNdefMessage = none
-  def readNonNdefMessage = none
-
-  // NFC pushing if it is present
-  override def onDestroy = wrap(super.onDestroy)(stopDetecting)
-  override def onNfcFeatureFound = wrap(startPushing)(super.onNfcFeatureFound)
-  def onNfcStateChange(ok: Boolean) = if (ok) onNfcStateEnabled else onNfcStateDisabled
-  def onNfcPushStateChange(ok: Boolean) = if (ok) onNfcPushStateEnabled else onNfcPushStateDisabled
-  def createNdefMessage(e: NfcEvent) = app.TransData.value.asInstanceOf[NFCData].getNfcMessage
-
-  def onNfcPushStateDisabled = setVis(GONE, VISIBLE)
-  def onNfcPushStateEnabled = setVis(VISIBLE, GONE)
-  def onNfcStateDisabled = setVis(GONE, VISIBLE)
-  def onNfcFeatureNotFound = setVis(GONE, GONE)
-  def onNdefPushCompleted = none
-  def onNfcStateEnabled = none
-
-  // When NFC is available we show a tip so users would know how exactly they might use it
-  def showTip(v: View) = showForm(negTextBuilder(dialog_ok, me getString nfc_payee_tip).create)
-  def goSettings(v: View) = startNfcSharingSettingsActivity
 }
