@@ -40,23 +40,22 @@ object JsonHttpUtils {
 object RatesSaver {
   def safe = retry(OlympusWrap.getRates, pickInc, 3 to 4)
   def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
-    val sensibleFees = for (notZero <- newFee("6") +: rates.feeHistory if notZero > 0) yield notZero
-    rates = Rates(feeHistory = sensibleFees take 3, exchange = newFiat, stamp = System.currentTimeMillis)
+    val sensibleSix = for (notZero <- newFee("6") +: rates.feeHistorySix if notZero > 0) yield notZero
+    val sensibleTwo = for (notZero <- newFee("2") +: rates.feeHistorySix if notZero > 0) yield notZero
+    rates = Rates(sensibleSix take 3, sensibleTwo take 3, newFiat, System.currentTimeMillis)
     app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
   }
 
   var rates = {
     val raw = app.prefs.getString(AbstractKit.RATES_DATA, new String)
-    Try(raw) map to[Rates] getOrElse Rates(Nil, Map.empty, 0)
+    Try(raw) map to[Rates] getOrElse Rates(Nil, Nil, Map.empty, 0)
   }
 }
 
-case class Rates(feeHistory: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
-  // Testnet was not accepting transactions with too low fee so use some hard min
-
-  private[this] val minAllowedFee = Coin valueOf 5000L
-  val feeLive = if (feeHistory.isEmpty) DEFAULT_TX_FEE else {
-    val averageFee: Coin = btcBigDecimal2MSat(feeHistory.sum / feeHistory.size)
-    if (averageFee isLessThan minAllowedFee) minAllowedFee else averageFee
-  }
+case class Rates(feeHistorySix: Seq[Double], feeHistoryTwo: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
+  private[this] val avgSix: Coin = if (feeHistorySix.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feeHistorySix.sum / feeHistorySix.size)
+  private[this] val avgTwo: Coin = if (feeHistoryTwo.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feeHistoryTwo.sum / feeHistorySix.size)
+  val feeSix = if (avgSix isLessThan minAllowedFee) minAllowedFee else avgSix
+  val feeTwo = if (avgTwo isLessThan minAllowedFee) minAllowedFee else avgTwo
+  lazy val minAllowedFee = Coin valueOf 5000L
 }

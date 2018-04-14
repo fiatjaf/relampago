@@ -199,7 +199,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     val pay: PayData
 
     def start = {
-      val estimateFee = RatesSaver.rates.feeLive
+      val estimateFee = RatesSaver.rates.feeSix
       <(app.kit sign plainRequest(estimateFee), onFail)(chooseFee)
     }
 
@@ -217,7 +217,7 @@ trait TimerActivity extends AppCompatActivity { me =>
 
       def proceed = {
         val divider = if (lst.getCheckedItemPosition == 0) 2 else 1
-        val request = plainRequest(RatesSaver.rates.feeLive div divider)
+        val request = plainRequest(RatesSaver.rates.feeSix div divider)
         futureProcess(request)
       }
 

@@ -46,10 +46,7 @@ object LNParams { me =>
   // On-chain fee calculations
   def shouldUpdateFee(network: Long, commit: Long) = {
     val mismatch = 2.0 * (network - commit) / (commit + network)
-
-    if (mismatch < -0.25 && mismatch > -1) true
-    else if (mismatch > 0.25 && mismatch < 1) true
-    else false
+    mismatch < -0.25 || mismatch > 0.25
   }
 
   def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {

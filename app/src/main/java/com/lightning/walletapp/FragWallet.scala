@@ -113,7 +113,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends ListToggler
       $subtitleText
     """.html
 
-    // Update all the data in one pass
+    // Update all the info in one pass
     UITask(customTitle setText titleText).run
   }
 
@@ -214,7 +214,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends ListToggler
 
   def boostIncoming(wrap: TxWrap) = {
     val current = coloredIn(wrap.valueDelta)
-    val increasedFee = RatesSaver.rates.feeLive divide 2
+    val increasedFee = RatesSaver.rates.feeSix divide 2
     val boost = coloredIn(wrap.valueDelta minus increasedFee)
     val userWarn = getString(boost_details).format(current, boost).html
     mkForm(ok = <(replace, onError)(none), none, baseBuilder(userWarn, null),
@@ -263,7 +263,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends ListToggler
     }
 
     // See if CPFP can be applied
-    val notEnoughValue = wrap.valueDelta isLessThan RatesSaver.rates.feeLive
+    val notEnoughValue = wrap.valueDelta isLessThan RatesSaver.rates.feeSix
     val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 1800L * 1000
     val doNotOfferCPFP = wrap.depth > 0 || wrap.isDead || tooFresh || notEnoughValue
 

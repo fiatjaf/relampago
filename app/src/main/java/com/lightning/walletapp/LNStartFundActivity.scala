@@ -123,7 +123,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     def askForFunding(their: Init): TimerTask = UITask {
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val dummyKey = derivePrivateKey(LNParams.extendedCloudKey, System.currentTimeMillis :: 0L :: Nil).publicKey
-      val rateManager = new RateManager(getString(amount_hint_newchan).format(denom withSign RatesSaver.rates.feeLive,
+      val rateManager = new RateManager(getString(amount_hint_newchan).format(denom withSign RatesSaver.rates.feeSix,
         denom withSign LNParams.maxChannelCapacity, denom withSign app.kit.conf1Balance), content)
 
       def next(msat: MilliSatoshi) = new TxProcessor {
@@ -149,7 +149,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       def askAttempt(alert: AlertDialog) = rateManager.result match {
-        case Success(ms) if ms < RatesSaver.rates.feeLive => app toast dialog_sum_small
+        case Success(ms) if ms < RatesSaver.rates.feeSix => app toast dialog_sum_small
         case Success(ms) if ms > LNParams.maxChannelCapacity => app toast dialog_sum_big
         case Failure(reason) => app toast dialog_sum_empty
         case Success(ms) => rm(alert)(next(ms).start)

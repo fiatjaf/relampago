@@ -242,7 +242,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   // SETTINGS FORM
 
   def makeSettingsForm = {
-    val feePerKb = denom withSign RatesSaver.rates.feeLive
+    val feePerKb = denom withSign RatesSaver.rates.feeSix
     val title = getString(read_settings).format(feePerKb).html
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
     val menu = showForm(negBuilder(dialog_ok, title, form).create)
