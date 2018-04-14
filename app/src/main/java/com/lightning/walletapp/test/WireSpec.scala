@@ -1,7 +1,8 @@
 package com.lightning.walletapp.test
 
-import java.net.{InetAddress, InetSocketAddress}
+import java.net.{Inet6Address, InetAddress, InetSocketAddress}
 
+import com.google.common.net.InetAddresses
 import com.lightning.walletapp.ln.PerHopPayload
 import com.lightning.walletapp.ln.crypto.Sphinx
 import com.lightning.walletapp.ln.wire._
@@ -42,6 +43,26 @@ class WireSpec {
     def point(fill: Byte) = Scalar(bin(32, fill)).toPoint
 
     def publicKey(fill: Byte) = PrivateKey(bin(32, fill), compressed = true).publicKey
+
+    {
+      println("encode/decode all kind of IPv6 addresses with ipv6address codec")
+
+      {
+        // IPv4 mapped
+        val bin = hex"00000000000000000000ffffae8a0b08".toBitVector
+        val ipv6 = Inet6Address.getByAddress(null, bin.toByteArray, null)
+        val bin2 = ipv6address.encode(ipv6).require
+        assert(bin == bin2)
+      }
+
+      {
+        // regular IPv6 address
+        val ipv6 = InetAddresses.forString("1080:0:0:0:8:800:200C:417A").asInstanceOf[Inet6Address]
+        val bin = ipv6address.encode(ipv6).require
+        val ipv62 = ipv6address.decode(bin).require.value
+        assert(ipv6 == ipv62)
+      }
+    }
 
     {
       println("encode/decode with rgb codec")

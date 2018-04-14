@@ -9,6 +9,7 @@ import com.lightning.walletapp.ln.{Hop, LightningException, PerHopPayload}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import fr.acinq.bitcoin.{BinaryData, Crypto}
 import scodec.bits.{BitVector, ByteVector}
+import scala.util.{Failure, Success, Try}
 import scodec.{Attempt, Codec, Err}
 
 
@@ -33,6 +34,11 @@ object LightningMessageCodecs { me =>
       case Attempt.Failure(err) => throw new LightningException(err.message)
     }
 
+  def attemptFromTry[T](run: => T): Attempt[T] = Try(run) match {
+    case Failure(reason) => Attempt failure Err(reason.getMessage)
+    case Success(result) => Attempt successful result
+  }
+
   // RGB <-> ByteVector
   private val bv2Rgb: PartialFunction[ByteVector, RGB] = {
     case ByteVector(red, green, blue, _*) => (red, green, blue)
@@ -45,11 +51,6 @@ object LightningMessageCodecs { me =>
   // BinaryData <-> ByteVector
   private val vec2Bin = (vec: ByteVector) => BinaryData(vec.toArray)
   private val bin2Vec = (bin: BinaryData) => ByteVector(bin.data)
-
-  // IP v4/6 <-> ByteVector
-  private val inet2Bv = (a: InetAddress) => ByteVector(a.getAddress)
-  private val bv2Inet6 = (bv: ByteVector) => InetAddress.getByAddress(bv.toArray).asInstanceOf[Inet6Address]
-  private val bv2Inet4 = (bv: ByteVector) => InetAddress.getByAddress(bv.toArray).asInstanceOf[Inet4Address]
 
   def der2wire(signature: BinaryData): BinaryData =
     Crypto decodeSignature signature match { case (r, s) =>
@@ -90,14 +91,18 @@ object LightningMessageCodecs { me =>
     if (long < 0) Attempt failure Err(s"Overflow $long")
     else Attempt successful long, identity)
 
-  val uint64ex: Codec[UInt64] = bytes(8).xmap(b => UInt64(b.toArray),
-    a => ByteVector(a.underlying.toByteArray) takeRight 8 padLeft 8)
+  val ipv6address: Codec[Inet6Address] = bytes(16).exmap(
+    bv => me attemptFromTry Inet6Address.getByAddress(null, bv.toArray, null),
+    inet6Address => me attemptFromTry ByteVector(inet6Address.getAddress)
+  )
 
-  private val ipv6address: Codec[Inet6Address] = bytes(16).xmap(bv2Inet6, inet2Bv)
-  private val ipv4address: Codec[Inet4Address] = bytes(4).xmap(bv2Inet4, inet2Bv)
+  private val ipv4address: Codec[Inet4Address] = bytes(4).xmap(
+    bv => InetAddress.getByAddress(bv.toArray).asInstanceOf[Inet4Address],
+    inet4Address => ByteVector(inet4Address.getAddress)
+  )
 
-  private val addressport: Codec[AddressPort] = discriminated[InetAddress]
-    .by(uint8).typecase(1, ipv4address).typecase(2, ipv6address) ~ uint16
+  val uint64ex: Codec[UInt64] = bytes(8).xmap(b => UInt64(b.toArray), a => ByteVector(a.underlying.toByteArray) takeRight 8 padLeft 8)
+  private val addressport: Codec[AddressPort] = discriminated[InetAddress].by(uint8).typecase(1, ipv4address).typecase(2, ipv6address) ~ uint16
 
   val socketaddress: Codec[InetSocketAddress] = addressport.xmap(
     addressAndPort => new InetSocketAddress(addressAndPort._1, addressAndPort._2),
