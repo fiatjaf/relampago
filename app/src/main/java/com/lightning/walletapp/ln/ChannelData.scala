@@ -22,6 +22,7 @@ case class CMDConfirmed(tx: Transaction) extends Command
 case class CMDBestHeight(height: Long) extends Command
 case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
+case class CMDFeerate(sat: Long) extends Command
 case object CMDHTLCProcess extends Command
 case object CMDForceClose extends Command
 case object CMDShutdown extends Command

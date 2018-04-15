@@ -224,6 +224,18 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA d1 doProcess CMDHTLCProcess
 
 
+      case (norm: NormalData, CMDFeerate(satPerKew), OPEN) =>
+        val localCommitFee = norm.commitments.localCommit.spec.feeratePerKw
+        val shouldUpdate = LNParams.shouldUpdateFee(satPerKew, localCommitFee)
+
+        if (shouldUpdate) Commitments.sendFee(norm.commitments, satPerKew) foreach { case c1 \ msg =>
+          // We only send a fee update if our current chan unspendable reserve + commitTx fee can afford it
+          // otherwise we fail silently in hope that fee will drop or we will receive a payment
+          me UPDATA norm.copy(commitments = c1) SEND msg
+          doProcess(CMDProceed)
+        }
+
+
       case (norm: NormalData, CMDBestHeight(height), OPEN | OFFLINE)
         // GUARD: break channel if expired outgoing HTLC exists + 576 blocks of grace period have passed
         if norm.commitments.localCommit.spec.htlcs.exists(htlc => !htlc.incoming && height - 576 >= htlc.add.expiry) ||
@@ -479,14 +491,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     // Change has been successfully processed
     events onProcessSuccess Tuple3(me, data, change)
   }
-
-  def sendFeeUpdate(norm: NormalData, updatedFeeRate: Long) =
-    Commitments.sendFee(norm.commitments, updatedFeeRate) foreach { case c1 \ msg =>
-      // We only send a fee update if our current chan reserve + commit tx fee can afford it
-      // otherwise we fail silently in hope that fee will drop or we will receive a payment
-      me UPDATA norm.copy(commitments = c1) SEND msg
-      doProcess(CMDProceed)
-    }
 
   private def storeRefund(some: HasCommitments, point: Point) = {
     val msg = "please publish your local commitment" getBytes "UTF-8"

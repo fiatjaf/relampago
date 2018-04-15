@@ -121,10 +121,13 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def askForFunding(their: Init): TimerTask = UITask {
+      val minCapacity = denom withSign RatesSaver.rates.feeTwo
+      val maxCapacity = denom withSign LNParams.maxChannelCapacity
+      val canSend = denom withSign app.kit.conf1Balance
+
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val dummyKey = derivePrivateKey(LNParams.extendedCloudKey, System.currentTimeMillis :: 0L :: Nil).publicKey
-      val rateManager = new RateManager(getString(amount_hint_newchan).format(denom withSign RatesSaver.rates.feeSix,
-        denom withSign LNParams.maxChannelCapacity, denom withSign app.kit.conf1Balance), content)
+      val rateManager = new RateManager(getString(amount_hint_newchan).format(minCapacity, maxCapacity, canSend), content)
 
       def next(msat: MilliSatoshi) = new TxProcessor {
         val dummyScript = pubKeyScript(dummyKey, dummyKey)
@@ -138,10 +141,8 @@ class LNStartFundActivity extends TimerActivity { me =>
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val theirUnspendableReserveSat = realChannelFundingAmountSat / LNParams.theirReserveToFundingRatio
           val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis)
-
-          freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32,
-            LNParams.broadcaster.ratePerKwSat, pushMsat = 0L, their, unsignedRequest,
-            outIndex, realChannelFundingAmountSat)
+          freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, LNParams.broadcaster.perKwTwoSat,
+            pushMsat = 0L, remoteInit = their, dummyRequest = unsignedRequest, outIndex, realChannelFundingAmountSat)
         }
 
         def onTxFail(fundingError: Throwable) = mkForm(askForFunding(their).run, none,
@@ -149,7 +150,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       def askAttempt(alert: AlertDialog) = rateManager.result match {
-        case Success(ms) if ms < RatesSaver.rates.feeSix => app toast dialog_sum_small
+        case Success(ms) if ms < RatesSaver.rates.feeTwo => app toast dialog_sum_small
         case Success(ms) if ms > LNParams.maxChannelCapacity => app toast dialog_sum_big
         case Failure(reason) => app toast dialog_sum_empty
         case Success(ms) => rm(alert)(next(ms).start)

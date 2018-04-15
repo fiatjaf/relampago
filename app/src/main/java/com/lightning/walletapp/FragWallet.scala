@@ -214,16 +214,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends ListToggler
 
   def boostIncoming(wrap: TxWrap) = {
     val current = coloredIn(wrap.valueDelta)
-    val increasedFee = RatesSaver.rates.feeSix divide 2
-    val boost = coloredIn(wrap.valueDelta minus increasedFee)
-    val userWarn = getString(boost_details).format(current, boost).html
-    mkForm(ok = <(replace, onError)(none), none, baseBuilder(userWarn, null),
-      dialog_ok, dialog_cancel)
+    val newFee = RatesSaver.rates.feeSix div 2
+    val boost = coloredIn(wrap.valueDelta minus newFee)
+    // Unlike normal transaction this one uses a whole half of feeSix
+    val userWarn = baseBuilder(getString(boost_details).format(current, boost).html, null)
+    mkForm(ok = <(replace, onError)(none), none, userWarn, dialog_ok, dialog_cancel)
 
-    // Transaction hiding must always happen before replacement sending
     def replace = if (wrap.depth < 1 && !wrap.isDead) runAnd(wrap.tx setMemo HIDE) {
-      val unsignedBoost = childPaysForParent(app.kit.wallet, wrap.tx, increasedFee)
-      app.kit blockingSend app.kit.sign(unsignedBoost).tx
+      // Parent transaction hiding must always happen before replacement is broadcasted
+      val unsigned = childPaysForParent(app.kit.wallet, wrap.tx, newFee)
+      app.kit blockingSend app.kit.sign(unsigned).tx
     }
 
     def onError(err: Throwable) = {

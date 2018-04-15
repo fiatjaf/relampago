@@ -198,10 +198,8 @@ trait TimerActivity extends AppCompatActivity { me =>
     def onTxFail(exc: Throwable)
     val pay: PayData
 
-    def start = {
-      val estimateFee = RatesSaver.rates.feeSix
-      <(app.kit sign plainRequest(estimateFee), onFail)(chooseFee)
-    }
+    // Estimate a real fee this tx will have in order to be confirmed within next 6 blocks
+    def start = <(app.kit sign plainRequest(RatesSaver.rates.feeSix), onFail)(chooseFee)
 
     def chooseFee(estimate: SendRequest): Unit = {
       val livePerTxFee: MilliSatoshi = estimate.tx.getFee
@@ -215,10 +213,10 @@ trait TimerActivity extends AppCompatActivity { me =>
       val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
       val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
-      def proceed = {
-        val divider = if (lst.getCheckedItemPosition == 0) 2 else 1
-        val request = plainRequest(RatesSaver.rates.feeSix div divider)
-        futureProcess(request)
+      def proceed = lst.getCheckedItemPosition match {
+        // Allow user to choose an economical fee when sending a manual transaction
+        case 0 => self futureProcess plainRequest(RatesSaver.rates.feeSix div 2)
+        case 1 => self futureProcess plainRequest(RatesSaver.rates.feeSix)
       }
 
       val bld = baseBuilder(getString(step_fees).format(pay cute sumOut).html, form)
@@ -227,11 +225,10 @@ trait TimerActivity extends AppCompatActivity { me =>
       lst.setItemChecked(0, true)
     }
 
-    def plainRequest(selectedFee: Coin) = {
+    def plainRequest(selectedFeePerKb: Coin) = {
       val unsignedRequestWithFee = pay.getRequest
-      unsignedRequestWithFee.feePerKb = selectedFee
+      unsignedRequestWithFee.feePerKb = selectedFeePerKb
       app.kit.wallet addLocalInputsToTx unsignedRequestWithFee
-      app.kit.wallet maybeAddOpReturnPubKeyHash unsignedRequestWithFee
       unsignedRequestWithFee
     }
 

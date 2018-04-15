@@ -20,6 +20,7 @@ import scala.util.Try
 
 
 object JsonHttpUtils {
+  val minAllowedFee = Coin valueOf 5000L
   def initDelay[T](next: Obs[T], startMillis: Long, timeoutMillis: Long) = {
     val adjustedTimeout = startMillis + timeoutMillis - System.currentTimeMillis
     val delayLeft = if (adjustedTimeout < 0L) 0L else adjustedTimeout
@@ -40,9 +41,12 @@ object JsonHttpUtils {
 object RatesSaver {
   def safe = retry(OlympusWrap.getRates, pickInc, 3 to 4)
   def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
-    val sensibleSix = for (notZero <- newFee("6") +: rates.feeHistorySix if notZero > 0) yield notZero
-    val sensibleTwo = for (notZero <- newFee("2") +: rates.feeHistorySix if notZero > 0) yield notZero
-    rates = Rates(sensibleSix take 3, sensibleTwo take 3, newFiat, System.currentTimeMillis)
+    val sensibleSix = for (notZero <- newFee("6") +: rates.feesSix if notZero > 0) yield notZero
+    val sensibleTwo = for (notZero <- newFee("2") +: rates.feesTwo if notZero > 0) yield notZero
+
+    // Channels may become open sooner then we get updated fees so inform channels once we get updated fees
+    rates = Rates(sensibleSix take 2, sensibleTwo take 2, exchange = newFiat, stamp = System.currentTimeMillis)
+    for (c <- app.ChannelManager.notClosingOrRefunding) c process CMDFeerate(LNParams.broadcaster.perKwTwoSat)
     app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
   }
 
@@ -52,10 +56,11 @@ object RatesSaver {
   }
 }
 
-case class Rates(feeHistorySix: Seq[Double], feeHistoryTwo: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
-  private[this] val avgSix: Coin = if (feeHistorySix.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feeHistorySix.sum / feeHistorySix.size)
-  private[this] val avgTwo: Coin = if (feeHistoryTwo.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feeHistoryTwo.sum / feeHistorySix.size)
+// 2 items of memory to help eliminate possible fee spikes
+// feesSix is used for manual txs sending, feesTwo is used to maintain a channel feerate
+case class Rates(feesSix: Seq[Double], feesTwo: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
+  val avgSix: Coin = if (feesSix.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feesSix.sum / 2)
+  val avgTwo: Coin = if (feesTwo.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feesTwo.sum / 2)
   val feeSix = if (avgSix isLessThan minAllowedFee) minAllowedFee else avgSix
   val feeTwo = if (avgTwo isLessThan minAllowedFee) minAllowedFee else avgTwo
-  lazy val minAllowedFee = Coin valueOf 5000L
 }

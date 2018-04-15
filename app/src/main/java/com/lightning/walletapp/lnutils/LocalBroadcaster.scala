@@ -12,7 +12,8 @@ import fr.acinq.bitcoin.BinaryData
 
 
 object LocalBroadcaster extends Broadcaster {
-  def ratePerKwSat = RatesSaver.rates.feeSix.value / 4
+  def perKwSixSat = RatesSaver.rates.feeSix.value / 4
+  def perKwTwoSat = RatesSaver.rates.feeTwo.value / 4
 
   def currentHeight = {
     val processed = app.kit.wallet.getLastBlockSeenHeight
@@ -53,9 +54,8 @@ object LocalBroadcaster extends Broadcaster {
       app.kit blockingSend wait.fundingTx
 
     case (chan, norm: NormalData, OFFLINE, OPEN) =>
-      // Check for fee changes once when channel becomes online
-      val commitFee = norm.commitments.localCommit.spec.feeratePerKw
-      val shouldUpdate = LNParams.shouldUpdateFee(ratePerKwSat, commitFee)
-      if (shouldUpdate) chan.sendFeeUpdate(norm, ratePerKwSat)
+      // Updated feerates may arrive sooner then channel gets open
+      // so inform channel about updated fees once it gets open
+      chan process CMDFeerate(perKwTwoSat)
   }
 }

@@ -88,8 +88,8 @@ trait Broadcaster extends ChannelListener { me =>
   def getBlockHashString(txid: BinaryData): Option[String]
   def getStatus(txid: BinaryData): DepthAndDead
   def currentHeight: Long
-  def ratePerKwSat: Long
-  val blocksPerDay = 144
+  def perKwSixSat: Long
+  def perKwTwoSat: Long
 
   // Parent state and next tier cltv delay
   // actual negative delay will be represented as 0L
@@ -108,6 +108,7 @@ trait Broadcaster extends ChannelListener { me =>
     parentDepth -> parentIsDead -> (cltvDelay + csvDelay)
   }
 
+  val blocksPerDay = 144
   def csvShowDelayed(t1: TransactionWithInputInfo, t2: TransactionWithInputInfo) =
     ShowDelayed(csv(t1.tx, t2.tx), t2.tx, t1 -- t2, t2.tx.allOutputsAmount)
 }

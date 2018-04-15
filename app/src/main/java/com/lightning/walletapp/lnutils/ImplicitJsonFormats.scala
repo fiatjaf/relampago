@@ -121,8 +121,13 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     jsonFormat[String, Option[MilliSatoshi], Long, PublicKey, Vector[Tag], BinaryData,
       PaymentRequest](PaymentRequest.apply, "prefix", "amount", "timestamp", "nodeId", "tags", "signature")
 
-  implicit val ratesFmt = jsonFormat[Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feeHistory", "exchange", "stamp")
-  implicit val cloudActFmt = jsonFormat[BinaryData, Seq[HttpParam], String, CloudAct](CloudAct.apply, "data", "plus", "path")
+  implicit val ratesFmt =
+    jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long,
+      Rates](Rates.apply, "feesSix", "feesTwo", "exchange", "stamp")
+
+  implicit val cloudActFmt =
+    jsonFormat[BinaryData, Seq[HttpParam], String,
+      CloudAct](CloudAct.apply, "data", "plus", "path")
 
   implicit val cloudDataFmt =
     jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct],
@@ -132,8 +137,10 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val outPointFmt = jsonFormat[BinaryData, Long, OutPoint](OutPoint.apply, "hash", "index")
   implicit val txOutFmt = jsonFormat[Satoshi, BinaryData, TxOut](TxOut.apply, "amount", "publicKeyScript")
-  implicit val inputInfoFmt = jsonFormat[OutPoint, TxOut, BinaryData, InputInfo](InputInfo.apply,
-    "outPoint", "txOut", "redeemScript")
+
+  implicit val inputInfoFmt =
+    jsonFormat[OutPoint, TxOut, BinaryData,
+      InputInfo](InputInfo.apply, "outPoint", "txOut", "redeemScript")
 
   implicit object TransactionWithInputInfoFmt
   extends JsonFormat[TransactionWithInputInfo] {
@@ -246,7 +253,6 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit object HasCommitmentsFmt
   extends JsonFormat[HasCommitments] {
-
     def read(json: JsValue) = json.asJsObject fields "tag" match {
       case JsString("WaitFundingDoneData") => json.convertTo[WaitFundingDoneData]
       case JsString("NegotiationsData") => json.convertTo[NegotiationsData]
