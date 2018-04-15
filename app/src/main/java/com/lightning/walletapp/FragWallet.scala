@@ -216,7 +216,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends ListToggler
     val current = coloredIn(wrap.valueDelta)
     val newFee = RatesSaver.rates.feeSix div 2
     val boost = coloredIn(wrap.valueDelta minus newFee)
-    // Unlike normal transaction this one uses a whole half of feeSix
+    // Unlike normal transaction this one uses a whole half of current feeSix
     val userWarn = baseBuilder(getString(boost_details).format(current, boost).html, null)
     mkForm(ok = <(replace, onError)(none), none, userWarn, dialog_ok, dialog_cancel)
 
