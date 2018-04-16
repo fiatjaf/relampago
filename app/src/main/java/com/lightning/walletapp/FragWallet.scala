@@ -119,8 +119,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       else statusOnline
 
     val titleText = s"""
-      &#3647; <strong>$btcFunds</strong><br>
-      &#9735; <strong>$lnFunds</strong><br>
+      <font color=#FF9900>&#3647;</font> <strong>$btcFunds</strong><br>
+      <font color=#0099FE>&#9735;</font> <strong>$lnFunds</strong><br>
       $subtitleText
     """.html
 
@@ -181,7 +181,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         // Zero valueDelta means this tx is foreign
         val signleBTCWrap = BTCWrap(transactionWrap)
         addItems(Vector apply signleBTCWrap).run
-        updTitle.run
       }
     }
   }
@@ -235,10 +234,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val description = getDescription(info.description)
       val humanHash = humanFour(info.hash.toUpperCase take 24)
       val humanSumDetails = s"<font color=#999999>$humanHash</font><br>$description"
+      holder.transactSum setText s"<font color=#0099FE>&#9735;</font> $humanSum".html
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactCircle setImageResource imageMap(info.actualStatus)
       holder.transactWhat setVisibility viewMap(showLNDetails)
-      holder.transactSum setText s"&#9735; $humanSum".html
       holder.transactWhat setText humanSumDetails.html
     }
 
@@ -295,17 +294,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val key = wrap.tx.getHashAsString
 
     def fillView(holder: ViewHolder) = {
-      val humanTimestamp = when(now = System.currentTimeMillis, date = getDate)
-      val statusImage = if (wrap.isDead) dead else if (wrap.depth >= minDepth) conf1 else await
-
       val humanSum = wrap.visibleValue.isPositive match {
         case true => sumIn.format(denom formatted wrap.visibleValue)
         case false => sumOut.format(denom formatted -wrap.visibleValue)
       }
 
-      holder.transactSum setText s"&#3647; $humanSum".html
-      holder.transactCircle setImageResource statusImage
-      holder.transactWhen setText humanTimestamp.html
+      val status = if (wrap.isDead) dead else if (wrap.depth >= minDepth) conf1 else await
+      holder.transactSum setText s"<font color=#FF9900>&#3647;</font> $humanSum".html
+      holder.transactWhen setText when(System.currentTimeMillis, getDate).html
+      holder.transactCircle setImageResource status
     }
 
     def generatePopup = {
@@ -313,11 +310,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val marking = if (wrap.visibleValue.isPositive) sumIn else sumOut
       val outputs = wrap.payDatas(wrap.visibleValue.isPositive).flatMap(_.toOption)
       val humanOutputs = for (paymentData <- outputs) yield paymentData.cute(marking).html
-      val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.actionTip, humanOutputs.toArray)
-
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
       val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+      val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.actionTip, humanOutputs.toArray)
 
       lst setHeaderDividersEnabled false
       lst addHeaderView detailsWrapper
