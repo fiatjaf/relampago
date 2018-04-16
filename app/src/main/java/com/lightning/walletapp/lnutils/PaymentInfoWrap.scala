@@ -106,7 +106,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def sentSig(cs: Commitments) = db txWrap {
     for (waitRevocation <- cs.remoteNextCommitInfo.left) {
       val htlcs = waitRevocation.nextRemoteCommit.spec.htlcs
-      for (Htlc(_, add) <- htlcs if add.amount >= cs.localParams.revokedSaveTolerance)
+      for (Htlc(_, add) <- htlcs if add.amount > cs.localParams.dustLimit)
         saveRevoked(add.hash160, add.expiry, waitRevocation.nextRemoteCommit.index)
     }
   }

@@ -9,12 +9,6 @@ import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import scala.util.Try
 
 
-object TxWrap {
-  final val HIDE = "HIDE"
-  def watchedWrap(wrap: TxWrap) = wrap.valueDelta.isZero
-  def hiddenWrap(wrap: TxWrap) = wrap.tx.getMemo == HIDE
-}
-
 class TxWrap(val tx: Transaction) {
   private val nativeSentFromMe = tx.getInputs.asScala.flatMap(inOuts).foldLeft(Coin.ZERO) {
     case accumulator \ output if output isMine app.kit.wallet => accumulator add output.getValue
@@ -54,4 +48,6 @@ class TxWrap(val tx: Transaction) {
 
   def depth = tx.getConfidence.getDepthInBlocks
   def isDead = tx.getConfidence.getConfidenceType == DEAD
+  def makeHidden = tx setMemo HIDE
+  final val HIDE = "HIDE"
 }

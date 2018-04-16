@@ -121,7 +121,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def askForFunding(their: Init): TimerTask = UITask {
-      val minCapacity = denom withSign RatesSaver.rates.feeTwo
+      val minCapacity = denom withSign LNParams.minChannelCapacity
       val maxCapacity = denom withSign LNParams.maxChannelCapacity
       val canSend = denom withSign app.kit.conf1Balance
 
@@ -150,7 +150,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       def askAttempt(alert: AlertDialog) = rateManager.result match {
-        case Success(ms) if ms < RatesSaver.rates.feeTwo => app toast dialog_sum_small
+        case Success(ms) if ms < LNParams.minChannelCapacity => app toast dialog_sum_small
         case Success(ms) if ms > LNParams.maxChannelCapacity => app toast dialog_sum_big
         case Failure(reason) => app toast dialog_sum_empty
         case Success(ms) => rm(alert)(next(ms).start)

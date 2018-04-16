@@ -10,7 +10,6 @@ import android.text.Html
 
 object ImplicitConversions {
   implicit def string2Ops(raw: String): StringOps = new StringOps(raw)
-  implicit def bitcoinjTx2Wrap(bitcoinjTx: org.bitcoinj.core.Transaction): TxWrap = new TxWrap(bitcoinjTx)
   implicit def bitcoinLibScript2bitcoinjScript(pubKeyScript: BinaryData): org.bitcoinj.script.Script =
     new org.bitcoinj.script.Script(pubKeyScript, 1501538400L) // 2017-09-01
 

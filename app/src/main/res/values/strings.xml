@@ -120,20 +120,13 @@
     <!-- notifications -->
     <string name="btc_empty">Empty wallet</string>
     <string name="ln_empty">No open channels</string>
-    <string name="btc_status_online">Bitcoin wallet is online</string>
-    <string name="btc_status_connecting">Connecting to peers&#8230;</string>
+    <string name="btc_status_online"><![CDATA[<font color=#16A764>Bitcoin wallet is online</font>]]></string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
 
     <array name="info_progress">
-        <item>Sync is complete</item>
-        <item>Sync: %1$d day behind</item>
-        <item>Sync: %1$d days behind</item>
-    </array>
-
-    <array name="ln_status_online">
-        <item>Connecting to channels</item>
-        <item>%1$d channel is online</item>
-        <item>%1$d channels are online</item>
-        <item>%1$d of %2$d channels are online</item>
+        <item><![CDATA[<font color=#16A764>Sync is complete</font>]]></item>
+        <item><![CDATA[<font color=#FF9900>Sync: %1$d day behind</font>]]></item>
+        <item><![CDATA[<font color=#FF9900>Sync: %1$d days behind</font>]]></item>
     </array>
 
     <!-- frag_view_pager_btc -->

@@ -79,9 +79,10 @@ object PaymentInfo {
   }
 
   def withoutChan(chan: Long, rd: RoutingData, span: Long, msat: Long) = {
-    val routesWithoutBadChannels = without(rd.routes, chan == _.shortChannelId)
-    val blackListedChan = Vector apply Tuple3(chan.toString, span, msat)
-    rd.copy(routes = routesWithoutBadChannels) -> blackListedChan
+    val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == chan)
+    val blackListedChan = Tuple3(chan.toString, span, msat)
+    val rd1 = rd.copy(routes = routesWithoutBadChannels)
+    rd1 -> Vector(blackListedChan)
   }
 
   def withoutNodes(badNodes: PublicKeyVec, rd: RoutingData, span: Long) = {

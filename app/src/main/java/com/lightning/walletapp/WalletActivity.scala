@@ -95,54 +95,9 @@ trait HumanTimeDisplay {
   }
 }
 
-trait ListToggler extends HumanTimeDisplay {
-  lazy val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
-  lazy val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
-  val minLinesNum = 4
-
-  abstract class CutAdapter[T](val max: Int, viewLine: Int) extends BaseAdapter {
-    // Automatically switches list view from short to long version and back again
-    def switch = cut = if (cut == minLinesNum) max else minLinesNum
-    def getItemId(position: Int) = position
-    def getCount = visibleItems.size
-
-    var cut = minLinesNum
-    var visibleItems = Vector.empty[T]
-    var availableItems = Vector.empty[T]
-
-    val set: Vector[T] => Unit = items1 => {
-      val visibility = if (items1.size > minLinesNum) View.VISIBLE else View.GONE
-      val resource = if (cut == minLinesNum) R.drawable.ic_expand_more_black_24dp
-        else R.drawable.ic_expand_less_black_24dp
-
-      allTxsWrapper setVisibility visibility
-      toggler setImageResource resource
-      visibleItems = items1 take cut
-      availableItems = items1
-    }
-
-    def getView(position: Int, savedView: View, parent: ViewGroup) = {
-      val view = if (null == savedView) host.getLayoutInflater.inflate(viewLine, null) else savedView
-      val hold = if (null == view.getTag) getHolder(view) else view.getTag.asInstanceOf[TxViewHolder]
-      hold fillView visibleItems(position)
-      view
-    }
-
-    def getHolder(view: View): TxViewHolder
-    abstract class TxViewHolder(view: View) {
-      val transactCircle = view.findViewById(R.id.transactCircle).asInstanceOf[ImageView]
-      val transactWhen = view.findViewById(R.id.transactWhen).asInstanceOf[TextView]
-      val transactSum = view.findViewById(R.id.transactSum).asInstanceOf[TextView]
-      def fillView(data: T): Unit
-      view setTag this
-    }
-  }
-}
-
-
 object WalletActivity {
+  var worker: FragWalletWorker = _
   val REDIRECT = "goToLnOpsActivity"
-  var walletFrag = Option.empty[FragWallet]
 }
 
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
@@ -162,6 +117,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   override def onCreateOptionsMenu(menu: Menu) = {
     // Called after fragLN sets toolbar as actionbar
     getMenuInflater.inflate(R.menu.wallet, menu)
+    WalletActivity.worker setupSearch menu
     true
   }
 
@@ -183,7 +139,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   def readNdefMessage(msg: Message) = try {
     val data: String = readFirstTextNdefMessage(msg)
     app.TransData recordValue data
-    checkTransData
+    me checkTransData null
 
   } catch { case _: Throwable =>
     // Could not process a message
@@ -192,12 +148,21 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData = {
-    walletPager.setCurrentItem(1, false)
+  def checkTransData(top: View) = {
+    println(s"app.TransData.value: ${app.TransData.value}")
+    walletPager.setCurrentItem(0, false)
 
     app.TransData.value match {
-      case _: NodeAnnouncement => // nope
-      case _ => app.TransData.value = null
+      case paymentRequest: PaymentRequest => WalletActivity.worker sendPayment paymentRequest
+      case bu: BitcoinURI => WalletActivity.worker sendBtcPopup bu.getAddress setSum Try(bu.getAmount)
+      case btcAddress: Address => WalletActivity.worker sendBtcPopup btcAddress
+      case WalletActivity.REDIRECT => goChanDetails(null)
+      case _ =>
+    }
+
+    app.TransData.value match {
+      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+      case otherwise => app.TransData.value = null
     }
   }
 
@@ -360,7 +325,7 @@ class FragScan extends Fragment with BarcodeCallback { me =>
     super.setUserVisibleHint(isVisibleToUser)
   }
 
-  // Only try to decode result after 2 seconds
+  // Only try to decode result after some time
   override def possibleResultPoints(points: Points) = none
   override def barcodeResult(res: BarcodeResult) = Option(res.getText) foreach {
     rawText => if (System.currentTimeMillis - lastAttempt > 3000) tryParseQR(rawText)
@@ -370,7 +335,7 @@ class FragScan extends Fragment with BarcodeCallback { me =>
     // May throw which is expected and fine
     lastAttempt = System.currentTimeMillis
     app.TransData recordValue text
-    host.checkTransData
+    host checkTransData null
 
   } catch app.TransData.onFail { code =>
     // Inform user about error details

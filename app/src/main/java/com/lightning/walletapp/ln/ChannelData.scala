@@ -7,7 +7,7 @@ import com.lightning.walletapp.ln.Scripts._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.AddErrorCodes._
 import com.lightning.walletapp.ln.LNParams.broadcaster._
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi, Transaction}
+import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction}
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
@@ -98,7 +98,7 @@ case class ClosingData(announce: NodeAnnouncement,
     }
 
     // Either everything including tier12 tx is confirmed or hard timeout has passed
-    val hardTimeout = closedAt + 1000 * 3600 * 24 * 60 < System.currentTimeMillis
+    val hardTimeout = closedAt + 1000 * 3600 * 24 * 90 < System.currentTimeMillis
     allConfirmed || hardTimeout
   }
 }
@@ -209,7 +209,6 @@ case class LocalParams(maxHtlcValueInFlightMsat: UInt64, channelReserveSat: Long
                        defaultFinalScriptPubKey: BinaryData, dustLimit: Satoshi,
                        shaSeed: BinaryData, isFunder: Boolean) {
 
-  lazy val revokedSaveTolerance: MilliSatoshi = dustLimit * 2
   lazy val delayedPaymentBasepoint = delayedPaymentKey.toPoint
   lazy val revocationBasepoint = revocationSecret.toPoint
   lazy val paymentBasepoint = paymentKey.toPoint
