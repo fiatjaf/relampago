@@ -149,7 +149,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   // EXTERNAL DATA CHECK
 
   def checkTransData(top: View) = {
-    println(s"app.TransData.value: ${app.TransData.value}")
     walletPager.setCurrentItem(0, false)
 
     app.TransData.value match {

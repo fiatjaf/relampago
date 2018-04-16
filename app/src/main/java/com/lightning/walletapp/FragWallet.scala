@@ -487,8 +487,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           }
         }
 
-        val bld = baseBuilder(app getString action_ln_details, content)
-        mkCheckForm(recAttempt, none, bld, dialog_ok, dialog_cancel)
+        val popupTitle = s"<font color=#0099FE>${app getString ln_receive_title}</font>".html
+        mkCheckForm(recAttempt, none, baseBuilder(popupTitle, content), dialog_ok, dialog_cancel)
       }
     }
   }
@@ -499,11 +499,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     else if (!pr.isFresh) app toast dialog_pr_expired
     else {
 
+      val title = app getString ln_send_title
+      val description = me getDescription pr.description
       val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSend).max)
-      val popupTitle = app.getString(ln_send_title).format(me getDescription pr.description).html
+      val popupTitle = s"<font color=#0099FE>$title</font><br><br><small>$description</small>"
       val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val hint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
-      val rateManager = new RateManager(extra = hint, content)
+      val rateManager = new RateManager(hint, content)
 
       def sendAttempt(alert: AlertDialog) = rateManager.result match {
         case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
@@ -519,7 +521,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
       }
 
-      val bld = baseBuilder(popupTitle, content)
+      val bld = baseBuilder(popupTitle.html, content)
       mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
       for (amountMsat <- pr.amount) rateManager setSum Try(amountMsat)
     }
@@ -536,10 +538,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // BTC SEND AND BOOST
 
   def sendBtcPopup(addr: Address): RateManager = {
-    val hint = app.getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
     val form = host.getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
+    val hint = app.getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
+    val bld = baseBuilder(s"<font color=#FF9900>${app getString btc_send_title}</font>".html, form)
     val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
-    val bld = baseBuilder(app getString action_coins_send, form)
     val rateManager = new RateManager(hint, form)
 
     def next(msat: MilliSatoshi) = new TxProcessor {

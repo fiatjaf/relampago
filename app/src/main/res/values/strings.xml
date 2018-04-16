@@ -145,6 +145,10 @@
         <item><![CDATA[<strong>cancelled</strong>]]></item>
     </array>
 
+    <string name="ln_send_title">Send Lightning payment</string>
+    <string name="btc_send_title">Send Bitcoin transaction</string>
+    <string name="ln_receive_title">Request Lightning payment</string>
+
     <!-- errors -->
     <string name="err_ln_peer_offline">Could not connect to remote peer at %1$s</string>
     <string name="err_ln_no_data_loss_protect">Data loss protection is not provided by this peer</string>
@@ -173,7 +177,6 @@
     <string name="ln_status_peer">Select peer</string>
     <string name="ln_status_none">No open channel found</string>
     <string name="ln_description_hint">add some description</string>
-    <string name="ln_send_title"><![CDATA[Send lightning payment<br><br><small>%1$s</small>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#1BA2E0>Incoming payment</font><br>%1$s]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
     <string name="ln_qr_disposable"><![CDATA[Request is valid for 1 hour<br>Do not reuse this QR code]]></string>
@@ -193,7 +196,6 @@
 
     <string name="notice_sync_title">Synchronization required</string>
     <string name="notice_sync_body">Please open Bitcoin + Lightning app</string>
-
     <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>cooperative</i></font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>refundable %6$s<br><br>Refundable channel balance has been transferred to your Bitcoin wallet<br><br>%7$s]]></string>
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
