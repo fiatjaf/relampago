@@ -108,7 +108,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           // Broadcast a funding transaction
           // Tell wallet activity to redirect to ops
           LNParams.broadcaster nullOnBecome freshChan
-          app.TransData.value = WalletActivity.REDIRECT
+          app.TransData.value = FragWallet.REDIRECT
           me exitTo classOf[WalletActivity]
       }
 

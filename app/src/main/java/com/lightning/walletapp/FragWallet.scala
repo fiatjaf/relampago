@@ -8,6 +8,7 @@ import collection.JavaConverters._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
+import com.lightning.walletapp.FragWallet._
 import com.lightning.walletapp.R.drawable._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
@@ -40,22 +41,30 @@ import android.content.Intent
 import android.net.Uri
 
 
+object FragWallet {
+  var currentPeerCount = 0
+  var currentBlocksLeft = 0
+  var showLNDetails = false
+  var worker: FragWalletWorker = _
+  val REDIRECT = "goToLnOpsActivity"
+}
+
 class FragWallet extends Fragment { me =>
   override def onCreateView(inflator: LayoutInflater, vg: ViewGroup, bn: Bundle) =
     inflator.inflate(R.layout.frag_view_pager_btc, vg, false)
 
   override def onViewCreated(view: View, savedInstanceState: Bundle) =
-    WalletActivity.worker = new FragWalletWorker(getActivity.asInstanceOf[WalletActivity], view)
+    worker = new FragWalletWorker(getActivity.asInstanceOf[WalletActivity], view)
 
   override def onResume = {
-    // Save global reference to current worker
-    WalletActivity.worker.onFragmentResume
+    // Save global reference
+    worker.onFragmentResume
     super.onResume
   }
 
   override def onDestroy = {
-    // This may be nullified hence a try/catch enclosure
-    try WalletActivity.worker.onFragmentDestroy catch none
+    // This may be nullified hence a try/catch
+    try worker.onFragmentDestroy catch none
     super.onDestroy
   }
 }
@@ -86,9 +95,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // UPDATING TITLE
 
-  var currentPeerCount = 0
-  var currentBlocksLeft = 0
-
   val catchListener = new BlocksListener {
     def onBlocksDownloaded(sourcePeerNode: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) = {
       if (left > broadcaster.blocksPerDay) app.kit.peerGroup addBlocksDownloadedEventListener getNextTracker(left)
@@ -107,8 +113,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def updTitle = {
-    val btcTotalSum = app.kit.conf1Balance
-    val btcFunds = if (btcTotalSum.value < 1) btcEmpty else denom withSign btcTotalSum
+    // Calculate on-chain funds
+    val conf0 = app.kit.conf0Balance
+    val conf1 = app.kit.conf1Balance
+    val zeroConf = conf0 minus conf1
+
+    val btcFunds =
+      if (zeroConf.isPositive) {
+        val humanConf1 = denom withSign conf1
+        val humanConf2 = denom formatted zeroConf
+        s"$humanConf1 + $humanConf2"
+      }
+      else if (conf0.isZero) btcEmpty
+      else denom withSign conf1
+
+    // Calculate off-chain funds
     val lnTotalSum = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
     val lnFunds = if (lnTotalSum < 1) lnEmpty else denom withSign MilliSatoshi(lnTotalSum)
     val daysLeft = currentBlocksLeft / broadcaster.blocksPerDay
@@ -118,21 +137,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       else if (currentPeerCount < 1) statusConnecting
       else statusOnline
 
-    val titleText = s"""
-      <font color=#FF9900>&#3647;</font> <strong>$btcFunds</strong><br>
-      <font color=#0099FE>&#9735;</font> <strong>$lnFunds</strong><br>
-      $subtitleText
-    """.html
-
-    // Update all the info in one pass
-    UITask(customTitle setText titleText)
+    UITask(customTitle setText s"""
+      &#3647; <strong>$btcFunds</strong><br>
+      &#9735; <strong>$lnFunds</strong><br>
+      $subtitleText""".html)
   }
 
   // END UPDATING TITLE
 
   // SEARCH BAR
 
-  var showLNDetails = false
   override def setupSearch(menu: Menu) = {
     // Expand payment list if search is active
     // hide payment description if it's not
@@ -181,6 +195,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         // Zero valueDelta means this tx is foreign
         val signleBTCWrap = BTCWrap(transactionWrap)
         addItems(Vector apply signleBTCWrap).run
+        updTitle.run
       }
     }
   }
@@ -234,10 +249,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val description = getDescription(info.description)
       val humanHash = humanFour(info.hash.toUpperCase take 24)
       val humanSumDetails = s"<font color=#999999>$humanHash</font><br>$description"
-      holder.transactSum setText s"<font color=#0099FE>&#9735;</font> $humanSum".html
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactCircle setImageResource imageMap(info.actualStatus)
       holder.transactWhat setVisibility viewMap(showLNDetails)
+      holder.transactSum setText s"&#9735; $humanSum".html
       holder.transactWhat setText humanSumDetails.html
     }
 
@@ -300,8 +315,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       val status = if (wrap.isDead) dead else if (wrap.depth >= minDepth) conf1 else await
-      holder.transactSum setText s"<font color=#FF9900>&#3647;</font> $humanSum".html
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
+      holder.transactSum setText s"&#3647; $humanSum".html
       holder.transactCircle setImageResource status
     }
 

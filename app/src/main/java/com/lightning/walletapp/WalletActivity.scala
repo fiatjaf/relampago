@@ -95,10 +95,6 @@ trait HumanTimeDisplay {
   }
 }
 
-object WalletActivity {
-  var worker: FragWalletWorker = _
-  val REDIRECT = "goToLnOpsActivity"
-}
 
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
@@ -117,7 +113,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   override def onCreateOptionsMenu(menu: Menu) = {
     // Called after fragLN sets toolbar as actionbar
     getMenuInflater.inflate(R.menu.wallet, menu)
-    WalletActivity.worker setupSearch menu
+    FragWallet.worker setupSearch menu
     true
   }
 
@@ -152,10 +148,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     walletPager.setCurrentItem(0, false)
 
     app.TransData.value match {
-      case paymentRequest: PaymentRequest => WalletActivity.worker sendPayment paymentRequest
-      case bu: BitcoinURI => WalletActivity.worker sendBtcPopup bu.getAddress setSum Try(bu.getAmount)
-      case btcAddress: Address => WalletActivity.worker sendBtcPopup btcAddress
-      case WalletActivity.REDIRECT => goChanDetails(null)
+      case paymentRequest: PaymentRequest => FragWallet.worker sendPayment paymentRequest
+      case bu: BitcoinURI => FragWallet.worker sendBtcPopup bu.getAddress setSum Try(bu.getAmount)
+      case btcAddress: Address => FragWallet.worker sendBtcPopup btcAddress
+      case FragWallet.REDIRECT => goChanDetails(null)
       case _ =>
     }
 
@@ -192,10 +188,14 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val denomChoiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
     val allDenominations = getResources.getStringArray(R.array.denoms).map(_.html)
 
-
     denomChoiceList setOnItemClickListener onTap { pos =>
-      app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
+      // Update denom first sp UI update can react to changes
+      // also persist user choice in app local data
+
       denom = denoms(pos)
+      FragWallet.worker.updTitle.run
+      FragWallet.worker.adapter.notifyDataSetChanged
+      app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
     }
 
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
