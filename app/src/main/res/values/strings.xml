@@ -148,7 +148,7 @@
     <string name="ln_send_title"><![CDATA[<font color=#0099FE>Send Lightning payment</font><br><br><small>%1$s</small>]]></string>
     <string name="ln_receive_title"><![CDATA[As Lightning payment<br><br><font color=#999999><small>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</small></font>]]></string>
     <string name="btc_receive_title"><![CDATA[As Bitcoin transaction<br><br><font color=#999999><small>make a QR-code with your current wallet address, can be used to receive regular on-chain transactions</small></font>]]></string>
-    <string name="send_paste">Paste a payment request</string>
+    <string name="send_paste">Paste a Payment Request</string>
     <string name="send_scan_qr">Scan a QR code</string>
 
     <!-- errors -->

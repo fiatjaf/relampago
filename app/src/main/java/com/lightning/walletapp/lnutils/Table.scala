@@ -107,15 +107,18 @@ object PaymentTable extends Table {
 }
 
 object RevokedTable extends Table {
-  val (table, h160, expiry, number) = ("revoked", "h160", "expiry", "number")
-  val newSql = s"INSERT INTO $table ($h160, $expiry, $number) VALUES (?, ?, ?)"
+  val (table, h160, expiry, number, backup) = ("revoked", "h160", "expiry", "number", "backup")
+  val newSql = s"INSERT INTO $table ($h160, $expiry, $number, $backup) VALUES (?, ?, ?, 0)"
   val selectSql = s"SELECT * FROM $table WHERE $number = ?"
 
   val createSql = s"""
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $h160 STRING NOT NULL,
-      $expiry INTEGER NOT NULL, $number INTEGER NOT NULL
-    ); CREATE INDEX idx1$table ON $table ($number);
+      $expiry INTEGER NOT NULL, $number INTEGER NOT NULL,
+      $backup INTEGER NOT NULL
+    );
+    CREATE INDEX idx1$table ON $table ($number);
+    CREATE INDEX idx2$table ON $table ($backup);
     COMMIT"""
 }
 
