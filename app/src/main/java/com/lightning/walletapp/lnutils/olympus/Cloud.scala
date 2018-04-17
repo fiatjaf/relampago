@@ -103,8 +103,8 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         val blinder = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
 
         val memo = BlindMemo(blinder params quantity, blinder tokens quantity, pubKeyR.getPublicKeyAsHex)
-        connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
-          "lang" -> app.getString(com.lightning.walletapp.R.string.lang), "seskey" -> memo.sesPubKeyHex)
+        connector.ask[String]("blindtokens/buy", "lang" -> app.getString(com.lightning.walletapp.R.string.lang),
+          "tokens" -> memo.makeBlindTokens.toJson.toString.hex, "seskey" -> memo.sesPubKeyHex)
             .map(PaymentRequest.read).map(pr => pr -> memo)
     }
 
@@ -124,5 +124,5 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   private def capableChannelExists =
     // Estimate whethere we can send a MAX price
-    app.ChannelManager.canSend(maxPriceMsat).nonEmpty
+    app.ChannelManager.canSendNow(maxPriceMsat).nonEmpty
 }

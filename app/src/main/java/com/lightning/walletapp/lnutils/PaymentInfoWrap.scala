@@ -27,7 +27,7 @@ import rx.lang.scala.{Observable => Obs}
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
-  private[this] val pendingPayments = mutable.Map.empty[BinaryData, RoutingData]
+  private[this] val inFlightPayments = mutable.Map.empty[BinaryData, RoutingData]
   private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
   def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
   def getAllRevoked(number: Long) = RichCursor apply db.select(RevokedTable.selectSql, number) vec toRevoked
@@ -80,7 +80,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def outPaymentAccepted(rd: RoutingData) = {
     // This may be a new payment or an old payment retry attempt
     // Either insert or update should be executed successfully
-    pendingPayments(rd.pr.paymentHash) = rd
+    inFlightPayments(rd.pr.paymentHash) = rd
 
     db txWrap {
       db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
@@ -96,7 +96,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     // receiving a preimage means that payment is fulfilled
     updOkOutgoing(ok)
 
-    pendingPayments.values.find(_.pr.paymentHash == ok.paymentHash) foreach { rd =>
+    inFlightPayments.values.find(_.pr.paymentHash == ok.paymentHash) foreach { rd =>
       // Make payment searchable + routing optimization: record subroutes in database
       db.change(PaymentTable.newVirtualSql, rd.queryText, rd.paymentHashString)
       if (rd.usedRoute.nonEmpty) RouteWrap cacheSubRoutes rd
@@ -120,7 +120,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
 
-        val rd1Opt = pendingPayments get add.paymentHash
+        val rd1Opt = inFlightPayments get add.paymentHash
         rd1Opt map parseFailureCutRoutes(failReason) match {
           // Try use the routes left or fetch new ones if empty
 
@@ -257,9 +257,9 @@ object Notificator {
   def getAlarmManager = app.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager]
   def removeResyncNotification = getAlarmManager cancel getIntent
 
-  def scheduleResyncNotificationOnceAgain = // TODO: make 21 days
+  def scheduleResyncNotificationOnceAgain =
     try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-      System.currentTimeMillis + 1000 * 3600 * 24, getIntent) catch none
+      System.currentTimeMillis + 1000 * 3600 * 24 * 21, getIntent) catch none
 }
 
 class Notificator extends BroadcastReceiver {

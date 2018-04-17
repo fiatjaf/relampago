@@ -422,7 +422,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     override def onError = {
       // Commit tx fee + channel reserve forbid sending of this payment
       // inform user with all the details laid out as cleanly as possible
-      case _ \ CMDReserveExcept(rpi, missingSat, reserveSat) =>
+      case _ \ CMDReserveOverflow(rpi, missingSat, reserveSat) =>
 
         val message = host getString err_ln_fee_overflow
         val reserve = coloredIn apply Satoshi(reserveSat)
@@ -430,8 +430,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val sending = coloredOut apply MilliSatoshi(rpi.firstMsat)
         onFail(message.format(reserve, sending, missing).html)
 
-      case _ \ CMDAddExcept(_, code) =>
-        // Display detailed description
+      case _ \ CMDAddImpossible(_, code) =>
+        // Show detailed description to user
         onFail(host getString code)
 
       case chan \ error =>
@@ -452,6 +452,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def ifOperational(next: Vector[Channel] => Unit) = {
+    // This fetches normal channels which MAY be offline and this is intentional
     val operational = app.ChannelManager.notClosingOrRefunding filter isOperational
     if (operational.isEmpty) app toast ln_status_none else next(operational)
   }
@@ -513,8 +514,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val description = me getDescription pr.description
       val title = app.getString(ln_send_title).format(description)
       val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSend).max)
-      val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val hint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
+      val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val rateManager = new RateManager(hint, content)
 
       def sendAttempt(alert: AlertDialog) = rateManager.result match {

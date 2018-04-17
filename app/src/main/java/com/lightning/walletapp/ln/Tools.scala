@@ -54,12 +54,9 @@ object Features {
 }
 
 trait CMDException extends LightningException { val rd: RoutingData }
-case class CMDAddExcept(rd: RoutingData, code: Int) extends CMDException
-case class CMDReserveExcept(rd: RoutingData, missingSat: Long, reserveSat: Long) extends CMDException
-
-// General exception for all Lightning-related errors
-class LightningException(reason: String = "LN error")
-  extends RuntimeException(reason)
+case class CMDAddImpossible(rd: RoutingData, code: Int) extends CMDException
+case class CMDReserveOverflow(rd: RoutingData, missingSat: Long, reserveSat: Long) extends CMDException
+class LightningException(reason: String = "General LN error") extends RuntimeException(reason)
 
 // STATE MACHINE
 

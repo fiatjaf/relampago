@@ -5,9 +5,9 @@ import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
-import java.util.concurrent.Executors
-import fr.acinq.eclair.UInt64
 
+import fr.acinq.eclair.UInt64
+import java.util.concurrent.Executors
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
@@ -224,12 +224,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA d1 doProcess CMDHTLCProcess
 
 
-      case (norm: NormalData, CMDFeerate(satPerKew), OPEN) =>
+      case (norm: NormalData, CMDFeerate(satPerKw), OPEN) =>
         val localCommitFee = norm.commitments.localCommit.spec.feeratePerKw
-        val shouldUpdate = LNParams.shouldUpdateFee(satPerKew, localCommitFee)
+        val shouldUpdate = LNParams.shouldUpdateFee(satPerKw, localCommitFee)
 
-        if (shouldUpdate) Commitments.sendFee(norm.commitments, satPerKew) foreach { case c1 \ msg =>
-          // We only send a fee update if our current chan unspendable reserve + commitTx fee can afford it
+        if (shouldUpdate) Commitments.sendFee(norm.commitments, satPerKw) foreach { case c1 \ msg =>
+          // We send a fee update if current chan unspendable reserve + commitTx fee can afford it
           // otherwise we fail silently in hope that fee will drop or we will receive a payment
           me UPDATA norm.copy(commitments = c1) SEND msg
           doProcess(CMDProceed)
@@ -237,12 +237,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm: NormalData, CMDBestHeight(height), OPEN | OFFLINE)
-        // GUARD: break channel if expired outgoing HTLC exists + 576 blocks of grace period have passed
-        if norm.commitments.localCommit.spec.htlcs.exists(htlc => !htlc.incoming && height - 576 >= htlc.add.expiry) ||
-          norm.commitments.remoteCommit.spec.htlcs.exists(htlc => htlc.incoming && height - 576 >= htlc.add.expiry) ||
-          Commitments.latestRemoteCommit(norm.commitments).spec.htlcs.exists(htlc => htlc.incoming &&
-            height - 576 >= htlc.add.expiry) =>
-
+        if Commitments.hasExpiredHtlcs(norm.commitments, height) =>
         startLocalClose(norm)
 
 

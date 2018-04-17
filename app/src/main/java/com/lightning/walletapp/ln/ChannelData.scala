@@ -92,14 +92,14 @@ case class ClosingData(announce: NodeAnnouncement,
   }
 
   def isOutdated = {
-    val allConfirmed = bestClosing match {
+    val allConfirmedOrDead = bestClosing match {
       case Left(mutualClosingTx) => getStatus(mutualClosingTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }
       case Right(info) => info.getState.map(_.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
     }
 
     // Either everything including tier12 tx is confirmed or hard timeout has passed
     val hardTimeout = closedAt + 1000 * 3600 * 24 * 90 < System.currentTimeMillis
-    allConfirmed || hardTimeout
+    allConfirmedOrDead || hardTimeout
   }
 }
 
@@ -235,6 +235,17 @@ object Commitments {
   def addRemoteProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.remoteChanges.proposed).using(_ :+ proposal)
   def addLocalProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.localChanges.proposed).using(_ :+ proposal)
 
+  def isHtlcExpired(htlc: Htlc, limitMsat: Long, height: Long) =
+    (htlc.add.amountMsat < limitMsat && height - 432 >= htlc.add.expiry) ||
+      (htlc.add.amountMsat >= limitMsat && height >= htlc.add.expiry)
+
+  def hasExpiredHtlcs(c: Commitments, height: Long) = {
+    val limitMsat = (c.localCommit.spec.feeratePerKw + c.localParams.dustLimit.amount) * 1000L
+    c.localCommit.spec.htlcs.exists(htlc => isHtlcExpired(htlc, limitMsat, height) && !htlc.incoming) ||
+      c.remoteCommit.spec.htlcs.exists(htlc => isHtlcExpired(htlc, limitMsat, height) && htlc.incoming) ||
+      latestRemoteCommit(c).spec.htlcs.exists(htlc => isHtlcExpired(htlc, limitMsat, height) && htlc.incoming)
+  }
+
   def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = {
     val remoteSigned = CommitmentSpec.findHtlcById(commitments.localCommit.spec, htlcId, incomingRelativeToLocal)
     val localSigned = CommitmentSpec.findHtlcById(latestRemoteCommit(commitments).spec, htlcId, !incomingRelativeToLocal)
@@ -246,9 +257,9 @@ object Commitments {
   }
 
   def sendAdd(c: Commitments, rd: RoutingData) =
-    if (rd.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddExcept(rd, ERR_REMOTE_AMOUNT_LOW)
-    else if (rd.firstMsat > maxHtlcValue.amount) throw CMDAddExcept(rd, ERR_AMOUNT_OVERFLOW)
-    else if (rd.pr.paymentHash.size != 32) throw CMDAddExcept(rd, ERR_FAILED)
+    if (rd.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
+    else if (rd.firstMsat > maxHtlcValue.amount) throw CMDAddImpossible(rd, ERR_AMOUNT_OVERFLOW)
+    else if (rd.pr.paymentHash.size != 32) throw CMDAddImpossible(rd, ERR_FAILED)
     else {
 
       // Let's compute the current commitment
@@ -268,9 +279,9 @@ object Commitments {
       val missingSat = reduced.toRemoteMsat / 1000L - reserveWithTxFeeSat
 
       // We should both check if WE can send another HTLC and if PEER can accept another HTLC
-      if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddExcept(rd, ERR_REMOTE_AMOUNT_HIGH)
-      if (outgoing.size > maxAllowedHtlcs || incoming.size > maxAllowedHtlcs) throw CMDAddExcept(rd, ERR_TOO_MANY_HTLC)
-      if (missingSat < 0L) throw CMDReserveExcept(rd, missingSat, reserveWithTxFeeSat)
+      if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
+      if (outgoing.size > maxAllowedHtlcs || incoming.size > maxAllowedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
+      if (missingSat < 0L) throw CMDReserveOverflow(rd, missingSat, reserveWithTxFeeSat)
       c1 -> add
     }
 

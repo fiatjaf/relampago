@@ -29,6 +29,7 @@ import org.bitcoinj.wallet.SendRequest
 import java.net.InetSocketAddress
 import android.app.Application
 import android.widget.Toast
+import language.postfixOps
 import scala.util.Try
 import java.io.File
 
@@ -115,7 +116,7 @@ class WalletApp extends Application { me =>
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
-    def canSend(amount: Long) = for (c <- all if isOperationalOpen(c) && estimateCanSend(c) >= amount) yield c
+    def canSendNow(amount: Long) = for (c <- all if isOperationalOpen(c) && estimateCanSend(c) >= amount) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
@@ -125,9 +126,9 @@ class WalletApp extends Application { me =>
 
     val socketEventsListener = new ConnectionListener {
       override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
-        // Channel level Error will fall under ChannelMessage case but node level Error should be sent to all chans
+        // Chan level Error will fall under ChannelMessage case but node level Error should be sent to all chans
         case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, ann).foreach(_ process err)
-        case cm: ChannelMessage => notClosing.find(_(_.channelId) contains cm.channelId).foreach(_ process cm)
+        case cm: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains cm.channelId).foreach(_ process cm)
         case cu: ChannelUpdate => fromNode(notClosing, ann).foreach(_ process cu)
         case _ =>
       }
@@ -190,7 +191,7 @@ class WalletApp extends Application { me =>
 
     def withRoutesAndOnionRDFrozenAllowed(rd: RoutingData, useCache: Boolean) = {
       val isDone = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
-      val capablePeerNodes = canSend(amount = rd.firstMsat).map(_.data.announce.nodeId)
+      val capablePeerNodes = canSendNow(rd.firstMsat).map(_.data.announce.nodeId)
       val isInFlight = activeInFlightHashes.contains(rd.pr.paymentHash)
 
       if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
@@ -200,8 +201,8 @@ class WalletApp extends Application { me =>
     }
 
     def addRoutesAndOnion(peers: PublicKeyVec, rd: RoutingData, useCache: Boolean) = {
-      // If payment request contains assisted routing info then we request assisted routes,
-      // otherwise we directly ask for recipient nodeId
+      // If payment request contains assisted routing info then request assisted routes
+      // otherwise directly ask for final recipient nodeId
 
       def getRoutes(targetId: PublicKey) = peers contains targetId match {
         case false if useCache => RouteWrap.findRoutes(peers, targetId, rd)
@@ -216,21 +217,15 @@ class WalletApp extends Application { me =>
       } yield Obs just completeRoutes
 
       val routesObs = if (rd.pr.routingInfo.isEmpty) getRoutes(rd.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
-      // Update RD with routes and then we can make an onion out of the first available cheapest route while saving the rest
-      for (routes <- routesObs) yield useFirstRoute(sortByPathAndInFlight(routes), rd)
-    }
-
-    def sortByPathAndInFlight(routes: PaymentRouteVec) = {
-      // Runtime optimization: prioritize routes of shorter length and fewer pending payments in target channels
-      val chanMap = notClosingOrRefunding.map(c => c.data.announce.nodeId -> inFlightOutgoingHtlcs(c).size).toMap
-      routes.sortBy(route => route.headOption.flatMap(hop => chanMap get hop.nodeId).getOrElse(0) + route.size)
+      // We get cheapest routes from server of which we select the shortest one and turn it into an onion routing packet
+      for (cheapestRoutes <- routesObs) yield useFirstRoute(cheapestRoutes.sortBy(hops => hops.size), rd)
     }
 
     def send(rd: RoutingData, noRouteLeft: RoutingData => Unit): Unit = {
       // Find a local channel which has enough funds, is online and belongs to a correct peer
       // empty used route means we're sending to our peer and should use it's nodeId as a target
       val target = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
-      val channelOpt = canSend(rd.firstMsat).find(_.data.announce.nodeId == target)
+      val channelOpt = canSendNow(rd.firstMsat).find(_.data.announce.nodeId == target)
 
       channelOpt match {
         case Some(targetChannel) => targetChannel process rd

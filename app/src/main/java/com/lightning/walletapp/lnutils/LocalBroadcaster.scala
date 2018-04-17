@@ -4,7 +4,6 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
-
 import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Sha256Hash

@@ -46,7 +46,6 @@ object BadEntityTable extends Table {
   val newSql = s"INSERT OR IGNORE INTO $table ($resId, $expire, $amount) VALUES (?, ?, ?)"
   val selectSql = s"SELECT * FROM $table WHERE $expire > ? AND $amount <= ? LIMIT 320"
   val updSql = s"UPDATE $table SET $expire = ?, $amount = ? WHERE $resId = ?"
-  val makeIdx = s"CREATE INDEX idx1$table ON $table ($expire, $amount)"
 
   val createSql = s"""
     CREATE TABLE $table (
@@ -54,7 +53,10 @@ object BadEntityTable extends Table {
       $resId STRING NOT NULL UNIQUE,
       $expire INTEGER NOT NULL,
       $amount INTEGER NOT NULL
-    ); $makeIdx;
+    );
+
+    /* resId index is created automatically */
+    CREATE INDEX idx1$table ON $table ($expire, $amount);
     COMMIT"""
 }
 
@@ -68,7 +70,10 @@ object RouteTable extends Table {
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $path STRING NOT NULL,
       $targetNode STRING NOT NULL UNIQUE, $expire INTEGER NOT NULL
-    ); CREATE INDEX idx1$table ON $table ($targetNode, $expire);
+    );
+
+    /* targetNode index is created automatically */
+    CREATE INDEX idx1$table ON $table ($targetNode, $expire);
     COMMIT"""
 }
 
@@ -102,7 +107,10 @@ object PaymentTable extends Table {
       $preimage STRING NOT NULL,$incoming INTEGER NOT NULL, $status INTEGER NOT NULL,
       $stamp INTEGER NOT NULL, $description STRING NOT NULL, $hash STRING NOT NULL UNIQUE,
       $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL
-    ); CREATE INDEX idx1$table ON $table ($status);
+    );
+
+    /* hash index is created automatically */
+    CREATE INDEX idx1$table ON $table ($status);
     COMMIT"""
 }
 
@@ -114,9 +122,9 @@ object RevokedTable extends Table {
   val createSql = s"""
     CREATE TABLE $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $h160 STRING NOT NULL,
-      $expiry INTEGER NOT NULL, $number INTEGER NOT NULL,
-      $backup INTEGER NOT NULL
+      $expiry INTEGER NOT NULL, $number INTEGER NOT NULL, $backup INTEGER NOT NULL
     );
+
     CREATE INDEX idx1$table ON $table ($number);
     CREATE INDEX idx2$table ON $table ($backup);
     COMMIT"""
