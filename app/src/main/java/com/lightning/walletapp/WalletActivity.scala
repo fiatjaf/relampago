@@ -14,35 +14,30 @@ import android.support.v4.view.MenuItemCompat._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import android.support.v7.widget.{SearchView, Toolbar}
+
 import android.provider.Settings.{System => FontSystem}
+import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
-import com.lightning.walletapp.ln.Channel.estimateTotalCanSend
-import android.support.v4.view.ViewPager.OnPageChangeListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import org.ndeftools.util.activity.NfcReaderActivity
-import android.widget.AbsListView.OnScrollListener
 import com.lightning.walletapp.lnutils.RatesSaver
+import com.github.clans.fab.FloatingActionMenu
+import android.support.v7.widget.SearchView
 import com.lightning.walletapp.helper.AES
 import android.support.v4.view.ViewPager
 import org.bitcoinj.store.SPVBlockStore
-import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import com.google.common.io.Files
 import java.text.SimpleDateFormat
-
 import org.bitcoinj.core.Address
-
-import scala.collection.mutable
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
-
 import scala.util.Try
 import java.io.File
 
@@ -95,9 +90,9 @@ trait HumanTimeDisplay {
   }
 }
 
-
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
+  lazy val floatingButton = findViewById(R.id.fab).asInstanceOf[FloatingActionMenu]
 
   lazy val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
@@ -109,6 +104,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionSettings) makeSettingsForm
   }
+
+  override def onBackPressed =
+    if (walletPager.getCurrentItem == 1) walletPager.setCurrentItem(0, true)
+    else if (floatingButton.isOpened) floatingButton close true
+    else super.onBackPressed
 
   override def onCreateOptionsMenu(menu: Menu) = {
     // Called after fragLN sets toolbar as actionbar
@@ -133,7 +133,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   def onNfcStateEnabled = none
 
   def readNdefMessage(msg: Message) = try {
-    val data: String = readFirstTextNdefMessage(msg)
+    val data = readFirstTextNdefMessage(msg)
     app.TransData recordValue data
     me checkTransData null
 
@@ -163,9 +163,50 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // BUTTONS REACTIONS
 
-  def goReceiveBTC(top: View) = {
-    app.TransData.value = app.kit.currentAddress
-    me goTo classOf[RequestActivity]
+  def goReceivePayment(top: View) = {
+    val options = Array(getString(btc_receive_title).html, getString(ln_receive_title).html)
+    val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+    val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_receive, lst).create)
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, options)
+
+    lst setDivider null
+    lst setDividerHeight 0
+    lst setOnItemClickListener onTap {
+      case 0 => generateOnChainBitcoinQR
+      case 1 => makeOffChainRequest
+    }
+
+    def generateOnChainBitcoinQR = rm(alert) {
+      app.TransData.value = app.kit.currentAddress
+      me goTo classOf[RequestActivity]
+    }
+
+    def makeOffChainRequest = rm(alert) {
+      FragWallet.worker.makePaymentRequest
+    }
+  }
+
+  def goSendPayment(top: View) = {
+    val options = Array(send_paste, send_scan_qr) map getString
+    val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+    val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, lst).create)
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, options)
+
+    lst setDivider null
+    lst setDividerHeight 0
+    lst setOnItemClickListener onTap {
+      case 0 => pasteAddressOrPaymentRequest
+      case 1 => scanQRCode
+    }
+
+    def pasteAddressOrPaymentRequest = rm(alert) {
+      app.getBufferTry.foreach(app.TransData.recordValue)
+      me checkTransData null
+    }
+
+    def scanQRCode = rm(alert) {
+      walletPager.setCurrentItem(1, true)
+    }
   }
 
   def goChanDetails(top: View) = {

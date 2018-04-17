@@ -68,7 +68,8 @@
         fab:menu_colorPressed="@color/btc"
         fab:menu_colorNormal="@color/btc"
         fab:menu_colorRipple="@color/btc"
-        style="@style/FloatingMenu">
+        style="@style/FloatingMenu"
+        android:id="@+id/fab">
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_add_white_18dp"
@@ -93,10 +94,10 @@
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"
             fab:fab_label="@string/action_coins_receive"
+            android:onClick="goReceivePayment"
             fab:fab_colorPressed="@color/btc"
             fab:fab_colorNormal="@color/btc"
             fab:fab_colorRipple="@color/btc"
-            android:onClick="goReceiveBTC"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 
@@ -106,7 +107,7 @@
             fab:fab_colorPressed="@color/btc"
             fab:fab_colorNormal="@color/btc"
             fab:fab_colorRipple="@color/btc"
-            android:onClick="goSendBTC"
+            android:onClick="goSendPayment"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 

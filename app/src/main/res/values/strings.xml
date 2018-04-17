@@ -103,7 +103,6 @@
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>can send %3$s</small>]]></string>
 
-    <string name="dialog_clipboard_absent">Nothing useful in clipboard</string>
     <string name="dialog_pr_making">Making payment request&#8230;</string>
     <string name="dialog_pr_expired">Expired payment request</string>
     <string name="dialog_recovering">Recovering funds&#8230;</string>
@@ -145,10 +144,12 @@
         <item><![CDATA[<strong>cancelled</strong>]]></item>
     </array>
 
-    <string name="ln_send_title">Send Lightning payment</string>
-    <string name="btc_send_title">Send Bitcoin transaction</string>
-    <string name="ln_receive_title">Request Lightning payment</string>
-    <string name="btc_receive_title">Request Bitcoin transaction</string>
+    <string name="btc_send_title"><![CDATA[<font color=#FF9900>Send Bitcoin transaction</string></font>]]></string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE>Send Lightning payment</font><br><br><small>%1$s</small>]]></string>
+    <string name="ln_receive_title"><![CDATA[As Lightning payment<br><br><font color=#999999><small>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</small></font>]]></string>
+    <string name="btc_receive_title"><![CDATA[As Bitcoin transaction<br><br><font color=#999999><small>make a QR-code with your current wallet address, can be used to receive regular on-chain transactions</small></font>]]></string>
+    <string name="send_paste">Paste a payment request</string>
+    <string name="send_scan_qr">Scan a QR code</string>
 
     <!-- errors -->
     <string name="err_ln_peer_offline">Could not connect to remote peer at %1$s</string>

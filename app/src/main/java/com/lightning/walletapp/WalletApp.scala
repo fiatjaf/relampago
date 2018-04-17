@@ -66,6 +66,7 @@ class WalletApp extends Application { me =>
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => null != db case _ => false }
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
+  def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
   def getTo(raw: String) = Address.fromString(params, raw)
 

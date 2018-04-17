@@ -510,10 +510,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     else if (!pr.isFresh) app toast dialog_pr_expired
     else {
 
-      val title = app getString ln_send_title
       val description = me getDescription pr.description
+      val title = app.getString(ln_send_title).format(description)
       val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSend).max)
-      val popupTitle = s"<font color=#0099FE>$title</font><br><br><small>$description</small>"
       val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val hint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
       val rateManager = new RateManager(hint, content)
@@ -532,7 +531,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
       }
 
-      val bld = baseBuilder(popupTitle.html, content)
+      val bld = baseBuilder(title.html, content)
       mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
       for (amountMsat <- pr.amount) rateManager setSum Try(amountMsat)
     }
@@ -551,7 +550,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def sendBtcPopup(addr: Address): RateManager = {
     val form = host.getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
     val hint = app.getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
-    val bld = baseBuilder(s"<font color=#FF9900>${app getString btc_send_title}</font>".html, form)
     val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
     val rateManager = new RateManager(hint, form)
 
@@ -574,6 +572,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case Success(ms) => rm(alert)(next(ms).start)
     }
 
+    val bld = baseBuilder(app.getString(btc_send_title).html, form)
     mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
     addressData setText humanFour(addr.toString)
     rateManager
