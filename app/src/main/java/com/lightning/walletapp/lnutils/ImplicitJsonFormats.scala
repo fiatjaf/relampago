@@ -103,7 +103,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val blindMemoFmt =
     jsonFormat[List[BlindParam], List[BigInteger], String,
-      BlindMemo](BlindMemo.apply, "params", "clears", "sesPubKeyHex")
+      BlindMemo](BlindMemo.apply, "params", "clears", "key")
 
   implicit val scalarFmt = jsonFormat[BigInteger, Scalar](Scalar.apply, "value")
   implicit val privateKeyFmt = jsonFormat[Scalar, Boolean, PrivateKey](PrivateKey.apply, "value", "compressed")

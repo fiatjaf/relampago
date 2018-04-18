@@ -20,13 +20,10 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   private var isFree = true
   def isAuthEnabled = auth == 1
-
-  // STATE MACHINE
-
-  def BECOME(d1: CloudData) = {
+  def BECOME(data1: CloudData) = {
     // Save fresh data to database on every update
-    OlympusWrap.updData(d1.toJson.toString, identifier)
-    become(d1, state)
+    OlympusWrap.updData(data1.toJson.toString, identifier)
+    become(data1, state)
   }
 
   def doProcess(some: Any) = (data, some) match {
@@ -61,15 +58,15 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
     // We do not have any acts or tokens but have a memo
     case CloudData(Some(pr \ memo), _, _) \ CMDStart if isFree =>
-      // Payment may still be unsent OR in-flight OR fulfilled OR failed
+      // Payment may still be unsent OR in-flight OR fulfilled OR failed already
       val isInFlight = app.ChannelManager.activeInFlightHashes contains pr.paymentHash
-      val send = connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
 
       if (!isInFlight) {
         // Assume that payment has been fulfilled and try to obtain storage tokens
-        val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
-        val send2 = send1.map(memo.makeClearSigs).map(memo.packEverything).doOnCompleted(me doProcess CMDStart)
-        send2.foreach(fresh => me BECOME data.copy(info = None, tokens = data.tokens ++ fresh), onError)
+        val send = connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.key)
+        val sendRelease = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
+        val sendConvert = sendRelease.map(memo.makeClearSigs).map(memo.packEverything).doOnCompleted(me doProcess CMDStart)
+        sendConvert.foreach(freshTokens => me BECOME data.copy(info = None, tokens = data.tokens ++ freshTokens), onError)
       }
 
       def onError(err: Throwable) = err.getMessage match {
@@ -91,33 +88,31 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   // TALKING TO SERVER
 
-  def getPaymentRequestBlindMemo: Obs[RequestAndMemo] =
+  private def getPaymentRequestBlindMemo =
     connector.ask[TokensInfo]("blindtokens/info") flatMap {
       case (signerMasterPubKey, signerSessionPubKey, quantity) =>
         val pubKeyQ = ECKey.fromPublicOnly(HEX decode signerMasterPubKey)
         val pubKeyR = ECKey.fromPublicOnly(HEX decode signerSessionPubKey)
-        val blinder = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
+        val ecBlind = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
 
-        val memo = BlindMemo(blinder params quantity, blinder tokens quantity, pubKeyR.getPublicKeyAsHex)
-        connector.ask[String]("blindtokens/buy", "lang" -> app.getString(com.lightning.walletapp.R.string.lang),
-          "tokens" -> memo.makeBlindTokens.toJson.toString.hex, "seskey" -> memo.sesPubKeyHex)
-            .map(PaymentRequest.read).map(pr => pr -> memo)
+        val memo = BlindMemo(ecBlind params quantity, ecBlind tokens quantity, pubKeyR.getPublicKeyAsHex)
+        val req = connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
+          "lang" -> app.getString(com.lightning.walletapp.R.string.lang), "seskey" -> memo.key)
+
+        // Return payment request along with unblinding params
+        for (raw <- req) yield Some(PaymentRequest read raw, memo)
     }
 
-  // ADDING NEW TOKENS
-
   private def getFreshData = for {
-    prAndMemo @ (pr, memo) <- getPaymentRequestBlindMemo
+    info @ Some(pr \ memo) <- getPaymentRequestBlindMemo
     if pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
-    rd = emptyRD(pr, firstMsat = pr.unsafeMsat, useCache = true)
+    rd = emptyRD(pr, pr.unsafeMsat, useCache = true)
     check = app.ChannelManager checkIfSendable rd
-    info = Some(prAndMemo)
     if data.info.isEmpty
   } yield check -> info
 
   def retryFresh(pr: PaymentRequest): Unit = {
     val rd = emptyRD(pr, pr.unsafeMsat, useCache = true)
-    val sendableResult = app.ChannelManager checkIfSendable rd
-    sendableResult.right foreach PaymentInfoWrap.addPendingPayment
+    PaymentInfoWrap addPendingPayment rd
   }
 }

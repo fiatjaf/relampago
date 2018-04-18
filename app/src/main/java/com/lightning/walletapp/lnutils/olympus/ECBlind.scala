@@ -8,7 +8,7 @@ import org.bitcoinj.core.ECKey
 import java.math.BigInteger
 
 
-case class BlindMemo(params: List[BlindParam], clears: List[BigInteger], sesPubKeyHex: String) {
+case class BlindMemo(params: List[BlindParam], clears: List[BigInteger], key: String) {
   def makeBlindTokens = params zip clears map { case (param, token) => param.blind(token).toString }
   def makeClearSigs(blind: BigInteger*) = params zip blind map { case (param, sig) => param unblind sig }
 
