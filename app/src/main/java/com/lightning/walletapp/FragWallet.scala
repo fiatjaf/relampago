@@ -87,9 +87,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       app.kit.peerGroup removeBlocksDownloadedEventListener this
     }
 
-    def getNextTracker(initBlocksLeft: Int) = new BlocksListener { self =>
-      def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) =
-        runAnd(currentBlocksLeft = left)(updTitle.run)
+    def getNextTracker(initBlocksLeft: Int) = new BlocksListener {
+      def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = {
+        // Runtime optimization: avoid calling update more than once per 144 blocks
+        if (left % broadcaster.blocksPerDay == 0) updTitle.run
+        currentBlocksLeft = left
+      }
     }
   }
 
