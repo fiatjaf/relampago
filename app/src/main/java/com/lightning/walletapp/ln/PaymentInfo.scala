@@ -28,13 +28,12 @@ object PaymentInfo {
   final val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
 
-  def emptyRD(pr: PaymentRequest, firstMsat: Long) = {
+  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
-      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4)
+      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache)
   }
 
-  def emptyRDFromInfo(info: PaymentInfo) = emptyRD(info.pr, info.firstMsat)
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
     makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
@@ -174,8 +173,8 @@ object PaymentInfo {
 
 case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv: Long)
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
-                       onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long,
-                       lastExpiry: Long, callsLeft: Int) {
+                       onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long, lastExpiry: Long,
+                       callsLeft: Int, useCache: Boolean) {
 
   // Allow users to search by payment description, recipient nodeId, payment hash
   lazy val queryText = s"${pr.description} ${pr.nodeId.toString} $paymentHashString"

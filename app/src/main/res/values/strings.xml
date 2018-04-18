@@ -157,9 +157,9 @@
     <string name="err_ln_remote_amount_high">Failed because payment amount is too high for your peer to accept</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum</string>
+    <string name="err_ln_no_peer">Failed because all the channels seem to be offline at the moment</string>
     <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already</string>
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
-    <string name="err_ln_no_route">Failed because no route to recipient could be found</string>
     <string name="err_ln_in_flight">Failed because this payment is currently in-flight</string>
     <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 

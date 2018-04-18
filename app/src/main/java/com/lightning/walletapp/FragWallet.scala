@@ -7,6 +7,7 @@ import org.bitcoinj.core._
 import collection.JavaConverters._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
+import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.FragWallet._
 import com.lightning.walletapp.R.drawable._
@@ -21,17 +22,15 @@ import java.util.{Date, TimerTask}
 import android.os.{Bundle, Handler}
 import scala.util.{Failure, Success, Try}
 import android.database.{ContentObserver, Cursor}
-import com.lightning.walletapp.ln.Tools.{none, random, runAnd}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
-import com.lightning.walletapp.lnutils.{PaymentTable, RatesSaver}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
-
-import org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT
+import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
+import org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import android.support.v4.app.Fragment
@@ -49,24 +48,11 @@ object FragWallet {
   val REDIRECT = "goToLnOpsActivity"
 }
 
-class FragWallet extends Fragment { me =>
-  override def onCreateView(inflator: LayoutInflater, vg: ViewGroup, bn: Bundle) =
-    inflator.inflate(R.layout.frag_view_pager_btc, vg, false)
-
-  override def onViewCreated(view: View, savedInstanceState: Bundle) =
-    worker = new FragWalletWorker(getActivity.asInstanceOf[WalletActivity], view)
-
-  override def onResume = {
-    // Save global reference
-    worker.onFragmentResume
-    super.onResume
-  }
-
-  override def onDestroy = {
-    // This may be nullified hence a try/catch
-    try worker.onFragmentDestroy catch none
-    super.onDestroy
-  }
+class FragWallet extends Fragment {
+  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_view_pager_btc, vg, false)
+  override def onViewCreated(view: View, state: Bundle) = worker = new FragWalletWorker(getActivity.asInstanceOf[WalletActivity], view)
+  override def onDestroy = wrap(super.onDestroy)(worker.onFragmentDestroy)
+  override def onResume = wrap(super.onResume)(worker.onFragmentResume)
 }
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
@@ -201,12 +187,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   val addItems: Vector[ItemWrap] => TimerTask = fresh => {
-    val visibleItems = for (item <- fresh ++ items if item.canShow) yield item
+    val visibleItems = for (item <- fresh ++ items if item.canShowOnUI) yield item
     val distinctItems = visibleItems.groupBy(_.key).values.map(_.head).toVector
     items = distinctItems.sortBy(_.getDate)(Ordering[Date].reverse)
 
     UITask {
-      allTxsWrapper setVisibility viewMap(items.size > minLinesNum)
+      val showExpander = items.size > minLinesNum
+      allTxsWrapper setVisibility viewMap(showExpander)
       mnemonicWarn setVisibility viewMap(items.isEmpty)
       itemsList setVisibility viewMap(items.nonEmpty)
       adapter.notifyDataSetChanged
@@ -230,13 +217,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   abstract class ItemWrap {
     def fillView(v: ViewHolder): Unit
     def getDate: java.util.Date
+    def canShowOnUI: Boolean
     def generatePopup: Unit
-    def canShow: Boolean
     def key: String
   }
 
   case class LNWrap(info: PaymentInfo) extends ItemWrap {
-    def canShow: Boolean = info.status != HIDDEN
+    def canShowOnUI: Boolean = info.actualStatus != HIDDEN
     val getDate: Date = new Date(info.stamp)
     val key = info.hash
 
@@ -257,8 +244,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def generatePopup = {
-      val rd = emptyRDFromInfo(info)
       val description = me getDescription info.description
+      val rd = emptyRD(info.pr, info.firstMsat, useCache = false)
       val humanStatus = s"<strong>${paymentStates apply info.actualStatus}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
@@ -304,7 +291,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   case class BTCWrap(wrap: TxWrap) extends ItemWrap {
-    def canShow: Boolean = wrap.tx.getMemo != wrap.HIDE
+    def canShowOnUI: Boolean = wrap.tx.getMemo != wrap.HIDE
     val getDate: Date = wrap.tx.getUpdateTime
     val key = wrap.tx.getHashAsString
 
@@ -392,9 +379,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
   }
 
-  // Load recent Bitcoin transactions right away
-  <(nativeBTCWraps, onFail)(wraps => addItems(wraps).run)
-
   // END DISPLAYING ITEMS LIST
 
   def onFragmentResume = {
@@ -478,7 +462,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           // Once again filter out those channels which can received a supplied amount
           val routes = chansWithRoutes.filterKeys(channel => estimateCanReceive(channel) >= sum.amount).values.toVector
           val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, desc.getText.toString.trim, None, routes)
-          val rd = emptyRD(pr, sum.amount)
+          val rd = emptyRD(pr, sum.amount, useCache = true)
 
           db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.paymentHashString)
           db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN, System.currentTimeMillis,
@@ -526,9 +510,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case Failure(reason) => app toast dialog_sum_empty
 
         case Success(ms) => rm(alert) {
-          // Outgoing payment needs to have an amount
-          // custom amount may be higher than requested
-          me doSend emptyRD(pr, ms.amount)
+          // Custom amount may be higher than requested
+          me doSend emptyRD(pr, ms.amount, useCache = true)
         }
       }
 
@@ -538,11 +521,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  def doSend(rd: RoutingData) = {
-    val request = app.ChannelManager.withRoutesAndOnionRD(rd, useCache = true)
-    def noRoutes(emptyRoutes: RoutingData) = onFail(host getString err_ln_no_route)
-    request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, noRoutes), onFail)
-  }
+  def doSend(rd: RoutingData) =
+    app.ChannelManager checkIfSendable rd match {
+      case Right(canSendRD) => PaymentInfoWrap addPendingPayment canSendRD
+      case Left(sanityCheckErrorMsg) => onFail(sanityCheckErrorMsg)
+    }
 
   // END LN STUFF
 
@@ -602,8 +585,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // END BTC SEND AND BOOST
 
-  // INIT
-
   host setSupportActionBar toolbar
   toolbar setOnClickListener onFastTap { if (!showLNDetails) showDenomChooser }
   itemsList setOnItemClickListener onTap { pos => adapter.getItem(pos).generatePopup }
@@ -620,5 +601,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   app.kit.peerGroup addBlocksDownloadedEventListener catchListener
   host.timer.schedule(adapter.notifyDataSetChanged, 10000, 10000)
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
+  <(nativeBTCWraps, onFail)(wraps => addItems(wraps).run)
   react(new String)
 }

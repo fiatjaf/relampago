@@ -235,16 +235,14 @@ object Commitments {
   def addRemoteProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.remoteChanges.proposed).using(_ :+ proposal)
   def addLocalProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.localChanges.proposed).using(_ :+ proposal)
 
-  def isHtlcExpired(htlc: Htlc, limitMsat: Long, height: Long) =
-    (htlc.add.amountMsat < limitMsat && height - 432 >= htlc.add.expiry) ||
-      (htlc.add.amountMsat >= limitMsat && height >= htlc.add.expiry)
+  def isHtlcExpired(htlc: Htlc, dustLimit: Satoshi, height: Long) =
+    (htlc.add.amount < dustLimit && height - 432 >= htlc.add.expiry) ||
+      (htlc.add.amount >= dustLimit && height >= htlc.add.expiry)
 
-  def hasExpiredHtlcs(c: Commitments, height: Long) = {
-    val limitMsat = (c.localCommit.spec.feeratePerKw + c.localParams.dustLimit.amount) * 1000L
-    c.localCommit.spec.htlcs.exists(htlc => isHtlcExpired(htlc, limitMsat, height) && !htlc.incoming) ||
-      c.remoteCommit.spec.htlcs.exists(htlc => isHtlcExpired(htlc, limitMsat, height) && htlc.incoming) ||
-      latestRemoteCommit(c).spec.htlcs.exists(htlc => isHtlcExpired(htlc, limitMsat, height) && htlc.incoming)
-  }
+  def hasExpiredHtlcs(c: Commitments, height: Long) =
+    c.localCommit.spec.htlcs.exists(htlc => isHtlcExpired(htlc, c.localParams.dustLimit, height) && !htlc.incoming) ||
+      c.remoteCommit.spec.htlcs.exists(htlc => isHtlcExpired(htlc, c.localParams.dustLimit, height) && htlc.incoming) ||
+      latestRemoteCommit(c).spec.htlcs.exists(htlc => isHtlcExpired(htlc, c.localParams.dustLimit, height) && htlc.incoming)
 
   def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = {
     val remoteSigned = CommitmentSpec.findHtlcById(commitments.localCommit.spec, htlcId, incomingRelativeToLocal)

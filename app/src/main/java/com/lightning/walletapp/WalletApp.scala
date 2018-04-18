@@ -15,7 +15,6 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import collection.JavaConverters.seqAsJavaListConverter
@@ -183,29 +182,19 @@ class WalletApp extends Application { me =>
       doProcess(bootstrap)
     }
 
-    def withRoutesAndOnionRD(rd: RoutingData, useCache: Boolean) = {
-      val isPaymentFrozen = frozenInFlightHashes.contains(rd.pr.paymentHash)
-      if (isPaymentFrozen) Obs error new LightningException(me getString err_ln_frozen)
-      else withRoutesAndOnionRDFrozenAllowed(rd, useCache)
-    }
-
-    def withRoutesAndOnionRDFrozenAllowed(rd: RoutingData, useCache: Boolean) = {
+    def checkIfSendable(rd: RoutingData) = {
       val isDone = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
-      val capablePeerNodes = canSendNow(rd.firstMsat).map(_.data.announce.nodeId)
-      val isInFlight = activeInFlightHashes.contains(rd.pr.paymentHash)
-
-      if (isInFlight) Obs error new LightningException(me getString err_ln_in_flight)
-      else if (isDone.isSuccess) Obs error new LightningException(me getString err_ln_fulfilled)
-      else if (capablePeerNodes.isEmpty) Obs error new LightningException(me getString err_ln_no_route)
-      else addRoutesAndOnion(capablePeerNodes, rd, useCache)
+      if (activeInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_in_flight)
+      else if (frozenInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_frozen)
+      else if (canSendNow(rd.firstMsat).isEmpty) Left(me getString err_ln_no_peer)
+      else if (isDone.isSuccess) Left(me getString err_ln_fulfilled)
+      else Right(rd)
     }
 
-    def addRoutesAndOnion(peers: PublicKeyVec, rd: RoutingData, useCache: Boolean) = {
-      // If payment request contains assisted routing info then request assisted routes
-      // otherwise directly ask for final recipient nodeId
-
+    def fetchRoutes(rd: RoutingData) = {
+      val peers = canSendNow(rd.firstMsat).map(_.data.announce.nodeId)
       def getRoutes(targetId: PublicKey) = peers contains targetId match {
-        case false if useCache => RouteWrap.findRoutes(peers, targetId, rd)
+        case false if rd.useCache => RouteWrap.findRoutes(peers, targetId, rd)
         case false => BadEntityWrap.findRoutes(peers, targetId, rd)
         case true => Obs just Vector(Vector.empty)
       }
@@ -216,26 +205,31 @@ class WalletApp extends Application { me =>
         completeRoutes = partialRoutes.map(_ ++ tag.route)
       } yield Obs just completeRoutes
 
-      val routesObs = if (rd.pr.routingInfo.isEmpty) getRoutes(rd.pr.nodeId) else Obs.zip(withExtraPart).map(_.flatten.toVector)
-      // We get cheapest routes from server of which we select the shortest one and turn it into an onion routing packet
-      for (cheapestRoutes <- routesObs) yield useFirstRoute(cheapestRoutes.sortBy(hops => hops.size), rd)
+      val cheapestRoutesObs =
+        if (peers.isEmpty) Obs error new LightningException(me getString err_ln_no_peer)
+        else if (rd.pr.routingInfo.isEmpty) getRoutes(targetId = rd.pr.nodeId)
+        else Obs.zip(withExtraPart).map(_.flatten.toVector)
+
+      for {
+        routes <- cheapestRoutesObs
+        shortest = routes.sortBy(_.size)
+      } yield useFirstRoute(shortest, rd)
     }
 
-    def send(rd: RoutingData, noRouteLeft: RoutingData => Unit): Unit = {
-      // Find a local channel which has enough funds, is online and belongs to a correct peer
-      // empty used route means we're sending to our peer and should use it's nodeId as a target
-      val target = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
-      val channelOpt = canSendNow(rd.firstMsat).find(_.data.announce.nodeId == target)
+    def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
+      // Find a local channel which is online, can send an amount and belongs to a correct peer
+      // or do the work required to reverse the payment in case if no channel is found
 
-      channelOpt match {
-        case Some(targetChannel) => targetChannel process rd
-        case None => sendEither(useRoutesLeft(rd), noRouteLeft)
-      }
-    }
+      case Right(rd) =>
+        // Empty used route means we're sending to our peer and should use it's nodeId as a target
+        val targetPeerId = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
+        val channelOpt = canSendNow(rd.firstMsat).find(_.data.announce.nodeId == targetPeerId)
+        channelOpt.map(_ process rd) getOrElse sendEither(useRoutesLeft(rd), noRoutes)
 
-    def sendEither(foeRD: FullOrEmptyRD, noRouteLeft: RoutingData => Unit) = foeRD match {
-      case Right(rdValidPaymentRoutePresent) => send(rdValidPaymentRoutePresent, noRouteLeft)
-      case Left(rdEmptyPaymentRoute) => noRouteLeft(rdEmptyPaymentRoute)
+      case Left(emptyRD) =>
+        // All routes have been filtered out
+        // or there were no routes at all
+        noRoutes(emptyRD)
     }
   }
 

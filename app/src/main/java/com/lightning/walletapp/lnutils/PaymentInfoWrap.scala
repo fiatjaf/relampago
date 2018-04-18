@@ -3,22 +3,23 @@ package com.lightning.walletapp.lnutils
 import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire._
+import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
+import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import android.support.v4.app.NotificationCompat
 import com.lightning.walletapp.helper.RichCursor
-import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.MainActivity
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import com.lightning.walletapp.R
-import scala.collection.mutable
+import org.bitcoinj.core.Peer
 
 import android.app.{AlarmManager, NotificationManager, PendingIntent}
 import android.content.{BroadcastReceiver, Context, Intent}
@@ -27,7 +28,28 @@ import rx.lang.scala.{Observable => Obs}
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
-  private[this] val inFlightPayments = mutable.Map.empty[BinaryData, RoutingData]
+  private[this] var inFlightPayments = Map.empty[BinaryData, RoutingData]
+  private[this] var unsent = Map.empty[BinaryData, RoutingData]
+  private[this] var chainInSync = false
+
+  app.kit.peerGroup addConnectedEventListener new PeerConnectedEventListener {
+    // We can not send payments until we know current blockchain height or else a channel may be closed!
+    def onPeerConnected(peer: Peer, peerCount: Int) = runAnd(chainInSync = peerCount > 2)(maybeResolvePending)
+  }
+
+  def addPendingPayment(rd: RoutingData) = {
+    unsent = unsent.updated(rd.pr.paymentHash, rd)
+    me insertOrUpdateOutgoingPayment rd
+    maybeResolvePending
+    uiNotify
+  }
+
+  def maybeResolvePending = if (chainInSync) {
+    def sendToChan(fullOrEmptyRD: FullOrEmptyRD) = app.ChannelManager.sendEither(fullOrEmptyRD, failOnUI)
+    for (_ \ rd <- unsent) app.ChannelManager.fetchRoutes(rd).foreach(sendToChan, exc => me failOnUI rd)
+    unsent = Map.empty
+  }
+
   private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
   def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
   def getAllRevoked(number: Long) = RichCursor apply db.select(RevokedTable.selectSql, number) vec toRevoked
@@ -55,6 +77,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
     rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
+  def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
+    db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
+    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
+      rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
+  }
+
   def markFailedAndFrozen = db txWrap {
     db change PaymentTable.updFailWaitingSql
     for (hash <- app.ChannelManager.activeInFlightHashes) updStatus(WAITING, hash)
@@ -62,15 +90,23 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def failOnUI(rd: RoutingData) = {
+    // Fail a payment and let user know
     updStatus(FAILURE, rd.pr.paymentHash)
     uiNotify
   }
 
-  def newRoutes(rd: RoutingData) = if (rd.callsLeft > 0) {
-    val rdMinusOneCall = rd.copy(callsLeft = rd.callsLeft - 1)
-    val request = app.ChannelManager.withRoutesAndOnionRD(rdMinusOneCall, useCache = false)
-    request.foreach(foeRD => app.ChannelManager.sendEither(foeRD, failOnUI), _ => me failOnUI rd)
-  } else updStatus(FAILURE, rd.pr.paymentHash)
+  def newRoutes(rd: RoutingData) =
+    app.ChannelManager checkIfSendable rd match {
+      case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
+        // Local conditions have not changed and we are still able to send this payment
+        def sendToChan(fullOrEmptyRD: FullOrEmptyRD) = app.ChannelManager.sendEither(fullOrEmptyRD, failOnUI)
+        val req = app.ChannelManager fetchRoutes rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
+        req.foreach(sendToChan, exc => me failOnUI rd)
+
+      case Left(why) =>
+        // UI will be updated a bit later
+        updStatus(FAILURE, rd.pr.paymentHash)
+    }
 
   override def onError = {
     case (_, exc: CMDException) => me failOnUI exc.rd
@@ -78,23 +114,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {
-    // This may be a new payment or an old payment retry attempt
-    // Either insert or update should be executed successfully
-    inFlightPayments(rd.pr.paymentHash) = rd
-
-    db txWrap {
-      db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
-      db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
-        rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
-    }
-
-    uiNotify
+    // Payment has been accepted by channel so start local tracking
+    inFlightPayments = inFlightPayments.updated(rd.pr.paymentHash, rd)
+    me insertOrUpdateOutgoingPayment rd
   }
 
   override def fulfillReceived(ok: UpdateFulfillHtlc) = db txWrap {
     // Save preimage right away, don't wait for their next commitSig
-    // receiving a preimage means that payment is fulfilled
-    updOkOutgoing(ok)
+    me updOkOutgoing ok
 
     inFlightPayments.values.find(_.pr.paymentHash == ok.paymentHash) foreach { rd =>
       // Make payment searchable + routing optimization: record subroutes in database
@@ -105,8 +132,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def sentSig(cs: Commitments) = db txWrap {
     for (waitRevocation <- cs.remoteNextCommitInfo.left) {
-      val htlcs = waitRevocation.nextRemoteCommit.spec.htlcs
-      for (Htlc(_, add) <- htlcs if add.amount > cs.localParams.dustLimit)
+      val activeHtlcs = waitRevocation.nextRemoteCommit.spec.htlcs
+      for (Htlc(_, add) <- activeHtlcs if add.amount > cs.localParams.dustLimit)
         saveRevoked(add.hash160, add.expiry, waitRevocation.nextRemoteCommit.index)
     }
   }
@@ -116,7 +143,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     // then retry failed payments where possible
 
     db txWrap {
-      for (Htlc(true, addHtlc) \ _ <- cs.localCommit.spec.fulfilled) updOkIncoming(addHtlc)
+      for (Htlc(true, addHtlc) \ _ <- cs.localCommit.spec.fulfilled) me updOkIncoming addHtlc
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
 
@@ -128,8 +155,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
             for (entity <- excludes) BadEntityWrap.putEntity tupled entity
             app.ChannelManager.sendEither(useRoutesLeft(prunedRD), newRoutes)
 
-          case _ =>
-            // Either halted or not found at all
+          case None =>
+            // May happen after app restart
             updStatus(FAILURE, add.paymentHash)
         }
       }
@@ -153,12 +180,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onBecome = {
     case (chan, _, from, CLOSING) if from != CLOSING =>
-      // Mark dropped and frozen payments, visually notify
+      // Mark dropped and frozen payments and let user know
       markFailedAndFrozen
       uiNotify
 
-    case (chan, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) if isOperational(chan) =>
-      // We may need to send an LN payment in -> OPEN unless it is a shutdown
+    case (chan, _, WAIT_FUNDING_DONE, OPEN) =>
+      // Schedule notification once a channel gets open
       Notificator.scheduleResyncNotificationOnceAgain
       OlympusWrap tellClouds OlympusWrap.CMDStart
   }
@@ -253,9 +280,9 @@ object GossipCatcher extends ChannelListener {
 
 object Notificator {
   private[this] val notificatorClass = classOf[Notificator]
+  def removeResyncNotification = getAlarmManager cancel getIntent
   def getIntent = PendingIntent.getBroadcast(app, 0, new Intent(app, notificatorClass), 0)
   def getAlarmManager = app.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager]
-  def removeResyncNotification = getAlarmManager cancel getIntent
 
   def scheduleResyncNotificationOnceAgain =
     try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
@@ -263,10 +290,13 @@ object Notificator {
 }
 
 class Notificator extends BroadcastReceiver {
-  def onReceive(ct: Context, intent: Intent) = classOf[MainActivity] match { case target =>
-    val targetIntent = PendingIntent.getActivity(ct, 0, new Intent(ct, target), PendingIntent.FLAG_UPDATE_CURRENT)
-    try ct.getSystemService(Context.NOTIFICATION_SERVICE).asInstanceOf[NotificationManager].notify(1, new NotificationCompat.Builder(ct)
-      .setContentIntent(targetIntent).setSmallIcon(R.drawable.dead).setContentTitle(ct getString R.string.notice_sync_title)
-      .setContentText(ct getString R.string.notice_sync_body).setAutoCancel(true).build) catch none
+  private[this] val mainClass = classOf[MainActivity]
+
+  def onReceive(ct: Context, intent: Intent) = {
+    val manager = ct.getSystemService(Context.NOTIFICATION_SERVICE).asInstanceOf[NotificationManager]
+    val targetIntent = PendingIntent.getActivity(ct, 0, new Intent(ct, mainClass), PendingIntent.FLAG_UPDATE_CURRENT)
+    try manager.notify(1, new NotificationCompat.Builder(ct).setContentIntent(targetIntent).setSmallIcon(R.drawable.dead)
+      .setContentTitle(ct getString R.string.notice_sync_title).setContentText(ct getString R.string.notice_sync_body)
+      .setAutoCancel(true).build) catch none
   }
 }

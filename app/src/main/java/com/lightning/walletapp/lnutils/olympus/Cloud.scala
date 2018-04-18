@@ -2,14 +2,13 @@ package com.lightning.walletapp.lnutils.olympus
 
 import spray.json._
 import com.lightning.walletapp.ln._
+import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
-
 import rx.lang.scala.{Observable => Obs}
-import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Utils.HEX
 import org.bitcoinj.core.ECKey
@@ -31,16 +30,17 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   }
 
   def doProcess(some: Any) = (data, some) match {
-    case CloudData(None, tokens, actions) \ CMDStart
-      // We are free AND backup is on AND (no tokens left OR few tokens left AND no acts left) AND a channel exists
-      if isFree && isAuthEnabled && (tokens.isEmpty || actions.isEmpty && tokens.size < 5) && capableChannelExists =>
-      val send = retry(getFreshData, pickInc, 4 to 5) doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
-      // This guard will intercept the next branch only if we are not capable of sending or have nothing to send
-      // If requested sum is low enough and tokens quantity is high enough and no race conditions
+    case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
+      (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
+      app.ChannelManager.canSendNow(maxPriceMsat).nonEmpty &&
+      isAuthEnabled =>
 
-      send foreach { case rd \ info =>
-        me BECOME data.copy(info = info)
-        app.ChannelManager.send(rd, none)
+      // This guard will intercept the next branch only if we are not capable of sending or have nothing to send
+      val send = retry(getFreshData, pickInc, 4 to 5) doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
+
+      for (Right(rd) \ newInfo <- send) {
+        me BECOME data.copy(info = newInfo)
+        PaymentInfoWrap addPendingPayment rd
       }
 
     // Execute anyway if we are free and have available tokens and actions
@@ -61,7 +61,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
     // We do not have any acts or tokens but have a memo
     case CloudData(Some(pr \ memo), _, _) \ CMDStart if isFree =>
-      // Payment may still be in-flight or fulfilled or maybe failed already
+      // Payment may still be unsent OR in-flight OR fulfilled OR failed
       val isInFlight = app.ChannelManager.activeInFlightHashes contains pr.paymentHash
       val send = connector.ask[BigIntegerVec]("blindtokens/redeem", "seskey" -> memo.sesPubKeyHex)
 
@@ -73,14 +73,10 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       }
 
       def onError(err: Throwable) = err.getMessage match {
-        case "notfulfilled" => if (!pr.isFresh) me BECOME data.copy(info = None) else {
-          // Apparently payment has been failed but request is still fresh so retry it instead of getting a new request
-          val send = withRoutesAndOnionRDFromPR(pr) doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
-          send.foreach(foeRD => app.ChannelManager.sendEither(foeRD, none), none)
-        }
-
+        case "notfulfilled" if pr.isFresh => me retryFresh pr
+        case "notfulfilled" => me BECOME data.copy(info = None)
         case "notfound" => me BECOME data.copy(info = None)
-        case serverMalfunction => Tools log serverMalfunction
+        case other => Tools log other
       }
 
     case (_, act: CloudAct)
@@ -113,16 +109,15 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   private def getFreshData = for {
     prAndMemo @ (pr, memo) <- getPaymentRequestBlindMemo
     if pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
-    Right(rd) <- withRoutesAndOnionRDFromPR(pr)
+    rd = emptyRD(pr, firstMsat = pr.unsafeMsat, useCache = true)
+    check = app.ChannelManager checkIfSendable rd
     info = Some(prAndMemo)
     if data.info.isEmpty
-  } yield rd -> info
+  } yield check -> info
 
-  private def withRoutesAndOnionRDFromPR(pr: PaymentRequest) =
-    // These payments will always be near dust so it is safe to retry them even if they are frozen
-    app.ChannelManager.withRoutesAndOnionRDFrozenAllowed(emptyRD(pr, pr.unsafeMsat), useCache = true)
-
-  private def capableChannelExists =
-    // Estimate whethere we can send a MAX price
-    app.ChannelManager.canSendNow(maxPriceMsat).nonEmpty
+  def retryFresh(pr: PaymentRequest): Unit = {
+    val rd = emptyRD(pr, pr.unsafeMsat, useCache = true)
+    val sendableResult = app.ChannelManager checkIfSendable rd
+    sendableResult.right foreach PaymentInfoWrap.addPendingPayment
+  }
 }
