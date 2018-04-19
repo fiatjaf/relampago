@@ -40,8 +40,15 @@ object LocalBroadcaster extends Broadcaster {
   } yield firstBlockHash.toString
 
   override def onProcessSuccess = {
-    case (_, close: ClosingData, _: Command) =>
+    case (_, close: ClosingData, c: Command) =>
+
+      println(s"GOT $c, SHOULD CLOSE")
+
       val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
+
+      println(tier12Publishable.size)
+      println(tier12Publishable)
+
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockingSend tx catch none
   }

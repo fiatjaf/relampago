@@ -6,9 +6,9 @@
     <!-- app wide -->
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
-    <string name="fee_risky"><![CDATA[<small>%1$s<br><small>Standard transaction fee</small></small>]]></string>
-    <string name="fee_live"><![CDATA[<small>%1$s<br><small>Priority transaction fee</small></small>]]></string>
-    <string name="step_fees"><![CDATA[<font color=#999999>Final step: fees</font><br><br>%1$s]]></string>
+    <string name="step_fees"><![CDATA[<font color=#999999>Final step: miner fee</font><br><br>%1$s]]></string>
+    <string name="fee_risky"><![CDATA[<small>%1$s<br><small>standard fee</small></small>]]></string>
+    <string name="fee_live"><![CDATA[<small>%1$s<br><small>priority fee</small></small>]]></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_create">New Bitcoin Wallet</string>
     <string name="wallet_restore">Restore Wallet</string>
@@ -123,17 +123,21 @@
     <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
 
     <array name="info_progress">
-        <item><![CDATA[<font color=#65BD65>Sync is complete</font>]]></item>
+        <item><![CDATA[<font color=#53A63C>Sync is complete</font>]]></item>
         <item><![CDATA[<font color=#FF9900>Sync: %1$d day behind</font>]]></item>
         <item><![CDATA[<font color=#FF9900>Sync: %1$d days behind</font>]]></item>
     </array>
 
-    <!-- frag_view_pager_btc -->
-    <string name="txs_fee_incoming"><![CDATA[<font color=#1BA2E0>Incoming transaction</font><br>%1$s]]></string>
-    <string name="txs_fee_details"><![CDATA[<font color=#E31300>Outgoing transaction</font><br>%2$s<br><br>%1$s fee]]></string>
-    <string name="txs_fee_absent"><![CDATA[<font color=#E31300>Outgoing transaction</font><br>%1$s<br><br>No fee]]></string>
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s]]></string>
+    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br>fee %3$s]]></string>
+
+    <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>received %2$s]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br>miner fee %3$s]]></string>
+
     <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
-    <string name="txs_sum_in"><![CDATA[<font color=#1BA2E0>%1$s</font>]]></string>
+    <string name="txs_sum_in"><![CDATA[<font color=#53A63C>%1$s</font>]]></string>
     <string name="txs_view_outside">View on SmartBit site</string>
     <string name="txs_p2wsh">Payment channel funding</string>
 
@@ -144,10 +148,11 @@
         <item><![CDATA[<strong>cancelled</strong>]]></item>
     </array>
 
-    <string name="btc_send_title"><![CDATA[<font color=#FF9900>Send Bitcoin transaction</string></font>]]></string>
-    <string name="ln_send_title"><![CDATA[<font color=#0099FE>Send Lightning payment</font><br><br><small>%1$s</small>]]></string>
-    <string name="ln_receive_title"><![CDATA[As Lightning payment<br><br><font color=#999999><small>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</small></font>]]></string>
-    <string name="btc_receive_title"><![CDATA[As Bitcoin transaction<br><br><font color=#999999><small>make a QR-code with your current wallet address, can be used to receive regular on-chain transactions</small></font>]]></string>
+    <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin transaction</strong></string></font>]]></string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><br><br><small>%1$s</small>]]></string>
+    <string name="ln_receive_option"><![CDATA[As Lightning payment<br><br><font color=#999999><small>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</small></font>]]></string>
+    <string name="btc_receive_option"><![CDATA[As Bitcoin transaction<br><br><font color=#999999><small>make a QR-code with your current wallet address, can be used to receive regular on-chain transactions</small></font>]]></string>
     <string name="send_paste">Paste a Payment Request</string>
     <string name="send_scan_qr">Scan a QR code</string>
 
@@ -157,7 +162,7 @@
     <string name="err_ln_remote_amount_high">Failed because payment amount is too high for your peer to accept</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum</string>
-    <string name="err_ln_no_peer">Failed because all the channels seem to be offline at the moment</string>
+    <string name="err_ln_no_chan">Failed because no channel can handle this payment at the moment</string>
     <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already</string>
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
     <string name="err_ln_in_flight">Failed because this payment is currently in-flight</string>
@@ -179,8 +184,6 @@
     <string name="ln_status_peer">Select peer</string>
     <string name="ln_status_none">No open channel found</string>
     <string name="ln_description_hint">add some description</string>
-    <string name="ln_incoming_title"><![CDATA[<font color=#1BA2E0>Incoming payment</font><br>%1$s]]></string>
-    <string name="ln_outgoing_title"><![CDATA[<font color=#E31300>Outgoing payment</font><br>%2$s<br><br>%1$s fee]]></string>
     <string name="ln_qr_disposable"><![CDATA[Request is valid for 1 hour<br>Do not reuse this QR code]]></string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>
     <string name="ln_no_description">No description provided</string>
@@ -190,9 +193,9 @@
     <!-- see PaymentInfo.scala -->
     <array name="ln_payment_states">
         <item>waiting for payee</item>
-        <item>in progress</item>
-        <item>paid and settled</item>
-        <item>cancelled</item>
+        <item>still in progress</item>
+        <item>paid successfully</item>
+        <item>cancelled and refunded</item>
         <item>frozen</item>
     </array>
 
@@ -201,7 +204,7 @@
     <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>cooperative</i></font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>refundable %6$s<br><br>Refundable channel balance has been transferred to your Bitcoin wallet<br><br>%7$s]]></string>
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[<font color=#65BD65>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>can send %5$s<br>can receive %6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[<font color=#53A63C>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>can send %5$s<br>can receive %6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>opened at <font color=#999999>%4$s</font><br>closed at <font color=#999999>%5$s</font><br>total capacity %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
     <string name="ln_ops_chan_receive_nothing_yet">nothing yet</string>
@@ -213,7 +216,7 @@
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Pending refunds</font><br>]]></string>
-    <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://smartbit.com.au/tx/%1$s>View closing status</a><br>%2$s<br>%3$s fee]]></string>
+    <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://testnet.smartbit.com.au/tx/%1$s>View closing status</a><br>%2$s<br>%3$s fee]]></string>
 
     <string name="ln_ops_unilateral_you"><![CDATA[<font color=#999999><i>by your wallet</i></font>]]></string>
     <string name="ln_ops_unilateral_peer"><![CDATA[<font color=#999999><i>by remote peer</i></font>]]></string>

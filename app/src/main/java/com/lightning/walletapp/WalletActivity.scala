@@ -164,7 +164,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   // BUTTONS REACTIONS
 
   def goReceivePayment(top: View) = {
-    val options = Array(getString(btc_receive_title).html, getString(ln_receive_title).html)
+    val options = Array(getString(btc_receive_option).html, getString(ln_receive_option).html)
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_receive, lst).create)
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, options)
@@ -218,8 +218,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   def goAddChannel(top: View) =
     if (app.ChannelManager.all.isEmpty) {
       val tokens = MilliSatoshi(amount = 500000L)
-      val humanIn = humanFiat(coloredIn(tokens), tokens, " ")
-      val warning = getString(tokens_warn).format(humanIn).html
+      val warning = getString(tokens_warn).format(coloredIn apply tokens).html
       val warn = baseTextBuilder(warning).setCustomTitle(me getString action_ln_open)
       mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
     } else me goTo classOf[LNStartActivity]

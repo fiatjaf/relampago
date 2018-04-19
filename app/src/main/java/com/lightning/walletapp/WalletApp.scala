@@ -186,7 +186,7 @@ class WalletApp extends Application { me =>
       val isDone = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
       if (activeInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_in_flight)
       else if (frozenInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_frozen)
-      else if (canSendNow(rd.firstMsat).isEmpty) Left(me getString err_ln_no_peer)
+      else if (canSendNow(rd.firstMsat).isEmpty) Left(me getString err_ln_no_chan)
       else if (isDone.isSuccess) Left(me getString err_ln_fulfilled)
       else Right(rd)
     }
@@ -206,7 +206,7 @@ class WalletApp extends Application { me =>
       } yield Obs just completeRoutes
 
       val cheapestRoutesObs =
-        if (peers.isEmpty) Obs error new LightningException(me getString err_ln_no_peer)
+        if (peers.isEmpty) Obs error new LightningException(me getString err_ln_no_chan)
         else if (rd.pr.routingInfo.isEmpty) getRoutes(targetId = rd.pr.nodeId)
         else Obs.zip(withExtraPart).map(_.flatten.toVector)
 

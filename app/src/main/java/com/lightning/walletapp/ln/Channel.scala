@@ -423,9 +423,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (RefundingData(announce, Some(remoteLatestPoint), commitments), CMDSpent(spendTx), REFUNDING)
         // GUARD: we have got a remote commit which we asked them to spend and we have their point
-        if spendTx.txIn.exists(_.outPoint == commitments.commitInput.outPoint) =>
-
-        // Claim our main output using their point and go to CLOSING
+        if spendTx.txIn.exists(input => commitments.commitInput.outPoint == input.outPoint) =>
         val rcp = Closing.claimRemoteMainOutput(commitments, remoteLatestPoint, spendTx)
         val d1 = ClosingData(announce, commitments, refundRemoteCommit = rcp :: Nil)
         BECOME(me STORE d1, CLOSING)
@@ -433,7 +431,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (some: HasCommitments, CMDSpent(tx), _)
         // GUARD: tx which spends our funding is broadcasted, must react
-        if tx.txIn.exists(_.outPoint == some.commitments.commitInput.outPoint) =>
+        if tx.txIn.exists(input => some.commitments.commitInput.outPoint == input.outPoint) =>
         val revokedOpt = Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, tx, LNParams.bag)
         val nextRemoteCommitEither = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
 

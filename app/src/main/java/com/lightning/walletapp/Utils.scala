@@ -82,13 +82,8 @@ object Utils {
   }
 
   def currentRate = Try(RatesSaver.rates exchange fiatName)
-  def msatInFiat(msat: MilliSatoshi) = currentRate.map(_ * msat.amount / BtcDenomination.factor)
-  def humanFiat(prefix: String, ms: MilliSatoshi, div: String = "<br>"): String = msatInFiat(ms) match {
-    case Success(amt) if fiatName == strYuan => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} cny</font>"
-    case Success(amt) if fiatName == strEuro => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} eur</font>"
-    case Success(amt) if fiatName == strYen => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} jpy</font>"
-    case Success(amt) => s"$prefix$div<font color=#999999>≈ ${formatFiat format amt} usd</font>"
-    case _ => prefix
+  def msatInFiat(milliSatoshi: MilliSatoshi) = currentRate map {
+    perBtc => milliSatoshi.amount * perBtc / BtcDenomination.factor
   }
 }
 
@@ -199,19 +194,20 @@ trait TimerActivity extends AppCompatActivity { me =>
     val pay: PayData
 
     // Estimate a real fee this tx will have in order to be confirmed within next 6 blocks
-    def start = <(app.kit sign plainRequest(RatesSaver.rates.feeSix), onFail)(chooseFee)
+    def start = <(app.kit sign plainRequest(RatesSaver.rates.feeSix), onTxFail)(chooseFee)
 
     def chooseFee(estimate: SendRequest): Unit = {
       val livePerTxFee: MilliSatoshi = estimate.tx.getFee
       val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
 
-      val markedLivePerTxFee = sumOut format denom.withSign(livePerTxFee)
-      val markedRiskyPerTxFee = sumOut format denom.withSign(riskyPerTxFee)
-      val txtFeeLive = getString(fee_live) format humanFiat(markedLivePerTxFee, livePerTxFee, " ")
-      val txtFeeRisky = getString(fee_risky) format humanFiat(markedRiskyPerTxFee, riskyPerTxFee, " ")
+      val markedLivePerTxFee = coloredOut(livePerTxFee)
+      val markedRiskyPerTxFee = coloredOut(riskyPerTxFee)
+      val txtFeeLive = getString(fee_live) format markedLivePerTxFee
+      val txtFeeRisky = getString(fee_risky) format markedRiskyPerTxFee
+      val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
+
       val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
       val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
-      val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
       def proceed = lst.getCheckedItemPosition match {
         // Allow user to choose an economical fee when sending a manual transaction
@@ -219,7 +215,7 @@ trait TimerActivity extends AppCompatActivity { me =>
         case 1 => self futureProcess plainRequest(RatesSaver.rates.feeSix)
       }
 
-      val bld = baseBuilder(getString(step_fees).format(pay cute sumOut).html, form)
+      val bld = baseBuilder(getString(step_fees).format(sumOut format pay.destination).html, form)
       mkForm(ok = <(proceed, onTxFail)(none), none, bld, dialog_pay, dialog_cancel)
       lst setAdapter new ArrayAdapter(me, singleChoice, feesOptions)
       lst.setItemChecked(0, true)
@@ -294,14 +290,8 @@ trait PayData {
   // Emptying a wallet needs special handling
   def isAll = app.kit.conf1Balance equals cn
   def getRequest: SendRequest
-  def cn: Coin
-
   def destination: String
-  def cute(direction: String) = {
-    val msat: MilliSatoshi = coin2MSat(cn)
-    val human = direction.format(denom withSign msat)
-    humanFiat(s"$destination<br><br>$human", msat)
-  }
+  def cn: Coin
 }
 
 case class AddrData(cn: Coin, address: Address) extends PayData {

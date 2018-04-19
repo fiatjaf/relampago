@@ -3,12 +3,12 @@ package com.lightning.walletapp.lnutils.olympus
 import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.lnutils._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
-import rx.lang.scala.{Observable => Obs}
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Utils.HEX
 import org.bitcoinj.core.ECKey
@@ -20,25 +20,26 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   private var isFree = true
   def isAuthEnabled = auth == 1
-  def BECOME(data1: CloudData) = {
-    // Save fresh data to database on every update
-    OlympusWrap.updData(data1.toJson.toString, identifier)
-    become(data1, state)
+  def BECOME(cloudData: CloudData) = {
+    // Just save updated data to database on every change
+    OlympusWrap.updData(cloudData.toJson.toString, identifier)
+    become(cloudData, state)
   }
 
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
       (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
-      app.ChannelManager.canSendNow(maxPriceMsat).nonEmpty &&
+      app.ChannelManager.notClosingOrRefunding.exists(isOperational) &&
       isAuthEnabled =>
 
-      // This guard will intercept the next branch only if we are not capable of sending or have nothing to send
-      val send = retry(getFreshData, pickInc, 4 to 5) doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
+      val send = retry(getPaymentRequestBlindMemo, pick = pickInc, times = 4 to 5)
+      val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
 
-      for (Right(rd) \ newInfo <- send) {
-        me BECOME data.copy(info = newInfo)
-        PaymentInfoWrap addPendingPayment rd
-      }
+      for {
+        Tuple2(pr, memo) <- send1
+        if data.info.isEmpty && pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
+        memoSaved = me BECOME CloudData(Some(pr, memo), clearTokens, actions)
+      } retryFreshRequest(pr)
 
     // Execute anyway if we are free and have available tokens and actions
     case CloudData(_, (point, clear, signature) +: tokens, action +: _) \ CMDStart if isFree =>
@@ -70,7 +71,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       }
 
       def onError(err: Throwable) = err.getMessage match {
-        case "notfulfilled" if pr.isFresh => me retryFresh pr
+        case "notfulfilled" if pr.isFresh => retryFreshRequest(pr)
         case "notfulfilled" => me BECOME data.copy(info = None)
         case "notfound" => me BECOME data.copy(info = None)
         case other => Tools log other
@@ -100,18 +101,10 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
           "lang" -> app.getString(com.lightning.walletapp.R.string.lang), "seskey" -> memo.key)
 
         // Return payment request along with unblinding params
-        for (raw <- req) yield Some(PaymentRequest read raw, memo)
+        for (raw <- req) yield Tuple2(PaymentRequest read raw, memo)
     }
 
-  private def getFreshData = for {
-    info @ Some(pr \ memo) <- getPaymentRequestBlindMemo
-    if pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
-    rd = emptyRD(pr, pr.unsafeMsat, useCache = true)
-    check = app.ChannelManager checkIfSendable rd
-    if data.info.isEmpty
-  } yield check -> info
-
-  def retryFresh(pr: PaymentRequest): Unit = {
+  def retryFreshRequest(pr: PaymentRequest): Unit = {
     val rd = emptyRD(pr, pr.unsafeMsat, useCache = true)
     PaymentInfoWrap addPendingPayment rd
   }

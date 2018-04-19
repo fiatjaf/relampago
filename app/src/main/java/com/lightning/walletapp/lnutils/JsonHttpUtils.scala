@@ -20,7 +20,7 @@ import scala.util.Try
 
 
 object JsonHttpUtils {
-  val minAllowedFee = Coin valueOf 5000L
+  val minAllowedFee = Coin valueOf 100000L // TODO: 5000L
   def initDelay[T](next: Obs[T], startMillis: Long, timeoutMillis: Long) = {
     val adjustedTimeout = startMillis + timeoutMillis - System.currentTimeMillis
     val delayLeft = if (adjustedTimeout < 0L) 0L else adjustedTimeout
