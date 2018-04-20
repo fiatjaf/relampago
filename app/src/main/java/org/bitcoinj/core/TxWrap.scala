@@ -48,6 +48,7 @@ class TxWrap(val tx: Transaction) {
 
   def depth = tx.getConfidence.getDepthInBlocks
   def isDead = tx.getConfidence.getConfidenceType == DEAD
+  def isVisible = tx.getMemo != HIDE && !valueDelta.isZero
   def makeHidden = tx setMemo HIDE
   final val HIDE = "HIDE"
 }

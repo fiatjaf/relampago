@@ -172,6 +172,10 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageClosing(close: ClosingData) = UITask {
       // Show the best current closing with most confirmations
       // since multiple different closings may be present at once
+
+
+      println(s"IS OUTDATED: ${close.isOutdated}")
+
       val closed = me time new Date(close.closedAt)
       lnOpsAction setVisibility View.GONE
 

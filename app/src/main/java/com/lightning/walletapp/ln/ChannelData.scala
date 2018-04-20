@@ -97,9 +97,8 @@ case class ClosingData(announce: NodeAnnouncement,
       case Right(info) => info.getState.map(_.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
     }
 
-    // Either everything including tier12 tx is confirmed or hard timeout has passed
-    val hardTimeout = closedAt + 1000 * 3600 * 24 * 90 < System.currentTimeMillis
-    allConfirmedOrDead || hardTimeout
+    val hardDelay: Long = closedAt + 1000L * 3600 * 24 * 90
+    allConfirmedOrDead || hardDelay < System.currentTimeMillis
   }
 }
 

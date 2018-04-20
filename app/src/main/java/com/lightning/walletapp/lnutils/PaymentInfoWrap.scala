@@ -165,7 +165,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       // Let the clouds know since they may be waiting
       // also vibrate to let a user know it's fulfilled
       OlympusWrap tellClouds OlympusWrap.CMDStart
-      com.lightning.walletapp.Vibr.vibrate
+      com.lightning.walletapp.Vibrator.vibrate
     }
 
     uiNotify
@@ -216,7 +216,7 @@ object RouteWrap {
     val subs = (rd.usedRoute drop 1).scanLeft(rd.usedRoute take 1) { case rs \ hop => rs :+ hop }
 
     for (_ \ node \ path <- rd.onion.sharedSecrets drop 1 zip subs) {
-      val expiration = System.currentTimeMillis + 1000 * 3600 * 24 * 7
+      val expiration = System.currentTimeMillis + 1000L * 3600 * 24 * 7
       val subPathJson = Vector(path).toJson.toString
       val subNodeString = node.toString
 
@@ -285,7 +285,7 @@ object Notificator {
 
   def scheduleResyncNotificationOnceAgain =
     try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-      System.currentTimeMillis + 1000 * 3600 * 24 * 21, getIntent) catch none
+      System.currentTimeMillis + 1000L * 3600 * 24 * 21, getIntent) catch none
 }
 
 class Notificator extends BroadcastReceiver {

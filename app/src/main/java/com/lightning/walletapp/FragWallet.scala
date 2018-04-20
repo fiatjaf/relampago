@@ -43,7 +43,6 @@ import android.net.Uri
 object FragWallet {
   var currentPeerCount = 0
   var currentBlocksLeft = 0
-  var showLNDetails = false
   var worker: FragWalletWorker = _
   val REDIRECT = "goToLnOpsActivity"
 }
@@ -124,36 +123,23 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // END UPDATING TITLE
 
-  // SEARCH BAR
-
-  override def setupSearch(menu: Menu) = {
-    // Expand payment list if search is active
-    // hide payment description if it's not
-
-    super.setupSearch(menu)
-    searchView addOnAttachStateChangeListener new View.OnAttachStateChangeListener {
-      def onViewDetachedFromWindow(arg: View) = runAnd(showLNDetails = false)(adapter.notifyDataSetChanged)
-      def onViewAttachedToWindow(arg: View) = runAnd(showLNDetails = true)(adapter.notifyDataSetChanged)
-    }
-  }
-
-  // END SEARCH BAR
-
   // DISPLAYING ITEMS LIST
 
   val minLinesNum = 4
   var currentCut = minLinesNum
-  var items = Vector.empty[ItemWrap]
+  var lnItems = Vector.empty[LNWrap]
+  var btcItems = Vector.empty[BTCWrap]
+  var allItems = Vector.empty[ItemWrap]
 
   val adapter = new BaseAdapter {
-    def getCount = math.min(items.size, currentCut)
-    def getItem(position: Int) = items(position)
+    def getCount = math.min(allItems.size, currentCut)
+    def getItem(position: Int) = allItems(position)
     def getItemId(position: Int) = position
 
     def getView(position: Int, savedView: View, parent: ViewGroup) = {
       val view = if (null == savedView) host.getLayoutInflater.inflate(R.layout.frag_tx_line, null) else savedView
       val holder = if (null == view.getTag) new ViewHolder(view) else view.getTag.asInstanceOf[ViewHolder]
-      items(position) fillView holder
+      allItems(position) fillView holder
       view
     }
   }
@@ -161,42 +147,32 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val itemsListListener = new TxTracker {
     override def coinsReceived(txj: Transaction) = guard(txj)
     override def coinsSent(txj: Transaction) = guard(txj)
-
     override def txConfirmed(txj: Transaction) = {
-      // Update amounts in title, mark as confirmed
+      // Update title amounts, mark as confirmed
       UITask(adapter.notifyDataSetChanged).run
-      runAnd(Vibr.vibrate)(updTitle.run)
+      Vibrator.vibrate
+      updTitle.run
     }
 
-    def guard(txj: Transaction) = {
+    def guard(txj: Transaction): Unit = {
       val transactionWrap = new TxWrap(txj)
-      if (!transactionWrap.valueDelta.isZero) {
-        // Zero valueDelta means this tx is foreign
-        val signleBTCWrap = BTCWrap(transactionWrap)
-        addItems(Vector apply signleBTCWrap).run
-        updTitle.run
-      }
+      if (transactionWrap.valueDelta.isZero) return
+      val btcs = BTCWrap(transactionWrap) +: btcItems
+      btcItems = btcs.filter(_.wrap.isVisible)
+      updList(btcItems ++ lnItems).run
+      updTitle.run
     }
   }
 
-  val addItems: Vector[ItemWrap] => TimerTask = fresh => {
-    val visibleItems = for (item <- fresh ++ items if item.canShowOnUI) yield item
-    val distinctItems = visibleItems.groupBy(_.key).values.map(_.head).toVector
-    items = distinctItems.sortBy(_.getDate)(Ordering[Date].reverse)
+  val updList: Vector[ItemWrap] => TimerTask = items => {
+    allItems = items.sortBy(_.getDate)(Ordering[Date].reverse)
 
     UITask {
-      val showExpander = items.size > minLinesNum
-      allTxsWrapper setVisibility viewMap(showExpander)
-      mnemonicWarn setVisibility viewMap(items.isEmpty)
-      itemsList setVisibility viewMap(items.nonEmpty)
+      allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
+      mnemonicWarn setVisibility viewMap(allItems.isEmpty)
+      itemsList setVisibility viewMap(allItems.nonEmpty)
       adapter.notifyDataSetChanged
     }
-  }
-
-  def nativeBTCWraps = {
-    val rawTransactions = app.kit.wallet.getRecentTransactions(PaymentTable.limit, false)
-    val rawWraps = for (txj <- rawTransactions.asScala.toVector) yield new TxWrap(txj)
-    for (wrap <- rawWraps if !wrap.valueDelta.isZero) yield BTCWrap(wrap)
   }
 
   class ViewHolder(view: View) {
@@ -210,15 +186,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   abstract class ItemWrap {
     def fillView(v: ViewHolder): Unit
     def getDate: java.util.Date
-    def canShowOnUI: Boolean
     def generatePopup: Unit
-    def key: String
   }
 
   case class LNWrap(info: PaymentInfo) extends ItemWrap {
-    def canShowOnUI: Boolean = info.actualStatus != HIDDEN
-    val getDate: Date = new Date(info.stamp)
-    val key = info.hash
+    val getDate = new Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
       val humanSum = info.incoming match {
@@ -227,13 +199,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       val description = getDescription(info.description)
-      val humanHash = humanFour(info.hash.toUpperCase take 24)
-      val humanSumDetails = s"<font color=#999999>$humanHash</font><br>$description"
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactCircle setImageResource imageMap(info.actualStatus)
-      holder.transactWhat setVisibility viewMap(showLNDetails)
+      holder.transactWhat setText getDescription(info.description).html
       holder.transactSum setText s"&#9735; $humanSum".html
-      holder.transactWhat setText humanSumDetails.html
+      holder.transactWhat setVisibility View.VISIBLE
     }
 
     def generatePopup = {
@@ -282,9 +252,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   case class BTCWrap(wrap: TxWrap) extends ItemWrap {
-    def canShowOnUI: Boolean = wrap.tx.getMemo != wrap.HIDE
-    val getDate: Date = wrap.tx.getUpdateTime
-    val key = wrap.tx.getHashAsString
+    val getDate = wrap.tx.getUpdateTime
 
     def fillView(holder: ViewHolder) = {
       val humanSum = wrap.visibleValue.isPositive match {
@@ -296,6 +264,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactSum setText s"&#3647; $humanSum".html
       holder.transactCircle setImageResource status
+      holder.transactWhat setVisibility View.GONE
     }
 
     def generatePopup = {
@@ -313,8 +282,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       lst setAdapter views
 
       viewTxOutside setOnClickListener onButtonTap {
-        val uri = Uri parse s"https://testnet.smartbit.com.au/tx/$key"
-        host startActivity new Intent(Intent.ACTION_VIEW, uri)
+        val uri = s"https://testnet.smartbit.com.au/tx/" + wrap.tx.getHashAsString
+        host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
       }
 
       val header = wrap.fee match {
@@ -325,23 +294,20 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       // See if CPFP can be applied
-      val notEnoughValue = wrap.valueDelta isLessThan RatesSaver.rates.feeSix
+      val notEnough = wrap.valueDelta isLessThan RatesSaver.rates.feeSix
       val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 1800L * 1000
-      val doNotOfferCPFPOption = wrap.depth > 0 || wrap.isDead || tooFresh || notEnoughValue
-
-      if (doNotOfferCPFPOption) showForm(negBuilder(dialog_ok, header.html, lst).create)
+      if (wrap.depth > 0 || tooFresh || notEnough) showForm(negBuilder(dialog_ok, header.html, lst).create)
       else mkForm(none, boostIncoming(wrap), baseBuilder(header.html, lst), dialog_ok, dialog_boost)
     }
   }
 
   toggler setOnClickListener onFastTap {
     val newImg = if (currentCut == minLinesNum) ic_expand_less_black_24dp else ic_expand_more_black_24dp
-    currentCut = if (currentCut == minLinesNum) items.size else minLinesNum
+    currentCut = if (currentCut == minLinesNum) allItems.size else minLinesNum
     toggler setImageResource newImg
     adapter.notifyDataSetChanged
   }
 
-  // Load LN payments right away
   new LoaderCallbacks[Cursor] { self =>
     def onLoadFinished(loader: LoaderCursor, c: Cursor) = none
     def onLoaderReset(loader: LoaderCursor) = none
@@ -354,13 +320,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def recentPays = new ReactLoader[PaymentInfo](host) {
-      val consume = (infos: InfoVec) => addItems(infos map LNWrap).run
-      def createItem(rCursor: RichCursor) = bag toPaymentInfo rCursor
+      val consume = (vec: InfoVec) => runAnd(lnItems = vec map LNWrap)(updList(btcItems ++ lnItems).run)
+      def createItem(richCursor: RichCursor) = bag toPaymentInfo richCursor
       def getCursor = bag.byRecent
     }
 
     def searchPays = new ReactLoader[PaymentInfo](host) {
-      val consume = (infos: InfoVec) => addItems(infos map LNWrap).run
+      val consume = (vec: InfoVec) => runAnd(lnItems = vec map LNWrap)(updList(lnItems).run)
       def createItem(rCursor: RichCursor) = bag toPaymentInfo rCursor
       def getCursor = bag byQuery lastQuery
     }
@@ -406,7 +372,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         onFail(message.format(reserve, sending, missing).html)
 
       case _ \ CMDAddImpossible(_, code) =>
-        // Show detailed description to user
         onFail(host getString code)
 
       case chan \ error =>
@@ -577,7 +542,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // END BTC SEND AND BOOST
 
   host setSupportActionBar toolbar
-  toolbar setOnClickListener onFastTap { if (!showLNDetails) showDenomChooser }
+  toolbar setOnClickListener onFastTap { if (searchView.isIconified) showDenomChooser }
   itemsList setOnItemClickListener onTap { pos => adapter.getItem(pos).generatePopup }
   itemsList setFooterDividersEnabled false
   itemsList addFooterView allTxsWrapper
@@ -592,6 +557,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   app.kit.peerGroup addBlocksDownloadedEventListener catchListener
   host.timer.schedule(adapter.notifyDataSetChanged, 10000, 10000)
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
-  <(nativeBTCWraps, onFail)(wraps => addItems(wraps).run)
   react(new String)
+
+  <(fun = {
+    val rawTxs = app.kit.wallet.getRecentTransactions(PaymentTable.limit, false)
+    val wraps = for (txnj <- rawTxs.asScala.toVector) yield new TxWrap(txnj)
+    btcItems = for (wrap <- wraps if wrap.isVisible) yield BTCWrap(wrap)
+    updList(btcItems ++ lnItems).run
+  }, onFail)(none)
 }
