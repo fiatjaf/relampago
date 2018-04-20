@@ -18,7 +18,6 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
-import java.util.{Date, TimerTask}
 import android.os.{Bundle, Handler}
 import scala.util.{Failure, Success, Try}
 import android.database.{ContentObserver, Cursor}
@@ -37,6 +36,7 @@ import android.support.v4.app.Fragment
 import org.bitcoinj.wallet.SendRequest
 import android.app.AlertDialog
 import android.content.Intent
+import java.util.TimerTask
 import android.net.Uri
 
 
@@ -123,6 +123,17 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // END UPDATING TITLE
 
+  override def setupSearch(menu: Menu) = {
+    // Expand payment list if search is active
+    // hide payment description if it's not
+
+    super.setupSearch(menu)
+    searchView addOnAttachStateChangeListener new View.OnAttachStateChangeListener {
+      def onViewDetachedFromWindow(searchViewItem: View) = adapter.notifyDataSetChanged
+      def onViewAttachedToWindow(searchViewItem: View) = adapter.notifyDataSetChanged
+    }
+  }
+
   // DISPLAYING ITEMS LIST
 
   val minLinesNum = 4
@@ -165,10 +176,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   val updList: Vector[ItemWrap] => TimerTask = items => {
-    allItems = items.sortBy(_.getDate)(Ordering[Date].reverse)
+    // Orders BTC and LN payments by their date and updates UI accordingly
+    allItems = items.sortBy(_.getDate)(Ordering[java.util.Date].reverse)
+    val showToggle = allItems.size > minLinesNum
 
     UITask {
-      allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
+      allTxsWrapper setVisibility viewMap(showToggle)
       mnemonicWarn setVisibility viewMap(allItems.isEmpty)
       itemsList setVisibility viewMap(allItems.nonEmpty)
       adapter.notifyDataSetChanged
@@ -190,7 +203,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   case class LNWrap(info: PaymentInfo) extends ItemWrap {
-    val getDate = new Date(info.stamp)
+    val getDate: java.util.Date = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
       val humanSum = info.incoming match {
@@ -199,11 +212,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       val description = getDescription(info.description)
+      val humanHash = humanFour(info.hash.toUpperCase take 24)
+      val humanSumDetails = s"<font color=#999999>$humanHash</font><br>$description"
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactCircle setImageResource imageMap(info.actualStatus)
-      holder.transactWhat setText getDescription(info.description).html
+      holder.transactWhat setVisibility viewMap(!searchView.isIconified)
       holder.transactSum setText s"&#9735; $humanSum".html
-      holder.transactWhat setVisibility View.VISIBLE
+      holder.transactWhat setText humanSumDetails.html
     }
 
     def generatePopup = {
@@ -252,7 +267,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   case class BTCWrap(wrap: TxWrap) extends ItemWrap {
-    val getDate = wrap.tx.getUpdateTime
+    val getDate: java.util.Date = wrap.tx.getUpdateTime
 
     def fillView(holder: ViewHolder) = {
       val humanSum = wrap.visibleValue.isPositive match {
