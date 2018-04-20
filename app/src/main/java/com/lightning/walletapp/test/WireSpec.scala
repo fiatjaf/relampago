@@ -1,6 +1,6 @@
 package com.lightning.walletapp.test
 
-import java.net.{Inet6Address, InetAddress, InetSocketAddress}
+import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
 
 import com.google.common.net.InetAddresses
 import com.lightning.walletapp.ln.PerHopPayload
@@ -75,23 +75,43 @@ class WireSpec {
     }
 
     {
-      println("encode/decode with socketaddress codec")
+      println("encode/decode all kind of IPv6 addresses with ipv6address codec")
 
       {
-        val ipv4addr = InetAddress.getByAddress(Array[Byte](192.toByte, 168.toByte, 1.toByte, 42.toByte))
-        val isa = new InetSocketAddress(ipv4addr, 4231)
-        val bin = socketaddress.encode(isa).toOption.get
+        // IPv4 mapped
+        val bin = hex"00000000000000000000ffffae8a0b08".toBitVector
+        val ipv6 = Inet6Address.getByAddress(null, bin.toByteArray, null)
+        val bin2 = ipv6address.encode(ipv6).require
+        assert(bin == bin2)
+      }
+
+      {
+        // regular IPv6 address
+        val ipv6 = InetAddresses.forString("1080:0:0:0:8:800:200C:417A").asInstanceOf[Inet6Address]
+        val bin = ipv6address.encode(ipv6).require
+        val ipv62 = ipv6address.decode(bin).require.value
+        assert(ipv6 == ipv62)
+      }
+    }
+
+    {
+      println("encode/decode with nodeaddress codec")
+
+      {
+        val ipv4addr = InetAddress.getByAddress(Array[Byte](192.toByte, 168.toByte, 1.toByte, 42.toByte)).asInstanceOf[Inet4Address]
+        val nodeaddr = IPv4(ipv4addr, 4231)
+        val bin = nodeaddress.encode(nodeaddr).require
         assert(bin == hex"01 C0 A8 01 2A 10 87".toBitVector)
-        val isa2 = socketaddress.decode(bin).toOption.get.value
-        assert(isa == isa2)
+        val nodeaddr2 = nodeaddress.decode(bin).require.value
+        assert(nodeaddr == nodeaddr2)
       }
       {
-        val ipv6addr = InetAddress.getByAddress(hex"2001 0db8 0000 85a3 0000 0000 ac1f 8001".toArray)
-        val isa = new InetSocketAddress(ipv6addr, 4231)
-        val bin = socketaddress.encode(isa).toOption.get
+        val ipv6addr = InetAddress.getByAddress(hex"2001 0db8 0000 85a3 0000 0000 ac1f 8001".toArray).asInstanceOf[Inet6Address]
+        val nodeaddr = IPv6(ipv6addr, 4231)
+        val bin = nodeaddress.encode(nodeaddr).require
         assert(bin == hex"02 2001 0db8 0000 85a3 0000 0000 ac1f 8001 1087".toBitVector)
-        val isa2 = socketaddress.decode(bin).toOption.get.value
-        assert(isa == isa2)
+        val nodeaddr2 = nodeaddress.decode(bin).require.value
+        assert(nodeaddr == nodeaddr2)
       }
     }
 
@@ -179,7 +199,7 @@ class WireSpec {
       val commit_sig = CommitSig(randomBytes(32), randomSignature, randomSignature :: randomSignature :: randomSignature :: Nil)
       val revoke_and_ack = RevokeAndAck(randomBytes(32), scalar(0), point(1))
       val channel_announcement = ChannelAnnouncement(randomSignature, randomSignature, randomSignature, randomSignature, bin(7, 9), Block.RegtestGenesisBlock.hash, 1, randomKey.publicKey, randomKey.publicKey, randomKey.publicKey, randomKey.publicKey)
-      val node_announcement = NodeAnnouncement(randomSignature, bin(0, 0),  1, randomKey.publicKey, (100.toByte, 200.toByte, 300.toByte), "node-alias", new InetSocketAddress(InetAddress.getByAddress(Array[Byte](192.toByte, 168.toByte, 1.toByte, 42.toByte)), 42000) :: Nil)
+      val node_announcement = NodeAnnouncement(randomSignature, bin(0, 0),  1, randomKey.publicKey, (100.toByte, 200.toByte, 300.toByte), "node-alias", IPv4(InetAddress.getByAddress(Array[Byte](192.toByte, 168.toByte, 1.toByte, 42.toByte)).asInstanceOf[Inet4Address], 42000) :: Nil)
       val channel_update = ChannelUpdate(randomSignature, Block.RegtestGenesisBlock.hash, 1, 2, bin(2, 2), 3, 4, 5, 6)
       val announcement_signatures = AnnouncementSignatures(randomBytes(32), 42, randomSignature, randomSignature)
       val ping = Ping(100, BinaryData("01" * 10))

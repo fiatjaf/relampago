@@ -48,7 +48,7 @@ object ConnectionManager {
 
     val work = Future {
       // First blocking connect, then send data
-      socket.connect(ann.addresses.head, 7500)
+      socket.connect(ann.socketAddresses.head, 7500)
       handler.init
 
       while (true) {

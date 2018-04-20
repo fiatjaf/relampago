@@ -16,7 +16,7 @@ import scodec.{Attempt, Codec, Err}
 object LightningMessageCodecs { me =>
   type BitVectorAttempt = Attempt[BitVector]
   type LNMessageVector = Vector[LightningMessage]
-  type InetSocketAddressList = List[InetSocketAddress]
+  type NodeAddressList = List[NodeAddress]
   type AddressPort = (InetAddress, Int)
   type RGB = (Byte, Byte, Byte)
 
@@ -101,19 +101,20 @@ object LightningMessageCodecs { me =>
     inet4Address => ByteVector(inet4Address.getAddress)
   )
 
-  val uint64ex: Codec[UInt64] = bytes(8).xmap(b => UInt64(b.toArray), a => ByteVector(a.underlying.toByteArray) takeRight 8 padLeft 8)
-  private val addressport: Codec[AddressPort] = discriminated[InetAddress].by(uint8).typecase(1, ipv4address).typecase(2, ipv6address) ~ uint16
+  def nodeaddress: Codec[NodeAddress] =
+    discriminated[NodeAddress].by(uint8)
+      .typecase(cr = provide(Padding), tag = 0)
+      .typecase(cr = (ipv4address ~ uint16).xmap[IPv4](x => IPv4(x._1, x._2), x => x.ipv4 -> x.port), tag = 1)
+      .typecase(cr = (ipv6address ~ uint16).xmap[IPv6](x => IPv6(x._1, x._2), x => x.ipv6 -> x.port), tag = 2)
+      .typecase(cr = (binarydata(10) ~ uint16).xmap[Tor2](x => Tor2(x._1, x._2), x => x.tor2 -> x.port), tag = 3)
+      .typecase(cr = (binarydata(35) ~ uint16).xmap[Tor3](x => Tor3(x._1, x._2), x => x.tor3 -> x.port), tag = 4)
 
-  val socketaddress: Codec[InetSocketAddress] = addressport.xmap(
-    addressAndPort => new InetSocketAddress(addressAndPort._1, addressAndPort._2),
-    inetSockAddress => (inetSockAddress.getAddress, inetSockAddress.getPort)
-  )
-
-  val rgb: Codec[RGB] = bytes(3).xmap(bv2Rgb, rgb2Bv)
   def binarydata(size: Int): Codec[BinaryData] = bytes(size).xmap(vec2Bin, bin2Vec)
   val varsizebinarydata: Codec[BinaryData] = variableSizeBytes(value = bytes.xmap(vec2Bin, bin2Vec), size = uint16)
   val varsizebinarydataLong: Codec[BinaryData] = variableSizeBytesLong(value = bytes.xmap(vec2Bin, bin2Vec), size = uint32)
+  val uint64ex: Codec[UInt64] = bytes(8).xmap(b => UInt64(b.toArray), a => ByteVector(a.underlying.toByteArray) takeRight 8 padLeft 8)
   val zeropaddedstring: Codec[String] = fixedSizeBytes(32, utf8).xmap(_.takeWhile(_ != '\u0000'), identity)
+  val rgb: Codec[RGB] = bytes(3).xmap(bv2Rgb, rgb2Bv)
 
   // Data formats
 
@@ -288,7 +289,7 @@ object LightningMessageCodecs { me =>
       (publicKey withContext "nodeId") ::
       (rgb withContext "rgbColor") ::
       (zeropaddedstring withContext "alias") ::
-      (variableSizeBytes(value = list(socketaddress), size = uint16) withContext "addresses")
+      (variableSizeBytes(value = list(nodeaddress), size = uint16) withContext "addresses")
 
   val channelUpdateWitness =
     (binarydata(32) withContext "chainHash") ::

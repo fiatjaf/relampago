@@ -96,10 +96,10 @@ class WalletApp extends Application { me =>
     }
 
     def mkNA(nodeId: PublicKey, hostName: String, port: Int) = {
-      // Make a fake node announcement with a dummy signature so it can be serialized
+      val someInetSocketAddress = new InetSocketAddress(hostName, port)
       val sig = Crypto encodeSignature Crypto.sign(random getBytes 32, LNParams.nodePrivateKey)
       NodeAnnouncement(sig, "", 0L, nodeId, (Byte.MinValue, Byte.MinValue, Byte.MinValue),
-        hostName, new InetSocketAddress(hostName, port) :: Nil)
+        hostName, NodeAddress(someInetSocketAddress) :: Nil)
     }
 
     def onFail(err: Int => Unit): PartialFunction[Throwable, Unit] = {

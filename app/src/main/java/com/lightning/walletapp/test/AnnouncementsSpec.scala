@@ -42,13 +42,6 @@ class AnnouncementsSpec {
     }
 
     {
-      println("create valid signed node announcement")
-      val ann = makeNodeAnnouncement(alicePk, "alias", (1: Byte, 2: Byte, 3: Byte), new InetSocketAddress("localhost", 9731) :: Nil, System.currentTimeMillis / 1000)
-      assert(checkSig(ann))
-      assert(!checkSig(ann.copy(timestamp = 153)))
-    }
-
-    {
       println("create valid signed channel update announcement")
       val ann = makeChannelUpdate(Block.RegtestGenesisBlock.hash, alicePk, randomKey.publicKey, 45561, 10, 10000, 100, 1, true, System.currentTimeMillis / 1000)
       assert(checkSig(ann, alicePk.publicKey))
