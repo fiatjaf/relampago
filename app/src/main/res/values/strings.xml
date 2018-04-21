@@ -6,13 +6,13 @@
     <!-- app wide -->
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
+    <string name="wallet_state">Total wallet balance\n<small><font color='#999999'>Bitcoin + Lightning funds</font></small></string>
     <string name="step_fees"><![CDATA[<font color=#999999>Final step: miner fee</font><br><br>%1$s]]></string>
     <string name="fee_risky"><![CDATA[<small>%1$s standard fee</small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s priority fee</small>]]></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_create">New Bitcoin Wallet</string>
     <string name="wallet_restore">Restore Wallet</string>
-    <string name="wallet_unit">Set Bitcoin unit</string>
 
     <array name="denoms">
         <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 btc</small></font>]]></item>

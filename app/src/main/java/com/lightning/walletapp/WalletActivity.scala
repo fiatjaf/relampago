@@ -8,6 +8,7 @@ import com.lightning.walletapp.Utils._
 import com.journeyapps.barcodescanner._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.Denomination._
 import android.support.v4.view.MenuItemCompat._
@@ -15,6 +16,7 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
+import scala.util.{Success, Try}
 import android.provider.Settings.{System => FontSystem}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
@@ -38,7 +40,6 @@ import org.ndeftools.Message
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
-import scala.util.Try
 import java.io.File
 
 
@@ -224,12 +225,25 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
+    val lnTotalSum = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
+    val walletTotalSum = MilliSatoshi(app.kit.conf0Balance.value * 1000L + lnTotalSum)
+
+    val walletTotalFiat = msatInFiat(walletTotalSum) match {
+      case Success(amt) if fiatName == strYuan => s"<small><font color=#999999>≈ ${formatFiat format amt} cny</font></small>"
+      case Success(amt) if fiatName == strEuro => s"<small><font color=#999999>≈ ${formatFiat format amt} eur</font></small>"
+      case Success(amt) if fiatName == strYen => s"<small><font color=#999999>≈ ${formatFiat format amt} jpy</font></small>"
+      case Success(amt) => s"<small><font color=#999999>≈ ${formatFiat format amt} usd</font></small>"
+      case _ => new String
+    }
+
+    val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
+    val stateContent = title.findViewById(R.id.stateContent).asInstanceOf[TextView]
     val denomChoiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
     val allDenominations = getResources.getStringArray(R.array.denoms).map(_.html)
 
     denomChoiceList setOnItemClickListener onTap { pos =>
-      // Update denom first sp UI update can react to changes
+      // Update denom first so UI update can react to changes
       // also persist user choice in app local data
 
       denom = denoms(pos)
@@ -240,7 +254,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
     denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    showForm(negBuilder(dialog_ok, getString(wallet_unit), form).create)
+    stateContent setText s"${coloredIn apply walletTotalSum}<br>$walletTotalFiat".html
+    showForm(negBuilder(dialog_ok, title, form).create)
   }
 
   // SETTINGS FORM
@@ -279,7 +294,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
             for {
               encrypted <- backups
               jsonDecoded = AES.decode(encrypted, cloudSecret)
-              refundingData = to[RefundingData](jsonDecoded)
+              refundingData <- Try(jsonDecoded) map to[RefundingData]
 
               // Now throw it away if it is already present in a list of local channels
               if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
