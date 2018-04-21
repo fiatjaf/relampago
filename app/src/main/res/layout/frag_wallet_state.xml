@@ -10,13 +10,13 @@
 
         <TextView
             style="@style/BaseText"
-            android:layout_weight="5"
+            android:layout_weight="1"
             android:layout_width="0dp"
             android:text="@string/wallet_state"/>
 
         <TextView
             style="@style/BaseText"
-            android:layout_weight="4"
+            android:layout_weight="1"
             android:layout_width="0dp"
             android:id="@+id/stateContent"
             android:gravity="end"/>

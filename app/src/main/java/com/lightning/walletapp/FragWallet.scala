@@ -250,9 +250,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
         case 0 =>
-          val humanFee = coloredOut apply MilliSatoshi(info.lastMsat - info.firstMsat)
+          val feeMsat = info.lastMsat - info.firstMsat
+          val feePercent = feeMsat / (info.firstMsat / 100D)
+          val humanFee = coloredOut apply MilliSatoshi(feeMsat)
           val expiry = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
-          val title = lnTitleOut.format(humanStatus, coloredOut apply info.firstSum, humanFee)
+          val title = lnTitleOut.format(humanStatus, coloredOut apply info.firstSum, humanFee, feePercent)
           val title1 = if (info.actualStatus == WAITING) s"$expiry<br>$title" else title
 
           // Allow user to retry this payment using excluded nodes and channels when it is a failure and pr is not expired yet
@@ -303,9 +305,22 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val header = wrap.fee match {
         case _ if wrap.isDead => sumOut format txsConfs.last
-        case _ if wrap.visibleValue.isPositive => app.getString(btc_incoming_title).format(confs, coloredIn apply wrap.visibleValue)
-        case Some(fee) => app.getString(btc_outgoing_title).format(confs, coloredOut apply -wrap.visibleValue, coloredOut apply fee)
-        case None => app.getString(btc_outgoing_title_no_fee).format(confs, coloredOut apply -wrap.visibleValue)
+
+        case _ if wrap.visibleValue.isPositive =>
+          val incomingTitle = app.getString(btc_incoming_title)
+          incomingTitle.format(confs, coloredIn apply wrap.visibleValue)
+
+        case None =>
+          val paymentSum = Satoshi(-wrap.visibleValue.value)
+          val titleNoFee = app.getString(btc_outgoing_title_no_fee)
+          titleNoFee.format(confs, coloredOut apply paymentSum)
+
+        case Some(fee) =>
+          val paymentSum = Satoshi(-wrap.visibleValue.value)
+          val feePercent = fee.value / (paymentSum.amount / 100D)
+          val titleWithFee = app.getString(btc_outgoing_title)
+          titleWithFee.format(confs, coloredOut(paymentSum),
+            coloredOut(fee), feePercent)
       }
 
       // See if CPFP can be applied

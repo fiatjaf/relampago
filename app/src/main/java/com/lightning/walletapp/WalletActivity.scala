@@ -17,6 +17,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import scala.util.{Success, Try}
+import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import android.provider.Settings.{System => FontSystem}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
@@ -30,7 +31,6 @@ import com.lightning.walletapp.helper.AES
 import android.support.v4.view.ViewPager
 import org.bitcoinj.store.SPVBlockStore
 import android.text.format.DateFormat
-import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import com.google.common.io.Files
 import java.text.SimpleDateFormat
@@ -225,8 +225,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
-    val lnTotalSum = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
-    val walletTotalSum = MilliSatoshi(app.kit.conf0Balance.value * 1000L + lnTotalSum)
+    val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
+    val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
 
     val walletTotalFiat = msatInFiat(walletTotalSum) match {
       case Success(amt) if fiatName == strYuan => s"<small><font color=#999999>≈ ${formatFiat format amt} cny</font></small>"

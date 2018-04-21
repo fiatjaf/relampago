@@ -6,7 +6,7 @@
     <!-- app wide -->
     <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
-    <string name="wallet_state">Total wallet balance\n<small><font color='#999999'>Bitcoin + Lightning funds</font></small></string>
+    <string name="wallet_state">Total balance\n<small><font color='#999999'>On-chain + LN funds</font></small></string>
     <string name="step_fees"><![CDATA[<font color=#999999>Final step: miner fee</font><br><br>%1$s]]></string>
     <string name="fee_risky"><![CDATA[<small>%1$s standard fee</small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s priority fee</small>]]></string>
@@ -130,11 +130,11 @@
 
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s]]></string>
-    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br>fee %3$s]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>fee %3$s = %4$.2f%%</small>]]></string>
 
     <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>received %2$s]]></string>
     <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s]]></string>
-    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br>miner fee %3$s]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>fee %3$s = %4$.2f%%</small>]]></string>
 
     <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#53A63C>%1$s</font>]]></string>
