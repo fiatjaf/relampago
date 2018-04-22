@@ -47,15 +47,16 @@ trait SearchBar { me =>
   var react: String => Unit = _
   var searchView: SearchView = _
 
-  val queryListener = new SearchView.OnQueryTextListener {
-    def onQueryTextChange(ask: String) = runAnd(true)(me react ask)
-    def onQueryTextSubmit(ask: String) = true
-  }
+  // This may be queried before search menu is created so null check
+  def isSearching = searchView != null && !searchView.isIconified
 
   def setupSearch(menu: Menu) = {
     val item = menu findItem R.id.action_search
     searchView = getActionView(item).asInstanceOf[SearchView]
-    searchView setOnQueryTextListener queryListener
+    searchView setOnQueryTextListener new SearchView.OnQueryTextListener {
+      def onQueryTextChange(queryText: String) = runAnd(true)(me react queryText)
+      def onQueryTextSubmit(queryText: String) = true
+    }
   }
 }
 

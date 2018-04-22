@@ -216,7 +216,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val humanSumDetails = s"<font color=#999999>$humanHash</font><br>$description"
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactCircle setImageResource imageMap(info.actualStatus)
-      holder.transactWhat setVisibility viewMap(!searchView.isIconified)
+      holder.transactWhat setVisibility viewMap(isSearching)
       holder.transactSum setText s"&#9735; $humanSum".html
       holder.transactWhat setText humanSumDetails.html
     }
@@ -572,7 +572,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // END BTC SEND AND BOOST
 
   host setSupportActionBar toolbar
-  toolbar setOnClickListener onFastTap { if (searchView.isIconified) showDenomChooser }
+  toolbar setOnClickListener onFastTap { if (!isSearching) showDenomChooser }
   itemsList setOnItemClickListener onTap { pos => adapter.getItem(pos).generatePopup }
   itemsList setFooterDividersEnabled false
   itemsList addFooterView allTxsWrapper
