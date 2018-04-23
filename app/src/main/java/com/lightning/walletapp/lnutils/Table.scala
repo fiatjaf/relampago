@@ -152,12 +152,16 @@ class LNOpenHelper(context: Context, name: String)
     dbs execSQL RouteTable.createSql
 
     // Randomize an order of two available default servers
-    val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
-    val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val dev1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9103", emptyData, "1", ord1, "0")
-    val dev2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9103", emptyData, "0", ord2, "1")
+//    val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
+//    val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
+//    val dev1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9103", emptyData, "1", ord1, "0")
+//    val dev2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9103", emptyData, "0", ord2, "1")
+//
+//    dbs.execSQL(OlympusTable.newSql, dev1)
+//    dbs.execSQL(OlympusTable.newSql, dev2)
 
-    dbs.execSQL(OlympusTable.newSql, dev1)
-    dbs.execSQL(OlympusTable.newSql, dev2)
+    val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
+    val test: Array[AnyRef] = Array("test-server-1", "http://192.210.203.16:9003", emptyData, "1", "0", "0")
+    dbs.execSQL(OlympusTable.newSql, test)
   }
 }
