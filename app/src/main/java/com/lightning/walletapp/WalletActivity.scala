@@ -16,7 +16,7 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import android.provider.Settings.{System => FontSystem}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
@@ -127,8 +127,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // NFC
 
-  def readEmptyNdefMessage = app toast nfc_error
-  def readNonNdefMessage = app toast nfc_error
+  def readEmptyNdefMessage = app toast err_no_data
+  def readNonNdefMessage = app toast err_no_data
   def onNfcStateChange(ok: Boolean) = none
   def onNfcFeatureNotFound = none
   def onNfcStateDisabled = none
@@ -141,7 +141,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   } catch { case _: Throwable =>
     // Could not process a message
-    app toast nfc_error
+    app toast err_no_data
   }
 
   // EXTERNAL DATA CHECK
@@ -202,8 +202,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     }
 
     def pasteAddressOrPaymentRequest = rm(alert) {
-      app.getBufferTry.foreach(app.TransData.recordValue)
-      me checkTransData null
+      app.getBufferTry map app.TransData.recordValue match {
+        case Failure(noUsableDataFound) => app toast err_no_data
+        case _ => me checkTransData null
+      }
     }
 
     def scanQRCode = rm(alert) {

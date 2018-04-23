@@ -77,15 +77,15 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   } catch { case _: Throwable =>
     // We have some data in NFC intent
     // but could not parse the content
-    me popup nfc_error
+    me popup err_no_data
   }
 
   def onNfcStateEnabled = none
   def onNfcStateDisabled = none
   def onNfcFeatureNotFound = none
   def onNfcStateChange(ok: Boolean) = none
-  def readNonNdefMessage = me popup nfc_error
-  def readEmptyNdefMessage = me popup nfc_error
+  def readNonNdefMessage = me popup err_no_data
+  def readEmptyNdefMessage = me popup err_no_data
 
   // STARTUP LOGIC
 

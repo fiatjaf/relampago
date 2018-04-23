@@ -32,7 +32,7 @@
     <string name="restore_hint">Your BIP32 mnemonic phrase</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.09&#8211;31<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
+    <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.09&#8211;32<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a>\n<small>don\'t change these settings unless\nyou know what you are doing</small></string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
 
@@ -176,7 +176,7 @@
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
     <string name="err_uri">Failed because request contains a malformed URI which could not be parsed</string>
     <string name="err_general">Failed because an error has occurred</string>
-    <string name="nfc_error">Malformed NFC message</string>
+    <string name="err_no_data">No useful data found</string>
     <string name="err_qr_parse">QR code is invalid</string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
