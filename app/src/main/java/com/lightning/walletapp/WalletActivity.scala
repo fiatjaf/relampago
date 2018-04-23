@@ -169,7 +169,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val options = Array(getString(btc_receive_option).html, getString(ln_receive_option).html)
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_receive, lst).create)
-    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, options)
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
 
     lst setDivider null
     lst setDividerHeight 0
@@ -192,7 +192,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val options = Array(send_paste, send_scan_qr) map getString
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, lst).create)
-    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, options)
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
 
     lst setDivider null
     lst setDividerHeight 0

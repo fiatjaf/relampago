@@ -5,7 +5,7 @@
     <TextView
         style="@style/MarginInfo"
         android:layout_width="wrap_content"
-        android:id="@+id/actionTip"
+        android:id="@+id/titleTip"
         android:maxWidth="235sp"/>
 
     <View style="@style/GrayDivider"/>
