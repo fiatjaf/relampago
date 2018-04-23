@@ -44,7 +44,7 @@
     </string>
 
     <string name="mnemonic_info">
-        <font color="#F03E1F">Mnemonic phrase is important</font>\n
+        <font color="#E31300">Mnemonic phrase is important</font>\n
         <a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and save it!
         \n\nSaving and properly securing a mnemonic phrase is a single most important action to do once a fresh Bitcoin wallet is created.
         \n\nYou will need it in case of various emergencies such as lost phone!
@@ -136,7 +136,7 @@
     <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s]]></string>
     <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>fee %3$s = %4$.2f%%</small>]]></string>
 
-    <string name="txs_sum_out"><![CDATA[<font color=#F03E1F>%1$s</font>]]></string>
+    <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#53A63C>%1$s</font>]]></string>
     <string name="txs_view_outside">View on SmartBit site</string>
     <string name="txs_p2wsh">Payment channel funding</string>
