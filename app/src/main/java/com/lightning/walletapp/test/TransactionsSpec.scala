@@ -209,7 +209,7 @@ class TransactionsSpec {
           val localSig = sign(htlcTimeoutTx, localHtlcPriv)
           val remoteSig = sign(htlcTimeoutTx, remoteHtlcPriv)
           val signed = addSigs(htlcTimeoutTx, localSig, remoteSig)
-          assert(checkSpendable(signed).isSuccess)
+          assert(checkValid(signed).isSuccess)
         }
       }
 
@@ -219,7 +219,7 @@ class TransactionsSpec {
           val claimHtlcSuccessTx = makeClaimHtlcSuccessTx(new PubKeyScriptIndexFinder(commitTx.tx), remoteHtlcPriv.publicKey, localHtlcPriv.publicKey, localRevocationPriv.publicKey, finalPubKeyScript, htlc, feeratePerKw).get
           val localSig = sign(claimHtlcSuccessTx, remoteHtlcPriv)
           val signed = addSigs(claimHtlcSuccessTx, localSig, paymentPreimage)
-          assert(checkSpendable(signed).isSuccess)
+          assert(checkValid(signed).isSuccess)
         }
       }
 
@@ -229,7 +229,7 @@ class TransactionsSpec {
           val localSig = sign(htlcSuccessTx, localHtlcPriv)
           val remoteSig = sign(htlcSuccessTx, remoteHtlcPriv)
           val signedTx = addSigs(htlcSuccessTx, localSig, remoteSig, paymentPreimage)
-          assert(checkSpendable(signedTx).isSuccess)
+          assert(checkValid(signedTx).isSuccess)
           // check remote sig
           assert(checkSig(htlcSuccessTx, remoteSig, remoteHtlcPriv.publicKey))
         }
@@ -240,7 +240,7 @@ class TransactionsSpec {
         val claimP2WPKHOutputTx = makeClaimP2WPKHOutputTx(commitTx.tx, remotePaymentPriv.publicKey, finalPubKeyScript, feeratePerKw).get
         val localSig = sign(claimP2WPKHOutputTx, remotePaymentPriv)
         val signedTx = addSigs(claimP2WPKHOutputTx, localSig, remotePaymentPriv.publicKey)
-        assert(checkSpendable(signedTx).isSuccess)
+        assert(checkValid(signedTx).isSuccess)
       }
 
       {
@@ -248,7 +248,7 @@ class TransactionsSpec {
         val claimHtlcTimeoutTx = makeClaimHtlcTimeoutTx(new PubKeyScriptIndexFinder(commitTx.tx), remoteHtlcPriv.publicKey, localHtlcPriv.publicKey, localRevocationPriv.publicKey, finalPubKeyScript, htlc2, feeratePerKw).get
         val localSig = sign(claimHtlcTimeoutTx, remoteHtlcPriv)
         val signed = addSigs(claimHtlcTimeoutTx, localSig)
-        assert(checkSpendable(signed).isSuccess)
+        assert(checkValid(signed).isSuccess)
       }
 
       {
@@ -257,7 +257,7 @@ class TransactionsSpec {
         val htlcPenaltyTx = makeHtlcPenaltyTx(new PubKeyScriptIndexFinder(commitTx.tx), script, finalPubKeyScript, feeratePerKw).get
         val sig = sign(htlcPenaltyTx, localRevocationPriv)
         val signed = addSigs(htlcPenaltyTx, sig, localRevocationPriv.publicKey)
-        assert(checkSpendable(signed).isSuccess)
+        assert(checkValid(signed).isSuccess)
       }
 
       {
@@ -266,7 +266,7 @@ class TransactionsSpec {
         val htlcPenaltyTx = makeHtlcPenaltyTx(new PubKeyScriptIndexFinder(commitTx.tx), script, finalPubKeyScript, feeratePerKw).get
         val sig = sign(htlcPenaltyTx, localRevocationPriv)
         val signed = addSigs(htlcPenaltyTx, sig, localRevocationPriv.publicKey)
-        assert(checkSpendable(signed).isSuccess)
+        assert(checkValid(signed).isSuccess)
       }
 
     }

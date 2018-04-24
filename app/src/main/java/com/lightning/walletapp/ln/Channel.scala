@@ -88,7 +88,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val signedLocalCommitTx = Scripts.addSigs(wait.localCommitTx, wait.localParams.fundingPrivKey.publicKey,
           wait.remoteParams.fundingPubkey, Scripts.sign(wait.localCommitTx, wait.localParams.fundingPrivKey), remote.signature)
 
-        if (Scripts.checkSpendable(signedLocalCommitTx).isFailure) BECOME(wait, CLOSING) else {
+        if (Scripts.checkValid(signedLocalCommitTx).isFailure) BECOME(wait, CLOSING) else {
           val localCommit = LocalCommit(0L, wait.localSpec, htlcTxsAndSigs = Nil, signedLocalCommitTx)
           val commits = Commitments(wait.localParams, wait.remoteParams, localCommit, wait.remoteCommit,
             localChanges = Changes(proposed = Vector.empty, signed = Vector.empty, acked = Vector.empty),
@@ -402,7 +402,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val signedClose = Scripts.addSigs(closing, commitments.localParams.fundingPrivKey.publicKey,
           commitments.remoteParams.fundingPubkey, closingSigned.signature, remoteClosingSig)
 
-        Scripts checkSpendable signedClose match {
+        Scripts checkValid signedClose match {
           case Failure(why) => throw new LightningException(why.getMessage)
           case Success(okClose) if remoteClosingFee == localClosingSigned.feeSatoshis =>
             // Our current and their proposed fees are equal for this tx, can broadcast

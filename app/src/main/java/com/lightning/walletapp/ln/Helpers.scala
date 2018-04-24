@@ -114,8 +114,9 @@ object Helpers { me =>
           commitments.remoteParams.toSelfDelay, localDelayedPrivkey.publicKey,
           commitments.localParams.defaultFinalScriptPubKey, feeRate)
 
-        sig = Scripts.sign(claimDelayed, key = localDelayedPrivkey)
-        signed <- Scripts checkSpendable Scripts.addSigs(claimDelayed, sig)
+        sig = Scripts.sign(claimDelayed, localDelayedPrivkey)
+        signed <- Scripts checkValid Scripts.addSigs(claimDelayed, sig)
+        if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
       } yield signed
 
       val allSuccessTxs = for {
@@ -154,9 +155,10 @@ object Helpers { me =>
         claimHtlcSuccessTx <- Scripts.makeClaimHtlcSuccessTx(finder, localHtlcPrivkey.publicKey, remoteHtlcPubkey,
           remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey, add, feeRate).toOption
 
-        signature = Scripts.sign(claimHtlcSuccessTx, key = localHtlcPrivkey)
-        signed = Scripts.addSigs(claimHtlcSuccessTx, signature, paymentInfo.preimage)
-        success <- Scripts.checkSpendable(signed).toOption
+        sig = Scripts.sign(claimHtlcSuccessTx, localHtlcPrivkey)
+        signed = Scripts.addSigs(claimHtlcSuccessTx, sig, paymentInfo.preimage)
+        if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+        success <- Scripts.checkValid(signed).toOption
       } yield success
 
       val claimTimeoutTxs = for {
@@ -166,7 +168,8 @@ object Helpers { me =>
 
         sig = Scripts.sign(claimHtlcTimeoutTx, localHtlcPrivkey)
         signed = Scripts.addSigs(claimHtlcTimeoutTx, localSig = sig)
-        timeout <- Scripts.checkSpendable(signed).toOption
+        if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+        timeout <- Scripts.checkValid(signed).toOption
       } yield timeout
 
       val main = claimRemoteMainOutput(commitments, remoteCommit.remotePerCommitmentPoint, remoteCommitTx.tx)
@@ -183,7 +186,8 @@ object Helpers { me =>
       val claimMain = for {
         claimP2WPKH <- Scripts.makeClaimP2WPKHOutputTx(commitTx, localPaymentPrivkey.publicKey, finalScriptPubKey, feeRate)
         signed = Scripts.addSigs(claimP2WPKH, Scripts.sign(claimP2WPKH, localPaymentPrivkey), localPaymentPrivkey.publicKey)
-        main <- Scripts.checkSpendable(signed)
+        if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+        main <- Scripts.checkValid(signed)
       } yield main
 
       // We only claim a main output here in case when it's a refunding
@@ -212,7 +216,8 @@ object Helpers { me =>
         val claimMainTx = for {
           makeClaimP2WPKH <- Scripts.makeClaimP2WPKHOutputTx(tx, localPrivkey.publicKey, finalScriptPubKey, feeRate)
           signed = Scripts.addSigs(makeClaimP2WPKH, Scripts.sign(makeClaimP2WPKH, localPrivkey), localPrivkey.publicKey)
-          main <- Scripts.checkSpendable(signed)
+          if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+          main <- Scripts.checkValid(signed)
         } yield main
 
         val claimPenaltyTx = for {
@@ -220,8 +225,9 @@ object Helpers { me =>
             finalScriptPubKey, commitments.localParams.toSelfDelay, remoteDelayedPaymentKey, feeRate)
 
           sig = Scripts.sign(theirMainPenalty, remoteRevocationPrivkey)
-          signed = Scripts.addSigs(theirMainPenalty, revocationSig = sig)
-          their <- Scripts.checkSpendable(signed)
+          signed = Scripts.addSigs(mainPenaltyTx = theirMainPenalty, sig)
+          if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+          their <- Scripts.checkValid(signed)
         } yield their
 
         val localHtlc = derivePubKey(commitments.localParams.htlcBasepoint, remotePerCommitmentPoint)
@@ -240,7 +246,8 @@ object Helpers { me =>
           redeemScript <- redeemMap get publicKeyScript
           htlcPenaltyTx <- Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, LNParams.broadcaster.perKwTwoSat).toOption
           signed = Scripts.addSigs(htlcPenaltyTx, Scripts.sign(htlcPenaltyTx, remoteRevocationPrivkey), remoteRevocationPubkey)
-          htlcPenalty <- Scripts.checkSpendable(signed).toOption
+          if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+          htlcPenalty <- Scripts.checkValid(signed).toOption
         } yield htlcPenalty
 
         RevokedCommitPublished(claimMainTx.toOption.toSeq,

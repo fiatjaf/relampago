@@ -252,12 +252,15 @@ object Scripts { me =>
   def sign(txinfo: TransactionWithInputInfo, key: PrivateKey): BinaryData =
     sign(txinfo.tx, 0, txinfo.input.redeemScript, txinfo.input.txOut.amount, key)
 
-  def checkSpendable[T <: TransactionWithInputInfo](txWithInputInfo: => T) = Try {
+  def checkValid[T <: TransactionWithInputInfo](txWithInputInfo: => T) = Try {
     if (txWithInputInfo.tx.txOut.isEmpty) throw new Exception("Empty transaction found")
     val check = Map(txWithInputInfo.tx.txIn.head.outPoint -> txWithInputInfo.input.txOut)
     Transaction.correctlySpends(txWithInputInfo.tx, check, STANDARD_SCRIPT_VERIFY_FLAGS)
     txWithInputInfo
   }
+
+  def checkNotDust(info: TransactionWithInputInfo, dustLimit: Satoshi) =
+    info.tx.txOut.headOption.exists(_.amount >= dustLimit)
 
   def checkSig(txinfo: TransactionWithInputInfo, sig: BinaryData, pubKey: PublicKey): Boolean =
     Crypto.verifySignature(Transaction.hashForSigning(txinfo.tx, 0, txinfo.input.redeemScript,

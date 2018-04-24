@@ -391,13 +391,13 @@ object Commitments {
       c.remoteParams.fundingPubkey, Scripts.sign(localCommitTx, c.localParams.fundingPrivKey), commit.signature)
 
     if (commit.htlcSignatures.size != sortedHtlcTxs.size) throw new LightningException
-    if (Scripts.checkSpendable(signedLocalCommitTx).isFailure) throw new LightningException
+    if (Scripts.checkValid(signedLocalCommitTx).isFailure) throw new LightningException
     val htlcSigs = for (info <- sortedHtlcTxs) yield Scripts.sign(info, localHtlcKey)
     val combined = (sortedHtlcTxs, htlcSigs, commit.htlcSignatures).zipped.toList
 
     val htlcTxsAndSigs = combined collect {
       case (htlcTx: HtlcTimeoutTx, localSig, remoteSig) =>
-        val check = Scripts checkSpendable Scripts.addSigs(htlcTx, localSig, remoteSig)
+        val check = Scripts checkValid Scripts.addSigs(htlcTx, localSig, remoteSig)
         if (check.isSuccess) HtlcTxAndSigs(htlcTx, localSig, remoteSig)
         else throw new LightningException
 
