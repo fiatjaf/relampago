@@ -9,7 +9,7 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
+import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -217,7 +217,7 @@ object RouteWrap {
 
     for (_ \ node \ path <- rd.onion.sharedSecrets drop 1 zip subs) {
       val expiration = System.currentTimeMillis + 1000L * 3600 * 24 * 7
-      val subPathJson = Vector(path).toJson.toString
+      val subPathJson = path.toJson.toString
       val subNodeString = node.toString
 
       db.change(RouteTable.newSql, subPathJson, subNodeString, expiration)
@@ -226,9 +226,14 @@ object RouteWrap {
   }
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
-    val cursor = db.select(RouteTable.selectSql, targetId, System.currentTimeMillis)
-    val routeTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRouteVec]
-    val validRouteTry = routeTry.filter(from contains _.head.head.nodeId).map(rs => Obs just rs)
+    val cursor = db.select(sql = RouteTable.selectSql, targetId, System.currentTimeMillis)
+    val routeTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRoute]
+    // Channels could be closed so make sure we still have a matching channel for this cached route
+    val validRouteTry = for (rt <- routeTry if from contains rt.head.nodeId) yield Obs just Vector(rt)
+
+    db.change(sql = RouteTable.killSql, targetId)
+    // Remove cached route in case if it starts hanging our payments
+    // this route will be put back again if payment was a successful one
     validRouteTry getOrElse BadEntityWrap.findRoutes(from, targetId, rd)
   }
 }

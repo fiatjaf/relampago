@@ -55,7 +55,7 @@ object BadEntityTable extends Table {
       $amount INTEGER NOT NULL
     );
 
-    /* resId index is created automatically */
+    /* unique resId index is created automatically */
     CREATE INDEX idx1$table ON $table ($expire, $amount);
     COMMIT"""
 }
@@ -65,6 +65,7 @@ object RouteTable extends Table {
   val newSql = s"INSERT OR IGNORE INTO $table ($path, $targetNode, $expire) VALUES (?, ?, ?)"
   val updSql = s"UPDATE $table SET $path = ?, $expire = ? WHERE $targetNode = ?"
   val selectSql = s"SELECT * FROM $table WHERE $targetNode = ? AND $expire > ?"
+  val killSql = s"DELETE FROM $table WHERE $targetNode = ?"
 
   val createSql = s"""
     CREATE TABLE $table (
@@ -72,7 +73,7 @@ object RouteTable extends Table {
       $targetNode STRING NOT NULL UNIQUE, $expire INTEGER NOT NULL
     );
 
-    /* targetNode index is created automatically */
+    /* unique targetNode index is created automatically */
     CREATE INDEX idx1$table ON $table ($targetNode, $expire);
     COMMIT"""
 }
@@ -150,15 +151,6 @@ class LNOpenHelper(context: Context, name: String)
     dbs execSQL OlympusTable.createSql
     dbs execSQL RevokedTable.createSql
     dbs execSQL RouteTable.createSql
-
-    // Randomize an order of two available default servers
-//    val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
-//    val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-//    val dev1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9103", emptyData, "1", ord1, "0")
-//    val dev2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9103", emptyData, "0", ord2, "1")
-//
-//    dbs.execSQL(OlympusTable.newSql, dev1)
-//    dbs.execSQL(OlympusTable.newSql, dev2)
 
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
     val test: Array[AnyRef] = Array("test-server-1", "http://192.210.203.16:9003", emptyData, "1", "0", "0")
