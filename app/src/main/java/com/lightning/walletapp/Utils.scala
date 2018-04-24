@@ -6,7 +6,6 @@ import android.view._
 import android.widget._
 import org.bitcoinj.core._
 import android.text.method._
-import com.lightning.walletapp.ln._
 import org.bitcoinj.core.listeners._
 import com.lightning.walletapp.Utils._
 import org.bitcoinj.wallet.listeners._
@@ -148,7 +147,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     val view = getLayoutInflater.inflate(R.layout.frag_top_tip, null).asInstanceOf[LinearLayout]
     val titleTextField = Utils clickableTextField view.findViewById(R.id.titleTip)
     titleTextField setText textFieldData
-    view setBackgroundColor 0x33999999
+    view setBackgroundColor 0x22AAAAAA
     view
   }
 
