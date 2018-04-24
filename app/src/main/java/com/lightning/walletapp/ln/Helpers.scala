@@ -9,7 +9,7 @@ import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import scala.util.{Success, Try}
 
 
-object Helpers { me =>
+object Helpers {
   def makeLocalTxs(commitTxNumber: Long, localParams: LocalParams,
                    remoteParams: AcceptChannel, commitmentInput: InputInfo,
                    localPerCommitmentPoint: Point, spec: CommitmentSpec) = {
@@ -68,7 +68,7 @@ object Helpers { me =>
     }
 
     def makeFirstClosing(commitments: Commitments, localScriptPubkey: BinaryData, remoteScriptPubkey: BinaryData) = {
-      val estimatedWeight: Int = Transaction.weight(Scripts.addSigs(makeFunderClosingTx(commitments.commitInput, localScriptPubkey,
+      val estimatedWeight = Transaction.weight(Scripts.addSigs(makeFunderClosingTx(commitments.commitInput, localScriptPubkey,
         remoteScriptPubkey, Satoshi(0), Satoshi(0), commitments.localCommit.spec), commitments.localParams.fundingPrivKey.publicKey,
         commitments.remoteParams.fundingPubkey, "aa" * 71, "bb" * 71).tx)
 
@@ -112,11 +112,11 @@ object Helpers { me =>
       def makeClaimDelayedOutput(tx: Transaction) = for {
         claimDelayed <- Scripts.makeClaimDelayedOutputTx(tx, localRevocationPubkey,
           commitments.remoteParams.toSelfDelay, localDelayedPrivkey.publicKey,
-          commitments.localParams.defaultFinalScriptPubKey, feeRate)
+          commitments.localParams.defaultFinalScriptPubKey, feeRate,
+          commitments.localParams.dustLimit)
 
         sig = Scripts.sign(claimDelayed, localDelayedPrivkey)
         signed <- Scripts checkValid Scripts.addSigs(claimDelayed, sig)
-        if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
       } yield signed
 
       val allSuccessTxs = for {
@@ -151,24 +151,24 @@ object Helpers { me =>
 
       val claimSuccessTxs = for {
         HtlcTimeoutTx(_, _, add) <- timeout
-        paymentInfo <- bag.getPaymentInfo(hash = add.paymentHash).toOption
-        claimHtlcSuccessTx <- Scripts.makeClaimHtlcSuccessTx(finder, localHtlcPrivkey.publicKey, remoteHtlcPubkey,
-          remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey, add, feeRate).toOption
+        paymentInfo <- bag.getPaymentInfo(add.paymentHash).toOption
+        claimHtlcSuccessTx <- Scripts.makeClaimHtlcSuccessTx(finder, localHtlcPrivkey.publicKey,
+          remoteHtlcPubkey, remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey,
+          add, feeRate, commitments.localParams.dustLimit).toOption
 
         sig = Scripts.sign(claimHtlcSuccessTx, localHtlcPrivkey)
         signed = Scripts.addSigs(claimHtlcSuccessTx, sig, paymentInfo.preimage)
-        if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
         success <- Scripts.checkValid(signed).toOption
       } yield success
 
       val claimTimeoutTxs = for {
         HtlcSuccessTx(_, _, add) <- success
-        claimHtlcTimeoutTx <- Scripts.makeClaimHtlcTimeoutTx(finder, localHtlcPrivkey.publicKey, remoteHtlcPubkey,
-          remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey, add, feeRate).toOption
+        claimHtlcTimeoutTx <- Scripts.makeClaimHtlcTimeoutTx(finder, localHtlcPrivkey.publicKey,
+          remoteHtlcPubkey, remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey,
+          add, feeRate, commitments.localParams.dustLimit).toOption
 
         sig = Scripts.sign(claimHtlcTimeoutTx, localHtlcPrivkey)
-        signed = Scripts.addSigs(claimHtlcTimeoutTx, localSig = sig)
-        if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+        signed = Scripts.addSigs(claimHtlcTimeoutTx, sig)
         timeout <- Scripts.checkValid(signed).toOption
       } yield timeout
 
@@ -184,9 +184,12 @@ object Helpers { me =>
       val feeRate = LNParams.broadcaster.perKwSixSat
 
       val claimMain = for {
-        claimP2WPKH <- Scripts.makeClaimP2WPKHOutputTx(commitTx, localPaymentPrivkey.publicKey, finalScriptPubKey, feeRate)
-        signed = Scripts.addSigs(claimP2WPKH, Scripts.sign(claimP2WPKH, localPaymentPrivkey), localPaymentPrivkey.publicKey)
-        if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+        claimP2WPKH <- Scripts.makeClaimP2WPKHOutputTx(commitTx,
+          localPaymentPrivkey.publicKey, finalScriptPubKey, feeRate,
+          commitments.localParams.dustLimit)
+
+        sig = Scripts.sign(txinfo = claimP2WPKH, localPaymentPrivkey)
+        signed = Scripts.addSigs(claimP2WPKH, sig, localPaymentPrivkey.publicKey)
         main <- Scripts.checkValid(signed)
       } yield main
 
@@ -214,19 +217,21 @@ object Helpers { me =>
         val feeRate = LNParams.broadcaster.perKwTwoSat
 
         val claimMainTx = for {
-          makeClaimP2WPKH <- Scripts.makeClaimP2WPKHOutputTx(tx, localPrivkey.publicKey, finalScriptPubKey, feeRate)
-          signed = Scripts.addSigs(makeClaimP2WPKH, Scripts.sign(makeClaimP2WPKH, localPrivkey), localPrivkey.publicKey)
-          if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+          makeClaimP2WPKH <- Scripts.makeClaimP2WPKHOutputTx(tx, localPrivkey.publicKey,
+            finalScriptPubKey, feeRate, commitments.localParams.dustLimit)
+
+          sig = Scripts.sign(txinfo = makeClaimP2WPKH, localPrivkey)
+          signed = Scripts.addSigs(makeClaimP2WPKH, sig, localPrivkey.publicKey)
           main <- Scripts.checkValid(signed)
         } yield main
 
         val claimPenaltyTx = for {
           theirMainPenalty <- Scripts.makeMainPenaltyTx(tx, remoteRevocationPubkey,
-            finalScriptPubKey, commitments.localParams.toSelfDelay, remoteDelayedPaymentKey, feeRate)
+            finalScriptPubKey, commitments.localParams.toSelfDelay, remoteDelayedPaymentKey,
+            feeRate, commitments.localParams.dustLimit)
 
           sig = Scripts.sign(theirMainPenalty, remoteRevocationPrivkey)
-          signed = Scripts.addSigs(mainPenaltyTx = theirMainPenalty, sig)
-          if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
+          signed = Scripts.addSigs(theirMainPenalty, sig)
           their <- Scripts.checkValid(signed)
         } yield their
 
@@ -244,11 +249,13 @@ object Helpers { me =>
         val htlcPenaltyTxs = for {
           TxOut(_, publicKeyScript) <- tx.txOut
           redeemScript <- redeemMap get publicKeyScript
-          htlcPenaltyTx <- Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, LNParams.broadcaster.perKwTwoSat).toOption
-          signed = Scripts.addSigs(htlcPenaltyTx, Scripts.sign(htlcPenaltyTx, remoteRevocationPrivkey), remoteRevocationPubkey)
-          if Scripts.checkNotDust(signed, commitments.localParams.dustLimit)
-          htlcPenalty <- Scripts.checkValid(signed).toOption
-        } yield htlcPenalty
+          htlcPenaltyTx <- Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey,
+            LNParams.broadcaster.perKwTwoSat, commitments.localParams.dustLimit).toOption
+
+          sig = Scripts.sign(htlcPenaltyTx, remoteRevocationPrivkey)
+          signed = Scripts.addSigs(htlcPenaltyTx, sig, remoteRevocationPubkey)
+          penalty <- Scripts.checkValid(signed).toOption
+        } yield penalty
 
         RevokedCommitPublished(claimMainTx.toOption.toSeq,
           claimPenaltyTx.toOption.toSeq, htlcPenaltyTxs, tx)

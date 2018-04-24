@@ -59,8 +59,8 @@ object RatesSaver {
 // 2 items of memory to help eliminate possible fee spikes
 // feesSix is used for manual txs sending, feesTwo is used to maintain a channel feerate
 case class Rates(feesSix: Seq[Double], feesTwo: Seq[Double], exchange: Fiat2Btc, stamp: Long) {
-  val avgSix: Coin = if (feesSix.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feesSix.sum / 2)
-  val avgTwo: Coin = if (feesTwo.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feesTwo.sum / 2)
+  private[this] val avgSix: Coin = if (feesSix.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feesSix.sum / 2)
+  private[this] val avgTwo: Coin = if (feesTwo.isEmpty) DEFAULT_TX_FEE else btcBigDecimal2MSat(feesTwo.sum / 2)
   val feeSix = if (avgSix isLessThan minAllowedFee) minAllowedFee else avgSix
   val feeTwo = if (avgTwo isLessThan minAllowedFee) minAllowedFee else avgTwo
 }
