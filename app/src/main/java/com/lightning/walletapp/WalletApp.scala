@@ -211,8 +211,10 @@ class WalletApp extends Application { me =>
 
       for {
         routes <- cheapestRoutesObs
-        shortest = routes.sortBy(_.size)
-      } yield useFirstRoute(shortest, rd)
+        // Runtime optimization: prioritize routes of shorter length AND fewer pending payments in local channels
+        chanMap = notClosingOrRefunding.map(chan => chan.data.announce.nodeId -> inFlightOutgoingHtlcs(chan).size).toMap
+        best = routes.sortBy(route => route.headOption.flatMap(hop => chanMap get hop.nodeId).getOrElse(0) + route.size)
+      } yield useFirstRoute(best, rd)
     }
 
     def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {

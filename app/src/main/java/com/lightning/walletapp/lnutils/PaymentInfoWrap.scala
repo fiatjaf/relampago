@@ -226,12 +226,12 @@ object RouteWrap {
   }
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
-    val cursor = db.select(sql = RouteTable.selectSql, targetId, System.currentTimeMillis)
+    val cursor = db.select(RouteTable.selectSql, targetId, System.currentTimeMillis)
     val routeTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRoute]
     // Channels could be closed so make sure we still have a matching channel for this cached route
     val validRouteTry = for (rt <- routeTry if from contains rt.head.nodeId) yield Obs just Vector(rt)
 
-    db.change(sql = RouteTable.killSql, targetId)
+    db.change(RouteTable.killSql, targetId)
     // Remove cached route in case if it starts hanging our payments
     // this route will be put back again if payment was a successful one
     validRouteTry getOrElse BadEntityWrap.findRoutes(from, targetId, rd)
@@ -249,7 +249,7 @@ object BadEntityWrap {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
     val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChanIds = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
-    OlympusWrap findRoutes OutRequest(badNodes, for (id <- badChanIds) yield id.toLong, from, targetId)
+    OlympusWrap findRoutes OutRequest(badNodes, for (shortId <- badChanIds) yield shortId.toLong, from, targetId)
   }
 }
 
