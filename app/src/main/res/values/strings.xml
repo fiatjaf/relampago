@@ -32,7 +32,7 @@
     <string name="restore_hint">Your BIP32 mnemonic phrase</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.09&#8211;34<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
+    <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.09&#8211;35<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a>\n<small>don\'t change these settings unless\nyou know what you are doing</small></string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
 
