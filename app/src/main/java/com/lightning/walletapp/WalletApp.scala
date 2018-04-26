@@ -15,6 +15,13 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+
+import rx.lang.scala.{Observable => Obs}
+import fr.acinq.bitcoin.{BinaryData, Crypto}
+import android.content.{ClipData, ClipboardManager, Context}
+import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
+import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.walletapp.lnutils.olympus.CloudAct
@@ -30,12 +37,6 @@ import android.widget.Toast
 import language.postfixOps
 import scala.util.Try
 import java.io.File
-
-import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
-import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
-import android.content.{ClipData, ClipboardManager, Context}
-import fr.acinq.bitcoin.{BinaryData, Crypto}
-import rx.lang.scala.{Observable => Obs}
 
 
 class WalletApp extends Application { me =>
@@ -82,6 +83,13 @@ class WalletApp extends Application { me =>
     if (andNotify) me toast getString(copied_to_clipboard).format(text)
   }
 
+  def mkNodeAnnouncement(nodeId: PublicKey, host: String, port: Int) = {
+    val nodeAddress: InetSocketAddress = new InetSocketAddress(host, port)
+    val nodeColors: RGB = Tuple3(Byte.MinValue, Byte.MinValue, Byte.MinValue)
+    val sig = Crypto encodeSignature Crypto.sign(random getBytes 32, LNParams.nodePrivateKey)
+    NodeAnnouncement(sig, "", 0L, nodeId, nodeColors, host, NodeAddress(nodeAddress) :: Nil)
+  }
+
   object TransData {
     var value: Any = _
     val prefixes = PaymentRequest.prefixes.values mkString "|"
@@ -91,15 +99,8 @@ class WalletApp extends Application { me =>
     def recordValue(rawText: String) = value = rawText match {
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
       case lnLink(body) if notMixedCase(body) => PaymentRequest read body.toLowerCase
-      case nodeLink(key, hostName, port) => mkNA(PublicKey(key), hostName, port.toInt)
+      case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), host, port.toInt)
       case _ => getTo(rawText)
-    }
-
-    def mkNA(nodeId: PublicKey, hostName: String, port: Int) = {
-      val someInetSocketAddress = new InetSocketAddress(hostName, port)
-      val sig = Crypto encodeSignature Crypto.sign(random getBytes 32, LNParams.nodePrivateKey)
-      NodeAnnouncement(sig, "", 0L, nodeId, (Byte.MinValue, Byte.MinValue, Byte.MinValue),
-        hostName, NodeAddress(someInetSocketAddress) :: Nil)
     }
 
     def onFail(err: Int => Unit): PartialFunction[Throwable, Unit] = {
