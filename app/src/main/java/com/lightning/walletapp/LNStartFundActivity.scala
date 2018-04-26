@@ -14,7 +14,6 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.CloudAct
-import com.lightning.walletapp.lnutils.RatesSaver
 import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.script.ScriptBuilder
@@ -42,7 +41,8 @@ class LNStartFundActivity extends TimerActivity { me =>
 
     app.TransData.value match {
       // We may get peer info either from built-in list of from user scanned qr code
-      case (ann: NodeAnnouncement, num: Int) => proceed(app.plurOrZero(chansNumber, num), ann)
+      case RemoteNodeView(ann \ num) => proceed(app.plurOrZero(chansNumber, num), ann)
+      case HardcodedNodeView(ann, hardcodedTip) => proceed(hardcodedTip, ann)
       case ann: NodeAnnouncement => proceed(chansNumber.last, ann)
       case _ => finish
     }

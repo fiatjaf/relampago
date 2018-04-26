@@ -13,7 +13,7 @@ class ThrottledWorkSpec {
         input * 2
       }
 
-      def process(result: String) = println(result)
+      def process(ask: String, result: String) = println(result)
       def error(err: Throwable) = err.printStackTrace
     }
 
