@@ -303,7 +303,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
               if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
               chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
               // Start watching this channel's funding tx output right away
-              watched = app.kit watchFunding refundingData.commitments
+              ok = app.kit watchFunding refundingData.commitments
             } app.ChannelManager.all +:= chan
             app.ChannelManager.initConnect
           }, none)

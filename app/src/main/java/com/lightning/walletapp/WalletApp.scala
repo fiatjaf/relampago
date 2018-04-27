@@ -160,20 +160,25 @@ class WalletApp extends Application { me =>
       }
     }
 
-    def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel {
+    def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel { self =>
       def STORE(hasCommitmentsData: HasCommitments) = runAnd(hasCommitmentsData)(ChannelWrap put hasCommitmentsData)
       def SEND(msg: LightningMessage) = ConnectionManager.connections.get(data.announce).foreach(_.handler process msg)
 
       def CLOSEANDWATCH(cd: ClosingData) = {
-        val commits = cd.localCommit.map(_.commitTx) ++ cd.remoteCommit.map(_.commitTx) ++ cd.nextRemoteCommit.map(_.commitTx)
+        val commitTxs = cd.localCommit.map(_.commitTx) ++ cd.remoteCommit.map(_.commitTx) ++ cd.nextRemoteCommit.map(_.commitTx)
+        repeat(OlympusWrap getChildTxs commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, Tools.errlog)
         // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
-        repeat(OlympusWrap getChildTxs commits, pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, Tools.errlog)
-        kit.watchScripts(commits.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
+        kit.watchScripts(commitTxs.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
         BECOME(STORE(cd), CLOSING)
 
         val tier12txs = for (state <- cd.tier12States) yield state.txn
         if (tier12txs.isEmpty) Tools log "Closing channel does not have tier 1-2 transactions"
         else OlympusWrap tellClouds CloudAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
+      }
+
+      def ASKREFUNDTX(ref: RefundingData) = {
+        val txsObs = OlympusWrap getChildTxs Seq(ref.commitments.commitInput.outPoint.txid)
+        txsObs.foreach(txs => for (tx <- txs) self process CMDSpent(tx), Tools.errlog)
       }
 
       // First add listeners, then call

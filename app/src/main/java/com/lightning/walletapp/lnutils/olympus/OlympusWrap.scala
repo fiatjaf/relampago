@@ -37,6 +37,9 @@ object OlympusWrap extends OlympusProvider {
   type CloudActVec = Vector[CloudAct]
   type StringVec = Vector[String]
   type CloudVec = Vector[Cloud]
+
+  // Tx request/response
+  type BinaryDataSeq = Seq[BinaryData]
   type TxSeq = Seq[Transaction]
 
   // BTC and fiat rates
@@ -85,17 +88,17 @@ object OlympusWrap extends OlympusProvider {
 
   def getRates = failOver(_.connector.getRates, clouds)
   def getBlock(hash: String) = failOver(_.connector getBlock hash, clouds)
-  def getChildTxs(txs: TxSeq) = failOver(_.connector getChildTxs txs, clouds)
   def findNodes(query: String) = failOver(_.connector findNodes query, clouds)
   def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, clouds)
+  def getChildTxs(txIds: BinaryDataSeq) = failOver(_.connector getChildTxs txIds, clouds)
 }
 
 trait OlympusProvider {
   def findRoutes(out: OutRequest): Obs[PaymentRouteVec]
   def findNodes(query: String): Obs[AnnounceChansNumVec]
   def getBlock(hash: String): Obs[BlockHeightAndTxs]
+  def getChildTxs(txIds: BinaryDataSeq): Obs[TxSeq]
   def getBackup(key: BinaryData): Obs[StringVec]
-  def getChildTxs(txs: TxSeq): Obs[TxSeq]
   def getRates: Obs[Result]
 }
 
@@ -114,6 +117,6 @@ class Connector(val url: String) extends OlympusProvider {
   def getBlock(hash: String) = ask[BlockHeightAndTxs]("block/get", "hash" -> hash)
   def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
-  def getChildTxs(txs: TxSeq) = ask[TxSeq]("txs/get", "txids" -> txs.map(_.txid).toJson.toString.hex)
+  def getChildTxs(txIds: BinaryDataSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
   def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routes", "params" -> out.toJson.toString.hex)
 }

@@ -36,6 +36,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   }
 
   def SEND(msg: LightningMessage): Unit
+  def ASKREFUNDTX(ref: RefundingData): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def STORE(content: HasCommitments): HasCommitments
   def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
@@ -452,7 +453,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // HANDLE INITIALIZATION
 
 
-      case (null, ref: RefundingData, null) => super.become(ref, REFUNDING)
+      case Tuple3(null, ref: RefundingData, null) =>
+        if (ref.remoteLatestPoint.isDefined) ASKREFUNDTX(ref)
+        super.become(ref, REFUNDING)
+
       case (null, close: ClosingData, null) => super.become(close, CLOSING)
       case (null, init: InitData, null) => super.become(init, WAIT_FOR_INIT)
       case (null, wait: WaitFundingDoneData, null) => super.become(wait, OFFLINE)

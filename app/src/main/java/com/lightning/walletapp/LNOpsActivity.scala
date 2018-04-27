@@ -24,7 +24,7 @@ class LNOpsActivity extends TimerActivity { me =>
   def INIT(s: Bundle) = if (app.isAlive) fillViewPager else me exitTo classOf[MainActivity]
   lazy val chanPager = findViewById(R.id.chanPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
-  lazy val localChanCache = for (c <- app.ChannelManager.all if c.state != REFUNDING) yield c
+  lazy val localChanCache = for (c <- app.ChannelManager.all if me canDisplay c.data) yield c
 
   lazy val inFlightPayments = getResources getStringArray R.array.ln_in_flight_payments
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
@@ -66,6 +66,12 @@ class LNOpsActivity extends TimerActivity { me =>
     }
   }
 
+  val humanStatus: DepthAndDead => String = {
+    case cfs \ false => app.plurOrZero(txsConfs, cfs)
+    case _ \ true => txsConfs.last
+    case _ => txsConfs.head
+  }
+
   def bundledFrag(pos: Int) = {
     val frag = new ChanDetailsFrag
     val arguments: Bundle = new Bundle
@@ -81,6 +87,16 @@ class LNOpsActivity extends TimerActivity { me =>
     chanPager setAdapter slidingFragmentAdapter
     resetIndicator.run
   }
+
+  def canDisplay(chanData: ChannelData) = chanData match {
+    case ref: RefundingData => ref.remoteLatestPoint.isDefined
+    case otherwise => true
+  }
+
+  def startedBy(c: ClosingData) = {
+    val byRemote = c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty
+    if (byRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
+  }
 }
 
 class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
@@ -92,17 +108,11 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
   lazy val host = getActivity.asInstanceOf[LNOpsActivity]
   import host._
 
-  val humanStatus: DepthAndDead => String = {
-    case cfs \ false => app.plurOrZero(txsConfs, cfs)
-    case _ \ true => txsConfs.last
-    case _ => txsConfs.head
-  }
-
   override def onViewCreated(view: View, state: Bundle) = {
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
     val lnOpsDescription = Utils clickableTextField view.findViewById(R.id.lnOpsDescription)
 
-    val chan = host.localChanCache(getArguments getInt "position")
+    val chan = localChanCache(getArguments getInt "position")
     val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
     val started = me time new Date(chan(_.startedAt).get)
     val capacity = chan(_.commitInput.txOut.amount).get
@@ -119,16 +129,19 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       else ln_chan_force_details
     }
 
-    lnOpsAction setOnClickListener host.onButtonTap {
+    lnOpsAction setOnClickListener onButtonTap {
       // First closing attempt will be a cooperative one while the second attempt will be uncooperative
-      val bld = host baseTextBuilder getCloseWarning.html setCustomTitle lnOpsAction.getText.toString
-      host.mkForm(chan process CMDShutdown, none, bld, dialog_ok, dialog_cancel)
+      val bld = baseTextBuilder(getCloseWarning.html) setCustomTitle lnOpsAction.getText.toString
+      mkForm(chan process CMDShutdown, none, bld, dialog_ok, dialog_cancel)
     }
 
     def manageOther = UITask {
       // Just show basic channel info here since we don't know the specifics about this one
-      lnOpsDescription setText basic.format(chan.state, started, coloredIn(capacity), alias)
+      val text = basic.format(chan.state, alias, started, coloredIn apply capacity).html
+
+      // Hide button
       lnOpsAction setVisibility View.GONE
+      lnOpsDescription setText text
     }
 
     def manageFunding(wait: WaitFundingDoneData) = UITask {
@@ -172,10 +185,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageClosing(close: ClosingData) = UITask {
       // Show the best current closing with most confirmations
       // since multiple different closings may be present at once
-
-
-      println(s"IS OUTDATED: ${close.isOutdated}")
-
       val closed = me time new Date(close.closedAt)
       lnOpsAction setVisibility View.GONE
 
@@ -208,13 +217,13 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
               statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
           }
 
-          val startedBy = host.getString(me startedBy close)
+          val startedByWhom = host getString startedBy(close)
           val humanTier12View = tier12View take 2 mkString "<br><br>"
           val status = humanStatus apply getStatus(info.commitTx.txid)
           val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
           val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
           val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
-          lnOpsDescription setText unilateralClosing.format(chan.state, startedBy, alias, started,
+          lnOpsDescription setText unilateralClosing.format(chan.state, startedByWhom, alias, started,
             closed, coloredIn(capacity), commitView + refundsView).html
       }
     }
@@ -243,18 +252,14 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       // must also be removed once fragment is finished
 
       override def onBecome = {
-        case (_, _, from, CLOSING) if from != CLOSING => host.resetIndicator.run
-        case (_, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) => host.resetIndicator.run
+        case (_, _, from, CLOSING) if from != CLOSING => resetIndicator.run
+        case (_, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) => resetIndicator.run
       }
     }
 
     val listeners = Vector(transitionListener, detailsListener)
-    wrap(chan.listeners ++= listeners)(detailsListener nullOnBecome chan)
     whenDestroy = UITask(chan.listeners --= listeners)
-  }
-
-  def startedBy(c: ClosingData) = {
-    val byRemote = c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty
-    if (byRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
+    detailsListener nullOnBecome chan
+    chan.listeners ++= listeners
   }
 }
