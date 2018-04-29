@@ -251,7 +251,7 @@ class RateManager(extra: String, val content: View) { me =>
   val fiatType = content.findViewById(R.id.fiatType).asInstanceOf[SegmentedGroup]
   val fiatInput = content.findViewById(R.id.fiatInputAmount).asInstanceOf[EditText]
   def result: TryMSat = Try(denom rawString2MSat satInput.getText.toString.noSpaces)
-  def setSum(res: TryMSat) = satInput.setText(res map denom.formatted getOrElse null)
+  def setSum(res: TryMSat) = satInput.setText(res map denom.asString getOrElse null)
   def fiatDecimal = BigDecimal(fiatInput.getText.toString.noSpaces)
 
   val fiatListener = new TextChangedWatcher {

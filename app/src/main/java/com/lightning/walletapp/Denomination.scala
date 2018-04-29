@@ -2,6 +2,7 @@ package com.lightning.walletapp
 
 import R.string._
 import java.text._
+import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.Utils.app
 import fr.acinq.bitcoin.MilliSatoshi
@@ -33,8 +34,16 @@ trait Denomination {
     MilliSatoshi(factored.toLong)
   }
 
-  def formatted(msat: MilliSatoshi) =
-    fmt format BigDecimal(msat.amount) / factor
+  def asString(msat: MilliSatoshi) = {
+    val factored = BigDecimal(msat.amount) / factor
+    fmt format factored
+  }
+
+  def formatted(msat: MilliSatoshi) = {
+    val basicFormattedSum = asString(msat)
+    val whole \ decimal = basicFormattedSum.splitAt(basicFormattedSum indexOf ".")
+    if (decimal == basicFormattedSum) basicFormattedSum else s"$whole<small>$decimal</small>"
+  }
 
   def withSign(msat: MilliSatoshi): String
   val fmt: DecimalFormat
