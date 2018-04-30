@@ -85,6 +85,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         BECOME(WaitFundingSignedData(announce, cmd.localParams, Tools.toLongId(fundTx.hash, cmd.outIndex), accept, fundTx,
           localSpec, localCommitTx, firstRemoteCommit), WAIT_FUNDING_SIGNED) SEND fundingCreated
 
+
       // They have signed our first commit, we can broadcast a funding tx
       case (wait: WaitFundingSignedData, remote: FundingSigned, WAIT_FUNDING_SIGNED) =>
         val signedLocalCommitTx = Scripts.addSigs(wait.localCommitTx, wait.localParams.fundingPrivKey.publicKey,
@@ -144,6 +145,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val c1 = Commitments.receiveFulfill(norm.commitments, fulfill)
         me UPDATA norm.copy(commitments = c1)
         events fulfillReceived fulfill
+
 
       case (norm: NormalData, fail: UpdateFailHtlc, OPEN) =>
         // Got a failure for an outgoing HTLC we sent earlier

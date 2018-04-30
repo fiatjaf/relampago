@@ -81,22 +81,23 @@ object PaymentInfo {
     val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == chan)
     val blackListedChan = Tuple3(chan.toString, span, msat)
     val rd1 = rd.copy(routes = routesWithoutBadChannels)
-    rd1 -> Vector(blackListedChan)
+    Some(rd1) -> Vector(blackListedChan)
   }
 
   def withoutNodes(badNodes: PublicKeyVec, rd: RoutingData, span: Long) = {
     val routesWithoutBadNodes = without(rd.routes, badNodes contains _.nodeId)
     val blackListedNodes = for (node <- badNodes) yield (node.toString, span, 0L)
-    rd.copy(routes = routesWithoutBadNodes) -> blackListedNodes
+    val rd1 = rd.copy(routes = routesWithoutBadNodes)
+    Some(rd1) -> blackListedNodes
   }
 
   private[this] var replacedChans = Set.empty[Long]
   def replaceRoute(rd: RoutingData, upd: ChannelUpdate) = {
     // In some cases we can just replace a faulty hop with a supplied one, but only do this once per channel to avoid infinite loops
     val route1 = rd.usedRoute map { case hop if hop.shortChannelId == upd.shortChannelId => upd toHop hop.nodeId case hop => hop }
-    val result = rd.copy(routes = route1 +: rd.routes) -> Vector.empty
+    val rd1 = rd.copy(routes = route1 +: rd.routes)
     replacedChans += upd.shortChannelId
-    result
+    Some(rd1) -> Vector.empty
   }
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
@@ -105,6 +106,7 @@ object PaymentInfo {
     Tools log parsed.toString
 
     parsed map {
+      case ErrorPacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case ErrorPacket(nodeKey, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
       case ErrorPacket(nodeKey, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
       case ErrorPacket(nodeKey, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)

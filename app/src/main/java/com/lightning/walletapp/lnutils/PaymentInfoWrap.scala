@@ -146,16 +146,18 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
 
-        val rd1Opt = inFlightPayments get add.paymentHash
-        rd1Opt map parseFailureCutRoutes(failReason) match {
-          // Try use the routes left or fetch new ones if empty
+        val rdOpt = inFlightPayments get add.paymentHash
+        rdOpt map parseFailureCutRoutes(failReason) match {
+          // Try to use the routes left or fetch new ones if empty
+          // but account for possibility of rd not being in place
 
-          case Some(prunedRD \ excludes) =>
+          case Some(Some(prunedRD) \ excludes) =>
             for (entity <- excludes) BadEntityWrap.putEntity tupled entity
             app.ChannelManager.sendEither(useRoutesLeft(prunedRD), newRoutes)
 
-          case None =>
+          case _ =>
             // May happen after app restart
+            // also when recipient sends an error
             updStatus(FAILURE, add.paymentHash)
         }
       }
