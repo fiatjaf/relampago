@@ -13,7 +13,7 @@ import fr.acinq.eclair.UInt64
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
   val chainHash = Block.TestnetGenesisBlock.hash
-  val theirReserveToFundingRatio = 100
+  val theirReserveToFundingRatio = 50
   val localFeatures = "02"
   val globalFeatures = ""
   val minDepth = 1
@@ -22,7 +22,7 @@ object LNParams { me =>
   final val minHtlcValue = MilliSatoshi(1000L)
   final val maxHtlcValue = MilliSatoshi(4000000000L)
   final val maxChannelCapacity = MilliSatoshi(16777216000L)
-  final val minChannelCapacity = MilliSatoshi(250000000L)
+  final val minChannelCapacity = MilliSatoshi(300000000L)
 
   var db: LNOpenHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
