@@ -31,8 +31,8 @@ object LocalBroadcaster extends Broadcaster {
   } getOrElse 0 -> false
 
   def getBlockHashString(txid: BinaryData) = for {
-    // Given a txid return a hash of containing block
-    // this will return a single block hash
+  // Given a txid return a hash of containing block
+  // this will return a single block hash
 
     txj <- getTx(txid)
     hashes <- Option(txj.getAppearsInHashes)
@@ -47,6 +47,16 @@ object LocalBroadcaster extends Broadcaster {
   }
 
   override def onBecome = {
+    case (chan, wait: WaitFundingDoneData, OFFLINE, WAIT_FUNDING_DONE) =>
+      // CMDConfirmed from wallet listener may be sent to an offline channel
+      // so use this additional check purely as a failsafe measure
+
+      for {
+        txj <- getTx(wait.fundingTx.txid)
+        depth \ isDead = getStatus(wait.fundingTx.txid)
+        if depth >= LNParams.minDepth && !isDead
+      } chan process CMDConfirmed(txj)
+
     case (_, wait: WaitFundingDoneData, _, _) =>
       // Watch funding script, broadcast funding tx
       app.kit watchFunding wait.commitments

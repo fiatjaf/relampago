@@ -351,15 +351,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         doProcess(CMDHTLCProcess)
 
 
-      // We may get this message any time so just save it here
-      case (wait: WaitFundingDoneData, CMDConfirmed(tx), OFFLINE)
-        if wait.fundingTx.txid == tx.txid =>
-
-        val our = makeFundingLocked(wait.commitments)
-        val wait1 = wait.modify(_.our) setTo Some(our)
-        me UPDATA STORE(wait1)
-
-
       // We're exiting a sync state while waiting for their FundingLocked
       case (wait: WaitFundingDoneData, cr: ChannelReestablish, OFFLINE) =>
         BECOME(wait, WAIT_FUNDING_DONE)
