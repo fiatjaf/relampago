@@ -20,9 +20,9 @@ object LNParams { me =>
 
   val maxCltvDelta = 7 * 144L
   final val minHtlcValue = MilliSatoshi(1000L)
-  final val maxHtlcValue = MilliSatoshi(4000000000L)
+  final val maxHtlcValue = MilliSatoshi(2000000000L)
+  final val minChannelCapacity = MilliSatoshi(200000000L)
   final val maxChannelCapacity = MilliSatoshi(16777216000L)
-  final val minChannelCapacity = MilliSatoshi(300000000L)
 
   var db: LNOpenHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
@@ -52,7 +52,7 @@ object LNParams { me =>
 
   def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (n <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: n :: Nil)
-    LocalParams(maxHtlcValueInFlightMsat = UInt64(4000000000L), theirReserve, toSelfDelay = 144, maxAcceptedHtlcs = 25,
+    LocalParams(maxHtlcValueInFlightMsat = UInt64(2000000000L), theirReserve, toSelfDelay = 144, maxAcceptedHtlcs = 25,
       fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey,
       dustLimit = Satoshi(5460L), shaSeed = sha256(sha.privateKey.toBin), isFunder = true)
   }

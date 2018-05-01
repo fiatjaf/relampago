@@ -131,6 +131,8 @@ class LNStartFundActivity extends TimerActivity { me =>
 
       def next(msat: MilliSatoshi) = new TxProcessor {
         val dummyScript = pubKeyScript(dummyKey, dummyKey)
+        val pay = P2WSHData(msat, dummyScript)
+
         def futureProcess(unsignedRequest: SendRequest) = {
           val finder = new PubKeyScriptIndexFinder(unsignedRequest.tx)
           val outIndex = finder.findPubKeyScriptIndex(dummyScript, None)
@@ -143,7 +145,6 @@ class LNStartFundActivity extends TimerActivity { me =>
             pushMsat = 0L, remoteInit = their, dummyRequest = unsignedRequest, outIndex, realChannelFundingAmountSat)
         }
 
-        val pay = P2WSHData(msat, dummyScript)
         def onTxFail(fundingError: Throwable) = {
           val bld = baseBuilder(messageWhenMakingTx(fundingError), null)
           mkForm(askForFunding(their).run, none, bld, dialog_ok, dialog_cancel)
