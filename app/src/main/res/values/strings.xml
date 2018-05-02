@@ -8,8 +8,8 @@
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
     <string name="wallet_state">Total balance\n<small><font color='#999999'>On-chain + LN funds</font></small></string>
     <string name="step_fees"><![CDATA[<font color=#999999>Final step: miner fee</font><br><br>%1$s]]></string>
-    <string name="fee_risky"><![CDATA[<small>%1$s standard fee</small>]]></string>
-    <string name="fee_live"><![CDATA[<small>%1$s priority fee</small>]]></string>
+    <string name="fee_risky"><![CDATA[<small>%1$s %2$s</small>]]></string>
+    <string name="fee_live"><![CDATA[<small>%1$s %2$s</small>]]></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_create">New Bitcoin Wallet</string>
     <string name="wallet_restore">Restore Wallet</string>
@@ -128,13 +128,13 @@
         <item><![CDATA[<font color=#FF9900>Sync: %1$d days behind</font>]]></item>
     </array>
 
-    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s]]></string>
-    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s]]></string>
-    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>fee %3$s = %4$.2f%%</small>]]></string>
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br>fee %3$s = %4$.2f%%<br><small>%5$s at current rates</small>]]></string>
 
-    <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>received %2$s]]></string>
-    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s]]></string>
-    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>fee %3$s = %4$.2f%%</small>]]></string>
+    <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br>fee %3$s = %4$.2f%%<br><small>%5$s at current rates</small>]]></string>
 
     <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#53A63C>%1$s</font>]]></string>
@@ -151,8 +151,8 @@
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin transaction</strong></string></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><br><br><small>%1$s</small>]]></string>
-    <string name="ln_receive_option"><![CDATA[As Lightning payment<br><br><font color=#999999><small>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</small></font>]]></string>
-    <string name="btc_receive_option"><![CDATA[As Bitcoin transaction<br><br><font color=#999999><small>make a QR-code with your current wallet address, can be used to receive regular on-chain transactions</small></font>]]></string>
+    <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><br><br><font color=#999999><small>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</small></font>]]></string>
+    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><br><br><font color=#999999><small>make a QR-code with your current wallet address, can be used to receive regular on-chain transactions</small></font>]]></string>
     <string name="send_paste">Paste a Payment Request</string>
     <string name="send_scan_qr">Scan a QR code</string>
 
@@ -168,7 +168,7 @@
     <string name="err_ln_in_flight">Failed because this payment is currently in-flight</string>
     <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 
-    <string name="err_ln_6_confs">Can\'t ask for payments because a funding Bitcoin transaction has not got 6 confirmations yet</string>
+    <string name="err_ln_6_confs">Can\'t ask for Lightning payments because a channel funding Bitcoin transaction has not got 6 confirmations yet</string>
     <string name="err_ln_reserve_unspent">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving</string>
     <string name="err_ln_fee_overflow"><![CDATA[Failed because this payment combined with Bitcoin <a href=http://lightning-wallet.com/using-lightning-wallet#commit-transaction-fee>commit transaction</a> fee exceeds your unspendable channel reserve<br><br>reserve %1$s<br>sending %2$s<br>missing %3$s]]></string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>

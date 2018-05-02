@@ -84,6 +84,14 @@ object Utils {
   def msatInFiat(milliSatoshi: MilliSatoshi) = currentRate map {
     perBtc => milliSatoshi.amount * perBtc / BtcDenomination.factor
   }
+
+  def msatInFiatHuman(ms: MilliSatoshi) = msatInFiat(ms) match {
+    case Success(amt) if fiatName == strYuan => s"≈ ${formatFiat format amt} cny"
+    case Success(amt) if fiatName == strEuro => s"≈ ${formatFiat format amt} eur"
+    case Success(amt) if fiatName == strYen => s"≈ ${formatFiat format amt} jpy"
+    case Success(amt) => s"≈ ${formatFiat format amt} usd"
+    case _ => new String
+  }
 }
 
 trait TimerActivity extends AppCompatActivity { me =>
@@ -196,14 +204,16 @@ trait TimerActivity extends AppCompatActivity { me =>
       val livePerTxFee: MilliSatoshi = estimate.tx.getFee
       val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
 
+      val inFiatLive = msatInFiatHuman(livePerTxFee)
+      val inFiatRisky = msatInFiatHuman(riskyPerTxFee)
       val markedLivePerTxFee = coloredOut(livePerTxFee)
       val markedRiskyPerTxFee = coloredOut(riskyPerTxFee)
-      val txtFeeLive = getString(fee_live) format markedLivePerTxFee
-      val txtFeeRisky = getString(fee_risky) format markedRiskyPerTxFee
-      val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
+      val txtFeeLive = getString(fee_live).format(markedLivePerTxFee, inFiatLive)
+      val txtFeeRisky = getString(fee_risky).format(markedRiskyPerTxFee, inFiatRisky)
       val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
       val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
+      val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
       def proceed = lst.getCheckedItemPosition match {
         // Allow user to choose an economical fee when sending a manual transaction

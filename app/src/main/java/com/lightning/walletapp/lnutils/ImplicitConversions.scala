@@ -4,7 +4,6 @@ import com.lightning.walletapp.Utils.app
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
 import org.bitcoinj.core.Utils.HEX
-import org.bitcoinj.core.TxWrap
 import android.text.Html
 
 

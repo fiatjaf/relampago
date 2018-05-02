@@ -16,7 +16,7 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import android.provider.Settings.{System => FontSystem}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
@@ -230,14 +230,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   def showDenomChooser = {
     val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
-
-    val walletTotalFiat = msatInFiat(walletTotalSum) match {
-      case Success(amt) if fiatName == strYuan => s"<small><font color=#999999>≈ ${formatFiat format amt} cny</font></small>"
-      case Success(amt) if fiatName == strEuro => s"<small><font color=#999999>≈ ${formatFiat format amt} eur</font></small>"
-      case Success(amt) if fiatName == strYen => s"<small><font color=#999999>≈ ${formatFiat format amt} jpy</font></small>"
-      case Success(amt) => s"<small><font color=#999999>≈ ${formatFiat format amt} usd</font></small>"
-      case _ => new String
-    }
+    val inFiat = msatInFiatHuman(walletTotalSum)
 
     val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
@@ -257,7 +250,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
     denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    stateContent setText s"${coloredIn apply walletTotalSum}<br>$walletTotalFiat".html
+    stateContent setText s"${coloredIn apply walletTotalSum}<br><small>$inFiat</small>".html
     showForm(negBuilder(dialog_ok, title, form).create)
   }
 

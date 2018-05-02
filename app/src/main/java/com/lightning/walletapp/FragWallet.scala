@@ -222,6 +222,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def generatePopup = {
+      val inFiat = msatInFiatHuman(info.firstSum)
       val rd = emptyRD(info.pr, info.firstMsat, useCache = false)
       val humanStatus = s"<strong>${paymentStates apply info.actualStatus}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
@@ -245,24 +246,23 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       info.incoming match {
         case 0 if info.lastMsat == 0 && info.lastExpiry == 0 =>
-          // Payment has net been sent to a peer yet so real fee is unknown as of now
-          val title = lnTitleOutNoFee.format(humanStatus, coloredOut apply info.firstSum)
+          // Payment has not been sent yet because on-chain wallet is still offline
+          val title = lnTitleOutNoFee.format(humanStatus, coloredOut(info.firstSum), inFiat)
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
         case 0 =>
-          val feeMsat = info.lastMsat - info.firstMsat
-          val feePercent = feeMsat / (info.firstMsat / 100D)
-          val humanFee = coloredOut apply MilliSatoshi(feeMsat)
-          val expiry = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
-          val title = lnTitleOut.format(humanStatus, coloredOut apply info.firstSum, humanFee, feePercent)
-          val title1 = if (info.actualStatus == WAITING) s"$expiry<br>$title" else title
+          val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
+          val feeAsPercent = fee.amount / (info.firstMsat / 100D)
+          val title = lnTitleOut.format(humanStatus, coloredOut(info.firstSum), coloredOut(fee), feeAsPercent, inFiat)
+          val titleWithExpiry = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight) + "<br>" + title
+          val title1 = if (info.actualStatus == WAITING) titleWithExpiry else title
 
           // Allow user to retry this payment using excluded nodes and channels when it is a failure and pr is not expired yet
           if (info.actualStatus != FAILURE || !info.pr.isFresh) showForm(negBuilder(dialog_ok, title1.html, detailsWrapper).create)
           else mkForm(doSend(rd), none, baseBuilder(title1.html, detailsWrapper), dialog_retry, dialog_cancel)
 
         case 1 =>
-          val title = lnTitleIn.format(humanStatus, coloredIn apply info.firstSum)
+          val title = lnTitleIn.format(humanStatus, coloredIn(info.firstSum), inFiat)
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
       }
     }
@@ -307,20 +307,24 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case _ if wrap.isDead => sumOut format txsConfs.last
 
         case _ if wrap.visibleValue.isPositive =>
+          val amount: MilliSatoshi = wrap.visibleValue
+          val inFiat: String = msatInFiatHuman(ms = amount)
           val incomingTitle = app.getString(btc_incoming_title)
-          incomingTitle.format(confs, coloredIn apply wrap.visibleValue)
+          incomingTitle.format(confs, coloredIn(amount), inFiat)
 
         case None =>
-          val paymentSum = Satoshi(-wrap.visibleValue.value)
+          val amount = Satoshi(-wrap.visibleValue.value)
+          val inFiat: String = msatInFiatHuman(ms = amount)
           val titleNoFee = app.getString(btc_outgoing_title_no_fee)
-          titleNoFee.format(confs, coloredOut apply paymentSum)
+          titleNoFee.format(confs, coloredOut(amount), inFiat)
 
         case Some(fee) =>
-          val paymentSum = Satoshi(-wrap.visibleValue.value)
-          val feePercent = fee.value / (paymentSum.amount / 100D)
+          val amount = Satoshi(-wrap.visibleValue.value)
+          val inFiat: String = msatInFiatHuman(ms = amount)
+          val feePercent = fee.value / (amount.amount / 100D)
           val titleWithFee = app.getString(btc_outgoing_title)
-          titleWithFee.format(confs, coloredOut(paymentSum),
-            coloredOut(fee), feePercent)
+          titleWithFee.format(confs, coloredOut(amount),
+            coloredOut(fee), feePercent, inFiat)
       }
 
       // See if CPFP can be applied
