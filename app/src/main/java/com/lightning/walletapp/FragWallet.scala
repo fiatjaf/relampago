@@ -22,6 +22,7 @@ import android.os.{Bundle, Handler}
 import scala.util.{Failure, Success, Try}
 import android.database.{ContentObserver, Cursor}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
+import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
@@ -29,7 +30,6 @@ import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
-import org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import android.support.v4.app.Fragment
@@ -445,13 +445,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
         val hint = app.getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
-        val desc = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
         val rateManager = new RateManager(hint, content)
 
         def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
           // Once again filter out those channels which can receive a supplied amount
+          val description = content.findViewById(R.id.inputDescription).asInstanceOf[EditText].getText.toString.trim
           val routes = chansWithRoutes.filterKeys(channel => estimateCanReceive(channel) >= sum.amount).values.toVector
-          val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, desc.getText.toString.trim, None, routes)
+          val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, description, None, routes)
           val rd = emptyRD(pr, sum.amount, useCache = true)
 
           db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.paymentHashString)
@@ -527,13 +527,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
     val rateManager = new RateManager(hint, form)
 
-    def next(msat: MilliSatoshi) = new TxProcessor {
-      def futureProcess(unsignedRequest: SendRequest) = {
-        val signedRequest = app.kit.sign(unsignedRequest).tx
-        app.kit blockingSend signedRequest
-      }
+    def next(ms: MilliSatoshi) = new TxProcessor {
+      def futureProcess(unsignedRequest: SendRequest) =
+        app.kit blockingSend app.kit.sign(unsignedRequest).tx
 
-      val pay = AddrData(msat, addr)
+      val pay = AddrData(ms, addr)
       def onTxFail(sendingError: Throwable) = {
         val bld = baseBuilder(messageWhenMakingTx(sendingError), null)
         mkForm(sendBtcPopup(addr), none, bld, dialog_ok, dialog_cancel)
@@ -541,7 +539,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def sendAttempt(alert: AlertDialog): Unit = rateManager.result match {
-      case Success(ms) if MIN_NONDUST_OUTPUT isGreaterThan ms => app toast dialog_sum_small
+      case Success(ms) if MIN isGreaterThan ms => app toast dialog_sum_small
       case Failure(probablyEmptySum) => app toast dialog_sum_empty
       case Success(ms) => rm(alert)(next(ms).start)
     }
