@@ -33,22 +33,27 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   private[this] var chainInSync = false
 
   app.kit.peerGroup addConnectedEventListener new PeerConnectedEventListener {
-    // We can not send payments until we know current blockchain height or else a channel may be closed!
-    def onPeerConnected(peer: Peer, peerCount: Int) = runAnd(chainInSync = peerCount > 2)(maybeResolvePending)
+    // We can not send payments until we know current blockchain height or else a channel may be closed
+    def onPeerConnected(peer: Peer, peerCount: Int) = runAnd(chainInSync = peerCount > 2)(resolvePending)
   }
 
   def addPendingPayment(rd: RoutingData) = {
+    // Add payment to unsents and try to resolve it
     unsent = unsent.updated(rd.pr.paymentHash, rd)
     me insertOrUpdateOutgoingPayment rd
-    maybeResolvePending
+    resolvePending
     uiNotify
   }
 
-  def maybeResolvePending = if (chainInSync) {
-    def sendToChan(fullOrEmptyRD: FullOrEmptyRD) = app.ChannelManager.sendEither(fullOrEmptyRD, failOnUI)
-    for (_ \ rd <- unsent) app.ChannelManager.fetchRoutes(rd).foreach(sendToChan, exc => me failOnUI rd)
+  def resolvePending = if (chainInSync) {
+    // Send all pending payments if possible
+    unsent.values foreach fetchAndSend
     unsent = Map.empty
   }
+
+  def fetchAndSend(rd: RoutingData) = app.ChannelManager.fetchRoutes(rd)
+    .foreach(foeRD => app.ChannelManager.sendEither(foeRD, failOnUI),
+      exception => me failOnUI rd)
 
   private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
   def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
@@ -97,10 +102,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def newRoutes(rd: RoutingData) =
     app.ChannelManager checkIfSendable rd match {
       case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
-        // Local conditions have not changed and we are still able to send this payment
-        def sendToChan(fullOrEmptyRD: FullOrEmptyRD) = app.ChannelManager.sendEither(fullOrEmptyRD, failOnUI)
-        val req = app.ChannelManager fetchRoutes rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-        req.foreach(sendToChan, exc => me failOnUI rd)
+        // Local conditions have not changed and we are still able to resend
+        me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
 
       case _ =>
         // UI will be updated a bit later
@@ -241,7 +244,6 @@ object RouteWrap {
 }
 
 object BadEntityWrap {
-  // entity is either nodeId or shortChannelId
   val putEntity = (entity: String, span: Long, msat: Long) => {
     db.change(BadEntityTable.newSql, entity, System.currentTimeMillis + span, msat)
     db.change(BadEntityTable.updSql, System.currentTimeMillis + span, msat, entity)
@@ -292,7 +294,7 @@ object Notificator {
 
   def scheduleResyncNotificationOnceAgain =
     try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-      System.currentTimeMillis + 1000L * 3600 * 24 * 21, getIntent) catch none
+      System.currentTimeMillis + 1000L * 3600 * 24 * 14, getIntent) catch none
 }
 
 class Notificator extends BroadcastReceiver {
