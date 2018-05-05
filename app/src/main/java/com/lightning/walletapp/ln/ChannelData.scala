@@ -15,6 +15,7 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.LNMessageVector
 import org.bitcoinj.wallet.SendRequest
 import fr.acinq.eclair.UInt64
 import language.postfixOps
+import scala.util.Try
 
 
 sealed trait Command
@@ -78,23 +79,24 @@ case class ClosingData(announce: NodeAnnouncement,
       remoteCommit.flatMap(_.getState) ++ nextRemoteCommit.flatMap(_.getState) ++
       refundRemoteCommit.flatMap(_.getState)
 
-  def bestClosing = {
+  def bestClosing = Try {
     val allClosings = mutualClose.map(Left.apply) ++
       revokedCommit.map(Right.apply) ++ localCommit.map(Right.apply) ++
         remoteCommit.map(Right.apply) ++ nextRemoteCommit.map(Right.apply) ++
         refundRemoteCommit.map(Right.apply)
 
     allClosings maxBy {
-      case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ _ => cfs }
-      case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
+      // This only selects alive commitTxs, will throw if none found
+      case Left(mutualClosingTx) => getStatus(mutualClosingTx.txid) match { case cfs \ false => cfs }
+      case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ false => cfs }
     }
   }
 
   def isOutdated = {
-    val allConfirmedOrDead = bestClosing match {
-      case Left(mutualClosingTx) => getStatus(mutualClosingTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }
-      case Right(info) => info.getState.map(_.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
-    }
+    val allConfirmedOrDead = bestClosing map {
+      case Left(mutualClosingTx) => getStatus(mutualClosingTx.txid) match { case cfs \ _ => cfs > minDepth }
+      case Right(info) => info.getState.map(_.txn.txid).map(getStatus) forall { case cfs \ isDead => cfs > minDepth || isDead }
+    } getOrElse true
 
     val hardDelay: Long = closedAt + 1000L * 3600 * 24 * 30
     allConfirmedOrDead || hardDelay < System.currentTimeMillis

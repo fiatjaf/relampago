@@ -138,8 +138,6 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageOther = UITask {
       // Just show basic channel info here since we don't know the specifics about this one
       val text = basic.format(chan.state, alias, started, coloredIn apply capacity).html
-
-      // Hide button
       lnOpsAction setVisibility View.GONE
       lnOpsDescription setText text
     }
@@ -185,46 +183,51 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageClosing(close: ClosingData) = UITask {
       // Show the best current closing with most confirmations
       // since multiple different closings may be present at once
-      val closed = me time new Date(close.closedAt)
-      lnOpsAction setVisibility View.GONE
+      // or no closing at all in case like restoking a closed commit
 
-      close.bestClosing match {
-        case Left(mutualClosingTx) =>
-          val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
-          val status = humanStatus apply getStatus(mutualClosingTx.txid)
-          val myFee = coloredOut(capacity - mutualClosingTx.allOutputsAmount)
-          val view = commitStatus.format(mutualClosingTx.txid.toString, status, myFee)
-          lnOpsDescription setText bilateralClosing.format(chan.state, alias, started,
-            closed, coloredIn(capacity), coloredIn(refundable), view).html
+      val bestClosingTry = close.bestClosing
+      if (bestClosingTry.isFailure) manageOther.run else {
+        val closedTimestamp = me time new Date(close.closedAt)
+        lnOpsAction setVisibility View.GONE
 
-        case Right(info) =>
-          val tier12View = info.getState collect {
-            case ShowDelayed(_ \ true \ _, _, fee, amt) =>
-              val deadDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              host.getString(ln_ops_chan_unilateral_status_dead).format(deadDetails, coloredIn apply amt)
+        bestClosingTry foreach {
+          case Left(mutualClosingTx) =>
+            val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
+            val status = humanStatus apply getStatus(mutualClosingTx.txid)
+            val myFee = coloredOut(capacity - mutualClosingTx.allOutputsAmount)
+            val view = commitStatus.format(mutualClosingTx.txid.toString, status, myFee)
+            lnOpsDescription setText bilateralClosing.format(chan.state, alias, started,
+              closedTimestamp, coloredIn(capacity), coloredIn(refundable), view).html
 
-            case ShowReady(_, fee, amt) =>
-              val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
+          case Right(info) =>
+            val tier12View = info.getState collect {
+              case ShowDelayed(_ \ true \ _, _, fee, amt) =>
+                val deadDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
+                host.getString(ln_ops_chan_unilateral_status_dead).format(deadDetails, coloredIn apply amt)
 
-            case show @ ShowDelayed(_ \ false \ _, _, fee, amt) if show.isPublishable =>
-              // This fails if input is spent by our peer, happens when we publish a revoked commit
-              val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
+              case ShowReady(_, fee, amt) =>
+                val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
+                host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
 
-            case ShowDelayed(_ \ false \ left, _, fee, amt) =>
-              val leftDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
-          }
+              case show @ ShowDelayed(_ \ false \ _, _, fee, amt) if show.isPublishable =>
+                // This fails if input is spent by our peer, happens when we publish a revoked commit
+                val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
+                host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
 
-          val startedByWhom = host getString startedBy(close)
-          val humanTier12View = tier12View take 2 mkString "<br><br>"
-          val status = humanStatus apply getStatus(info.commitTx.txid)
-          val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
-          val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
-          val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
-          lnOpsDescription setText unilateralClosing.format(chan.state, startedByWhom, alias, started,
-            closed, coloredIn(capacity), commitView + refundsView).html
+              case ShowDelayed(_ \ false \ left, _, fee, amt) =>
+                val leftDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
+                statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
+            }
+
+            val startedByWhom = host getString startedBy(close)
+            val humanTier12View = tier12View take 2 mkString "<br><br>"
+            val status = humanStatus apply getStatus(info.commitTx.txid)
+            val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
+            val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
+            val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
+            lnOpsDescription setText unilateralClosing.format(chan.state, startedByWhom, alias, started,
+              closedTimestamp, coloredIn(capacity), commitView + refundsView).html
+        }
       }
     }
 
