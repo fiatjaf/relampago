@@ -117,8 +117,8 @@
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
-    <string name="btc_empty">Empty wallet</string>
     <string name="ln_empty">No open channels</string>
+    <string name="btc_empty">Empty btc wallet</string>
     <string name="btc_status_online"><![CDATA[<font color=#65BD65>Bitcoin wallet is online</font>]]></string>
     <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
 

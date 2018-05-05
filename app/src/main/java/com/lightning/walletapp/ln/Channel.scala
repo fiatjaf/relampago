@@ -1,6 +1,5 @@
 package com.lightning.walletapp.ln
 
-import scala.concurrent.duration._
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Channel._
@@ -14,7 +13,6 @@ import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
-import rx.lang.scala.{Observable => Obs}
 import scala.util.{Failure, Success}
 
 
@@ -461,11 +459,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
-        // Wait for 5 seconds to catch their remote commit, CMDForceClose won't work in that case
-        Obs.just(CMDForceClose).delay(5.seconds).foreach(force => me process force)
-
-
-      case (some: HasCommitments, CMDForceClose, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
         // REFUNDING is an exception here: no matter what happens we can't spend local in that state
         startLocalClose(some)
 

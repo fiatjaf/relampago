@@ -151,13 +151,13 @@ object Helpers {
 
       val claimSuccessTxs = for {
         HtlcTimeoutTx(_, _, add) <- timeout
-        paymentInfo <- bag.getPaymentInfo(add.paymentHash).toOption
+        info <- bag.getPaymentInfo(add.paymentHash).toOption
         claimHtlcSuccessTx <- Scripts.makeClaimHtlcSuccessTx(finder, localHtlcPrivkey.publicKey,
           remoteHtlcPubkey, remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey,
           add, feeRate, commitments.localParams.dustLimit).toOption
 
         sig = Scripts.sign(claimHtlcSuccessTx, localHtlcPrivkey)
-        signed = Scripts.addSigs(claimHtlcSuccessTx, sig, paymentInfo.preimage)
+        signed = Scripts.addSigs(claimHtlcSuccessTx, sig, info.preimage)
         success <- Scripts.checkValid(signed).toOption
       } yield success
 

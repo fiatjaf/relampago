@@ -24,7 +24,6 @@ case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
 case class CMDFeerate(sat: Long) extends Command
 case object CMDHTLCProcess extends Command
-case object CMDForceClose extends Command
 case object CMDShutdown extends Command
 case object CMDOffline extends Command
 case object CMDProceed extends Command
@@ -97,7 +96,7 @@ case class ClosingData(announce: NodeAnnouncement,
       case Right(info) => info.getState.map(_.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
     }
 
-    val hardDelay: Long = closedAt + 1000L * 3600 * 24 * 90
+    val hardDelay: Long = closedAt + 1000L * 3600 * 24 * 30
     allConfirmedOrDead || hardDelay < System.currentTimeMillis
   }
 }

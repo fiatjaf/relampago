@@ -20,11 +20,13 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import android.os.{Bundle, Handler}
 import scala.util.{Failure, Success, Try}
+import org.bitcoinj.wallet.{SendRequest, Wallet}
 import android.database.{ContentObserver, Cursor}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
+import org.bitcoinj.wallet.listeners.WalletCoinsReceivedEventListener
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
@@ -33,7 +35,6 @@ import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import android.support.v4.app.Fragment
-import org.bitcoinj.wallet.SendRequest
 import android.app.AlertDialog
 import android.content.Intent
 import java.util.TimerTask
@@ -155,11 +156,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  val itemsListListener = new TxTracker {
-    override def coinsReceived(txj: Transaction) = guard(txj)
-    override def coinsSent(txj: Transaction) = guard(txj)
+  val itemsListListener = new TxTracker with WalletCoinsReceivedEventListener {
+    // isGreaterThan check because as of now both listeners are fired on incoming and outgoing txs
+    def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (a isGreaterThan b) guard(txj)
+    def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (b isGreaterThan a) guard(txj)
+
     override def txConfirmed(txj: Transaction) = {
-      // Update title amounts, mark as confirmed
+      // Update title amounts, mark txj as confirmed
       UITask(adapter.notifyDataSetChanged).run
       Vibrator.vibrate
       updTitle.run
@@ -406,6 +409,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         onFail(message.format(reserve, sending, missing).html)
 
       case _ \ CMDAddImpossible(_, code) =>
+        // One of many generic reasons
         onFail(host getString code)
 
       case chan \ error =>

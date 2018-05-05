@@ -3,6 +3,7 @@ package com.lightning.walletapp
 import R.string._
 import spray.json._
 import org.bitcoinj.core._
+
 import scala.concurrent.duration._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
@@ -15,7 +16,6 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import rx.lang.scala.{Observable => Obs}
 import fr.acinq.bitcoin.{BinaryData, Crypto}
 import android.content.{ClipData, ClipboardManager, Context}
@@ -23,17 +23,21 @@ import org.bitcoinj.uri.{BitcoinURI, BitcoinURIParseException}
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
+
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.walletapp.lnutils.olympus.CloudAct
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import fr.acinq.bitcoin.Crypto.PublicKey
-import org.bitcoinj.wallet.SendRequest
+import org.bitcoinj.wallet.{SendRequest, Wallet}
 import java.net.InetSocketAddress
+
 import android.app.Application
 import android.widget.Toast
+
 import language.postfixOps
 import scala.util.Try
 import java.io.File
@@ -145,18 +149,20 @@ class WalletApp extends Application { me =>
     }
 
     val chainEventsListener = new TxTracker with BlocksListener {
-      override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
       def tellHeight(left: Int) = if (left < 1) for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
       override def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
       override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
 
-      override def coinsSent(txj: Transaction) = {
-        // We always attempt to extract a payment preimage
-        // just assuming any incoming tx may contain it
+      override def txConfirmed(txj: Transaction) =
+        for (c <- notClosing) c process CMDConfirmed(txj)
+
+      override def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = {
+        // We always attempt to extract a payment preimage by just assuming any incoming tx
+        // may contain it, also send all txs to chans, each of them will sort every tx out
 
         val spent = CMDSpent(txj)
-        bag.extractPreimage(spent.tx)
         for (c <- all) c process spent
+        bag.extractPreimage(spent.tx)
       }
     }
 
