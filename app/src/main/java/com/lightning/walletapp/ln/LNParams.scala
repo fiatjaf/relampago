@@ -22,7 +22,7 @@ object LNParams { me =>
   final val minHtlcValue = MilliSatoshi(1000L)
   final val maxHtlcValue = MilliSatoshi(2000000000L)
   final val minChannelCapacity = MilliSatoshi(200000000L)
-  final val maxChannelCapacity = MilliSatoshi(16777216000L)
+  final val maxChannelCapacity = Satoshi(16777215L)
 
   var db: LNOpenHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
