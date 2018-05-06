@@ -93,10 +93,18 @@ object PaymentInfo {
 
   private[this] var replacedChans = Set.empty[Long]
   def replaceRoute(rd: RoutingData, upd: ChannelUpdate) = {
-    // In some cases we can just replace a faulty hop with a supplied one, but only do this once per channel to avoid infinite loops
-    val route1 = rd.usedRoute map { case hop if hop.shortChannelId == upd.shortChannelId => upd toHop hop.nodeId case hop => hop }
-    val rd1 = rd.copy(routes = route1 +: rd.routes)
+    // In some cases we can just replace a faulty hop with a supplied one
+    // but only do this once per each channel to avoid infinite loops
     replacedChans += upd.shortChannelId
+
+    val route1 = rd.usedRoute map { hop =>
+      // Replace a single hop and return it otherwise unchanged
+      val shouldReplace = hop.shortChannelId == upd.shortChannelId
+      if (shouldReplace) upd toHop hop.nodeId else hop
+    }
+
+    // Put updated route back, nothing to blacklist
+    val rd1 = rd.copy(routes = route1 +: rd.routes)
     Some(rd1) -> Vector.empty
   }
 
