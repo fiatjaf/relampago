@@ -134,14 +134,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   def onNfcStateDisabled = none
   def onNfcStateEnabled = none
 
-  def readNdefMessage(msg: Message) = try {
-    val data = readFirstTextNdefMessage(msg)
-    app.TransData recordValue data
-    me checkTransData null
-
-  } catch { case _: Throwable =>
-    // Could not process a message
-    app toast err_no_data
+  def readNdefMessage(m: Message) = {
+    def fail(err: Throwable) = app toast err_no_data
+    def nfcSuccess(unitRecordResult: Unit) = me checkTransData null
+    <(app.TransData recordValue ndefMessageString(m), fail)(nfcSuccess)
   }
 
   // EXTERNAL DATA CHECK
@@ -157,10 +153,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       case _ =>
     }
 
-    app.TransData.value match {
-      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-      case otherwise => app.TransData.value = null
-    }
+    // Clear value in all cases except NodeAnnouncement, we'll need this one
+    val isNodeAnnounce = app.TransData.value.isInstanceOf[NodeAnnouncement]
+    if (isNodeAnnounce) me goTo classOf[LNStartFundActivity]
+    else app.TransData.value = null
   }
 
   // BUTTONS REACTIONS
@@ -203,7 +199,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     def pasteAddressOrPaymentRequest = rm(alert) {
       app.getBufferTry map app.TransData.recordValue match {
-        case Failure(noUsableDataFound) => app toast err_no_data
+        // Buffer may contain junk so always account for error
+        case Failure(why) => app toast err_no_data
         case _ => me checkTransData null
       }
     }
@@ -356,6 +353,7 @@ class FragScan extends Fragment with BarcodeCallback { me =>
   lazy val host = getActivity.asInstanceOf[WalletActivity]
   var lastAttempt = System.currentTimeMillis
   var barcodeReader: BarcodeView = _
+  import host._
 
   override def onCreateView(inflator: LayoutInflater, vg: ViewGroup, bn: Bundle) =
     inflator.inflate(R.layout.frag_view_pager_scan, vg, false)
@@ -381,14 +379,11 @@ class FragScan extends Fragment with BarcodeCallback { me =>
     rawText => if (System.currentTimeMillis - lastAttempt > 3000) tryParseQR(rawText)
   }
 
-  def tryParseQR(text: String) = try {
-    // May throw which is expected and fine
+  def tryParseQR(text: String) = {
+    def decodeSuccess(unitRecordResult: Unit) = host checkTransData null
+    def fail(err: Throwable) = runAnd(app toast err_no_data)(barcodeReader.resume)
+    <(app.TransData recordValue text, fail)(decodeSuccess)
     lastAttempt = System.currentTimeMillis
-    app.TransData recordValue text
-    host checkTransData null
-
-  } catch app.TransData.onFail { code =>
-    // Inform user about error details
-    app toast host.getString(code)
+    barcodeReader.pause
   }
 }

@@ -20,8 +20,8 @@ object ImplicitConversions {
 }
 
 class StringOps(source: String) {
+  def html = Html.fromHtml(source, Html.FROM_HTML_MODE_LEGACY)
   def binary = BinaryData(source getBytes "UTF-8")
   def hex = HEX.encode(source getBytes "UTF-8")
   def noSpaces = source.replace(" ", "")
-  def html = Html fromHtml source
 }

@@ -236,7 +236,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     }
 
     def messageWhenMakingTx: PartialFunction[Throwable, CharSequence] = {
-      case _: ExceededMaxTransactionSize => app getString err_transaction_too_large
+      case _: ExceededMaxTransactionSize => app getString err_tx_too_large
       case _: CouldNotAdjustDownwards => app getString err_empty_shrunk
       case notEnough: InsufficientMoneyException =>
 

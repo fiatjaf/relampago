@@ -26,7 +26,7 @@ class LNStartActivity extends TimerActivity with SearchBar { me =>
 
   private val ohHiMarkKey = PublicKey("03dc39d7f43720c2c0f86778dfd2a77049fa4a44b4f0a8afb62f3921567de41375")
   private val enduranceKey = PublicKey("03933884aaf1d6b108397e5efe5c86bcf2d8ca8d2f700eda99db9214fc2712b134")
-  private val endurance = HardcodedNodeView(app.mkNodeAnnouncement(enduranceKey, "34.250.234.192", 9735), "<i>Recommended high liquidity node</i>")
+  private val endurance = HardcodedNodeView(app.mkNodeAnnouncement(enduranceKey, "34.250.234.192", 9735), "<i>ACINQ node</i>")
   private val ohHiMark = HardcodedNodeView(app.mkNodeAnnouncement(ohHiMarkKey, "192.210.203.16", 9735), "<i>Bitcoin + Lightning node</i>")
 
   val adapter = new BaseAdapter {
@@ -65,7 +65,7 @@ class LNStartActivity extends TimerActivity with SearchBar { me =>
 
       def process(ask: String, res: AnnounceChansNumVec) = {
         val remoteNodeViewWraps = res map RemoteNodeView.apply
-        val augmentedViews = endurance +: /*ohHiMark +:*/ remoteNodeViewWraps
+        val augmentedViews = endurance +: ohHiMark +: remoteNodeViewWraps
         nodes = if (ask.isEmpty) augmentedViews else remoteNodeViewWraps
         UITask(adapter.notifyDataSetChanged).run
       }
