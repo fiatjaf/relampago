@@ -15,7 +15,6 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.LNMessageVector
 import org.bitcoinj.wallet.SendRequest
 import fr.acinq.eclair.UInt64
 import language.postfixOps
-import scala.util.Try
 
 
 sealed trait Command
@@ -79,24 +78,23 @@ case class ClosingData(announce: NodeAnnouncement,
       remoteCommit.flatMap(_.getState) ++ nextRemoteCommit.flatMap(_.getState) ++
       refundRemoteCommit.flatMap(_.getState)
 
-  def bestClosing = Try {
+  def bestClosing = {
     val allClosings = mutualClose.map(Left.apply) ++
       revokedCommit.map(Right.apply) ++ localCommit.map(Right.apply) ++
         remoteCommit.map(Right.apply) ++ nextRemoteCommit.map(Right.apply) ++
         refundRemoteCommit.map(Right.apply)
 
     allClosings maxBy {
-      // This only selects alive commitTxs, will throw if none found
-      case Left(mutualClosingTx) => getStatus(mutualClosingTx.txid) match { case cfs \ false => cfs }
-      case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ false => cfs }
+      case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ _ => cfs }
+      case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
     }
   }
 
   def isOutdated = {
-    val allConfirmedOrDead = bestClosing map {
-      case Left(mutualClosingTx) => getStatus(mutualClosingTx.txid) match { case cfs \ _ => cfs > minDepth }
+    val allConfirmedOrDead = bestClosing match {
+      case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }
       case Right(info) => info.getState.map(_.txn.txid).map(getStatus) forall { case cfs \ isDead => cfs > minDepth || isDead }
-    } getOrElse true
+    }
 
     val hardDelay: Long = closedAt + 1000L * 3600 * 24 * 30
     allConfirmedOrDead || hardDelay < System.currentTimeMillis
@@ -235,14 +233,10 @@ object Commitments {
   def addRemoteProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.remoteChanges.proposed).using(_ :+ proposal)
   def addLocalProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.localChanges.proposed).using(_ :+ proposal)
 
-  def isHtlcExpired(htlc: Htlc, dustLimit: Satoshi, height: Long) =
-    (htlc.add.amount < dustLimit && height - 432 >= htlc.add.expiry) ||
-      (htlc.add.amount >= dustLimit && height >= htlc.add.expiry)
-
   def hasExpiredHtlcs(c: Commitments, height: Long) =
-    c.localCommit.spec.htlcs.exists(htlc => isHtlcExpired(htlc, c.localParams.dustLimit, height) && !htlc.incoming) ||
-      c.remoteCommit.spec.htlcs.exists(htlc => isHtlcExpired(htlc, c.localParams.dustLimit, height) && htlc.incoming) ||
-      latestRemoteCommit(c).spec.htlcs.exists(htlc => isHtlcExpired(htlc, c.localParams.dustLimit, height) && htlc.incoming)
+    c.localCommit.spec.htlcs.exists(htlc => !htlc.incoming && height - 72 >= htlc.add.expiry) ||
+      c.remoteCommit.spec.htlcs.exists(htlc => htlc.incoming && height - 72 >= htlc.add.expiry) ||
+      latestRemoteCommit(c).spec.htlcs.exists(htlc => htlc.incoming && height - 72 >= htlc.add.expiry)
 
   def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = {
     val remoteSigned = CommitmentSpec.findHtlcById(commitments.localCommit.spec, htlcId, incomingRelativeToLocal)
