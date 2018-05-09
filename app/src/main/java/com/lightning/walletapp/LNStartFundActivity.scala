@@ -62,18 +62,18 @@ class LNStartFundActivity extends TimerActivity { me =>
     val freshChan = app.ChannelManager.createChannel(Set.empty, InitData apply announce)
 
     lazy val openListener = new ConnectionListener with ChannelListener { self =>
-      override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
-        case setupMsg: ChannelSetupMessage if ann == announce => freshChan process setupMsg
-        case err: Error if ann == announce => onError(freshChan -> err.exception)
+      override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+        case msg: ChannelSetupMessage if nodeId == announce.nodeId => freshChan process msg
+        case err: Error if nodeId == announce.nodeId => onError(freshChan -> err.exception)
         case _ =>
       }
 
       val noLossProtect = new LightningException(me getString err_ln_no_data_loss_protect)
       val peerOffline = new LightningException(me getString err_ln_peer_offline format announce.addresses.head.toString)
-      override def onOperational(ann: NodeAnnouncement, their: Init) = if (ann == announce) askForFunding(their).run
-      override def onIncompatible(ann: NodeAnnouncement) = if (ann == announce) onError(freshChan -> noLossProtect)
-      override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) onError(freshChan -> peerOffline)
-      override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) onError(freshChan -> peerOffline)
+      override def onOperational(nodeId: PublicKey, their: Init) = if (nodeId == announce.nodeId) askForFunding(their).run
+      override def onIncompatible(nodeId: PublicKey) = if (nodeId == announce.nodeId) onError(freshChan -> noLossProtect)
+      override def onTerminalError(nodeId: PublicKey) = if (nodeId == announce.nodeId) onError(freshChan -> peerOffline)
+      override def onDisconnect(nodeId: PublicKey) = if (nodeId == announce.nodeId) onError(freshChan -> peerOffline)
 
       override def onBecome = {
         case (_, WaitFundingData(_, cmd, accept), WAIT_FOR_ACCEPT, WAIT_FOR_FUNDING) =>
@@ -165,7 +165,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     whenBackPressed = UITask {
       freshChan.listeners -= openListener
       ConnectionManager.listeners -= openListener
-      ConnectionManager.connections(announce).disconnect
+      ConnectionManager.connections(announce.nodeId).disconnect
       finish
     }
 

@@ -106,8 +106,8 @@ class WalletApp extends Application { me =>
     val operationalListeners = Set(broadcaster, bag, GossipCatcher)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
-    def fromNode(of: Vector[Channel], ann: NodeAnnouncement) = for (c <- of if c.data.announce == ann) yield c
     def canSendNow(amount: Long) = for (c <- all if isOperationalOpen(c) && estimateCanSend(c) >= amount) yield c
+    def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
@@ -116,22 +116,22 @@ class WalletApp extends Application { me =>
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
     val socketEventsListener = new ConnectionListener {
-      override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
+      override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         // Chan level Error will fall under ChannelMessage case but node level Error should be sent to all chans
-        case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, ann).foreach(_ process err)
-        case cm: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains cm.channelId).foreach(_ process cm)
-        case cu: ChannelUpdate => fromNode(notClosing, ann).foreach(_ process cu)
+        case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, nodeId).foreach(_ process err)
+        case msg: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains msg.channelId).foreach(_ process msg)
+        case cu: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process cu)
         case _ =>
       }
 
-      override def onDisconnect(ann: NodeAnnouncement) = maybeReconnect(fromNode(notClosing, ann), ann)
-      override def onOperational(ann: NodeAnnouncement, their: Init) = fromNode(notClosing, ann).foreach(_ process CMDOnline)
-      override def onTerminalError(ann: NodeAnnouncement) = fromNode(notClosing, ann).foreach(_ process CMDShutdown)
-      override def onIncompatible(ann: NodeAnnouncement) = onTerminalError(ann)
+      override def onDisconnect(nodeId: PublicKey) = maybeReconnect(fromNode(notClosing, nodeId), nodeId)
+      override def onOperational(nodeId: PublicKey, their: Init) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
+      override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDShutdown)
+      override def onIncompatible(nodeId: PublicKey) = onTerminalError(nodeId)
 
-      def maybeReconnect(cs: Vector[Channel], ann: NodeAnnouncement) = if (cs.nonEmpty) {
-        // Immediately inform affected channels and try to reconnect back again in 5 seconds
-        Obs.just(ann).delay(5.seconds).subscribe(ConnectionManager.connectTo, none)
+      def maybeReconnect(cs: Vector[Channel], nodeId: PublicKey) = if (cs.nonEmpty) {
+        val reTry = Obs.from(ConnectionManager.connections get nodeId).delay(5.seconds)
+        reTry.subscribe(w => ConnectionManager connectTo w.ann, none)
         cs.foreach(_ process CMDOffline)
       }
     }
@@ -155,8 +155,8 @@ class WalletApp extends Application { me =>
     }
 
     def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel { self =>
-      def STORE(hasCommitmentsData: HasCommitments) = runAnd(hasCommitmentsData)(ChannelWrap put hasCommitmentsData)
-      def SEND(msg: LightningMessage) = ConnectionManager.connections.get(data.announce).foreach(_.handler process msg)
+      def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
+      def STORE(data: HasCommitments) = runAnd(data)(ChannelWrap put data)
 
       def CLOSEANDWATCH(cd: ClosingData) = {
         val commitTxs = cd.localCommit.map(_.commitTx) ++ cd.remoteCommit.map(_.commitTx) ++ cd.nextRemoteCommit.map(_.commitTx)
