@@ -85,6 +85,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val blocksTitleListener = new BlocksListener {
     def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) =
+      // Runtime optimization: avoid calling update more than once per 144 blocks
       if (left % broadcaster.blocksPerDay == 0) updTitle.run
   }
 
