@@ -10,7 +10,6 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
-import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import android.support.v4.app.NotificationCompat
@@ -19,7 +18,6 @@ import com.lightning.walletapp.MainActivity
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import com.lightning.walletapp.R
-import org.bitcoinj.core.Peer
 
 import android.app.{AlarmManager, NotificationManager, PendingIntent}
 import android.content.{BroadcastReceiver, Context, Intent}
@@ -30,12 +28,6 @@ import rx.lang.scala.{Observable => Obs}
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   private[this] var inFlightPayments = Map.empty[BinaryData, RoutingData]
   private[this] var unsent = Map.empty[BinaryData, RoutingData]
-  private[this] var chainInSync = false
-
-  app.kit.peerGroup addConnectedEventListener new PeerConnectedEventListener {
-    // We can not send payments until we know current blockchain height or else a channel may be closed
-    def onPeerConnected(peer: Peer, peerCount: Int) = runAnd(chainInSync = peerCount > 2)(resolvePending)
-  }
 
   def addPendingPayment(rd: RoutingData) = {
     // Add payment to unsents and try to resolve it
@@ -45,8 +37,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     uiNotify
   }
 
-  def resolvePending = if (chainInSync) {
-    // Send all pending payments if possible
+  def resolvePending = if (app.ChannelManager.chainHeightObtained) {
+    // Send all pending payments only if we have an updated chain height
+    // attempt to send with expiry in past will result in a closed channel
     unsent.values foreach fetchAndSend
     unsent = Map.empty
   }

@@ -103,6 +103,8 @@ class WalletApp extends Application { me =>
   }
 
   object ChannelManager {
+    var chainHeightObtained = false
+    var currentBlocksLeft = Int.MaxValue
     val operationalListeners = Set(broadcaster, bag, GossipCatcher)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
@@ -137,14 +139,17 @@ class WalletApp extends Application { me =>
     }
 
     val chainEventsListener = new TxTracker with BlocksListener {
-      def tellHeight(left: Int) = if (left < 1) for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
-      override def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = tellHeight(left)
-      override def onChainDownloadStarted(peer: Peer, left: Int) = tellHeight(left)
+      override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
+      override def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = onChainDownload(left)
+      override def onChainDownloadStarted(peer: Peer, left: Int) = onChainDownload(left)
 
-      override def txConfirmed(txj: Transaction) =
-        for (c <- notClosing) c process CMDConfirmed(txj)
+      def onChainDownload(blocksLeft: Int) = {
+        if (!chainHeightObtained) runAnd(chainHeightObtained = true)(PaymentInfoWrap.resolvePending)
+        if (blocksLeft < 1) for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
+        currentBlocksLeft = blocksLeft
+      }
 
-      override def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = {
+      def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = {
         // We always attempt to extract a payment preimage by just assuming any incoming tx
         // may contain it, also send all txs to chans, each of them will sort every tx out
 

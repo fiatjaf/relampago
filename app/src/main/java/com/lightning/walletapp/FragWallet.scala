@@ -43,7 +43,6 @@ import android.net.Uri
 
 object FragWallet {
   var currentPeerCount = 0
-  var currentBlocksLeft = 0
   var worker: FragWalletWorker = _
   val REDIRECT = "goToLnOpsActivity"
 }
@@ -74,8 +73,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val syncOps = app.getResources getStringArray R.array.info_progress
   val txsConfs = app.getResources getStringArray R.array.txs_confs
   val lnTitleOutNoFee = app getString ln_outgoing_title_no_fee
+  val statusOperational = app getString btc_status_operational
   val statusConnecting = app getString btc_status_connecting
-  val statusOnline = app getString btc_status_online
   val lnTitleOut = app getString ln_outgoing_title
   val lnTitleIn = app getString ln_incoming_title
   val noDesc = app getString ln_no_description
@@ -84,19 +83,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // UPDATING TITLE
 
-  val catchListener = new BlocksListener {
-    def onBlocksDownloaded(sourcePeerNode: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) = {
-      if (left > broadcaster.blocksPerDay) app.kit.peerGroup addBlocksDownloadedEventListener getNextTracker(left)
-      app.kit.peerGroup removeBlocksDownloadedEventListener this
-    }
-
-    def getNextTracker(initBlocksLeft: Int) = new BlocksListener {
-      def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = {
-        // Runtime optimization: avoid calling update more than once per 144 blocks
-        if (left % broadcaster.blocksPerDay == 0) updTitle.run
-        currentBlocksLeft = left
-      }
-    }
+  val blocksTitleListener = new BlocksListener {
+    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) =
+      if (left % broadcaster.blocksPerDay == 0) updTitle.run
   }
 
   val constListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
@@ -109,12 +98,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val lnTotalSum = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
     val lnFunds = if (lnTotalSum < 1) lnEmpty else denom withSign MilliSatoshi(lnTotalSum)
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
-    val daysLeft = currentBlocksLeft / broadcaster.blocksPerDay
 
     val subtitleText =
-      if (currentBlocksLeft > 6) app.plurOrZero(syncOps, daysLeft)
-      else if (currentPeerCount < 1) statusConnecting
-      else statusOnline
+      if (currentPeerCount < 1 || !app.ChannelManager.chainHeightObtained) statusConnecting
+      else if (app.ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay) statusOperational
+      else app.plurOrZero(syncOps, app.ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
 
     UITask(customTitle setText s"""
       &#3647; <strong>$btcFunds</strong><br>
@@ -235,10 +223,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       paymentHash setOnClickListener onButtonTap(host share rd.paymentHashString)
       paymentDetails setText getDescription(info.description).html
 
-      def makeProof =
-        // Signed request along with a preimage constitute a proof
-        app.getString(ln_proof).format(PaymentRequest write info.pr,
-          rd.paymentHashString, info.preimage.toString)
+      def makeProof = {
+        val lnProof = app getString ln_proof
+        val serialized = PaymentRequest write info.pr
+        lnProof.format(serialized, info.preimage.toString)
+      }
 
       if (info.actualStatus == SUCCESS) {
         paymentHash setVisibility View.GONE
@@ -332,7 +321,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       // See if CPFP can be applied
       val notEnough = wrap.valueDelta isLessThan RatesSaver.rates.feeSix
-      val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 1800L * 1000
+      val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 600 * 1000L
       if (wrap.depth > 0 || tooFresh || notEnough) showForm(negBuilder(dialog_ok, header.html, lst).create)
       else mkForm(none, boostIncoming(wrap), baseBuilder(header.html, lst), dialog_ok, dialog_boost)
     }
@@ -386,10 +375,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     app.kit.wallet removeCoinsSentEventListener itemsListListener
     app.kit.wallet removeCoinsReceivedEventListener itemsListListener
     app.kit.wallet removeTransactionConfidenceEventListener itemsListListener
-
-    app.kit.peerGroup removeConnectedEventListener constListener
+    app.kit.peerGroup removeBlocksDownloadedEventListener blocksTitleListener
     app.kit.peerGroup removeDisconnectedEventListener constListener
-    app.kit.peerGroup removeBlocksDownloadedEventListener catchListener
+    app.kit.peerGroup removeConnectedEventListener constListener
   }
 
   // LN STUFF
@@ -587,10 +575,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   app.kit.wallet addCoinsSentEventListener itemsListListener
   app.kit.wallet addCoinsReceivedEventListener itemsListListener
   app.kit.wallet addTransactionConfidenceEventListener itemsListListener
-
-  app.kit.peerGroup addConnectedEventListener constListener
+  app.kit.peerGroup addBlocksDownloadedEventListener blocksTitleListener
   app.kit.peerGroup addDisconnectedEventListener constListener
-  app.kit.peerGroup addBlocksDownloadedEventListener catchListener
+  app.kit.peerGroup addConnectedEventListener constListener
+
+  // Periodically update timestamps in a payments list
   host.timer.schedule(adapter.notifyDataSetChanged, 10000, 10000)
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
   react(new String)

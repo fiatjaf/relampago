@@ -119,7 +119,7 @@
     <!-- notifications -->
     <string name="ln_empty">No open channels</string>
     <string name="btc_empty">Empty btc wallet</string>
-    <string name="btc_status_online"><![CDATA[<font color=#65BD65>Bitcoin wallet is online</font>]]></string>
+    <string name="btc_status_operational"><![CDATA[<font color=#65BD65>Wallet is operational</font>]]></string>
     <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
 
     <array name="info_progress">
@@ -180,13 +180,13 @@
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
     <string name="ln_status_peer">Select peer</string>
-    <string name="ln_status_none">No open channel found</string>
-    <string name="ln_description_hint">add some description</string>
-    <string name="ln_qr_disposable"><![CDATA[Request is valid for 1 hour<br>Do not reuse this QR code]]></string>
-    <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>
-    <string name="ln_no_description">No description provided</string>
-    <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_share_hash">Share Payment Hash</string>
+    <string name="ln_status_none">No open channel found</string>
+    <string name="ln_share_proof">Share Proof of Payment</string>
+    <string name="ln_description_hint">add some description</string>
+    <string name="ln_no_description">No description provided</string>
+    <string name="ln_proof">Signed payment request: %1$s\n\nPayment preimage: %3$s</string>
+    <string name="ln_qr_disposable"><![CDATA[Request is valid for 1 hour<br>Do not reuse this QR code]]></string>
 
     <!-- see PaymentInfo.scala -->
     <array name="ln_payment_states">
