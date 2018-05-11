@@ -22,8 +22,8 @@ import android.app.AlertDialog
 import java.util.TimerTask
 import android.os.Bundle
 
+import fr.acinq.bitcoin.{MilliSatoshi, Satoshi, Script}
 import org.bitcoinj.core.{Coin, TransactionOutput}
-import fr.acinq.bitcoin.{MilliSatoshi, Script}
 import android.widget.{ImageButton, TextView}
 import scala.util.{Failure, Success}
 
@@ -121,13 +121,17 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def askForFunding(their: Init): TimerTask = UITask {
-      val minCapacity = denom withSign LNParams.minChannelCapacity
-      val maxCapacity = denom withSign LNParams.maxChannelCapacity
+      // Current feerate may be higher than hard cap so choose the largest one
+      val Seq(minFeeCap, minHardCap) = Seq(LNParams.broadcaster.perKwTwoSat, 200000L) map Satoshi
+      val minCapacity: MilliSatoshi = if (minFeeCap > minHardCap) minFeeCap else minHardCap
+
+      val minHuman = denom withSign minCapacity
+      val maxHuman = denom withSign LNParams.maxChannelCapacity
       val canSend = denom withSign app.kit.conf1Balance
 
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
+      val rateManager = new RateManager(getString(amount_hint_newchan).format(minHuman, maxHuman, canSend), content)
       val dummyKey = derivePrivateKey(LNParams.extendedCloudKey, System.currentTimeMillis :: 0L :: Nil).publicKey
-      val rateManager = new RateManager(getString(amount_hint_newchan).format(minCapacity, maxCapacity, canSend), content)
 
       def next(msat: MilliSatoshi) = new TxProcessor {
         val dummyScript = pubKeyScript(dummyKey, dummyKey)
@@ -136,7 +140,6 @@ class LNStartFundActivity extends TimerActivity { me =>
         def futureProcess(unsignedRequest: SendRequest) = {
           val finder = new PubKeyScriptIndexFinder(unsignedRequest.tx)
           val outIndex = finder.findPubKeyScriptIndex(dummyScript, None)
-
           val realChannelFundingAmountSat = unsignedRequest.tx.getOutput(outIndex).getValue.getValue
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val theirUnspendableReserveSat = realChannelFundingAmountSat / LNParams.theirReserveToFundingRatio
@@ -152,8 +155,8 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       def askAttempt(alert: AlertDialog) = rateManager.result match {
-        case Success(ms) if ms < LNParams.minChannelCapacity => app toast dialog_sum_small
         case Success(ms) if ms > LNParams.maxChannelCapacity => app toast dialog_sum_big
+        case Success(ms) if ms < minCapacity => app toast dialog_sum_small
         case Failure(reason) => app toast dialog_sum_empty
         case Success(ms) => rm(alert)(next(ms).start)
       }
