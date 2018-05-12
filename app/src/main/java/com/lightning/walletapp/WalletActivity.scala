@@ -259,17 +259,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
     val menu = showForm(negBuilder(dialog_ok, title, form).create)
 
-    val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
-    val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
-    val createZygote = form.findViewById(R.id.createZygote).asInstanceOf[Button]
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
-
-    manageOlympus setOnClickListener onButtonTap {
-      // Just show a list of available Olympus servers
-      def proceed = me goTo classOf[OlympusActivity]
-      rm(menu)(proceed)
-    }
+    val createZygote = form.findViewById(R.id.createZygote).asInstanceOf[Button]
+    val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
+    val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
+    recoverFunds.setEnabled(app.ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
 
     recoverFunds setOnClickListener onButtonTap {
       // When wallet data is lost users may recover channel funds
@@ -292,7 +287,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
               // Now throw it away if it is already present in a list of local channels
               if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
               chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
-              // Start watching this channel's funding tx output right away
               ok = app.kit watchFunding refundingData.commitments
             } app.ChannelManager.all +:= chan
             app.ChannelManager.initConnect
@@ -302,6 +296,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
           app toast dialog_recovering
         }
       }
+    }
+
+    manageOlympus setOnClickListener onButtonTap {
+      // Just show a list of available Olympus servers
+      def proceed = me goTo classOf[OlympusActivity]
+      rm(menu)(proceed)
     }
 
     createZygote setOnClickListener onButtonTap {

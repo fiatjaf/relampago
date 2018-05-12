@@ -193,8 +193,8 @@
         <item>waiting for payee</item>
         <item>still in progress</item>
         <item>paid successfully</item>
-        <item>cancelled and refunded</item>
-        <item>cancelled and frozen</item>
+        <item>failed and refunded</item>
+        <item>failed and frozen</item>
     </array>
 
     <string name="notice_sync_title">Synchronization required</string>
