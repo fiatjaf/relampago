@@ -150,8 +150,8 @@ class WalletApp extends Application { me =>
       }
 
       def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = {
-        // We always attempt to extract a payment preimage by just assuming any incoming tx
-        // may contain it, also send all txs to chans, each of them will sort every tx out
+        // Always attempt to extract a payment preimage by just assuming any
+        // incoming tx may contain it, also send all txs to chans
 
         val spent = CMDSpent(txj)
         for (c <- all) c process spent

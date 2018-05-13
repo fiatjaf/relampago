@@ -8,7 +8,7 @@
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Confirmation may take hours</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Faster confirmation times</font></small></small>]]></string>
-    <string name="wallet_state">Total balance\n<small><font color='#999999'>On-chain + LN funds</font></small></string>
+    <string name="wallet_state">Total balance\n<small><font color='#999999'>On-chain + LN</font></small></string>
     <string name="step_fees"><![CDATA[<font color=#999999>Final step: miner fee</font><br><br>%1$s]]></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_create">New Bitcoin Wallet</string>
