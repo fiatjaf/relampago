@@ -122,21 +122,21 @@ object PaymentInfo {
       case ErrorPacket(nodeKey, u: Update) =>
         val isHonest = Announcements.checkSig(u.update, nodeKey)
         if (!isHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
-        else withoutChan(u.update.shortChannelId, rd, 300 * 1000, rd.firstMsat)
+        else withoutChan(u.update.shortChannelId, rd, 180 * 1000, rd.firstMsat)
 
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
       case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
-      case ErrorPacket(nodeKey, _: BadOnion) => withoutNodes(Vector(nodeKey), rd, 300 * 1000)
+      case ErrorPacket(nodeKey, _: BadOnion) => withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nodeKey, UnknownNextPeer | PermanentChannelFailure) =>
         rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
           withoutChan(payHop.shortChannelId, rd, 86400 * 7 * 1000, 0L)
-        } getOrElse withoutNodes(Vector(nodeKey), rd, 300 * 1000)
+        } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nodeKey, _) =>
         rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
-          withoutChan(payHop.shortChannelId, rd, 300 * 1000, rd.firstMsat)
-        } getOrElse withoutNodes(Vector(nodeKey), rd, 300 * 1000)
+          withoutChan(payHop.shortChannelId, rd, 180 * 1000, rd.firstMsat)
+        } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
     } getOrElse {
       val cut = rd.usedRoute drop 1 dropRight 1
