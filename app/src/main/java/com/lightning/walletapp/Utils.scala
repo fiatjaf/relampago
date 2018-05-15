@@ -85,7 +85,7 @@ object Utils {
     perBtc => milliSatoshi.amount * perBtc / BtcDenomination.factor
   }
 
-  def msatInFiatHuman(ms: MilliSatoshi) = msatInFiat(ms) match {
+  val msatInFiatHuman = (ms: MilliSatoshi) => msatInFiat(ms) match {
     case Success(amt) if fiatName == strYuan => s"≈ ${formatFiat format amt} cny"
     case Success(amt) if fiatName == strEuro => s"≈ ${formatFiat format amt} eur"
     case Success(amt) if fiatName == strYen => s"≈ ${formatFiat format amt} jpy"

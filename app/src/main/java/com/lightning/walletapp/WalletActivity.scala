@@ -210,16 +210,16 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def goAddChannel(top: View) =
     if (app.ChannelManager.all.isEmpty) {
-      val tokens = MilliSatoshi(amount = 500000L)
-      val warning = getString(tokens_warn).format(coloredIn apply tokens).html
-      val warn = baseTextBuilder(warning).setCustomTitle(me getString action_ln_open)
+      val price = MilliSatoshi(amount = 500000L)
+      val humanPrice = s"${coloredIn apply price} <font color=#999999>${msatInFiatHuman apply price}</font>"
+      val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
       mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
     } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
     val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
-    val inFiatTotal = msatInFiatHuman(walletTotalSum)
+    val inFiatTotal = msatInFiatHuman apply walletTotalSum
 
     val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)

@@ -214,7 +214,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def generatePopup = {
-      val inFiat = msatInFiatHuman(info.firstSum)
+      val inFiat = msatInFiatHuman apply info.firstSum
       val rd = emptyRD(info.pr, info.firstMsat, useCache = false)
       val humanStatus = s"<strong>${paymentStates apply info.actualStatus}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
@@ -301,19 +301,19 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         case _ if wrap.visibleValue.isPositive =>
           val amount: MilliSatoshi = wrap.visibleValue
-          val inFiat: String = msatInFiatHuman(ms = amount)
+          val inFiat: String = msatInFiatHuman apply amount
           val incomingTitle = app.getString(btc_incoming_title)
           incomingTitle.format(confs, coloredIn(amount), inFiat)
 
         case None =>
           val amount = Satoshi(-wrap.visibleValue.value)
-          val inFiat: String = msatInFiatHuman(ms = amount)
+          val inFiat: String = msatInFiatHuman apply amount
           val titleNoFee = app.getString(btc_outgoing_title_no_fee)
           titleNoFee.format(confs, coloredOut(amount), inFiat)
 
         case Some(fee) =>
           val amount = Satoshi(-wrap.visibleValue.value)
-          val inFiat: String = msatInFiatHuman(ms = amount)
+          val inFiat: String = msatInFiatHuman apply amount
           val feePercent = fee.value / (amount.amount / 100D)
           val titleWithFee = app.getString(btc_outgoing_title)
           titleWithFee.format(confs, coloredOut(amount),
