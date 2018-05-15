@@ -281,12 +281,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
               refundingData <- Try(jsonDecoded) map to[RefundingData]
 
               // Now throw it away if it is already present in a list of local channels
-              if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
-              chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
+              if !app.ChannelManager.all.exists(chan => chan(cs => cs.channelId) contains refundingData.commitments.channelId)
+              chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, bootstrap = refundingData)
               ok = app.kit watchFunding refundingData.commitments
             } app.ChannelManager.all +:= chan
             app.ChannelManager.initConnect
-          }, none)
+          }, Tools.errlog)
 
           // Let user know it's happening
           app toast dialog_recovering

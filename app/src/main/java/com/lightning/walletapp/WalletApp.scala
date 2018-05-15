@@ -17,7 +17,6 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import rx.lang.scala.{Observable => Obs}
-import fr.acinq.bitcoin.{BinaryData, Crypto}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
@@ -30,8 +29,10 @@ import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import fr.acinq.bitcoin.Crypto.PublicKey
+import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
+import fr.acinq.bitcoin.Crypto
 import android.app.Application
 import android.widget.Toast
 import scala.util.Try
@@ -119,22 +120,24 @@ class WalletApp extends Application { me =>
 
     val socketEventsListener = new ConnectionListener {
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        // Chan level Error will fall under ChannelMessage case but node level Error should be sent to all chans
-        case err: Error if err.channelId == BinaryData("00" * 32) => fromNode(notClosing, nodeId).foreach(_ process err)
-        case msg: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains msg.channelId).foreach(_ process msg)
-        case cu: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process cu)
+        // Ignore all routing messages except ChannelUpdate which may contain payment parameters
+        case chanUpdate: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process chanUpdate)
+        case err: Error if err.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process err)
+        // Delay remote error to give a chance to catch remote spent commit if it's present
+        case err: Error => Obs just err delay 5.seconds foreach relay
+        case msg: ChannelMessage => relay(msg)
         case _ =>
       }
 
-      override def onDisconnect(nodeId: PublicKey) = maybeReconnect(fromNode(notClosing, nodeId), nodeId)
+      def relay(m: ChannelMessage) = notClosing.find(chan => chan(cs => cs.channelId) contains m.channelId).foreach(_ process m)
       override def onOperational(nodeId: PublicKey, their: Init) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
       override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDShutdown)
       override def onIncompatible(nodeId: PublicKey) = onTerminalError(nodeId)
 
-      def maybeReconnect(cs: Vector[Channel], nodeId: PublicKey) = if (cs.nonEmpty) {
-        val reTry = Obs.from(ConnectionManager.connections get nodeId).delay(5.seconds)
-        reTry.subscribe(w => ConnectionManager connectTo w.ann, none)
-        cs.foreach(_ process CMDOffline)
+      override def onDisconnect(nodeId: PublicKey) = if (fromNode(notClosing, nodeId).nonEmpty) {
+        val delayedRetryAttempt = Obs from ConnectionManager.connections.get(nodeId) delay 5.seconds
+        delayedRetryAttempt.subscribe(worker => ConnectionManager connectTo worker.ann, none)
+        fromNode(notClosing, nodeId).foreach(_ process CMDOffline)
       }
     }
 
