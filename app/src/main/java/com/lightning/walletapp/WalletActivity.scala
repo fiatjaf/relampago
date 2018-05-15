@@ -162,25 +162,21 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   // BUTTONS REACTIONS
 
   def goReceivePayment(top: View) = {
-    val options = Array(getString(btc_receive_option).html, getString(ln_receive_option).html)
+    val options = Array(getString(ln_receive_option).html, getString(btc_receive_option).html)
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_receive, lst).create)
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
-
-    lst setDivider null
+    lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
     lst setDividerHeight 0
-    lst setOnItemClickListener onTap {
-      case 0 => generateOnChainBitcoinQR
-      case 1 => makeOffChainRequest
+    lst setDivider null
+
+    def offChain = rm(alert) {
+      FragWallet.worker.makePaymentRequest
     }
 
-    def generateOnChainBitcoinQR = rm(alert) {
+    def onChain = rm(alert) {
       app.TransData.value = app.kit.currentAddress
       me goTo classOf[RequestActivity]
-    }
-
-    def makeOffChainRequest = rm(alert) {
-      FragWallet.worker.makePaymentRequest
     }
   }
 
@@ -189,15 +185,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, lst).create)
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
-
-    lst setDivider null
+    lst setOnItemClickListener onTap { case 0 => pasteRequest case 1 => scanQR }
     lst setDividerHeight 0
-    lst setOnItemClickListener onTap {
-      case 0 => pasteAddressOrPaymentRequest
-      case 1 => scanQRCode
-    }
+    lst setDivider null
 
-    def pasteAddressOrPaymentRequest = rm(alert) {
+    def pasteRequest = rm(alert) {
       app.getBufferTry map app.TransData.recordValue match {
         // Buffer may contain junk so always account for error
         case Failure(why) => app toast err_no_data
@@ -205,7 +197,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       }
     }
 
-    def scanQRCode = rm(alert) {
+    def scanQR = rm(alert) {
       walletPager.setCurrentItem(1, true)
     }
   }

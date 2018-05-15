@@ -118,7 +118,7 @@
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
-    <string name="btc_empty">Empty on-chain</string>
+    <string name="btc_empty">No funds</string>
     <string name="ln_empty">No open channels</string>
     <string name="btc_status_operational"><![CDATA[<font color=#65BD65>Wallet is operational</font>]]></string>
     <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
@@ -153,7 +153,7 @@
     <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin transaction</strong></string></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><br><br><small>%1$s</small>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><br><br><font color=#999999><small>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</small></font>]]></string>
-    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><br><br><font color=#999999><small>make a QR-code with your current wallet address, can be used to receive regular on-chain transactions</small></font>]]></string>
+    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><br><br><font color=#999999><small>make a QR-code with on-chain wallet address, can be used to receive regular Bitcoin transactions</small></font>]]></string>
     <string name="send_paste">Paste a Payment Request</string>
     <string name="send_scan_qr">Scan a QR code</string>
 
