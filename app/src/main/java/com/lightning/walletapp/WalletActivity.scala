@@ -107,10 +107,13 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     if (m.getItemId == R.id.actionSettings) makeSettingsForm
   }
 
-  override def onBackPressed =
+  override def onBackPressed = {
+    val isExpanded = FragWallet.worker.currentCut > FragWallet.worker.minLinesNum
     if (walletPager.getCurrentItem == 1) walletPager.setCurrentItem(0, true)
     else if (floatingButton.isOpened) floatingButton close true
+    else if (isExpanded) FragWallet.worker.toggler.performClick
     else super.onBackPressed
+  }
 
   override def onCreateOptionsMenu(menu: Menu) = {
     // Called after fragLN sets toolbar as actionbar

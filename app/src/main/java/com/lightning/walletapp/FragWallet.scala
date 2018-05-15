@@ -322,15 +322,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       // See if CPFP can be applied
       val notEnough = wrap.valueDelta isLessThan RatesSaver.rates.feeSix
-      val tooFresh = wrap.tx.getUpdateTime.getTime > System.currentTimeMillis - 600 * 1000L
-      if (wrap.depth > 0 || tooFresh || notEnough) showForm(negBuilder(dialog_ok, header.html, lst).create)
+      if (wrap.depth > 0 || notEnough) showForm(negBuilder(dialog_ok, header.html, lst).create)
       else mkForm(none, boostIncoming(wrap), baseBuilder(header.html, lst), dialog_ok, dialog_boost)
     }
   }
 
   toggler setOnClickListener onFastTap {
-    val newImg = if (currentCut == minLinesNum) ic_expand_less_black_24dp else ic_expand_more_black_24dp
-    currentCut = if (currentCut == minLinesNum) allItems.size else minLinesNum
+    val newImg = if (currentCut > minLinesNum) ic_expand_more_black_24dp else ic_expand_less_black_24dp
+    currentCut = if (currentCut > minLinesNum) minLinesNum else allItems.size
     toggler setImageResource newImg
     adapter.notifyDataSetChanged
   }
