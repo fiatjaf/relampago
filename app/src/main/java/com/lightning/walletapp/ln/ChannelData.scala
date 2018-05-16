@@ -267,7 +267,7 @@ object Commitments {
 
   def sendAdd(c: Commitments, rd: RoutingData) =
     if (rd.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
-    else if (rd.firstMsat > maxHtlcValue.amount) throw CMDAddImpossible(rd, ERR_AMOUNT_OVERFLOW)
+    else if (rd.firstMsat > maxHtlcValueMsat) throw CMDAddImpossible(rd, ERR_AMOUNT_OVERFLOW)
     else if (rd.pr.paymentHash.size != 32) throw CMDAddImpossible(rd, ERR_FAILED)
     else {
 
@@ -285,7 +285,7 @@ object Commitments {
       // We should both check if we can send another HTLC and if PEER can accept another HTLC
       if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
       if (outgoing.size > maxAllowedHtlcs || incoming.size > maxAllowedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
-      if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDReserveOverflow(rd, -c1.reducedRemoteState.canSendMsat)
+      if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDAddImpossible(rd, ERR_FAILED)
       c1 -> add
     }
 

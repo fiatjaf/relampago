@@ -220,7 +220,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
-    val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
+    val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
     val inFiatTotal = msatInFiatHuman apply walletTotalSum
 

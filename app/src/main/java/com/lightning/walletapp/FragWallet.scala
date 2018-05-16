@@ -96,7 +96,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def updTitle = {
     val btcTotalSum = app.kit.conf0Balance
-    val lnTotalSum = app.ChannelManager.notClosingOrRefunding.map(estimateTotalCanSend).sum
+    val lnTotalSum = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val lnFunds = if (lnTotalSum < 1) lnEmpty else denom withSign MilliSatoshi(lnTotalSum)
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
 
@@ -383,18 +383,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // LN STUFF
 
   val chanListener = new ChannelListener {
+    // Displays various chan errors to users
     // Should be removed on activity destroyed
 
     override def onError = {
-      // Commit tx fee + channel reserve forbid sending of this payment
-      // inform user with all the details laid out as cleanly as possible
-
-      case _ \ CMDReserveOverflow(rpi, msat) =>
-        val missing = coloredOut apply MilliSatoshi(msat)
-        val sending = coloredOut apply MilliSatoshi(rpi.firstMsat)
-        val text = host.getString(err_ln_fee_overflow).format(missing, sending)
-        UITask(host showForm negTextBuilder(dialog_ok, text.html).create).run
-
       case _ \ CMDAddImpossible(_, code) =>
         // One of many generic reasons
         onFail(host getString code)
@@ -476,9 +468,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     else if (!pr.isFresh) app toast dialog_pr_expired
     else {
 
+      // Define how much we can send but cap an amount by hardcoded maximum
+      val unboundedMaxCanSend = operationalChannels.map(estimateCanSend).max
+      val maxCanSendMsat = math.min(unboundedMaxCanSend, maxHtlcValueMsat)
+      val maxCanSend = MilliSatoshi(maxCanSendMsat)
+
       val description = me getDescription pr.description
       val title = app.getString(ln_send_title).format(description)
-      val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSend).max)
       val hint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
       val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val rateManager = new RateManager(hint, content)

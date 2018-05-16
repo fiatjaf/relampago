@@ -159,7 +159,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       val canReceiveHuman = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
       val finalCanReceive = if (channelAndHop(chan).isDefined) canReceiveHuman else sumOut format nothingYet
 
-      val canSend = MilliSatoshi apply estimateTotalCanSend(chan)
+      val canSend = MilliSatoshi apply estimateCanSend(chan)
       val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
       lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, started, coloredIn(capacity),
         finalCanSend, finalCanReceive, app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size), nodeId).html
@@ -170,7 +170,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageNegotiations = UITask {
-      val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
+      val refundable = MilliSatoshi apply estimateCanSend(chan)
       val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
       lnOpsDescription setText negotiations.format(chan.state, alias, started,
         coloredIn(capacity), coloredIn(refundable), inFlight).html
@@ -189,7 +189,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       close.bestClosing match {
         case Left(mutualClosingTx) =>
-          val refundable = MilliSatoshi apply estimateTotalCanSend(chan)
+          val refundable = MilliSatoshi apply estimateCanSend(chan)
           val status = humanStatus apply getStatus(mutualClosingTx.txid)
           val myFee = coloredOut(capacity - mutualClosingTx.allOutputsAmount)
           val view = commitStatus.format(mutualClosingTx.txid.toString, status, myFee)

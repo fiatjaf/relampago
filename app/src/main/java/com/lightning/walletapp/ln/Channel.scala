@@ -160,9 +160,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // We can send a new HTLC when channel is both operational and online
       case (norm: NormalData, rd: RoutingData, OPEN) if isOperational(me) =>
         val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, rd)
-        //me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
-        //events outPaymentAccepted rd
-        //doProcess(CMDProceed)
+        me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
+        events outPaymentAccepted rd
+        doProcess(CMDProceed)
 
 
       // We're fulfilling an HTLC we got earlier
@@ -543,10 +543,6 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
-  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
-  def isOperationalOpen(chan: Channel) = isOperational(chan) && chan.state == OPEN
-
   def inFlightOutgoingHtlcs(chan: Channel) = chan.data match {
     // Channels should always be filtered by some criteria before calling this method
     // like find all current in-flight HTLC from alive chans or all frozen from closing chans
@@ -558,19 +554,13 @@ object Channel {
     // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve
     // peer's balance can't go below their channel reserve, commit tx fee is always paid by us
     val canReceive = cs.localCommit.spec.toRemoteMsat - cs.localParams.channelReserveSat * 1000L
-    math.min(canReceive, LNParams.maxHtlcValue.amount)
+    math.min(canReceive, LNParams.maxHtlcValueMsat)
   } getOrElse 0L
 
-  def estimateTotalCanSend(chan: Channel) = chan { cs =>
-    // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
-    // sending limit consists of unspendable channel reserve (not included) + current commit tx fee
-    cs.localCommit.spec.toLocalMsat - cs.localCommit.spec.feeratePerKw * 1000L
-  } getOrElse 0L
-
-  def estimateCanSend(chan: Channel) = {
-    val unconstrainedCanSend = estimateTotalCanSend(chan)
-    math.min(unconstrainedCanSend, LNParams.maxHtlcValue.amount)
-  }
+  def estimateCanSend(chan: Channel) = chan(_.reducedRemoteState.canSendMsat) getOrElse 0L
+  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
+  def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
+  def isOperationalOpen(chan: Channel) = isOperational(chan) && chan.state == OPEN
 
   def channelAndHop(chan: Channel) = for {
     // Make sure this hop is the real one
