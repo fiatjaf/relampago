@@ -389,8 +389,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       // Commit tx fee + channel reserve forbid sending of this payment
       // inform user with all the details laid out as cleanly as possible
 
-      case _ \ CMDReserveOverflow(rpi, missingSat) =>
-        val missing = coloredOut apply -Satoshi(missingSat)
+      case _ \ CMDReserveOverflow(rpi, msat) =>
+        val missing = coloredOut apply MilliSatoshi(msat)
         val sending = coloredOut apply MilliSatoshi(rpi.firstMsat)
         val text = host.getString(err_ln_fee_overflow).format(missing, sending)
         UITask(host showForm negTextBuilder(dialog_ok, text.html).create).run

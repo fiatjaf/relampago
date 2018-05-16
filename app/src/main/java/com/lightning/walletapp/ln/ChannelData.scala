@@ -218,12 +218,22 @@ case class LocalCommit(index: Long, spec: CommitmentSpec, htlcTxsAndSigs: Seq[Ht
 case class RemoteCommit(index: Long, spec: CommitmentSpec, txid: BinaryData, remotePerCommitmentPoint: Point)
 case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: BinaryData, remoteSig: BinaryData)
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
+case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long)
 
 case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
                        remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
                        remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point], commitInput: InputInfo,
                        remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, extraHop: Option[Hop] = None,
-                       startedAt: Long = System.currentTimeMillis)
+                       startedAt: Long = System.currentTimeMillis) { me =>
+
+  lazy val reducedRemoteState = {
+    // Current HTLC set and estimated amount of money we can send *from our peer's point of view*
+    val reduced = CommitmentSpec.reduce(Commitments.latestRemoteCommit(me).spec, remoteChanges.acked, localChanges.proposed)
+    val feesSat = if (localParams.isFunder) Scripts.commitTxFee(remoteParams.dustLimitSat, reduced).amount else 0L
+    val reserveWithCommitTxFeeMsat = (feesSat + remoteParams.channelReserveSatoshis) * 1000L
+    ReducedState(reduced.htlcs, reduced.toRemoteMsat - reserveWithCommitTxFeeMsat)
+  }
+}
 
 object Commitments {
   def fundingTxid(c: Commitments) = BinaryData(c.commitInput.outPoint.hash.reverse)
@@ -250,11 +260,9 @@ object Commitments {
 
   def sendFee(c: Commitments, ratePerKw: Long) = {
     val updateFee = UpdateFee(c.channelId, ratePerKw)
-    val c1 = addLocalProposal(c, updateFee)
-
-    val reduced = CommitmentSpec.reduce(latestRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
-    val remoteWithFeeSat = Scripts.commitTxFee(c1.remoteParams.dustLimitSat, reduced).amount + c1.remoteParams.channelReserveSatoshis
-    if (reduced.toRemoteMsat / 1000L - remoteWithFeeSat < 0L) None else Some(c1, updateFee)
+    val c1 = addLocalProposal(c, proposal = updateFee)
+    if (c1.reducedRemoteState.canSendMsat < 0L) None
+    else Some(c1, updateFee)
   }
 
   def sendAdd(c: Commitments, rd: RoutingData) =
@@ -269,22 +277,15 @@ object Commitments {
         rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet.serialize)
 
       val c1 = addLocalProposal(c, add).modify(_.localNextHtlcId).using(_ + 1)
-      val reduced = CommitmentSpec.reduce(latestRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
-      val feesSat = if (c1.localParams.isFunder) Scripts.commitTxFee(c.remoteParams.dustLimitSat, reduced).amount else 0L
+      // We have an updated Commitments in c1 and thus c1.reducedRemoteState gets updated too
       val maxAllowedHtlcs = math.min(c.localParams.maxAcceptedHtlcs, c.remoteParams.maxAcceptedHtlcs)
-      val totalInFlightMsat = UInt64(reduced.htlcs.map(_.add.amountMsat).sum)
-      val incoming \ outgoing = reduced.htlcs.partition(_.incoming)
-
-      // We can't send more than our reserve + commit tx Bitcoin fees *as seen by them*
-      // additionally we multiply computed commit fee by 4 to create a safety gap which
-      // will prevent a channel from force-closing in case of unexpected rapid fee spikes
-      val reserveWithExtendedFeeSat = feesSat * 4 + c.remoteParams.channelReserveSatoshis
-      val missingSat = reduced.toRemoteMsat / 1000L - reserveWithExtendedFeeSat
+      val totalInFlightMsat = UInt64(c1.reducedRemoteState.htlcs.map(_.add.amountMsat).sum)
+      val incoming \ outgoing = c1.reducedRemoteState.htlcs.partition(_.incoming)
 
       // We should both check if we can send another HTLC and if PEER can accept another HTLC
       if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
       if (outgoing.size > maxAllowedHtlcs || incoming.size > maxAllowedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
-      if (missingSat < 0L) throw CMDReserveOverflow(rd, missingSat)
+      if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDReserveOverflow(rd, -c1.reducedRemoteState.canSendMsat)
       c1 -> add
     }
 
