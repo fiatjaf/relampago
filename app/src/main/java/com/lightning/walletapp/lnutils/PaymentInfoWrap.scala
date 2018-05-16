@@ -103,7 +103,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
         updStatus(FAILURE, rd.pr.paymentHash)
     }
 
-  override def onError = {
+  override def onException = {
     case (_, exc: CMDException) => me failOnUI exc.rd
     case chan \ error => chan process CMDShutdown
   }

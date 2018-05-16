@@ -64,16 +64,16 @@ class LNStartFundActivity extends TimerActivity { me =>
     lazy val openListener = new ConnectionListener with ChannelListener { self =>
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         case msg: ChannelSetupMessage if nodeId == announce.nodeId => freshChan process msg
-        case err: Error if nodeId == announce.nodeId => onError(freshChan -> err.exception)
+        case err: Error if nodeId == announce.nodeId => onException(freshChan -> err.exception)
         case _ =>
       }
 
       val noLossProtect = new LightningException(me getString err_ln_no_data_loss_protect)
       val peerOffline = new LightningException(me getString err_ln_peer_offline format announce.addresses.head.toString)
       override def onOperational(nodeId: PublicKey, their: Init) = if (nodeId == announce.nodeId) askForFunding(their).run
-      override def onIncompatible(nodeId: PublicKey) = if (nodeId == announce.nodeId) onError(freshChan -> noLossProtect)
-      override def onTerminalError(nodeId: PublicKey) = if (nodeId == announce.nodeId) onError(freshChan -> peerOffline)
-      override def onDisconnect(nodeId: PublicKey) = if (nodeId == announce.nodeId) onError(freshChan -> peerOffline)
+      override def onIncompatible(nodeId: PublicKey) = if (nodeId == announce.nodeId) onException(freshChan -> noLossProtect)
+      override def onTerminalError(nodeId: PublicKey) = if (nodeId == announce.nodeId) onException(freshChan -> peerOffline)
+      override def onDisconnect(nodeId: PublicKey) = if (nodeId == announce.nodeId) onException(freshChan -> peerOffline)
 
       override def onBecome = {
         case (_, WaitFundingData(_, cmd, accept), WAIT_FOR_ACCEPT, WAIT_FOR_FUNDING) =>
@@ -112,7 +112,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           me exitTo classOf[WalletActivity]
       }
 
-      override def onError = {
+      override def onException = {
         case _ \ errorWhileOpening =>
           // Inform user, disconnect this channel, go back
           UITask(app toast errorWhileOpening.getMessage).run

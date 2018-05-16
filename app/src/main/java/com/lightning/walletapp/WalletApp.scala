@@ -147,8 +147,8 @@ class WalletApp extends Application { me =>
       override def onChainDownloadStarted(peer: Peer, left: Int) = onChainDownload(left)
 
       def onChainDownload(blocksLeft: Int) = {
-        if (!chainHeightObtained) runAnd(chainHeightObtained = true)(PaymentInfoWrap.resolvePending)
         // No matter how many blocks are left, only inform chans on last block for performance reasons
+        if (!chainHeightObtained) runAnd(chainHeightObtained = true)(PaymentInfoWrap.resolvePending)
         if (blocksLeft < 1) for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
         currentBlocksLeft = blocksLeft
       }

@@ -19,12 +19,12 @@ import scala.util.{Failure, Success}
 abstract class Channel extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
   def apply[T](ex: Commitments => T) = Some(data) collect { case some: HasCommitments => ex apply some.commitments }
-  def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onError me -> err }
+  def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onException me -> err }
   var listeners: Set[ChannelListener] = _
 
   private[this] val events = new ChannelListener {
     override def onProcessSuccess = { case ps => for (lst <- listeners if lst.onProcessSuccess isDefinedAt ps) lst onProcessSuccess ps }
-    override def onError = { case malfunction => for (lst <- listeners if lst.onError isDefinedAt malfunction) lst onError malfunction }
+    override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
 
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
@@ -579,7 +579,7 @@ trait ChannelListener {
   type Incoming = (Channel, ChannelData, Any)
   type Transition = (Channel, ChannelData, String, String)
   def onProcessSuccess: PartialFunction[Incoming, Unit] = none
-  def onError: PartialFunction[Malfunction, Unit] = none
+  def onException: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
 
   def fulfillReceived(ok: UpdateFulfillHtlc): Unit = none

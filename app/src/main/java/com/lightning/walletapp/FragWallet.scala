@@ -382,26 +382,25 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // LN STUFF
 
-  val chanListener = new ChannelListener {
-    // Displays various chan errors to users
-    // Should be removed on activity destroyed
+  val chanListener =
+    new ChannelListener {
+      override def onException = {
+        case _ \ CMDAddImpossible(_, errCode) =>
+          // Why outgoing payment was not added
+          onFail(host getString errCode)
 
-    override def onError = {
-      case _ \ CMDAddImpossible(_, code) =>
-        // One of many generic reasons
-        onFail(host getString code)
+        case _ \ error =>
+          // Show internal error description
+          val content = UncaughtHandler toText error
+          val dlg = negTextBuilder(dialog_ok, content)
+          UITask(host showForm dlg.create).run
+      }
 
-      case chan \ error =>
-        val content = UncaughtHandler toText error
-        val dlg = negTextBuilder(dialog_ok, content)
-        UITask(host showForm dlg.create).run
+      override def onBecome = {
+        // Update UI on all changes
+        case state => updTitle.run
+      }
     }
-
-    override def onBecome = {
-      // Update UI on all changes
-      case state => updTitle.run
-    }
-  }
 
   def showQR(pr: PaymentRequest) = {
     host goTo classOf[RequestActivity]
