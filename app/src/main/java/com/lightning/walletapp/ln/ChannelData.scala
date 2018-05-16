@@ -248,6 +248,15 @@ object Commitments {
     } yield htlcIn.add
   }
 
+  def sendFee(c: Commitments, ratePerKw: Long) = {
+    val updateFee = UpdateFee(c.channelId, ratePerKw)
+    val c1 = addLocalProposal(c, updateFee)
+
+    val reduced = CommitmentSpec.reduce(latestRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
+    val remoteWithFeeSat = Scripts.commitTxFee(c1.remoteParams.dustLimitSat, reduced).amount + c1.remoteParams.channelReserveSatoshis
+    if (reduced.toRemoteMsat / 1000L - remoteWithFeeSat < 0L) None else Some(c1, updateFee)
+  }
+
   def sendAdd(c: Commitments, rd: RoutingData) =
     if (rd.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
     else if (rd.firstMsat > maxHtlcValue.amount) throw CMDAddImpossible(rd, ERR_AMOUNT_OVERFLOW)
@@ -266,14 +275,16 @@ object Commitments {
       val totalInFlightMsat = UInt64(reduced.htlcs.map(_.add.amountMsat).sum)
       val incoming \ outgoing = reduced.htlcs.partition(_.incoming)
 
-      // WE can't send more than OUR reserve + commit tx Bitcoin fees
-      val reserveWithTxFeeSat = feesSat + c.remoteParams.channelReserveSatoshis
-      val missingSat = reduced.toRemoteMsat / 1000L - reserveWithTxFeeSat
+      // We can't send more than our reserve + commit tx Bitcoin fees *as seen by them*
+      // additionally we multiply computed commit fee by 4 to create a safety gap which
+      // will prevent a channel from force-closing in case of unexpected rapid fee spikes
+      val reserveWithExtendedFeeSat = feesSat * 4 + c.remoteParams.channelReserveSatoshis
+      val missingSat = reduced.toRemoteMsat / 1000L - reserveWithExtendedFeeSat
 
-      // We should both check if WE can send another HTLC and if PEER can accept another HTLC
+      // We should both check if we can send another HTLC and if PEER can accept another HTLC
       if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
       if (outgoing.size > maxAllowedHtlcs || incoming.size > maxAllowedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
-      if (missingSat < 0L) throw CMDReserveOverflow(rd, missingSat, reserveWithTxFeeSat)
+      if (missingSat < 0L) throw CMDReserveOverflow(rd, missingSat)
       c1 -> add
     }
 
@@ -335,15 +346,6 @@ object Commitments {
     if (notBadOnion) throw new LightningException
     if (found.isEmpty) throw new LightningException
     addRemoteProposal(c, fail)
-  }
-
-  def sendFee(c: Commitments, ratePerKw: Long) = {
-    val updateFee = UpdateFee(c.channelId, ratePerKw)
-    val c1 = addLocalProposal(c, updateFee)
-
-    val reduced = CommitmentSpec.reduce(latestRemoteCommit(c1).spec, c1.remoteChanges.acked, c1.localChanges.proposed)
-    val remoteWithFeeSat = Scripts.commitTxFee(c1.remoteParams.dustLimitSat, reduced).amount + c1.remoteParams.channelReserveSatoshis
-    if (reduced.toRemoteMsat / 1000L - remoteWithFeeSat < 0L) None else Some(c1, updateFee)
   }
 
   def sendCommit(c: Commitments, remoteNextPerCommitmentPoint: Point) = {

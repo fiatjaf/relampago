@@ -388,13 +388,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     override def onError = {
       // Commit tx fee + channel reserve forbid sending of this payment
       // inform user with all the details laid out as cleanly as possible
-      case _ \ CMDReserveOverflow(rpi, missingSat, reserveSat) =>
 
-        val message = host getString err_ln_fee_overflow
-        val reserve = coloredIn apply Satoshi(reserveSat)
-        val missing = coloredOut apply Satoshi(missingSat)
+      case _ \ CMDReserveOverflow(rpi, missingSat) =>
+        val missing = coloredOut apply -Satoshi(missingSat)
         val sending = coloredOut apply MilliSatoshi(rpi.firstMsat)
-        onFail(message.format(reserve, sending, missing).html)
+        val text = host.getString(err_ln_fee_overflow).format(missing, sending)
+        UITask(host showForm negTextBuilder(dialog_ok, text.html).create).run
 
       case _ \ CMDAddImpossible(_, code) =>
         // One of many generic reasons

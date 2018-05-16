@@ -148,6 +148,7 @@ class WalletApp extends Application { me =>
 
       def onChainDownload(blocksLeft: Int) = {
         if (!chainHeightObtained) runAnd(chainHeightObtained = true)(PaymentInfoWrap.resolvePending)
+        // No matter how many blocks are left, only inform chans on last block for performance reasons
         if (blocksLeft < 1) for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
         currentBlocksLeft = blocksLeft
       }
@@ -174,8 +175,8 @@ class WalletApp extends Application { me =>
         BECOME(STORE(cd), CLOSING)
 
         val tier12txs = for (state <- cd.tier12States) yield state.txn
-        if (tier12txs.isEmpty) Tools log "Closing channel does not have tier 1-2 transactions"
-        else OlympusWrap tellClouds CloudAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
+        val act = CloudAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
+        if (tier12txs.nonEmpty) OlympusWrap tellClouds act
       }
 
       def ASKREFUNDTX(ref: RefundingData) = {
