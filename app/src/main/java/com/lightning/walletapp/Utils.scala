@@ -72,12 +72,12 @@ object Utils {
   val fiatMap = Map(typeUSD -> strDollar, typeEUR -> strEuro, typeJPY -> strYen, typeCNY -> strYuan)
   val revFiatMap = Map(strDollar -> typeUSD, strEuro -> typeEUR, strYen -> typeJPY, strYuan -> typeCNY)
   def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
-  def humanFour(adr: String) = adr grouped 4 mkString "\u0020"
+  def humanSix(adr: String) = adr grouped 6 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {
-    val textView: TextView = view.asInstanceOf[TextView]
-    textView setMovementMethod LinkMovementMethod.getInstance
-    textView
+    val field: TextView = view.asInstanceOf[TextView]
+    field setMovementMethod LinkMovementMethod.getInstance
+    field
   }
 
   def currentRate = Try(RatesSaver.rates exchange fiatName)
@@ -303,7 +303,7 @@ trait PayData {
 case class AddrData(cn: Coin, address: Address) extends PayData {
   def getRequest = if (isAll) emptyWallet(address) else to(address, cn)
   def link = BitcoinURI.convertToBitcoinURI(address, cn, null, null)
-  def destination = humanFour(address.toString)
+  def destination = humanSix(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {

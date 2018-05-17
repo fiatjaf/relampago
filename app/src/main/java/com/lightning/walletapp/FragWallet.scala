@@ -203,7 +203,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       val description = getDescription(info.description)
-      val humanHash = humanFour(info.hash.toUpperCase take 24)
+      val humanHash = humanSix(info.hash.toUpperCase take 24)
       val humanSumDetails = s"<font color=#999999>$humanHash</font><br>$description"
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactCircle setImageResource imageMap(info.actualStatus)
@@ -536,7 +536,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     val bld = baseBuilder(app.getString(btc_send_title).html, form)
     mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
-    addressData setText humanFour(addr.toString)
+    addressData setText humanSix(addr.toString)
     rateManager
   }
 

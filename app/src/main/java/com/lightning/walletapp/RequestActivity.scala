@@ -68,7 +68,7 @@ class RequestActivity extends TimerActivity { me =>
 
     app.TransData.value match {
       case pr: PaymentRequest => showInfo(drawAll(denom asString pr.amount.get, getString(ln_qr_disposable).html), PaymentRequest write pr)
-      case onChainAddress: Address => showInfo(drawBottom(Utils humanFour onChainAddress.toString), onChainAddress.toString)
+      case onChainAddress: Address => showInfo(drawBottom(Utils humanSix onChainAddress.toString), onChainAddress.toString)
       case _ => finish
     }
 
