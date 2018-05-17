@@ -32,7 +32,6 @@ class LNOpsActivity extends TimerActivity { me =>
 
   lazy val basic = getString(ln_ops_chan_basic)
   lazy val negotiations = getString(ln_ops_chan_negotiations)
-  lazy val nothingYet = getString(ln_ops_chan_receive_nothing_yet)
   lazy val unilateralClosing = getString(ln_ops_chan_unilateral_closing)
   lazy val bilateralClosing = getString(ln_ops_chan_bilateral_closing)
   lazy val statusLeft = getString(ln_ops_chan_unilateral_status_left)
@@ -155,12 +154,10 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def manageOpen = UITask {
-      val canReceive = MilliSatoshi apply estimateCanReceive(chan)
-      val canReceiveHuman = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-      val finalCanReceive = if (channelAndHop(chan).isDefined) canReceiveHuman else sumOut format nothingYet
-
       val canSend = MilliSatoshi apply estimateCanSend(chan)
+      val canReceive = MilliSatoshi apply estimateCanReceive(chan)
       val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
+      val finalCanReceive = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
       lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, started, coloredIn(capacity),
         finalCanSend, finalCanReceive, app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size), nodeId).html
 

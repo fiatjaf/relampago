@@ -205,7 +205,6 @@
     <string name="ln_ops_chan_open"><![CDATA[<font color=#53A63C>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>can send %5$s<br>can receive %6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>opened at <font color=#999999>%4$s</font><br>closed at <font color=#999999>%5$s</font><br>total capacity %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
-    <string name="ln_ops_chan_receive_nothing_yet">nothing yet</string>
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>Pending payments are present</font><br><br>Cooperative closing is going to be postponed until they are resolved, would you still like to proceed?]]></string>
     <string name="ln_chan_close_details"><![CDATA[Closing results in a regular Bitcoin transaction which refunds current channel balance back into your Bitcoin wallet.<br><br>Channel itself becomes unusable once this action is initiated, would you like to proceed?]]></string>

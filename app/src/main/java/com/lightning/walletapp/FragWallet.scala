@@ -168,12 +168,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   val updList: Vector[ItemWrap] => TimerTask = items => {
-    // Orders BTC and LN payments by their date and updates UI accordingly
-    allItems = items.sortBy(_.getDate)(Ordering[java.util.Date].reverse)
-    val showToggle = allItems.size > minLinesNum
+    // Orders BTC and LN payments by their date and updates UI list accordingly
+    allItems = items.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
 
     UITask {
-      allTxsWrapper setVisibility viewMap(showToggle)
+      allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
       mnemonicWarn setVisibility viewMap(allItems.isEmpty)
       itemsList setVisibility viewMap(allItems.nonEmpty)
       adapter.notifyDataSetChanged
@@ -382,25 +381,30 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // LN STUFF
 
-  val chanListener =
-    new ChannelListener {
-      override def onException = {
-        case _ \ CMDAddImpossible(_, errCode) =>
-          // Why outgoing payment was not added
-          onFail(host getString errCode)
+  val chanListener = new ChannelListener {
+    // Updates UI and informs user about errors
+    // should be removed once activity is destroyed
 
-        case _ \ error =>
-          // Show internal error description
-          val content = UncaughtHandler toText error
-          val dlg = negTextBuilder(dialog_ok, content)
-          UITask(host showForm dlg.create).run
-      }
-
-      override def onBecome = {
-        // Update UI on all changes
-        case state => updTitle.run
-      }
+    override def onProcessSuccess = {
+      case (_, _, error: wire.Error) =>
+        onFail(error.exception.getMessage)
     }
+
+    override def onException = {
+      case _ \ CMDAddImpossible(_, errCode) =>
+        onFail(host getString errCode)
+
+      case _ \ error =>
+        val content = UncaughtHandler toText error
+        val dlg = negTextBuilder(dialog_ok, content)
+        UITask(host showForm dlg.create).run
+    }
+
+    override def onBecome = {
+      // Update UI on all changes
+      case state => updTitle.run
+    }
+  }
 
   def showQR(pr: PaymentRequest) = {
     host goTo classOf[RequestActivity]
@@ -579,7 +583,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   react(new String)
 
   <(fun = {
-    val rawTxs = app.kit.wallet.getRecentTransactions(PaymentTable.limit, false)
+    val rawTxs = app.kit.wallet.getRecentTransactions(24, false)
     val wraps = for (txnj <- rawTxs.asScala.toVector) yield new TxWrap(txnj)
     btcItems = for (wrap <- wraps if wrap.isVisible) yield BTCWrap(wrap)
     updList(btcItems ++ lnItems).run

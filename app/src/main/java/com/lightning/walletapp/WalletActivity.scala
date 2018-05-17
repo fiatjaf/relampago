@@ -220,6 +220,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
+    val channelFee = Satoshi(LNParams.broadcaster.perKwTwoSat)
     val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
     val inFiatTotal = msatInFiatHuman apply walletTotalSum
@@ -244,7 +245,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
     denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
     stateContent setText s"${coloredIn apply walletTotalSum}<br><small>$inFiatTotal</small>".html
-    chanFeeContent setText s"${denom withSign RatesSaver.rates.feeTwo} / KB".html
+    chanFeeContent setText s"${denom withSign channelFee} / KW".html
     showForm(negBuilder(dialog_ok, title, form).create)
   }
 
@@ -281,7 +282,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
               refundingData <- Try(jsonDecoded) map to[RefundingData]
 
               // Now throw it away if it is already present in a list of local channels
-              if !app.ChannelManager.all.exists(chan => chan(cs => cs.channelId) contains refundingData.commitments.channelId)
+              if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
               chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, bootstrap = refundingData)
               ok = app.kit watchFunding refundingData.commitments
             } app.ChannelManager.all +:= chan

@@ -122,14 +122,11 @@ class WalletApp extends Application { me =>
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         // Ignore all routing messages except ChannelUpdate which may contain payment parameters
         case chanUpdate: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process chanUpdate)
-        case err: Error if err.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process err)
-        // Delay remote error to give a chance to catch remote spent commit if it's present
-        case err: Error => Obs just err delay 5.seconds foreach relay
-        case msg: ChannelMessage => relay(msg)
+        case error: Error if error.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process error)
+        case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
         case _ =>
       }
 
-      def relay(m: ChannelMessage) = notClosing.find(chan => chan(cs => cs.channelId) contains m.channelId).foreach(_ process m)
       override def onOperational(nodeId: PublicKey, their: Init) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
       override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDShutdown)
       override def onIncompatible(nodeId: PublicKey) = onTerminalError(nodeId)

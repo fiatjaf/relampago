@@ -244,9 +244,9 @@ object Commitments {
   def addLocalProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.localChanges.proposed).using(_ :+ proposal)
 
   def hasExpiredHtlcs(c: Commitments, height: Long) =
-    c.localCommit.spec.htlcs.exists(htlc => !htlc.incoming && height - 72 >= htlc.add.expiry) ||
-      c.remoteCommit.spec.htlcs.exists(htlc => htlc.incoming && height - 72 >= htlc.add.expiry) ||
-      latestRemoteCommit(c).spec.htlcs.exists(htlc => htlc.incoming && height - 72 >= htlc.add.expiry)
+    c.localCommit.spec.htlcs.exists(htlc => !htlc.incoming && height - 144 >= htlc.add.expiry) ||
+      c.remoteCommit.spec.htlcs.exists(htlc => htlc.incoming && height - 144 >= htlc.add.expiry) ||
+      latestRemoteCommit(c).spec.htlcs.exists(htlc => htlc.incoming && height - 144 >= htlc.add.expiry)
 
   def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = {
     val remoteSigned = CommitmentSpec.findHtlcById(commitments.localCommit.spec, htlcId, incomingRelativeToLocal)
@@ -285,7 +285,7 @@ object Commitments {
       // We should both check if we can send another HTLC and if PEER can accept another HTLC
       if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
       if (outgoing.size > maxAllowedHtlcs || incoming.size > maxAllowedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
-      if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDAddImpossible(rd, ERR_FAILED)
+      if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
       c1 -> add
     }
 

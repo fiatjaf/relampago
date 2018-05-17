@@ -277,8 +277,6 @@ object GossipCatcher extends ChannelListener {
   }
 }
 
-// RESYNC NOTIFICATION
-
 object Notificator {
   private[this] val notificatorClass = classOf[Notificator]
   def removeResyncNotification = getAlarmManager cancel getIntent
