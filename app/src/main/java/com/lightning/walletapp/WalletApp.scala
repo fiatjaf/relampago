@@ -113,14 +113,14 @@ class WalletApp extends Application { me =>
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
-    def canSendNow(sum: Long) = for {
+    def canSendNow(msat: Long) = for {
       // Find an open and currently online channel
       // with enough funds to handle HTLC + on-chain fee
 
       chan <- all
-      lim <- chan(_.localCommit.spec.feeratePerKw)
+      lim <- chan(_.localCommit.spec.feeratePerKw * 1000L)
       if isOperational(chan) && chan.state == OPEN
-      if estimateCanSend(chan) - lim - sum >= 0
+      if estimateCanSend(chan) - lim - msat >= 0
     } yield chan
 
     def frozenInFlightHashes = all.diff(notClosingOrRefunding).flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)
