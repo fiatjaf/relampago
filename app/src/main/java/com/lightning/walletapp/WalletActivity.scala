@@ -245,7 +245,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
     denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
     stateContent setText s"${coloredIn apply walletTotalSum}<br><small>$inFiatTotal</small>".html
-    chanFeeContent setText s"${denom withSign channelFee} / KW".html
+    chanFeeContent setText s"${denom withSign channelFee} / kw".html
     showForm(negBuilder(dialog_ok, title, form).create)
   }
 

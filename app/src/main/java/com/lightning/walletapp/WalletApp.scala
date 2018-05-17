@@ -109,10 +109,19 @@ class WalletApp extends Application { me =>
     val operationalListeners = Set(broadcaster, bag, GossipCatcher)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
-    def canSendNow(amount: Long) = for (c <- all if isOperationalOpen(c) && estimateCanSend(c) >= amount) yield c
     def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
     def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
+
+    def canSendNow(sum: Long) = for {
+      // Find an open and currently online channel
+      // with enough funds to handle HTLC + on-chain fee
+
+      chan <- all
+      lim <- chan(_.localCommit.spec.feeratePerKw)
+      if isOperational(chan) && chan.state == OPEN
+      if estimateCanSend(chan) - lim - sum >= 0
+    } yield chan
 
     def frozenInFlightHashes = all.diff(notClosingOrRefunding).flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)
     def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)

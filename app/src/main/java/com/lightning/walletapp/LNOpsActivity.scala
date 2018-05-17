@@ -120,9 +120,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     // Order matters here!
     def getCloseWarning = host getString {
       val openAndOffline = isOperational(chan)
-      val openAndOnline = isOperationalOpen(chan)
-      val noPending = inFlightOutgoingHtlcs(chan).isEmpty
-      if (openAndOnline && noPending) ln_chan_close_details
+      val openAndOnline = openAndOffline && chan.state == OPEN
+      val noPendingPayments = inFlightOutgoingHtlcs(chan).isEmpty
+      if (openAndOnline && noPendingPayments) ln_chan_close_details
       else if (openAndOnline) ln_chan_close_inflight_details
       else if (openAndOffline) ln_chan_force_offline_details
       else ln_chan_force_details
