@@ -120,7 +120,7 @@ class WalletApp extends Application { me =>
       chan <- all
       lim <- chan(_.localCommit.spec.feeratePerKw * 1000L)
       if isOperational(chan) && chan.state == OPEN
-      if estimateCanSend(chan) - lim - msat >= 0
+      if estimateCanSend(chan) - lim >= msat
     } yield chan
 
     def frozenInFlightHashes = all.diff(notClosingOrRefunding).flatMap(inFlightOutgoingHtlcs).map(_.add.paymentHash)

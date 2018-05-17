@@ -348,7 +348,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         BECOME(norm.copy(commitments = c1), OPEN)
         norm.localShutdown foreach SEND
-        doProcess(CMDHTLCProcess)
 
 
       // We're exiting a sync state while waiting for their FundingLocked
