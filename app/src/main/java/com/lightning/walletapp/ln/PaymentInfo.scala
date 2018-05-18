@@ -25,7 +25,8 @@ object PaymentInfo {
   final val FAILURE = 3
   final val FROZEN = 4
 
-  final val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
+  final val NOIMAGE = BinaryData("3030303030303030")
+  final val NOCHANID = BinaryData("3131313131313131")
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
@@ -216,9 +217,9 @@ trait PaymentInfoBag { me =>
   def saveRevoked(hash: BinaryData, expiry: Long, number: Long)
 
   // Manage payments list
+  def extractPreimage(tx: Transaction)
   def getPaymentInfo(hash: BinaryData): Try[PaymentInfo]
   def updStatus(paymentStatus: Int, hash: BinaryData)
-  def updOkOutgoing(fulfill: UpdateFulfillHtlc)
-  def updOkIncoming(add: UpdateAddHtlc)
-  def extractPreimage(tx: Transaction)
+  def updOkOutgoing(m: UpdateFulfillHtlc)
+  def updOkIncoming(m: UpdateAddHtlc)
 }

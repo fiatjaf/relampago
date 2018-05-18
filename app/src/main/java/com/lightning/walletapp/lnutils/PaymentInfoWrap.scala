@@ -52,19 +52,19 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
   def getAllRevoked(number: Long) = RichCursor apply db.select(RevokedTable.selectSql, number) vec toRevoked
 
-  def extractPreimage(tx: Transaction) = {
-    val fulfills = tx.txIn.map(txIn => txIn.witness.stack) collect {
-      case Seq(_, pre, _) if pre.size == 32 => UpdateFulfillHtlc(null, 0L, pre)
-      case Seq(_, _, _, pre, _) if pre.size == 32 => UpdateFulfillHtlc(null, 0L, pre)
+  def extractPreimage(candidateTx: Transaction) = {
+    val fulfills = candidateTx.txIn.map(_.witness.stack) collect {
+      case Seq(_, pre, _) if pre.size == 32 => UpdateFulfillHtlc(NOCHANID, 0L, pre)
+      case Seq(_, _, _, pre, _) if pre.size == 32 => UpdateFulfillHtlc(NOCHANID, 0L, pre)
     }
 
-    fulfills foreach updOkOutgoing
+    for (m <- fulfills) me updOkOutgoing m
     if (fulfills.nonEmpty) uiNotify
   }
 
   def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
-  def updOkIncoming(u: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, u.amountMsat, System.currentTimeMillis, u.paymentHash)
-  def updOkOutgoing(fulfill: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, fulfill.paymentPreimage, fulfill.paymentHash)
+  def updOkIncoming(m: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
+  def updOkOutgoing(m: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
   def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
@@ -77,7 +77,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
     db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
-      rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
+      rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
   def markFailedAndFrozen = db txWrap {
@@ -138,7 +138,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     // then retry failed payments where possible
 
     db txWrap {
-      for (Htlc(true, addHtlc) \ _ <- cs.localCommit.spec.fulfilled) me updOkIncoming addHtlc
+      for (Htlc(true, addPayment) \ _ <- cs.localCommit.spec.fulfilled) me updOkIncoming addPayment
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
 

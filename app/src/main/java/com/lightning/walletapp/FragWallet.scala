@@ -442,7 +442,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
           db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.paymentHashString)
           db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN, System.currentTimeMillis,
-            pr.description, rd.paymentHashString, sum.amount, 0L, 0L)
+            pr.description, rd.paymentHashString, sum.amount, 0L, 0L, NOCHANID)
 
           showQR(pr)
         }
