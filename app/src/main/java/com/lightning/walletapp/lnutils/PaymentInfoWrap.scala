@@ -58,7 +58,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       case Seq(_, _, _, pre, _) if pre.size == 32 => UpdateFulfillHtlc(NOCHANID, 0L, pre)
     }
 
-    for (m <- fulfills) me updOkOutgoing m
+    fulfills foreach updOkOutgoing
     if (fulfills.nonEmpty) uiNotify
   }
 
