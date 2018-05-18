@@ -165,10 +165,16 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         doProcess(CMDProceed)
 
 
-      // We're fulfilling an HTLC we got earlier
-      case (norm @ NormalData(_, commitments, _, _), cmd: CMDFulfillHtlc, OPEN) =>
-        val c1 \ updateFulfillHtlc = Commitments.sendFulfill(commitments, cmd)
-        me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
+      // We're fulfilling an HTLC we got from them earlier
+      // this is a special case where we don't throw if cross signed HTLC is not found
+      // it may happen when we have already fulfilled it just before connection got lost
+      case (norm @ NormalData(_, commitments, _, _), cmd: CMDFulfillHtlc, OPEN) => for {
+        add <- Commitments.getHtlcCrossSigned(commitments, incomingRelativeToLocal = true, cmd.id)
+        updateFulfillHtlc = UpdateFulfillHtlc(commitments.channelId, cmd.id, cmd.preimage)
+
+        if updateFulfillHtlc.paymentHash == add.paymentHash
+        c1 = Commitments.addLocalProposal(commitments, updateFulfillHtlc)
+      } me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
 
 
       // Failing an HTLC we got earlier
@@ -348,6 +354,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         BECOME(norm.copy(commitments = c1), OPEN)
         norm.localShutdown foreach SEND
+        doProcess(CMDHTLCProcess)
 
 
       // We're exiting a sync state while waiting for their FundingLocked

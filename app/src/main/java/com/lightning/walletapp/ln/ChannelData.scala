@@ -308,14 +308,6 @@ object Commitments {
       c1
     }
 
-  def sendFulfill(c: Commitments, cmd: CMDFulfillHtlc) = {
-    val ok = UpdateFulfillHtlc(c.channelId, cmd.id, cmd.preimage)
-    getHtlcCrossSigned(commitments = c, incomingRelativeToLocal = true, cmd.id) match {
-      case Some(add) if ok.paymentHash == add.paymentHash => addLocalProposal(c, ok) -> ok
-      case None => throw new LightningException
-    }
-  }
-
   def receiveFulfill(c: Commitments, fulfill: UpdateFulfillHtlc) =
     getHtlcCrossSigned(commitments = c, incomingRelativeToLocal = false, fulfill.id) match {
       case Some(add) if fulfill.paymentHash == add.paymentHash => addRemoteProposal(c, fulfill)
