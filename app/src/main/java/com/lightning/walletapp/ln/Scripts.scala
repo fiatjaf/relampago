@@ -246,9 +246,6 @@ object Scripts { me =>
   def sign(tx: Transaction, inputIndex: Int, redeemScript: BinaryData, amount: Satoshi, key: PrivateKey): BinaryData =
     Transaction.signInput(tx, inputIndex, redeemScript, SIGHASH_ALL, amount, SIGVERSION_WITNESS_V0, key)
 
-  def sign(tx: Transaction, inputIndex: Int, redeemScript: BinaryData, key: PrivateKey): BinaryData =
-    Transaction.signInput(tx, inputIndex, redeemScript, SIGHASH_ALL, Satoshi(0), SIGVERSION_BASE, key)
-
   def sign(txinfo: TransactionWithInputInfo, key: PrivateKey): BinaryData =
     sign(txinfo.tx, 0, txinfo.input.redeemScript, txinfo.input.txOut.amount, key)
 
