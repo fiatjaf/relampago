@@ -47,15 +47,14 @@ object LocalBroadcaster extends Broadcaster {
   }
 
   override def onBecome = {
-    case (chan, wait: WaitFundingDoneData, OFFLINE, WAIT_FUNDING_DONE) =>
-      // CMDConfirmed from wallet listener may be sent to an offline channel
-      // so use this additional check purely as a failsafe measure
+    case (chan, wait: WaitFundingDoneData, OFFLINE, WAIT_FUNDING_DONE) => for {
+      // CMDConfirmed may be sent to an offline channel and there will be no reaction
+      // so always double check a funding state here as a failsafe measure
 
-      for {
-        txj <- getTx(wait.fundingTx.txid)
-        depth \ isDead = getStatus(wait.fundingTx.txid)
-        if depth >= LNParams.minDepth && !isDead
-      } chan process CMDConfirmed(txj)
+      txj <- getTx(wait.fundingTx.txid)
+      depth \ isDead = getStatus(wait.fundingTx.txid)
+      if depth >= LNParams.minDepth && !isDead
+    } chan process CMDConfirmed(txj)
 
     case (_, wait: WaitFundingDoneData, _, _) =>
       // Watch funding script, broadcast funding tx

@@ -27,6 +27,7 @@ import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import org.bitcoinj.wallet.listeners.WalletCoinsReceivedEventListener
+import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
@@ -262,6 +263,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   case class BTCWrap(wrap: TxWrap) extends ItemWrap {
     val getDate: java.util.Date = wrap.tx.getUpdateTime
+    private[this] def txDepth = wrap.tx.getConfidence.getDepthInBlocks
+    private[this] def txDead = DEAD == wrap.tx.getConfidence.getConfidenceType
 
     def fillView(holder: ViewHolder) = {
       val humanSum = wrap.visibleValue.isPositive match {
@@ -269,7 +272,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case false => sumOut.format(denom formatted -wrap.visibleValue)
       }
 
-      val status = if (wrap.isDead) dead else if (wrap.depth >= minDepth) conf1 else await
+      val status = if (txDead) dead else if (txDepth >= minDepth) conf1 else await
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactSum setText s"&#3647; $humanSum".html
       holder.transactCircle setImageResource status
@@ -277,7 +280,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def generatePopup = {
-      val confs = app.plurOrZero(txsConfs, wrap.depth)
+      val confs = app.plurOrZero(txsConfs, txDepth)
       val marking = if (wrap.visibleValue.isPositive) sumIn else sumOut
       val outputs = wrap.payDatas(wrap.visibleValue.isPositive).flatMap(_.toOption)
       val humanOutputs = for (pay <- outputs) yield marking.format(pay.destination).html
@@ -296,7 +299,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       val header = wrap.fee match {
-        case _ if wrap.isDead => sumOut format txsConfs.last
+        case _ if txDead => sumOut format txsConfs.last
 
         case _ if wrap.visibleValue.isPositive =>
           val amount: MilliSatoshi = wrap.visibleValue
@@ -321,7 +324,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       // See if CPFP can be applied
       val notEnough = wrap.valueDelta isLessThan RatesSaver.rates.feeSix
-      if (wrap.depth > 0 || notEnough) showForm(negBuilder(dialog_ok, header.html, lst).create)
+      if (txDepth > 0 || notEnough) showForm(negBuilder(dialog_ok, header.html, lst).create)
       else mkForm(none, boostIncoming(wrap), baseBuilder(header.html, lst), dialog_ok, dialog_boost)
     }
   }
@@ -548,8 +551,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val userWarn = baseBuilder(app.getString(boost_details).format(current, boost).html, null)
     mkForm(ok = <(replace, onError)(none), none, userWarn, dialog_ok, dialog_cancel)
 
-    def replace = if (wrap.depth < 1 && !wrap.isDead) runAnd(wrap.makeHidden) {
-      // Parent transaction hiding must always happen before child is broadcasted
+    def replace: Unit = {
+      // Check once again whether it still needs boosting
+      if (wrap.tx.getConfidence.getDepthInBlocks > 0) return
+      if (DEAD == wrap.tx.getConfidence.getConfidenceType) return
+      wrap.makeHidden
+
+      // Parent transaction hiding must happen before child is broadcasted
       val unsigned = childPaysForParent(app.kit.wallet, wrap.tx, newFee)
       app.kit blockingSend app.kit.sign(unsigned).tx
     }
