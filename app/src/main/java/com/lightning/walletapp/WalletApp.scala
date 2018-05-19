@@ -3,7 +3,6 @@ package com.lightning.walletapp
 import R.string._
 import spray.json._
 import org.bitcoinj.core._
-
 import scala.concurrent.duration._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
@@ -16,17 +15,16 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+
 import rx.lang.scala.{Observable => Obs}
-import org.bitcoinj.wallet.{DefaultCoinSelector, SendRequest, Wallet}
+import org.bitcoinj.wallet.{SendRequest, Wallet}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.walletapp.lnutils.olympus.CloudAct
 import java.util.concurrent.TimeUnit.MILLISECONDS
-
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
@@ -34,11 +32,9 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
-
 import fr.acinq.bitcoin.Crypto
 import android.app.Application
 import android.widget.Toast
-
 import scala.util.Try
 import java.io.File
 
@@ -96,12 +92,12 @@ class WalletApp extends Application { me =>
   object TransData {
     var value: Any = _
     private[this] val prefixes = PaymentRequest.prefixes.values mkString "|"
-    private[this] val lnLink = s"(?im).*?([$prefixes]{4,6}[0-9]{1,}\\w+){1}".r.unanchored
+    private[this] val lnLink = s"(?im).*?($prefixes)([0-9]{1,}\\w+){1}".r.unanchored
     private[this] val nodeLink = "([a-fA-F0-9]{66})@([a-zA-Z0-9:\\.\\-_]+):([0-9]+)".r
 
     def recordValue(rawText: String) = value = rawText match {
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
-      case lnLink(body) if notMixedCase(body) => PaymentRequest read body.toLowerCase
+      case lnLink(pre, x) if notMixedCase(s"$pre$x") => PaymentRequest read s"$pre$x".toLowerCase
       case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), host, port.toInt)
       case _ => Address.fromString(params, rawText)
     }
