@@ -126,7 +126,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       val minCapacity: MilliSatoshi = if (minFeeCap > minHardCap) minFeeCap else minHardCap
 
       val minHuman = denom withSign minCapacity
-      val maxHuman = denom withSign LNParams.maxChannelCapacity
+      val maxHuman = denom withSign LNParams.maxChanCapacity
       val canSend = denom withSign app.kit.conf1Balance
 
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
@@ -155,7 +155,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       def askAttempt(alert: AlertDialog) = rateManager.result match {
-        case Success(ms) if ms > LNParams.maxChannelCapacity => app toast dialog_sum_big
+        case Success(ms) if ms > LNParams.maxChanCapacity => app toast dialog_sum_big
         case Success(ms) if ms < minCapacity => app toast dialog_sum_small
         case Failure(reason) => app toast dialog_sum_empty
         case Success(ms) => rm(alert)(next(ms).start)

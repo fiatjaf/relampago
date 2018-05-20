@@ -118,6 +118,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   override def onCreateOptionsMenu(menu: Menu) = {
     // Called after fragLN sets toolbar as actionbar
     getMenuInflater.inflate(R.menu.wallet, menu)
+    // Updated here to make sure it's present
+    floatingActionMenu setIconAnimated false
     FragWallet.worker setupSearch menu
     true
   }
