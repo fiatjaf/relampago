@@ -88,8 +88,8 @@ trait Broadcaster extends ChannelListener { me =>
   def getBlockHashString(txid: BinaryData): Option[String]
   def getStatus(txid: BinaryData): DepthAndDead
   def currentHeight: Long
+  def perKwThreeSat: Long
   def perKwSixSat: Long
-  def perKwTwoSat: Long
 
   // Parent state and next tier cltv delay
   // actual negative delay will be represented as 0L

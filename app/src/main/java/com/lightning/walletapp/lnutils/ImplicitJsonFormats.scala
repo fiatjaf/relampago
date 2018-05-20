@@ -123,7 +123,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val ratesFmt =
     jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long,
-      Rates](Rates.apply, "feesSix", "feesTwo", "exchange", "stamp")
+      Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
 
   implicit val cloudActFmt =
     jsonFormat[BinaryData, Seq[HttpParam], String,

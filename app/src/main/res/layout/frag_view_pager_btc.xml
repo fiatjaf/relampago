@@ -71,7 +71,7 @@
         fab:menu_colorNormal="@color/btc"
         fab:menu_colorRipple="@color/btc"
         style="@style/FloatingMenu"
-        android:id="@+id/fab">
+        android:id="@+id/fam">
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_add_white_18dp"

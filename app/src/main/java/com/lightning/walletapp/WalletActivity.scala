@@ -94,7 +94,7 @@ trait HumanTimeDisplay {
 
 class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
-  lazy val floatingButton = findViewById(R.id.fab).asInstanceOf[FloatingActionMenu]
+  lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
 
   lazy val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
@@ -110,7 +110,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   override def onBackPressed = {
     val isExpanded = FragWallet.worker.currentCut > FragWallet.worker.minLinesNum
     if (walletPager.getCurrentItem == 1) walletPager.setCurrentItem(0, true)
-    else if (floatingButton.isOpened) floatingButton close true
+    else if (floatingActionMenu.isOpened) floatingActionMenu close true
     else if (isExpanded) FragWallet.worker.toggler.performClick
     else super.onBackPressed
   }
@@ -220,7 +220,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
-    val channelFee = Satoshi(LNParams.broadcaster.perKwTwoSat)
+    val channelFee = Satoshi(LNParams.broadcaster.perKwThreeSat)
     val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
     val inFiatTotal = msatInFiatHuman apply walletTotalSum
@@ -308,11 +308,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       }, none, baseTextBuilder(getString(zygote_details).html), dialog_next, dialog_cancel)
 
       def createZygote = {
-        val zygote = FileOps shell s"wallet snapshot ${new Date}.txt"
         val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
         val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
         val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
         val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
+        val zygote = FileOps shell s"Bitcoin Wallet Snapshot ${new Date}.txt"
         Files.write(encoded.require.toByteArray, zygote)
         zygote
       }
