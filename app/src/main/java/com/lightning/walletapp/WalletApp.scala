@@ -282,7 +282,7 @@ class WalletApp extends Application { me =>
       peerGroup.setMinRequiredProtocolVersion(70015)
       peerGroup.setDownloadTxDependencies(0)
       peerGroup.setPingIntervalMsec(10000)
-      peerGroup.setMaxConnections(5)
+      peerGroup.setMaxConnections(10)
       peerGroup.addWallet(wallet)
 
       Notificator.removeResyncNotification
