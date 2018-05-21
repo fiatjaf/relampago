@@ -283,15 +283,15 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm @ NormalData(_, _, None, their), CMDProceed, OPEN)
-        if inFlightOutgoingHtlcs(me).isEmpty && their.isDefined =>
         // GUARD: got their shutdown with no in-flight HTLCs
+        if inFlightHtlcs(me).isEmpty && their.isDefined =>
         me startShutdown norm
         doProcess(CMDProceed)
 
 
       case (NormalData(announce, commitments, our, their), CMDProceed, OPEN)
-        // GUARD: got both shutdowns without in-flight HTLCs so we can start negs
-        if inFlightOutgoingHtlcs(me).isEmpty && our.isDefined && their.isDefined =>
+        // GUARD: got both shutdowns without in-flight HTLCs so can negotiate
+        if inFlightHtlcs(me).isEmpty && our.isDefined && their.isDefined =>
 
         val firstProposed = Closing.makeFirstClosing(commitments, our.get.scriptPubKey, their.get.scriptPubKey)
         val neg = NegotiationsData(announce, commitments, our.get, their.get, firstProposed :: Nil)
@@ -549,7 +549,7 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  def inFlightOutgoingHtlcs(chan: Channel) = chan.data match {
+  def inFlightHtlcs(chan: Channel) = chan.data match {
     // Channels should always be filtered by some criteria before calling this method
     // like find all current in-flight HTLC from alive chans or all frozen from closing chans
     case some: HasCommitments => Commitments.latestRemoteCommit(some.commitments).spec.htlcs

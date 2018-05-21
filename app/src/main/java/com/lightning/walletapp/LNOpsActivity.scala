@@ -121,8 +121,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def getCloseWarning = host getString {
       val openAndOffline = isOperational(chan)
       val openAndOnline = openAndOffline && chan.state == OPEN
-      val noPendingPayments = inFlightOutgoingHtlcs(chan).isEmpty
-      if (openAndOnline && noPendingPayments) ln_chan_close_details
+      val coopClosePossible = openAndOnline && inFlightHtlcs(chan).isEmpty
+
+      if (coopClosePossible) ln_chan_close_details
       else if (openAndOnline) ln_chan_close_inflight_details
       else if (openAndOffline) ln_chan_force_offline_details
       else ln_chan_force_details
@@ -159,7 +160,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
       val finalCanReceive = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
       lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, started, coloredIn(capacity),
-        finalCanSend, finalCanReceive, app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size), nodeId).html
+        finalCanSend, finalCanReceive, app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size), nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
@@ -168,7 +169,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
     def manageNegotiations = UITask {
       val refundable = MilliSatoshi apply estimateCanSend(chan)
-      val inFlight = app.plurOrZero(inFlightPayments, inFlightOutgoingHtlcs(chan).size)
+      val inFlight = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
       lnOpsDescription setText negotiations.format(chan.state, alias, started,
         coloredIn(capacity), coloredIn(refundable), inFlight).html
 
