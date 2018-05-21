@@ -5,15 +5,15 @@
 
     <!-- app wide -->
     <string name="step_fees"><![CDATA[<font color=#999999>Final step: miner fee</font><br><br>%1$s]]></string>
-    <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
+    <string name="greetings">Bitcoin Lightning Wallet\n\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Confirmation may take hours</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Faster confirmation times</font></small></small>]]></string>
     <string name="wallet_state"><small>Total balance\n<font color='#999999'>On-chain and LN</font></small></string>
     <string name="wallet_chan_feerate"><small>Channel fee rate</small></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
-    <string name="wallet_create">New Bitcoin Wallet</string>
     <string name="wallet_restore">Restore Wallet</string>
+    <string name="wallet_create">New Wallet</string>
 
     <array name="denoms">
         <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 btc</small></font>]]></item>
@@ -27,7 +27,7 @@
     </array>
 
     <string name="create_wallet_creating">Generating your wallet\nIt may take up to a few minutes</string>
-    <string name="restore_when">When was Bitcoin wallet created?\nLeave date as is if not sure</string>
+    <string name="restore_when">When was your wallet created?\nLeave date as is if not sure</string>
     <string name="restore_wallet_restoring">Restoring your wallet\nIt may take a while</string>
     <string name="restore_mnemonic_wrong">Phrase must be 12 words long</string>
     <string name="restore_hint">Your BIP32 mnemonic phrase</string>
@@ -206,7 +206,7 @@
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved, would you still like to proceed?]]></string>
-    <string name="ln_chan_close_details"><![CDATA[Closing results in a regular Bitcoin transaction which refunds current channel balance back into your Bitcoin wallet.<br><br>Channel itself becomes unusable once this action is initiated, would you like to proceed?]]></string>
+    <string name="ln_chan_close_details"><![CDATA[Closing results in a regular Bitcoin transaction which refunds current channel balance back into your on-chain wallet.<br><br>Channel itself becomes unusable once this action is initiated, would you like to proceed?]]></string>
     <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>This channel is offline now so closing it will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Please note that closing a channel right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
 

@@ -77,7 +77,6 @@ class WalletApp extends Application { me =>
   }
 
   def setBuffer(text: String, andNotify: Boolean = true) = {
-    // Set clipboard contents to given text and notify user via toast
     clipboardManager setPrimaryClip ClipData.newPlainText("wallet", text)
     if (andNotify) me toast getString(copied_to_clipboard).format(text)
   }
@@ -129,7 +128,7 @@ class WalletApp extends Application { me =>
 
     val socketEventsListener = new ConnectionListener {
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        // Ignore all routing messages except ChannelUpdate which may contain payment parameters
+        // Ignore routing messages except ChannelUpdate since it may contain payment parameters
         case chanUpdate: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process chanUpdate)
         case error: Error if error.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process error)
         case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
@@ -282,7 +281,7 @@ class WalletApp extends Application { me =>
       peerGroup.setMinRequiredProtocolVersion(70015)
       peerGroup.setDownloadTxDependencies(0)
       peerGroup.setPingIntervalMsec(10000)
-      peerGroup.setMaxConnections(10)
+      peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
       Notificator.removeResyncNotification
