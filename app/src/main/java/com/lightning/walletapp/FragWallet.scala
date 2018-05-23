@@ -470,7 +470,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def sendPayment(pr: PaymentRequest) = ifOperational { operationalChannels =>
     if (PaymentRequest.prefixes(chainHash) != pr.prefix) app toast err_general
-    else if (pr.nodeId == nodePublicKey) app toast err_general
+    else if (pr.nodeId == nodePublicKey) app toast err_self_payment
     else if (!pr.isFresh) app toast dialog_pr_expired
     else {
 
