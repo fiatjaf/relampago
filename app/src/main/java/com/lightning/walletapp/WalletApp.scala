@@ -226,7 +226,7 @@ class WalletApp extends Application { me =>
 
       for {
         routes <- cheapestRoutesObs
-        // Runtime optimization: prioritize shorter routes AND fewer pending payments in local channels
+        // Runtime optimization: shorter routes AND local channels with fewer pending payments
         chanMap = notClosingOrRefunding.map(chan => chan.data.announce.nodeId -> inFlightHtlcs(chan).size).toMap
         best = routes.sortBy(route => route.headOption.flatMap(hop => chanMap get hop.nodeId).getOrElse(0) + route.size)
       } yield useFirstRoute(best, rd)
