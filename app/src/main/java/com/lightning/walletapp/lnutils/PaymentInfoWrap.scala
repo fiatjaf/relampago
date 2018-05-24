@@ -214,7 +214,7 @@ object RouteWrap {
     val subs = (rd.usedRoute drop 1).scanLeft(rd.usedRoute take 1) { case rs \ hop => rs :+ hop }
 
     for (_ \ node \ path <- rd.onion.sharedSecrets drop 1 zip subs) {
-      val expiration = System.currentTimeMillis + 1000L * 3600 * 24 * 7
+      val expiration = System.currentTimeMillis + 1000L * 3600 * 24 * 14
       val subPathJson = path.toJson.toString
       val subNodeString = node.toString
 
