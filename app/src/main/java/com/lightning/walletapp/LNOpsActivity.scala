@@ -159,7 +159,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       val canReceive = MilliSatoshi apply estimateCanReceive(chan)
       val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
       val finalCanReceive = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, started, coloredIn(capacity),
+      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, coloredIn(capacity),
         finalCanSend, finalCanReceive, app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size), nodeId).html
 
       // Initialize button
