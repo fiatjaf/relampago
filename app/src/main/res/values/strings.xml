@@ -185,7 +185,7 @@
     <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_description_hint">add some description</string>
     <string name="ln_no_description">No description provided</string>
-    <string name="ln_proof">Signed payment request: %1$s\n\nPayment preimage: %3$s</string>
+    <string name="ln_proof">Signed payment request: %1$s\n\nPayment preimage: %2$s</string>
     <string name="ln_qr_disposable"><![CDATA[Request is valid for 1 hour<br>Do not reuse this QR code]]></string>
 
     <!-- see PaymentInfo.scala -->
