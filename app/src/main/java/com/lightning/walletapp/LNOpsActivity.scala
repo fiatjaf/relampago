@@ -130,9 +130,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     lnOpsAction setOnClickListener onButtonTap {
-      // First closing attempt will be a cooperative one while the second attempt will be uncooperative
+      // First attempt will be a cooperative one while the second attempt will be uncooperative
       val bld = baseTextBuilder(getCloseWarning.html) setCustomTitle lnOpsAction.getText.toString
-      mkForm(chan process CMDShutdown, none, bld, dialog_ok, dialog_cancel)
+      mkForm(chan process app.ChannelManager.CMDLocalShutdown, none, bld, dialog_ok, dialog_cancel)
     }
 
     def manageOther = UITask {

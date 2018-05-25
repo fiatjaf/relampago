@@ -251,7 +251,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SHUTDOWN in WAIT_FUNDING_DONE and OPEN
 
 
-      case (wait: WaitFundingDoneData, CMDShutdown, WAIT_FUNDING_DONE) =>
+      case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), WAIT_FUNDING_DONE) =>
         // We have decided to close our channel before it reached a min depth
         me startShutdown NormalData(wait.announce, wait.commitments)
 
@@ -266,7 +266,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         doProcess(CMDProceed)
 
 
-      case (norm @ NormalData(_, commitments, our, their), CMDShutdown, OPEN) =>
+      case (norm @ NormalData(_, commitments, our, their), CMDShutdown(scriptPubKey), OPEN) =>
         // We have unsigned outgoing HTLCs or already have tried to close this channel cooperatively
         val nope = our.isDefined | their.isDefined | Commitments.localHasUnsignedOutgoing(commitments)
         if (nope) startLocalClose(norm) else me startShutdown norm
@@ -283,7 +283,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm @ NormalData(_, _, None, their), CMDProceed, OPEN)
-        // GUARD: got their shutdown with no in-flight HTLCs
+        // GUARD: already have their shutdown with no in-flight HTLCs
         if inFlightHtlcs(me).isEmpty && their.isDefined =>
         me startShutdown norm
         doProcess(CMDProceed)
@@ -469,8 +469,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         startLocalClose(some)
 
 
-      case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | OFFLINE) =>
-        // CMDShutdown in WAIT_FUNDING_DONE and OPEN can be cooperative
+      case (some: HasCommitments, _: CMDShutdown, NEGOTIATIONS | OFFLINE) =>
+        // Disregard custom scriptPubKey and always refund to local wallet
+        // CMDShutdown in WAIT_FUNDING_DONE and OPEN may be cooperative
         startLocalClose(some)
 
 

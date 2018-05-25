@@ -18,15 +18,15 @@ import language.postfixOps
 
 
 sealed trait Command
+case class CMDShutdown(scriptPubKey: Option[BinaryData] = None) extends Command
 case class CMDConfirmed(tx: Transaction) extends Command
 case class CMDBestHeight(height: Long) extends Command
 case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
 case class CMDFeerate(sat: Long) extends Command
 case object CMDHTLCProcess extends Command
-case object CMDShutdown extends Command
-case object CMDOffline extends Command
 case object CMDProceed extends Command
+case object CMDOffline extends Command
 case object CMDOnline extends Command
 
 case class CMDOpenChannel(localParams: LocalParams, tempChanId: BinaryData, initialFeeratePerKw: Long,

@@ -104,8 +104,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
   override def onException = {
-    case (_, exc: CMDException) => me failOnUI exc.rd
-    case chan \ error => chan process CMDShutdown
+    case (_, nonFatal: CMDException) => me failOnUI nonFatal.rd
+    case chan \ error => chan process app.ChannelManager.CMDLocalShutdown
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {

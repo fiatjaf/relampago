@@ -207,9 +207,18 @@
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved, would you still like to proceed?]]></string>
-    <string name="ln_chan_close_details"><![CDATA[Closing results in a regular Bitcoin transaction which refunds current channel balance back into your on-chain wallet.<br><br>Channel itself becomes unusable once this action is initiated, would you like to proceed?]]></string>
     <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>This channel is offline now so closing it will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Please note that closing a channel right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
+
+    <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close the channel and send a refunding transaction to the following address?<br><br>%1$s]]></string>
+    <string name="ln_chan_close_confirm_local"><![CDATA[Do you want to close the channel and send a refunding transaction back to this wallet?<br><br>%1$s]]></string>
+    <string name="ln_chan_close_details">Where should a refunding on-chain transaction be sent once this channel is closed?</string>
+    <string name="ln_chan_close_option_local">To this wallet</string>
+
+    <string name="ln_chan_close_option_address"><![CDATA[
+        Paste an Address<br><br><font color=#999999><small>Please note that it\'s not possible to determine an exact
+        refunding fee in advance so do not use this option if recipient expects an exact amount</small></font>
+    ]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Pending refunds</font><br>]]></string>

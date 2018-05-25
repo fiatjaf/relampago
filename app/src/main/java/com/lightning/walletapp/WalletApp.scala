@@ -105,6 +105,7 @@ class WalletApp extends Application { me =>
   object ChannelManager {
     var chainHeightObtained = false
     var currentBlocksLeft = Int.MaxValue
+    val CMDLocalShutdown = CMDShutdown(None)
     val operationalListeners = Set(broadcaster, bag, GossipCatcher)
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
@@ -136,7 +137,7 @@ class WalletApp extends Application { me =>
       }
 
       override def onOperational(nodeId: PublicKey, their: Init) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
-      override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDShutdown)
+      override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDLocalShutdown)
       override def onIncompatible(nodeId: PublicKey) = onTerminalError(nodeId)
 
       override def onDisconnect(nodeId: PublicKey) = if (fromNode(notClosing, nodeId).nonEmpty) {
