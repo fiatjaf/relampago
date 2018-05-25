@@ -167,8 +167,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       lnOpsAction setText action_ln_close
     }
 
-    def manageNegotiations = UITask {
-      val refundable = MilliSatoshi apply estimateCanSend(chan)
+    def manageNegotiations(cs: Commitments) = UITask {
+      val refundable = MilliSatoshi(cs.localCommit.spec.toLocalMsat)
       val inFlight = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
       lnOpsDescription setText negotiations.format(chan.state, alias, started,
         coloredIn(capacity), coloredIn(refundable), inFlight).html
@@ -187,12 +187,11 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       close.bestClosing match {
         case Left(mutualClosingTx) =>
-          val refundable = MilliSatoshi apply estimateCanSend(chan)
-          val status = humanStatus apply getStatus(mutualClosingTx.txid)
-          val myFee = coloredOut(capacity - mutualClosingTx.allOutputsAmount)
-          val view = commitStatus.format(mutualClosingTx.txid.toString, status, myFee)
-          lnOpsDescription setText bilateralClosing.format(chan.state, alias, started,
-            closedTimestamp, coloredIn(capacity), coloredIn(refundable), view).html
+          val fee = capacity - mutualClosingTx.allOutputsAmount
+          val refundable = MilliSatoshi(close.commitments.localCommit.spec.toLocalMsat) - fee
+          val view = commitStatus.format(mutualClosingTx.txid.toString, humanStatus apply getStatus(mutualClosingTx.txid), coloredOut apply fee)
+          val text = bilateralClosing.format(chan.state, alias, started, closedTimestamp, coloredIn(capacity), coloredIn(refundable), view)
+          lnOpsDescription setText text.html
 
         case Right(info) =>
           val tier12View = info.getState collect {
@@ -237,9 +236,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       override def onBecome = {
         case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
         case (_, _: NormalData, _, _) if isOperational(chan) => manageOpen.run
+        case (_, norm: NormalData, _, _) => manageNegotiations(norm.commitments).run
+        case (_, negs: NegotiationsData, _, _) => manageNegotiations(negs.commitments).run
         case (_, close: ClosingData, _, _) => manageClosing(close).run
-        case (_, _: NegotiationsData, _, _) => manageNegotiations.run
-        case (_, _: NormalData, _, _) => manageNegotiations.run
         case otherwise => manageOther.run
       }
     }
