@@ -43,10 +43,7 @@ object RatesSaver {
   def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
     val sensibleSix = for (notZero <- newFee("6") +: rates.feesSix if notZero > 0) yield notZero
     val sensibleThree = for (notZero <- newFee("3") +: rates.feesThree if notZero > 0) yield notZero
-
-    // Channels may become open sooner then we get updated fees so inform channels once we get updated fees
-    rates = Rates(sensibleSix take 2, sensibleThree take 2, exchange = newFiat, stamp = System.currentTimeMillis)
-    for (c <- app.ChannelManager.notClosingOrRefunding) c process CMDFeerate(LNParams.broadcaster.perKwThreeSat)
+    rates = Rates(sensibleSix take 2, sensibleThree take 2, exchange = newFiat, System.currentTimeMillis)
     app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
   }
 
