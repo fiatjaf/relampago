@@ -46,7 +46,7 @@
 
     <string name="mnemonic_info">
         <font color="#F00859">Mnemonic phrase is important</font>\n
-        <a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and save it now!
+        <a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Read about it</a> and save it now!
         \n\nYou will need it in case if anything goes wrong with your wallet!
     </string>
 
@@ -169,7 +169,7 @@
 
     <string name="err_ln_6_confs">Can\'t ask for Lightning payments because a channel funding Bitcoin transaction has not got 6 confirmations yet</string>
     <string name="err_ln_no_chan">Failed because either all channels are offline or no channel has enough funds to handle an off-chain payment amount combined with on-chain commit transaction fee</string>
-    <string name="err_ln_reserve_unspent">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving</string>
+    <string name="err_ln_reserve_unspent">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving</string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
@@ -207,8 +207,8 @@
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved, would you still like to proceed?]]></string>
-    <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>This channel is offline now so closing it will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
-    <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Please note that closing a channel right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
+    <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>This channel is offline now so closing it will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Please note that closing a channel right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
 
     <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close this channel and send a refunding transaction to the following address?<br><br>%1$s]]></string>
     <string name="ln_chan_close_confirm_local">Do you want to close this channel and send a refunding transaction back to this wallet?</string>
