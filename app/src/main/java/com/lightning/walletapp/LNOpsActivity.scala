@@ -9,14 +9,16 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.LNParams.broadcaster.getStatus
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import android.view.View.OnTouchListener
-import fr.acinq.bitcoin.MilliSatoshi
-import android.widget.Button
+import org.bitcoinj.script.ScriptBuilder
+import scala.util.Success
 import android.os.Bundle
 import java.util.Date
 
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
+import android.widget.{ArrayAdapter, Button, ListView}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 
 
 class LNOpsActivity extends TimerActivity { me =>
@@ -113,25 +115,57 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
     val chan = localChanCache(getArguments getInt "position")
     val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
+    // It is assumed that all channels here always have commitments
     val started = me time new Date(chan(_.startedAt).get)
     val capacity = chan(_.commitInput.txOut.amount).get
     val alias = chan.data.announce.alias take 64
 
-    // Order matters here!
-    def getCloseWarning = host getString {
-      val openAndOffline = isOperational(chan)
-      val openAndOnline = openAndOffline && chan.state == OPEN
+    // Order matters here
+    lnOpsAction setOnClickListener onButtonTap {
+      val openButCurrentlyOffline = isOperational(chan)
+      val openAndOnline = openButCurrentlyOffline && chan.state == OPEN
       val coopClosePossible = openAndOnline && inFlightHtlcs(chan).isEmpty
 
-      if (coopClosePossible) ln_chan_close_details
-      else if (openAndOnline) ln_chan_close_inflight_details
-      else if (openAndOffline) ln_chan_force_offline_details
-      else ln_chan_force_details
+      if (coopClosePossible) showCoopOptions
+      else if (openAndOnline) showWarning(host getString ln_chan_close_inflight_details)
+      else if (openButCurrentlyOffline) showWarning(host getString ln_chan_force_offline_details)
+      else showWarning(host getString ln_chan_force_details)
     }
 
-    lnOpsAction setOnClickListener onButtonTap {
-      // First attempt will be a cooperative one while the second attempt will be uncooperative
-      val bld = baseTextBuilder(getCloseWarning.html) setCustomTitle lnOpsAction.getText.toString
+    def showCoopOptions = {
+      val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+      val alert = showForm(negBuilder(dialog_cancel, host getString ln_chan_close_details, lst).create)
+      val options = Array(host getString ln_chan_close_option_local, host getString ln_chan_close_option_address)
+      lst setAdapter new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, for (text <- options) yield text.html)
+      lst setOnItemClickListener onTap { case 0 => sendToLocalWallet case 1 => sendToAddress }
+      lst setDividerHeight 0
+      lst setDivider null
+
+      def sendToLocalWallet = rm(alert) {
+        // Simple case: send refunding tx to this wallet
+        showWarning(host getString ln_chan_close_confirm_local)
+      }
+
+      def sendToAddress = rm(alert) {
+        app.getBufferTry map app.toAddress match {
+          // Users have an option to provide a custom address
+          // to omit a useless intermediary in-wallet transaction
+
+          case Success(address) =>
+            val where = sumOut format humanSix(address.toString)
+            val bld = baseBuilder(host getString action_ln_close, host.getString(ln_chan_close_confirm_address).format(where).html)
+            val customFinalPubKeyScript: Option[BinaryData] = Some(ScriptBuilder.createOutputScript(address).getProgram)
+            mkForm(chan process CMDShutdown(customFinalPubKeyScript), none, bld, dialog_ok, dialog_cancel)
+
+          case _ =>
+            // No address is present
+            app toast err_no_data
+        }
+      }
+    }
+
+    def showWarning(details: String) = {
+      val bld = baseTextBuilder(details.html).setCustomTitle(host getString action_ln_close)
       mkForm(chan process app.ChannelManager.CMDLocalShutdown, none, bld, dialog_ok, dialog_cancel)
     }
 

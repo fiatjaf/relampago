@@ -67,6 +67,7 @@ class WalletApp extends Application { me =>
   def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => null != db case _ => false }
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
+  def toAddress(rawText: String) = Address.fromString(app.params, rawText)
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
 
   Utils.appReference = me
@@ -98,7 +99,7 @@ class WalletApp extends Application { me =>
       case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
       case lnLink(pre, x) if notMixedCase(s"$pre$x") => PaymentRequest read s"$pre$x".toLowerCase
       case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), host, port.toInt)
-      case _ => Address.fromString(params, rawText)
+      case _ => toAddress(rawText)
     }
   }
 

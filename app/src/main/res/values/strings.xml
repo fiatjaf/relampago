@@ -90,8 +90,8 @@
     <string name="action_coins_send">Send funds</string>
     <string name="action_coins_receive">Receive funds</string>
     <string name="action_ln_details">View channel details</string>
+    <string name="action_ln_close">Close this channel</string>
     <string name="action_ln_open">Open new channel</string>
-    <string name="action_ln_close">Close channel</string>
     <string name="action_ln_force">Force close</string>
 
     <!-- dialogs -->
@@ -210,8 +210,8 @@
     <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>This channel is offline now so closing it will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Please note that closing a channel right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
 
-    <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close the channel and send a refunding transaction to the following address?<br><br>%1$s]]></string>
-    <string name="ln_chan_close_confirm_local"><![CDATA[Do you want to close the channel and send a refunding transaction back to this wallet?<br><br>%1$s]]></string>
+    <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close this channel and send a refunding transaction to the following address?<br><br>%1$s]]></string>
+    <string name="ln_chan_close_confirm_local">Do you want to close this channel and send a refunding transaction back to this wallet?</string>
     <string name="ln_chan_close_details">Where should a refunding on-chain transaction be sent once this channel is closed?</string>
     <string name="ln_chan_close_option_local">To this wallet</string>
 

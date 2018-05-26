@@ -117,17 +117,6 @@ trait TimerActivity extends AppCompatActivity { me =>
   def onFail(error: CharSequence): Unit = UITask(me showForm negBuilder(dialog_ok, null, error).create).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
 
-  def showForm(alertDialog: AlertDialog) = {
-    alertDialog.getWindow.getAttributes.windowAnimations = R.style.SlidingDialog
-    // This may be called after a host activity is destroyed and thus it may throw
-
-    try alertDialog.show catch none finally if (scrWidth > 2.3) {
-      alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
-    }
-
-    alertDialog
-  }
-
   def mkForm(ok: => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) =
     // Used for forms which do not need to check user input and can be dismissed right away
     mkCheckForm(alert => rm(alert)(ok), no, bld, okResource, noResource)
@@ -141,6 +130,17 @@ trait TimerActivity extends AppCompatActivity { me =>
     alert getButton BUTTON_POSITIVE setOnClickListener onButtonTap(ok apply alert)
     alert getButton BUTTON_NEGATIVE setOnClickListener noListener
     alert
+  }
+
+  def showForm(alertDialog: AlertDialog) = {
+    alertDialog.getWindow.getAttributes.windowAnimations = R.style.SlidingDialog
+    // This may be called after a host activity is destroyed and thus it may throw
+
+    try alertDialog.show catch none finally if (scrWidth > 2.3) {
+      alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
+    }
+
+    alertDialog
   }
 
   def INIT(savedInstanceState: Bundle): Unit

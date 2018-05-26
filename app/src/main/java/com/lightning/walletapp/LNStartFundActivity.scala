@@ -22,7 +22,7 @@ import android.app.AlertDialog
 import java.util.TimerTask
 import android.os.Bundle
 
-import fr.acinq.bitcoin.{MilliSatoshi, Satoshi, Script}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Script}
 import org.bitcoinj.core.{Coin, TransactionOutput}
 import android.widget.{ImageButton, TextView}
 import scala.util.{Failure, Success}
@@ -122,7 +122,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
     def askForFunding(their: Init): TimerTask = UITask {
       // Current feerate may be higher than hard capacity so choose the currently largest value
-      val minCapacity = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, 2000000L) * 1000L)
+      val minCapacity = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, 200000L) * 1000L)
 
       val minHuman = denom withSign minCapacity
       val maxHuman = denom withSign LNParams.maxChanCapacity
@@ -140,8 +140,8 @@ class LNStartFundActivity extends TimerActivity { me =>
           val finder = new PubKeyScriptIndexFinder(unsignedRequest.tx)
           val outIndex = finder.findPubKeyScriptIndex(dummyScript, None)
           val realChannelFundingAmountSat = unsignedRequest.tx.getOutput(outIndex).getValue.getValue
-          val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val theirUnspendableReserveSat = realChannelFundingAmountSat / LNParams.theirReserveToFundingRatio
+          val finalPubKeyScript: BinaryData = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis)
           freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, LNParams.broadcaster.perKwThreeSat,
             pushMsat = 0L, remoteInit = their, dummyRequest = unsignedRequest, outIndex, realChannelFundingAmountSat)

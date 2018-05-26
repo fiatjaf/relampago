@@ -24,7 +24,6 @@ import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import org.ndeftools.util.activity.NfcReaderActivity
-import com.lightning.walletapp.lnutils.RatesSaver
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
 import com.lightning.walletapp.helper.AES
