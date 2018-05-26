@@ -288,7 +288,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
               ok = app.kit watchFunding refundingData.commitments
             } app.ChannelManager.all +:= chan
             app.ChannelManager.initConnect
-          }, Tools.errlog)
+            // Inform if not fine
+          }, onFail)
 
           // Let user know it's happening
           app toast dialog_recovering
