@@ -165,7 +165,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     }
 
     def showWarning(details: String) = {
-      val bld = baseTextBuilder(details.html).setCustomTitle(host getString action_ln_close)
+      val bld = baseBuilder(host getString action_ln_close, details.html)
       mkForm(chan process app.ChannelManager.CMDLocalShutdown, none, bld, dialog_ok, dialog_cancel)
     }
 
