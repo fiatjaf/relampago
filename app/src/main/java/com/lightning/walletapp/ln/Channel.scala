@@ -294,12 +294,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         doProcess(CMDProceed)
 
 
-      case (NormalData(ann, commitments, our, their), CMDProceed, OPEN)
+      case (NormalData(announce, commitments, our, their), CMDProceed, OPEN)
         // GUARD: got both shutdowns without HTLCs in-flight so can negotiate
         if inFlightHtlcs(me).isEmpty && our.isDefined && their.isDefined =>
 
         val firstProposed = Closing.makeFirstClosing(commitments, our.get.scriptPubKey, their.get.scriptPubKey)
-        val neg = NegotiationsData(ann, commitments, our.get, their.get, firstProposed :: Nil)
+        val neg = NegotiationsData(announce, commitments, our.get, their.get, firstProposed :: Nil)
         BECOME(me STORE neg, NEGOTIATIONS) SEND firstProposed.localClosingSigned
 
 

@@ -90,8 +90,8 @@
     <string name="action_coins_send">Send funds</string>
     <string name="action_coins_receive">Receive funds</string>
     <string name="action_ln_details">View channel details</string>
-    <string name="action_ln_close">Close this channel</string>
     <string name="action_ln_open">Open new channel</string>
+    <string name="action_ln_close">Close channel</string>
     <string name="action_ln_force">Force close</string>
 
     <!-- dialogs -->
