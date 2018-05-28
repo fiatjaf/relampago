@@ -56,18 +56,16 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
 
 
-      case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT)
-        if accept.temporaryChannelId == cmd.tempChanId =>
-
-        if (accept.minimumDepth > 6L) throw new LightningException("Their minimumDepth is too high")
-        if (accept.toSelfDelay > 2016) throw new LightningException("Their toSelfDelay is too high")
-        if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
-        if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
-        if (accept.channelReserveSatoshis > cmd.realFundingAmountSat / 10) throw new LightningException("Their proposed reserve is too high")
+      case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>
         if (accept.dustLimitSatoshis > cmd.localParams.channelReserveSat) throw new LightningException("Our channel reserve is less than their dust")
+        if (accept.channelReserveSatoshis > cmd.realFundingAmountSat / 10) throw new LightningException("Their proposed reserve is too high")
+        if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
         if (accept.dustLimitSatoshis < 546L) throw new LightningException("Their on-chain dust limit is too low")
         if (accept.maxAcceptedHtlcs > 483) throw new LightningException("They can accept too many payments")
+        if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
         if (accept.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
+        if (accept.minimumDepth > 6L) throw new LightningException("Their minimumDepth is too high")
+        if (accept.toSelfDelay > 2016) throw new LightningException("Their toSelfDelay is too high")
         BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
 
 
