@@ -221,14 +221,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
-    val channelFee = Satoshi(LNParams.broadcaster.perKwThreeSat)
     val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
     val inFiatTotal = msatInFiatHuman apply walletTotalSum
 
     val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
-    val chanFeeContent = title.findViewById(R.id.chanFeeContent).asInstanceOf[TextView]
     val stateContent = title.findViewById(R.id.stateContent).asInstanceOf[TextView]
     val denomChoiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
     val allDenominations = getResources.getStringArray(R.array.denoms).map(_.html)
@@ -246,7 +244,6 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
     denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
     stateContent setText s"${coloredIn apply walletTotalSum}<br><small>$inFiatTotal</small>".html
-    chanFeeContent setText s"${denom withSign channelFee} / kw".html
     showForm(negBuilder(dialog_ok, title, form).create)
   }
 

@@ -10,7 +10,6 @@
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Confirmation may take hours</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Faster confirmation times</font></small></small>]]></string>
     <string name="wallet_state"><small>Total balance\n<font color='#999999'>On-chain and LN</font></small></string>
-    <string name="wallet_chan_feerate"><small>Channel fee rate</small></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_restore">Restore Wallet</string>
     <string name="wallet_create">New Wallet</string>
@@ -202,7 +201,7 @@
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>cooperative</i></font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>refunded %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[<font color=#53A63C>%1$s</font><br>%2$s<br><br>capacity %3$s<br>can send %4$s<br>can receive %5$s<br><br>%6$s<br><br><font color=#999999>Peer node ID</font><br><small>%7$s</small>]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[<font color=#53A63C>%1$s</font><br>%2$s<br><br>capacity %3$s<br>can send %4$s<br>can receive %5$s<br><small>commit fee %6$s</small><br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>opened at <font color=#999999>%4$s</font><br>closed at <font color=#999999>%5$s</font><br>total capacity %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
 

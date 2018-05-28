@@ -10,6 +10,7 @@ import com.lightning.walletapp.ln.LNParams.broadcaster.getStatus
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import android.view.View.OnTouchListener
 import org.bitcoinj.script.ScriptBuilder
+
 import scala.util.Success
 import android.os.Bundle
 import java.util.Date
@@ -18,7 +19,8 @@ import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
 import android.widget.{ArrayAdapter, Button, ListView}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
+import com.lightning.walletapp.lnutils.RatesSaver
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 
 
 class LNOpsActivity extends TimerActivity { me =>
@@ -191,10 +193,11 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     def manageOpen = UITask {
       val canSend = MilliSatoshi apply estimateCanSend(chan)
       val canReceive = MilliSatoshi apply estimateCanReceive(chan)
+      val commitFee = Satoshi(chan(_.reducedRemoteState.feesSat) getOrElse 0L)
       val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
       val finalCanReceive = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, coloredIn(capacity),
-        finalCanSend, finalCanReceive, app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size), nodeId).html
+      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, coloredIn(capacity), finalCanSend,
+        finalCanReceive, coloredOut(commitFee), app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size), nodeId).html
 
       // Initialize button
       lnOpsAction setVisibility View.VISIBLE
