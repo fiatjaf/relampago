@@ -10,17 +10,15 @@ import com.lightning.walletapp.ln.LNParams.broadcaster.getStatus
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import android.view.View.OnTouchListener
 import org.bitcoinj.script.ScriptBuilder
-
 import scala.util.Success
 import android.os.Bundle
 import java.util.Date
 
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import android.widget.{ArrayAdapter, Button, ListView}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
-import com.lightning.walletapp.lnutils.RatesSaver
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 
 
 class LNOpsActivity extends TimerActivity { me =>
