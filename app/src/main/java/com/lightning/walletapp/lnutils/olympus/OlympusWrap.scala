@@ -118,5 +118,5 @@ class Connector(val url: String) extends OlympusProvider {
   def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getChildTxs(txIds: BinaryDataSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
-  def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routes", "params" -> out.toJson.toString.hex)
+  def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.hex)
 }

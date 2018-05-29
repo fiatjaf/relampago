@@ -137,6 +137,6 @@ case class Tor3(tor3: BinaryData, port: Int) extends NodeAddress {
 }
 
 // Not in a spec
-case class OutRequest(badNodes: Vector[String], badChans: Vector[Long], from: Vector[PublicKey], to: PublicKey)
+case class OutRequest(sat: Long, badNodes: Vector[String], badChans: Vector[Long], from: Vector[PublicKey], to: PublicKey)
 case class WalletZygote(v: Int, db: BinaryData, wallet: BinaryData, chain: BinaryData)
 case class AESZygote(v: Int, iv: BinaryData, ciphertext: BinaryData)

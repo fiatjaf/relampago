@@ -61,11 +61,11 @@ object PaymentInfo {
         (nextPayload +: loads, nodeId +: nodes, nextFee, expiry + delta)
     }
 
-    val cltvDeltaFail = lastExpiry - firstExpiry > LNParams.maxCltvDelta
+    val cltvDeltaFail = lastExpiry - LNParams.broadcaster.currentHeight > LNParams.maxCltvDelta
     val lnFeeFail = LNParams.isFeeNotOk(lastMsat, lastMsat - rd.firstMsat, route.size)
 
     if (cltvDeltaFail || lnFeeFail) useFirstRoute(rest, rd) else {
-      val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, allPayloads, assoc = rd.pr.paymentHash)
+      val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, payloads = allPayloads, assoc = rd.pr.paymentHash)
       val rd1 = rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
       Right(rd1)
     }

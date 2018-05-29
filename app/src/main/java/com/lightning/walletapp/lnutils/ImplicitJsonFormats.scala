@@ -295,6 +295,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     Option[FundingLocked], Transaction, Commitments, WaitFundingDoneData](WaitFundingDoneData.apply,
     "announce", "our", "their", "fundingTx", "commitments"), tag = "WaitFundingDoneData")
 
-  implicit val routeRequestFmt = jsonFormat[Vector[String], Vector[Long], Vector[PublicKey], PublicKey,
-    OutRequest](OutRequest.apply, "badNodes", "badChans", "from", "to")
+  implicit val outRequestFmt =
+    jsonFormat[Long, Vector[String], Vector[Long], Vector[PublicKey], PublicKey,
+      OutRequest](OutRequest.apply, "sat", "badNodes", "badChans", "from", "to")
 }

@@ -246,7 +246,7 @@ object BadEntityWrap {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
     val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChanIds = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
-    OlympusWrap findRoutes OutRequest(badNodes, for (shortId <- badChanIds) yield shortId.toLong, from, targetId)
+    OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, badNodes, badChanIds.map(_.toLong), from, targetId)
   }
 }
 
