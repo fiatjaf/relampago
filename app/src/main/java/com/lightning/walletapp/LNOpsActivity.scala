@@ -152,7 +152,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           // to omit a useless intermediary in-wallet transaction
 
           case Success(address) =>
-            val where = sumOut format humanSix(address.toString)
+            val where = humanSix(address.toString)
             val bld = baseBuilder(host getString action_ln_close, host.getString(ln_chan_close_confirm_address).format(where).html)
             val customFinalPubKeyScript: Option[BinaryData] = Some(ScriptBuilder.createOutputScript(address).getProgram)
             mkForm(chan process CMDShutdown(customFinalPubKeyScript), none, bld, dialog_ok, dialog_cancel)
