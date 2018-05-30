@@ -107,8 +107,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       else app.plurOrZero(syncOps, app.ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
 
     UITask(customTitle setText s"""
-      &#3647; <strong>$btcFunds</strong><br>
-      &#9735; <strong>$lnFunds</strong><br>
+      <font color=#AAAAAA>&#3647;</font> <strong>$btcFunds</strong><br>
+      <font color=#AAAAAA>&#9735;</font> <strong>$lnFunds</strong><br>
       $subtitleText""".html)
   }
 
