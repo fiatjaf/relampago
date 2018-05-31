@@ -44,7 +44,7 @@
     </string>
 
     <string name="mnemonic_info">
-        <font color="#F00859">Mnemonic phrase is important</font>\n
+        <font color="#E31300">Mnemonic phrase is important</font>\n
         <a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Read about it</a> and save it now!
         \n\nYou will need it in case if anything goes wrong with your wallet!
     </string>
