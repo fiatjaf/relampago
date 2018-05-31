@@ -16,15 +16,16 @@ import android.os.Bundle
 
 
 class WhenPicker(host: TimerActivity, start: Long)
-extends DatePicker(host) with OnDateChangedListener { me =>
-  def pure = runAnd(me)(try getParent.asInstanceOf[ViewGroup] removeView me catch none)
-  def human = java.text.DateFormat getDateInstance java.text.DateFormat.MEDIUM format cal.getTime
+  extends DatePicker(host) with OnDateChangedListener { me =>
+  def refresh = runAnd(me)(try getParent.asInstanceOf[ViewGroup] removeView me catch none)
+  def humanTime = java.text.DateFormat getDateInstance java.text.DateFormat.MEDIUM format cal.getTime
   def onDateChanged(view: DatePicker, year: Int, mon: Int, dt: Int) = cal.set(year, mon, dt)
   init(cal get Calendar.YEAR, cal get Calendar.MONTH, cal get Calendar.DATE, me)
 
   lazy val cal = {
     val calendar = Calendar.getInstance
     calendar setTimeInMillis start
+    me setMinDate start
     calendar
   }
 }
@@ -34,12 +35,10 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
   lazy val restoreCode = findViewById(R.id.restoreCode).asInstanceOf[NachoTextView]
   lazy val restoreWallet = findViewById(R.id.restoreWallet).asInstanceOf[Button]
   lazy val restoreWhen = findViewById(R.id.restoreWhen).asInstanceOf[Button]
-  lazy val dp = new WhenPicker(me, 1519862400L * 1000)
+  lazy val dp = new WhenPicker(me, 1526817600 * 1000L)
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_restore)
-    val style = android.R.layout.simple_list_item_1
-
     restoreCode addTextChangedListener new TextChangedWatcher {
       override def onTextChanged(s: CharSequence, x: Int, y: Int, z: Int) = {
         val mnemonicPhraseIsCorrect = getMnemonicText.split("\\s+").length > 11
@@ -49,18 +48,20 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
       }
     }
 
-    restoreWhen setText dp.human
+    restoreWhen setText dp.humanTime
     restoreCode.addChipTerminator(' ', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode.addChipTerminator(',', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode.addChipTerminator('\n', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode setDropDownBackgroundResource R.color.button_material_dark
-    restoreCode setAdapter new ArrayAdapter(me, style,
+
+    restoreCode setAdapter new ArrayAdapter(me,
+      android.R.layout.simple_list_item_1,
       MnemonicCode.INSTANCE.getWordList)
   }
 
   override def onBackPressed = wrap(super.onBackPressed)(app.kit.stopAsync)
-  def getMnemonicText: String = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")
-  def setWhen(v: View) = mkForm(restoreWhen setText dp.human, none, baseBuilder(null, dp.pure), dialog_ok, dialog_cancel)
+  def getMnemonicText = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")
+  def setWhen(v: View) = mkForm(restoreWhen setText dp.humanTime, none, baseBuilder(null, dp.refresh), dialog_ok, dialog_cancel)
   def recWallet(v: View) = hideKeys(doRecoverWallet)
 
   def doRecoverWallet =

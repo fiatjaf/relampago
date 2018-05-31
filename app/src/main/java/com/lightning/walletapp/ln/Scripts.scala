@@ -246,13 +246,10 @@ object Scripts { me =>
   def sign(tx: Transaction, inputIndex: Int, redeemScript: BinaryData, amount: Satoshi, key: PrivateKey): BinaryData =
     Transaction.signInput(tx, inputIndex, redeemScript, SIGHASH_ALL, amount, SIGVERSION_WITNESS_V0, key)
 
-  def sign(tx: Transaction, inputIndex: Int, redeemScript: BinaryData, key: PrivateKey): BinaryData =
-    Transaction.signInput(tx, inputIndex, redeemScript, SIGHASH_ALL, Satoshi(0), SIGVERSION_BASE, key)
-
   def sign(txinfo: TransactionWithInputInfo, key: PrivateKey): BinaryData =
     sign(txinfo.tx, 0, txinfo.input.redeemScript, txinfo.input.txOut.amount, key)
 
-  def checkSpendable[T <: TransactionWithInputInfo](txWithInputInfo: => T) = Try {
+  def checkValid[T <: TransactionWithInputInfo](txWithInputInfo: => T) = Try {
     if (txWithInputInfo.tx.txOut.isEmpty) throw new Exception("Empty transaction found")
     val check = Map(txWithInputInfo.tx.txIn.head.outPoint -> txWithInputInfo.input.txOut)
     Transaction.correctlySpends(txWithInputInfo.tx, check, STANDARD_SCRIPT_VERIFY_FLAGS)
@@ -335,60 +332,63 @@ object Scripts { me =>
     htlcTimeoutTxs -> htlcSuccessTxs
   }
 
-  def makeClaimHtlcTimeoutTx(finder: PubKeyScriptIndexFinder,
-                             localHtlcPubkey: PublicKey, remoteHtlcPubkey: PublicKey,
-                             remoteRevocationPubkey: PublicKey, localFinalScriptPubKey: BinaryData,
-                             add: UpdateAddHtlc, feeratePerKw: Long): Try[ClaimHtlcTimeoutTx] = Try {
+  def makeClaimHtlcTimeoutTx(finder: PubKeyScriptIndexFinder, localHtlcPubkey: PublicKey, remoteHtlcPubkey: PublicKey,
+                             remoteRevocationPubkey: PublicKey, localFinalScriptPubKey: BinaryData, add: UpdateAddHtlc,
+                             feeratePerKw: Long, dustLimit: Satoshi): Try[ClaimHtlcTimeoutTx] = Try {
 
     val redeem = htlcReceived(remoteHtlcPubkey, localHtlcPubkey, remoteRevocationPubkey, add.hash160, add.expiry)
     val index = finder.findPubKeyScriptIndex(Script.write(Script pay2wsh redeem), Option apply add.amount)
     val inputInfo = InputInfo(OutPoint(finder.tx, index), finder.tx.txOut(index), Script write redeem)
     val finalAmount = inputInfo.txOut.amount - weight2fee(feeratePerKw, claimHtlcTimeoutWeight)
+    if (finalAmount < dustLimit) throw new LightningException("ClaimTx amount below dust")
     val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, 0x00000000L) :: Nil
     val txOut = TxOut(finalAmount, localFinalScriptPubKey) :: Nil
     val tx = Transaction(2, txIn, txOut, lockTime = add.expiry)
     ClaimHtlcTimeoutTx(inputInfo, tx)
   }
 
-  def makeClaimHtlcSuccessTx(finder: PubKeyScriptIndexFinder,
-                             localHtlcPubkey: PublicKey, remoteHtlcPubkey: PublicKey,
-                             remoteRevocationPubkey: PublicKey, localFinalScriptPubKey: BinaryData,
-                             add: UpdateAddHtlc, feeratePerKw: Long): Try[ClaimHtlcSuccessTx] = Try {
+  def makeClaimHtlcSuccessTx(finder: PubKeyScriptIndexFinder, localHtlcPubkey: PublicKey, remoteHtlcPubkey: PublicKey,
+                             remoteRevocationPubkey: PublicKey, localFinalScriptPubKey: BinaryData, add: UpdateAddHtlc,
+                             feeratePerKw: Long, dustLimit: Satoshi): Try[ClaimHtlcSuccessTx] = Try {
 
     val redeem = htlcOffered(remoteHtlcPubkey, localHtlcPubkey, remoteRevocationPubkey, add.hash160)
     val index = finder.findPubKeyScriptIndex(Script.write(Script pay2wsh redeem), Option apply add.amount)
     val inputInfo = InputInfo(OutPoint(finder.tx, index), finder.tx.txOut(index), Script write redeem)
     val finalAmount = inputInfo.txOut.amount - weight2fee(feeratePerKw, claimHtlcSuccessWeight)
+    if (finalAmount < dustLimit) throw new LightningException("ClaimTx amount below dust")
     val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, 0xffffffffL) :: Nil
     val txOut = TxOut(finalAmount, localFinalScriptPubKey) :: Nil
     val tx = Transaction(2, txIn, txOut, lockTime = 0L)
     ClaimHtlcSuccessTx(inputInfo, tx)
   }
 
-  def makeClaimP2WPKHOutputTx(delayedOutputTx: Transaction,
-                              localPaymentPubkey: PublicKey, localFinalScriptPubKey: BinaryData,
-                              feeratePerKw: Long): Try[ClaimP2WPKHOutputTx] = Try {
+  def makeClaimP2WPKHOutputTx(delayedOutputTx: Transaction, localPaymentPubkey: PublicKey,
+                              localFinalScriptPubKey: BinaryData, feeratePerKw: Long,
+                              dustLimit: Satoshi): Try[ClaimP2WPKHOutputTx] = Try {
 
     val redeem = Script pay2pkh localPaymentPubkey
     val finder = new PubKeyScriptIndexFinder(delayedOutputTx)
     val index = finder.findPubKeyScriptIndex(Script.write(Script pay2wpkh localPaymentPubkey), None)
     val inputInfo = InputInfo(OutPoint(delayedOutputTx, index), delayedOutputTx.txOut(index), Script write redeem)
     val finalAmount = inputInfo.txOut.amount - weight2fee(feeratePerKw, claimP2WPKHOutputWeight)
+    if (finalAmount < dustLimit) throw new LightningException("ClaimTx amount below dust")
     val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, 0x00000000L) :: Nil
     val txOut = TxOut(finalAmount, localFinalScriptPubKey) :: Nil
     val tx = Transaction(2, txIn, txOut, lockTime = 0L)
     ClaimP2WPKHOutputTx(inputInfo, tx)
   }
 
-  def makeClaimDelayedOutputTx(delayedOutputTx: Transaction, localRevocationPubkey: PublicKey, toLocalDelay: Int,
+  def makeClaimDelayedOutputTx(delayedOutputTx: Transaction,
+                               localRevocationPubkey: PublicKey, toLocalDelay: Int,
                                remoteDelayedPaymentPubkey: PublicKey, localFinalScriptPubKey: BinaryData,
-                               feeratePerKw: Long): Try[ClaimDelayedOutputTx] = Try {
+                               feeratePerKw: Long, dustLimit: Satoshi): Try[ClaimDelayedOutputTx] = Try {
 
     val finder = new PubKeyScriptIndexFinder(delayedOutputTx)
     val redeem = toLocalDelayed(localRevocationPubkey, toLocalDelay, remoteDelayedPaymentPubkey)
     val index = finder.findPubKeyScriptIndex(pubkeyScript = Script.write(Script pay2wsh redeem), None)
     val inputInfo = InputInfo(OutPoint(delayedOutputTx, index), delayedOutputTx.txOut(index), Script write redeem)
     val finalAmount = inputInfo.txOut.amount - weight2fee(feeratePerKw, claimHtlcDelayedWeight)
+    if (finalAmount < dustLimit) throw new LightningException("ClaimTx amount below dust")
     val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, toLocalDelay) :: Nil
     val txOut = TxOut(finalAmount, localFinalScriptPubKey) :: Nil
     val tx = Transaction(2, txIn, txOut, lockTime = 0L)
@@ -397,27 +397,29 @@ object Scripts { me =>
 
   def makeMainPenaltyTx(commitTx: Transaction,
                         remoteRevocationPubkey: PublicKey, localFinalScriptPubKey: BinaryData,
-                        toRemoteDelay: Int, remoteDelayedPaymentPubkey: PublicKey,
-                        feeratePerKw: Long): Try[MainPenaltyTx] = Try {
+                        toRemoteDelay: Int, remoteDelayedPaymentPubkey: PublicKey, feeratePerKw: Long,
+                        dustLimit: Satoshi): Try[MainPenaltyTx] = Try {
 
     val finder = new PubKeyScriptIndexFinder(commitTx)
     val redeem = toLocalDelayed(remoteRevocationPubkey, toRemoteDelay, remoteDelayedPaymentPubkey)
     val index = finder.findPubKeyScriptIndex(pubkeyScript = Script.write(Script pay2wsh redeem), None)
     val inputInfo = InputInfo(OutPoint(commitTx, index), commitTx.txOut(index), Script write redeem)
     val finalAmount = inputInfo.txOut.amount - weight2fee(feeratePerKw, mainPenaltyWeight)
+    if (finalAmount < dustLimit) throw new LightningException("ClaimTx amount below dust")
     val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, 0xffffffffL) :: Nil
     val txOut = TxOut(finalAmount, localFinalScriptPubKey) :: Nil
     val tx = Transaction(2, txIn, txOut, lockTime = 0L)
     MainPenaltyTx(inputInfo, tx)
   }
 
-  def makeHtlcPenaltyTx(finder: PubKeyScriptIndexFinder,
-                        redeem: BinaryData, localFinalScriptPubKey: BinaryData,
-                        feeratePerKw: Long): Try[HtlcPenaltyTx] = Try {
+  def makeHtlcPenaltyTx(finder: PubKeyScriptIndexFinder, redeem: BinaryData,
+                        localFinalScriptPubKey: BinaryData, feeratePerKw: Long,
+                        dustLimit: Satoshi): Try[HtlcPenaltyTx] = Try {
 
     val index = finder.findPubKeyScriptIndex(pubkeyScript = Script.write(Script pay2wsh redeem), None)
     val inputInfo = InputInfo(outPoint = OutPoint(finder.tx, index), finder.tx.txOut(index), redeem)
     val finalAmount = inputInfo.txOut.amount - weight2fee(feeratePerKw, htlcPenaltyWeight)
+    if (finalAmount < dustLimit) throw new LightningException("ClaimTx amount below dust")
     val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, 0xffffffffL) :: Nil
     val txOut = TxOut(finalAmount, localFinalScriptPubKey) :: Nil
     val tx = Transaction(2, txIn, txOut, lockTime = 0L)

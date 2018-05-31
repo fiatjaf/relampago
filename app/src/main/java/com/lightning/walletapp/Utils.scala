@@ -6,7 +6,6 @@ import android.view._
 import android.widget._
 import org.bitcoinj.core._
 import android.text.method._
-import com.lightning.walletapp.ln._
 import org.bitcoinj.core.listeners._
 import com.lightning.walletapp.Utils._
 import org.bitcoinj.wallet.listeners._
@@ -17,8 +16,8 @@ import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
 import android.widget.RadioGroup.OnCheckedChangeListener
 import android.widget.AdapterView.OnItemClickListener
 import info.hoang8f.android.segmented.SegmentedGroup
-import com.lightning.walletapp.ln.LNParams.minDepth
 import concurrent.ExecutionContext.Implicits.global
+import com.lightning.walletapp.ln.LNParams.minDepth
 import android.view.inputmethod.InputMethodManager
 import com.lightning.walletapp.lnutils.RatesSaver
 import android.support.v7.app.AppCompatActivity
@@ -32,10 +31,10 @@ import org.bitcoinj.script.Script
 import scala.concurrent.Future
 import android.os.Bundle
 
+import org.bitcoinj.wallet.{DefaultCoinSelector, SendRequest, Wallet}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
 import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
-import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import android.content.{Context, Intent}
@@ -54,7 +53,7 @@ object Utils {
   var denom: Denomination = _
   var fiatName: String = _
 
-  val fileName = "Testnet"
+  val fileName = "SegwitTestnet"
   val dbFileName = s"$fileName.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
@@ -73,17 +72,25 @@ object Utils {
   val fiatMap = Map(typeUSD -> strDollar, typeEUR -> strEuro, typeJPY -> strYen, typeCNY -> strYuan)
   val revFiatMap = Map(strDollar -> typeUSD, strEuro -> typeEUR, strYen -> typeJPY, strYuan -> typeCNY)
   def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
-  def humanFour(adr: String) = adr grouped 4 mkString "\u0020"
+  def humanSix(adr: String) = adr grouped 6 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {
-    val textView: TextView = view.asInstanceOf[TextView]
-    textView setMovementMethod LinkMovementMethod.getInstance
-    textView
+    val field: TextView = view.asInstanceOf[TextView]
+    field setMovementMethod LinkMovementMethod.getInstance
+    field
   }
 
   def currentRate = Try(RatesSaver.rates exchange fiatName)
   def msatInFiat(milliSatoshi: MilliSatoshi) = currentRate map {
     perBtc => milliSatoshi.amount * perBtc / BtcDenomination.factor
+  }
+
+  val msatInFiatHuman = (ms: MilliSatoshi) => msatInFiat(ms) match {
+    case Success(amt) if fiatName == strYuan => s"≈ ${formatFiat format amt} cny"
+    case Success(amt) if fiatName == strEuro => s"≈ ${formatFiat format amt} eur"
+    case Success(amt) if fiatName == strYen => s"≈ ${formatFiat format amt} jpy"
+    case Success(amt) => s"≈ ${formatFiat format amt} usd"
+    case _ => new String
   }
 }
 
@@ -100,14 +107,6 @@ trait TimerActivity extends AppCompatActivity { me =>
     metrix
   }
 
-  // Basis for dialog forms
-  def str2Tuple(textFieldData: CharSequence): (LinearLayout, TextView) = {
-    val view = getLayoutInflater.inflate(R.layout.frag_top_tip, null).asInstanceOf[LinearLayout]
-    val titleTextField = Utils clickableTextField view.findViewById(R.id.actionTip)
-    titleTextField setText textFieldData
-    view -> titleTextField
-  }
-
   def finishMe(top: View) = finish
   def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
   def rm(prev: Dialog)(exe: => Unit) = wrap(prev.dismiss)(me delayUI exe)
@@ -117,17 +116,6 @@ trait TimerActivity extends AppCompatActivity { me =>
   def negBuilder(neg: Int, title: View, body: View) = baseBuilder(title, body).setNegativeButton(neg, null)
   def onFail(error: CharSequence): Unit = UITask(me showForm negBuilder(dialog_ok, null, error).create).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
-
-  def showForm(alertDialog: AlertDialog) = {
-    alertDialog.getWindow.getAttributes.windowAnimations = R.style.SlidingDialog
-    // This may be called after a host activity is destroyed and thus it may throw
-
-    try alertDialog.show catch none finally if (scrWidth > 2.3) {
-      alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
-    }
-
-    alertDialog
-  }
 
   def mkForm(ok: => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) =
     // Used for forms which do not need to check user input and can be dismissed right away
@@ -144,6 +132,14 @@ trait TimerActivity extends AppCompatActivity { me =>
     alert
   }
 
+  def showForm(alertDialog: AlertDialog) = {
+    // This may be called after a host activity is destroyed and thus it may throw
+    alertDialog.getWindow.getAttributes.windowAnimations = R.style.SlidingDialog
+    alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
+    try alertDialog.show catch none
+    alertDialog
+  }
+
   def INIT(savedInstanceState: Bundle): Unit
   override def onCreate(savedActivityInstanceState: Bundle) = {
     Thread setDefaultUncaughtExceptionHandler new UncaughtHandler(me)
@@ -152,8 +148,13 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   override def onDestroy = wrap(super.onDestroy)(timer.cancel)
-  implicit def str2View(res: CharSequence): LinearLayout =
-    str2Tuple(res) match { case view \ _ => view }
+  implicit def str2View(textFieldData: CharSequence): LinearLayout = {
+    val view = getLayoutInflater.inflate(R.layout.frag_top_tip, null).asInstanceOf[LinearLayout]
+    val titleTextField = Utils clickableTextField view.findViewById(R.id.titleTip)
+    titleTextField setText textFieldData
+    view setBackgroundColor 0x22AAAAAA
+    view
+  }
 
   implicit def UITask(exec: => Unit): TimerTask = {
     val runnableExec = new Runnable { override def run = exec }
@@ -200,14 +201,16 @@ trait TimerActivity extends AppCompatActivity { me =>
       val livePerTxFee: MilliSatoshi = estimate.tx.getFee
       val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
 
+      val inFiatLive = msatInFiatHuman(livePerTxFee)
+      val inFiatRisky = msatInFiatHuman(riskyPerTxFee)
       val markedLivePerTxFee = coloredOut(livePerTxFee)
       val markedRiskyPerTxFee = coloredOut(riskyPerTxFee)
-      val txtFeeLive = getString(fee_live) format markedLivePerTxFee
-      val txtFeeRisky = getString(fee_risky) format markedRiskyPerTxFee
-      val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
+      val txtFeeLive = getString(fee_live).format(markedLivePerTxFee, inFiatLive)
+      val txtFeeRisky = getString(fee_risky).format(markedRiskyPerTxFee, inFiatRisky)
       val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
       val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
+      val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
       def proceed = lst.getCheckedItemPosition match {
         // Allow user to choose an economical fee when sending a manual transaction
@@ -230,7 +233,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     }
 
     def messageWhenMakingTx: PartialFunction[Throwable, CharSequence] = {
-      case _: ExceededMaxTransactionSize => app getString err_transaction_too_large
+      case _: ExceededMaxTransactionSize => app getString err_tx_too_large
       case _: CouldNotAdjustDownwards => app getString err_empty_shrunk
       case notEnough: InsufficientMoneyException =>
 
@@ -255,7 +258,7 @@ class RateManager(extra: String, val content: View) { me =>
   val fiatType = content.findViewById(R.id.fiatType).asInstanceOf[SegmentedGroup]
   val fiatInput = content.findViewById(R.id.fiatInputAmount).asInstanceOf[EditText]
   def result: TryMSat = Try(denom rawString2MSat satInput.getText.toString.noSpaces)
-  def setSum(res: TryMSat) = satInput.setText(res map denom.formatted getOrElse null)
+  def setSum(res: TryMSat) = satInput.setText(res map denom.asString getOrElse null)
   def fiatDecimal = BigDecimal(fiatInput.getText.toString.noSpaces)
 
   val fiatListener = new TextChangedWatcher {
@@ -297,7 +300,7 @@ trait PayData {
 case class AddrData(cn: Coin, address: Address) extends PayData {
   def getRequest = if (isAll) emptyWallet(address) else to(address, cn)
   def link = BitcoinURI.convertToBitcoinURI(address, cn, null, null)
-  def destination = humanFour(address.toString)
+  def destination = humanSix(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
@@ -317,15 +320,15 @@ trait BlocksListener extends PeerDataEventListener {
   def onPreMessageReceived(peer: Peer, message: Message) = message
 }
 
-abstract class TxTracker extends WalletCoinsSentEventListener
-with WalletCoinsReceivedEventListener with TransactionConfidenceEventListener {
-  def onCoinsSent(w: Wallet, tx: Transaction, a: Coin, b: Coin) = if (a isGreaterThan b) coinsSent(tx)
-  def onCoinsReceived(w: Wallet, tx: Transaction, a: Coin, b: Coin) = if (b isGreaterThan a) coinsReceived(tx)
+abstract class TxTracker
+extends WalletCoinsSentEventListener
+with TransactionConfidenceEventListener {
+  def txConfirmed(txj: Transaction): Unit = none
+  def onTransactionConfidenceChanged(wallet: Wallet, txj: Transaction) =
+    if (txj.getConfidence.getDepthInBlocks == minDepth) txConfirmed(txj)
+}
 
-  def onTransactionConfidenceChanged(w: Wallet, tx: Transaction) =
-    if (tx.getConfidence.getDepthInBlocks == minDepth) txConfirmed(tx)
-
-  def coinsSent(tx: Transaction): Unit = none
-  def coinsReceived(tx: Transaction): Unit = none
-  def txConfirmed(tx: Transaction): Unit = none
+class MinDepthReachedCoinSelector extends DefaultCoinSelector {
+  override def shouldSelect(txj: Transaction) = if (null == txj) true
+    else txj.getConfidence.getDepthInBlocks >= minDepth
 }

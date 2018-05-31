@@ -13,16 +13,15 @@ import fr.acinq.eclair.UInt64
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
   val chainHash = Block.TestnetGenesisBlock.hash
-  val theirReserveToFundingRatio = 100
+  val theirReserveToFundingRatio = 50
   val localFeatures = "02"
   val globalFeatures = ""
   val minDepth = 1
 
   val maxCltvDelta = 7 * 144L
+  final val maxHtlcValueMsat = 2000000000L
   final val minHtlcValue = MilliSatoshi(1000L)
-  final val maxHtlcValue = MilliSatoshi(4000000000L)
-  final val maxChannelCapacity = MilliSatoshi(16777216000L)
-  final val minChannelCapacity = MilliSatoshi(250000000L)
+  final val maxChanCapacity = MilliSatoshi(16777215000L)
 
   var db: LNOpenHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
@@ -52,7 +51,7 @@ object LNParams { me =>
 
   def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (n <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: n :: Nil)
-    LocalParams(maxHtlcValueInFlightMsat = UInt64(4000000000L), theirReserve, toSelfDelay = 144 /* TODO: * 90 */, maxAcceptedHtlcs = 25,
+    LocalParams(maxHtlcValueInFlightMsat = UInt64(2000000000L), theirReserve, toSelfDelay = 144, maxAcceptedHtlcs = 25,
       fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey,
       dustLimit = Satoshi(5460L), shaSeed = sha256(sha.privateKey.toBin), isFunder = true)
   }
@@ -89,8 +88,8 @@ trait Broadcaster extends ChannelListener { me =>
   def getBlockHashString(txid: BinaryData): Option[String]
   def getStatus(txid: BinaryData): DepthAndDead
   def currentHeight: Long
+  def perKwThreeSat: Long
   def perKwSixSat: Long
-  def perKwTwoSat: Long
 
   // Parent state and next tier cltv delay
   // actual negative delay will be represented as 0L

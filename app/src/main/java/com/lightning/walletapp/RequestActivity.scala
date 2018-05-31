@@ -10,7 +10,6 @@ import android.os.{Bundle, Environment}
 import android.text.{StaticLayout, TextPaint}
 import android.widget.{ImageButton, ImageView}
 import com.google.zxing.{BarcodeFormat, EncodeHintType}
-
 import com.lightning.walletapp.lnutils.ImplicitConversions.string2Ops
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import android.text.Layout.Alignment.ALIGN_NORMAL
@@ -68,9 +67,8 @@ class RequestActivity extends TimerActivity { me =>
     setContentView(R.layout.activity_request)
 
     app.TransData.value match {
-      case pr: PaymentRequest => showInfo(drawAll(denom withSign pr.amount.get, getString(ln_qr_disposable).html), PaymentRequest write pr)
-      case payData: AddrData => showInfo(drawAll(denom withSign payData.cn, Utils humanFour payData.address.toString), payData.link)
-      case address: Address => showInfo(drawBottom(Utils humanFour address.toString), address.toString)
+      case pr: PaymentRequest => showInfo(drawAll(denom asString pr.amount.get, getString(ln_qr_disposable).html), PaymentRequest write pr)
+      case onChainAddress: Address => showInfo(drawBottom(Utils humanSix onChainAddress.toString), onChainAddress.toString)
       case _ => finish
     }
 

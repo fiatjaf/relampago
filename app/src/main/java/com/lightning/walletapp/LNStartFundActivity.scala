@@ -14,7 +14,6 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.CloudAct
-import com.lightning.walletapp.lnutils.RatesSaver
 import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.script.ScriptBuilder
@@ -23,8 +22,8 @@ import android.app.AlertDialog
 import java.util.TimerTask
 import android.os.Bundle
 
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Script}
 import org.bitcoinj.core.{Coin, TransactionOutput}
-import fr.acinq.bitcoin.{MilliSatoshi, Script}
 import android.widget.{ImageButton, TextView}
 import scala.util.{Failure, Success}
 
@@ -42,7 +41,8 @@ class LNStartFundActivity extends TimerActivity { me =>
 
     app.TransData.value match {
       // We may get peer info either from built-in list of from user scanned qr code
-      case (ann: NodeAnnouncement, num: Int) => proceed(app.plurOrZero(chansNumber, num), ann)
+      case RemoteNodeView(ann \ num) => proceed(app.plurOrZero(chansNumber, num), ann)
+      case HardcodedNodeView(ann, hardcodedTip) => proceed(hardcodedTip, ann)
       case ann: NodeAnnouncement => proceed(chansNumber.last, ann)
       case _ => finish
     }
@@ -62,18 +62,18 @@ class LNStartFundActivity extends TimerActivity { me =>
     val freshChan = app.ChannelManager.createChannel(Set.empty, InitData apply announce)
 
     lazy val openListener = new ConnectionListener with ChannelListener { self =>
-      override def onMessage(ann: NodeAnnouncement, msg: LightningMessage) = msg match {
-        case setupMsg: ChannelSetupMessage if ann == announce => freshChan process setupMsg
-        case err: Error if ann == announce => onError(freshChan -> err.exception)
+      override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+        case msg: ChannelSetupMessage if nodeId == announce.nodeId => freshChan process msg
+        case err: Error if nodeId == announce.nodeId => onException(freshChan -> err.exception)
         case _ =>
       }
 
       val noLossProtect = new LightningException(me getString err_ln_no_data_loss_protect)
       val peerOffline = new LightningException(me getString err_ln_peer_offline format announce.addresses.head.toString)
-      override def onOperational(ann: NodeAnnouncement, their: Init) = if (ann == announce) askForFunding(their).run
-      override def onIncompatible(ann: NodeAnnouncement) = if (ann == announce) onError(freshChan -> noLossProtect)
-      override def onTerminalError(ann: NodeAnnouncement) = if (ann == announce) onError(freshChan -> peerOffline)
-      override def onDisconnect(ann: NodeAnnouncement) = if (ann == announce) onError(freshChan -> peerOffline)
+      override def onOperational(nodeId: PublicKey, their: Init) = if (nodeId == announce.nodeId) askForFunding(their).run
+      override def onIncompatible(nodeId: PublicKey) = if (nodeId == announce.nodeId) onException(freshChan -> noLossProtect)
+      override def onTerminalError(nodeId: PublicKey) = if (nodeId == announce.nodeId) onException(freshChan -> peerOffline)
+      override def onDisconnect(nodeId: PublicKey) = if (nodeId == announce.nodeId) onException(freshChan -> peerOffline)
 
       override def onBecome = {
         case (_, WaitFundingData(_, cmd, accept), WAIT_FOR_ACCEPT, WAIT_FOR_FUNDING) =>
@@ -112,7 +112,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           me exitTo classOf[WalletActivity]
       }
 
-      override def onError = {
+      override def onException = {
         case _ \ errorWhileOpening =>
           // Inform user, disconnect this channel, go back
           UITask(app toast errorWhileOpening.getMessage).run
@@ -121,29 +121,32 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def askForFunding(their: Init): TimerTask = UITask {
-      val minCapacity = denom withSign LNParams.minChannelCapacity
-      val maxCapacity = denom withSign LNParams.maxChannelCapacity
+      // Current feerate may be higher than hard capacity so choose the currently largest value
+      val minCapacity = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, 250000L) * 1000L)
+
+      val minHuman = denom withSign minCapacity
+      val maxHuman = denom withSign LNParams.maxChanCapacity
       val canSend = denom withSign app.kit.conf1Balance
 
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
+      val rateManager = new RateManager(getString(amount_hint_newchan).format(minHuman, maxHuman, canSend), content)
       val dummyKey = derivePrivateKey(LNParams.extendedCloudKey, System.currentTimeMillis :: 0L :: Nil).publicKey
-      val rateManager = new RateManager(getString(amount_hint_newchan).format(minCapacity, maxCapacity, canSend), content)
 
       def next(msat: MilliSatoshi) = new TxProcessor {
         val dummyScript = pubKeyScript(dummyKey, dummyKey)
+        val pay = P2WSHData(msat, dummyScript)
+
         def futureProcess(unsignedRequest: SendRequest) = {
           val finder = new PubKeyScriptIndexFinder(unsignedRequest.tx)
           val outIndex = finder.findPubKeyScriptIndex(dummyScript, None)
-
           val realChannelFundingAmountSat = unsignedRequest.tx.getOutput(outIndex).getValue.getValue
-          val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val theirUnspendableReserveSat = realChannelFundingAmountSat / LNParams.theirReserveToFundingRatio
+          val finalPubKeyScript: BinaryData = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis)
-          freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, LNParams.broadcaster.perKwTwoSat,
+          freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, LNParams.broadcaster.perKwThreeSat,
             pushMsat = 0L, remoteInit = their, dummyRequest = unsignedRequest, outIndex, realChannelFundingAmountSat)
         }
 
-        val pay = P2WSHData(msat, dummyScript)
         def onTxFail(fundingError: Throwable) = {
           val bld = baseBuilder(messageWhenMakingTx(fundingError), null)
           mkForm(askForFunding(their).run, none, bld, dialog_ok, dialog_cancel)
@@ -151,8 +154,8 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       def askAttempt(alert: AlertDialog) = rateManager.result match {
-        case Success(ms) if ms < LNParams.minChannelCapacity => app toast dialog_sum_small
-        case Success(ms) if ms > LNParams.maxChannelCapacity => app toast dialog_sum_big
+        case Success(ms) if ms > LNParams.maxChanCapacity => app toast dialog_sum_big
+        case Success(ms) if ms < minCapacity => app toast dialog_sum_small
         case Failure(reason) => app toast dialog_sum_empty
         case Success(ms) => rm(alert)(next(ms).start)
       }
@@ -164,7 +167,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     whenBackPressed = UITask {
       freshChan.listeners -= openListener
       ConnectionManager.listeners -= openListener
-      ConnectionManager.connections(announce).disconnect
+      ConnectionManager.connections(announce.nodeId).disconnect
       finish
     }
 

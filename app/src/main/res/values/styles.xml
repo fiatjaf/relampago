@@ -2,13 +2,6 @@
 
     <!-- page layouts -->
 
-    <style name="WarnLinearLayout">
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:layout_width">fill_parent</item>
-        <item name="android:orientation">vertical</item>
-        <item name="android:gravity">top|center</item>
-    </style>
-
     <style name="StandardLinearLayout">
         <item name="android:layout_height">fill_parent</item>
         <item name="android:layout_width">fill_parent</item>
@@ -18,6 +11,14 @@
 
     <style name="StandardLinearLayoutPage" parent="StandardLinearLayout">
         <item name="android:background">#FFF5F5F5</item>
+    </style>
+
+    <style name="LineLinearLayout">
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingLeft">@dimen/app_padding</item>
+        <item name="android:paddingRight">@dimen/app_padding</item>
+        <item name="android:paddingBottom">14dp</item>
+        <item name="android:paddingTop">12dp</item>
     </style>
 
     <!-- gray dividers -->

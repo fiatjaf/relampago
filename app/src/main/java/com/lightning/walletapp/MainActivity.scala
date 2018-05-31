@@ -60,36 +60,24 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // NFC AND SHARE
 
-  override def onNoNfcIntentFound = try {
+  private[this] def readSuccess(unitRecordResult: Unit) = next
+  private[this] def readFail(err: Throwable) = runAnd(app toast err_no_data)(next)
+  def readNdefMessage(m: Message) = <(app.TransData recordValue ndefMessageString(m), readFail)(readSuccess)
+
+  override def onNoNfcIntentFound = {
     val data = Seq(getIntent.getDataString, getIntent getStringExtra Intent.EXTRA_TEXT)
-    data.find(text => null != text) foreach app.TransData.recordValue
-    next
-
-    // We have some data in intent
-    // but could not parse the content
-  } catch app.TransData onFail popup
-
-  def readNdefMessage(msg: Message) = try {
-    val data: String = readFirstTextNdefMessage(msg)
-    if (null != data) app.TransData recordValue data
-    next
-
-  } catch { case _: Throwable =>
-    // We have some data in NFC intent
-    // but could not parse the content
-    me popup nfc_error
+    <(data.find(text => null != text) foreach app.TransData.recordValue, readFail)(readSuccess)
   }
 
   def onNfcStateEnabled = none
   def onNfcStateDisabled = none
   def onNfcFeatureNotFound = none
   def onNfcStateChange(ok: Boolean) = none
-  def readNonNdefMessage = me popup nfc_error
-  def readEmptyNdefMessage = me popup nfc_error
+  def readNonNdefMessage = me readFail null
+  def readEmptyNdefMessage = me readFail null
 
   // STARTUP LOGIC
 
-  def popup(code: Int) = runAnd(app toast code)(next)
   def next: Unit = (app.walletFile.exists, app.isAlive) match {
     // Find out what exactly should be done once user opens an app
     // depends on both wallet app file existence and runtime objects presence
@@ -111,7 +99,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   def goRestoreWallet(view: View) = {
     val restoreOptions = getResources getStringArray R.array.restore_options
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.actionTip, restoreOptions)
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, restoreOptions)
     val alert = showForm(negBuilder(dialog_cancel, null, lst).create)
 
     lst setDivider null

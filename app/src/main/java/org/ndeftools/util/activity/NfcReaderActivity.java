@@ -107,7 +107,7 @@ public abstract class NfcReaderActivity extends NfcDetectorActivity {
 	protected abstract void readNonNdefMessage();
 
 
-	public String readFirstTextNdefMessage(Message message) {
+	public String ndefMessageString(Message message) {
 		Log.d(TAG, "Found " + message.size() + " NDEF records");
 
 		for(int k = 0; k < message.size(); k++) {

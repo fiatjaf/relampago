@@ -12,7 +12,7 @@ import fr.acinq.bitcoin.BinaryData
 
 object LocalBroadcaster extends Broadcaster {
   def perKwSixSat = RatesSaver.rates.feeSix.value / 4
-  def perKwTwoSat = RatesSaver.rates.feeTwo.value / 4
+  def perKwThreeSat = RatesSaver.rates.feeThree.value / 4
 
   def currentHeight = {
     val processed = app.kit.wallet.getLastBlockSeenHeight
@@ -40,13 +40,22 @@ object LocalBroadcaster extends Broadcaster {
   } yield firstBlockHash.toString
 
   override def onProcessSuccess = {
-    case (_, close: ClosingData, c: Command) =>
+    case (_, close: ClosingData, _: Command) =>
       val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockingSend tx catch none
   }
 
   override def onBecome = {
+    case (chan, wait: WaitFundingDoneData, OFFLINE, WAIT_FUNDING_DONE) => for {
+      // CMDConfirmed may be sent to an offline channel and there will be no reaction
+      // so always double check a funding state here as a failsafe measure
+
+      txj <- getTx(wait.fundingTx.txid)
+      depth \ isDead = getStatus(wait.fundingTx.txid)
+      if depth >= LNParams.minDepth && !isDead
+    } chan process CMDConfirmed(txj)
+
     case (_, wait: WaitFundingDoneData, _, _) =>
       // Watch funding script, broadcast funding tx
       app.kit watchFunding wait.commitments
@@ -55,6 +64,6 @@ object LocalBroadcaster extends Broadcaster {
     case (chan, norm: NormalData, OFFLINE, OPEN) =>
       // Updated feerates may arrive sooner then channel gets open
       // so inform channel about updated fees once it gets open
-      chan process CMDFeerate(perKwTwoSat)
+      chan process CMDFeerate(perKwThreeSat)
   }
 }

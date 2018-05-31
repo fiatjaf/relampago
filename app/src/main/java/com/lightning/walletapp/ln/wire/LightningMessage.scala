@@ -69,9 +69,8 @@ case class Error(channelId: BinaryData, data: BinaryData) extends ChannelMessage
 
   def exception = {
     val text = new String(data, "UTF-8")
-    val default = "Remote peer has sent an error"
-    val finalText = if (text.isEmpty) default else text
-    new LightningException(finalText)
+    if (text.isEmpty) new LightningException("Error from remote peer")
+    else new LightningException(s"Error from remote peer: $text")
   }
 }
 
@@ -97,7 +96,7 @@ case class ChannelUpdate(signature: BinaryData, chainHash: BinaryData, shortChan
                          timestamp: Long, flags: BinaryData, cltvExpiryDelta: Int, htlcMinimumMsat: Long,
                          feeBaseMsat: Long, feeProportionalMillionths: Long) extends RoutingMessage {
 
-  def feeEstimate = (feeBaseMsat + feeProportionalMillionths * 10).toDouble
+  lazy val feeEstimate = (feeBaseMsat + feeProportionalMillionths * 10).toDouble
   def toHop(nodeId: PublicKey) = Hop(nodeId, shortChannelId, cltvExpiryDelta,
     htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
 }
@@ -138,6 +137,6 @@ case class Tor3(tor3: BinaryData, port: Int) extends NodeAddress {
 }
 
 // Not in a spec
-case class OutRequest(badNodes: Vector[String], badChans: Vector[Long], from: Vector[PublicKey], to: PublicKey)
+case class OutRequest(sat: Long, badNodes: Vector[String], badChans: Vector[Long], from: Vector[PublicKey], to: PublicKey)
 case class WalletZygote(v: Int, db: BinaryData, wallet: BinaryData, chain: BinaryData)
 case class AESZygote(v: Int, iv: BinaryData, ciphertext: BinaryData)

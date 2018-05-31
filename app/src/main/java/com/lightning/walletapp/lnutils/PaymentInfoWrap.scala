@@ -9,8 +9,7 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
-import org.bitcoinj.core.listeners.PeerConnectedEventListener
+import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import android.support.v4.app.NotificationCompat
@@ -19,7 +18,6 @@ import com.lightning.walletapp.MainActivity
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import com.lightning.walletapp.R
-import org.bitcoinj.core.Peer
 
 import android.app.{AlarmManager, NotificationManager, PendingIntent}
 import android.content.{BroadcastReceiver, Context, Intent}
@@ -30,34 +28,34 @@ import rx.lang.scala.{Observable => Obs}
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   private[this] var inFlightPayments = Map.empty[BinaryData, RoutingData]
   private[this] var unsent = Map.empty[BinaryData, RoutingData]
-  private[this] var chainInSync = false
-
-  app.kit.peerGroup addConnectedEventListener new PeerConnectedEventListener {
-    // We can not send payments until we know current blockchain height or else a channel may be closed!
-    def onPeerConnected(peer: Peer, peerCount: Int) = runAnd(chainInSync = peerCount > 2)(maybeResolvePending)
-  }
 
   def addPendingPayment(rd: RoutingData) = {
+    // Add payment to unsents and try to resolve it
     unsent = unsent.updated(rd.pr.paymentHash, rd)
     me insertOrUpdateOutgoingPayment rd
-    maybeResolvePending
+    resolvePending
     uiNotify
   }
 
-  def maybeResolvePending = if (chainInSync) {
-    def sendToChan(fullOrEmptyRD: FullOrEmptyRD) = app.ChannelManager.sendEither(fullOrEmptyRD, failOnUI)
-    for (_ \ rd <- unsent) app.ChannelManager.fetchRoutes(rd).foreach(sendToChan, exc => me failOnUI rd)
+  def resolvePending = if (app.ChannelManager.chainHeightObtained) {
+    // Send all pending payments only if we have an updated chain height
+    // attempt to send with expiry in past will result in a closed channel
+    unsent.values foreach fetchAndSend
     unsent = Map.empty
   }
+
+  def fetchAndSend(rd: RoutingData) = app.ChannelManager.fetchRoutes(rd)
+    .foreach(foeRD => app.ChannelManager.sendEither(foeRD, failOnUI),
+      exception => me failOnUI rd)
 
   private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
   def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
   def getAllRevoked(number: Long) = RichCursor apply db.select(RevokedTable.selectSql, number) vec toRevoked
 
-  def extractPreimage(tx: Transaction) = {
-    val fulfills = tx.txIn.map(txIn => txIn.witness.stack) collect {
-      case Seq(_, pre, _) if pre.size == 32 => UpdateFulfillHtlc(null, 0L, pre)
-      case Seq(_, _, _, pre, _) if pre.size == 32 => UpdateFulfillHtlc(null, 0L, pre)
+  def extractPreimage(candidateTx: Transaction) = {
+    val fulfills = candidateTx.txIn.map(_.witness.stack) collect {
+      case Seq(_, pre, _) if pre.size == 32 => UpdateFulfillHtlc(NOCHANID, 0L, pre)
+      case Seq(_, _, _, pre, _) if pre.size == 32 => UpdateFulfillHtlc(NOCHANID, 0L, pre)
     }
 
     fulfills foreach updOkOutgoing
@@ -65,8 +63,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
-  def updOkIncoming(u: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, u.amountMsat, System.currentTimeMillis, u.paymentHash)
-  def updOkOutgoing(fulfill: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, fulfill.paymentPreimage, fulfill.paymentHash)
+  def updOkIncoming(m: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
+  def updOkOutgoing(m: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
   def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
@@ -79,7 +77,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
     db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
-      rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry)
+      rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
   def markFailedAndFrozen = db txWrap {
@@ -97,19 +95,17 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def newRoutes(rd: RoutingData) =
     app.ChannelManager checkIfSendable rd match {
       case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
-        // Local conditions have not changed and we are still able to send this payment
-        def sendToChan(fullOrEmptyRD: FullOrEmptyRD) = app.ChannelManager.sendEither(fullOrEmptyRD, failOnUI)
-        val req = app.ChannelManager fetchRoutes rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-        req.foreach(sendToChan, exc => me failOnUI rd)
+        // Local conditions have not changed and we are still able to resend
+        me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
 
       case _ =>
         // UI will be updated a bit later
         updStatus(FAILURE, rd.pr.paymentHash)
     }
 
-  override def onError = {
-    case (_, exc: CMDException) => me failOnUI exc.rd
-    case chan \ error => chan process CMDShutdown
+  override def onException = {
+    case (_, nonFatal: CMDException) => me failOnUI nonFatal.rd
+    case chan \ error => chan process app.ChannelManager.CMDLocalShutdown
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {
@@ -142,20 +138,22 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     // then retry failed payments where possible
 
     db txWrap {
-      for (Htlc(true, addHtlc) \ _ <- cs.localCommit.spec.fulfilled) me updOkIncoming addHtlc
+      for (Htlc(true, addPayment) \ _ <- cs.localCommit.spec.fulfilled) me updOkIncoming addPayment
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
 
-        val rd1Opt = inFlightPayments get add.paymentHash
-        rd1Opt map parseFailureCutRoutes(failReason) match {
-          // Try use the routes left or fetch new ones if empty
+        val rdOpt = inFlightPayments get add.paymentHash
+        rdOpt map parseFailureCutRoutes(failReason) match {
+          // Try to use the routes left or fetch new ones if empty
+          // but account for possibility of rd not being in place
 
-          case Some(prunedRD \ excludes) =>
+          case Some(Some(prunedRD) \ excludes) =>
             for (entity <- excludes) BadEntityWrap.putEntity tupled entity
             app.ChannelManager.sendEither(useRoutesLeft(prunedRD), newRoutes)
 
-          case None =>
+          case _ =>
             // May happen after app restart
+            // also when recipient sends an error
             updStatus(FAILURE, add.paymentHash)
         }
       }
@@ -216,8 +214,8 @@ object RouteWrap {
     val subs = (rd.usedRoute drop 1).scanLeft(rd.usedRoute take 1) { case rs \ hop => rs :+ hop }
 
     for (_ \ node \ path <- rd.onion.sharedSecrets drop 1 zip subs) {
-      val expiration = System.currentTimeMillis + 1000L * 3600 * 24 * 7
-      val subPathJson = Vector(path).toJson.toString
+      val expiration = System.currentTimeMillis + 1000L * 3600 * 24 * 14
+      val subPathJson = path.toJson.toString
       val subNodeString = node.toString
 
       db.change(RouteTable.newSql, subPathJson, subNodeString, expiration)
@@ -227,14 +225,18 @@ object RouteWrap {
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
     val cursor = db.select(RouteTable.selectSql, targetId, System.currentTimeMillis)
-    val routeTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRouteVec]
-    val validRouteTry = routeTry.filter(from contains _.head.head.nodeId).map(rs => Obs just rs)
+    val routeTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRoute]
+    // Channels could be closed so make sure we still have a matching channel for this cached route
+    val validRouteTry = for (rt <- routeTry if from contains rt.head.nodeId) yield Obs just Vector(rt)
+
+    db.change(RouteTable.killSql, targetId)
+    // Remove cached route in case if it starts hanging our payments
+    // this route will be put back again if payment was a successful one
     validRouteTry getOrElse BadEntityWrap.findRoutes(from, targetId, rd)
   }
 }
 
 object BadEntityWrap {
-  // entity is either nodeId or shortChannelId
   val putEntity = (entity: String, span: Long, msat: Long) => {
     db.change(BadEntityTable.newSql, entity, System.currentTimeMillis + span, msat)
     db.change(BadEntityTable.updSql, System.currentTimeMillis + span, msat, entity)
@@ -244,7 +246,7 @@ object BadEntityWrap {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
     val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChanIds = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
-    OlympusWrap findRoutes OutRequest(badNodes, for (id <- badChanIds) yield id.toLong, from, targetId)
+    OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, badNodes, badChanIds.map(_.toLong), from, targetId)
   }
 }
 
@@ -275,8 +277,6 @@ object GossipCatcher extends ChannelListener {
   }
 }
 
-// RESYNC NOTIFICATION
-
 object Notificator {
   private[this] val notificatorClass = classOf[Notificator]
   def removeResyncNotification = getAlarmManager cancel getIntent
@@ -285,7 +285,7 @@ object Notificator {
 
   def scheduleResyncNotificationOnceAgain =
     try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-      System.currentTimeMillis + 1000L * 3600 * 24 * 21, getIntent) catch none
+      System.currentTimeMillis + 1000L * 3600 * 24 * 14, getIntent) catch none
 }
 
 class Notificator extends BroadcastReceiver {

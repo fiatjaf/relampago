@@ -25,7 +25,8 @@ object PaymentInfo {
   final val FAILURE = 3
   final val FROZEN = 4
 
-  final val NOIMAGE = BinaryData("00000000" getBytes "UTF-8")
+  final val NOIMAGE = BinaryData("3030303030303030")
+  final val NOCHANID = BinaryData("3131313131313131")
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
@@ -60,11 +61,11 @@ object PaymentInfo {
         (nextPayload +: loads, nodeId +: nodes, nextFee, expiry + delta)
     }
 
-    val cltvDeltaFail = lastExpiry - firstExpiry > LNParams.maxCltvDelta
+    val cltvDeltaFail = lastExpiry - LNParams.broadcaster.currentHeight > LNParams.maxCltvDelta
     val lnFeeFail = LNParams.isFeeNotOk(lastMsat, lastMsat - rd.firstMsat, route.size)
 
     if (cltvDeltaFail || lnFeeFail) useFirstRoute(rest, rd) else {
-      val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, allPayloads, assoc = rd.pr.paymentHash)
+      val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, payloads = allPayloads, assoc = rd.pr.paymentHash)
       val rd1 = rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
       Right(rd1)
     }
@@ -81,22 +82,31 @@ object PaymentInfo {
     val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == chan)
     val blackListedChan = Tuple3(chan.toString, span, msat)
     val rd1 = rd.copy(routes = routesWithoutBadChannels)
-    rd1 -> Vector(blackListedChan)
+    Some(rd1) -> Vector(blackListedChan)
   }
 
   def withoutNodes(badNodes: PublicKeyVec, rd: RoutingData, span: Long) = {
     val routesWithoutBadNodes = without(rd.routes, badNodes contains _.nodeId)
     val blackListedNodes = for (node <- badNodes) yield (node.toString, span, 0L)
-    rd.copy(routes = routesWithoutBadNodes) -> blackListedNodes
+    val rd1 = rd.copy(routes = routesWithoutBadNodes)
+    Some(rd1) -> blackListedNodes
   }
 
   private[this] var replacedChans = Set.empty[Long]
   def replaceRoute(rd: RoutingData, upd: ChannelUpdate) = {
-    // In some cases we can just replace a faulty hop with a supplied one, but only do this once per channel to avoid infinite loops
-    val route1 = rd.usedRoute map { case hop if hop.shortChannelId == upd.shortChannelId => upd toHop hop.nodeId case hop => hop }
-    val result = rd.copy(routes = route1 +: rd.routes) -> Vector.empty
+    // In some cases we can just replace a faulty hop with a supplied one
+    // but only do this once per each channel to avoid infinite loops
     replacedChans += upd.shortChannelId
-    result
+
+    val route1 = rd.usedRoute map { hop =>
+      // Replace a single hop and return it otherwise unchanged
+      val shouldReplace = hop.shortChannelId == upd.shortChannelId
+      if (shouldReplace) upd toHop hop.nodeId else hop
+    }
+
+    // Put updated route back, nothing to blacklist
+    val rd1 = rd.copy(routes = route1 +: rd.routes)
+    Some(rd1) -> Vector.empty
   }
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
@@ -105,6 +115,7 @@ object PaymentInfo {
     Tools log parsed.toString
 
     parsed map {
+      case ErrorPacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case ErrorPacket(nodeKey, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
       case ErrorPacket(nodeKey, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
       case ErrorPacket(nodeKey, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
@@ -112,21 +123,21 @@ object PaymentInfo {
       case ErrorPacket(nodeKey, u: Update) =>
         val isHonest = Announcements.checkSig(u.update, nodeKey)
         if (!isHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
-        else withoutChan(u.update.shortChannelId, rd, 300 * 1000, rd.firstMsat)
+        else withoutChan(u.update.shortChannelId, rd, 180 * 1000, rd.firstMsat)
 
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
       case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
-      case ErrorPacket(nodeKey, _: BadOnion) => withoutNodes(Vector(nodeKey), rd, 300 * 1000)
+      case ErrorPacket(nodeKey, _: BadOnion) => withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nodeKey, UnknownNextPeer | PermanentChannelFailure) =>
         rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
           withoutChan(payHop.shortChannelId, rd, 86400 * 7 * 1000, 0L)
-        } getOrElse withoutNodes(Vector(nodeKey), rd, 300 * 1000)
+        } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nodeKey, _) =>
         rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
-          withoutChan(payHop.shortChannelId, rd, 300 * 1000, rd.firstMsat)
-        } getOrElse withoutNodes(Vector(nodeKey), rd, 300 * 1000)
+          withoutChan(payHop.shortChannelId, rd, 180 * 1000, rd.firstMsat)
+        } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
     } getOrElse {
       val cut = rd.usedRoute drop 1 dropRight 1
@@ -206,9 +217,9 @@ trait PaymentInfoBag { me =>
   def saveRevoked(hash: BinaryData, expiry: Long, number: Long)
 
   // Manage payments list
+  def extractPreimage(tx: Transaction)
   def getPaymentInfo(hash: BinaryData): Try[PaymentInfo]
   def updStatus(paymentStatus: Int, hash: BinaryData)
-  def updOkOutgoing(fulfill: UpdateFulfillHtlc)
-  def updOkIncoming(add: UpdateAddHtlc)
-  def extractPreimage(tx: Transaction)
+  def updOkOutgoing(m: UpdateFulfillHtlc)
+  def updOkIncoming(m: UpdateAddHtlc)
 }

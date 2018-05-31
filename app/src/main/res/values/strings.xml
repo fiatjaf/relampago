@@ -4,15 +4,15 @@
     <string name="emerge_mode">Emergency mode</string>
 
     <!-- app wide -->
-    <string name="greetings">Bitcoin + Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
-    <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
-    <string name="wallet_state">Total balance\n<small><font color='#999999'>On-chain + LN funds</font></small></string>
     <string name="step_fees"><![CDATA[<font color=#999999>Final step: miner fee</font><br><br>%1$s]]></string>
-    <string name="fee_risky"><![CDATA[<small>%1$s standard fee</small>]]></string>
-    <string name="fee_live"><![CDATA[<small>%1$s priority fee</small>]]></string>
+    <string name="greetings">Bitcoin Lightning Wallet\n\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
+    <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
+    <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Confirmation may take hours</font></small></small>]]></string>
+    <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Faster confirmation times</font></small></small>]]></string>
+    <string name="wallet_state"><small>Total balance\n<font color='#999999'>On-chain and LN</font></small></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
-    <string name="wallet_create">New Bitcoin Wallet</string>
     <string name="wallet_restore">Restore Wallet</string>
+    <string name="wallet_create">New Wallet</string>
 
     <array name="denoms">
         <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 btc</small></font>]]></item>
@@ -26,28 +26,27 @@
     </array>
 
     <string name="create_wallet_creating">Generating your wallet\nIt may take up to a few minutes</string>
-    <string name="restore_when">When was Bitcoin wallet created?\nLeave date as is if not sure</string>
+    <string name="restore_when">When was your wallet created?\nLeave date as is if not sure</string>
     <string name="restore_wallet_restoring">Restoring your wallet\nIt may take a while</string>
     <string name="restore_mnemonic_wrong">Phrase must be 12 words long</string>
     <string name="restore_hint">Your BIP32 mnemonic phrase</string>
 
     <!-- headers with links -->
-    <string name="read_settings"><![CDATA[<small>Feerate: %1$s / kB, v0.08&#8211;29<br>Got some questions or feel lost?<br><a href=http://lightning-wallet.com>Read a short app manual</a></small>]]></string>
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a>\n<small>don\'t change these settings unless\nyou know what you are doing</small></string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
+    <string name="read_settings"><![CDATA[<small>Bitcoin Lightning Wallet<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.09&#8211;51</small>]]></string>
 
     <string name="channel_recovery_info">
-        Channel recovery tool asks Olympus servers for available channel backups and uses those to reimburse locked funds back into
-        your Bitcoin wallet.\n\nYou should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels
-        with some locked funds, otherwise nothing will happen.\n\nAlso, using this tool does not affect open channels currently present
-        on this device.
+        Recovery tool retrieves available channel backups and uses them to reimburse locked funds back into your on-chain wallet.\n\nYou
+        should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds,
+        otherwise nothing will happen.\n\nYou are advised to start with this once wallet is fully synchronized.\n\nUsing this tool
+        does not affect open channels currently present on this device.
     </string>
 
     <string name="mnemonic_info">
-        <font color="#E31300">Mnemonic phrase is important</font>\n
-        <a href="http://lightning-wallet.com/setting-up-bitcoin-wallet#mnemonic-code">Read about it</a> and save it!
-        \n\nSaving and properly securing a mnemonic phrase is a single most important action to do once a fresh Bitcoin wallet is created.
-        \n\nYou will need it in case of various emergencies such as lost phone!
+        <font color="#F00859">Mnemonic phrase is important</font>\n
+        <a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Read about it</a> and save it now!
+        \n\nYou will need it in case if anything goes wrong with your wallet!
     </string>
 
     <string name="tokens_warn"><![CDATA[
@@ -117,24 +116,24 @@
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
-    <string name="btc_empty">Empty wallet</string>
+    <string name="btc_empty">No funds</string>
     <string name="ln_empty">No open channels</string>
-    <string name="btc_status_online"><![CDATA[<font color=#65BD65>Bitcoin wallet is online</font>]]></string>
+    <string name="btc_status_operational">Wallet is operational</string>
     <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
 
     <array name="info_progress">
-        <item><![CDATA[<font color=#53A63C>Sync is complete</font>]]></item>
+        <item>Sync is complete</item>
         <item><![CDATA[<font color=#FF9900>Sync: %1$d day behind</font>]]></item>
         <item><![CDATA[<font color=#FF9900>Sync: %1$d days behind</font>]]></item>
     </array>
 
-    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s]]></string>
-    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s]]></string>
-    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>fee %3$s = %4$.2f%%</small>]]></string>
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br>fee %3$s = %4$.2f%%<br><small>%5$s at current rates</small>]]></string>
 
-    <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>received %2$s]]></string>
-    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s]]></string>
-    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>fee %3$s = %4$.2f%%</small>]]></string>
+    <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br>fee %3$s = %4$.2f%%<br><small>%5$s at current rates</small>]]></string>
 
     <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#53A63C>%1$s</font>]]></string>
@@ -151,8 +150,8 @@
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin transaction</strong></string></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><br><br><small>%1$s</small>]]></string>
-    <string name="ln_receive_option"><![CDATA[As Lightning payment<br><br><font color=#999999><small>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</small></font>]]></string>
-    <string name="btc_receive_option"><![CDATA[As Bitcoin transaction<br><br><font color=#999999><small>make a QR-code with your current wallet address, can be used to receive regular on-chain transactions</small></font>]]></string>
+    <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><br><br><font color=#999999><small>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</small></font>]]></string>
+    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><br><br><font color=#999999><small>make a QR-code with on-chain wallet address, can be used to receive regular Bitcoin transactions</small></font>]]></string>
     <string name="send_paste">Paste a Payment Request</string>
     <string name="send_scan_qr">Scan a QR code</string>
 
@@ -162,41 +161,39 @@
     <string name="err_ln_remote_amount_high">Failed because payment amount is too high for your peer to accept</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum</string>
-    <string name="err_ln_no_chan">Failed because no channel can handle this payment at the moment</string>
     <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already</string>
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
     <string name="err_ln_in_flight">Failed because this payment is currently in-flight</string>
     <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 
-    <string name="err_ln_6_confs">Can\'t ask for payments because a funding Bitcoin transaction has not got 6 confirmations yet</string>
-    <string name="err_ln_reserve_unspent">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving</string>
-    <string name="err_ln_fee_overflow"><![CDATA[Failed because this payment combined with Bitcoin <a href=http://lightning-wallet.com/using-lightning-wallet#commit-transaction-fee>commit transaction</a> fee exceeds your unspendable channel reserve<br><br>reserve %1$s<br>sending %2$s<br>missing %3$s]]></string>
+    <string name="err_ln_6_confs">Can\'t ask for Lightning payments because a channel funding Bitcoin transaction has not got 6 confirmations yet</string>
+    <string name="err_ln_no_chan">Failed because either all channels are offline or no channel has enough funds to handle an off-chain payment amount combined with on-chain commit transaction fee</string>
+    <string name="err_ln_reserve_unspent">Can\'t ask for payments yet because first you need to spend at least %1$s in order to <a href="http://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds">make some space</a> for receiving</string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
-    <string name="err_transaction_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
+    <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
-    <string name="err_uri">Failed because request contains a malformed URI which could not be parsed</string>
+    <string name="err_self_payment">Failed because payments to yourself are not allowed</string>
     <string name="err_general">Failed because an error has occurred</string>
-    <string name="nfc_error">Malformed NFC message</string>
-    <string name="err_qr_parse">QR code is invalid</string>
+    <string name="err_no_data">No useful data found</string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
     <string name="ln_status_peer">Select peer</string>
-    <string name="ln_status_none">No open channel found</string>
-    <string name="ln_description_hint">add some description</string>
-    <string name="ln_qr_disposable"><![CDATA[Request is valid for 1 hour<br>Do not reuse this QR code]]></string>
-    <string name="ln_proof">Signed payment request: %1$s\n\nPayment hash: %2$s\n\nPayment preimage: %3$s</string>
-    <string name="ln_no_description">No description provided</string>
-    <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_share_hash">Share Payment Hash</string>
+    <string name="ln_status_none">No open channel found</string>
+    <string name="ln_share_proof">Share Proof of Payment</string>
+    <string name="ln_description_hint">add some description</string>
+    <string name="ln_no_description">No description provided</string>
+    <string name="ln_proof">Signed payment request: %1$s\n\nPayment preimage: %2$s</string>
+    <string name="ln_qr_disposable"><![CDATA[Request is valid for 1 hour<br>Do not reuse this QR code]]></string>
 
     <!-- see PaymentInfo.scala -->
     <array name="ln_payment_states">
         <item>waiting for payee</item>
         <item>still in progress</item>
         <item>paid successfully</item>
-        <item>cancelled and refunded</item>
-        <item>frozen</item>
+        <item>failed and refunded</item>
+        <item>failed and frozen</item>
     </array>
 
     <string name="notice_sync_title">Synchronization required</string>
@@ -204,15 +201,23 @@
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>cooperative</i></font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>refunded %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[<font color=#53A63C>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>can send %5$s<br>can receive %6$s<br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[<font color=#53A63C>%1$s</font><br>%2$s<br><br>capacity %3$s<br>can send %4$s<br>can receive %5$s<br><small>commit fee %6$s</small><br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>opened at <font color=#999999>%4$s</font><br>closed at <font color=#999999>%5$s</font><br>total capacity %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
-    <string name="ln_ops_chan_receive_nothing_yet">nothing yet</string>
 
-    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>Pending payments are present</font><br><br>Cooperative closing is going to be postponed until they are resolved, would you still like to proceed?]]></string>
-    <string name="ln_chan_close_details"><![CDATA[Closing results in a regular Bitcoin transaction which refunds current channel balance back into your Bitcoin wallet.<br><br>Channel itself becomes unusable once this action is initiated, would you like to proceed?]]></string>
-    <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>This channel is currently offline so closing it right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a><br><br>This type of closing requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
-    <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Please note that closing a channel right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closing>forced channel closing</a><br><br>This type of closing requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
+    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved, would you still like to proceed?]]></string>
+    <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>This channel is offline now so closing it will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Please note that closing a channel right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
+
+    <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close this channel and send a refunding on-chain transaction to the following address?<br><br>%1$s]]></string>
+    <string name="ln_chan_close_confirm_local">Do you want to close this channel and send a refunding on-chain transaction back to this wallet?</string>
+    <string name="ln_chan_close_details">Where should a refunding on-chain transaction be sent once this channel is closed?</string>
+    <string name="ln_chan_close_option_local">To this wallet</string>
+
+    <string name="ln_chan_close_option_address"><![CDATA[
+        Paste an Address<br><br><font color=#999999><small>Please note that it\'s not possible to determine an exact
+        refunding fee in advance so do not use this option if recipient expects an exact amount</small></font>
+    ]]></string>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Pending refunds</font><br>]]></string>

@@ -5,7 +5,6 @@ import com.lightning.walletapp.Utils._
 import scala.collection.JavaConverters._
 import com.lightning.walletapp.{AddrData, P2WSHData}
 import org.bitcoinj.wallet.WalletTransaction.Pool.{UNSPENT, SPENT, PENDING}
-import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import scala.util.Try
 
 
@@ -46,8 +45,6 @@ class TxWrap(val tx: Transaction) {
     Stream(UNSPENT, SPENT, PENDING).map(app.kit.wallet.getTransactionPool)
       .map(input.getConnectedOutput).find(_ != null)
 
-  def depth = tx.getConfidence.getDepthInBlocks
-  def isDead = tx.getConfidence.getConfidenceType == DEAD
   def isVisible = tx.getMemo != HIDE && !valueDelta.isZero
   def makeHidden = tx setMemo HIDE
   final val HIDE = "HIDE"

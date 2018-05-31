@@ -1,32 +1,30 @@
 package com.lightning.walletapp.ln
 
-import scala.concurrent.duration._
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
-
-import fr.acinq.eclair.UInt64
 import java.util.concurrent.Executors
+import fr.acinq.eclair.UInt64
+
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
+import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import fr.acinq.bitcoin.Crypto.{Point, Scalar}
-import fr.acinq.bitcoin.{Satoshi, Transaction}
-import rx.lang.scala.{Observable => Obs}
 import scala.util.{Failure, Success}
 
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
   def apply[T](ex: Commitments => T) = Some(data) collect { case some: HasCommitments => ex apply some.commitments }
-  def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onError me -> err }
+  def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onException me -> err }
   var listeners: Set[ChannelListener] = _
 
   private[this] val events = new ChannelListener {
     override def onProcessSuccess = { case ps => for (lst <- listeners if lst.onProcessSuccess isDefinedAt ps) lst onProcessSuccess ps }
-    override def onError = { case malfunction => for (lst <- listeners if lst.onError isDefinedAt malfunction) lst onError malfunction }
+    override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
 
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
@@ -36,6 +34,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   }
 
   def SEND(msg: LightningMessage): Unit
+  def ASKREFUNDTX(ref: RefundingData): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def STORE(content: HasCommitments): HasCommitments
   def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
@@ -57,17 +56,16 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
 
 
-      case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT)
-        if accept.temporaryChannelId == cmd.tempChanId =>
-
+      case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>
+        if (accept.dustLimitSatoshis > cmd.localParams.channelReserveSat) throw new LightningException("Our channel reserve is less than their dust")
+        if (accept.channelReserveSatoshis > cmd.realFundingAmountSat / 10) throw new LightningException("Their proposed reserve is too high")
+        if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
+        if (accept.dustLimitSatoshis < 546L) throw new LightningException("Their on-chain dust limit is too low")
+        if (accept.maxAcceptedHtlcs > 483) throw new LightningException("They can accept too many payments")
+        if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
+        if (accept.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
         if (accept.minimumDepth > 6L) throw new LightningException("Their minimumDepth is too high")
         if (accept.toSelfDelay > 2016) throw new LightningException("Their toSelfDelay is too high")
-        if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
-        if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
-        if (accept.channelReserveSatoshis > cmd.realFundingAmountSat / 10) throw new LightningException("Their proposed reserve is too high")
-        if (accept.maxAcceptedHtlcs > 483) throw new LightningException("They can accept too many payments")
-        if (accept.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
-        if (accept.dustLimitSatoshis < 546L) throw new LightningException("Their dust limit is too low")
         BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
 
 
@@ -83,12 +81,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         BECOME(WaitFundingSignedData(announce, cmd.localParams, Tools.toLongId(fundTx.hash, cmd.outIndex), accept, fundTx,
           localSpec, localCommitTx, firstRemoteCommit), WAIT_FUNDING_SIGNED) SEND fundingCreated
 
+
       // They have signed our first commit, we can broadcast a funding tx
       case (wait: WaitFundingSignedData, remote: FundingSigned, WAIT_FUNDING_SIGNED) =>
         val signedLocalCommitTx = Scripts.addSigs(wait.localCommitTx, wait.localParams.fundingPrivKey.publicKey,
           wait.remoteParams.fundingPubkey, Scripts.sign(wait.localCommitTx, wait.localParams.fundingPrivKey), remote.signature)
 
-        if (Scripts.checkSpendable(signedLocalCommitTx).isFailure) BECOME(wait, CLOSING) else {
+        if (Scripts.checkValid(signedLocalCommitTx).isFailure) BECOME(wait, CLOSING) else {
           val localCommit = LocalCommit(0L, wait.localSpec, htlcTxsAndSigs = Nil, signedLocalCommitTx)
           val commits = Commitments(wait.localParams, wait.remoteParams, localCommit, wait.remoteCommit,
             localChanges = Changes(proposed = Vector.empty, signed = Vector.empty, acked = Vector.empty),
@@ -115,7 +114,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if wait.fundingTx.txid == fundTx.txid =>
 
         // Create and store our FundingLocked
-        // since CMDConfirmed only happens once
         val our = makeFundingLocked(wait.commitments)
         val wait1 = me STORE wait.copy(our = Some apply our)
         if (wait.their.isEmpty) me UPDATA wait1 SEND our
@@ -144,6 +142,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA norm.copy(commitments = c1)
         events fulfillReceived fulfill
 
+
       case (norm: NormalData, fail: UpdateFailHtlc, OPEN) =>
         // Got a failure for an outgoing HTLC we sent earlier
         val c1 = Commitments.receiveFail(norm.commitments, fail)
@@ -164,10 +163,16 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         doProcess(CMDProceed)
 
 
-      // We're fulfilling an HTLC we got earlier
-      case (norm @ NormalData(_, commitments, _, _), cmd: CMDFulfillHtlc, OPEN) =>
-        val c1 \ updateFulfillHtlc = Commitments.sendFulfill(commitments, cmd)
-        me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
+      // We're fulfilling an HTLC we got from them earlier
+      // this is a special case where we don't throw if cross signed HTLC is not found
+      // it may happen when we have already fulfilled it just before connection got lost
+      case (norm @ NormalData(_, commitments, _, _), cmd: CMDFulfillHtlc, OPEN) => for {
+        add <- Commitments.getHtlcCrossSigned(commitments, incomingRelativeToLocal = true, cmd.id)
+        updateFulfillHtlc = UpdateFulfillHtlc(commitments.channelId, cmd.id, cmd.preimage)
+
+        if updateFulfillHtlc.paymentHash == add.paymentHash
+        c1 = Commitments.addLocalProposal(commitments, updateFulfillHtlc)
+      } me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
 
 
       // Failing an HTLC we got earlier
@@ -244,9 +249,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SHUTDOWN in WAIT_FUNDING_DONE and OPEN
 
 
-      case (wait: WaitFundingDoneData, CMDShutdown, WAIT_FUNDING_DONE) =>
-        // We have decided to close our channel before it reached a min depth
-        me startShutdown NormalData(wait.announce, wait.commitments)
+      case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), WAIT_FUNDING_DONE) =>
+        // We have decided to cooperatively close our channel before it has reached a min depth
+        val finalKey = scriptPubKey getOrElse wait.commitments.localParams.defaultFinalScriptPubKey
+        startShutdown(NormalData(wait.announce, wait.commitments), finalKey)
 
 
       case (wait: WaitFundingDoneData, remote: Shutdown, WAIT_FUNDING_DONE) =>
@@ -254,19 +260,20 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         val norm = NormalData(wait.announce, wait.commitments)
         val norm1 = norm.modify(_.remoteShutdown) setTo Some(remote)
-        // We have their Shutdown so we add ours and start negotiations
-        me startShutdown norm1
+        // We just got their Shutdown so we add ours and start negotiations
+        startShutdown(norm1, wait.commitments.localParams.defaultFinalScriptPubKey)
         doProcess(CMDProceed)
 
 
-      case (norm @ NormalData(_, commitments, our, their), CMDShutdown, OPEN) =>
-        // We have unsigned outgoing HTLCs or already have tried to close this channel cooperatively
+      case (norm @ NormalData(_, commitments, our, their), CMDShutdown(scriptPubKey), OPEN) =>
+        // We may have unsigned outgoing HTLCs or already have tried to close this channel cooperatively
         val nope = our.isDefined | their.isDefined | Commitments.localHasUnsignedOutgoing(commitments)
-        if (nope) startLocalClose(norm) else me startShutdown norm
+        val finalKey = scriptPubKey getOrElse commitments.localParams.defaultFinalScriptPubKey
+        if (nope) startLocalClose(norm) else startShutdown(norm, finalKey)
 
 
+      // Either they initiate a shutdown or respond to the one we have sent
       case (norm @ NormalData(_, commitments, _, None), remote: Shutdown, OPEN) =>
-        // GUARD: Either they initiate a shutdown or respond to the one we have sent
 
         val d1 = norm.modify(_.remoteShutdown) setTo Some(remote)
         val nope = Commitments.remoteHasUnsignedOutgoing(commitments)
@@ -275,16 +282,19 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if (nope) startLocalClose(norm) else me UPDATA d1 doProcess CMDProceed
 
 
-      case (norm @ NormalData(_, _, None, their), CMDProceed, OPEN)
-        if inFlightOutgoingHtlcs(me).isEmpty && their.isDefined =>
-        // GUARD: got their shutdown with no in-flight HTLCs
-        me startShutdown norm
+      case (norm @ NormalData(_, commitments, None, their), CMDProceed, OPEN)
+        if inFlightHtlcs(me).isEmpty && their.isDefined =>
+
+        // We have previously received their Shutdown
+        // so we have issued a CMDProceed and are getting it here now
+        // which means we do not have any HTLCs in-flight so can negotiatiate
+        startShutdown(norm, commitments.localParams.defaultFinalScriptPubKey)
         doProcess(CMDProceed)
 
 
       case (NormalData(announce, commitments, our, their), CMDProceed, OPEN)
-        // GUARD: got both shutdowns without in-flight HTLCs so we can start negs
-        if inFlightOutgoingHtlcs(me).isEmpty && our.isDefined && their.isDefined =>
+        // GUARD: got both shutdowns without HTLCs in-flight so can negotiate
+        if inFlightHtlcs(me).isEmpty && our.isDefined && their.isDefined =>
 
         val firstProposed = Closing.makeFirstClosing(commitments, our.get.scriptPubKey, their.get.scriptPubKey)
         val neg = NegotiationsData(announce, commitments, our.get, their.get, firstProposed :: Nil)
@@ -350,15 +360,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         doProcess(CMDHTLCProcess)
 
 
-      // We may get this message any time so just save it here
-      case (wait: WaitFundingDoneData, CMDConfirmed(tx), OFFLINE)
-        if wait.fundingTx.txid == tx.txid =>
-
-        val our = makeFundingLocked(wait.commitments)
-        val wait1 = wait.modify(_.our) setTo Some(our)
-        me UPDATA STORE(wait1)
-
-
       // We're exiting a sync state while waiting for their FundingLocked
       case (wait: WaitFundingDoneData, cr: ChannelReestablish, OFFLINE) =>
         BECOME(wait, WAIT_FUNDING_DONE)
@@ -402,7 +403,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val signedClose = Scripts.addSigs(closing, commitments.localParams.fundingPrivKey.publicKey,
           commitments.remoteParams.fundingPubkey, closingSigned.signature, remoteClosingSig)
 
-        Scripts checkSpendable signedClose match {
+        Scripts checkValid signedClose match {
           case Failure(why) => throw new LightningException(why.getMessage)
           case Success(okClose) if remoteClosingFee == localClosingSigned.feeSatoshis =>
             // Our current and their proposed fees are equal for this tx, can broadcast
@@ -452,7 +453,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // HANDLE INITIALIZATION
 
 
-      case (null, ref: RefundingData, null) => super.become(ref, REFUNDING)
+      case Tuple3(null, ref: RefundingData, null) =>
+        if (ref.remoteLatestPoint.isDefined) ASKREFUNDTX(ref)
+        super.become(ref, REFUNDING)
+
       case (null, close: ClosingData, null) => super.become(close, CLOSING)
       case (null, init: InitData, null) => super.become(init, WAIT_FOR_INIT)
       case (null, wait: WaitFundingDoneData, null) => super.become(wait, OFFLINE)
@@ -464,17 +468,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
-        // Wait for 5 seconds to catch their remote commit, CMDForceClose won't work in that case
-        Obs.just(CMDForceClose).delay(5.seconds).foreach(force => me process force)
-
-
-      case (some: HasCommitments, CMDForceClose, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
         // REFUNDING is an exception here: no matter what happens we can't spend local in that state
         startLocalClose(some)
 
 
-      case (some: HasCommitments, CMDShutdown, NEGOTIATIONS | OFFLINE) =>
-        // CMDShutdown in WAIT_FUNDING_DONE and OPEN can be cooperative
+      case (some: HasCommitments, _: CMDShutdown, NEGOTIATIONS | OFFLINE) =>
+        // Disregard custom scriptPubKey and always refund to local wallet
+        // CMDShutdown in WAIT_FUNDING_DONE and OPEN may be cooperative
         startLocalClose(some)
 
 
@@ -502,11 +502,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     BECOME(me STORE NormalData(wait.announce, c1), OPEN)
   }
 
-  private def startShutdown(norm: NormalData) = {
-    val finalScriptPubKey = norm.commitments.localParams.defaultFinalScriptPubKey
-    val localShutdown = Shutdown(norm.commitments.channelId, finalScriptPubKey)
-    val norm1 = norm.modify(_.localShutdown) setTo Some(localShutdown)
-    BECOME(norm1, OPEN) SEND localShutdown
+  private def startShutdown(norm: NormalData, finalScriptPubKey: BinaryData) = {
+    val localShutdownMessage = Shutdown(norm.commitments.channelId, finalScriptPubKey)
+    val norm1 = norm.modify(_.localShutdown) setTo Some(localShutdownMessage)
+    BECOME(norm1, OPEN) SEND localShutdownMessage
   }
 
   private def startMutualClose(some: HasCommitments, tx: Transaction) = some match {
@@ -553,11 +552,7 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
-  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
-  def isOperationalOpen(chan: Channel) = isOperational(chan) && chan.state == OPEN
-
-  def inFlightOutgoingHtlcs(chan: Channel) = chan.data match {
+  def inFlightHtlcs(chan: Channel) = chan.data match {
     // Channels should always be filtered by some criteria before calling this method
     // like find all current in-flight HTLC from alive chans or all frozen from closing chans
     case some: HasCommitments => Commitments.latestRemoteCommit(some.commitments).spec.htlcs
@@ -568,20 +563,12 @@ object Channel {
     // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve
     // peer's balance can't go below their channel reserve, commit tx fee is always paid by us
     val canReceive = cs.localCommit.spec.toRemoteMsat - cs.localParams.channelReserveSat * 1000L
-    math.min(canReceive, LNParams.maxHtlcValue.amount)
+    math.min(canReceive, LNParams.maxHtlcValueMsat)
   } getOrElse 0L
 
-  def estimateTotalCanSend(chan: Channel) = chan { cs =>
-    val currentLimit = cs.remoteParams.channelReserveSatoshis + cs.localCommit.spec.feeratePerKw
-    // Somewhat counterintuitive: remoteParams.channelReserveSatoshis is OUR unspendable reseve
-    // sending limit consists of unspendable channel reserve + current commit tx fee
-    cs.localCommit.spec.toLocalMsat - currentLimit * 1000L
-  } getOrElse 0L
-
-  def estimateCanSend(chan: Channel) = {
-    val unconstrainedCanSend = estimateTotalCanSend(chan)
-    math.min(unconstrainedCanSend, LNParams.maxHtlcValue.amount)
-  }
+  def estimateCanSend(chan: Channel) = chan(_.reducedRemoteState.canSendMsat) getOrElse 0L
+  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
+  def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
 
   def channelAndHop(chan: Channel) = for {
     // Make sure this hop is the real one
@@ -600,7 +587,7 @@ trait ChannelListener {
   type Incoming = (Channel, ChannelData, Any)
   type Transition = (Channel, ChannelData, String, String)
   def onProcessSuccess: PartialFunction[Incoming, Unit] = none
-  def onError: PartialFunction[Malfunction, Unit] = none
+  def onException: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
 
   def fulfillReceived(ok: UpdateFulfillHtlc): Unit = none
