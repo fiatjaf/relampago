@@ -285,7 +285,7 @@ object Notificator {
 
   def scheduleResyncNotificationOnceAgain =
     try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-      System.currentTimeMillis + 1000L * 3600 * 24 * 14, getIntent) catch none
+      System.currentTimeMillis + 1000L * 3600 * 24 * 10, getIntent) catch none
 }
 
 class Notificator extends BroadcastReceiver {

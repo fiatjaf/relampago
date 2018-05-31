@@ -65,7 +65,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
         if (accept.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
         if (accept.minimumDepth > 6L) throw new LightningException("Their minimumDepth is too high")
-        if (accept.toSelfDelay > 2016) throw new LightningException("Their toSelfDelay is too high")
+        if (accept.toSelfDelay > 2000) throw new LightningException("Their toSelfDelay is too high")
         BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
 
 

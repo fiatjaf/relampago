@@ -19,10 +19,10 @@
 
     <application
         android:name="com.lightning.walletapp.WalletApp"
-        android:icon="@drawable/ic_launcher_testnet"
+        android:icon="@drawable/ic_launcher"
         android:fullBackupContent="false"
         android:allowBackup="false"
-        android:label="Testnet">
+        android:label="Bitcoin">
 
         <receiver android:enabled="true" android:process=":remote"
             android:name="com.lightning.walletapp.lnutils.Notificator">

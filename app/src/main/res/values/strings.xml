@@ -200,7 +200,7 @@
     <string name="notice_sync_body">Please open Bitcoin + Lightning app</string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>cooperative</i></font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>refunded %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>
-    <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
+    <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_open"><![CDATA[<font color=#53A63C>%1$s</font><br>%2$s<br><br>capacity %3$s<br>can send %4$s<br>can receive %5$s<br><small>commit fee %6$s</small><br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>opened at <font color=#999999>%4$s</font><br>closed at <font color=#999999>%5$s</font><br>total capacity %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
@@ -221,7 +221,7 @@
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Pending refunds</font><br>]]></string>
-    <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://testnet.smartbit.com.au/tx/%1$s>View closing status</a><br>%2$s<br>%3$s fee]]></string>
+    <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://smartbit.com.au/tx/%1$s>View closing status</a><br>%2$s<br>%3$s fee]]></string>
 
     <string name="ln_ops_unilateral_you"><![CDATA[<font color=#999999><i>by your wallet</i></font>]]></string>
     <string name="ln_ops_unilateral_peer"><![CDATA[<font color=#999999><i>by remote peer</i></font>]]></string>

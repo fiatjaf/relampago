@@ -40,7 +40,7 @@ import java.io.File
 
 
 class WalletApp extends Application { me =>
-  lazy val params = org.bitcoinj.params.TestNet3Params.get
+  lazy val params = org.bitcoinj.params.MainNetParams.get
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
   lazy val chainFile = new File(getFilesDir, chainFileName)
@@ -269,7 +269,7 @@ class WalletApp extends Application { me =>
     }
 
     def useCheckPoints(time: Long) = {
-      val pts = getAssets open "checkpoints-testnet.txt"
+      val pts = getAssets open "checkpoints.txt"
       CheckpointManager.checkpoint(params, pts, store, time)
     }
 
