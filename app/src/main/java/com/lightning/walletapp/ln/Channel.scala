@@ -552,13 +552,6 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  def inFlightHtlcs(chan: Channel) = chan.data match {
-    // Channels should always be filtered by some criteria before calling this method
-    // like find all current in-flight HTLC from alive chans or all frozen from closing chans
-    case some: HasCommitments => Commitments.latestRemoteCommit(some.commitments).spec.htlcs
-    case _ => Set.empty[Htlc]
-  }
-
   def estimateCanReceive(chan: Channel) = chan { cs =>
     // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve
     // peer's balance can't go below their channel reserve, commit tx fee is always paid by us
@@ -567,6 +560,7 @@ object Channel {
   } getOrElse 0L
 
   def estimateCanSend(chan: Channel) = chan(_.reducedRemoteState.canSendMsat) getOrElse 0L
+  def inFlightHtlcs(chan: Channel) = chan(cs => Commitments.latestRemoteCommit(cs).spec.htlcs) getOrElse Set.empty[Htlc]
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
   def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
   def hasReceivedPayments(chan: Channel) = chan(_.remoteNextHtlcId).exists(_ > 0)
