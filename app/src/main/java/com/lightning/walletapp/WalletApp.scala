@@ -287,8 +287,8 @@ class WalletApp extends Application { me =>
       peerGroup.addWallet(wallet)
 
       Notificator.removeResyncNotification
-      if (ChannelManager.notClosingOrRefunding.nonEmpty)
-        Notificator.scheduleResyncNotificationOnceAgain
+      val shouldReschedule = ChannelManager.notClosingOrRefunding.exists(hasReceivedPayments)
+      if (shouldReschedule) Notificator.scheduleResyncNotificationOnceAgain
 
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       // Passing bitcoinj listener ensures onChainDownloadStarted is called

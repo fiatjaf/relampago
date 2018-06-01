@@ -173,6 +173,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
       // Mutual tx has enough confirmations or hard timeout has passed out
       db.change(ChannelTable.killSql, close.commitments.channelId)
+
+    case (_, _: NormalData, _: UpdateAddHtlc) =>
+      // We have just accepted an incoming payment
+      // must periodically watch this chan from now on
+      Notificator.scheduleResyncNotificationOnceAgain
   }
 
   override def onBecome = {
@@ -182,8 +187,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       uiNotify
 
     case (chan, _, WAIT_FUNDING_DONE, OPEN) =>
-      // Schedule notification once a channel gets open
-      Notificator.scheduleResyncNotificationOnceAgain
+      // It should now be possible to buy tokens
       OlympusWrap tellClouds OlympusWrap.CMDStart
   }
 }

@@ -569,6 +569,7 @@ object Channel {
   def estimateCanSend(chan: Channel) = chan(_.reducedRemoteState.canSendMsat) getOrElse 0L
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
   def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
+  def hasReceivedPayments(chan: Channel) = chan(_.remoteNextHtlcId).exists(_ > 0)
 
   def channelAndHop(chan: Channel) = for {
     // Make sure this hop is the real one
