@@ -188,11 +188,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // Fail or fulfill incoming HTLCs
       case (norm: NormalData, CMDHTLCProcess, OPEN) =>
-        val minExpiry = LNParams.broadcaster.currentHeight
-        for (Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs) {
-          if (add.expiry < minExpiry) throw new LightningException("Payment expiry in past")
-          me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, minExpiry + 6L)
-        }
+        for (Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs)
+          me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag)
 
         // And sign once done
         doProcess(CMDProceed)

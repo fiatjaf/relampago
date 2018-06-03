@@ -146,7 +146,7 @@ object PaymentInfo {
   }
 
   // After mutually signed HTLCs are present we need to parse and fail/fulfill them
-  def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag, minExpiry: Long) = Try {
+  def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag) = Try {
     val packet = parsePacket(privateKey = nodeSecret, associatedData = add.paymentHash, add.onionRoutingPacket)
     Tuple3(perHopPayloadCodec decode BitVector(packet.payload), packet.nextPacket, packet.sharedSecret)
   } map {
@@ -154,11 +154,6 @@ object PaymentInfo {
     case (Attempt.Successful(decoded), nextPacket, sharedSecret)
       if nextPacket.isLast && decoded.value.outgoingCltv != add.expiry =>
       failHtlc(sharedSecret, FinalIncorrectCltvExpiry(add.expiry), add)
-
-    case (Attempt.Successful(_), nextPacket, sharedSecret)
-      // We may not have enough time to enforce this on-chain
-      if nextPacket.isLast && add.expiry < minExpiry =>
-      failHtlc(sharedSecret, FinalExpiryTooSoon, add)
 
     case (Attempt.Successful(_), nextPacket, ss) if nextPacket.isLast => bag getPaymentInfo add.paymentHash match {
       // Payment request may not have a zero final sum which means it's a donation and should not be checked for overflow

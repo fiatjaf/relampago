@@ -104,7 +104,6 @@ class WalletApp extends Application { me =>
   }
 
   object ChannelManager {
-    var chainHeightObtained = false
     var currentBlocksLeft = Int.MaxValue
     val CMDLocalShutdown = CMDShutdown(None)
     val operationalListeners = Set(broadcaster, bag, GossipCatcher)
@@ -154,19 +153,25 @@ class WalletApp extends Application { me =>
       override def onChainDownloadStarted(peer: Peer, left: Int) = onChainDownload(left)
 
       def onChainDownload(blocksLeft: Int) = {
-        // No matter how many blocks are left, only inform chans on last block for performance reasons
-        if (!chainHeightObtained) runAnd(chainHeightObtained = true)(PaymentInfoWrap.resolvePending)
-        if (blocksLeft < 1) for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
+        // Should wait until all blocks are downloaded
+        // otherwise peers may lie about current height
         currentBlocksLeft = blocksLeft
+
+        if (currentBlocksLeft < 1) {
+          // Send out pending payments and report best height to channels
+          val cmdBestHeight = CMDBestHeight(broadcaster.currentHeight)
+          for (c <- all) c process cmdBestHeight
+          PaymentInfoWrap.resolvePending
+        }
       }
 
       def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = {
-        // Always attempt to extract a payment preimage by just assuming any
-        // incoming tx may contain it, also send all txs to chans
+        // Always attempt to extract a payment preimage by simply assuming
+        // any incoming tx may contain it, also send all txs to chans
 
-        val spent = CMDSpent(txj)
-        for (c <- all) c process spent
-        bag.extractPreimage(spent.tx)
+        val cmdSpent = CMDSpent(txj)
+        for (c <- all) c process cmdSpent
+        bag.extractPreimage(cmdSpent.tx)
       }
     }
 

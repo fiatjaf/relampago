@@ -102,7 +102,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
 
     val subtitleText =
-      if (currentPeerCount < 1 || !app.ChannelManager.chainHeightObtained) statusConnecting
+      if (currentPeerCount < 1) statusConnecting
       else if (app.ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay) statusOperational
       else app.plurOrZero(syncOps, app.ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
 

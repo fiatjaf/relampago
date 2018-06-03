@@ -295,12 +295,13 @@ object Commitments {
     else {
 
       val c1 = addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(_ + 1)
-      // Let's compute the current commitment *as seen by us* with this change taken into account
+      // We should both check if WE can accept another HTLC and if PEER can send another HTLC
+      // let's compute the current commitment *as seen by us* with this change taken into account
       val reduced = CommitmentSpec.reduce(c1.localCommit.spec, c1.localChanges.acked, c1.remoteChanges.proposed)
       val feesSat = if (c.localParams.isFunder) 0L else Scripts.commitTxFee(c.localParams.dustLimit, reduced).amount
       val totalInFlightMsat = UInt64(reduced.htlcs.map(_.add.amountMsat).sum)
 
-      // We should both check if WE can accept another HTLC and if PEER can send another HTLC
+      if (add.expiry <= broadcaster.currentHeight) throw new LightningException
       if (totalInFlightMsat > c.localParams.maxHtlcValueInFlightMsat) throw new LightningException
       if (reduced.htlcs.count(_.incoming) > c.localParams.maxAcceptedHtlcs) throw new LightningException
       if (reduced.toRemoteMsat / 1000L - feesSat - c.localParams.channelReserveSat < 0L) throw new LightningException
