@@ -20,7 +20,8 @@
     <Button
         style="@style/TransButton"
         android:id="@+id/createZygote"
-        android:text="@string/sets_zygote"/>
+        android:text="@string/sets_zygote"
+        android:enabled="false"/>
 
     <Button
         style="@style/TransButton"
