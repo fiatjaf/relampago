@@ -114,16 +114,21 @@ class WalletApp extends Application { me =>
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
     def canSendNow(msat: Long) = for {
-      // Find an open and currently online channel
-      // with enough funds to handle HTLC + on-chain fee
-
-      chan <- all
-      lim <- chan(_.localCommit.spec.feeratePerKw * 1000L)
-      if isOperational(chan) && chan.state == OPEN
-      if estimateCanSend(chan) - lim >= msat
+    // Open AND online AND can handle amount + on-chain fee
+      chan <- all if isOperational(chan) && chan.state == OPEN
+      feerateMsat <- chan(_.localCommit.spec.feeratePerKw * 1000L)
+      if estimateCanSend(chan) - feerateMsat >= msat
     } yield chan
 
-    def frozenInFlightHashes = all.diff(notClosingOrRefunding).flatMap(inFlightHtlcs).map(_.add.paymentHash)
+    def frozenInFlightHashes = for {
+      chan <- all if chan.state == Channel.CLOSING
+      theirDust <- chan(_.remoteParams.dustLimitSatoshis).toList
+      // Frozen means a channel has been broken and we have a non-dust HTLC
+      // which will either be taken by peer with us getting a payment preimage
+      // or it will eventually be taken by us and thus fulfilled on-chain
+      htlc <- inFlightHtlcs(chan) if htlc.add.amountMsat > theirDust
+    } yield htlc.add.paymentHash
+
     def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(_.add.paymentHash)
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
