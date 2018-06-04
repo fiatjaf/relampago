@@ -248,9 +248,14 @@ object BadEntityWrap {
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
-    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, rd.firstMsat)
-    val badNodes \ badChanIds = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
-    OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, badNodes, badChanIds.map(_.toLong), from, targetId)
+    val cursor = db.select(BadEntityTable.selectSql, params = System.currentTimeMillis, rd.firstMsat)
+    val badNodes \ badChans = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
+    val chansSet = for (shortChanId: String <- badChans.toSet) yield shortChanId.toLong
+    val fromSet = for (peerKey: PublicKey <- from.toSet) yield peerKey.toString
+
+    // We subtract peer keys set from bad nodes set because it may happen that blacklisted node becomes our peer
+    val request = OutRequest(rd.firstMsat / 1000L, badNodes.toSet diff fromSet, chansSet, fromSet, targetId.toString)
+    OlympusWrap findRoutes request
   }
 }
 

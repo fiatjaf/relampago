@@ -110,13 +110,11 @@ class Connector(val url: String) extends OlympusProvider {
       case _ => throw new ProtocolException
     }
 
-  def http(way: String) = post(s"$url/$way", true)
-    .trustAllCerts.trustAllHosts.connectTimeout(15000)
-
   def getRates = ask[Result]("rates/get")
   def getBlock(hash: String) = ask[BlockHeightAndTxs]("block/get", "hash" -> hash)
   def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getChildTxs(txIds: BinaryDataSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
   def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.hex)
+  def http(requestPath: String) = post(s"$url/$requestPath", true).trustAllCerts.trustAllHosts.connectTimeout(15000)
 }
