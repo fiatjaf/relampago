@@ -1,11 +1,13 @@
 package com.lightning.walletapp
 
+import spray.json._
 import me.relex.circleindicator._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.LNParams.broadcaster.getStatus
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import android.view.View.OnTouchListener
@@ -16,9 +18,9 @@ import java.util.Date
 
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
+import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import android.widget.{ArrayAdapter, Button, ListView}
-import com.lightning.walletapp.ln.Tools.{none, wrap}
 
 
 class LNOpsActivity extends TimerActivity { me =>
@@ -94,6 +96,11 @@ class LNOpsActivity extends TimerActivity { me =>
     case otherwise => true
   }
 
+  def export(chanData: ChannelData) = chanData match {
+    case some: HasCommitments => me share some.toJson.toString
+    case otherwise => app toast err_no_data
+  }
+
   def startedBy(c: ClosingData) = {
     val byRemote = c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty
     if (byRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
@@ -119,6 +126,10 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
     val started = me time new Date(chan(_.startedAt).get)
     val capacity = chan(_.commitInput.txOut.amount).get
     val alias = chan.data.announce.alias take 64
+
+    lnOpsDescription setOnLongClickListener new View.OnLongClickListener {
+      def onLongClick(chanDetails: View) = runAnd(true)(host export chan.data)
+    }
 
     // Order matters here
     lnOpsAction setOnClickListener onButtonTap {

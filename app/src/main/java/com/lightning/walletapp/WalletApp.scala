@@ -77,9 +77,9 @@ class WalletApp extends Application { me =>
     Utils.fiatName = prefs.getString(AbstractKit.FIAT_TYPE, Utils.strDollar)
   }
 
-  def setBuffer(text: String, andNotify: Boolean = true) = {
+  def setBuffer(text: String) = {
     clipboardManager setPrimaryClip ClipData.newPlainText("wallet", text)
-    if (andNotify) me toast getString(copied_to_clipboard).format(text)
+    me toast getString(copied_to_clipboard).format(text)
   }
 
   def mkNodeAnnouncement(nodeId: PublicKey, host: String, port: Int) = {
