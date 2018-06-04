@@ -126,7 +126,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       // so choose the currently largest value
 
       val maxCap = Satoshi(16777215L)
-      val minCap = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, 250000L) * 1000L)
+      val minCap = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, 300000L) * 1000L)
       val canSend = MilliSatoshi(math.min(app.kit.conf1Balance.value, maxCap.amount) * 1000L)
 
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
