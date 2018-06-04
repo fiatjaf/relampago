@@ -114,7 +114,7 @@ class WalletApp extends Application { me =>
     def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
 
     def canSendNow(msat: Long) = for {
-    // Open AND online AND can handle amount + on-chain fee
+      // Open AND online AND can handle amount + on-chain fee
       chan <- all if isOperational(chan) && chan.state == OPEN
       feerateMsat <- chan(_.localCommit.spec.feeratePerKw * 1000L)
       if estimateCanSend(chan) - feerateMsat >= msat

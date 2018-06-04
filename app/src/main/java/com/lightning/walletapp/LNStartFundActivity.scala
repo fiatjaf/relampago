@@ -23,7 +23,7 @@ import android.app.AlertDialog
 import java.util.TimerTask
 import android.os.Bundle
 
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Script}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi, Script}
 import org.bitcoinj.core.{Coin, TransactionOutput}
 import android.widget.{ImageButton, TextView}
 import scala.util.{Failure, Success, Try}
@@ -122,16 +122,17 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def askForFunding(their: Init): TimerTask = UITask {
-      // Current feerate may be higher than hard capacity so choose the currently largest value
-      val minCapacity = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, 250000L) * 1000L)
-      val maxCapacity = MilliSatoshi(math.min(app.kit.conf1Balance.value, 16777215L) * 1000L)
-      val canSend = denom withSign app.kit.conf1Balance
-      val minHuman = denom withSign minCapacity
-      val maxHuman = denom withSign maxCapacity
+      // Current feerate may be higher than hard capacity
+      // so choose the currently largest value
+
+      val maxCap = Satoshi(16777215L)
+      val minCap = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, 250000L) * 1000L)
+      val canSend = MilliSatoshi(math.min(app.kit.conf1Balance.value, maxCap.amount) * 1000L)
 
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-      val rateManager = new RateManager(getString(amount_hint_newchan).format(minHuman, maxHuman, canSend), content)
+      val txt = getString(amount_hint_newchan).format(denom withSign minCap, denom withSign maxCap, denom withSign canSend)
       val dummyKey = derivePrivateKey(LNParams.extendedCloudKey, System.currentTimeMillis :: 0L :: Nil).publicKey
+      val rateManager = new RateManager(txt, content)
 
       def next(msat: MilliSatoshi) = new TxProcessor {
         val dummyScript = pubKeyScript(dummyKey, dummyKey)
@@ -155,13 +156,13 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       def askAttempt(alert: AlertDialog) = rateManager.result match {
-        case Success(ms) if ms > maxCapacity => app toast dialog_sum_big
-        case Success(ms) if ms < minCapacity => app toast dialog_sum_small
+        case Success(ms) if ms < minCap => app toast dialog_sum_small
+        case Success(ms) if ms > canSend => app toast dialog_sum_big
         case Failure(reason) => app toast dialog_sum_empty
         case Success(ms) => rm(alert)(next(ms).start)
       }
 
-      def useMax = rateManager setSum Try(maxCapacity)
+      def useMax = rateManager setSum Try(canSend)
       val bld = baseBuilder(getString(ln_ops_start_fund_title).html, content).setNeutralButton("max", null)
       val button = mkCheckForm(askAttempt, none, bld, dialog_next, dialog_cancel) getButton BUTTON_NEUTRAL
       button setOnClickListener onButtonTap(useMax)
