@@ -227,6 +227,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
+    val shareLightningId = title.findViewById(R.id.shareLightningId).asInstanceOf[Button]
     val stateContent = title.findViewById(R.id.stateContent).asInstanceOf[TextView]
     val denomChoiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
     val allDenominations = getResources.getStringArray(R.array.denoms).map(_.html)
@@ -244,6 +245,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
     denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
     stateContent setText s"${coloredIn apply walletTotalSum}<br><small>$inFiatTotal</small>".html
+    shareLightningId setOnClickListener onButtonTap(me share LNParams.nodePublicKey.toString)
     showForm(negBuilder(dialog_ok, title, form).create)
   }
 
