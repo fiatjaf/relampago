@@ -135,8 +135,10 @@ trait TimerActivity extends AppCompatActivity { me =>
   def showForm(alertDialog: AlertDialog) = {
     // This may be called after a host activity is destroyed and thus it may throw
     alertDialog.getWindow.getAttributes.windowAnimations = R.style.SlidingDialog
-    alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
     try alertDialog.show catch none
+
+    // Could be run on tablets so constrain max window size
+    alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
     alertDialog
   }
 
