@@ -26,8 +26,8 @@ import rx.lang.scala.{Observable => Obs}
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
-  private[this] var inFlightPayments = Map.empty[BinaryData, RoutingData]
-  private[this] var unsent = Map.empty[BinaryData, RoutingData]
+  var inFlightPayments = Map.empty[BinaryData, RoutingData]
+  var unsent = Map.empty[BinaryData, RoutingData]
 
   def addPendingPayment(rd: RoutingData) = {
     // Add payment to unsents and try to resolve it

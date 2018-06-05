@@ -181,6 +181,7 @@
     <string name="ln_share_hash">Share Payment Hash</string>
     <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_share_ln_id">Share Lightning Node ID</string>
+    <string name="ln_share_routing">Share routing details</string>
 
     <string name="ln_status_peer">Select peer</string>
     <string name="ln_status_none">No open channel found</string>

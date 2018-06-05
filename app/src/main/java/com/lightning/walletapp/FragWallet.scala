@@ -219,6 +219,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val humanStatus = s"<strong>${paymentStates apply info.actualStatus}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
+      val paymentRouting = detailsWrapper.findViewById(R.id.paymentRouting).asInstanceOf[Button]
       val paymentProof = detailsWrapper.findViewById(R.id.paymentProof).asInstanceOf[Button]
       val paymentHash = detailsWrapper.findViewById(R.id.paymentHash).asInstanceOf[Button]
       paymentHash setOnClickListener onButtonTap(host share rd.paymentHashString)
@@ -233,8 +234,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       if (info.actualStatus == SUCCESS) {
         paymentHash setVisibility View.GONE
         paymentProof setVisibility View.VISIBLE
-        val listener = onButtonTap(host share makeProof)
-        paymentProof setOnClickListener listener
+        paymentProof setOnClickListener onButtonTap(host share makeProof)
+        PaymentInfoWrap.inFlightPayments get rd.pr.paymentHash foreach { rd1 =>
+          paymentRouting setOnClickListener onButtonTap(host share rd1.usedRoute.toString)
+          paymentRouting setVisibility View.VISIBLE
+        }
       }
 
       info.incoming match {
