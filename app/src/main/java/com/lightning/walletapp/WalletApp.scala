@@ -122,10 +122,10 @@ class WalletApp extends Application { me =>
 
     def frozenInFlightHashes = for {
       chan <- all if chan.state == Channel.CLOSING
-      theirDust <- chan(_.remoteParams.dustLimitSatoshis).toList
+      theirDust <- chan(_.remoteParams.dustLimitSatoshis * 1000L).toList
       // Frozen means a channel has been broken and we have a non-dust HTLC
       // which will either be taken by peer with us getting a payment preimage
-      // or it will eventually be taken by us and thus fulfilled on-chain
+      // or it will eventually be taken by us and thus fulfilled as on-chain tx
       htlc <- inFlightHtlcs(chan) if htlc.add.amountMsat > theirDust
     } yield htlc.add.paymentHash
 

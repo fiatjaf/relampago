@@ -37,7 +37,12 @@ case class DescriptionHashTag(hash: BinaryData) extends Tag {
 }
 
 case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
-               htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long)
+               htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) {
+
+  def humanDetails = s"""
+    Node ID: $nodeId, channel ID: $shortChannelId, expiry delta: $cltvExpiryDelta blocks,
+    routing fee: ${feeProportionalMillionths / 10000}% of sum + $feeBaseMsat msat"""
+}
 
 case class RoutingInfoTag(route: PaymentRoute) extends Tag {
   def toInt5s: Int5Seq = encode(Bech32.eight2five(route flatMap pack), 'r')
