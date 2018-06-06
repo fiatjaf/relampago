@@ -8,6 +8,7 @@ import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Sha256Hash
 import fr.acinq.bitcoin.BinaryData
+import java.util.Collections
 
 
 object LocalBroadcaster extends Broadcaster {
@@ -52,9 +53,9 @@ object LocalBroadcaster extends Broadcaster {
     } chan process CMDConfirmed(txj)
 
     case (_, wait: WaitFundingDoneData, _, _) =>
-      // Watch funding script, broadcast funding tx
-      app.kit watchFunding wait.commitments
-      app.kit blockingSend wait.fundingTx
+      val fundingScript = wait.commitments.commitInput.txOut.publicKeyScript
+      app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
+      app.kit.blockingSend(wait.fundingTx)
 
     case (chan, norm: NormalData, OFFLINE, OPEN) =>
       // Updated feerates may arrive sooner then channel gets open

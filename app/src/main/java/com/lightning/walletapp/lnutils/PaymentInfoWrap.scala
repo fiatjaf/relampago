@@ -8,7 +8,9 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
+import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -18,6 +20,7 @@ import com.lightning.walletapp.MainActivity
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import com.lightning.walletapp.R
+import java.util.Collections
 
 import android.app.{AlarmManager, NotificationManager, PendingIntent}
 import android.content.{BroadcastReceiver, Context, Intent}
@@ -171,7 +174,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onProcessSuccess = {
     case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
-      // Mutual tx has enough confirmations or hard timeout has passed out
+      val fundingScript = close.commitments.commitInput.txOut.publicKeyScript
+      app.kit.wallet.removeWatchedScripts(Collections singletonList fundingScript)
+      app.kit.wallet.removeWatchedScripts(app.kit closingPubKeyScripts close)
       db.change(ChannelTable.killSql, close.commitments.channelId)
 
     case (_, _: NormalData, _: UpdateAddHtlc) =>

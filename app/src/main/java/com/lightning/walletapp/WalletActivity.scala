@@ -17,6 +17,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import scala.util.{Failure, Try}
+import java.util.{Collections, Date}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import android.provider.Settings.{System => FontSystem}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
@@ -38,7 +39,6 @@ import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import android.net.Uri
-import java.util.Date
 import java.io.File
 
 
@@ -283,9 +283,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
               // Now throw it away if it is already present in a list of local channels
               if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
-              chan = app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, bootstrap = refundingData)
-              ok = app.kit watchFunding refundingData.commitments
-            } app.ChannelManager.all +:= chan
+              ok = app.kit.wallet.addWatchedScripts(Collections singletonList refundingData.commitments.commitInput.txOut.publicKeyScript)
+            } app.ChannelManager.all +:= app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
             app.ChannelManager.initConnect
             // Inform if not fine
           }, onFail)

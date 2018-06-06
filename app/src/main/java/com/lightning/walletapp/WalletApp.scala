@@ -185,15 +185,12 @@ class WalletApp extends Application { me =>
       def STORE(data: HasCommitments) = runAnd(data)(ChannelWrap put data)
 
       def CLOSEANDWATCH(cd: ClosingData) = {
-        val commitTxs = cd.localCommit.map(_.commitTx) ++ cd.remoteCommit.map(_.commitTx) ++ cd.nextRemoteCommit.map(_.commitTx)
-        repeat(OlympusWrap getChildTxs commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, Tools.errlog)
-        // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
-        kit.watchScripts(commitTxs.flatMap(_.txOut).map(_.publicKeyScript) map bitcoinLibScript2bitcoinjScript)
-        BECOME(STORE(cd), CLOSING)
-
         val tier12txs = for (state <- cd.tier12States) yield state.txn
-        val act = CloudAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
-        if (tier12txs.nonEmpty) OlympusWrap tellClouds act
+        if (tier12txs.nonEmpty) OlympusWrap tellClouds CloudAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
+        repeat(OlympusWrap getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
+        // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
+        kit.wallet.addWatchedScripts(kit closingPubKeyScripts cd)
+        BECOME(STORE(cd), CLOSING)
       }
 
       def ASKREFUNDTX(ref: RefundingData) = {
@@ -266,10 +263,14 @@ class WalletApp extends Application { me =>
     def currentAddress = wallet currentAddress KeyPurpose.RECEIVE_FUNDS
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE // Returns all utxos
     def conf1Balance = wallet getBalance BalanceType.AVAILABLE_SPENDABLE // Uses coin selector
-    def blockingSend(tx: Transaction) = peerGroup.broadcastTransaction(tx, 1).broadcast.get.toString
-    def watchFunding(cs: Commitments) = watchScripts(cs.commitInput.txOut.publicKeyScript :: Nil)
-    def watchScripts(scripts: ScriptSeq) = wallet addWatchedScripts scripts.asJava
+    def blockingSend(txj: Transaction) = peerGroup.broadcastTransaction(txj, 1).broadcast.get.toString
     def shutDown = none
+
+    def closingPubKeyScripts(cd: ClosingData) = {
+      val scripts = cd.commitTxs.flatMap(_.txOut).map(_.publicKeyScript)
+      val jScripts = for (scr <- scripts) yield bitcoinLibScript2bitcoinjScript(scr)
+      jScripts.asJava
+    }
 
     def sign(unsigned: SendRequest) = {
       // Create a tx ready for broadcast
