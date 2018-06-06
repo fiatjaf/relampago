@@ -39,9 +39,9 @@ case class DescriptionHashTag(hash: BinaryData) extends Tag {
 case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
                htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
-  def humanDetails = s"""
-    Node ID: $nodeId, channel ID: $shortChannelId, expiry delta: $cltvExpiryDelta blocks,
-    routing fee: ${feeProportionalMillionths / 10000}% of sum + $feeBaseMsat msat"""
+  def humanDetails =
+    s"Node ID: $nodeId, channel ID: $shortChannelId, expiry delta: $cltvExpiryDelta blocks, " +
+      s"routing fee: ${feeProportionalMillionths / 10000D}% of sum + baseline $feeBaseMsat msat"
 }
 
 case class RoutingInfoTag(route: PaymentRoute) extends Tag {
