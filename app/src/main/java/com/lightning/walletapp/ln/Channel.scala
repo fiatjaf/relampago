@@ -33,8 +33,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     override def settled(cs: Commitments) = for (lst <- listeners) lst settled cs
   }
 
-  def SEND(msg: LightningMessage): Unit
   def ASKREFUNDTX(ref: RefundingData): Unit
+  def ASKREFUNDPEER(some: HasCommitments, point: Point)
+
+  def SEND(msg: LightningMessage): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def STORE(content: HasCommitments): HasCommitments
   def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
@@ -303,8 +305,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (ref: RefundingData, cr: ChannelReestablish, REFUNDING) =>
         cr.myCurrentPerCommitmentPoint -> ref.remoteLatestPoint match {
-          case _ \ Some(ourSavedPoint) => storeRefund(ref, ourSavedPoint)
-          case Some(theirPoint) \ _ => storeRefund(ref, theirPoint)
+          case _ \ Some(ourSavedPoint) => ASKREFUNDPEER(ref, ourSavedPoint)
+          case Some(theirPoint) \ _ => ASKREFUNDPEER(ref, theirPoint)
           case _ =>
         }
 
@@ -312,7 +314,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // GUARD: we have started in NORMAL state but their nextRemoteRevocationNumber is too far away
         if norm.commitments.localCommit.index < cr.nextRemoteRevocationNumber && cr.myCurrentPerCommitmentPoint.isDefined =>
         val secret = Generators.perCommitSecret(norm.commitments.localParams.shaSeed, cr.nextRemoteRevocationNumber - 1)
-        if (cr.yourLastPerCommitmentSecret contains secret) storeRefund(norm, cr.myCurrentPerCommitmentPoint.get)
+        if (cr.yourLastPerCommitmentSecret contains secret) ASKREFUNDPEER(norm, cr.myCurrentPerCommitmentPoint.get)
         else throw new LightningException
 
 
@@ -482,12 +484,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
     // Change has been successfully processed
     events onProcessSuccess Tuple3(me, data, change)
-  }
-
-  private def storeRefund(some: HasCommitments, point: Point) = {
-    val msg = "please publish your local commitment" getBytes "UTF-8"
-    val ref = RefundingData(some.announce, Some(point), some.commitments)
-    BECOME(me STORE ref, REFUNDING) SEND Error(ref.commitments.channelId, msg)
   }
 
   private def makeFundingLocked(cs: Commitments) = {

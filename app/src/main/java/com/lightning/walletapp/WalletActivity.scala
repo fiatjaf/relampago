@@ -278,13 +278,10 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
             for {
               encrypted <- backups
-              jsonDecoded = AES.decode(encrypted, cloudSecret)
-              refundingData <- Try(jsonDecoded) map to[RefundingData]
-
-              // Now throw it away if it is already present in a list of local channels
-              if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains refundingData.commitments.channelId)
-              ok = app.kit.wallet.addWatchedScripts(Collections singletonList refundingData.commitments.commitInput.txOut.publicKeyScript)
-            } app.ChannelManager.all +:= app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, refundingData)
+              ref <- Try apply AES.decode(encrypted, cloudSecret) map to[RefundingData]
+              if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains ref.commitments.channelId)
+            } app.ChannelManager.all +:= app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, ref)
+            // Now reconnect all fresh created channels
             app.ChannelManager.initConnect
             // Inform if not fine
           }, onFail)

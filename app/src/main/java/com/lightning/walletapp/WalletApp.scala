@@ -3,6 +3,7 @@ package com.lightning.walletapp
 import R.string._
 import spray.json._
 import org.bitcoinj.core._
+
 import scala.concurrent.duration._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
@@ -15,28 +16,32 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import rx.lang.scala.{Observable => Obs}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
+
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.walletapp.lnutils.olympus.CloudAct
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
-import fr.acinq.bitcoin.Crypto.PublicKey
+import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
+
 import fr.acinq.bitcoin.Crypto
 import android.app.Application
 import android.widget.Toast
+
 import scala.util.Try
 import java.io.File
+import java.util.Collections
 
 
 class WalletApp extends Application { me =>
@@ -197,6 +202,16 @@ class WalletApp extends Application { me =>
         // Failsafe check in case if we are still in REFUNDING state after app is restarted
         val txsObs = OlympusWrap getChildTxs Seq(ref.commitments.commitInput.outPoint.txid)
         txsObs.foreach(txs => for (tx <- txs) self process CMDSpent(tx), Tools.errlog)
+      }
+
+      def ASKREFUNDPEER(some: HasCommitments, point: Point) = {
+        val msg = "please publish your local commitment" getBytes "UTF-8"
+        val ref = RefundingData(some.announce, Some(point), some.commitments)
+        val fundingScript = some.commitments.commitInput.txOut.publicKeyScript
+
+        // Start watching for remote spend and ask peer to broadcast it
+        app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
+        BECOME(STORE(ref), REFUNDING) SEND Error(ref.commitments.channelId, msg)
       }
 
       // First add listeners, then call
