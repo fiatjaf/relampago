@@ -4,6 +4,7 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
+import com.lightning.walletapp.ln.wire.ChannelReestablish
 import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Sha256Hash
@@ -37,22 +38,26 @@ object LocalBroadcaster extends Broadcaster {
 
   override def onProcessSuccess = {
     case (_, close: ClosingData, _: Command) =>
+      // Repeatedly spend everything we can in this state in case it was unsuccessful before
       val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockingSend tx catch none
+
+    case (chan, wait: WaitFundingDoneData, _: ChannelReestablish) if wait.our.isEmpty =>
+      // CMDConfirmed may be sent to an offline channel and there will be no reaction
+      // so always double check a funding state here as a failsafe measure
+      // but only if we don't have our FundingLocked defined already
+
+      for {
+        txj <- getTx(wait.fundingTx.txid)
+        depth \ isDead = getStatus(wait.fundingTx.txid)
+        if depth >= LNParams.minDepth && !isDead
+      } chan process CMDConfirmed(txj)
   }
 
   override def onBecome = {
-    case (chan, wait: WaitFundingDoneData, OFFLINE, WAIT_FUNDING_DONE) => for {
-      // CMDConfirmed may be sent to an offline channel and there will be no reaction
-      // so always double check a funding state here as a failsafe measure
-
-      txj <- getTx(wait.fundingTx.txid)
-      depth \ isDead = getStatus(wait.fundingTx.txid)
-      if depth >= LNParams.minDepth && !isDead
-    } chan process CMDConfirmed(txj)
-
     case (_, wait: WaitFundingDoneData, _, _) =>
+      // Repeatedly send a funding tx in case it was unsuccessful before
       val fundingScript = wait.commitments.commitInput.txOut.publicKeyScript
       app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
       app.kit.blockingSend(wait.fundingTx)

@@ -73,7 +73,6 @@ class WalletApp extends Application { me =>
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
   def toAddress(rawText: String) = Address.fromString(app.params, rawText)
-  def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
 
   Utils.appReference = me
   override def onCreate = wrap(super.onCreate) {
@@ -101,9 +100,10 @@ class WalletApp extends Application { me =>
     private[this] val nodeLink = "([a-fA-F0-9]{66})@([a-zA-Z0-9:\\.\\-_]+):([0-9]+)".r
 
     def recordValue(rawText: String) = value = rawText match {
-      case raw if raw startsWith "bitcoin" => new BitcoinURI(params, raw)
-      case lnLink(pre, x) if notMixedCase(s"$pre$x") => PaymentRequest read s"$pre$x".toLowerCase
+      case _ if rawText startsWith "bitcoin" => new BitcoinURI(params, rawText)
+      case _ if rawText startsWith "BITCOIN" => new BitcoinURI(params, rawText.toLowerCase)
       case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), host, port.toInt)
+      case lnLink(pre, x) => PaymentRequest read s"$pre$x".toLowerCase
       case _ => toAddress(rawText)
     }
   }

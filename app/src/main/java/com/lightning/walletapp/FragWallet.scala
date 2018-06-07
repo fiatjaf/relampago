@@ -235,9 +235,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         paymentHash setVisibility View.GONE
         paymentProof setVisibility View.VISIBLE
         paymentProof setOnClickListener onButtonTap(host share makeProof)
-        PaymentInfoWrap.inFlightPayments get rd.pr.paymentHash foreach { rd1 =>
-          val detailsTxt = rd1.usedRoute.map(_.humanDetails).mkString("\n------\n")
-          paymentRouting setOnClickListener onButtonTap(host share detailsTxt)
+        for (rd1 <- PaymentInfoWrap.inFlightPayments get rd.pr.paymentHash if rd1.usedRoute.nonEmpty) {
+          val routingPathDetailsText = rd1.usedRoute.map(_.humanDetails) mkString "\n=================\n"
+          paymentRouting setOnClickListener onButtonTap(host share routingPathDetailsText)
           paymentRouting setVisibility View.VISIBLE
         }
       }
