@@ -394,11 +394,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         localShutdown, remoteShutdown, ClosingTxProposed(_, localClosingSigned) +: _, _),
         ClosingSigned(channelId, remoteClosingFee, remoteClosingSig), NEGOTIATIONS) =>
 
-        val ClosingTxProposed(closing, closingSigned) = Closing.makeClosing(commitments,
-          Satoshi(remoteClosingFee), localShutdown.scriptPubKey, remoteShutdown.scriptPubKey)
+        val ClosingTxProposed(closing, closingSigned) =
+          Closing.makeClosing(commitments, Satoshi(remoteClosingFee),
+            localShutdown.scriptPubKey, remoteShutdown.scriptPubKey)
 
-        val signedClose = Scripts.addSigs(closing, commitments.localParams.fundingPrivKey.publicKey,
-          commitments.remoteParams.fundingPubkey, closingSigned.signature, remoteClosingSig)
+        val signedClose =
+          Scripts.addSigs(closing, commitments.localParams.fundingPrivKey.publicKey,
+            commitments.remoteParams.fundingPubkey, closingSigned.signature, remoteClosingSig)
 
         Scripts checkValid signedClose match {
           case Failure(why) => throw new LightningException(why.getMessage)
