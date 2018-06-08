@@ -82,7 +82,6 @@
     <!-- menu and fab -->
     <string name="sets_manage_olympus">Manage Olympus servers</string>
     <string name="sets_chan_recover">Use channel recovery tool</string>
-    <string name="sets_zygote">Use wallet migration tool</string>
     <string name="sets_mnemonic">View mnemonic phrase</string>
     <string name="sets_rescan">Rescan blockchain</string>
 
