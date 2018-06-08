@@ -117,12 +117,11 @@ class OlympusActivity extends TimerActivity { me =>
     mkCheckForm(addAttempt, none, baseBuilder(getString(title), content), dialog_ok, dialog_cancel)
     def set(c: Cloud) = wrap(serverHostPort setText c.connector.url)(serverBackup setChecked c.isAuthEnabled)
 
-    def addAttempt(alert: AlertDialog) = {
-      val auth = if (serverBackup.isChecked) 1 else 0
-      val checker = Uri parse serverHostPort.getText.toString
-      val addressValid = checker.getHost != null && checker.getPort > 0
-      if (addressValid) next(checker.toString, auth)
-      if (addressValid) alert.dismiss
+    def addAttempt(alert: AlertDialog): Unit = {
+      val uriChecker = Uri parse serverHostPort.getText.toString
+      if (uriChecker.getHost == null || uriChecker.getPort < 80) return
+      next(uriChecker.toString, if (serverBackup.isChecked) 1 else 0)
+      alert.dismiss
     }
   }
 }

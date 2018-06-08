@@ -335,12 +335,8 @@ object Commitments {
   }
 
   def receiveFailMalformed(c: Commitments, fail: UpdateFailMalformedHtlc) = {
-    val found = getHtlcCrossSigned(c, incomingRelativeToLocal = false, fail.id)
-    val notBadOnion = (fail.failureCode & FailureMessageCodecs.BADONION) == 0
-    // A receiving node MUST fail a channel if BADONION bit is not set
-
-    if (notBadOnion) throw new LightningException
-    if (found.isEmpty) throw new LightningException
+    if (fail.failureCode.&(FailureMessageCodecs.BADONION) == 0) throw new LightningException("BadOnion not set")
+    if (getHtlcCrossSigned(c, incomingRelativeToLocal = false, fail.id).isEmpty) throw new LightningException
     addRemoteProposal(c, fail)
   }
 

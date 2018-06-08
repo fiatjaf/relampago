@@ -360,7 +360,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def searchPays = new ReactLoader[PaymentInfo](host) {
       val consume = (vec: InfoVec) => runAnd(lnItems = vec map LNWrap)(updList(lnItems).run)
-      def createItem(rCursor: RichCursor) = bag toPaymentInfo rCursor
+      def createItem(richCursor: RichCursor) = bag toPaymentInfo richCursor
       def getCursor = bag byQuery lastQuery
     }
 

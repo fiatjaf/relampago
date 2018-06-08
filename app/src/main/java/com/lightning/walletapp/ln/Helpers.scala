@@ -42,14 +42,14 @@ object Helpers {
     val remoteDelayedPaymentPubkey = derivePubKey(remoteParams.delayedPaymentBasepoint, remotePerCommitmentPoint)
     val remoteHtlcPubkey = derivePubKey(remoteParams.htlcBasepoint, remotePerCommitmentPoint)
 
-    val commitTx = Scripts.makeCommitTx(commitmentInput, commitTxNumber, remoteParams.paymentBasepoint,
-      localParams.paymentBasepoint, !localParams.isFunder, remoteParams.dustLimitSat, remoteRevocationPubkey,
-      localParams.toSelfDelay, remoteDelayedPaymentPubkey, localPaymentPubkey, remoteHtlcPubkey,
-      localHtlcPubkey, spec)
+    val commitTx =
+      Scripts.makeCommitTx(commitmentInput, commitTxNumber, remoteParams.paymentBasepoint, localParams.paymentBasepoint,
+        !localParams.isFunder, remoteParams.dustLimitSat, remoteRevocationPubkey, localParams.toSelfDelay, remoteDelayedPaymentPubkey,
+        localPaymentPubkey, remoteHtlcPubkey, localHtlcPubkey, spec)
 
-    val htlcTimeoutTxs \ htlcSuccessTxs = Scripts.makeHtlcTxs(commitTx.tx, remoteParams.dustLimitSat,
-      remoteRevocationPubkey, localParams.toSelfDelay, remoteDelayedPaymentPubkey, remoteHtlcPubkey,
-      localHtlcPubkey, spec)
+    val htlcTimeoutTxs \ htlcSuccessTxs =
+      Scripts.makeHtlcTxs(commitTx.tx, remoteParams.dustLimitSat, remoteRevocationPubkey,
+        localParams.toSelfDelay, remoteDelayedPaymentPubkey, remoteHtlcPubkey, localHtlcPubkey, spec)
 
     (commitTx, htlcTimeoutTxs, htlcSuccessTxs,
       remoteHtlcPubkey, remoteRevocationPubkey)
