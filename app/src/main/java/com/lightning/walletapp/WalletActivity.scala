@@ -212,13 +212,12 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     else me goTo classOf[LNOpsActivity]
   }
 
-  def goAddChannel(top: View) =
-    if (app.ChannelManager.all.isEmpty) {
-      val price = MilliSatoshi(amount = 1000000L)
-      val humanPrice = s"${coloredIn apply price} <font color=#999999>${msatInFiatHuman apply price}</font>"
-      val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
-      mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
-    } else me goTo classOf[LNStartActivity]
+  val tokensPrice = MilliSatoshi(1000000L)
+  def goAddChannel(top: View) = if (app.ChannelManager.all.isEmpty && OlympusWrap.hasAuthEnabled) {
+    val humanPrice = s"${coloredIn apply tokensPrice} <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
+    val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
+    mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
+  } else me goTo classOf[LNStartActivity]
 
   def showDenomChooser = {
     val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum

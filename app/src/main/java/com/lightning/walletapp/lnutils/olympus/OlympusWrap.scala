@@ -54,6 +54,7 @@ object OlympusWrap extends OlympusProvider {
   // and final filtering is done inside of each available cloud
   var clouds = RichCursor(db select OlympusTable.selectAllSql) vec toCloud
   def tellClouds(data: Any) = for (cloud <- clouds) cloud doProcess data
+  def hasAuthEnabled = clouds.exists(_.isAuthEnabled)
 
   // SQL interface
 
@@ -67,9 +68,9 @@ object OlympusWrap extends OlympusProvider {
     val auth = rc int OlympusTable.auth
     val id = rc string OlympusTable.identifier
     val removable = rc int OlympusTable.removable
-    val saved = to[CloudData](rc string OlympusTable.data)
+    val stored = to[CloudData](rc string OlympusTable.data)
     val connector = new Connector(rc string OlympusTable.url)
-    new Cloud(id, connector, auth, removable) { data = saved }
+    new Cloud(id, connector, auth, removable) { data = stored }
   }
 
   // Olympus RPC interface
