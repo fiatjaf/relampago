@@ -21,7 +21,7 @@
         style="@style/TransButton"
         android:id="@+id/createZygote"
         android:text="@string/sets_zygote"
-        android:enabled="false"/>
+        android:visibility="gone"/>
 
     <Button
         style="@style/TransButton"
