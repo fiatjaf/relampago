@@ -20,8 +20,9 @@ import scala.util.{Failure, Try}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import android.provider.Settings.{System => FontSystem}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
+import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
@@ -31,10 +32,14 @@ import org.bitcoinj.store.SPVBlockStore
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+import com.google.common.io.Files
 import org.bitcoinj.core.Address
+import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
+import android.net.Uri
 import java.util.Date
+import java.io.File
 
 
 trait SearchBar { me =>
@@ -252,6 +257,7 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
+    val createZygote = form.findViewById(R.id.createZygote).asInstanceOf[Button]
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
     val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
     recoverFunds.setEnabled(app.ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
@@ -289,6 +295,25 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       // Just show a list of available Olympus servers
       def proceed = me goTo classOf[OlympusActivity]
       rm(menu)(proceed)
+    }
+
+    createZygote setOnClickListener onButtonTap {
+      def openForm = mkForm(ok = <(createZygote, onFail) { zygote =>
+        val zygoteFileShare = new Intent setAction Intent.ACTION_SEND setType "text/plain"
+        me startActivity zygoteFileShare.putExtra(Intent.EXTRA_STREAM, Uri fromFile zygote)
+      }, none, baseTextBuilder(getString(zygote_details).html), dialog_next, dialog_cancel)
+
+      def createZygote = {
+        val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
+        val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
+        val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
+        val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
+        val zygote = FileOps shell s"Bitcoin Wallet Snapshot ${new Date}.txt"
+        Files.write(encoded.require.toByteArray, zygote)
+        zygote
+      }
+
+      rm(menu)(openForm)
     }
 
     rescanWallet setOnClickListener onButtonTap {
