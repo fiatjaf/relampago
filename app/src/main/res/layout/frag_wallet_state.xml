@@ -23,11 +23,4 @@
     </LinearLayout>
 
     <View style="@style/GrayDivider"/>
-
-    <Button
-        style="@style/TransButton"
-        android:id="@+id/shareLightningId"
-        android:text="@string/ln_share_ln_id"/>
-
-    <View style="@style/GrayDivider"/>
 </LinearLayout>

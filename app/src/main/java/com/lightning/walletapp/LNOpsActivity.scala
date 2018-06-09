@@ -18,9 +18,9 @@ import java.util.Date
 
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
-import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import android.widget.{ArrayAdapter, Button, ListView}
+import com.lightning.walletapp.ln.Tools.{none, wrap}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 
 
 class LNOpsActivity extends TimerActivity { me =>
@@ -28,8 +28,8 @@ class LNOpsActivity extends TimerActivity { me =>
   def INIT(s: Bundle) = if (app.isAlive) fillViewPager else me exitTo classOf[MainActivity]
   lazy val chanPager = findViewById(R.id.chanPager).asInstanceOf[android.support.v4.view.ViewPager]
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
-  lazy val localChanCache = for (c <- app.ChannelManager.all if me canDisplay c.data) yield c
-
+  lazy val localChanCache = for (chan <- app.ChannelManager.all if me canDisplay chan.data) yield chan
+  lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
   lazy val inFlightPayments = getResources getStringArray R.array.ln_in_flight_payments
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
@@ -58,13 +58,11 @@ class LNOpsActivity extends TimerActivity { me =>
   }
 
   val touchListener = new OnTouchListener {
-    def onTouch(view: View, event: MotionEvent) = {
-      if (event.getAction == MotionEvent.ACTION_DOWN) {
-        val coords = event.getX / chanPagerIndicator.getWidth
-        val position = (localChanCache.size * coords).toInt
-        chanPager.setCurrentItem(position, false)
-      }
-
+    def onTouch(circle: View, event: MotionEvent): Boolean = {
+      if (event.getAction != MotionEvent.ACTION_DOWN) return false
+      val coords = event.getX / chanPagerIndicator.getWidth
+      val position = (localChanCache.size * coords).toInt
+      chanPager.setCurrentItem(position, false)
       false
     }
   }
@@ -78,7 +76,7 @@ class LNOpsActivity extends TimerActivity { me =>
   def bundledFrag(pos: Int) = {
     val frag = new ChanDetailsFrag
     val arguments: Bundle = new Bundle
-    arguments.putInt("position", pos)
+    arguments.putInt("chanPosition", pos)
     frag setArguments arguments
     frag
   }
@@ -117,191 +115,195 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
   import host._
 
   override def onViewCreated(view: View, state: Bundle) = {
+    val chan = localChanCache(getArguments getInt "chanPosition")
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
     val lnOpsDescription = Utils clickableTextField view.findViewById(R.id.lnOpsDescription)
+    def warnAndForceClose = warnAndMaybeClose(host getString ln_chan_force_details)
 
-    val chan = localChanCache(getArguments getInt "position")
-    val nodeId = humanNode(chan.data.announce.nodeId.toString, "<br>")
-    // It is assumed that all channels here always have commitments
-    val started = me time new Date(chan(_.startedAt).get)
-    val capacity = chan(_.commitInput.txOut.amount).get
-    val alias = chan.data.announce.alias take 64
+    def warnAndMaybeClose(warning: String) =
+      mkForm(chan process app.ChannelManager.CMDLocalShutdown, none,
+        baseTextBuilder(warning.html), dialog_ok, dialog_cancel)
 
-    lnOpsDescription setOnLongClickListener new View.OnLongClickListener {
-      def onLongClick(chanDetails: View) = runAnd(true)(host export chan.data)
-    }
+    chan { cs =>
+      val alias = chan.data.announce.alias take 16
+      val started = me time new Date(cs.startedAt)
+      val capacity = cs.commitInput.txOut.amount
 
-    // Order matters here
-    lnOpsAction setOnClickListener onButtonTap {
-      val openButCurrentlyOffline = isOperational(chan)
-      val openAndOnline = openButCurrentlyOffline && chan.state == OPEN
-      val coopClosePossible = openAndOnline && inFlightHtlcs(chan).isEmpty
+      def showCoopOptions = {
+        val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+        val alert = showForm(negBuilder(dialog_cancel, host getString ln_chan_actions, lst).create)
+        lst setAdapter new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, chanActions)
+        lst setDividerHeight 0
+        lst setDivider null
 
-      if (coopClosePossible) showCoopOptions
-      else if (openAndOnline) showWarning(host getString ln_chan_close_inflight_details)
-      else if (openButCurrentlyOffline) showWarning(host getString ln_chan_force_offline_details)
-      else showWarning(host getString ln_chan_force_details)
-    }
+        def proceedCoopCloseOrWarn(startCoopClosing: => Unit) = rm(alert) {
+          val fundingOrOpenButOffline = isOperational(chan) || isOpening(chan)
+          val fundingOrOpenAndOnline = fundingOrOpenButOffline && chan.state != OFFLINE
 
-    def showCoopOptions = {
-      val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-      val alert = showForm(negBuilder(dialog_cancel, host getString ln_chan_close_details, lst).create)
-      val options = Array(host getString ln_chan_close_option_local, host getString ln_chan_close_option_address)
-      lst setAdapter new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, for (text <- options) yield text.html)
-      lst setOnItemClickListener onTap { case 0 => sendToLocalWallet case 1 => sendToAddress }
-      lst setDividerHeight 0
-      lst setDivider null
+          if (fundingOrOpenAndOnline && inFlightHtlcs(chan).isEmpty) startCoopClosing
+          else if (fundingOrOpenAndOnline) warnAndMaybeClose(host getString ln_chan_close_inflight_details)
+          else if (fundingOrOpenButOffline) warnAndMaybeClose(host getString ln_chan_force_offline_details)
+          else warnAndForceClose
+        }
 
-      def sendToLocalWallet = rm(alert) {
-        // Simple case: send refunding tx to this wallet
-        showWarning(host getString ln_chan_close_confirm_local)
-      }
+        def shareInfo = host share {
+          val c = cs.channelId.toString
+          val w = LNParams.nodePublicKey.toString
+          val p = chan.data.announce.nodeId.toString
+          s"Wallet: $w\n\nPeer: $p\n\nChannel: $c"
+        }
 
-      def sendToAddress = rm(alert) {
-        app.getBufferTry map app.toAddress match {
-          // Users have an option to provide a custom address
-          // to omit a useless intermediary in-wallet transaction
+        def closeToWallet = {
+          // Simple case: send refunding transaction to this wallet
+          warnAndMaybeClose(host getString ln_chan_close_confirm_local)
+        }
 
-          case Success(address) =>
-            val where = humanSix(address.toString)
-            val bld = baseBuilder(host getString action_ln_close, host.getString(ln_chan_close_confirm_address).format(where).html)
-            val customFinalPubKeyScript: Option[BinaryData] = Some(ScriptBuilder.createOutputScript(address).getProgram)
-            mkForm(chan process CMDShutdown(customFinalPubKeyScript), none, bld, dialog_ok, dialog_cancel)
+        def closeToAddress = {
+          app.getBufferTry map app.toAddress match {
+            // Users have an option to provide a custom address
+            // to omit a useless intermediary in-wallet transaction
 
-          case _ =>
-            // No address is present
-            app toast err_no_data
+            case Success(address) =>
+              val where = humanSix(address.toString)
+              val text = host.getString(ln_chan_close_confirm_address).format(where).html
+              val customFinalPubKeyScript: Option[BinaryData] = Some(ScriptBuilder.createOutputScript(address).getProgram)
+              mkForm(chan process CMDShutdown(customFinalPubKeyScript), none, baseTextBuilder(text), dialog_ok, dialog_cancel)
+
+            case _ =>
+              // No address is present
+              app toast err_no_data
+          }
+        }
+
+        lst setOnItemClickListener onTap {
+          case 3 => proceedCoopCloseOrWarn(closeToWallet)
+          case 2 => proceedCoopCloseOrWarn(closeToAddress)
+          case 1 => host export chan.data
+          case 0 => shareInfo
         }
       }
-    }
 
-    def showWarning(details: String) = {
-      val bld = baseBuilder(host getString action_ln_close, details.html)
-      mkForm(chan process app.ChannelManager.CMDLocalShutdown, none, bld, dialog_ok, dialog_cancel)
-    }
-
-    def manageOther = UITask {
-      // Just show basic channel info here since we don't know the specifics about this one
-      val text = basic.format(chan.state, alias, started, coloredIn apply capacity).html
-      lnOpsAction setVisibility View.GONE
-      lnOpsDescription setText text
-    }
-
-    def manageFunding(wait: WaitFundingDoneData) = UITask {
-      val fundingTxId = Commitments fundingTxid wait.commitments
-      val threshold = math.max(wait.commitments.remoteParams.minimumDepth, LNParams.minDepth)
-      lnOpsDescription setText host.getString(ln_ops_chan_opening).format(chan.state, alias, started,
-        coloredIn(capacity), app.plurOrZero(txsConfs, threshold), fundingTxId.toString,
-        humanStatus(LNParams.broadcaster getStatus fundingTxId), nodeId).html
-
-      // Initialize button
-      lnOpsAction setVisibility View.VISIBLE
-      lnOpsAction setText action_ln_close
-    }
-
-    def manageOpen = UITask {
-      val canSend = MilliSatoshi apply estimateCanSend(chan)
-      val canReceive = MilliSatoshi apply estimateCanReceive(chan)
-      val commitFee = Satoshi(chan(_.reducedRemoteState.feesSat) getOrElse 0L)
-      val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
-      val finalCanReceive = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-      lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, coloredIn(capacity), finalCanSend,
-        finalCanReceive, coloredOut(commitFee), app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size), nodeId).html
-
-      // Initialize button
-      lnOpsAction setVisibility View.VISIBLE
-      lnOpsAction setText action_ln_close
-    }
-
-    def manageNegotiations(cs: Commitments) = UITask {
-      val refundable = MilliSatoshi(cs.localCommit.spec.toLocalMsat)
-      val inFlight = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
-      lnOpsDescription setText negotiations.format(chan.state, alias, started,
-        coloredIn(capacity), coloredIn(refundable), inFlight).html
-
-      // Initialize button
-      lnOpsAction setVisibility View.VISIBLE
-      lnOpsAction setText action_ln_force
-    }
-
-    def manageClosing(close: ClosingData) = UITask {
-      // Show the best current closing with most confirmations
-      // since multiple different closings may be present at once
-      // or no closing at all in case like restoking a closed commit
-      val closedTimestamp = me time new Date(close.closedAt)
-      lnOpsAction setVisibility View.GONE
-
-      close.bestClosing match {
-        case Left(mutualClosingTx) =>
-          val fee = capacity - mutualClosingTx.allOutputsAmount
-          val refundable = MilliSatoshi(close.commitments.localCommit.spec.toLocalMsat) - fee
-          val view = commitStatus.format(mutualClosingTx.txid.toString, humanStatus apply getStatus(mutualClosingTx.txid), coloredOut apply fee)
-          val text = bilateralClosing.format(chan.state, alias, started, closedTimestamp, coloredIn(capacity), coloredIn(refundable), view)
-          lnOpsDescription setText text.html
-
-        case Right(info) =>
-          val tier12View = info.getState collect {
-            case ShowDelayed(_ \ true \ _, _, fee, amt) =>
-              val deadDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              host.getString(ln_ops_chan_unilateral_status_dead).format(deadDetails, coloredIn apply amt)
-
-            case ShowReady(_, fee, amt) =>
-              val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
-
-            case show @ ShowDelayed(_ \ false \ _, _, fee, amt) if show.isPublishable =>
-              // This fails if input is spent by our peer, happens when we publish a revoked commit
-              val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
-
-            case ShowDelayed(_ \ false \ left, _, fee, amt) =>
-              val leftDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-              statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
-          }
-
-          val startedByWhom = host getString startedBy(close)
-          val humanTier12View = tier12View take 2 mkString "<br><br>"
-          val status = humanStatus apply getStatus(info.commitTx.txid)
-          val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
-          val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
-          val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
-          lnOpsDescription setText unilateralClosing.format(chan.state, startedByWhom, alias, started,
-            closedTimestamp, coloredIn(capacity), commitView + refundsView).html
-      }
-    }
-
-    val detailsListener = new ChannelListener {
-      // Updates chan details to current chan state
-      // must be removed once fragment is finished
-
-      override def onProcessSuccess = {
-        // Simply update current UI on each new block
-        case (_, _, _: CMDBestHeight) => nullOnBecome(chan)
+      def manageOther = UITask {
+        // Just show basic channel info here since we don't know the specifics about it
+        val text = basic.format(chan.state, alias, started, coloredIn apply capacity).html
+        lnOpsAction setVisibility View.GONE
+        lnOpsDescription setText text
       }
 
-      override def onBecome = {
-        case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
-        case (_, _: NormalData, _, _) if isOperational(chan) => manageOpen.run
-        case (_, norm: NormalData, _, _) => manageNegotiations(norm.commitments).run
-        case (_, negs: NegotiationsData, _, _) => manageNegotiations(negs.commitments).run
-        case (_, close: ClosingData, _, _) => manageClosing(close).run
-        case otherwise => manageOther.run
+      def manageFunding(wait: WaitFundingDoneData) = UITask {
+        val fundingTxId = Commitments fundingTxid wait.commitments
+        val fundingStatus = humanStatus(LNParams.broadcaster getStatus fundingTxId)
+        val threshold = math.max(wait.commitments.remoteParams.minimumDepth, LNParams.minDepth)
+        lnOpsDescription setText host.getString(ln_ops_chan_opening).format(chan.state, alias, started,
+          coloredIn(capacity), app.plurOrZero(txsConfs, threshold), fundingTxId.toString, fundingStatus).html
+
+        // Show channel actions with cooperative closing options
+        lnOpsAction setOnClickListener onButtonTap(showCoopOptions)
+        lnOpsAction setVisibility View.VISIBLE
+        lnOpsAction setText ln_chan_actions
       }
-    }
 
-    val transitionListener = new ChannelListener {
-      // Updates circle indicator to current chan state
-      // must also be removed once fragment is finished
+      def manageOpen = UITask {
+        val canSend = MilliSatoshi apply estimateCanSend(chan)
+        val canReceive = MilliSatoshi apply estimateCanReceive(chan)
+        val commitFee = MilliSatoshi(cs.reducedRemoteState.feesSat * 1000L)
+        val inFlightHTLCs = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
+        val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
+        val finalCanReceive = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
+        lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, coloredIn(capacity),
+          finalCanSend, finalCanReceive, coloredOut(commitFee), inFlightHTLCs).html
 
-      override def onBecome = {
-        case (_, _, from, CLOSING) if from != CLOSING => resetIndicator.run
-        case (_, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) => resetIndicator.run
+        // Show channel actions with cooperative closing options
+        lnOpsAction setOnClickListener onButtonTap(showCoopOptions)
+        lnOpsAction setVisibility View.VISIBLE
+        lnOpsAction setText ln_chan_actions
       }
-    }
 
-    val listeners = Vector(transitionListener, detailsListener)
-    whenDestroy = UITask(chan.listeners --= listeners)
-    detailsListener nullOnBecome chan
-    chan.listeners ++= listeners
+      def manageNegotiations(cs: Commitments) = UITask {
+        val refundable = MilliSatoshi(cs.localCommit.spec.toLocalMsat)
+        val inFlightHTLCs = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
+        lnOpsDescription setText negotiations.format(chan.state, alias, started,
+          coloredIn(capacity), coloredIn(refundable), inFlightHTLCs).html
+
+        // Show warning and proceed with an uncooperative closing
+        lnOpsAction setOnClickListener onButtonTap(warnAndForceClose)
+        lnOpsAction setVisibility View.VISIBLE
+        lnOpsAction setText ln_chan_force
+      }
+
+      def manageClosing(close: ClosingData) = UITask {
+        // Show the best current closing with most confirmations
+        // since multiple different closings may be present at once
+        // or no closing at all in case like restoking a closed commit
+        val closedTimestamp = me time new Date(close.closedAt)
+        lnOpsAction setVisibility View.GONE
+
+        close.bestClosing match {
+          case Left(mutualClosingTx) =>
+            val fee = capacity - mutualClosingTx.allOutputsAmount
+            val refundable = MilliSatoshi(close.commitments.localCommit.spec.toLocalMsat) - fee
+            val view = commitStatus.format(mutualClosingTx.txid.toString, humanStatus apply getStatus(mutualClosingTx.txid), coloredOut apply fee)
+            val text = bilateralClosing.format(chan.state, alias, started, closedTimestamp, coloredIn(capacity), coloredIn(refundable), view)
+            lnOpsDescription setText text.html
+
+          case Right(info) =>
+            val tier12View = info.getState collect {
+              case ShowDelayed(_ \ true \ _, _, fee, amt) =>
+                val deadDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
+                host.getString(ln_ops_chan_unilateral_status_dead).format(deadDetails, coloredIn apply amt)
+
+              case ShowReady(_, fee, amt) =>
+                val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
+                host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
+
+              case show @ ShowDelayed(_ \ false \ _, _, fee, amt) if show.isPublishable =>
+                // This fails if input is spent by our peer, happens when we publish a revoked commit
+                val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
+                host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
+
+              case ShowDelayed(_ \ false \ left, _, fee, amt) =>
+                val leftDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
+                statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
+            }
+
+            val startedByWhom = host getString startedBy(close)
+            val humanTier12View = tier12View take 2 mkString "<br><br>"
+            val status = humanStatus apply getStatus(info.commitTx.txid)
+            val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
+            val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
+            val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
+            lnOpsDescription setText unilateralClosing.format(chan.state, startedByWhom, alias, started,
+              closedTimestamp, coloredIn(capacity), commitView + refundsView).html
+        }
+      }
+
+      val detailsListener = new ChannelListener {
+        override def onBecome: PartialFunction[Transition, Unit] = {
+          case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
+          case (_, _: NormalData, _, _) if isOperational(chan) => manageOpen.run
+          case (_, norm: NormalData, _, _) => manageNegotiations(norm.commitments).run
+          case (_, negs: NegotiationsData, _, _) => manageNegotiations(negs.commitments).run
+          case (_, close: ClosingData, _, _) => manageClosing(close).run
+          case _ => manageOther.run
+        }
+
+        override def onProcessSuccess = {
+          // Simply update current UI on each new block
+          case (_, _, _: CMDBestHeight) => nullOnBecome(chan)
+        }
+      }
+
+      val transitionListener = new ChannelListener {
+        override def onBecome: PartialFunction[Transition, Unit] = {
+          case (_, _, from, CLOSING) if from != CLOSING => resetIndicator.run
+          case (_, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) => resetIndicator.run
+        }
+      }
+
+      val listeners = Vector(transitionListener, detailsListener)
+      whenDestroy = UITask(chan.listeners --= listeners)
+      detailsListener nullOnBecome chan
+      chan.listeners ++= listeners
+    }
   }
 }

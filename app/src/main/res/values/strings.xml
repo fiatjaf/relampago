@@ -90,8 +90,6 @@
     <string name="action_coins_receive">Receive funds</string>
     <string name="action_ln_details">View channel details</string>
     <string name="action_ln_open">Open new channel</string>
-    <string name="action_ln_close">Close channel</string>
-    <string name="action_ln_force">Force close</string>
 
     <!-- dialogs -->
     <string name="amount_hint_sat"><![CDATA[Amount in Satoshi%1$s]]></string>
@@ -180,7 +178,6 @@
 
     <string name="ln_share_hash">Share Payment Hash</string>
     <string name="ln_share_proof">Share Proof of Payment</string>
-    <string name="ln_share_ln_id">Share Lightning Node ID</string>
     <string name="ln_share_routing">Share routing details</string>
 
     <string name="ln_status_peer">Select peer</string>
@@ -201,26 +198,29 @@
 
     <string name="notice_sync_title">Synchronization required</string>
     <string name="notice_sync_body">Please open Bitcoin + Lightning app</string>
-    <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>cooperative</i></font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>refunded %6$s<br><br>%7$s]]></string>
-    <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br><br>%6$s<br><br>Waiting until in-flight payments are resolved and peer agrees to a cooperative closing]]></string>
-    <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[<font color=#53A63C>%1$s</font><br>%2$s<br><br>capacity %3$s<br>can send %4$s<br>can receive %5$s<br><small>commit fee %6$s</small><br><br>%7$s<br><br><font color=#999999>Peer node ID</font><br><small>%8$s</small>]]></string>
-    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>opened at <font color=#999999>%4$s</font><br>closed at <font color=#999999>%5$s</font><br>total capacity %6$s<br><br>%7$s]]></string>
+
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s]]></string>
+    <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>refundable %5$s<br><br>%6$s]]></string>
+    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>opened at <font color=#999999>%4$s</font><br>closed at <font color=#999999>%5$s</font><br>total capacity %6$s<br><br>%7$s]]></string>
+    <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>cooperative</i></font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>refunded %6$s<br><br>%7$s]]></string>
+    <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[<font color=#53A63C>%1$s</font><br>%2$s<br><br>capacity %3$s<br>can send %4$s<br>can receive %5$s<br><small>commit fee %6$s</small><br><br>%7$s]]></string>
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved, would you still like to proceed?]]></string>
-    <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>This channel is offline now so closing it will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
-    <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Please note that closing a channel right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
+    <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>Channel is offline now so closing it will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Note that closing a channel right now will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
 
     <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close this channel and send a refunding on-chain transaction to the following address?<br><br>%1$s]]></string>
     <string name="ln_chan_close_confirm_local">Do you want to close this channel and send a refunding on-chain transaction back to this wallet?</string>
-    <string name="ln_chan_close_details">Where should a refunding on-chain transaction be sent once this channel is closed?</string>
-    <string name="ln_chan_close_option_local">To this wallet</string>
+    <string name="ln_chan_actions">Channel actions</string>
+    <string name="ln_chan_force">Force close</string>
 
-    <string name="ln_chan_close_option_address"><![CDATA[
-        Paste an Address<br><br><font color=#999999><small>Please note that it\'s not possible to determine an exact
-        refunding fee in advance so do not use this option if recipient expects an exact amount</small></font>
-    ]]></string>
+    <array name="ln_chan_actions_list">
+        <item>Share channel details</item>
+        <item><![CDATA[Export channel snapshot<br><font color=#999999><small>contains private key material</small></font>]]></item>
+        <item><![CDATA[Close to specified address<br><font color=#999999><small>copy an address before proceeding</small></font>]]></item>
+        <item>Close to this wallet</item>
+    </array>
 
     <string name="ln_ops_chan_amount_status">%1$s - %2$s fee</string>
     <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Pending refunds</font><br>]]></string>
