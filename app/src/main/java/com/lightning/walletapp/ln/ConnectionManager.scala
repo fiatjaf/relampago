@@ -69,8 +69,7 @@ object ConnectionManager {
 
       message match {
         case ping: Ping if ping.pongLength > 0 =>
-          val response = Pong("00" * ping.pongLength)
-          handler process response
+          handler process Pong("00" * ping.pongLength)
 
         case their: Init =>
           // Save their Init for possible subsequent requests

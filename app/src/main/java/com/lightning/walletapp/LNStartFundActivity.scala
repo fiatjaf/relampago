@@ -10,6 +10,7 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
 import fr.acinq.bitcoin.DeterministicWallet._
+import com.lightning.walletapp.StartNodeView._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -33,18 +34,15 @@ class LNStartFundActivity extends TimerActivity { me =>
   var whenBackPressed: Runnable = UITask(super.onBackPressed)
   lazy val lnStartFundCancel = findViewById(R.id.lnStartFundCancel).asInstanceOf[ImageButton]
   lazy val lnStartFundDetails = findViewById(R.id.lnStartFundDetails).asInstanceOf[TextView]
-  lazy val chansNumber = getResources getStringArray R.array.ln_ops_start_node_channels
-  lazy val nodeView = getString(ln_ops_start_fund_node_view)
   override def onBackPressed = whenBackPressed.run
 
   def INIT(state: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_ln_start_fund)
 
     app.TransData.value match {
-      // We may get peer info either from built-in list of from user scanned qr code
-      case RemoteNodeView(ann \ num) => proceed(app.plurOrZero(chansNumber, num), ann)
-      case HardcodedNodeView(ann, hardcodedTip) => proceed(hardcodedTip, ann)
-      case ann: NodeAnnouncement => proceed(chansNumber.last, ann)
+      case remoteView @ RemoteNodeView(ann \ _) => proceed(remoteView.asString(nodeFundView, "<br>"), ann)
+      case hardcodedView @ HardcodedNodeView(ann, _) => proceed(hardcodedView.asString(nodeFundView, "<br>"), ann)
+      case ann: NodeAnnouncement => proceed(HardcodedNodeView(ann, chansNumber.last).asString(nodeFundView, "<br>"), ann)
       case _ => finish
     }
 
@@ -57,10 +55,10 @@ class LNStartFundActivity extends TimerActivity { me =>
     Script.write(Script pay2wsh multisigScript)
   }
 
-  def proceed(pubChansNum: String, announce: NodeAnnouncement) = {
-    val theirNodeHumanId = humanNode(announce.nodeId.toString, "<br>")
-    val detailsText = nodeView.format(announce.alias, pubChansNum, theirNodeHumanId).html
+  def proceed(asString: String, announce: NodeAnnouncement) = {
     val freshChan = app.ChannelManager.createChannel(Set.empty, InitData apply announce)
+    lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
+    lnStartFundDetails setText asString.html
 
     lazy val openListener = new ConnectionListener with ChannelListener { self =>
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
@@ -179,9 +177,5 @@ class LNStartFundActivity extends TimerActivity { me =>
     freshChan.listeners += openListener
     ConnectionManager.listeners += openListener
     ConnectionManager connectTo announce
-
-    // Disconnect channel and go back once user taps a back button
-    lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
-    lnStartFundDetails setText detailsText
   }
 }
