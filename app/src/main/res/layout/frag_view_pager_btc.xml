@@ -13,7 +13,7 @@
             android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
             android:background="@android:color/black"
             android:layout_width="match_parent"
-            android:layout_height="76sp"
+            android:layout_height="84sp"
             android:id="@+id/toolbar"
 
             app:contentInsetLeft="@dimen/app_padding"

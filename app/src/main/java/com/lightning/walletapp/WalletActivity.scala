@@ -18,8 +18,8 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import scala.util.{Failure, Try}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
-import android.provider.Settings.{System => FontSystem}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
+import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -61,25 +61,25 @@ trait SearchBar { me =>
 
 trait HumanTimeDisplay {
   val host: TimerActivity
-  val time: Date => String = date => new SimpleDateFormat(timeString) format date
-  lazy val bigFont = FontSystem.getFloat(host.getContentResolver, FontSystem.FONT_SCALE, 1) > 1
+  val time: Date => String = date =>
+    new SimpleDateFormat(timeString) format date
 
   // Should be accessed after activity is initialized
   lazy val timeString = DateFormat is24HourFormat host match {
-    case false if host.scrWidth < 2.2 & bigFont => "MM/dd/yy' <small>'h:mma'</small>'"
-    case false if host.scrWidth < 2.2 => "MM/dd/yy' <small>'h:mma'</small>'"
+    case false if scrWidth < 2.2 & bigFont => "MM/dd/yy' <small>'h:mma'</small>'"
+    case false if scrWidth < 2.2 => "MM/dd/yy' <small>'h:mma'</small>'"
 
-    case false if host.scrWidth < 2.5 & bigFont => "MM/dd/yy' <small>'h:mma'</small>'"
-    case false if host.scrWidth < 2.5 => "MM/dd/yy' <small>'h:mma'</small>'"
+    case false if scrWidth < 2.5 & bigFont => "MM/dd/yy' <small>'h:mma'</small>'"
+    case false if scrWidth < 2.5 => "MM/dd/yy' <small>'h:mma'</small>'"
 
     case false if bigFont => "MMM dd, yyyy' <small>'h:mma'</small>'"
     case false => "MMMM dd, yyyy' <small>'h:mma'</small>'"
 
-    case true if host.scrWidth < 2.2 & bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
-    case true if host.scrWidth < 2.2 => "d MMM yyyy' <small>'HH:mm'</small>'"
+    case true if scrWidth < 2.2 & bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
+    case true if scrWidth < 2.2 => "d MMM yyyy' <small>'HH:mm'</small>'"
 
-    case true if host.scrWidth < 2.4 & bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
-    case true if host.scrWidth < 2.5 => "d MMM yyyy' <small>'HH:mm'</small>'"
+    case true if scrWidth < 2.4 & bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
+    case true if scrWidth < 2.5 => "d MMM yyyy' <small>'HH:mm'</small>'"
 
     case true if bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
     case true => "d MMMM yyyy' <small>'HH:mm'</small>'"

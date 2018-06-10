@@ -19,9 +19,28 @@ object ImplicitConversions {
     new org.bitcoinj.core.Transaction(app.params, fr.acinq.bitcoin.Transaction write bitcoinLibTx)
 }
 
+object IconGetter extends Html.ImageGetter {
+  private val metrics = app.getResources.getDisplayMetrics
+  val scrWidth = metrics.widthPixels.toDouble / metrics.density
+  val maxDialog = metrics.densityDpi * 2.1
+
+  import android.provider.Settings.{System => FontSystem}
+  val bigFont = FontSystem.getFloat(app.getContentResolver, FontSystem.FONT_SCALE, 1) > 1
+  private val noneDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_none, null)
+  private val btcDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_btc_shape, null)
+  private val lnDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_bolt_shape, null)
+  def getDrawable(s: String) = s match { case "ln" => lnDrawable case "btc" => btcDrawable case "none" => noneDrawable }
+
+  private val fontAdjusted = if (bigFont) 22 else 19
+  private val screenMetricsAdjusted = (fontAdjusted * metrics.density).toInt
+  noneDrawable.setBounds(0, 0, screenMetricsAdjusted, screenMetricsAdjusted)
+  btcDrawable.setBounds(0, 0, screenMetricsAdjusted, screenMetricsAdjusted)
+  lnDrawable.setBounds(0, 0, screenMetricsAdjusted, screenMetricsAdjusted)
+}
+
 class StringOps(source: String) {
+  def html = Html.fromHtml(source, IconGetter, null)
   def binary = BinaryData(source getBytes "UTF-8")
   def hex = HEX.encode(source getBytes "UTF-8")
   def noSpaces = source.replace(" ", "")
-  def html = Html fromHtml source
 }

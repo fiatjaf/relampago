@@ -25,12 +25,12 @@ import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
 import fr.acinq.bitcoin.MilliSatoshi
 import language.implicitConversions
-import android.util.DisplayMetrics
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.script.Script
 import scala.concurrent.Future
 import android.os.Bundle
 
+import com.lightning.walletapp.lnutils.IconGetter.{scrWidth, maxDialog}
 import org.bitcoinj.wallet.{DefaultCoinSelector, SendRequest, Wallet}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
@@ -98,14 +98,6 @@ trait TimerActivity extends AppCompatActivity { me =>
   val goTo: Class[_] => Unit = me startActivity new Intent(me, _)
   val exitTo: Class[_] => Unit = goto => wrap(finish)(goTo apply goto)
   val timer = new Timer
-
-  // Screen size in inches and prefs reference
-  lazy val maxDialog = metrics.densityDpi * 2.1
-  lazy val scrWidth = metrics.widthPixels.toDouble / metrics.densityDpi
-  lazy val metrics = new DisplayMetrics match { case metrix =>
-    getWindowManager.getDefaultDisplay getMetrics metrix
-    metrix
-  }
 
   def finishMe(top: View) = finish
   def delayUI(fun: TimerTask) = timer.schedule(fun, 225)

@@ -109,9 +109,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       else app.plurOrZero(syncOps, app.ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
 
     UITask(customTitle setText s"""
-      <font color=#AAAAAA>&#3647;</font> <strong>$btcFunds</strong><br>
-      <font color=#AAAAAA>&#9735;</font> <strong>$lnFunds</strong><br>
-      $subtitleText""".html)
+      <img src="btc"/><strong>$btcFunds</strong><br>
+      <img src="ln"/><strong>$lnFunds</strong><br>
+      $subtitleText<img src="none"/>""".html)
   }
 
   // END UPDATING TITLE
@@ -210,8 +210,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val humanSumDetails = s"<font color=#999999>$humanHash</font><br>$description"
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactCircle setImageResource imageMap(info.actualStatus)
+      holder.transactSum setText s"""<img src="ln"/>$humanSum""".html
       holder.transactWhat setVisibility viewMap(isSearching)
-      holder.transactSum setText s"&#9735; $humanSum".html
       holder.transactWhat setText humanSumDetails.html
     }
 
@@ -280,7 +280,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val status = if (txDead) dead else if (txDepth >= minDepth) conf1 else await
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
-      holder.transactSum setText s"&#3647; $humanSum".html
+      holder.transactSum setText s"""<img src="btc"/>$humanSum""".html
       holder.transactCircle setImageResource status
       holder.transactWhat setVisibility View.GONE
     }
