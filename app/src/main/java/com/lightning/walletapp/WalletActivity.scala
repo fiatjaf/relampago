@@ -230,20 +230,19 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     val denomChoiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
     val allDenominations = getResources.getStringArray(R.array.denoms).map(_.html)
 
-    denomChoiceList setOnItemClickListener onTap { pos =>
-      // Update denom first so UI update can react to changes
-      // also persist user choice in app local data
-
-      denom = denoms(pos)
-      FragWallet.worker.updTitle.run
+    def updateDenomination = {
+      // Update denom first so UI update can react to changes, also persist user choice in local data
+      app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, denomChoiceList.getCheckedItemPosition).commit
+      denom = denoms(denomChoiceList.getCheckedItemPosition)
       FragWallet.worker.adapter.notifyDataSetChanged
-      app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
+      FragWallet.worker.updTitle.run
     }
 
+    denomChoiceList.getCheckedItemPosition
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
     denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
     stateContent setText s"${coloredIn apply walletTotalSum}<br><small>$inFiatTotal</small>".html
-    showForm(negBuilder(dialog_ok, title, form).create)
+    mkForm(updateDenomination, none, negBuilder(dialog_ok, title, form), dialog_ok, dialog_cancel)
   }
 
   // SETTINGS FORM

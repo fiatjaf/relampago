@@ -186,7 +186,7 @@
     <string name="ln_no_description">No description provided</string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment preimage: %2$s</string>
     <string name="ln_qr_disposable"><![CDATA[Request is valid for 1 hour<br>Do not reuse this QR code]]></string>
-    <string name="ln_open_offer">Would you like to open a payment channel with the payee to be able to fulfill it\'s payment requests?</string>
+    <string name="ln_open_offer">Would you like to open a payment channel with the payee to be able to fulfill its payment requests?</string>
 
     <!-- see PaymentInfo.scala -->
     <array name="ln_payment_states">
