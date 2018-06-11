@@ -176,7 +176,7 @@
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
-    <string name="ln_share_hash">Share Payment Hash</string>
+    <string name="ln_share_hash">Share payment hash</string>
     <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_share_routing">Share routing details</string>
 
