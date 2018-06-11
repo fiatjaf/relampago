@@ -185,11 +185,11 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   def goSendPayment(top: View) = {
-    val options = Array(send_paste, send_scan_qr) map getString
+    val options = Array(send_scan_qr, send_paste) map getString
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, lst).create)
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
-    lst setOnItemClickListener onTap { case 0 => pasteRequest case 1 => scanQR }
+    lst setOnItemClickListener onTap { case 0 => scanQR case 1 => pasteRequest }
     lst setDividerHeight 0
     lst setDivider null
 
