@@ -463,36 +463,36 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     if (PaymentRequest.prefixes(chainHash) != pr.prefix) app toast err_general
     else if (app.ChannelManager.notClosingOrRefunding.isEmpty) proposeOpen(pr)
     else if (pr.nodeId == nodePublicKey) app toast err_self_payment
-    else if (!pr.isFresh) app toast dialog_pr_expired
-    else {
+    else if (!pr.isFresh) app toast dialog_pr_expired else {
 
-      // Define how much we can send but cap an amount by hardcoded maximum
+      // This fetches normal channels which MAY be offline currently and this is intentional
       val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
-      val maxCanSendMsat = math.min(operationalChannels.map(estimateCanSend).max, maxHtlcValueMsat)
-      val maxCanSend = MilliSatoshi(maxCanSendMsat)
+      if (operationalChannels.isEmpty) app toast ln_status_none else {
 
-      val description = me getDescription pr.description
-      val title = app.getString(ln_send_title).format(description)
-      val hint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
-      val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-      val rateManager = new RateManager(hint, content)
+        // Define how much we can send but cap an amount by hardcoded maximum, it's safe to call max here because checked
+        val maxCanSend = MilliSatoshi apply math.min(operationalChannels.map(estimateCanSend).max, maxHtlcValueMsat)
+        val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
+        val title = app.getString(ln_send_title).format(me getDescription pr.description).html
+        val hint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
+        val rateManager = new RateManager(hint, content)
+        val bld = baseBuilder(title, content)
 
-      def sendAttempt(alert: AlertDialog) = rateManager.result match {
-        case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
-        case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
-        case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
-        case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
-        case Failure(reason) => app toast dialog_sum_empty
+        def sendAttempt(alert: AlertDialog) = rateManager.result match {
+          case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
+          case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+          case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
+          case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
+          case Failure(reason) => app toast dialog_sum_empty
 
-        case Success(ms) => rm(alert) {
-          // Custom amount may be higher than requested
-          me doSend emptyRD(pr, ms.amount, useCache = true)
+          case Success(ms) => rm(alert) {
+            // Custom amount may be higher than requested
+            me doSend emptyRD(pr, ms.amount, useCache = true)
+          }
         }
-      }
 
-      val bld = baseBuilder(title.html, content)
-      mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
-      for (amountMsat <- pr.amount) rateManager setSum Try(amountMsat)
+        mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
+        for (amountMsat <- pr.amount) rateManager setSum Try(amountMsat)
+      }
     }
 
   def proposeOpen(pr: PaymentRequest) = {
