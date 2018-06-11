@@ -50,9 +50,9 @@ class LNOpsActivity extends TimerActivity { me =>
     }
 
   val colors = new IndicatorColorProvider {
-    def getColor(position: Int) = localChanCache(position) match {
-      case channel if isOperational(channel) => R.drawable.green_radius
-      case channel if isOpening(channel) => R.drawable.yellow_radius
+    def getColor(chanPosition: Int) = localChanCache(chanPosition) match {
+      case c if isOperational(c) && c.state == OPEN => R.drawable.green_radius
+      case c if isOperational(c) || isOpening(c) => R.drawable.yellow_radius
       case _ => R.drawable.white_radius
     }
   }
@@ -207,11 +207,12 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         val canSend = MilliSatoshi apply estimateCanSend(chan)
         val canReceive = MilliSatoshi apply estimateCanReceive(chan)
         val commitFee = MilliSatoshi(cs.reducedRemoteState.feesSat * 1000L)
+        val myReserve = MilliSatoshi(cs.remoteParams.channelReserveSatoshis * 1000L)
         val inFlightHTLCs = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
         val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
         val finalCanReceive = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
         lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, coloredIn(capacity),
-          finalCanSend, finalCanReceive, coloredOut(commitFee), inFlightHTLCs).html
+          finalCanSend, finalCanReceive, coloredOut(myReserve), coloredOut(commitFee), inFlightHTLCs).html
 
         // Show channel actions with cooperative closing options
         lnOpsAction setOnClickListener onButtonTap(showCoopOptions)
@@ -295,6 +296,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       val transitionListener = new ChannelListener {
         override def onBecome: PartialFunction[Transition, Unit] = {
+          case (_, _, from, OFFLINE) if from != OFFLINE => resetIndicator.run
           case (_, _, from, CLOSING) if from != CLOSING => resetIndicator.run
           case (_, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) => resetIndicator.run
         }
