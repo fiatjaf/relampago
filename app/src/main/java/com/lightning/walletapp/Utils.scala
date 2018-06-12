@@ -287,6 +287,7 @@ class RateManager(extra: String, val content: View) { me =>
 trait PayData {
   // Emptying a wallet needs special handling
   def isAll = app.kit.conf1Balance equals cn
+  def onClick(activity: TimerActivity)
   def getRequest: SendRequest
   def destination: String
   def cn: Coin
@@ -294,13 +295,14 @@ trait PayData {
 
 case class AddrData(cn: Coin, address: Address) extends PayData {
   def getRequest = if (isAll) emptyWallet(address) else to(address, cn)
-  def link = BitcoinURI.convertToBitcoinURI(address, cn, null, null)
+  def onClick(activity: TimerActivity) = app setBuffer address.toString
   def destination = humanSix(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
   // This will only be used for funding of LN payment channels as destination is unreadable
   def getRequest = if (isAll) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
+  def onClick(activity: TimerActivity) = activity goTo classOf[LNOpsActivity]
   def destination = app getString txs_p2wsh
 }
 

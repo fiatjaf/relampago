@@ -70,7 +70,7 @@ case class Error(channelId: BinaryData, data: BinaryData) extends ChannelMessage
   def exception = {
     val text = new String(data, "UTF-8")
     if (text.isEmpty) new LightningException("Error from remote peer")
-    else new LightningException(s"Error from remote peer: $text")
+    else new LightningException(s"Error from remote peer\n\n$text")
   }
 }
 
