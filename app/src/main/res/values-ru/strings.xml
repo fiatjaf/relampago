@@ -234,9 +234,9 @@
     <string name="ln_ops_chan_unilateral_status_dead"><![CDATA[%1$s<br>= %2$s отменена]]></string>
     <string name="ln_ops_chan_unilateral_status_done"><![CDATA[%1$s<br>= %2$s получена]]></string>
     <string name="ln_ops_chan_unilateral_status_left"><![CDATA[%2$s<br>= %3$s %1$s]]></string>
-	<string name="ln_total_value">Всего отправлено %1$s</string>
+	<string name="ln_total_value">Отправлено %1$s</string>
 
-	<array name="ln_total_payments">
+    <array name="ln_total_payments">
         <item><![CDATA[Нет отправленных платежей]]></item>
         <item><![CDATA[Отправлен %1$s платеж]]></item>
         <item><![CDATA[Отправлено %1$s платежа]]></item>
