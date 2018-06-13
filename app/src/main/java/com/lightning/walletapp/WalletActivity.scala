@@ -166,21 +166,37 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   // BUTTONS REACTIONS
 
   def goReceivePayment(top: View) = {
-    val options = Array(getString(ln_receive_option).html, getString(btc_receive_option).html)
+    val totalOperationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
+    val operationalChannelsWithRoutes = totalOperationalChannels.flatMap(channelAndHop).toMap
+    val maxCanReceive = Try(operationalChannelsWithRoutes.keys.map(estimateCanReceive).max)
+    val maxCanReceive1 = MilliSatoshi(maxCanReceive getOrElse 0L)
+    val canReceiveLNPayments = maxCanReceive1 >= minHtlcValue
+
+    val reserveUnspent = getString(ln_receive_reserve) format coloredOut(maxCanReceive1)
+    val lnReceiveText = if (totalOperationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_no_channels)
+      else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_option).format(me getString ln_receive_6conf)
+      else if (!canReceiveLNPayments) getString(ln_receive_option).format(reserveUnspent)
+      else getString(ln_receive_option).format(me getString ln_receive_ok)
+
+    val options = Array(lnReceiveText.html, getString(btc_receive_option).html)
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_receive, lst).create)
-    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
-    lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
-    lst setDividerHeight 0
-    lst setDivider null
 
-    def offChain = rm(alert) {
-      FragWallet.worker.makePaymentRequest
+    lst setDivider null
+    lst setDividerHeight 0
+    lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options) {
+      override def isEnabled(itemPosition: Int) = itemPosition != 0 || canReceiveLNPayments
     }
 
     def onChain = rm(alert) {
       app.TransData.value = app.kit.currentAddress
       me goTo classOf[RequestActivity]
+    }
+
+    def offChain = rm(alert) {
+      // Provide filtered channels with real hops and real receivable amount
+      FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive1)
     }
   }
 

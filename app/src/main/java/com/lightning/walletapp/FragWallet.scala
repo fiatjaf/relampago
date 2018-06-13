@@ -31,6 +31,7 @@ import org.bitcoinj.wallet.listeners.WalletCoinsReceivedEventListener
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
+import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
@@ -405,58 +406,39 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     app.TransData.value = pr
   }
 
-  def makePaymentRequest = {
-    // This fetches normal channels which MAY be offline currently and this is intentional
-    val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
+  def receive(chansWithRoutes: Map[Channel, PaymentRoute], maxCanReceive: MilliSatoshi) = {
+    val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
+    val hint = app.getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
+    val rateManager = new RateManager(hint, content)
 
-    // Ensure we have channels present at all
-    if (operationalChannels.isEmpty) app toast ln_status_none else {
-      val bld = negTextBuilder(dialog_ok, host getString err_ln_6_confs)
-      val chansWithRoutes = operationalChannels.flatMap(channelAndHop).toMap
+    def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
+      // Once again filter out those channels which can receive a supplied amount
+      val description = content.findViewById(R.id.inputDescription).asInstanceOf[EditText].getText.toString.trim
+      val routes = chansWithRoutes.filterKeys(channel => estimateCanReceive(channel) >= sum.amount).values.toVector
+      val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, description, None, routes)
+      val rd = emptyRD(pr, sum.amount, useCache = true)
 
-      // Ensure we have channels capable of receiving
-      if (chansWithRoutes.isEmpty) showForm(bld.create) else {
-        val maxCanReceive = MilliSatoshi(chansWithRoutes.keys.map(estimateCanReceive).max)
-        val reserveUnspent = host getString err_ln_reserve_unspent format coloredOut(maxCanReceive)
-        val bld = negTextBuilder(dialog_ok, reserveUnspent.html)
+      db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.paymentHashString)
+      db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN, System.currentTimeMillis,
+        pr.description, rd.paymentHashString, sum.amount, 0L, 0L, NOCHANID)
 
-        // Ensure our unspendable channel reserve is surpassed
-        if (maxCanReceive < minHtlcValue) showForm(bld.create) else {
-          val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
-          val hint = app.getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
-          val rateManager = new RateManager(hint, content)
+      showQR(pr)
+    }
 
-          def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
-            // Once again filter out those channels which can receive a supplied amount
-            val description = content.findViewById(R.id.inputDescription).asInstanceOf[EditText].getText.toString.trim
-            val routes = chansWithRoutes.filterKeys(channel => estimateCanReceive(channel) >= sum.amount).values.toVector
-            val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, description, None, routes)
-            val rd = emptyRD(pr, sum.amount, useCache = true)
+    def recAttempt(alert: AlertDialog) = rateManager.result match {
+      case Success(ms) if maxCanReceive < ms => app toast dialog_sum_big
+      case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+      case Failure(reason) => app toast dialog_sum_empty
 
-            db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.paymentHashString)
-            db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN, System.currentTimeMillis,
-              pr.description, rd.paymentHashString, sum.amount, 0L, 0L, NOCHANID)
-
-            showQR(pr)
-          }
-
-          def recAttempt(alert: AlertDialog) = rateManager.result match {
-            case Success(ms) if maxCanReceive < ms => app toast dialog_sum_big
-            case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
-            case Failure(reason) => app toast dialog_sum_empty
-
-            case Success(ms) => rm(alert) {
-              // Requests without amount are not allowed for now
-              <(makeRequest(ms, random getBytes 32), onFail)(none)
-              app toast dialog_pr_making
-            }
-          }
-
-          val bld = baseBuilder(app.getString(ln_receive_title).html, content)
-          mkCheckForm(recAttempt, none, bld, dialog_ok, dialog_cancel)
-        }
+      case Success(ms) => rm(alert) {
+        // Requests without amount are not allowed for now
+        <(makeRequest(ms, random getBytes 32), onFail)(none)
+        app toast dialog_pr_making
       }
     }
+
+    val bld = baseBuilder(app.getString(ln_receive_title).html, content)
+    mkCheckForm(recAttempt, none, bld, dialog_ok, dialog_cancel)
   }
 
   def sendPayment(pr: PaymentRequest) =
@@ -469,7 +451,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
       if (operationalChannels.isEmpty) app toast ln_status_none else {
 
-        // Define how much we can send but cap an amount by hardcoded maximum, it's safe to call max here because checked
+        // Define how much we can send but cap an amount by maximum, it's safe to call max here because checked
         val maxCanSend = MilliSatoshi apply math.min(operationalChannels.map(estimateCanSend).max, maxHtlcValueMsat)
         val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
         val title = app.getString(ln_send_title).format(me getDescription pr.description).html
