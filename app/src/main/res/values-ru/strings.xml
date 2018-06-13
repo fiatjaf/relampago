@@ -252,9 +252,9 @@
 
     <array name="ln_status_expiry">
         <item><![CDATA[отменяется&#8230;]]></item>
-        <item><![CDATA[истекает через %1$s блок]]></item>
-        <item><![CDATA[истекает через %1$s блока]]></item>
-        <item><![CDATA[истекает через %1$s блоков]]></item>
+        <item><![CDATA[остался %1$s блок]]></item>
+        <item><![CDATA[осталось %1$s блока]]></item>
+        <item><![CDATA[осталось %1$s блоков]]></item>
     </array>
 
 	<array name="ln_in_flight_payments">
