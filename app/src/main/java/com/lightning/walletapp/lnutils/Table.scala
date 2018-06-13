@@ -88,9 +88,10 @@ object PaymentTable extends Table {
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
 
   // Selecting
+  val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
+  val selectTotalSql = s"SELECT $lastMsat FROM $table WHERE $chanId = ? AND $incoming = ?"
   val selectRecentSql = s"SELECT * FROM $table WHERE $status IN ($WAITING, $SUCCESS, $FAILURE, $FROZEN) ORDER BY $id DESC LIMIT 48"
   val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT 24)"
-  val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
 
   // Updating, creating
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ?, $chanId = ? WHERE $hash = ?"
@@ -162,7 +163,6 @@ class LNOpenHelper(context: Context, name: String)
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
     val dev1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9103", emptyData, "1", ord1, "0")
     val dev2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9103", emptyData, "0", ord2, "1")
-
     dbs.execSQL(OlympusTable.newSql, dev1)
     dbs.execSQL(OlympusTable.newSql, dev2)
   }

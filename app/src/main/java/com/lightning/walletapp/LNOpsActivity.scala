@@ -6,10 +6,11 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
+import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.LNParams.broadcaster.getStatus
-import com.lightning.walletapp.ln.LNParams.DepthAndDead
+import com.lightning.walletapp.helper.RichCursor
 import android.view.View.OnTouchListener
 import org.bitcoinj.script.ScriptBuilder
 import scala.util.Success
@@ -18,8 +19,9 @@ import java.util.Date
 
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
+import com.lightning.walletapp.ln.Tools.{none, wrap, memoize}
 import android.widget.{ArrayAdapter, Button, ListView}
-import com.lightning.walletapp.ln.Tools.{none, wrap}
+import com.lightning.walletapp.lnutils.PaymentTable
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 
 
@@ -32,6 +34,7 @@ class LNOpsActivity extends TimerActivity { me =>
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
   lazy val inFlightPayments = getResources getStringArray R.array.ln_in_flight_payments
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
+  lazy val totalPayments = getResources getStringArray R.array.ln_total_payments
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
 
   lazy val basic = getString(ln_ops_chan_basic)
@@ -42,6 +45,7 @@ class LNOpsActivity extends TimerActivity { me =>
   lazy val refundStatus = getString(ln_ops_chan_refund_status)
   lazy val amountStatus = getString(ln_ops_chan_amount_status)
   lazy val commitStatus = getString(ln_ops_chan_commit_status)
+  lazy val totalValue = getString(ln_total_value)
 
   val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
@@ -102,6 +106,11 @@ class LNOpsActivity extends TimerActivity { me =>
   def startedBy(c: ClosingData) = {
     val byRemote = c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty
     if (byRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
+  }
+
+  val getTotalSent = memoize { chanId: BinaryData =>
+    val cursor = db.select(PaymentTable.selectTotalSql, chanId, 0)
+    RichCursor(cursor).vec(_ long PaymentTable.lastMsat)
   }
 }
 
@@ -204,15 +213,17 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       }
 
       def manageOpen = UITask {
-        val canSend = MilliSatoshi apply estimateCanSend(chan)
-        val canReceive = MilliSatoshi apply estimateCanReceive(chan)
+        val total = getTotalSent(cs.channelId)
+        val canSend = MilliSatoshi(Channel estimateCanSend chan)
+        val canReceive = MilliSatoshi(Channel estimateCanReceive chan)
         val commitFee = MilliSatoshi(cs.reducedRemoteState.feesSat * 1000L)
-        val myReserve = MilliSatoshi(cs.remoteParams.channelReserveSatoshis * 1000L)
+        val totalPaymentsNumber = app.plurOrZero(totalPayments, total.size)
         val inFlightHTLCs = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
+        val totalValueSent = totalValue.format(MilliSatoshi andThen coloredOut apply total.sum)
         val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
         val finalCanReceive = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
         lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, coloredIn(capacity),
-          finalCanSend, finalCanReceive, coloredOut(myReserve), coloredOut(commitFee), inFlightHTLCs).html
+          finalCanSend, finalCanReceive, coloredOut(commitFee), inFlightHTLCs, totalValueSent, totalPaymentsNumber).html
 
         // Show channel actions with cooperative closing options
         lnOpsAction setOnClickListener onButtonTap(showCoopOptions)

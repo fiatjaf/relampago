@@ -250,15 +250,10 @@ object Commitments {
       c.remoteCommit.spec.htlcs.exists(htlc => htlc.incoming && height - 144 >= htlc.add.expiry) ||
       latestRemoteCommit(c).spec.htlcs.exists(htlc => htlc.incoming && height - 144 >= htlc.add.expiry)
 
-  def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = {
-    val remoteSigned = CommitmentSpec.findHtlcById(commitments.localCommit.spec, htlcId, incomingRelativeToLocal)
-    val localSigned = CommitmentSpec.findHtlcById(latestRemoteCommit(commitments).spec, htlcId, !incomingRelativeToLocal)
-
-    for {
-      htlcOut <- remoteSigned
-      htlcIn <- localSigned
-    } yield htlcIn.add
-  }
+  def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = for {
+    _ <- CommitmentSpec.findHtlcById(latestRemoteCommit(commitments).spec, htlcId, !incomingRelativeToLocal)
+    htlcOut <- CommitmentSpec.findHtlcById(commitments.localCommit.spec, htlcId, incomingRelativeToLocal)
+  } yield htlcOut.add
 
   def sendFee(c: Commitments, ratePerKw: Long) = {
     val updateFee = UpdateFee(c.channelId, ratePerKw)

@@ -4,6 +4,7 @@ import com.lightning.walletapp.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
+import scala.collection.mutable
 import crypto.RandomGenerator
 import java.util
 
@@ -39,6 +40,10 @@ object Tools {
     if (fundingOutputIndex >= 65536 | fundingHash.size != 32) throw new LightningException
     else fundingHash.take(30) :+ fundingHash.data(30).^(fundingOutputIndex >> 8).toByte :+
       fundingHash.data(31).^(fundingOutputIndex).toByte
+
+  def memoize[I, O](fun: I => O): I => O = new mutable.HashMap[I, O] {
+    override def apply(argument: I) = getOrElseUpdate(argument, fun apply argument)
+  }
 }
 
 object Features {

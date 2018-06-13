@@ -204,7 +204,7 @@
     <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>opened at <font color=#999999>%4$s</font><br>closed at <font color=#999999>%5$s</font><br>total capacity %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>cooperative</i></font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>closed at <font color=#999999>%4$s</font><br>total capacity %5$s<br>refunded %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>opened at <font color=#999999>%3$s</font><br>total capacity %4$s<br>%5$s required<br><br><a href=https://smartbit.com.au/tx/%6$s>View funding status</a><br>%7$s]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[<font color=#76B041>%1$s</font><br>%2$s<br><br>capacity %3$s<br>can send %4$s<br>can receive %5$s<br><br><small>reserve %6$s<br>commit fee %7$s</small><br><br>%8$s]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[<font color=#76B041>%1$s</font><br>%2$s<br><br>capacity %3$s<br>can send %4$s<br>can receive %5$s<br><small>commit fee %6$s</small><br><br>%7$s<br><small>%8$s<br>%9$s</small>]]></string>
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved, would you still like to proceed?]]></string>
     <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>Channel is offline now so closing it will result in a</font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closing</a> which requires additional fees and refunding transaction is going to be delayed, would you still like to proceed?]]></string>
@@ -231,6 +231,13 @@
     <string name="ln_ops_chan_unilateral_status_dead"><![CDATA[%1$s<br>= %2$s cancelled]]></string>
     <string name="ln_ops_chan_unilateral_status_done"><![CDATA[%1$s<br>= %2$s received]]></string>
     <string name="ln_ops_chan_unilateral_status_left"><![CDATA[%2$s<br>= %3$s %1$s]]></string>
+    <string name="ln_total_value">%1$s sent in total</string>
+
+    <array name="ln_total_payments">
+        <item><![CDATA[No payments sent yet]]></item>
+        <item><![CDATA[%1$s payment sent in total]]></item>
+        <item><![CDATA[%1$s payments sent in total]]></item>
+    </array>
 
     <array name="ln_status_left_blocks">
         <item><![CDATA[in progress&#8230;]]></item>
