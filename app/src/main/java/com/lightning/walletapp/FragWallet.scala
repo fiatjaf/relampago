@@ -248,14 +248,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       info.incoming match {
         case 0 if info.lastMsat == 0 && info.lastExpiry == 0 =>
-          // Payment has not been sent yet because on-chain wallet is still offline
+          // Payment has not been sent yet because an on-chain wallet is still offline
           val title = lnTitleOutNoFee.format(humanStatus, coloredOut(info.firstSum), inFiat)
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
         case 0 =>
           val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
-          val feeAsPercent = fee.amount / (info.firstMsat / 100D)
-          val title = lnTitleOut.format(humanStatus, coloredOut(info.firstSum), coloredOut(fee), feeAsPercent, inFiat)
+          val paidFeePercent = fee.amount / (info.firstMsat / 100D)
+          val title = lnTitleOut.format(humanStatus, coloredOut(info.firstSum), inFiat, coloredOut(fee), paidFeePercent)
           val titleWithExpiry = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight) + "<br>" + title
           val title1 = if (info.actualStatus == WAITING) titleWithExpiry else title
 
@@ -311,24 +311,20 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case _ if txDead => sumOut format txsConfs.last
 
         case _ if wrap.visibleValue.isPositive =>
-          val amount: MilliSatoshi = wrap.visibleValue
-          val inFiat: String = msatInFiatHuman apply amount
-          val incomingTitle = app.getString(btc_incoming_title)
-          incomingTitle.format(confs, coloredIn(amount), inFiat)
+          val inFiat = msatInFiatHuman(wrap.visibleValue)
+          app.getString(btc_incoming_title).format(confs,
+            coloredIn(wrap.visibleValue), inFiat)
 
         case None =>
-          val amount = Satoshi(-wrap.visibleValue.value)
-          val inFiat: String = msatInFiatHuman apply amount
-          val titleNoFee = app.getString(btc_outgoing_title_no_fee)
-          titleNoFee.format(confs, coloredOut(amount), inFiat)
+          val inFiat = msatInFiatHuman(-wrap.visibleValue)
+          app.getString(btc_outgoing_title_no_fee).format(confs,
+            coloredOut(-wrap.visibleValue), inFiat)
 
         case Some(fee) =>
           val amount = Satoshi(-wrap.visibleValue.value)
-          val inFiat: String = msatInFiatHuman apply amount
-          val feePercent = fee.value / (amount.amount / 100D)
-          val titleWithFee = app.getString(btc_outgoing_title)
-          titleWithFee.format(confs, coloredOut(amount),
-            coloredOut(fee), feePercent, inFiat)
+          val paidFeePercent = fee.value / (amount.amount / 100D)
+          app.getString(btc_outgoing_title).format(confs, coloredOut(amount),
+            msatInFiatHuman(amount), coloredOut(fee), paidFeePercent)
       }
 
       // See if CPFP can be applied

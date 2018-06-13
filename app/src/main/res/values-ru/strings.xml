@@ -125,11 +125,11 @@
 
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
-    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br>комса %3$s = %4$.2f%%<br><small>%5$s по текущему курсу</small>]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
 
     <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
     <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
-    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br>комса %3$s = %4$.2f%%<br><small>%5$s по текущему курсу</small>]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
 
     <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#76B041>%1$s</font>]]></string>
