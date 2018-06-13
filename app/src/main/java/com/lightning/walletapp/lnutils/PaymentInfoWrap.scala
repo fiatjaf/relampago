@@ -258,9 +258,10 @@ object BadEntityWrap {
     val chansSet = for (shortChanId: String <- badChans.toSet) yield shortChanId.toLong
     val fromSet = for (peerKey: PublicKey <- from.toSet) yield peerKey.toString
 
-    // We subtract peer keys set from bad nodes set because it may happen that blacklisted node becomes our peer
-    val request = OutRequest(rd.firstMsat / 1000L, badNodes.toSet diff fromSet, chansSet, fromSet, targetId.toString)
-    OlympusWrap findRoutes request
+    // One of blacklisted nodes may become our peer or final payee
+    val prunedBadNodes = badNodes.toSet - targetId.toString diff fromSet
+    OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, prunedBadNodes,
+      chansSet, fromSet, targetId.toString)
   }
 }
 
