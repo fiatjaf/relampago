@@ -391,13 +391,26 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val chanListener = new ChannelListener {
     // Updates UI on transitions and informs user on errors, should be removed once activity is destroyed
-    override def onProcessSuccess = { case (_, _, err: wire.Error) => host onFail err.exception.getMessage }
+    override def onProcessSuccess = { case (_, _, remote: wire.Error) => host onFail remote.exception.getMessage }
     override def onBecome = { case _ => updTitle.run }
 
     override def onException = {
-      // Also inform user on internal errors
-      case _ \ CMDAddImpossible(_, internalErrorCode) => onFail(host getString internalErrorCode)
-      case _ \ err => UITask(host showForm negTextBuilder(dialog_ok, UncaughtHandler toText err).create).run
+      case _ \ CMDAddImpossible(_, code) =>
+        // Non-fatal: can't add this payment
+        val msg = host getString code
+        host onFail msg
+
+      case chan \ HTLCExpiryException(_, htlc) =>
+        val peer = chan.data.announce.nodeId.toString
+        val payHash = htlc.add.paymentHash.toString
+        val msg = host getString err_ln_expired
+        host onFail msg.format(peer, payHash)
+
+      case _ \ internal =>
+        // Internal error has happened
+        val text = UncaughtHandler toText internal
+        val bld = negTextBuilder(dialog_ok, text)
+        UITask(host showForm bld.create).run
     }
   }
 

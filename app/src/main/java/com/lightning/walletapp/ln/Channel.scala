@@ -240,9 +240,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         }
 
 
-      case (norm: NormalData, CMDBestHeight(height), OPEN | OFFLINE)
-        if Commitments.hasExpiredHtlcs(norm.commitments, height) =>
-        startLocalClose(norm)
+      case (norm: NormalData, CMDBestHeight(chainHeight), OPEN | OFFLINE) =>
+        val expiredPayment = Commitments.findExpiredHtlc(norm.commitments, chainHeight)
+        if (expiredPayment.nonEmpty) throw HTLCExpiryException(norm, expiredPayment.get)
 
 
       // SHUTDOWN in WAIT_FUNDING_DONE and OPEN
@@ -509,7 +509,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     case _ => BECOME(me STORE ClosingData(some.announce, some.commitments, Nil, tx :: Nil), CLOSING)
   }
 
-  private def startLocalClose(some: HasCommitments): Unit =
+  def startLocalClose(some: HasCommitments): Unit =
     // Something went wrong and we decided to spend our CURRENT commit transaction
     // BUT if we're at negotiations AND we have a signed mutual closing tx then send it
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {

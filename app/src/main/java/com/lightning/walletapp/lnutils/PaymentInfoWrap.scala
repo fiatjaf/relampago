@@ -43,7 +43,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   def resolvePending = if (app.ChannelManager.currentBlocksLeft < 1) {
     // Send all pending payments only if we have an updated chain height
-    // attempt to send with expiry in past will result in a closed channel
     unsent.values foreach fetchAndSend
     unsent = Map.empty
   }
@@ -108,8 +107,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
   override def onException = {
-    case (_, nonFatal: CMDException) => me failOnUI nonFatal.rd
-    case chan \ error => chan process app.ChannelManager.CMDLocalShutdown
+    case _ \ CMDAddImpossible(rd, _) => me failOnUI rd
+    case chan \ HTLCExpiryException(norm, _) => chan startLocalClose norm
+    case chan \ _ => chan process app.ChannelManager.CMDLocalShutdown
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {
