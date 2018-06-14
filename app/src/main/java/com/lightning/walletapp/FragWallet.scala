@@ -396,20 +396,20 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     override def onException = {
       case _ \ CMDAddImpossible(_, code) =>
-        // Non-fatal: can't add this payment
-        val msg = host getString code
-        host onFail msg
+        // Non-fatal: can't add this payment, inform user why
+        val bld = negTextBuilder(dialog_ok, host getString code)
+        UITask(host showForm bld.create).run
 
       case chan \ HTLCExpiryException(_, htlc) =>
-        val peer = chan.data.announce.nodeId.toString
-        val payHash = htlc.add.paymentHash.toString
-        val msg = host getString err_ln_expired
-        host onFail msg.format(peer, payHash)
+        val paymentHash = htlc.add.paymentHash.toString
+        val peerKey = chan.data.announce.nodeId.toString
+        val msg = host.getString(err_ln_expired).format(peerKey, paymentHash)
+        UITask(host showForm negTextBuilder(dialog_ok, msg.html).create).run
 
       case _ \ internal =>
-        // Internal error has happened
-        val text = UncaughtHandler toText internal
-        val bld = negTextBuilder(dialog_ok, text)
+        // Internal error has happened, show stack trace
+        val stackTrace = UncaughtHandler toText internal
+        val bld = negTextBuilder(dialog_ok, stackTrace)
         UITask(host showForm bld.create).run
     }
   }
