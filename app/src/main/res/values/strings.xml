@@ -151,11 +151,12 @@
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><small><br><br>%1$s</small>]]></string>
-    <string name="ln_receive_ok"><![CDATA[<font color=#999999>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</font>]]></string>
     <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><font color=#999999><small><br><br>make a QR-code with on-chain wallet address, can be used to receive regular Bitcoin transactions</small></font>]]></string>
+
     <string name="ln_receive_reserve"><![CDATA[<font color=#333333>can\'t ask for Lightning payments yet because first you need to spend at least</font> %1$s <font color=#333333>in order to make some space for receiving</font>]]></string>
     <string name="ln_receive_6conf"><![CDATA[<font color=#333333>can\'t ask for Lightning payments yet because a funding Bitcoin transaction has not got 6 confirmations</font>]]></string>
     <string name="ln_receive_no_channels"><![CDATA[<font color=#333333>can\'t ask for Lightning payments yet because no open payment channels are present currently</font>]]></string>
+    <string name="ln_receive_ok"><![CDATA[<font color=#999999>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</font>]]></string>
 
     <!-- errors -->
     <string name="err_ln_peer_offline">Could not connect to remote peer at %1$s</string>
