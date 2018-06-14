@@ -144,18 +144,19 @@
         <item><![CDATA[<strong>отменена</strong>]]></item>
     </array>
 
-    <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Получить платеж-Молнию</strong></font>]]></string>
-    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></string></font>]]></string>
-    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br><br><small>%1$s</small>]]></string>
     <string name="send_scan_qr">Сканировать QR-код</string>
-    <string name="send_paste">Вставить запрос</string>
+    <string name="send_paste"><![CDATA[Вставить Биткоин-адрес<br><font color=#999999><small>или запрос-Молнию</small></font>]]></string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br><br><small>%1$s</small>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></string></font>]]></string>
 
-	<string name="ln_receive_option"><![CDATA[<font color=#0099FE>Платеж-Молния</font><small><br><br>%1$s</small>]]></string>
-    <string name="ln_receive_ok"><![CDATA[<font color=#999999>создать QR-код с одноразовым запросом для получения быстрых оффчейн платежей</font>]]></string>
+    <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>
+    <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запрос-Молния</font><small><br><br>%1$s</small>]]></string>
+
     <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Биткоин-транзакция</font><font color=#999999><small><br><br>создать QR-код с обычным адресом для получения ончейн Биткоин-транзакций</small></font>]]></string>
     <string name="ln_receive_reserve"><![CDATA[<font color=#333333>входящие платежи-Молнии пока невозможны потому что для начала вам нужно потратить хотя-бы</font> %1$s <font color=#333333>чтобы освободить место для получения денег</font>]]></string>
     <string name="ln_receive_6conf"><![CDATA[<font color=#333333>входящие платежи-Молнии пока невозможны потому что пополняющая канал Биткоин-транзакция еще не получила 6 подтверждений</font>]]></string>
     <string name="ln_receive_no_channels"><![CDATA[<font color=#333333>входящие платежи-Молнии пока невозможны потому что нет открытых платежных каналов</font>]]></string>
+    <string name="ln_receive_ok"><![CDATA[<font color=#999999>создать QR-код с одноразовым запросом для получения быстрых оффчейн платежей</font>]]></string>
 
     <!-- errors -->
     <string name="err_ln_peer_offline">Не удалось подключиться к узлу %1$s</string>

@@ -144,12 +144,12 @@
         <item><![CDATA[<strong>cancelled</strong>]]></item>
     </array>
 
-    <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
-    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin transaction</strong></string></font>]]></string>
-    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><br><br><small>%1$s</small>]]></string>
-    <string name="send_paste">Paste a Payment Request</string>
     <string name="send_scan_qr">Scan a QR code</string>
+    <string name="send_paste"><![CDATA[Paste a Bitcoin address<br><font color=#999999><small>or Lightning Payment Request</small></font>]]></string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><br><br><small>%1$s</small>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin transaction</strong></string></font>]]></string>
 
+    <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><small><br><br>%1$s</small>]]></string>
     <string name="ln_receive_ok"><![CDATA[<font color=#999999>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</font>]]></string>
     <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><font color=#999999><small><br><br>make a QR-code with on-chain wallet address, can be used to receive regular Bitcoin transactions</small></font>]]></string>
