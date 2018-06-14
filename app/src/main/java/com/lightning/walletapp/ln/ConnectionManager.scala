@@ -68,23 +68,14 @@ object ConnectionManager {
       lastMsg = System.currentTimeMillis
 
       message match {
-        case cm: ChannelMessage => println(s"<-- $cm")
-        case _ =>
-      }
-
-      message match {
-        case ping: Ping if ping.pongLength > 0 =>
-          handler process Pong("00" * ping.pongLength)
-
         case their: Init =>
           // Save their Init for possible subsequent requests
           val isOk = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures)
           if (isOk) events.onOperational(ann.nodeId, their) else events.onIncompatible(ann.nodeId)
           if (isOk) savedInit = their
 
-        case _ =>
-          // Send a message downstream
-          events.onMessage(ann.nodeId, message)
+        case pg: Ping if pg.pongLength > 0 => handler process Pong("00" * pg.pongLength)
+        case internalMessage => events.onMessage(ann.nodeId, internalMessage)
       }
     }
   }
