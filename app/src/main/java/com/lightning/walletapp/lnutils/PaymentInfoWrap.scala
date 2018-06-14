@@ -21,6 +21,7 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import com.lightning.walletapp.R
 import java.util.Collections
+import scala.util.Random
 
 import android.app.{AlarmManager, NotificationManager, PendingIntent}
 import android.content.{BroadcastReceiver, Context, Intent}
@@ -254,14 +255,12 @@ object BadEntityWrap {
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
     val cursor = db.select(BadEntityTable.selectSql, params = System.currentTimeMillis, rd.firstMsat)
-    val badNodes \ badChans = RichCursor(cursor).vec(_ string BadEntityTable.resId).partition(_.length > 60)
-    val chansSet = for (shortChanId: String <- badChans.toSet) yield shortChanId.toLong
-    val fromSet = for (peerKey: PublicKey <- from.toSet) yield peerKey.toString
+    val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
+    val fromAsString = for (peerKey: PublicKey <- Random shuffle from) yield peerKey.toString
 
-    // One of blacklisted nodes may become our peer or final payee
-    val prunedBadNodes = badNodes.toSet - targetId.toString diff fromSet
-    OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, prunedBadNodes,
-      chansSet, fromSet, targetId.toString)
+    // One of blacklisted nodes may become our peer or final payee so we remove them from bad nodes
+    OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, badNodes - targetId.toString -- fromAsString,
+      for (shortChanId: String <- badChans) yield shortChanId.toLong, fromAsString, targetId.toString)
   }
 }
 

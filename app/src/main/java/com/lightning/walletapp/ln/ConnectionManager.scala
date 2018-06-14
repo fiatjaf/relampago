@@ -68,6 +68,11 @@ object ConnectionManager {
       lastMsg = System.currentTimeMillis
 
       message match {
+        case cm: ChannelMessage => println(s"<-- $cm")
+        case _ =>
+      }
+
+      message match {
         case ping: Ping if ping.pongLength > 0 =>
           handler process Pong("00" * ping.pongLength)
 

@@ -296,6 +296,6 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     "announce", "our", "their", "fundingTx", "commitments"), tag = "WaitFundingDoneData")
 
   implicit val outRequestFmt =
-    jsonFormat[Long, Set[String], Set[Long], Set[String], String,
+    jsonFormat[Long, Set[String], Set[Long], Vector[String], String,
       OutRequest](OutRequest.apply, "sat", "badNodes", "badChans", "from", "to")
 }

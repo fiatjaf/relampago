@@ -245,12 +245,8 @@ class WalletApp extends Application { me =>
         else if (rd.pr.routingInfo.isEmpty) getRoutes(targetId = rd.pr.nodeId)
         else Obs.zip(withExtraPart).map(_.flatten.toVector)
 
-      for {
-        routes <- cheapestRoutesObs
-        // Runtime optimization: shorter routes AND local channels with fewer pending payments
-        chanMap = notClosingOrRefunding.map(chan => chan.data.announce.nodeId -> inFlightHtlcs(chan).size).toMap
-        best = routes.sortBy(route => route.headOption.flatMap(hop => chanMap get hop.nodeId).getOrElse(0) + route.size)
-      } yield useFirstRoute(best, rd)
+      // This may filter out too long or too expensive routes
+      for (routes <- cheapestRoutesObs) yield useFirstRoute(routes, rd)
     }
 
     def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
