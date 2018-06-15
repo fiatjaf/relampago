@@ -170,8 +170,8 @@
     <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 
     <string name="err_ln_no_chan">Failed because either all channels are offline or no channel has enough funds to handle an off-chain payment amount combined with on-chain commit transaction fee</string>
-    <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
     <string name="err_ln_expired"><![CDATA[A channel has just been force closed because of an expired outgoing payment<br><br><strong>Faulty peer public key</strong><br>%1$s<br><br><strong>Expired payment hash</strong><br>%2$s]]></string>
+    <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
     <string name="err_self_payment">Failed because payments to yourself are not allowed</string>
