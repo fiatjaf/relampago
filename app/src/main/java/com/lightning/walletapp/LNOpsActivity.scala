@@ -78,11 +78,11 @@ class LNOpsActivity extends TimerActivity { me =>
   }
 
   def bundledFrag(pos: Int) = {
-    val frag = new ChanDetailsFrag
     val arguments: Bundle = new Bundle
+    val fragment = new ChanDetailsFrag(me)
     arguments.putInt("chanPosition", pos)
-    frag setArguments arguments
-    frag
+    fragment setArguments arguments
+    fragment
   }
 
   def fillViewPager = {
@@ -99,7 +99,7 @@ class LNOpsActivity extends TimerActivity { me =>
   }
 
   def export(chanData: ChannelData) = chanData match {
-    case some: HasCommitments => me share some.toJson.toString
+    case some: HasCommitments => share(some.toJson.toString)
     case otherwise => app toast err_no_data
   }
 
@@ -110,17 +110,14 @@ class LNOpsActivity extends TimerActivity { me =>
 
   val getTotalSent = memoize { chanId: BinaryData =>
     val cursor = db.select(PaymentTable.selectTotalSql, chanId, 0)
-    RichCursor(cursor).vec(_ long PaymentTable.lastMsat)
+    RichCursor(cursor).vec(rc => rc long PaymentTable.lastMsat)
   }
 }
 
-class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
-  override def onCreateView(i: LayoutInflater, vg: ViewGroup, bn: Bundle) =
-    i.inflate(R.layout.frag_view_pager_chan, vg, false)
-
+class ChanDetailsFrag(val host: LNOpsActivity) extends Fragment with HumanTimeDisplay { me =>
+  override def onCreateView(i: LayoutInflater, v: ViewGroup, b: Bundle) = i.inflate(R.layout.frag_view_pager_chan, v, false)
   override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
   var whenDestroy: Runnable = new Runnable { def run = none }
-  lazy val host = getActivity.asInstanceOf[LNOpsActivity]
   import host._
 
   override def onViewCreated(view: View, state: Bundle) = {

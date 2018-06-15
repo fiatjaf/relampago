@@ -1,25 +1,27 @@
 package com.lightning.walletapp
 
 import android.graphics._
+import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
-import com.lightning.walletapp.Denomination._
-
-import java.io.{File, FileOutputStream}
-import android.os.{Bundle, Environment}
-import android.text.{StaticLayout, TextPaint}
-import android.widget.{ImageButton, ImageView}
-import com.google.zxing.{BarcodeFormat, EncodeHintType}
-import com.lightning.walletapp.lnutils.ImplicitConversions.string2Ops
+import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import android.text.Layout.Alignment.ALIGN_NORMAL
-import com.lightning.walletapp.ln.PaymentRequest
 import android.graphics.Bitmap.Config.ARGB_8888
 import com.google.zxing.qrcode.QRCodeWriter
 import android.graphics.Bitmap.createBitmap
+import fr.acinq.bitcoin.BinaryData
 import org.bitcoinj.core.Address
 import android.content.Intent
+import android.view.View
 import android.net.Uri
+
+import android.widget.{ImageButton, ImageView, LinearLayout}
+import com.google.zxing.{BarcodeFormat, EncodeHintType}
+import com.lightning.walletapp.ln.Tools.{wrap, none}
+import android.text.{StaticLayout, TextPaint}
+import java.io.{File, FileOutputStream}
+import android.os.{Bundle, Environment}
 
 
 object QRGen {
@@ -54,6 +56,8 @@ object FileOps {
 }
 
 class RequestActivity extends TimerActivity { me =>
+  lazy val reqOptions = findViewById(R.id.reqOptions).asInstanceOf[LinearLayout]
+  lazy val reqFulfilled = findViewById(R.id.reqFulfilled).asInstanceOf[LinearLayout]
   lazy val shareText = findViewById(R.id.shareText).asInstanceOf[ImageButton]
   lazy val shareQR = findViewById(R.id.shareQR).asInstanceOf[ImageButton]
   lazy val reqCode = findViewById(R.id.reqCode).asInstanceOf[ImageView]
@@ -62,18 +66,41 @@ class RequestActivity extends TimerActivity { me =>
   lazy val bottomSize = getResources getDimensionPixelSize R.dimen.bitmap_bottom_size
   lazy val topSize = getResources getDimensionPixelSize R.dimen.bitmap_top_size
   lazy val qrSize = getResources getDimensionPixelSize R.dimen.bitmap_qr_size
+  lazy val disposable = getString(ln_qr_disposable)
+
+  override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
+  var whenDestroy: Runnable = new Runnable { def run = none }
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_request)
 
     app.TransData.value match {
-      case pr: PaymentRequest => showInfo(drawAll(denom asString pr.amount.get, getString(ln_qr_disposable).html), PaymentRequest write pr)
+      case pr: PaymentRequest => showInfo(drawAll(denom asString pr.amount.get, disposable.html), PaymentRequest write pr)
       case onChainAddress: Address => showInfo(drawBottom(Utils humanSix onChainAddress.toString), onChainAddress.toString)
       case _ => finish
     }
 
-    // Clear data right away
+    val receivedListener = new ChannelListener {
+      val targetPaymentHash = app.TransData.value match {
+        case request: PaymentRequest => request.paymentHash
+        case _ => BinaryData.empty
+      }
+
+      override def settled(cs: Commitments) = for {
+        Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled
+        if add.paymentHash == targetPaymentHash
+      } showPaid.run
+    }
+
+    // Listen to all channels, remove listener on exiting, clear TransData right away
+    whenDestroy = UITask(for (c <- app.ChannelManager.all) c.listeners -= receivedListener)
+    for (c <- app.ChannelManager.all) c.listeners += receivedListener
     app.TransData.value = null
+  }
+
+  def showPaid = UITask {
+    reqOptions setVisibility View.GONE
+    reqFulfilled setVisibility View.VISIBLE
   }
 
   def showInfo(renderBitmap: Bitmap => Bitmap, data: String) = {
