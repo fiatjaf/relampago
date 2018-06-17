@@ -227,10 +227,14 @@ class WalletApp extends Application { me =>
     }
 
     def fetchRoutes(rd: RoutingData) = {
-      val peers = canSendNow(rd.firstMsat).map(_.data.announce.nodeId)
-      def getRoutes(targetId: PublicKey) = peers contains targetId match {
-        case false if rd.useCache => RouteWrap.findRoutes(peers, targetId, rd)
-        case false => BadEntityWrap.findRoutes(peers, targetId, rd)
+      // Double ordering: first randomize channels without payments, then order those with
+      val free \ busy = canSendNow(rd.firstMsat).partition(chan => inFlightHtlcs(chan).isEmpty)
+      val peers = scala.util.Random.shuffle(free) ++ busy.sortBy(chan => inFlightHtlcs(chan).size)
+      val from = for (chan <- peers) yield chan.data.announce.nodeId
+
+      def getRoutes(targetId: PublicKey) = from contains targetId match {
+        case false if rd.useCache => RouteWrap.findRoutes(from, targetId, rd)
+        case false => BadEntityWrap.findRoutes(from, targetId, rd)
         case true => Obs just Vector(Vector.empty)
       }
 

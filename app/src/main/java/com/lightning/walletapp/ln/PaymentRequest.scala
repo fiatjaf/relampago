@@ -40,8 +40,8 @@ case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
                htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
   def humanDetails =
-    s"Node ID: $nodeId, channel ID: $shortChannelId, expiry delta: $cltvExpiryDelta blocks, " +
-      f"routing fee: ${feeProportionalMillionths / 10000D}%2f%% of sum + baseline $feeBaseMsat msat"
+    s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry delta: $cltvExpiryDelta blocks, " +
+      s"Routing fee: ${feeProportionalMillionths / 10000D}% of sum + baseline $feeBaseMsat msat"
 }
 
 case class RoutingInfoTag(route: PaymentRoute) extends Tag {

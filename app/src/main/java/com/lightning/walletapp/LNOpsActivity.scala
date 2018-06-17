@@ -78,11 +78,11 @@ class LNOpsActivity extends TimerActivity { me =>
   }
 
   def bundledFrag(pos: Int) = {
-    val arguments: Bundle = new Bundle
-    val fragment = new ChanDetailsFrag(me)
-    arguments.putInt("chanPosition", pos)
-    fragment setArguments arguments
-    fragment
+    val frag = new ChanDetailsFrag
+    val fragmentArguments = new Bundle
+    fragmentArguments.putInt("pos", pos)
+    frag setArguments fragmentArguments
+    frag
   }
 
   def fillViewPager = {
@@ -98,37 +98,30 @@ class LNOpsActivity extends TimerActivity { me =>
     case otherwise => true
   }
 
-  def export(chanData: ChannelData) = chanData match {
-    case some: HasCommitments => share(some.toJson.toString)
-    case otherwise => app toast err_no_data
-  }
-
-  def startedBy(c: ClosingData) = {
-    val byRemote = c.remoteCommit.nonEmpty || c.nextRemoteCommit.nonEmpty
-    if (byRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
-  }
-
-  val getTotalSent = memoize { chanId: BinaryData =>
+  val getTotalSent: BinaryData => Vector[Long] = memoize { chanId =>
     val cursor = db.select(PaymentTable.selectTotalSql, chanId, 0)
-    RichCursor(cursor).vec(rc => rc long PaymentTable.lastMsat)
+    RichCursor(cursor).vec(_ long PaymentTable.lastMsat)
   }
 }
 
-class ChanDetailsFrag(val host: LNOpsActivity) extends Fragment with HumanTimeDisplay { me =>
-  override def onCreateView(i: LayoutInflater, v: ViewGroup, b: Bundle) = i.inflate(R.layout.frag_view_pager_chan, v, false)
+class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
+  override def onCreateView(i: LayoutInflater, v: ViewGroup, b: Bundle) =
+    i.inflate(R.layout.frag_view_pager_chan, v, false)
+
   override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
   var whenDestroy: Runnable = new Runnable { def run = none }
+  lazy val host = getActivity.asInstanceOf[LNOpsActivity]
   import host._
 
-  override def onViewCreated(view: View, state: Bundle) = {
-    val chan = localChanCache(getArguments getInt "chanPosition")
+  override def onViewCreated(view: View, s: Bundle) = {
+    val chan = localChanCache(getArguments getInt "pos")
     val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
     val lnOpsDescription = Utils clickableTextField view.findViewById(R.id.lnOpsDescription)
     def warnAndForceClose = warnAndMaybeClose(host getString ln_chan_force_details)
 
     def warnAndMaybeClose(warning: String) =
-      mkForm(chan process app.ChannelManager.CMDLocalShutdown, none,
-        baseTextBuilder(warning.html), dialog_ok, dialog_cancel)
+      mkForm(chan process app.ChannelManager.CMDLocalShutdown,
+        none, baseTextBuilder(warning.html), dialog_ok, dialog_cancel)
 
     chan { cs =>
       val alias = chan.data.announce.alias take 16
@@ -153,10 +146,10 @@ class ChanDetailsFrag(val host: LNOpsActivity) extends Fragment with HumanTimeDi
         }
 
         def shareInfo = host share {
-          val c = cs.channelId.toString
+          val cId = cs.channelId.toString
           val w = LNParams.nodePublicKey.toString
-          val p = chan.data.announce.nodeId.toString
-          s"Wallet: $w\n\nPeer: $p\n\nChannel: $c"
+          val peer = chan.data.announce.nodeId.toString
+          s"Wallet: $w\n\nPeer: $peer\n\nChannel: $cId"
         }
 
         def closeToWallet = {
@@ -182,9 +175,9 @@ class ChanDetailsFrag(val host: LNOpsActivity) extends Fragment with HumanTimeDi
         }
 
         lst setOnItemClickListener onTap {
-          case 3 => proceedCoopCloseOrWarn(closeToWallet)
-          case 2 => proceedCoopCloseOrWarn(closeToAddress)
-          case 1 => host export chan.data
+          case 3 => proceedCoopCloseOrWarn(startCoopClosing = closeToWallet)
+          case 2 => proceedCoopCloseOrWarn(startCoopClosing = closeToAddress)
+          case 1 => host share chan.data.asInstanceOf[HasCommitments].toJson.toString
           case 0 => shareInfo
         }
       }
@@ -243,7 +236,6 @@ class ChanDetailsFrag(val host: LNOpsActivity) extends Fragment with HumanTimeDi
       def manageClosing(close: ClosingData) = UITask {
         // Show the best current closing with most confirmations
         // since multiple different closings may be present at once
-        // or no closing at all in case like restoking a closed commit
         val closedTimestamp = me time new Date(close.closedAt)
         lnOpsAction setVisibility View.GONE
 
@@ -275,14 +267,15 @@ class ChanDetailsFrag(val host: LNOpsActivity) extends Fragment with HumanTimeDi
                 statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
             }
 
-            val startedByWhom = host getString startedBy(close)
             val humanTier12View = tier12View take 2 mkString "<br><br>"
             val status = humanStatus apply getStatus(info.commitTx.txid)
             val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
+            val isRemote = close.remoteCommit.nonEmpty || close.nextRemoteCommit.nonEmpty
+            val startedByWhom = if (isRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
             val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
             val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
-            lnOpsDescription setText unilateralClosing.format(chan.state, startedByWhom, alias, started,
-              closedTimestamp, coloredIn(capacity), commitView + refundsView).html
+            lnOpsDescription setText unilateralClosing.format(chan.state, host getString startedByWhom,
+              alias, started, closedTimestamp, coloredIn(capacity), commitView + refundsView).html
         }
       }
 

@@ -10,7 +10,6 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -21,7 +20,6 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import com.lightning.walletapp.R
 import java.util.Collections
-import scala.util.Random
 
 import android.app.{AlarmManager, NotificationManager, PendingIntent}
 import android.content.{BroadcastReceiver, Context, Intent}
@@ -256,7 +254,7 @@ object BadEntityWrap {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
     val cursor = db.select(BadEntityTable.selectSql, params = System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
-    val fromAsString = for (peerKey: PublicKey <- Random shuffle from) yield peerKey.toString
+    val fromAsString = for (peerPubKey: PublicKey <- from) yield peerPubKey.toString
 
     // One of blacklisted nodes may become our peer or final payee so we remove them from bad nodes
     OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, badNodes - targetId.toString -- fromAsString,
