@@ -77,6 +77,11 @@ class LNOpsActivity extends TimerActivity { me =>
     case _ => txsConfs.head
   }
 
+  val getTotalSent: BinaryData => Vector[Long] = memoize { chanId =>
+    val cursor = db.select(PaymentTable.selectTotalSql, chanId, 0)
+    RichCursor(cursor).vec(_ long PaymentTable.lastMsat)
+  }
+
   def bundledFrag(pos: Int) = {
     val frag = new ChanDetailsFrag
     val fragmentArguments = new Bundle
@@ -96,11 +101,6 @@ class LNOpsActivity extends TimerActivity { me =>
   def canDisplay(chanData: ChannelData) = chanData match {
     case ref: RefundingData => ref.remoteLatestPoint.isDefined
     case otherwise => true
-  }
-
-  val getTotalSent: BinaryData => Vector[Long] = memoize { chanId =>
-    val cursor = db.select(PaymentTable.selectTotalSql, chanId, 0)
-    RichCursor(cursor).vec(_ long PaymentTable.lastMsat)
   }
 }
 
@@ -203,17 +203,20 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       }
 
       def manageOpen = UITask {
-        val total = getTotalSent(cs.channelId)
+        val totalSent = getTotalSent(cs.channelId)
+        val paymentsNumber = app.plurOrZero(totalPayments, totalSent.size)
+        val valueSent = totalValue.format(MilliSatoshi andThen coloredOut apply totalSent.sum)
+
         val canSend = MilliSatoshi(Channel estimateCanSend chan)
         val canReceive = MilliSatoshi(Channel estimateCanReceive chan)
+        val canSend1 = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
+        val canReceive1 = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
+
         val commitFee = MilliSatoshi(cs.reducedRemoteState.feesSat * 1000L)
-        val totalPaymentsNumber = app.plurOrZero(totalPayments, total.size)
-        val inFlightHTLCs = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
-        val totalValueSent = totalValue.format(MilliSatoshi andThen coloredOut apply total.sum)
-        val finalCanSend = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
-        val finalCanReceive = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-        lnOpsDescription setText host.getString(ln_ops_chan_open).format(chan.state, alias, coloredIn(capacity),
-          finalCanSend, finalCanReceive, coloredOut(commitFee), inFlightHTLCs, totalValueSent, totalPaymentsNumber).html
+        val inFlightHTLC = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
+        val openTemplate = if (channelAndHop(chan).isEmpty) ln_ops_chan_open_no_receive else ln_ops_chan_open
+        lnOpsDescription setText host.getString(openTemplate).format(chan.state, alias, coloredIn(capacity),
+          canSend1, canReceive1, coloredOut(commitFee), inFlightHTLC, valueSent, paymentsNumber).html
 
         // Show channel actions with cooperative closing options
         lnOpsAction setOnClickListener onButtonTap(showCoopOptions)
@@ -223,9 +226,9 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       def manageNegotiations(cs: Commitments) = UITask {
         val refundable = MilliSatoshi(cs.localCommit.spec.toLocalMsat)
-        val inFlightHTLCs = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
+        val inFlightHTLC = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
         lnOpsDescription setText negotiations.format(chan.state, alias, started,
-          coloredIn(capacity), coloredIn(refundable), inFlightHTLCs).html
+          coloredIn(capacity), coloredIn(refundable), inFlightHTLC).html
 
         // Show warning and proceed with an uncooperative closing
         lnOpsAction setOnClickListener onButtonTap(warnAndForceClose)
