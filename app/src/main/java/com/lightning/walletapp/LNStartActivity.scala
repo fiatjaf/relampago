@@ -25,6 +25,12 @@ class LNStartActivity extends ScanActivity { me =>
     def getCount = 2
   }
 
+  override def onBackPressed = {
+    val isScannerOpen = 1 == walletPager.getCurrentItem
+    if (isScannerOpen) walletPager.setCurrentItem(0, true)
+    else super.onBackPressed
+  }
+
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionScan) walletPager.setCurrentItem(1, true)
   }

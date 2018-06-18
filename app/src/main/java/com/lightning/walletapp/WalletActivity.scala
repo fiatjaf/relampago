@@ -103,7 +103,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   override def onBackPressed = {
     val isExpanded = FragWallet.worker.currentCut > FragWallet.worker.minLinesNum
-    if (walletPager.getCurrentItem == 1) walletPager.setCurrentItem(0, true)
+    if (1 == walletPager.getCurrentItem) walletPager.setCurrentItem(0, true)
     else if (floatingActionMenu.isOpened) floatingActionMenu close true
     else if (isExpanded) FragWallet.worker.toggler.performClick
     else super.onBackPressed
