@@ -14,7 +14,7 @@
         android:layout_gravity="center"/>
 
     <ImageButton
-        android:onClick="checkTransData"
+        android:onClick="returnToBase"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:padding="@dimen/app_padding"

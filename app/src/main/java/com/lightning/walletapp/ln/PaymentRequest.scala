@@ -135,7 +135,7 @@ object PaymentRequest {
             routes: PaymentRouteVec): PaymentRequest = {
 
     val paymentHashTag = PaymentHashTag(paymentHash)
-    val tags = routes.map(RoutingInfoTag.apply) ++ Vector(DescriptionTag(description), ExpiryTag(3600), paymentHashTag)
+    val tags = routes.map(RoutingInfoTag.apply) ++ Vector(DescriptionTag(description), ExpiryTag(3600 * 48), paymentHashTag)
     val pr = PaymentRequest(prefixes(chain), amount, System.currentTimeMillis / 1000L, privateKey.publicKey, tags, BinaryData.empty)
     pr sign privateKey
   }

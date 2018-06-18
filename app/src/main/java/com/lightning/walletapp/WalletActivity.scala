@@ -5,7 +5,6 @@ import android.widget._
 import com.lightning.walletapp.ln._
 import android.text.format.DateUtils._
 import com.lightning.walletapp.Utils._
-import com.journeyapps.barcodescanner._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
@@ -18,16 +17,15 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import scala.util.{Failure, Try}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
-import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
+import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
 import com.lightning.walletapp.helper.AES
-import android.support.v4.view.ViewPager
 import org.bitcoinj.store.SPVBlockStore
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
@@ -91,15 +89,12 @@ trait HumanTimeDisplay {
   }
 }
 
-class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
-  lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
+class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
-
-  lazy val slidingFragmentAdapter =
-    new FragmentStatePagerAdapter(getSupportFragmentManager) {
-      def getItem(pos: Int) = if (pos == 0) new FragWallet else new FragScan
-      def getCount = 2
-    }
+  lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
+    def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
+    def getCount = 2
+  }
 
   override def onDestroy = wrap(super.onDestroy)(stopDetecting)
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
@@ -118,14 +113,13 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
     // Called after fragLN sets toolbar as actionbar
     getMenuInflater.inflate(R.menu.wallet, menu)
     // Updated here to make sure it's present
-    floatingActionMenu setIconAnimated false
     FragWallet.worker setupSearch menu
     true
   }
 
   def INIT(state: Bundle) = if (app.isAlive) {
-    me setContentView R.layout.activity_wallet
     wrap(me setDetecting true)(me initNfc state)
+    me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
   } else me exitTo classOf[MainActivity]
 
@@ -138,17 +132,14 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
   def onNfcStateDisabled = none
   def onNfcStateEnabled = none
 
-  def readNdefMessage(m: Message) = {
-    def fail(err: Throwable) = app toast err_no_data
-    def nfcSuccess(unitRecordResult: Unit) = me checkTransData null
-    <(app.TransData recordValue ndefMessageString(m), fail)(nfcSuccess)
-  }
+  def readNdefMessage(m: Message) =
+    <(app.TransData recordValue ndefMessageString(m),
+      fail => app toast err_no_data)(ok => checkTransData)
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData(top: View) = {
-    walletPager.setCurrentItem(0, false)
-
+  def checkTransData = {
+    returnToBase(view = null)
     app.TransData.value match {
       case paymentRequest: PaymentRequest => FragWallet.worker sendPayment paymentRequest
       case bu: BitcoinURI => FragWallet.worker sendBtcPopup bu.getAddress setSum Try(bu.getAmount)
@@ -211,9 +202,8 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
 
     def pasteRequest = rm(alert) {
       app.getBufferTry map app.TransData.recordValue match {
-        // Buffer may contain junk so always account for error
-        case Failure(why) => app toast err_no_data
-        case _ => me checkTransData null
+        case Failure(junkDataProvided) => app toast err_no_data
+        case _ => checkTransData
       }
     }
 
@@ -351,45 +341,5 @@ class WalletActivity extends NfcReaderActivity with TimerActivity { me =>
       // Can be accessed here and from page button
       rm(menu)(me viewMnemonic null)
     }
-  }
-}
-
-class FragScan extends Fragment with BarcodeCallback { me =>
-  type Points = java.util.List[com.google.zxing.ResultPoint]
-  lazy val host = getActivity.asInstanceOf[WalletActivity]
-  var lastAttempt = System.currentTimeMillis
-  var barcodeReader: BarcodeView = _
-  import host._
-
-  override def onCreateView(inflator: LayoutInflater, vg: ViewGroup, bn: Bundle) =
-    inflator.inflate(R.layout.frag_view_pager_scan, vg, false)
-
-  override def onViewCreated(view: View, savedInstanceState: Bundle) = {
-    barcodeReader = view.findViewById(R.id.reader).asInstanceOf[BarcodeView]
-    barcodeReader decodeContinuous me
-  }
-
-  override def setUserVisibleHint(isVisibleToUser: Boolean) = {
-    if (isAdded) if (isVisibleToUser) barcodeReader.resume else {
-      getFragmentManager.beginTransaction.detach(me).attach(me).commit
-      barcodeReader.pause
-    }
-
-    // Remove snapshot traces if stopped
-    super.setUserVisibleHint(isVisibleToUser)
-  }
-
-  // Only try to decode result after some time
-  override def possibleResultPoints(points: Points) = none
-  override def barcodeResult(res: BarcodeResult) = Option(res.getText) foreach {
-    rawText => if (System.currentTimeMillis - lastAttempt > 3000) tryParseQR(rawText)
-  }
-
-  def tryParseQR(text: String) = {
-    def decodeSuccess(unitRecordResult: Unit) = host checkTransData null
-    def fail(err: Throwable) = runAnd(app toast err_no_data)(barcodeReader.resume)
-    <(app.TransData recordValue text, fail)(decodeSuccess)
-    lastAttempt = System.currentTimeMillis
-    barcodeReader.pause
   }
 }

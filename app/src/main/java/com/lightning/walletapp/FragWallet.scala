@@ -374,7 +374,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def onFragmentResume = {
     for (c <- app.ChannelManager.all) c.listeners += chanListener
     // Calling host when this fragment is definitely created
-    runAnd(updTitle.run)(host checkTransData null)
+    runAnd(updTitle.run)(host.checkTransData)
   }
 
   def onFragmentDestroy = {
