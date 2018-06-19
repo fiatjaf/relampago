@@ -97,7 +97,7 @@ object PaymentTable extends Table {
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ?, $chanId = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ?, $chanId = ? WHERE $hash = ?"
   val updLastParamsSql = s"UPDATE $table SET $status = $WAITING, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
-  val updFailWaitingSql = s"UPDATE $table SET $status = $FAILURE WHERE $status = $WAITING"
+  val updFailWaitingAndFrozenSql = s"UPDATE $table SET $status = $FAILURE WHERE $status IN ($WAITING, $FROZEN)"
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
 
   val createVSql = s"""
