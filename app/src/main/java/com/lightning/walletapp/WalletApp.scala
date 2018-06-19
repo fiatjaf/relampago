@@ -166,8 +166,7 @@ class WalletApp extends Application { me =>
 
         if (currentBlocksLeft < 1) {
           // Send out pending payments and report best height to channels
-          val cmdBestHeight = CMDBestHeight(broadcaster.currentHeight)
-          for (c <- all) c process cmdBestHeight
+          for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
           PaymentInfoWrap.resolvePending
         }
       }
@@ -304,35 +303,49 @@ class WalletApp extends Application { me =>
       CheckpointManager.checkpoint(params, pts, store, time)
     }
 
+    def stopwatch(what: String)(run: => Unit) = {
+      val a = System.currentTimeMillis
+      run
+      println(s"$what: ${System.currentTimeMillis - a}")
+    }
+
     def setupAndStartDownload = {
-      wallet.setAcceptRiskyTransactions(true)
-      wallet.addTransactionConfidenceEventListener(ChannelManager.chainEventsListener)
-      wallet.addCoinsSentEventListener(ChannelManager.chainEventsListener)
-      wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
-      wallet.setCoinSelector(new MinDepthReachedCoinSelector)
+      stopwatch("wallet") {
+        wallet.setAcceptRiskyTransactions(true)
+        wallet.addTransactionConfidenceEventListener(ChannelManager.chainEventsListener)
+        wallet.addCoinsSentEventListener(ChannelManager.chainEventsListener)
+        wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
+        wallet.setCoinSelector(new MinDepthReachedCoinSelector)
+      }
 
-      try {
-        Notificator.removeResyncNotification
-        val shouldReschedule = ChannelManager.notClosingOrRefunding.exists(hasReceivedPayments)
-        val fastPeer = InetAddress getByName Uri.parse(OlympusWrap.clouds.head.connector.url).getHost
-        if (shouldReschedule) Notificator.scheduleResyncNotificationOnceAgain
-        peerGroup addAddress new PeerAddress(app.params, fastPeer, 8333)
-      } catch none
+      stopwatch("misc") {
+        try {
+          Notificator.removeResyncNotification
+          val shouldReschedule = ChannelManager.notClosingOrRefunding.exists(hasReceivedPayments)
+          val fastPeer = InetAddress getByName Uri.parse(OlympusWrap.clouds.head.connector.url).getHost
+          if (shouldReschedule) Notificator.scheduleResyncNotificationOnceAgain
+          peerGroup addAddress new PeerAddress(app.params, fastPeer, 8333)
+        } catch none
+      }
 
-      peerGroup addPeerDiscovery new DnsDiscovery(params)
-      peerGroup.setMinRequiredProtocolVersion(70015)
-      peerGroup.setDownloadTxDependencies(0)
-      peerGroup.setPingIntervalMsec(10000)
-      peerGroup.setMaxConnections(5)
-      peerGroup.addWallet(wallet)
+      stopwatch("peerGroup") {
+        peerGroup addPeerDiscovery new DnsDiscovery(params)
+        peerGroup.setMinRequiredProtocolVersion(70015)
+        peerGroup.setDownloadTxDependencies(0)
+        peerGroup.setPingIntervalMsec(10000)
+        peerGroup.setMaxConnections(5)
+        peerGroup.addWallet(wallet)
+      }
 
-      ConnectionManager.listeners += ChannelManager.socketEventsListener
-      startBlocksDownload(ChannelManager.chainEventsListener)
-      // Try to clear act leftovers if no channels left
-      OlympusWrap tellClouds OlympusWrap.CMDStart
-      PaymentInfoWrap.markFailedAndFrozen
-      ChannelManager.initConnect
-      RatesSaver.initialize
+      stopwatch("rest") {
+        ConnectionManager.listeners += ChannelManager.socketEventsListener
+        startBlocksDownload(ChannelManager.chainEventsListener)
+        // Try to clear act leftovers if no channels left
+        OlympusWrap tellClouds OlympusWrap.CMDStart
+        PaymentInfoWrap.markFailedAndFrozen
+        ChannelManager.initConnect
+        RatesSaver.initialize
+      }
     }
   }
 }

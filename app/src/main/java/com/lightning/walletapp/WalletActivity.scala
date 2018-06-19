@@ -17,11 +17,10 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import scala.util.{Failure, Try}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
-import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats.refundingDataFmt
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import android.support.v4.app.FragmentStatePagerAdapter
+import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
@@ -30,12 +29,10 @@ import org.bitcoinj.store.SPVBlockStore
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-import com.google.common.io.Files
 import org.bitcoinj.core.Address
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
-import java.io.File
 
 
 trait SearchBar { me =>
@@ -257,7 +254,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
-    val createZygote = form.findViewById(R.id.createZygote).asInstanceOf[Button]
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
     val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
     recoverFunds.setEnabled(app.ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
@@ -295,21 +291,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       // Just show a list of available Olympus servers
       def proceed = me goTo classOf[OlympusActivity]
       rm(menu)(proceed)
-    }
-
-    createZygote setOnClickListener onButtonTap {
-      def openForm = mkForm(ok = <(createZygote, onFail)(share), none,
-        baseTextBuilder(getString(zygote_details).html), dialog_next, dialog_cancel)
-
-      def createZygote = {
-        val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
-        val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
-        val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
-        val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
-        org.bitcoinj.core.Utils.HEX encode encoded.require.toByteArray
-      }
-
-      rm(menu)(openForm)
     }
 
     rescanWallet setOnClickListener onButtonTap {

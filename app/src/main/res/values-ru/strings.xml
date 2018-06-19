@@ -190,7 +190,7 @@
     <string name="ln_description_hint">добавьте описание</string>
     <string name="ln_no_description">Описание отсутствует</string>
     <string name="ln_proof">Подписанный платежный запрос: %1$s\n\nPreimage платежа: %2$s</string>
-    <string name="ln_qr_disposable"><![CDATA[Платеж валиден 48 часов<br>Не используйте его повторно]]></string>
+    <string name="ln_qr_disposable"><![CDATA[Платеж валиден 2 дня<br>Не используйте его повторно]]></string>
     <string name="ln_open_offer">Хотите открыть платежный канал с получателем чтобы отправлять ему платежи?</string>
 
     <!-- see PaymentInfo.scala -->
