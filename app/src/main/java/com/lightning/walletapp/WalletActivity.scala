@@ -13,13 +13,13 @@ import com.lightning.walletapp.Denomination._
 import android.support.v4.view.MenuItemCompat._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import scala.util.{Failure, Try}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, WalletZygote}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats.refundingDataFmt
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -32,10 +32,8 @@ import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
 import com.google.common.io.Files
 import org.bitcoinj.core.Address
-import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
-import android.net.Uri
 import java.util.Date
 import java.io.File
 
@@ -300,19 +298,15 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     createZygote setOnClickListener onButtonTap {
-      def openForm = mkForm(ok = <(createZygote, onFail) { zygote =>
-        val zygoteFileShare = new Intent setAction Intent.ACTION_SEND setType "text/plain"
-        me startActivity zygoteFileShare.putExtra(Intent.EXTRA_STREAM, Uri fromFile zygote)
-      }, none, baseTextBuilder(getString(zygote_details).html), dialog_next, dialog_cancel)
+      def openForm = mkForm(ok = <(createZygote, onFail)(share), none,
+        baseTextBuilder(getString(zygote_details).html), dialog_next, dialog_cancel)
 
       def createZygote = {
         val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
         val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
         val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
         val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
-        val zygote = FileOps shell s"Bitcoin Wallet Snapshot ${new Date}.txt"
-        Files.write(encoded.require.toByteArray, zygote)
-        zygote
+        org.bitcoinj.core.Utils.HEX encode encoded.require.toByteArray
       }
 
       rm(menu)(openForm)
