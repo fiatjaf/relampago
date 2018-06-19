@@ -555,13 +555,14 @@ object Channel {
   } getOrElse 0L
 
   def estimateCanSend(chan: Channel) = chan(_.reducedRemoteState.canSendMsat) getOrElse 0L
-  def inFlightHtlcs(chan: Channel) = chan(cs => Commitments.latestRemoteCommit(cs).spec.htlcs) getOrElse Set.empty[Htlc]
-  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
+  def estimateCanSendCapped(chan: Channel) = math.min(estimateCanSend(chan), LNParams.maxHtlcValueMsat)
   def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
+  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
+  def inFlightHtlcs(chan: Channel) = chan(cs => Commitments.latestRemoteCommit(cs).spec.htlcs) getOrElse Set.empty
   def hasReceivedPayments(chan: Channel) = chan(_.remoteNextHtlcId).exists(_ > 0)
 
   def channelAndHop(chan: Channel) = for {
-    // Make sure this hop is the real one
+    // Make sure this payment hop is real
     Some(extraHop) <- chan(_.extraHop)
     if extraHop.htlcMinimumMsat > 0L
   } yield chan -> Vector(extraHop)

@@ -161,12 +161,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val operationalChannelsWithRoutes = totalOperationalChannels.flatMap(channelAndHop).toMap
     val maxCanReceive = Try(operationalChannelsWithRoutes.keys.map(estimateCanReceive).max)
     val maxCanReceive1 = MilliSatoshi(maxCanReceive getOrElse 0L)
-    val canReceiveLNPayments = maxCanReceive1 >= minHtlcValue
 
     val reserveUnspent = getString(ln_receive_reserve) format coloredOut(maxCanReceive1)
     val lnReceiveText = if (totalOperationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_no_channels)
       else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_option).format(me getString ln_receive_6conf)
-      else if (!canReceiveLNPayments) getString(ln_receive_option).format(reserveUnspent)
+      else if (maxCanReceive1 < minHtlcValue) getString(ln_receive_option).format(reserveUnspent)
       else getString(ln_receive_option).format(me getString ln_receive_ok)
 
     val options = Array(lnReceiveText.html, getString(btc_receive_option).html)
@@ -177,7 +176,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     lst setDividerHeight 0
     lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options) {
-      override def isEnabled(itemPosition: Int) = itemPosition != 0 || canReceiveLNPayments
+      override def isEnabled(position: Int) = position != 0 || maxCanReceive1 >= minHtlcValue
     }
 
     def onChain = rm(alert) {
@@ -192,7 +191,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def goSendPayment(top: View) = {
-    val options = Array(send_scan_qr, send_paste).map(option => getString(option).html)
+    val options = Array(getString(send_scan_qr).html, getString(send_paste_payment_request).html)
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, lst).create)
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)

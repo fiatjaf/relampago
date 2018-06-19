@@ -145,8 +145,9 @@
     </array>
 
     <string name="send_scan_qr">Scan a QR code</string>
-    <string name="send_paste"><![CDATA[Paste a Bitcoin address<br><font color=#999999><small>or Lightning Payment Request</small></font>]]></string>
-    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><br><br><small>%1$s</small>]]></string>
+    <string name="send_paste_payment_request"><![CDATA[Paste a Bitcoin address<br><font color=#999999><small>or Lightning Payment Request</small></font>]]></string>
+    <string name="ln_send_title_exit"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong><br>and return to seller</font><small><br><br>%1$s</small>]]></string>
+    <string name="ln_send_title_normal"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin transaction</strong></string></font>]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>

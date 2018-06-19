@@ -394,6 +394,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     override def onProcessSuccess = { case (_, _, remote: wire.Error) => host onFail remote.exception.getMessage }
     override def onBecome = { case _ => updTitle.run }
 
+    override def settled(cs: Commitments) = for {
+      Htlc(_, add) \ _ <- cs.localCommit.spec.fulfilled
+      rd <- PaymentInfoWrap.inFlightPayments get add.paymentHash
+    } if (rd.pr.closeAppOnSuccess) host delayUI host.finish
+
     override def onException = {
       case _ \ CMDAddImpossible(_, code) =>
         // Non-fatal: can't add this payment, inform user why
@@ -464,13 +469,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
       if (operationalChannels.isEmpty) app toast ln_status_none else {
 
-        // Define how much we can send but cap an amount by maximum, it's safe to call max here because checked
-        val maxCanSend = MilliSatoshi apply math.min(operationalChannels.map(estimateCanSend).max, maxHtlcValueMsat)
         val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-        val title = app.getString(ln_send_title).format(me getDescription pr.description).html
+        val titleTemplate = if (pr.closeAppOnSuccess) ln_send_title_exit else ln_send_title_normal
+        val title = app.getString(titleTemplate).format(me getDescription pr.description)
+        val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSendCapped).max)
         val hint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
         val rateManager = new RateManager(hint, content)
-        val bld = baseBuilder(title, content)
+        val bld = baseBuilder(title.html, content)
 
         def sendAttempt(alert: AlertDialog) = rateManager.result match {
           case Success(ms) if maxCanSend < ms => app toast dialog_sum_big

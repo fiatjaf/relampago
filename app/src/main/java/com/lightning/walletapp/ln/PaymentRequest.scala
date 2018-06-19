@@ -90,6 +90,7 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
   lazy val paymentHash = tags.collectFirst { case p: PaymentHashTag => p.hash }.get
   lazy val routingInfo = tags.collect { case r: RoutingInfoTag => r }
   lazy val unsafeMsat = amount.get.amount
+  var closeAppOnSuccess = false
 
   def isFresh: Boolean = {
     val expiry = tags.collectFirst { case ex: ExpiryTag => ex.seconds }
@@ -280,7 +281,8 @@ object PaymentRequest {
         loop(data drop len, tags1)
       }
 
-    val (hrp, data) = Bech32 decode input
+    val split = input split '?'
+    val Tuple2(hrp, data) = Bech32 decode split.head
     val stream = data.foldLeft(BitStream.empty)(write5)
     require(stream.bitCount >= 65 * 8, "Data is too short")
 
@@ -302,14 +304,14 @@ object PaymentRequest {
 
     val pr = PaymentRequest(prefix, amountOpt, Timestamp decode data0, pub, tags.toVector, signature)
     require(Crypto.verifySignature(messageHash, r -> s, pub), "Invalid payment request signature")
+    pr.closeAppOnSuccess = split.length > 1
     pr
   }
 
   def write(pr: PaymentRequest): String = {
     val hrp = pr.prefix + Amount.encode(pr.amount)
     val int5s = toInt5s(pr.stream writeBytes pr.signature)
-    val checksum = Bech32.checksum(hrp, int5s)
-
+    val checksum: Int5Seq = Bech32.checksum(hrp, int5s)
     val body = (int5s ++ checksum) map Bech32.pam
     hrp + "1" + new String(body.toArray)
   }

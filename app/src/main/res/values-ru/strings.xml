@@ -80,7 +80,7 @@
     <string name="sets_manage_olympus">Настроить бэкап-сервера</string>
     <string name="sets_chan_recover">Восстановитель каналов</string>
     <string name="sets_rescan">Рескан блокчейна</string>
-    <string name="sets_mnemonic">Посмотреть мнемо код</string>
+    <string name="sets_mnemonic">Мнемонический код</string>
     <string name="sets_zygote">Мигратор кошелька</string>
 
     <string name="action_coins_send">Послать деньги</string>
@@ -145,9 +145,10 @@
     </array>
 
     <string name="send_scan_qr">Сканировать QR-код</string>
-    <string name="send_paste"><![CDATA[Вставить Биткоин-адрес<br><font color=#999999><small>или запрос-Молнию</small></font>]]></string>
-    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br><br><small>%1$s</small>]]></string>
-    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></string></font>]]></string>
+    <string name="send_paste_payment_request"><![CDATA[Вставить Биткоин-адрес<br><font color=#999999><small>или платежный запрос-Молнию</small></font>]]></string>
+    <string name="ln_send_title_exit"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong><br>и вернуться к продавцу</font><small><br><br>%1$s</small>]]></string>
+    <string name="ln_send_title_normal"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Послать Биткоин-транзакцию</strong></string></font>]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запрос-Молния</font><small><br><br>%1$s</small>]]></string>
