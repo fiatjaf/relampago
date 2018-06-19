@@ -15,7 +15,6 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.CloudAct
-import android.content.DialogInterface.BUTTON_NEUTRAL
 import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.script.ScriptBuilder
@@ -160,10 +159,9 @@ class LNStartFundActivity extends TimerActivity { me =>
         case Success(ms) => rm(alert)(next(ms).start)
       }
 
-      def useMax = rateManager setSum Try(canSend)
-      val bld = baseBuilder(getString(ln_ops_start_fund_title).html, content).setNeutralButton("max", null)
-      val button = mkCheckForm(askAttempt, none, bld, dialog_next, dialog_cancel) getButton BUTTON_NEUTRAL
-      button setOnClickListener onButtonTap(useMax)
+      def useMax(alert: AlertDialog) = rateManager setSum Try(canSend)
+      val bld = baseBuilder(title = getString(ln_ops_start_fund_title).html, content)
+      mkCheckFormNeutral(askAttempt, none, useMax, bld, dialog_next, dialog_cancel, dialog_max)
     }
 
     whenBackPressed = UITask {

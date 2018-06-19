@@ -281,8 +281,7 @@ object PaymentRequest {
         loop(data drop len, tags1)
       }
 
-    val split = input split '?'
-    val Tuple2(hrp, data) = Bech32 decode split.head
+    val Tuple2(hrp, data) = Bech32 decode input
     val stream = data.foldLeft(BitStream.empty)(write5)
     require(stream.bitCount >= 65 * 8, "Data is too short")
 
@@ -304,7 +303,6 @@ object PaymentRequest {
 
     val pr = PaymentRequest(prefix, amountOpt, Timestamp decode data0, pub, tags.toVector, signature)
     require(Crypto.verifySignature(messageHash, r -> s, pub), "Invalid payment request signature")
-    pr.closeAppOnSuccess = split.length > 1
     pr
   }
 

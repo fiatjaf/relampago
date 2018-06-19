@@ -103,11 +103,13 @@
     <string name="dialog_sum_empty">Укажите сумму платежа</string>
     <string name="dialog_sum_small">Сумма слишком мала</string>
     <string name="dialog_sum_big">Сумма слишком велика</string>
+    <string name="dialog_pay_quit">Pay &amp; Quit</string>
     <string name="dialog_cancel">Отмена</string>
     <string name="dialog_retry">Retry</string>
     <string name="dialog_boost">CPFP</string>
     <string name="dialog_next">Далее</string>
     <string name="dialog_pay">Pay</string>
+    <string name="dialog_max">Max</string>
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
@@ -146,8 +148,7 @@
 
     <string name="send_scan_qr">Сканировать QR-код</string>
     <string name="send_paste_payment_request"><![CDATA[Вставить Биткоин-адрес<br><font color=#999999><small>или платежный запрос-Молнию</small></font>]]></string>
-    <string name="ln_send_title_exit"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong><br>и вернуться к продавцу</font><small><br><br>%1$s</small>]]></string>
-    <string name="ln_send_title_normal"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Послать Биткоин-транзакцию</strong></string></font>]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>

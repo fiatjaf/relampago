@@ -64,8 +64,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   def readNdefMessage(m: Message) = <(app.TransData recordValue ndefMessageString(m), readFail)(ok => next)
 
   override def onNoNfcIntentFound = {
-    val dataOpt = Seq(getIntent.getDataString, getIntent getStringExtra Intent.EXTRA_TEXT).find(txt => null != txt)
-    <(dataOpt.map(paymentRequest => s"$paymentRequest?close") foreach app.TransData.recordValue, readFail)(ok => next)
+    val datas = Seq(getIntent.getDataString, getIntent getStringExtra Intent.EXTRA_TEXT)
+    <(datas.find(txt => null != txt) foreach app.TransData.recordValue, readFail)(ok => next)
   }
 
   def onNfcStateEnabled = none

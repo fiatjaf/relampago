@@ -105,11 +105,13 @@
     <string name="dialog_sum_empty">Please provide an amount</string>
     <string name="dialog_sum_small">Amount is too small</string>
     <string name="dialog_sum_big">Amount is too large</string>
+    <string name="dialog_pay_quit">Pay &amp; Quit</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_retry">Retry</string>
-    <string name="dialog_boost">Boost</string>
+    <string name="dialog_boost">CPFP</string>
     <string name="dialog_next">Next</string>
     <string name="dialog_pay">Pay</string>
+    <string name="dialog_max">Max</string>
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
@@ -146,8 +148,7 @@
 
     <string name="send_scan_qr">Scan a QR code</string>
     <string name="send_paste_payment_request"><![CDATA[Paste a Bitcoin address<br><font color=#999999><small>or Lightning Payment Request</small></font>]]></string>
-    <string name="ln_send_title_exit"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong><br>and return to seller</font><small><br><br>%1$s</small>]]></string>
-    <string name="ln_send_title_normal"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><small><br><br>%1$s</small>]]></string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin transaction</strong></string></font>]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>

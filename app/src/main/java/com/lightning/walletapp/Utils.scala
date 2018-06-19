@@ -25,11 +25,11 @@ import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
 import fr.acinq.bitcoin.MilliSatoshi
 import language.implicitConversions
-import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.script.Script
 import scala.concurrent.Future
 import android.os.Bundle
 
+import android.content.DialogInterface.{BUTTON_NEUTRAL, BUTTON_POSITIVE, BUTTON_NEGATIVE}
 import com.lightning.walletapp.lnutils.IconGetter.{scrWidth, maxDialog}
 import org.bitcoinj.wallet.{DefaultCoinSelector, SendRequest, Wallet}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
@@ -40,8 +40,6 @@ import android.app.{AlertDialog, Dialog}
 import android.content.{Context, Intent}
 import java.util.{Timer, TimerTask}
 
-import android.content.DialogInterface.BUTTON_POSITIVE
-import android.content.DialogInterface.BUTTON_NEGATIVE
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import InputMethodManager.HIDE_NOT_ALWAYS
 import Context.INPUT_METHOD_SERVICE
@@ -116,11 +114,18 @@ trait TimerActivity extends AppCompatActivity { me =>
   def mkCheckForm(ok: AlertDialog => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) = {
     val builderWithOkCancelButtons = bld.setPositiveButton(okResource, null).setNegativeButton(noResource, null)
     val alert = showForm(builderWithOkCancelButtons.create)
-    val noListener = me onButtonTap rm(alert)(no)
 
     try clickableTextField(alert findViewById android.R.id.message) catch none
-    alert getButton BUTTON_POSITIVE setOnClickListener onButtonTap(ok apply alert)
-    alert getButton BUTTON_NEGATIVE setOnClickListener noListener
+    alert getButton BUTTON_NEGATIVE setOnClickListener onButtonTap { rm(alert)(no) /* use manual dismiss */ }
+    alert getButton BUTTON_POSITIVE setOnClickListener onButtonTap { ok(alert) /* maybe dismiss later */ }
+    alert
+  }
+
+  def mkCheckFormNeutral(ok: AlertDialog => Unit, no: => Unit, neutral: AlertDialog => Unit,
+                         bld: Builder, okResource: Int, noResource: Int, neutralResource: Int) = {
+
+    val alert = mkCheckForm(ok, no, bld.setNeutralButton(neutralResource, null), okResource, noResource)
+    alert getButton BUTTON_NEUTRAL setOnClickListener onButtonTap { neutral(alert) /* maybe dismiss later */ }
     alert
   }
 

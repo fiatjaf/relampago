@@ -59,7 +59,7 @@ class FragWallet extends Fragment {
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
   import host.{UITask, onButtonTap, mkForm, showForm, negBuilder, baseBuilder, negTextBuilder, onFastTap, str2View}
-  import host.{onFail, TxProcessor, getSupportLoaderManager, rm, mkCheckForm, <, onTap, showDenomChooser}
+  import host.{onFail, TxProcessor, getSupportLoaderManager, rm, mkCheckForm, mkCheckFormNeutral, <, onTap, showDenomChooser}
   def getDescription(rawText: String) = if (rawText.isEmpty) s"<i>$noDesc</i>" else rawText take 140
 
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
@@ -460,8 +460,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
     }
 
-    val bld = baseBuilder(app.getString(ln_receive_title).html, content)
-    mkCheckForm(recAttempt, none, bld, dialog_ok, dialog_cancel)
+    def useMax(alert: AlertDialog) = rateManager setSum Try(maxCanReceive)
+    val bld = baseBuilder(title = app.getString(ln_receive_title).html, content)
+    mkCheckFormNeutral(recAttempt, none, useMax, bld, dialog_ok, dialog_cancel, dialog_max)
   }
 
   def sendPayment(pr: PaymentRequest) =
@@ -475,12 +476,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       if (operationalChannels.isEmpty) app toast ln_status_none else {
 
         val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-        val titleTemplate = if (pr.closeAppOnSuccess) ln_send_title_exit else ln_send_title_normal
-        val title = app.getString(titleTemplate).format(me getDescription pr.description)
         val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSendCapped).max)
         val hint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
         val rateManager = new RateManager(hint, content)
-        val bld = baseBuilder(title.html, content)
 
         def sendAttempt(alert: AlertDialog) = rateManager.result match {
           case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
@@ -495,8 +493,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           }
         }
 
-        mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
-        for (amountMsat <- pr.amount) rateManager setSum Try(amountMsat)
+        def payAndQuit(alert: AlertDialog) = {
+          // Send payment and finish on success
+          pr.closeAppOnSuccess = true
+          sendAttempt(alert)
+        }
+
+        val bld = baseBuilder(app.getString(ln_send_title).format(me getDescription pr.description).html, content)
+        mkCheckFormNeutral(sendAttempt, none, payAndQuit, bld, dialog_pay, dialog_cancel, dialog_pay_quit)
+        for (initialPaymentAmountMsat <- pr.amount) rateManager setSum Try(initialPaymentAmountMsat)
       }
     }
 
