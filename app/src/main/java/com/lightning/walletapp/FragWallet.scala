@@ -390,9 +390,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // LN STUFF
 
   val chanListener = new ChannelListener {
-    // Updates UI on transitions and informs user on errors, should be removed once activity is destroyed
-    override def onProcessSuccess = { case (_, _, remote: wire.Error) => host onFail remote.exception.getMessage }
+    // Simply update title on each new transition
     override def onBecome = { case _ => updTitle.run }
+
+    override def onProcessSuccess = {
+      case (chan, _, remote: wire.Error) =>
+        val history = chan(cs => MessageItem getHistoryString cs.channelId)
+        host onFail s"${remote.exception.getMessage}\n\n${history getOrElse new String}"
+    }
 
     override def settled(cs: Commitments) = for {
       Htlc(_, add) \ _ <- cs.localCommit.spec.fulfilled

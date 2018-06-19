@@ -68,6 +68,11 @@ object ConnectionManager {
       lastMsg = System.currentTimeMillis
 
       message match {
+        case cm: ChannelMessage => MessageItem.record(cm.channelId, IncomingMessage(System.currentTimeMillis, cm))
+        case _ =>
+      }
+
+      message match {
         case their: Init =>
           // Save their Init for possible subsequent requests
           val isOk = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures)
@@ -94,3 +99,19 @@ class ConnectionListener {
   def onIncompatible(nodeId: PublicKey): Unit = none
   def onDisconnect(nodeId: PublicKey): Unit = none
 }
+
+// TEMP
+
+trait MessageItem {
+  val message: LightningMessage
+  val stamp: Long
+}
+
+object MessageItem {
+  var history = Map.empty[BinaryData, Vector[MessageItem]] withDefaultValue Vector.empty
+  def record(chanId: BinaryData, item: MessageItem) = history = history.updated(chanId, history(chanId) :+ item dropRight 10)
+  def getHistoryString(chanId: BinaryData) = history(chanId).map(_.toString).mkString("\n\n")
+}
+
+case class IncomingMessage(stamp: Long, message: LightningMessage) extends MessageItem
+case class OutgoingMessage(stamp: Long, message: LightningMessage) extends MessageItem
