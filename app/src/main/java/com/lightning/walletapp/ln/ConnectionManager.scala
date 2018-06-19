@@ -108,8 +108,14 @@ trait MessageItem {
 }
 
 object MessageItem {
-  var history = Map.empty[BinaryData, Vector[MessageItem]] withDefaultValue Vector.empty
-  def record(chanId: BinaryData, item: MessageItem) = history = history.updated(chanId, history(chanId) :+ item dropRight 10)
+  import scala.collection.mutable
+  val history = mutable.Map.empty[BinaryData, Vector[MessageItem]]
+
+  def record(chanId: BinaryData, item: MessageItem) = {
+    if (history contains chanId) history(chanId) = item +: history(chanId) take 20
+    else history(chanId) = Vector(item)
+  }
+
   def getHistoryString(chanId: BinaryData) = history(chanId).map(_.toString).mkString("\n\n")
 }
 
