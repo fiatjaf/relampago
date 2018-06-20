@@ -21,7 +21,7 @@ object ImplicitConversions {
 
 object IconGetter extends Html.ImageGetter {
   private val metrics = app.getResources.getDisplayMetrics
-  val scrWidth = metrics.widthPixels.toDouble / metrics.density
+  val scrWidth = metrics.widthPixels.toDouble / metrics.densityDpi
   val maxDialog = metrics.densityDpi * 2.1
 
   import android.provider.Settings.{System => FontSystem}
