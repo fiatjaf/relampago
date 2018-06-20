@@ -103,7 +103,7 @@
     <string name="dialog_sum_empty">Укажите сумму платежа</string>
     <string name="dialog_sum_small">Сумма слишком мала</string>
     <string name="dialog_sum_big">Сумма слишком велика</string>
-    <string name="dialog_pay_quit">Pay &amp; Quit</string>
+    <string name="dialog_pay_quit">Pay &amp; Exit</string>
     <string name="dialog_cancel">Отмена</string>
     <string name="dialog_retry">Retry</string>
     <string name="dialog_boost">CPFP</string>
