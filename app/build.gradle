@@ -10,7 +10,7 @@ android {
         multiDexEnabled true
         versionName "0.09"
         minSdkVersion 21
-        versionCode 53
+        versionCode 54
     }
 
     buildTypes {
