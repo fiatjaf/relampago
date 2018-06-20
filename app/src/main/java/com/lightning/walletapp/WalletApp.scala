@@ -182,15 +182,7 @@ class WalletApp extends Application { me =>
     }
 
     def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel { self =>
-      def SEND(m: LightningMessage) = {
-
-        m match {
-          case cm: ChannelMessage => MessageItem.record(cm.channelId, OutgoingMessage(System.currentTimeMillis, cm))
-          case _ =>
-        }
-
-        for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
-      }
+      def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
       def STORE(data: HasCommitments) = runAnd(data)(ChannelWrap put data)
 
       def CLOSEANDWATCH(cd: ClosingData) = {

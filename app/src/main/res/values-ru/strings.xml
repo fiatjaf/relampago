@@ -1,0 +1,285 @@
+<resources>
+    <string name="lang">rus</string>
+    <string name="emerge_report">Показать отчет</string>
+    <string name="emerge_mode">Аварийный режим</string>
+
+    <!-- app wide -->
+    <string name="step_fees"><![CDATA[<font color=#999999>Выберите комиссию</font><br><br>%1$s]]></string>
+    <string name="greetings">Bitcoin Кошелек-Молния\nПрочитайте <a href='http://lightning-wallet.com'>инструкцию</a></string>
+    <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Может занять несколько часов</font></small></small>]]></string>
+    <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Более быстрое подтверждение</font></small></small>]]></string>
+    <string name="sets_rescan_ok">Сейчас кошелек закроется рескан блокчейна начнется автоматически при следующем открытии</string>
+    <string name="wallet_state"><small>Баланс\n<font color='#999999'>Ончейн и LN</font></small></string>
+    <string name="copied_to_clipboard">Скопировано «%1$s»</string>
+    <string name="wallet_restore">Восстановить кошелек</string>
+    <string name="wallet_create">Новый кошелек</string>
+
+    <array name="denoms">
+        <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 btc</small></font>]]></item>
+        <item><![CDATA[Finney <font color=#999999><small>= 0.0001 btc</small></font>]]></item>
+        <item><![CDATA[Bitcoin <font color=#999999><small>= 1 btc</small></font>]]></item>
+    </array>
+
+    <array name="restore_options">
+        <item>Мнемонический код</item>
+        <item>Файл-слепок кошелька</item>
+    </array>
+
+    <string name="create_wallet_creating">Создается новый кошелек\nЭто может занять некоторое время</string>
+    <string name="restore_when">Когда вы создали кошелек?\nНе менйяте дату если не уверены</string>
+    <string name="restore_wallet_restoring">Кошелек восстанавливается\nЭто может занять некоторое время</string>
+    <string name="restore_mnemonic_wrong">Нужно ровно 12 слов</string>
+    <string name="restore_hint">Ваш мнемонический код</string>
+
+    <!-- headers with links -->
+    <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>Зачем нужен бэкап-сервер</a>\n<small>не меняйте настройки внизу\nесли не знаете что делате</small></string>
+    <string name="boost_details"><![CDATA[Хотите поднять комиссию для этой транзакции и подтвердить ее быстрее?<br><br>сейчас %1$s<br>после CPFP %2$s<br>]]></string>
+    <string name="read_settings"><![CDATA[<small>Bitcoin Кошелек-Молния<br><a href=http://lightning-wallet.com>Прочитайте инструкцию</a><br>v0.09&#8211;54</small>]]></string>
+
+    <string name="channel_recovery_info">
+        Восстановитель каналов скачивает резервные копии ваших потерянных каналов с бэкап-серверов и использует
+        их для возмещения средств обратно в ваш ончейн кошелек.\n\nОжидайте возвратной транзакции вскоре после 
+        запуска восстановителя если у вас есть потерянные каналы с деньгами
+    </string>
+
+    <string name="mnemonic_info">
+        <font color="#E31300">Сохраните мнемонический код</font>\n
+        <a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> зачем он
+        нужен и сохраните его прямо сейчас!\n\nОн вам понадобится если с телефоном что-то пойдет не так
+    </string>
+
+    <string name="tokens_warn"><![CDATA[
+        Пожалуйста, учите: этот кошелек использует <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>платные талоны</a>
+        для хранения зашифрованных бэкапов ваших каналов.<br><br>Автоматический платеж-Молния в сумме <i>%1$s</i> купит 50 талонов
+        как только вы откроете первый канал.<br><br>Эти талоны защитят вас от случайной потери денег в каналах
+    ]]></string>
+
+    <string name="zygote_details"><![CDATA[
+        Мигратор создает снапшот, который потом можно будет использовать для полного восстановления кошелька.<br><br>
+        Мигратор следует использовать если вы хотите перенести кошелек с одного телефона на другой или удалить кошелек чтобы вскоре его восстановить.
+        <br><br>Снапшот <strong>НЕ НУЖНО</strong> использовать для долговременного хранения или для создания множественных копий одного и
+        того же кошелька на нескольких телефонах!
+    ]]></string>
+
+    <!-- Olympus server -->
+    <string name="olympus_actions">Добавить, убрать, переместить</string>
+    <string name="olympus_hint">хост:порт сервера</string>
+    <string name="olympus_edit">Изменить сервер</string>
+    <string name="olympus_add">Добавить сервер</string>
+    <string name="olympus_backup">Бэкап-сервер</string>
+
+	<array name="olympus_tokens_left">
+        <item><![CDATA[<small><i>талонов нет</i></small>]]></item>
+        <item><![CDATA[<small><i>есть %1$d талон</i></small>]]></item>
+        <item><![CDATA[<small><i>есть %1$d талона</i></small>]]></item>
+        <item><![CDATA[<small><i>есть %1$d талонов</i></small>]]></item>
+        <item><![CDATA[<small><i>бэкап отключен</i></small>]]></item>
+    </array>
+
+    <!-- menu and fab -->
+    <string name="sets_manage_olympus">Настроить бэкап-сервера</string>
+    <string name="sets_chan_recover">Восстановитель каналов</string>
+    <string name="sets_rescan">Рескан блокчейна</string>
+    <string name="sets_mnemonic">Мнемонический код</string>
+    <string name="sets_zygote">Мигратор кошелька</string>
+
+    <string name="action_coins_send">Послать деньги</string>
+    <string name="action_coins_receive">Получить деньги</string>
+    <string name="action_ln_details">Состояние каналов</string>
+    <string name="action_ln_open">Открыть новый канал</string>
+
+    <!-- dialogs -->
+    <string name="amount_hint_sat"><![CDATA[Сумма в Satoshi%1$s]]></string>
+    <string name="amount_hint_btc"><![CDATA[Сумма в Bitcoin%1$s]]></string>
+    <string name="amount_hint_fin"><![CDATA[Сумма в Finney%1$s]]></string>
+
+    <string name="amount_hint_can_send"><![CDATA[<br><small>доступно %1$s</small>]]></string>
+    <string name="amount_hint_can_receive"><![CDATA[<br><small>лимит %1$s</small>]]></string>
+    <string name="amount_hint_newchan"><![CDATA[<br><small>минимум %1$s<br>максимум %2$s<br>доступно %3$s</small>]]></string>
+
+    <string name="dialog_pr_making">Создаю платежный запрос&#8230;</string>
+    <string name="dialog_pr_expired">Этот платежный запрос устарел</string>
+    <string name="dialog_recovering">Восстанавливаю деньги&#8230;</string>
+    <string name="dialog_sum_empty">Укажите сумму платежа</string>
+    <string name="dialog_sum_small">Сумма слишком мала</string>
+    <string name="dialog_sum_big">Сумма слишком велика</string>
+    <string name="dialog_pay_quit">Pay &amp; Exit</string>
+    <string name="dialog_cancel">Отмена</string>
+    <string name="dialog_retry">Retry</string>
+    <string name="dialog_boost">CPFP</string>
+    <string name="dialog_next">Далее</string>
+    <string name="dialog_pay">Pay</string>
+    <string name="dialog_max">Max</string>
+    <string name="dialog_ok">OK</string>
+
+    <!-- notifications -->
+    <string name="btc_empty">Нет монет</string>
+    <string name="ln_empty">Нет каналов</string>
+    <string name="btc_status_operational">Кошелек онлайн</string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Поиск узлов&#8230;</font>]]></string>
+
+    <array name="info_progress">
+        <item>Синхронизация завершена</item>
+        <item><![CDATA[<font color=#FF9900>Остался %1$d день</font>]]></item>
+        <item><![CDATA[<font color=#FF9900>Осталось %1$d дня</font>]]></item>
+        <item><![CDATA[<font color=#FF9900>Осталось %1$d дней</font>]]></item>
+    </array>
+
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
+
+    <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
+
+    <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
+    <string name="txs_sum_in"><![CDATA[<font color=#76B041>%1$s</font>]]></string>
+    <string name="txs_view_outside">Посмотреть на SmartBit</string>
+    <string name="txs_p2wsh">Пополнение канала</string>
+
+    <array name="txs_confs">
+        <item><![CDATA[<strong>ожидает&#160;подтверждения</strong>]]></item>
+        <item><![CDATA[<strong>%1$s&#160;подтвреждение</strong>]]></item>
+        <item><![CDATA[<strong>%1$s&#160;подтверждения</strong>]]></item>
+        <item><![CDATA[<strong>%1$s&#160;подтверждений</strong>]]></item>
+        <item><![CDATA[<strong>отменена</strong>]]></item>
+    </array>
+
+    <string name="send_scan_qr">Сканировать QR-код</string>
+    <string name="send_paste_payment_request"><![CDATA[Вставить Биткоин-адрес<br><font color=#999999><small>или платежный запрос-Молнию</small></font>]]></string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Послать Биткоин-транзакцию</strong></string></font>]]></string>
+
+    <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>
+    <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запрос-Молния</font><small><br><br>%1$s</small>]]></string>
+
+    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Биткоин-транзакция</font><font color=#999999><small><br><br>создать QR-код с обычным адресом для получения ончейн Биткоин-транзакций</small></font>]]></string>
+    <string name="ln_receive_reserve"><![CDATA[<font color=#333333>входящие платежи-Молнии пока невозможны потому что для начала вам нужно потратить хотя-бы</font> %1$s <font color=#333333>чтобы освободить место для получения денег</font>]]></string>
+    <string name="ln_receive_6conf"><![CDATA[<font color=#333333>входящие платежи-Молнии пока невозможны потому что пополняющая канал Биткоин-транзакция еще не получила 6 подтверждений</font>]]></string>
+    <string name="ln_receive_no_channels"><![CDATA[<font color=#333333>входящие платежи-Молнии пока невозможны потому что нет открытых платежных каналов</font>]]></string>
+    <string name="ln_receive_ok"><![CDATA[<font color=#999999>создать QR-код с одноразовым запросом для получения быстрых оффчейн платежей</font>]]></string>
+
+    <!-- errors -->
+    <string name="err_ln_peer_offline">Не удалось подключиться к узлу %1$s</string>
+    <string name="err_ln_no_data_loss_protect">Узел не защищает от утери данных</string>
+    <string name="err_ln_remote_amount_high">Не получилось потому что сумма платежа слишком высока для вашего пира</string>
+    <string name="err_ln_remote_amount_low">Не получилось потому что сумма платежа слишком низка для вашего пира</string>
+    <string name="err_ln_amount_overflow">Не получилось потому что сумма платежа превышет допустимый предел</string>
+    <string name="err_ln_fulfilled">Не получилось потому что этот платежный запрос уже оплачен</string>
+    <string name="err_ln_too_many">Не получилось потому что слишком много платежей уже в пути</string>
+    <string name="err_ln_in_flight">Не получилось потому что этот платеж уже в пути</string>
+    <string name="err_ln_frozen">Не получилось потому что этот платеж заморожен</string>
+
+    <string name="err_ln_no_chan">Не получилось потому что канал сейчас оффлайн или же в канале недостаточно средств для отправки платежа</string>
+    <string name="err_ln_expired"><![CDATA[Канал только что закрылся с вашей стороны из-за просроченного исходящего платежа<br><br>Публичный ключ пира<br>%1$s<br><br>Хэш платежа<br>%2$s]]></string>
+    <string name="err_not_enough_funds"><![CDATA[<strong>Недостаточно средств</strong><br><br>доступно %1$s<br>отправлено %2$s<br>не хватает %3$s<br>в ожидании %4$s<br><br>Учтите что входящие Биткоин-транзакции можно тратить только после того как они получат хотя-бы одно подтверждение]]></string>
+    <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии. Вы можете добавить денег в кошелек и попробовать еше раз</string>
+    <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой. Попробуйте разбить ее на несколько более мелких транзакций</string>
+    <string name="err_self_payment">Не получилось потому что вы пытаетесь отправить платеж самому себе</string>
+    <string name="err_general">Не получилось потому что произошла непредвиденная ошибка</string>
+    <string name="err_no_data">Ничего не найдено</string>
+
+    <!-- SPECIFIC TO LIGHTNING NETWORK -->
+
+    <string name="ln_share_hash">Хэш платежа</string>
+    <string name="ln_share_proof">Доказательство платежа</string>
+    <string name="ln_share_routing">Детали маршрута</string>
+
+    <string name="ln_status_peer">Выберите пира</string>
+    <string name="ln_status_none">Нет открытых каналов</string>
+    <string name="ln_description_hint">добавьте описание</string>
+    <string name="ln_no_description">Описание отсутствует</string>
+    <string name="ln_proof">Подписанный платежный запрос: %1$s\n\nPreimage платежа: %2$s</string>
+    <string name="ln_qr_disposable"><![CDATA[Платеж валиден 2 дня<br>Не используйте его повторно]]></string>
+    <string name="ln_open_offer">Хотите открыть платежный канал с получателем чтобы отправлять ему платежи?</string>
+
+    <!-- see PaymentInfo.scala -->
+    <array name="ln_payment_states">
+        <item>ожидает получения</item>
+        <item>находится в пути</item>
+        <item>успешно оплачен</item>
+        <item>возвращен назад</item>
+        <item>заморожен</item>
+    </array>
+
+    <string name="notice_sync_title">Требуется синхронизация</string>
+    <string name="notice_sync_body">Откройте Bitcoin Кошелек-Молнию</string>
+
+    <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>емкость %4$s]]></string>
+    <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>емкость %4$s<br>баланс %5$s<br><br>%6$s]]></string>
+    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>открыт <font color=#999999>%4$s</font><br>закрыт <font color=#999999>%5$s</font><br>емкость %6$s<br><br>%7$s]]></string>
+    <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>кооперативно</i></font><br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>закрыт <font color=#999999>%4$s</font><br>емкость %5$s<br>возврат %6$s<br><br>%7$s]]></string>
+
+    <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>емкость %4$s<br>нужно %5$s<br><br><a href=https://smartbit.com.au/tx/%6$s>Посмотреть статус</a><br>%7$s]]></string>
+    <string name="ln_ops_chan_open_no_receive"><![CDATA[<font color=#76B041>%1$s</font><br>%2$s<br><br>емкость %3$s<br>can send %4$s<br>can receive %5$s<br><small><font color=#FF9900>receiving not enabled by peer yet</font><br>комиссия %6$s</small><br><br>%7$s<br><small>%8$s<br>%9$s</small>]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[<font color=#76B041>%1$s</font><br>%2$s<br><br>емкость %3$s<br>can send %4$s<br>can receive %5$s<br><small>комиссия %6$s</small><br><br>%7$s<br><small>%8$s<br>%9$s</small>]]></string>
+
+    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>В канале есть зависшие платежи</font> поэтому кооперативное закрытие будет отложено пока они не исчезнут, все еще хотите продолжить?]]></string>
+    <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>Канал сейчас оффлайн</font> поэтому попытка закрытия приведет к <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсированному закрытию</a>, на которое уйдет большая сумма комиссии, кроме того возвратная транзакция будет отложена, все еще хотите продолжить?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[&#9888; <font color=#FF9900>Учтите, что попытка закрытия канала прямо сейчас приведет к </font> <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсированному закрытию</a>, на которое уйдет большая сумма комиссии, кроме того возвратная транзакция будет отложена, все еще хотите продолжить?]]></string>
+
+    <string name="ln_chan_close_confirm_address"><![CDATA[Хотите закрыть канал и отправить возвратную Биткоин-транзакцию на следующий адрес?<br><br>%1$s]]></string>
+    <string name="ln_chan_close_confirm_local">Хотите закрыть канал и отправить возвратную Биткоин-транзакцию обратно в этот кошелек?</string>
+    <string name="ln_chan_actions">Действия</string>
+    <string name="ln_chan_force">Закрыть</string>
+
+    <array name="ln_chan_actions_list">
+        <item>Передать детали канала</item>
+        <item><![CDATA[Передать слепок канала<br><font color=#999999><small>содержит приватные данные</small></font>]]></item>
+        <item><![CDATA[Закрыть на адрес<br><font color=#999999><small>c начала скопируйте адрес</small></font>]]></item>
+        <item>Закрыть в этот кошелек</item>
+    </array>
+
+    <string name="ln_ops_chan_amount_status">%1$s - %2$s комиссии</string>
+    <string name="ln_ops_chan_refund_status"><![CDATA[<br><br><font color=#999999>Отложенные транзакции</font><br>]]></string>
+    <string name="ln_ops_chan_commit_status"><![CDATA[<a href=https://smartbit.com.au/tx/%1$s>Посмотреть состояние</a><br>%2$s<br>комиссия %3$s]]></string>
+
+    <string name="ln_ops_unilateral_you"><![CDATA[<font color=#999999><i>с вашей стороны</i></font>]]></string>
+    <string name="ln_ops_unilateral_peer"><![CDATA[<font color=#999999><i>со стороны пира</i></font>]]></string>
+    <string name="ln_ops_chan_unilateral_status_dead"><![CDATA[%1$s<br>= %2$s отменена]]></string>
+    <string name="ln_ops_chan_unilateral_status_done"><![CDATA[%1$s<br>= %2$s получена]]></string>
+    <string name="ln_ops_chan_unilateral_status_left"><![CDATA[%2$s<br>= %3$s %1$s]]></string>
+	<string name="ln_total_value">Отправлено %1$s</string>
+
+    <array name="ln_total_payments">
+        <item><![CDATA[Нет отправленных платежей]]></item>
+        <item><![CDATA[Отправлен %1$s платеж]]></item>
+        <item><![CDATA[Отправлено %1$s платежа]]></item>
+        <item><![CDATA[Отправлено %1$s платежей]]></item>
+    </array>
+
+    <array name="ln_status_left_blocks">
+        <item><![CDATA[отправляется&#8230;]]></item>
+        <item><![CDATA[через %1$s блок]]></item>
+        <item><![CDATA[через %1$s блока]]></item>
+        <item><![CDATA[через %1$s блоков]]></item>
+    </array>
+
+    <array name="ln_status_expiry">
+        <item><![CDATA[отменяется&#8230;]]></item>
+        <item><![CDATA[остался %1$s блок]]></item>
+        <item><![CDATA[осталось %1$s блока]]></item>
+        <item><![CDATA[осталось %1$s блоков]]></item>
+    </array>
+
+	<array name="ln_in_flight_payments">
+        <item><![CDATA[Нет платежей в пути]]></item>
+        <item><![CDATA[%1$s платеж в пути]]></item>
+        <item><![CDATA[%1$s платежа в пути]]></item>
+        <item><![CDATA[%1$s платежей в пути]]></item>
+    </array>
+
+    <!-- opening a new channel -->
+    <array name="ln_ops_start_node_channels">
+        <item><![CDATA[<strong>Нет открытых каналов</strong>]]></item>
+        <item><![CDATA[<strong>%1$s</strong> открытый канал]]></item>
+        <item><![CDATA[<strong>%1$s</strong> открытых канала]]></item>
+        <item><![CDATA[<strong>%1$s</strong> открытых каналов]]></item>
+        <item><![CDATA[<i>Нет данных о каналах</i>]]></item>
+    </array>
+
+    <string name="ln_ops_start_fund_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про Молнию</a></small><br><br>Создание канала]]></string>
+    <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>открытие канала</i></font><br><small>%2$s</small><br><br><font color=#999999>публичный ключ пира</font><br><small>%3$s</small>]]></string>
+    <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
+</resources>
