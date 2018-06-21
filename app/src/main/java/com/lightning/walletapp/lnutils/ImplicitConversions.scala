@@ -31,9 +31,6 @@ object IconGetter extends Html.ImageGetter {
   private val lnDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_bolt_shape, null)
   def getDrawable(s: String) = s match { case "ln" => lnDrawable case "btc" => btcDrawable case "none" => noneDrawable }
 
-  println(s"metrics.density: ${metrics.density}")
-  println(s"metrics.densityDpi: ${metrics.densityDpi}")
-
   private val fontAdjusted = if (bigFont) 7.5 else 8.3
   private val screenMetricsAdjusted = (metrics.densityDpi / fontAdjusted).toInt
   noneDrawable.setBounds(0, 0, screenMetricsAdjusted, screenMetricsAdjusted)
