@@ -558,7 +558,7 @@ object Channel {
   def estimateCanSendCapped(chan: Channel) = math.min(estimateCanSend(chan), LNParams.maxHtlcValueMsat)
   def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case _ => false }
-  def inFlightHtlcs(chan: Channel) = chan(cs => Commitments.latestRemoteCommit(cs).spec.htlcs) getOrElse Set.empty
+  def inFlightHtlcs(chan: Channel) = chan(Commitments.latestRemoteCommit(_).spec.htlcs) getOrElse Set.empty
   def hasReceivedPayments(chan: Channel) = chan(_.remoteNextHtlcId).exists(_ > 0)
 
   def channelAndHop(chan: Channel) = for {
@@ -566,6 +566,11 @@ object Channel {
     Some(extraHop) <- chan(_.extraHop)
     if extraHop.htlcMinimumMsat > 0L
   } yield chan -> Vector(extraHop)
+}
+
+case class ChanReport(chan: Channel, cs: Commitments) {
+  def finalCanSend = estimateCanSend(chan) - softReserve.amount * 1000L
+  val softReserve: Satoshi = cs.commitInput.txOut.amount / 25
 }
 
 trait ChannelListener {

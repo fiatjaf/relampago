@@ -3,6 +3,7 @@ package com.lightning.walletapp
 import R.string._
 import spray.json._
 import org.bitcoinj.core._
+
 import scala.concurrent.duration._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
@@ -15,28 +16,32 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import rx.lang.scala.{Observable => Obs}
+import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import java.net.{InetAddress, InetSocketAddress}
+
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
+
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.walletapp.lnutils.olympus.CloudAct
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
-import fr.acinq.bitcoin.Crypto
 import android.app.Application
 import java.util.Collections
+
 import android.widget.Toast
 import android.net.Uri
+
 import scala.util.Try
 import java.io.File
 
@@ -112,18 +117,16 @@ class WalletApp extends Application { me =>
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
-    def notClosingOrRefunding = for (c <- all if c.state != Channel.CLOSING && c.state != Channel.REFUNDING) yield c
-    def notClosing = for (c <- all if c.state != Channel.CLOSING) yield c
+    def notClosingOrRefunding = for (c <- all if c.state != CLOSING && c.state != REFUNDING) yield c
+    def notClosing = for (c <- all if c.state != CLOSING) yield c
 
-    def canSendNow(msat: Long) = for {
-      // Open AND online AND can handle amount + on-chain fee
+    def onlineReports = for {
       chan <- all if isOperational(chan) && chan.state == OPEN
-      feerateMsat <- chan(_.localCommit.spec.feeratePerKw * 1000L)
-      if estimateCanSend(chan) - feerateMsat >= msat
-    } yield chan
+      // Operational channels have commitments by definition
+    } yield ChanReport(chan, chan(identity).get)
 
     def frozenInFlightHashes = for {
-      chan <- all if chan.state == Channel.CLOSING
+      chan <- all if chan.state == CLOSING
       theirDust <- chan(_.remoteParams.dustLimitSatoshis * 1000L).toList
       // Frozen means a channel has been broken and we have a non-dust HTLC
       // which will either be taken by peer with us getting a payment preimage
@@ -204,8 +207,6 @@ class WalletApp extends Application { me =>
         val msg = "please publish your local commitment" getBytes "UTF-8"
         val ref = RefundingData(some.announce, Some(point), some.commitments)
         val fundingScript = some.commitments.commitInput.txOut.publicKeyScript
-
-        // Start watching for remote spend and ask peer to broadcast it
         app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
         BECOME(STORE(ref), REFUNDING) SEND Error(ref.commitments.channelId, msg)
       }
@@ -217,17 +218,31 @@ class WalletApp extends Application { me =>
     }
 
     def checkIfSendable(rd: RoutingData) = {
-      val isDone = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
+      val bestRepOpt = onlineReports.sortBy(rep => -rep.finalCanSend).headOption
+      val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
       if (activeInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_in_flight)
       else if (frozenInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_frozen)
-      else if (canSendNow(rd.firstMsat).isEmpty) Left(me getString err_ln_no_chan)
-      else if (isDone.isSuccess) Left(me getString err_ln_fulfilled)
-      else Right(rd)
+      else if (isPaid.isSuccess) Left(me getString err_ln_fulfilled)
+      else bestRepOpt match {
+
+        // We should explain to user what exactly is going on here
+        case Some(report) if report.finalCanSend < rd.firstMsat =>
+
+          val alias = report.chan.data.announce.alias take 16
+          val sendingNow = coloredOut apply MilliSatoshi(rd.firstMsat)
+          val finalCanSend = coloredIn apply MilliSatoshi(report.finalCanSend)
+          val capacity = coloredIn apply MilliSatoshi(Commitments.latestRemoteCommit(report.cs).spec.toRemoteMsat)
+          val hardReserve = coloredOut apply Satoshi(report.cs.remoteParams.channelReserveSatoshis + report.cs.reducedRemoteState.feesSat)
+          Left(getString(err_ln_second_reserve).format(alias, hardReserve, coloredOut(report.softReserve), capacity, finalCanSend, sendingNow).html)
+
+        case None => Left(me getString err_ln_no_chan)
+        case Some(reportWhichIsFine) => Right(rd)
+      }
     }
 
     def fetchRoutes(rd: RoutingData) = {
-      // Double ordering: first randomize channels without payments, then order those with
-      val free \ busy = canSendNow(rd.firstMsat).partition(chan => inFlightHtlcs(chan).isEmpty)
+      val chans = onlineReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan }
+      val free \ busy = chans.partition(onlineCapableChan => inFlightHtlcs(onlineCapableChan).isEmpty)
       val peers = scala.util.Random.shuffle(free) ++ busy.sortBy(chan => inFlightHtlcs(chan).size)
       val from = for (chan <- peers) yield chan.data.announce.nodeId
 
@@ -257,10 +272,11 @@ class WalletApp extends Application { me =>
       // or do the work required to reverse the payment in case if no channel is found
 
       case Right(rd) =>
-        // Empty used route means we're sending to our peer and should use it's nodeId as a target
         val targetPeerId = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
-        val channelOpt = canSendNow(rd.firstMsat).find(_.data.announce.nodeId == targetPeerId)
-        channelOpt.map(_ process rd) getOrElse sendEither(useRoutesLeft(rd), noRoutes)
+        // Empty used route means we're sending to our peer and should use it's nodeId as a target
+        val chans = onlineReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan }
+        val targetChannelOpt = chans.find(target => targetPeerId == target.data.announce.nodeId)
+        targetChannelOpt.map(_ process rd) getOrElse sendEither(useRoutesLeft(rd), noRoutes)
 
       case Left(emptyRD) =>
         // All routes have been filtered out

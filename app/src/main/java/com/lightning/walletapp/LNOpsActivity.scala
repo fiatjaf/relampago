@@ -54,9 +54,9 @@ class LNOpsActivity extends TimerActivity { me =>
     }
 
   val colors = new IndicatorColorProvider {
-    def getColor(chanPosition: Int) = localChanCache(chanPosition) match {
-      case c if isOperational(c) && c.state == OPEN => R.drawable.green_radius
-      case c if isOperational(c) || isOpening(c) => R.drawable.yellow_radius
+    def getColor(position: Int) = localChanCache(position) match {
+      case chan if isOperational(chan) && chan.state == OPEN => R.drawable.green_radius
+      case chan if isOperational(chan) || isOpening(chan) => R.drawable.yellow_radius
       case _ => R.drawable.white_radius
     }
   }

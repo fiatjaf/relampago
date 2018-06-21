@@ -152,15 +152,15 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   // BUTTONS REACTIONS
 
   def goReceivePayment(top: View) = {
-    val totalOperationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
-    val operationalChannelsWithRoutes = totalOperationalChannels.flatMap(channelAndHop).toMap
-    val maxCanReceive = Try(operationalChannelsWithRoutes.keys.map(estimateCanReceive).max)
-    val maxCanReceive1 = MilliSatoshi(maxCanReceive getOrElse 0L)
+    val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
+    val operationalChannelsWithRoutes = operationalChannels.flatMap(channelAndHop).toMap
+    val maxCanReceive = MilliSatoshi(operationalChannelsWithRoutes.keys
+      .map(estimateCanReceive).reduceOption(_ max _) getOrElse 0L)
 
-    val reserveUnspent = getString(ln_receive_reserve) format coloredOut(maxCanReceive1)
-    val lnReceiveText = if (totalOperationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_no_channels)
+    val reserveUnspent = getString(ln_receive_reserve) format coloredOut(maxCanReceive)
+    val lnReceiveText = if (operationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_no_channels)
       else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_option).format(me getString ln_receive_6conf)
-      else if (maxCanReceive1 < minHtlcValue) getString(ln_receive_option).format(reserveUnspent)
+      else if (maxCanReceive < minHtlcValue) getString(ln_receive_option).format(reserveUnspent)
       else getString(ln_receive_option).format(me getString ln_receive_ok)
 
     val options = Array(lnReceiveText.html, getString(btc_receive_option).html)
@@ -171,7 +171,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     lst setDividerHeight 0
     lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options) {
-      override def isEnabled(position: Int) = position != 0 || maxCanReceive1 >= minHtlcValue
+      override def isEnabled(position: Int) = position != 0 || maxCanReceive >= minHtlcValue
     }
 
     def onChain = rm(alert) {
@@ -181,7 +181,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     def offChain = rm(alert) {
       // Provide filtered channels with real hops and real receivable amount
-      FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive1)
+      FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive)
     }
   }
 
