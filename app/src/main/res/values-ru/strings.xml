@@ -183,8 +183,9 @@
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
     <string name="ln_share_hash">Хэш платежа</string>
-    <string name="ln_share_proof">Доказательство платежа</string>
     <string name="ln_share_routing">Детали маршрута</string>
+    <string name="ln_share_proof">Доказательство платежа</string>
+    <string name="txs_share_body">Share raw transaction</string>
 
     <string name="ln_status_peer">Выберите пира</string>
     <string name="ln_status_none">Нет открытых каналов</string>
