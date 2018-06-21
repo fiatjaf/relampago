@@ -33,9 +33,9 @@ object IconGetter extends Html.ImageGetter {
 
   private val fontAdjusted = if (bigFont) 7.5 else 8.3
   private val screenMetricsAdjusted = (metrics.densityDpi / fontAdjusted).toInt
-  noneDrawable.setBounds(0, 0, screenMetricsAdjusted, screenMetricsAdjusted)
-  btcDrawable.setBounds(0, 0, screenMetricsAdjusted, screenMetricsAdjusted)
-  lnDrawable.setBounds(0, 0, screenMetricsAdjusted, screenMetricsAdjusted)
+  noneDrawable.setBounds(0, -2, screenMetricsAdjusted, screenMetricsAdjusted)
+  btcDrawable.setBounds(0, -2, screenMetricsAdjusted, screenMetricsAdjusted)
+  lnDrawable.setBounds(0, -2, screenMetricsAdjusted, screenMetricsAdjusted)
 }
 
 class StringOps(source: String) {
