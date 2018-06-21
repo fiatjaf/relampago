@@ -17,9 +17,9 @@ import scala.util.Success
 import android.os.Bundle
 import java.util.Date
 
+import com.lightning.walletapp.ln.Tools.{none, wrap, memoize, runAnd}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
-import com.lightning.walletapp.ln.Tools.{none, wrap, memoize}
 import android.widget.{ArrayAdapter, Button, ListView}
 import com.lightning.walletapp.lnutils.PaymentTable
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
@@ -238,17 +238,17 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       def manageClosing(close: ClosingData) = UITask {
         // Show the best current closing with most confirmations
-        // since multiple different closings may be present at once
         val closedTimestamp = me time new Date(close.closedAt)
         lnOpsAction setVisibility View.GONE
 
         close.bestClosing match {
           case Left(mutualClosingTx) =>
             val fee = capacity - mutualClosingTx.allOutputsAmount
+            val status = humanStatus apply getStatus(mutualClosingTx.txid)
             val refundable = MilliSatoshi(close.commitments.localCommit.spec.toLocalMsat) - fee
-            val view = commitStatus.format(mutualClosingTx.txid.toString, humanStatus apply getStatus(mutualClosingTx.txid), coloredOut apply fee)
-            val text = bilateralClosing.format(chan.state, alias, started, closedTimestamp, coloredIn(capacity), coloredIn(refundable), view)
-            lnOpsDescription setText text.html
+            val view = commitStatus.format(mutualClosingTx.txid.toString, status, coloredOut apply fee)
+            lnOpsDescription setText bilateralClosing.format(chan.state, alias, started, closedTimestamp,
+              coloredIn(capacity), coloredIn(refundable), view).html
 
           case Right(info) =>
             val tier12View = info.getState collect {
@@ -273,10 +273,11 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
             val humanTier12View = tier12View take 2 mkString "<br><br>"
             val status = humanStatus apply getStatus(info.commitTx.txid)
             val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
-            val isRemote = close.remoteCommit.nonEmpty || close.nextRemoteCommit.nonEmpty
-            val startedByWhom = if (isRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
             val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
             val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
+
+            val isRemote = close.remoteCommit.nonEmpty || close.nextRemoteCommit.nonEmpty
+            val startedByWhom = if (isRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
             lnOpsDescription setText unilateralClosing.format(chan.state, host getString startedByWhom,
               alias, started, closedTimestamp, coloredIn(capacity), commitView + refundsView).html
         }
@@ -304,6 +305,10 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
           case (_, _, from, CLOSING) if from != CLOSING => resetIndicator.run
           case (_, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) => resetIndicator.run
         }
+      }
+
+      lnOpsDescription setOnLongClickListener new View.OnLongClickListener {
+        def onLongClick(descriptionText: View) = runAnd(true)(showCoopOptions)
       }
 
       val listeners = Vector(transitionListener, detailsListener)
