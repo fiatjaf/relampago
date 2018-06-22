@@ -137,6 +137,7 @@
     <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#76B041>%1$s</font>]]></string>
     <string name="txs_view_outside">View on SmartBit site</string>
+    <string name="txs_share_body">Share raw transaction</string>
     <string name="txs_p2wsh">Payment channel funding</string>
 
     <array name="txs_confs">
@@ -185,7 +186,6 @@
     <string name="ln_share_hash">Share payment hash</string>
     <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_share_routing">Share routing details</string>
-    <string name="txs_share_body">Share raw transaction</string>
 
     <string name="ln_status_peer">Select peer</string>
     <string name="ln_status_none">No open channels found</string>

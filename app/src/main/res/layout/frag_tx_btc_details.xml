@@ -7,6 +7,11 @@
         android:id="@+id/viewTxOutside"
         android:text="@string/txs_view_outside"/>
 
+    <Button
+        style="@style/TransButton"
+        android:id="@+id/viewShareBody"
+        android:text="@string/txs_share_body"/>
+
     <View style="@style/GrayDivider"/>
 
 </LinearLayout>

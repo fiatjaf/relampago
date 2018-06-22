@@ -295,6 +295,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val humanOutputs = for (pay <- outputs) yield marking.format(pay.destination).html
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
+      val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
       val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
       val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, humanOutputs.toArray)
       lst setOnItemClickListener onTap { idx => outputs(idx - 1) onClick host }
@@ -305,6 +306,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       viewTxOutside setOnClickListener onButtonTap {
         val uri = s"https://smartbit.com.au/tx/" + wrap.tx.getHashAsString
         host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
+      }
+
+      viewShareBody setOnClickListener onButtonTap {
+        val rawTransaction = wrap.tx.unsafeBitcoinSerialize
+        host share BinaryData(rawTransaction).toString
       }
 
       val header = wrap.fee match {
