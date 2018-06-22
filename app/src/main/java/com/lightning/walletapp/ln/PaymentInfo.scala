@@ -32,8 +32,8 @@ object PaymentInfo {
   type FailureTryVec = Vector[FailureTry]
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
 
-  // Stores a history of error responses from remote peers per each outgoing payment request
-  private[this] var errors = Map.empty[BinaryData, FailureTryVec] withDefaultValue Vector.empty
+  // Stores a history of error responses from peers per each outgoing payment request
+  var errors = Map.empty[BinaryData, FailureTryVec] withDefaultValue Vector.empty
   private[this] var replacedChans = Set.empty[Long]
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {

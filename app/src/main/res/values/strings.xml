@@ -186,6 +186,7 @@
     <string name="ln_share_hash">Share payment hash</string>
     <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_share_routing">Share routing details</string>
+    <string name="ln_share_errors">Share peer responses</string>
 
     <string name="ln_status_peer">Select peer</string>
     <string name="ln_status_none">No open channels found</string>

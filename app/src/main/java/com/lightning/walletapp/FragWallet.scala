@@ -223,6 +223,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
       val paymentRouting = detailsWrapper.findViewById(R.id.paymentRouting).asInstanceOf[Button]
+      val peerResponses = detailsWrapper.findViewById(R.id.peerResponses).asInstanceOf[Button]
       val paymentProof = detailsWrapper.findViewById(R.id.paymentProof).asInstanceOf[Button]
       val paymentHash = detailsWrapper.findViewById(R.id.paymentHash).asInstanceOf[Button]
       paymentHash setOnClickListener onButtonTap(host share rd.paymentHashString)
@@ -255,6 +256,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case 0 =>
           val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
           val paidFeePercent = fee.amount / (info.firstMsat / 100D)
+
+          // Show how many blocks left until expiration if this payment is still in-flight
           val title = lnTitleOut.format(humanStatus, coloredOut(info.firstSum), inFiat, coloredOut(fee), paidFeePercent)
           val titleWithExpiry = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight) + "<br>" + title
           val title1 = if (info.actualStatus == WAITING) titleWithExpiry else title
@@ -262,6 +265,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           // Allow user to retry this payment using excluded nodes and channels when it is a failure and pr is not expired yet
           if (info.actualStatus != FAILURE || !info.pr.isFresh) showForm(negBuilder(dialog_ok, title1.html, detailsWrapper).create)
           else mkForm(doSend(rd), none, baseBuilder(title1.html, detailsWrapper), dialog_retry, dialog_cancel)
+
+          if (info.actualStatus == FAILURE)
+            for (errs <- PaymentInfo.errors get rd.pr.paymentHash) {
+              val history = errs.reverse.map(_.toString) mkString "\n===\n"
+              peerResponses setOnClickListener onButtonTap(host share history)
+              peerResponses setVisibility View.VISIBLE
+            }
 
         case 1 =>
           val title = lnTitleIn.format(humanStatus, coloredIn(info.firstSum), inFiat)

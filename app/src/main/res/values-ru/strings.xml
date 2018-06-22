@@ -187,6 +187,7 @@
     <string name="ln_share_hash">Хэш платежа</string>
     <string name="ln_share_routing">Детали маршрута</string>
     <string name="ln_share_proof">Доказательство платежа</string>
+    <string name="ln_share_errors">История Onion-ответов</string>
 
     <string name="ln_status_peer">Выберите пира</string>
     <string name="ln_status_none">Нет открытых каналов</string>

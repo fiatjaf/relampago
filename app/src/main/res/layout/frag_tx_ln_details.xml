@@ -19,6 +19,12 @@
         android:text="@string/ln_share_routing"
         android:visibility="gone"/>
 
+    <Button
+        style="@style/TransButton"
+        android:id="@+id/peerResponses"
+        android:text="@string/ln_share_errors"
+        android:visibility="gone"/>
+
     <View style="@style/GrayDivider"/>
 
     <TextView
