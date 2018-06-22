@@ -307,7 +307,6 @@ class WalletApp extends Application { me =>
     }
 
     def setupAndStartDownload = {
-      wallet.setAcceptRiskyTransactions(true)
       wallet.addTransactionConfidenceEventListener(ChannelManager.chainEventsListener)
       wallet.addCoinsSentEventListener(ChannelManager.chainEventsListener)
       wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
