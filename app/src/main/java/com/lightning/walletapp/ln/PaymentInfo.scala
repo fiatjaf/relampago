@@ -27,7 +27,14 @@ object PaymentInfo {
 
   final val NOIMAGE = BinaryData("3030303030303030")
   final val NOCHANID = BinaryData("3131313131313131")
+
+  type FailureTry = Try[ErrorPacket]
+  type FailureTryVec = Vector[FailureTry]
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
+
+  // Stores a history of error responses from remote peers per each outgoing payment request
+  private[this] var errors = Map.empty[BinaryData, FailureTryVec] withDefaultValue Vector.empty
+  private[this] var replacedChans = Set.empty[Long]
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
@@ -92,7 +99,6 @@ object PaymentInfo {
     Some(rd1) -> blackListedNodes
   }
 
-  private[this] var replacedChans = Set.empty[Long]
   def replaceRoute(rd: RoutingData, upd: ChannelUpdate) = {
     // In some cases we can just replace a faulty hop with a supplied one
     // but only do this once per each channel to avoid infinite loops
@@ -112,7 +118,7 @@ object PaymentInfo {
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
     // Try to reduce remaining routes and also remember bad nodes and channels
     val parsed = Try apply parseErrorPacket(rd.onion.sharedSecrets, fail.reason)
-    Tools log parsed.toString
+    errors = errors.updated(rd.pr.paymentHash, errors(rd.pr.paymentHash) :+ parsed)
 
     parsed map {
       case ErrorPacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
