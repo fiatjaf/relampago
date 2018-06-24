@@ -8,7 +8,7 @@ import fr.acinq.eclair.crypto.BitStream._
 import com.lightning.walletapp.ln.PaymentRequest._
 import com.lightning.walletapp.ln.RoutingInfoTag._
 import com.lightning.walletapp.ln.crypto.MultiStreamUtils._
-
+import com.lightning.walletapp.ln.wire.Hop
 import fr.acinq.eclair.crypto.BitStream
 import java.nio.ByteOrder.BIG_ENDIAN
 import java.math.BigInteger
@@ -34,14 +34,6 @@ case class DescriptionTag(description: String) extends Tag {
 
 case class DescriptionHashTag(hash: BinaryData) extends Tag {
   def toInt5s: Int5Seq = encode(Bech32 eight2five hash, 'h')
-}
-
-case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
-               htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) {
-
-  def humanDetails =
-    s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry delta: $cltvExpiryDelta blocks, " +
-      s"Routing fee: ${feeProportionalMillionths / 10000D}% of sum + baseline $feeBaseMsat msat"
 }
 
 case class RoutingInfoTag(route: PaymentRoute) extends Tag {

@@ -254,7 +254,7 @@ object BadEntityWrap {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
     val cursor = db.select(BadEntityTable.selectSql, params = System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
-    val fromAsString = for (peerPubKey: PublicKey <- from) yield peerPubKey.toString
+    val fromAsString = for (peerPubKey: PublicKey <- from.toSet) yield peerPubKey.toString
 
     // One of blacklisted nodes may become our peer or final payee so we remove them from bad nodes
     OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, badNodes - targetId.toString -- fromAsString,
@@ -284,7 +284,7 @@ object GossipCatcher extends ChannelListener {
       // GUARD: we already have an old or empty Hop, replace it with a new one
       if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
       // Set a fresh update for this channel and process no further updates afterwards
-      chan process upd.toHop(chan.data.announce.nodeId)
+      chan.process(upd toHop chan.data.announce.nodeId)
       chan.listeners -= GossipCatcher
   }
 }

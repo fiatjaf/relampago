@@ -3,6 +3,7 @@ package com.lightning.walletapp
 import R.string._
 import spray.json._
 import org.bitcoinj.core._
+
 import scala.concurrent.duration._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
@@ -15,19 +16,21 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import rx.lang.scala.{Observable => Obs}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import java.net.{InetAddress, InetSocketAddress}
+
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
+
 import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.walletapp.lnutils.olympus.CloudAct
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
@@ -35,10 +38,14 @@ import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
 import android.app.Application
 import java.util.Collections
+
 import android.widget.Toast
 import android.net.Uri
+
 import scala.util.Try
 import java.io.File
+
+import com.lightning.walletapp.ln.RoutingInfoTag.{PaymentRoute, PaymentRouteVec}
 
 
 class WalletApp extends Application { me =>
@@ -213,7 +220,7 @@ class WalletApp extends Application { me =>
     }
 
     def checkIfSendable(rd: RoutingData) = {
-      val bestRepOpt = onlineReports.sortBy(rep => -rep.finalCanSend).headOption
+      val bestRepOpt = onlineReports.sortBy(rp => -rp.finalCanSend).headOption
       val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
       if (activeInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_in_flight)
       else if (frozenInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_frozen)
@@ -236,10 +243,15 @@ class WalletApp extends Application { me =>
     }
 
     def fetchRoutes(rd: RoutingData) = {
-      val chans = onlineReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan }
-      val free \ busy = chans.partition(onlineCapableChan => inFlightHtlcs(onlineCapableChan).isEmpty)
-      val peers = scala.util.Random.shuffle(free) ++ busy.sortBy(chan => inFlightHtlcs(chan).size)
-      val from = for (chan <- peers) yield chan.data.announce.nodeId
+      // First we collect chans which in principle can handle a given payment sum right now
+      // after we get the results we first prioritize cheapest routes and then routes which belong to less busy chans
+      val from = onlineReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
+
+      def withHints = for {
+        tag <- Obs from rd.pr.routingInfo
+        partialRoutes <- getRoutes(tag.route.head.nodeId)
+        completeRoutes = partialRoutes.map(_ ++ tag.route)
+      } yield Obs just completeRoutes
 
       def getRoutes(targetId: PublicKey) = from contains targetId match {
         case false if rd.useCache => RouteWrap.findRoutes(from, targetId, rd)
@@ -247,19 +259,17 @@ class WalletApp extends Application { me =>
         case true => Obs just Vector(Vector.empty)
       }
 
-      def withExtraPart = for {
-        tag <- Obs from rd.pr.routingInfo
-        partialRoutes <- getRoutes(tag.route.head.nodeId)
-        completeRoutes = partialRoutes.map(_ ++ tag.route)
-      } yield Obs just completeRoutes
-
-      val cheapestRoutesObs =
-        if (peers.isEmpty) Obs error new LightningException(me getString err_ln_no_chan)
+      val paymentRoutesObs =
+        if (from.isEmpty) Obs error new LightningException(me getString err_ln_no_chan)
         else if (rd.pr.routingInfo.isEmpty) getRoutes(targetId = rd.pr.nodeId)
-        else Obs.zip(withExtraPart).map(_.flatten.toVector)
+        else Obs.zip(withHints).map(_.flatten.toVector)
 
-      // This may filter out too long or too expensive routes
-      for (routes <- cheapestRoutesObs) yield useFirstRoute(routes, rd)
+      for {
+        routes <- paymentRoutesObs
+        cheapest = routes.sortBy(route => route.map(hop => hop.estimate).sum)
+        busyMap = all.map(chan => chan.data.announce.nodeId -> inFlightHtlcs(chan).size).toMap
+        unloadest = cheapest.sortBy(route => if (route.nonEmpty) busyMap(route.head.nodeId) else 0)
+      } yield useFirstRoute(unloadest, rd)
     }
 
     def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
@@ -267,10 +277,10 @@ class WalletApp extends Application { me =>
       // or do the work required to reverse the payment in case if no channel is found
 
       case Right(rd) =>
-        val targetPeerId = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
-        // Empty used route means we're sending to our peer and should use it's nodeId as a target
+        // Empty used route means we're sending to our peer and it's nodeId is our target
+        val targetId = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
         val chans = onlineReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan }
-        val targetChannelOpt = chans.find(target => targetPeerId == target.data.announce.nodeId)
+        val targetChannelOpt = chans.find(peerChannel => targetId == peerChannel.data.announce.nodeId)
         targetChannelOpt.map(_ process rd) getOrElse sendEither(useRoutesLeft(rd), noRoutes)
 
       case Left(emptyRD) =>

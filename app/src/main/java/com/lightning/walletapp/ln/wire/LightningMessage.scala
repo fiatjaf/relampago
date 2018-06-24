@@ -2,9 +2,9 @@ package com.lightning.walletapp.ln.wire
 
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
-import com.lightning.walletapp.ln.{Hop, LightningException}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
+import com.lightning.walletapp.ln.LightningException
 import com.lightning.walletapp.ln.Tools.fromShortId
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
@@ -92,14 +92,32 @@ case class ChannelAnnouncement(nodeSignature1: BinaryData, nodeSignature2: Binar
   lazy val nodes = Set(nodeId1, nodeId2)
 }
 
-case class ChannelUpdate(signature: BinaryData, chainHash: BinaryData, shortChannelId: Long,
-                         timestamp: Long, flags: BinaryData, cltvExpiryDelta: Int, htlcMinimumMsat: Long,
-                         feeBaseMsat: Long, feeProportionalMillionths: Long) extends RoutingMessage {
+// PAYMENT ROUTE INFO
 
-  lazy val feeEstimate = (feeBaseMsat + feeProportionalMillionths * 10).toDouble
-  def toHop(nodeId: PublicKey) = Hop(nodeId, shortChannelId, cltvExpiryDelta,
-    htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
+trait FeeEstimate {
+  val feeBaseMsat: Long
+  val feeProportionalMillionths: Long
+  val estimate = (feeBaseMsat + feeProportionalMillionths * 10).toDouble
 }
+
+case class ChannelUpdate(signature: BinaryData, chainHash: BinaryData, shortChannelId: Long, timestamp: Long,
+                         flags: BinaryData, cltvExpiryDelta: Int, htlcMinimumMsat: Long, feeBaseMsat: Long,
+                         feeProportionalMillionths: Long) extends RoutingMessage with FeeEstimate {
+
+  def toHop(nodeId: PublicKey) =
+    Hop(nodeId, shortChannelId, cltvExpiryDelta,
+      htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
+}
+
+case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int, htlcMinimumMsat: Long,
+               feeBaseMsat: Long, feeProportionalMillionths: Long) extends FeeEstimate {
+
+  def humanDetails =
+    s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry delta: $cltvExpiryDelta blocks, " +
+      s"Routing fee: ${feeProportionalMillionths / 10000D}% of sum + baseline $feeBaseMsat msat"
+}
+
+// NODE ADDRESS HANDLING
 
 case class NodeAnnouncement(signature: BinaryData,
                             features: BinaryData, timestamp: Long,
@@ -137,6 +155,6 @@ case class Tor3(tor3: BinaryData, port: Int) extends NodeAddress {
 }
 
 // Not in a spec
-case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Vector[String], to: String)
+case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)
 case class WalletZygote(v: Int, db: BinaryData, wallet: BinaryData, chain: BinaryData)
 case class AESZygote(v: Int, iv: BinaryData, ciphertext: BinaryData)

@@ -5,7 +5,7 @@ import scodec.codecs._
 import java.math.BigInteger
 import fr.acinq.eclair.UInt64
 import com.lightning.walletapp.ln.crypto.Sphinx
-import com.lightning.walletapp.ln.{Hop, LightningException, PerHopPayload}
+import com.lightning.walletapp.ln.{LightningException, PerHopPayload}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import fr.acinq.bitcoin.{BinaryData, Crypto}
 import scodec.bits.{BitVector, ByteVector}
