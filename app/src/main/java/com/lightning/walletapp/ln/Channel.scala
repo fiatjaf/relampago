@@ -166,25 +166,25 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // We're fulfilling an HTLC we got from them earlier
-      // this is a special case where we don't throw if cross signed HTLC is not found
-      // it may happen when we have already fulfilled it just before connection got lost
-      case (norm @ NormalData(_, commitments, _, _), cmd: CMDFulfillHtlc, OPEN) => for {
-        add <- Commitments.getHtlcCrossSigned(commitments, incomingRelativeToLocal = true, cmd.id)
-        updateFulfillHtlc = UpdateFulfillHtlc(commitments.channelId, cmd.id, cmd.preimage)
+      case (norm: NormalData, cmd: CMDFulfillHtlc, OPEN) => for {
+        // this is a special case where we don't throw if cross signed HTLC is not found
+        // such a case may happen when we have already fulfilled it just before connection got lost
+        add <- Commitments.getHtlcCrossSigned(norm.commitments, incomingRelativeToLocal = true, cmd.id)
+        updateFulfillHtlc = UpdateFulfillHtlc(norm.commitments.channelId, cmd.id, cmd.preimage)
 
         if updateFulfillHtlc.paymentHash == add.paymentHash
-        c1 = Commitments.addLocalProposal(commitments, updateFulfillHtlc)
+        c1 = Commitments.addLocalProposal(norm.commitments, updateFulfillHtlc)
       } me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
 
 
       // Failing an HTLC we got earlier
-      case (norm @ NormalData(_, commitments, _, _), cmd: CMDFailHtlc, OPEN) =>
-        val c1 \ updateFailHtlc = Commitments.sendFail(commitments, cmd)
+      case (norm: NormalData, cmd: CMDFailHtlc, OPEN) =>
+        val c1 \ updateFailHtlc = Commitments.sendFail(norm.commitments, cmd)
         me UPDATA norm.copy(commitments = c1) SEND updateFailHtlc
 
 
-      case (norm @ NormalData(_, commitments, _, _), cmd: CMDFailMalformedHtlc, OPEN) =>
-        val c1 \ updateFailMalformedHtlс = Commitments.sendFailMalformed(commitments, cmd)
+      case (norm: NormalData, cmd: CMDFailMalformedHtlc, OPEN) =>
+        val c1 \ updateFailMalformedHtlс = Commitments.sendFailMalformed(norm.commitments, cmd)
         me UPDATA norm.copy(commitments = c1) SEND updateFailMalformedHtlс
 
 
