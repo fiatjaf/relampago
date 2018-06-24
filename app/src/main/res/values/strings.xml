@@ -154,12 +154,11 @@
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><font color=#999999><small><br><br>make a QR-code with on-chain wallet address, can be used to receive regular Bitcoin transactions</small></font>]]></string>
-
-    <string name="ln_receive_reserve"><![CDATA[<font color=#333333>can\'t ask for Lightning payments yet because first you need to spend at least</font> %1$s <font color=#333333>in order to make some space for receiving</font>]]></string>
-    <string name="ln_receive_6conf"><![CDATA[<font color=#333333>can\'t ask for Lightning payments yet because a funding Bitcoin transaction has not got 6 confirmations</font>]]></string>
-    <string name="ln_receive_no_channels"><![CDATA[<font color=#333333>can\'t ask for Lightning payments yet because no open payment channels are present currently</font>]]></string>
-    <string name="ln_receive_ok"><![CDATA[<font color=#999999>make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</font>]]></string>
+    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><font color=#999999><small><br><br>Make a QR-code with on-chain wallet address, can be used to receive regular Bitcoin transactions</small></font>]]></string>
+    <string name="ln_receive_6conf"><![CDATA[<font color=#333333>Can\'t ask for Lightning payments because your peer is not ready yet. Typically peers become ready once a channel funding Bitcoin transaction gets 6 confirmations</font>]]></string>
+    <string name="ln_receive_reserve"><![CDATA[<font color=#333333>Can\'t ask for Lightning payments yet because first you need to spend at least</font> %1$s <font color=#333333>in order to make some space for receiving</font>]]></string>
+    <string name="ln_receive_ok"><![CDATA[<font color=#999999>Make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</font>]]></string>
+    <string name="ln_receive_nochan"><![CDATA[<font color=#333333>Can\'t ask for Lightning payments because there are no open channels</font>]]></string>
 
     <string name="err_ln_peer_offline">Could not connect to remote peer at %1$s</string>
     <string name="err_ln_no_data_loss_protect">Data loss protection is not provided by this peer</string>
@@ -172,6 +171,7 @@
     <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 
     <string name="err_ln_no_chan">Failed because no channel is currently online, please check your phone connectivity and try again in a few seconds</string>
+    <string name="err_ln_still_opening">Failed because a payment channel is not open yet\n\nFunding transaction needs to get enough confirmations before a channel can be used to send payments</string>
     <string name="err_ln_expired"><![CDATA[A channel has just been force closed because of an expired outgoing payment<br><br><strong>Faulty peer public key</strong><br>%1$s<br><br><strong>Expired payment hash</strong><br>%2$s]]></string>
     <string name="err_ln_second_reserve"><![CDATA[Failed because a channel balance is too low when soft reserve is taken into account<br><br>%1$s<br><br>hard reserve %2$s<br>soft reserve %3$s<br><br>capacity %4$s<br>can send %5$s<br>sending %6$s]]></string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
@@ -189,7 +189,6 @@
     <string name="ln_share_errors">Share peer responses</string>
 
     <string name="ln_status_peer">Select peer</string>
-    <string name="ln_status_none">No open channels found</string>
     <string name="ln_description_hint">add some description</string>
     <string name="ln_no_description">No description provided</string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment preimage: %2$s</string>

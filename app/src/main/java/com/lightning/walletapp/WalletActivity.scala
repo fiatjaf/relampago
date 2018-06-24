@@ -158,7 +158,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       .map(estimateCanReceive).reduceOption(_ max _) getOrElse 0L)
 
     val reserveUnspent = getString(ln_receive_reserve) format coloredOut(maxCanReceive)
-    val lnReceiveText = if (operationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_no_channels)
+    val lnReceiveText = if (operationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_nochan)
       else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_option).format(me getString ln_receive_6conf)
       else if (maxCanReceive < minHtlcValue) getString(ln_receive_option).format(reserveUnspent)
       else getString(ln_receive_option).format(me getString ln_receive_ok)
@@ -208,7 +208,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def goChanDetails(top: View) = {
     val nothingToShow = app.ChannelManager.all.isEmpty
-    if (nothingToShow) app toast ln_status_none
+    if (nothingToShow) app toast ln_receive_nochan
     else me goTo classOf[LNOpsActivity]
   }
 

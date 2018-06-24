@@ -155,11 +155,10 @@
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запрос-Молния</font><small><br><br>%1$s</small>]]></string>
-
     <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Биткоин-транзакция</font><font color=#999999><small><br><br>создать QR-код с обычным адресом для получения ончейн Биткоин-транзакций</small></font>]]></string>
-    <string name="ln_receive_reserve"><![CDATA[<font color=#333333>входящие платежи-Молнии пока невозможны потому что для начала вам нужно потратить хотя-бы</font> %1$s <font color=#333333>чтобы освободить место для получения денег</font>]]></string>
-    <string name="ln_receive_6conf"><![CDATA[<font color=#333333>входящие платежи-Молнии пока невозможны потому что пополняющая канал Биткоин-транзакция еще не получила 6 подтверждений</font>]]></string>
-    <string name="ln_receive_no_channels"><![CDATA[<font color=#333333>входящие платежи-Молнии пока невозможны потому что нет открытых платежных каналов</font>]]></string>
+    <string name="ln_receive_6conf"><![CDATA[<font color=#333333>Входящие платежи-Молнии пока невозможны потому что ваш пир еще не готов. Как правило пиры становятся готовы как только пополняющая канал Биткоин-транзакция получает 6 подтверждений</font>]]></string>
+    <string name="ln_receive_reserve"><![CDATA[<font color=#333333>Входящие платежи-Молнии пока невозможны потому что для начала вам нужно потратить хотя-бы</font> %1$s <font color=#333333>чтобы освободить место для получения денег</font>]]></string>
+    <string name="ln_receive_nochan"><![CDATA[<font color=#333333>Входящие платежи-Молнии пока невозможны потому что нет открытых платежных каналов</font>]]></string>
     <string name="ln_receive_ok"><![CDATA[<font color=#999999>создать QR-код с одноразовым запросом для получения быстрых оффчейн платежей</font>]]></string>
 
     <string name="err_ln_peer_offline">Не удалось подключиться к узлу %1$s</string>
@@ -175,6 +174,7 @@
     <string name="err_ln_no_chan">Не получилось потому что канал сейчас оффлайн. Проверьте, есть ли сеть и попробуйте еще раз через несколько секунд</string>
     <string name="err_ln_expired"><![CDATA[Канал только что закрылся с вашей стороны из-за просроченного исходящего платежа<br><br>Публичный ключ пира<br>%1$s<br><br>Хэш платежа<br>%2$s]]></string>
     <string name="err_ln_second_reserve"><![CDATA[Не получилось потому что баланс слишком низкий с учетом софт-резерва<br><br>%1$s<br><br>хард-резерв %2$s<br>софт-резерв %3$s<br><br>емоксть %4$s<br>лимит %5$s<br>sending %6$s]]></string>
+    <string name="err_ln_still_opening">Не получилось потому что платежный канал еще не открыт\n\nПополняющая канал Биткоин-транзакция должна получить больше подтверждений перед тем как его можно будет использовать для отправки платежей</string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Недостаточно средств</strong><br><br>доступно %1$s<br>отправлено %2$s<br>не хватает %3$s<br>в ожидании %4$s<br><br>Учтите что входящие Биткоин-транзакции можно тратить только после того как они получат хотя-бы одно подтверждение]]></string>
     <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии. Вы можете добавить денег в кошелек и попробовать еше раз</string>
     <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой. Попробуйте разбить ее на несколько более мелких транзакций</string>
@@ -190,7 +190,6 @@
     <string name="ln_share_errors">История Onion-ответов</string>
 
     <string name="ln_status_peer">Выберите пира</string>
-    <string name="ln_status_none">Нет открытых каналов</string>
     <string name="ln_description_hint">добавьте описание</string>
     <string name="ln_no_description">Описание отсутствует</string>
     <string name="ln_proof">Подписанный платежный запрос: %1$s\n\nPreimage платежа: %2$s</string>

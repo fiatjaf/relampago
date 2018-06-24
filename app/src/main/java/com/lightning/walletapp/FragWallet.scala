@@ -418,13 +418,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     override def onException = {
       case _ \ CMDAddImpossible(_, code) =>
         // Non-fatal: can't add this payment, inform user why
-        val bld = negTextBuilder(dialog_ok, host getString code)
+        val bld = negTextBuilder(dialog_ok, app getString code)
         UITask(host showForm bld.create).run
 
       case chan \ HTLCExpiryException(_, htlc) =>
         val paymentHash = htlc.add.paymentHash.toString
         val peerKey = chan.data.announce.nodeId.toString
-        val msg = host.getString(err_ln_expired).format(peerKey, paymentHash)
+        val msg = app.getString(err_ln_expired).format(peerKey, paymentHash)
         UITask(host showForm negTextBuilder(dialog_ok, msg.html).create).run
 
       case _ \ internal =>
@@ -482,9 +482,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     else if (pr.nodeId == nodePublicKey) app toast err_self_payment
     else if (!pr.isFresh) app toast dialog_pr_expired else {
 
-      // This fetches normal channels which MAY be offline currently and this is intentional
+      // This fetches normal channels which MAY be offline currently, this is fine
+      val openingChannels = app.ChannelManager.notClosingOrRefunding.filter(isOpening)
       val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
-      if (operationalChannels.isEmpty) app toast ln_status_none else {
+      if (operationalChannels.isEmpty && openingChannels.nonEmpty) onFail(app getString err_ln_still_opening)
+      else if (operationalChannels.isEmpty) app toast ln_receive_nochan else {
 
         val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
         val maxCanSend = MilliSatoshi(operationalChannels.map(estimateCanSendCapped).max)
@@ -519,7 +521,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def proposeOpen(pr: PaymentRequest) = {
     val proceed: RemoteNodeView => Unit = rnv => {
       def startOpening = host goTo classOf[LNStartFundActivity]
-      val bld = baseBuilder(host getString ln_open_offer, rnv.asString(StartNodeView.nodeView, "<br>").html)
+      val bld = baseBuilder(app getString ln_open_offer, rnv.asString(StartNodeView.nodeView, "<br>").html)
       mkForm(runAnd(app.TransData.value = rnv)(startOpening), none, bld, dialog_ok, dialog_cancel)
     }
 
@@ -528,7 +530,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       announce \ connects <- res take 1 if announce.nodeId == pr.nodeId
       rnv = RemoteNodeView(announce -> connects)
     } UITask(proceed apply rnv).run
-    app toast ln_status_none
+    app toast ln_receive_nochan
   }
 
   def doSend(rd: RoutingData) =
