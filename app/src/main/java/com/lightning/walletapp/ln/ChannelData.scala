@@ -289,6 +289,7 @@ object Commitments {
   def receiveAdd(c: Commitments, add: UpdateAddHtlc) =
     if (add.amountMsat < minHtlcValue.amount) throw new LightningException
     else if (add.id != c.remoteNextHtlcId) throw new LightningException
+    else if (add.expiry <= currentHeight) throw new LightningException
     else if (add.paymentHash.size != 32) throw new LightningException
     else {
 
@@ -299,7 +300,6 @@ object Commitments {
       val feesSat = if (c.localParams.isFunder) 0L else Scripts.commitTxFee(c.localParams.dustLimit, reduced).amount
       val totalInFlightMsat = UInt64(reduced.htlcs.map(_.add.amountMsat).sum)
 
-      if (add.expiry <= broadcaster.currentHeight) throw new LightningException
       if (totalInFlightMsat > c.localParams.maxHtlcValueInFlightMsat) throw new LightningException
       if (reduced.htlcs.count(_.incoming) > c.localParams.maxAcceptedHtlcs) throw new LightningException
       if (reduced.toRemoteMsat / 1000L - feesSat - c.localParams.channelReserveSat < 0L) throw new LightningException

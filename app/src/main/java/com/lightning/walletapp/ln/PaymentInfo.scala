@@ -102,16 +102,16 @@ object PaymentInfo {
   def replaceRoute(rd: RoutingData, upd: ChannelUpdate) = {
     // In some cases we can just replace a faulty hop with a supplied one
     // but only do this once per each channel to avoid infinite loops
-    replacedChans += upd.shortChannelId
 
-    val route1 = rd.usedRoute map { hop =>
+    val withReplacedHop = rd.usedRoute map { hop =>
       // Replace a single hop and return it otherwise unchanged
       val shouldReplace = hop.shortChannelId == upd.shortChannelId
       if (shouldReplace) upd toHop hop.nodeId else hop
     }
 
-    // Put updated route back, nothing to blacklist
-    val rd1 = rd.copy(routes = route1 +: rd.routes)
+    // Put reconstructed route back, nothing to blacklist
+    val rd1 = rd.copy(routes = withReplacedHop +: rd.routes)
+    replacedChans += upd.shortChannelId
     Some(rd1) -> Vector.empty
   }
 
@@ -129,7 +129,12 @@ object PaymentInfo {
       case ErrorPacket(nodeKey, u: Update) =>
         val isHonest = Announcements.checkSig(u.update, nodeKey)
         if (!isHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
-        else withoutChan(u.update.shortChannelId, rd, 180 * 1000, rd.firstMsat)
+        else rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
+          // A node along a payment route may choose a different channel than the one we have requested
+          // if that happens it means our requested channel has not been used so we put it back here and retry it once again
+          if (payHop.shortChannelId == u.update.shortChannelId) withoutChan(u.update.shortChannelId, rd, 180 * 1000, rd.firstMsat)
+          else withoutChan(u.update.shortChannelId, rd.copy(routes = rd.usedRoute +: rd.routes), 180 * 1000, rd.firstMsat)
+        } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
       case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
