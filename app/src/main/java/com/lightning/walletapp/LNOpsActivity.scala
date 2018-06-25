@@ -204,22 +204,20 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
       def manageOpen = UITask {
         val totalSent = getTotalSent(cs.channelId)
         val valueSent = coloredOut apply MilliSatoshi(totalSent.sum)
-        val payNum = app.plurOrZero(totalPayments, totalSent.size)
+        val paymentsSent = app.plurOrZero(totalPayments, totalSent.size)
+        val inFlightHTLC = app.plurOrZero(paymentsInFlight, inFlightHtlcs(chan).size)
 
         val canSend = MilliSatoshi(Channel estimateCanSend chan)
         val canReceive = MilliSatoshi(Channel estimateCanReceive chan)
         val canSend1 = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
         val canReceive1 = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
+        val openTemplate = if (channelAndHop(chan).isEmpty) ln_ops_chan_open_no_receive else ln_ops_chan_open
 
         val commitFee = MilliSatoshi(cs.reducedRemoteState.feesSat * 1000L)
-        val localReserve = MilliSatoshi(cs.localParams.channelReserveSat * 1000L)
-        val remoteReserve = MilliSatoshi(cs.remoteParams.channelReserveSatoshis * 1000L)
-
-        val inFlightHTLC = app.plurOrZero(paymentsInFlight, inFlightHtlcs(chan).size)
-        val openTemplate = if (channelAndHop(chan).isEmpty) ln_ops_chan_open_no_receive else ln_ops_chan_open
-        lnOpsDescription setText host.getString(openTemplate).format(chan.state, alias, coloredIn(capacity),
-          canSend1, coloredOut(remoteReserve), coloredOut(commitFee), canReceive1, coloredOut(localReserve),
-          inFlightHTLC, payNum, valueSent).html
+        val refundable = MilliSatoshi(Commitments.latestRemoteCommit(cs).spec.toRemoteMsat)
+        lnOpsDescription setText host.getString(openTemplate).format(chan.state, alias,
+          coloredIn(capacity), coloredIn(refundable), coloredOut(commitFee), canSend1,
+          canReceive1, inFlightHTLC, paymentsSent, valueSent).html
 
         // Show channel actions with cooperative closing options
         lnOpsAction setOnClickListener onButtonTap(showCoopOptions)
