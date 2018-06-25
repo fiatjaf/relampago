@@ -103,7 +103,6 @@
     <string name="dialog_sum_empty">Укажите сумму платежа</string>
     <string name="dialog_sum_small">Сумма слишком мала</string>
     <string name="dialog_sum_big">Сумма слишком велика</string>
-    <string name="dialog_pay_quit">Pay &amp; Exit</string>
     <string name="dialog_cancel">Отмена</string>
     <string name="dialog_retry">Retry</string>
     <string name="dialog_boost">CPFP</string>
@@ -214,8 +213,8 @@
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>кооперативно</i></font><br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>закрыт <font color=#999999>%4$s</font><br>емкость %5$s<br>возврат %6$s<br><br>%7$s]]></string>
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>емкость %4$s<br>нужно %5$s<br><br><a href=https://testnet.smartbit.com.au/tx/%6$s>Посмотреть статус</a><br>%7$s]]></string>
 
-    <string name="ln_ops_chan_open_no_receive"><![CDATA[<font color=#76B041>%1$s</font><br>%2$s<br><br>емкость %3$s<br>can send %4$s<br><small>локальный резерв %5$s<br>комиссия %6$s</small><br><br><small><font color=#FF9900>receiving not enabled by peer yet</font></small><br>отправлено %7$s<br><small>резерв пира %8$s</small><br><br><small>отправлено %9$s</small><br>%10$s<br>%11$s]]></string>
-    <string name="ln_ops_chan_open"><![CDATA[<font color=#76B041>%1$s</font><br>%2$s<br><br>емкость %3$s<br>can send %4$s<br><small>локальный резерв %5$s<br>комиссия %6$s</small><br><br>can receive %7$s<br><small>резерв пира %8$s</small><br><br><small>отправлено %9$s</small><br>%10$s<br>%11$s]]></string>
+    <string name="ln_ops_chan_open_no_receive"><![CDATA[<font color=#76B041>%1$s</font><br>%2$s<br><br>емкость %3$s<br>can send %4$s<br><small>локальный резерв %5$s<br>комиссия %6$s</small><br><br><small><font color=#FF9900>receiving not enabled by peer yet</font></small><br>отправлено %7$s<br><small>резерв пира %8$s</small><br><br>%9$s<br>%10$s<br><small>отправлено %11$s</small>]]></string>
+    <string name="ln_ops_chan_open"><![CDATA[<font color=#76B041>%1$s</font><br>%2$s<br><br>емкость %3$s<br>can send %4$s<br><small>локальный резерв %5$s<br>комиссия %6$s</small><br><br>can receive %7$s<br><small>резерв пира %8$s</small><br><br>%9$s<br>%10$s<br><small>отправлено %11$s</small>]]></string>
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>В канале есть зависшие платежи</font> поэтому кооперативное закрытие будет отложено пока они не исчезнут, все еще хотите продолжить?]]></string>
     <string name="ln_chan_force_offline_details"><![CDATA[&#9888; <font color=#FF9900>Канал сейчас оффлайн</font> поэтому попытка закрытия приведет к <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсированному закрытию</a>, на которое уйдет большая сумма комиссии, кроме того возвратная транзакция будет отложена, все еще хотите продолжить?]]></string>

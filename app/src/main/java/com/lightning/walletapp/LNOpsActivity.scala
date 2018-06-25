@@ -203,7 +203,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       def manageOpen = UITask {
         val totalSent = getTotalSent(cs.channelId)
-        val valueSent = MilliSatoshi(totalSent.sum)
+        val valueSent = coloredOut apply MilliSatoshi(totalSent.sum)
         val payNum = app.plurOrZero(totalPayments, totalSent.size)
 
         val canSend = MilliSatoshi(Channel estimateCanSend chan)
@@ -219,7 +219,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         val openTemplate = if (channelAndHop(chan).isEmpty) ln_ops_chan_open_no_receive else ln_ops_chan_open
         lnOpsDescription setText host.getString(openTemplate).format(chan.state, alias, coloredIn(capacity),
           canSend1, coloredOut(remoteReserve), coloredOut(commitFee), canReceive1, coloredOut(localReserve),
-          coloredOut(valueSent), inFlightHTLC, payNum).html
+          inFlightHTLC, payNum, valueSent).html
 
         // Show channel actions with cooperative closing options
         lnOpsAction setOnClickListener onButtonTap(showCoopOptions)
