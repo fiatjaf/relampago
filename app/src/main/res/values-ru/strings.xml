@@ -242,10 +242,6 @@
     <string name="ln_ops_chan_unilateral_status_dead"><![CDATA[%1$s<br>= %2$s отменена]]></string>
     <string name="ln_ops_chan_unilateral_status_done"><![CDATA[%1$s<br>= %2$s получена]]></string>
     <string name="ln_ops_chan_unilateral_status_left"><![CDATA[%2$s<br>= %3$s %1$s]]></string>
-<<<<<<< HEAD
-	<string name="ln_total_value">Отправлено %1$s</string>
-=======
->>>>>>> f38ea1a... DIsplay more useful info in OPEN details
 
     <array name="ln_total_payments">
         <item><![CDATA[Нет отправленных платежей]]></item>
