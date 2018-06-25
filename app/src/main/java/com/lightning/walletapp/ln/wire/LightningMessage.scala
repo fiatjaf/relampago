@@ -114,7 +114,7 @@ case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int, ht
 
   def humanDetails =
     s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry delta: $cltvExpiryDelta blocks, " +
-      s"Routing fee: ${feeProportionalMillionths / 10000D}% of sum + baseline $feeBaseMsat msat"
+      f"Routing fee: ${feeProportionalMillionths / 10000D}%2f of sum + baseline $feeBaseMsat msat"
 }
 
 // NODE ADDRESS HANDLING

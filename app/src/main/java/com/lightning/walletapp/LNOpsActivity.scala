@@ -45,7 +45,6 @@ class LNOpsActivity extends TimerActivity { me =>
   lazy val refundStatus = getString(ln_ops_chan_refund_status)
   lazy val amountStatus = getString(ln_ops_chan_amount_status)
   lazy val commitStatus = getString(ln_ops_chan_commit_status)
-  lazy val totalValue = getString(ln_total_value)
 
   val slidingFragmentAdapter =
     new FragmentStatePagerAdapter(getSupportFragmentManager) {
@@ -204,8 +203,8 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       def manageOpen = UITask {
         val totalSent = getTotalSent(cs.channelId)
-        val paymentsNumber = app.plurOrZero(totalPayments, totalSent.size)
-        val valueSent = totalValue.format(MilliSatoshi andThen coloredOut apply totalSent.sum)
+        val valueSent = MilliSatoshi(totalSent.sum)
+        val payNum = app.plurOrZero(totalPayments, totalSent.size)
 
         val canSend = MilliSatoshi(Channel estimateCanSend chan)
         val canReceive = MilliSatoshi(Channel estimateCanReceive chan)
@@ -213,10 +212,14 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         val canReceive1 = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
 
         val commitFee = MilliSatoshi(cs.reducedRemoteState.feesSat * 1000L)
-        val inFlightHTLC = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
+        val localReserve = MilliSatoshi(cs.localParams.channelReserveSat * 1000L)
+        val remoteReserve = MilliSatoshi(cs.remoteParams.channelReserveSatoshis * 1000L)
+
+        val inFlightHTLC = app.plurOrZero(paymentsInFlight, inFlightHtlcs(chan).size)
         val openTemplate = if (channelAndHop(chan).isEmpty) ln_ops_chan_open_no_receive else ln_ops_chan_open
         lnOpsDescription setText host.getString(openTemplate).format(chan.state, alias, coloredIn(capacity),
-          canSend1, canReceive1, coloredOut(commitFee), inFlightHTLC, valueSent, paymentsNumber).html
+          canSend1, coloredOut(remoteReserve), coloredOut(commitFee), canReceive1, coloredOut(localReserve),
+          coloredOut(valueSent), inFlightHTLC, payNum).html
 
         // Show channel actions with cooperative closing options
         lnOpsAction setOnClickListener onButtonTap(showCoopOptions)
