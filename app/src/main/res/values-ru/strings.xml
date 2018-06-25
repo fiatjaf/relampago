@@ -10,6 +10,7 @@
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Более быстрое подтверждение</font></small></small>]]></string>
     <string name="sets_rescan_ok">Сейчас кошелек закроется рескан блокчейна начнется автоматически при следующем открытии</string>
     <string name="wallet_state"><small>Баланс\n<font color='#999999'>Ончейн и LN</font></small></string>
+    <string name="exchange_rate"><small>Курс\n<font color='#999999'>За 1 биткоин</font></small></string>
     <string name="copied_to_clipboard">Скопировано «%1$s»</string>
     <string name="wallet_restore">Восстановить кошелек</string>
     <string name="wallet_create">Новый кошелек</string>

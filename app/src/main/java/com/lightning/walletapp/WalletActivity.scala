@@ -212,8 +212,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     else me goTo classOf[LNOpsActivity]
   }
 
-  val tokensPrice = MilliSatoshi(1000000L)
-  def goAddChannel(top: View) = if (app.ChannelManager.all.isEmpty && OlympusWrap.hasAuthEnabled) {
+  private[this] val tokensPrice = MilliSatoshi(1000000L)
+  def goAddChannel(top: View) = if (app.ChannelManager.all.isEmpty) {
     val humanPrice = s"${coloredIn apply tokensPrice} <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
     val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
     mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
@@ -222,6 +222,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def showDenomChooser = {
     val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
+    val rate = msatInFiatHuman apply MilliSatoshi(100000000000L)
     val inFiatTotal = msatInFiatHuman apply walletTotalSum
 
     val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
@@ -229,6 +230,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val stateContent = title.findViewById(R.id.stateContent).asInstanceOf[TextView]
     val denomChoiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
     val allDenominations = getResources.getStringArray(R.array.denoms).map(_.html)
+    title.findViewById(R.id.stateExchange).asInstanceOf[TextView] setText rate
 
     def updateDenomination = {
       // Update denom first so UI update can react to changes, also persist user choice in local data

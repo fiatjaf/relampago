@@ -5,6 +5,29 @@
     <LinearLayout
         style="@style/LineLinearLayout"
         android:orientation="horizontal"
+        android:layout_width="fill_parent"
+        android:gravity="center">
+
+        <TextView
+            style="@style/BaseText"
+            android:layout_weight="4"
+            android:layout_width="0dp"
+            android:text="@string/exchange_rate"/>
+
+        <TextView
+            style="@style/BaseText"
+            android:layout_weight="5"
+            android:layout_width="0dp"
+            android:id="@+id/stateExchange"
+            android:gravity="end"/>
+
+    </LinearLayout>
+
+    <View style="@style/GrayDivider"/>
+
+    <LinearLayout
+        style="@style/LineLinearLayout"
+        android:orientation="horizontal"
         android:layout_width="fill_parent">
 
         <TextView

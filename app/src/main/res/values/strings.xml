@@ -10,6 +10,7 @@
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Confirmation may take hours</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Faster confirmation times</font></small></small>]]></string>
     <string name="wallet_state"><small>Total balance\n<font color='#999999'>On-chain and LN</font></small></string>
+    <string name="exchange_rate"><small>Exchange rate\n<font color='#999999'>Per 1 bitcoin</font></small></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_restore">Restore Wallet</string>
     <string name="wallet_create">New Wallet</string>
