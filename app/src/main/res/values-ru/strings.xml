@@ -210,7 +210,7 @@
 
     <string name="ln_ops_chan_basic"><![CDATA[%1$s<br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>емкость %4$s]]></string>
     <string name="ln_ops_chan_negotiations"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>емкость %4$s<br>баланс %5$s<br><br>%6$s]]></string>
-    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>открыт <font color=#999999>%4$s</font><br>закрыт <font color=#999999>%5$s</font><br>емкость %6$s<br><br>%7$s]]></string>
+    <string name="ln_ops_chan_unilateral_closing"><![CDATA[%1$s<br>%2$s<br>%3$s<br><br>открыт <font color=#999999>%4$s</font><br>закрыт <font color=#999999>%5$s</font><br>емкость %6$s<br>ваши %7$s<br><br>%8$s]]></string>
     <string name="ln_ops_chan_bilateral_closing"><![CDATA[%1$s<br><font color=#999999><i>кооперативно</i></font><br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>закрыт <font color=#999999>%4$s</font><br>емкость %5$s<br>возврат %6$s<br><br>%7$s]]></string>
 
     <string name="ln_ops_chan_opening"><![CDATA[<font color=#FF9900>%1$s</font><br>%2$s<br><br>открыт <font color=#999999>%3$s</font><br>емкость %4$s<br>нужно %5$s<br><br><a href=https://smartbit.com.au/tx/%6$s>Посмотреть статус</a><br>%7$s]]></string>

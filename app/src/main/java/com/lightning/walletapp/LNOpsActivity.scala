@@ -273,13 +273,14 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
             val humanTier12View = tier12View take 2 mkString "<br><br>"
             val status = humanStatus apply getStatus(info.commitTx.txid)
             val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
+            val balance = MilliSatoshi(close.commitments.localCommit.spec.toLocalMsat)
             val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
             val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
 
             val isRemote = close.remoteCommit.nonEmpty || close.nextRemoteCommit.nonEmpty
             val startedByWhom = if (isRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
-            lnOpsDescription setText unilateralClosing.format(chan.state, host getString startedByWhom,
-              alias, started, closedTimestamp, coloredIn(capacity), commitView + refundsView).html
+            lnOpsDescription setText unilateralClosing.format(chan.state, host getString startedByWhom, alias,
+              started, closedTimestamp, coloredIn(capacity), coloredIn(balance), commitView + refundsView).html
         }
       }
 
