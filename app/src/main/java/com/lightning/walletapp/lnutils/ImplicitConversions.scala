@@ -23,6 +23,7 @@ object IconGetter extends Html.ImageGetter {
   private val metrics = app.getResources.getDisplayMetrics
   val scrWidth = metrics.widthPixels.toDouble / metrics.densityDpi
   val maxDialog = metrics.densityDpi * 2.1
+  val isTablet = scrWidth > 3.5
 
   import android.provider.Settings.{System => FontSystem}
   val bigFont = FontSystem.getFloat(app.getContentResolver, FontSystem.FONT_SCALE, 1) > 1

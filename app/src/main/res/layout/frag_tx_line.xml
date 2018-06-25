@@ -31,8 +31,6 @@
 
     <TextView
         style="@style/BaseText"
-        android:visibility="gone"
-        android:textColor="@color/bg"
         android:id="@+id/transactWhat"
         android:layout_width="wrap_content"/>
 

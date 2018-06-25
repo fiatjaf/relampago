@@ -34,6 +34,7 @@ import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
+import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
@@ -142,7 +143,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def getItemId(position: Int) = position
 
     def getView(position: Int, savedView: View, parent: ViewGroup) = {
-      val view = if (null == savedView) host.getLayoutInflater.inflate(R.layout.frag_tx_line, null) else savedView
+      val resource = if (isTablet) R.layout.frag_tx_line_tablet else R.layout.frag_tx_line
+      val view = if (null == savedView) host.getLayoutInflater.inflate(resource, null) else savedView
       val holder = if (null == view.getTag) new ViewHolder(view) else view.getTag.asInstanceOf[ViewHolder]
       allItems(position) fillView holder
       view
@@ -206,14 +208,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case 0 => sumOut.format(denom formatted info.firstSum)
       }
 
-      val description = getDescription(info.description)
-      val humanHash = humanSix(info.hash.toUpperCase take 24)
-      val humanSumDetails = s"<font color=#999999>$humanHash</font><br>$description"
-      holder.transactWhen setText when(System.currentTimeMillis, getDate).html
-      holder.transactCircle setImageResource imageMap(info.actualStatus)
+      val desc = getDescription(info.description)
       holder.transactSum setText s"""<img src="ln"/>$humanSum""".html
-      holder.transactWhat setVisibility viewMap(isSearching)
-      holder.transactWhat setText humanSumDetails.html
+      holder.transactCircle setImageResource imageMap(info.actualStatus)
+      holder.transactWhen setText when(System.currentTimeMillis, getDate).html
+      holder.transactWhat setVisibility viewMap(isTablet || isSearching)
+      holder.transactWhat setText desc.html
     }
 
     def generatePopup = {
@@ -294,8 +294,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val status = if (txDead) dead else if (txDepth >= minDepth) conf1 else await
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactSum setText s"""<img src="btc"/>$humanSum""".html
+      holder.transactWhat setText wrap.tx.getHashAsString
+      holder.transactWhat setVisibility viewMap(isTablet)
       holder.transactCircle setImageResource status
-      holder.transactWhat setVisibility View.GONE
     }
 
     def generatePopup = {
