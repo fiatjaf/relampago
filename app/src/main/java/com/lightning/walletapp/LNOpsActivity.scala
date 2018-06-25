@@ -32,7 +32,7 @@ class LNOpsActivity extends TimerActivity { me =>
   lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
   lazy val localChanCache = for (chan <- app.ChannelManager.all if me canDisplay chan.data) yield chan
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
-  lazy val inFlightPayments = getResources getStringArray R.array.ln_in_flight_payments
+  lazy val paymentsInFlight = getResources getStringArray R.array.ln_in_flight_payments
   lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
   lazy val totalPayments = getResources getStringArray R.array.ln_total_payments
   lazy val txsConfs = getResources getStringArray R.array.txs_confs
@@ -229,7 +229,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
 
       def manageNegotiations(cs: Commitments) = UITask {
         val refundable = MilliSatoshi(cs.localCommit.spec.toLocalMsat)
-        val inFlightHTLC = app.plurOrZero(inFlightPayments, inFlightHtlcs(chan).size)
+        val inFlightHTLC = app.plurOrZero(paymentsInFlight, inFlightHtlcs(chan).size)
         lnOpsDescription setText negotiations.format(chan.state, alias, started,
           coloredIn(capacity), coloredIn(refundable), inFlightHTLC).html
 
