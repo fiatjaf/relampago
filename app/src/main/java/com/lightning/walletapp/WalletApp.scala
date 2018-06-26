@@ -128,6 +128,7 @@ class WalletApp extends Application { me =>
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         // Ignore routing messages except ChannelUpdate since it may contain payment parameters
         case chanUpdate: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process chanUpdate)
+        case error: Error if error.exception.getMessage == "sync error" => ConnectionManager.connections.get(nodeId).foreach(_.disconnect) // we are best programmers in the world
         case error: Error if error.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process error)
         case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
         case _ =>
