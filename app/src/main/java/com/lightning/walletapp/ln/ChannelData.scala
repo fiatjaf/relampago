@@ -95,6 +95,21 @@ case class ClosingData(announce: NodeAnnouncement,
     }
   }
 
+  def frozenPublishedHashes = {
+    val localFrozenPublishedHashes = for {
+      localCommitPublished: LocalCommitPublished <- localCommit
+      t1 \ _ <- localCommitPublished.claimHtlcTimeout
+    } yield t1.add.paymentHash
+
+    val remoteFrozenPublishedHashes = for {
+      remoteCommitPublished: RemoteCommitPublished <- remoteCommit ++ nextRemoteCommit
+      ClaimHtlcTimeoutTx(Some(add), _, _) <- remoteCommitPublished.claimHtlcTimeout
+    } yield add.paymentHash
+
+    localFrozenPublishedHashes ++
+      remoteFrozenPublishedHashes
+  }
+
   def isOutdated = {
     val allConfirmedOrDead = bestClosing match {
       case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }

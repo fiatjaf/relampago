@@ -120,16 +120,8 @@ class WalletApp extends Application { me =>
       // Operational channels have commitments by definition
     } yield ChanReport(chan, chan(identity).get)
 
-    def frozenInFlightHashes = for {
-      chan <- all if chan.state == CLOSING
-      theirDust <- chan(_.remoteParams.dustLimitSatoshis * 1000L).toList
-      // Frozen means a channel has been broken and we have a non-dust HTLC
-      // which will either be taken by peer with us getting a payment preimage
-      // or it will eventually be taken by us and thus fulfilled as on-chain tx
-      htlc <- inFlightHtlcs(chan) if htlc.add.amountMsat > theirDust
-    } yield htlc.add.paymentHash
-
-    def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(_.add.paymentHash)
+    def frozenInFlightHashes = all.map(c => c.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
+    def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(htlc => htlc.add.paymentHash)
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
     val socketEventsListener = new ConnectionListener {
