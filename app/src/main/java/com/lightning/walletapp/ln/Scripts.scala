@@ -153,9 +153,9 @@ object Scripts { me =>
 
   case class HtlcSuccessTx(input: InputInfo, tx: Transaction, add: UpdateAddHtlc) extends TransactionWithInputInfo
   case class HtlcTimeoutTx(input: InputInfo, tx: Transaction, add: UpdateAddHtlc) extends TransactionWithInputInfo
-
+  case class ClaimHtlcTimeoutTx(addOpt: Option[UpdateAddHtlc], input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
   case class ClaimHtlcSuccessTx(input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
-  case class ClaimHtlcTimeoutTx(input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
+
   case class ClaimP2WPKHOutputTx(input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
   case class ClaimDelayedOutputTx(input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
   case class MainPenaltyTx(input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
@@ -344,7 +344,7 @@ object Scripts { me =>
     val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, 0x00000000L) :: Nil
     val txOut = TxOut(finalAmount, localFinalScriptPubKey) :: Nil
     val tx = Transaction(2, txIn, txOut, lockTime = add.expiry)
-    ClaimHtlcTimeoutTx(inputInfo, tx)
+    ClaimHtlcTimeoutTx(Some(add), inputInfo, tx)
   }
 
   def makeClaimHtlcSuccessTx(finder: PubKeyScriptIndexFinder, localHtlcPubkey: PublicKey, remoteHtlcPubkey: PublicKey,

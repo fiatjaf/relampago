@@ -186,8 +186,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val claimHtlcSuccessTxFmt = taggedJsonFmt(jsonFormat[InputInfo, Transaction,
     ClaimHtlcSuccessTx](ClaimHtlcSuccessTx.apply, "input", "tx"), tag = "ClaimHtlcSuccessTx")
 
-  implicit val claimHtlcTimeoutTxFmt = taggedJsonFmt(jsonFormat[InputInfo, Transaction,
-    ClaimHtlcTimeoutTx](ClaimHtlcTimeoutTx.apply, "input", "tx"), tag = "ClaimHtlcTimeoutTx")
+  implicit val claimHtlcTimeoutTxFmt = taggedJsonFmt(jsonFormat[Option[UpdateAddHtlc], InputInfo, Transaction,
+    ClaimHtlcTimeoutTx](ClaimHtlcTimeoutTx.apply, "addOpt", "input", "tx"), tag = "ClaimHtlcTimeoutTx")
 
   implicit val claimP2WPKHOutputTxFmt = taggedJsonFmt(jsonFormat[InputInfo, Transaction,
     ClaimP2WPKHOutputTx](ClaimP2WPKHOutputTx.apply, "input", "tx"), tag = "ClaimP2WPKHOutputTx")
