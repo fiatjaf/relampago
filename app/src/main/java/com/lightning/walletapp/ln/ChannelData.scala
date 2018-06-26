@@ -73,8 +73,10 @@ case class ClosingData(announce: NodeAnnouncement,
                        refundRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
                        closedAt: Long = System.currentTimeMillis) extends HasCommitments {
 
-  lazy val commitTxs = localCommit.map(_.commitTx) ++
-    remoteCommit.map(_.commitTx) ++ nextRemoteCommit.map(_.commitTx)
+  lazy val commitTxs =
+    localCommit.map(_.commitTx) ++
+      remoteCommit.map(_.commitTx) ++
+      nextRemoteCommit.map(_.commitTx)
 
   def tier12States =
     revokedCommit.flatMap(_.getState) ++ localCommit.flatMap(_.getState) ++
