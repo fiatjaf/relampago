@@ -354,6 +354,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case _ => throw new LightningException
         }
 
+        doProcess(CMDOnline)
+        // Send ChannelReestablish once again
         BECOME(norm.copy(commitments = c1), OPEN)
         norm.localShutdown foreach SEND
         doProcess(CMDHTLCProcess)

@@ -120,17 +120,13 @@ class WalletApp extends Application { me =>
       // Operational channels have commitments by definition
     } yield ChanReport(chan, chan(identity).get)
 
-    def frozenInFlightHashes = all.map(c => c.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
+    def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
     def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(htlc => htlc.add.paymentHash)
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
     val socketEventsListener = new ConnectionListener {
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
-
-        // TODO: remove this
-        case error: Error if error.exception.getMessage == "sync error" => ConnectionManager.connections.get(nodeId).foreach(_.disconnect)
-
         case error: Error if error.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process error)
         case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
         case _ =>
