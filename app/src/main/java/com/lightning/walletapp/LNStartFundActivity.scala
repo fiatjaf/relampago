@@ -9,7 +9,6 @@ import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
-import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.walletapp.StartNodeView._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
@@ -128,8 +127,8 @@ class LNStartFundActivity extends TimerActivity { me =>
 
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val txt = getString(amount_hint_newchan).format(denom withSign minCap, denom withSign maxCap, denom withSign canSend)
-      val dummyKey = derivePrivateKey(LNParams.extendedCloudKey, System.currentTimeMillis :: 0L :: Nil).publicKey
       val rateManager = new RateManager(txt, content)
+      val dummyKey = randomPrivKey.publicKey
 
       def next(msat: MilliSatoshi) = new TxProcessor {
         val dummyScript = pubKeyScript(dummyKey, dummyKey)
