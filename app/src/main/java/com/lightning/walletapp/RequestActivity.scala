@@ -71,8 +71,8 @@ class RequestActivity extends TimerActivity { me =>
   override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
   var whenDestroy: Runnable = new Runnable { def run = none }
 
-  def INIT(state: Bundle) = {
-    setContentView(R.layout.activity_request)
+  def INIT(state: Bundle) = if (app.isAlive) {
+    setContentView(R.layout.activity_qr_request)
 
     app.TransData.value match {
       case pr: PaymentRequest => showInfo(drawAll(denom asString pr.amount.get, disposable.html), PaymentRequest write pr)
@@ -92,11 +92,10 @@ class RequestActivity extends TimerActivity { me =>
       } showPaid.run
     }
 
-    // Listen to all channels, remove listener on exiting, clear TransData right away
+    app.TransData.value = null
     whenDestroy = UITask(for (c <- app.ChannelManager.all) c.listeners -= receivedListener)
     for (c <- app.ChannelManager.all) c.listeners += receivedListener
-    app.TransData.value = null
-  }
+  } else me exitTo classOf[MainActivity]
 
   def showPaid = UITask {
     reqOptions setVisibility View.GONE

@@ -275,18 +275,15 @@ class WalletApp extends Application { me =>
   }
 
   abstract class WalletKit extends AbstractKit {
-    type ScriptSeq = Seq[org.bitcoinj.script.Script]
     def currentAddress = wallet currentAddress KeyPurpose.RECEIVE_FUNDS
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE // Returns all utxos
     def conf1Balance = wallet getBalance BalanceType.AVAILABLE_SPENDABLE // Uses coin selector
     def blockingSend(txj: Transaction) = peerGroup.broadcastTransaction(txj, 1).broadcast.get.toString
     def shutDown = none
 
-    def closingPubKeyScripts(cd: ClosingData) = {
-      val scripts = cd.commitTxs.flatMap(_.txOut).map(_.publicKeyScript)
-      val jScripts = for (scr <- scripts) yield bitcoinLibScript2bitcoinjScript(scr)
-      jScripts.asJava
-    }
+    def closingPubKeyScripts(cd: ClosingData) =
+      cd.commitTxs.flatMap(_.txOut).map(_.publicKeyScript)
+        .map(bitcoinLibScript2bitcoinjScript).asJava
 
     def sign(unsigned: SendRequest) = {
       // Create a tx ready for broadcast
