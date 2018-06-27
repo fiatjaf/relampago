@@ -155,11 +155,11 @@
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запрос-Молния</font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Биткоин-транзакция</font><font color=#999999><small><br><br>создать QR-код с обычным адресом для получения ончейн Биткоин-транзакций</small></font>]]></string>
-    <string name="ln_receive_6conf"><![CDATA[<font color=#333333>Входящие платежи-Молнии пока невозможны потому что ваш пир еще не готов. Как правило пиры становятся готовы как только пополняющая канал Биткоин-транзакция получает 6 подтверждений</font>]]></string>
-    <string name="ln_receive_reserve"><![CDATA[<font color=#333333>Входящие платежи-Молнии пока невозможны потому что для начала вам нужно потратить хотя-бы</font> %1$s <font color=#333333>чтобы освободить место для получения денег</font>]]></string>
-    <string name="ln_receive_nochan"><![CDATA[<font color=#333333>Входящие платежи-Молнии пока невозможны потому что нет открытых платежных каналов</font>]]></string>
-    <string name="ln_receive_ok"><![CDATA[<font color=#999999>создать QR-код с одноразовым запросом для получения быстрых оффчейн платежей</font>]]></string>
+    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Биткоин-транзакция</font><small><br><br>создать QR-код с обычным адресом для получения ончейн Биткоин-транзакций</small>]]></string>
+    <string name="ln_receive_6conf">&#9888; Входящие платежи-Молнии пока невозможны потому что ваш пир еще не готов. Как правило пиры становятся готовы как только пополняющая канал Биткоин-транзакция получает 6 подтверждений</string>
+    <string name="ln_receive_reserve"><![CDATA[&#9888; Входящие платежи-Молнии пока невозможны потому что для начала вам нужно потратить хотя-бы %1$s чтобы освободить место для получения денег]]></string>
+    <string name="ln_receive_ok">создать QR-код с одноразовым запросом для получения быстрых оффчейн-платежей</string>
+    <string name="ln_receive_nochan">&#9888; Нет платежных каналов</string>
 
     <string name="err_ln_peer_offline">Не удалось подключиться к узлу %1$s</string>
     <string name="err_ln_no_data_loss_protect">Узел не защищает от утери данных</string>
