@@ -45,9 +45,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     unsent = Map.empty
   }
 
-  def fetchAndSend(rd: RoutingData) = app.ChannelManager.fetchRoutes(rd)
-    .foreach(foeRD => app.ChannelManager.sendEither(foeRD, failOnUI),
-      exception => me failOnUI rd)
+  def fetchAndSend(rd: RoutingData): Unit = app.ChannelManager.fetchRoutes(rd)
+    .foreach(app.ChannelManager.sendEither(_, failOnUI), exception => me failOnUI rd)
 
   private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
   def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
