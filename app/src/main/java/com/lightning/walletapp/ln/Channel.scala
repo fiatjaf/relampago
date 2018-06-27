@@ -319,6 +319,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm: NormalData, cr: ChannelReestablish, OFFLINE) =>
+        // Send our ChannelReestablishment again to ensure they've got it
+        // this message should preceed all the subsequent messages here
+        doProcess(CMDOnline)
+
         // If next_local_commitment_number is 1 in both the channel_reestablish it sent
         // and received, then the node MUST retransmit funding_locked, otherwise it MUST NOT
         if (cr.nextLocalCommitmentNumber == 1 && norm.commitments.localCommit.index == 0)
@@ -354,8 +358,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case _ => throw new LightningException
         }
 
-        doProcess(CMDOnline)
-        // Send ChannelReestablish once again
         BECOME(norm.copy(commitments = c1), OPEN)
         norm.localShutdown foreach SEND
         doProcess(CMDHTLCProcess)

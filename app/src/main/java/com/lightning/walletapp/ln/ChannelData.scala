@@ -78,6 +78,11 @@ case class ClosingData(announce: NodeAnnouncement,
       remoteCommit.map(_.commitTx) ++
       nextRemoteCommit.map(_.commitTx)
 
+  lazy val frozenPublishedHashes =
+    localCommit.map(_.frozenHashes) ++
+      remoteCommit.map(_.frozenHashes) ++
+      nextRemoteCommit.map(_.frozenHashes)
+
   def tier12States =
     revokedCommit.flatMap(_.getState) ++ localCommit.flatMap(_.getState) ++
       remoteCommit.flatMap(_.getState) ++ nextRemoteCommit.flatMap(_.getState) ++
@@ -93,21 +98,6 @@ case class ClosingData(announce: NodeAnnouncement,
       case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ _ => cfs }
       case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
     }
-  }
-
-  def frozenPublishedHashes = {
-    val localFrozenPublishedHashes = for {
-      localCommitPublished: LocalCommitPublished <- localCommit
-      t1 \ _ <- localCommitPublished.claimHtlcTimeout
-    } yield t1.add.paymentHash
-
-    val remoteFrozenPublishedHashes = for {
-      remoteCommitPublished: RemoteCommitPublished <- remoteCommit ++ nextRemoteCommit
-      ClaimHtlcTimeoutTx(Some(add), _, _) <- remoteCommitPublished.claimHtlcTimeout
-    } yield add.paymentHash
-
-    localFrozenPublishedHashes ++
-      remoteFrozenPublishedHashes
   }
 
   def isOutdated = {
@@ -126,8 +116,15 @@ sealed trait CommitPublished {
   val commitTx: Transaction
 }
 
-case class LocalCommitPublished(claimMainDelayed: Seq[ClaimDelayedOutputTx], claimHtlcSuccess: Seq[SuccessAndClaim],
-                                claimHtlcTimeout: Seq[TimeoutAndClaim], commitTx: Transaction) extends CommitPublished {
+sealed trait FrozenHashProvider {
+  def frozenHashes: Seq[BinaryData]
+}
+
+case class LocalCommitPublished(claimMainDelayed: Seq[ClaimDelayedOutputTx],
+                                claimHtlcSuccess: Seq[SuccessAndClaim], claimHtlcTimeout: Seq[TimeoutAndClaim],
+                                commitTx: Transaction) extends CommitPublished with FrozenHashProvider {
+
+  def frozenHashes = for (t1 \ _ <- claimHtlcTimeout) yield t1.add.paymentHash
 
   def getState = {
     val success = for (t1 \ t2 <- claimHtlcSuccess) yield HideReady(t1.tx) :: csvShowDelayed(t1, t2) :: Nil
@@ -137,8 +134,11 @@ case class LocalCommitPublished(claimMainDelayed: Seq[ClaimDelayedOutputTx], cla
   }
 }
 
-case class RemoteCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimHtlcSuccess: Seq[ClaimHtlcSuccessTx],
-                                 claimHtlcTimeout: Seq[ClaimHtlcTimeoutTx], commitTx: Transaction) extends CommitPublished {
+case class RemoteCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx],
+                                 claimHtlcSuccess: Seq[ClaimHtlcSuccessTx], claimHtlcTimeout: Seq[ClaimHtlcTimeoutTx],
+                                 commitTx: Transaction) extends CommitPublished with FrozenHashProvider {
+
+  def frozenHashes = for (ClaimHtlcTimeoutTx(Some(add), _, _) <- claimHtlcTimeout) yield add.paymentHash
 
   def getState = {
     val timeout = for (t1 <- claimHtlcTimeout) yield ShowDelayed(cltv(commitTx, t1.tx), t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
