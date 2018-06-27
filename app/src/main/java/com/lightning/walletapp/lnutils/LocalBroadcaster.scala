@@ -1,5 +1,6 @@
 package com.lightning.walletapp.lnutils
 
+import collection.JavaConverters._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
@@ -27,14 +28,14 @@ object LocalBroadcaster extends Broadcaster {
     tx.getConfidence.getDepthInBlocks -> isTxDead
   } getOrElse 0 -> false
 
-  def getBlockHashString(txid: BinaryData) = for {
-    // Given a txid return a hash of containing block
-    // this will return a single block hash
+  def getBlockHashStrings(txid: BinaryData) = for {
+    // Given a txid return a hash of containing blocks
+    // this may return multiple block hashes
 
-    txj <- getTx(txid)
-    hashes <- Option(txj.getAppearsInHashes)
-    firstBlockHash = hashes.keySet.iterator.next
-  } yield firstBlockHash.toString
+    txj <- getTx(txid).toVector
+    hashes <- Option(txj.getAppearsInHashes).toVector
+    hash <- hashes.keySet.asScala.toVector
+  } yield hash.toString
 
   override def onProcessSuccess = {
     case (_, close: ClosingData, _: Command) =>

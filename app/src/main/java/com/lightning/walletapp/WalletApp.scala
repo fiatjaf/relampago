@@ -186,7 +186,7 @@ class WalletApp extends Application { me =>
       def ASKREFUNDTX(ref: RefundingData) = {
         // Failsafe check in case if we are still in REFUNDING state after app is restarted
         val txsObs = OlympusWrap getChildTxs Seq(ref.commitments.commitInput.outPoint.txid)
-        txsObs.foreach(txs => for (tx <- txs) self process CMDSpent(tx), Tools.errlog)
+        txsObs.foreach(txs => for (tx <- txs) self process CMDSpent(tx), none)
       }
 
       def ASKREFUNDPEER(some: HasCommitments, point: Point) = {

@@ -275,9 +275,9 @@ object GossipCatcher extends ChannelListener {
       val outIdx = norm.commitments.commitInput.outPoint.index
 
       for {
-        hash <- broadcaster getBlockHashString txid
-        height \ txIds <- retry(OlympusWrap getBlock hash, pickInc, 4 to 5)
-        shortChannelId <- Tools.toShortIdOpt(height, txIds indexOf txid.toString, outIdx)
+        hash <- broadcaster getBlockHashStrings txid
+        blockHeight \ txIds <- OlympusWrap getBlock hash
+        shortChannelId <- Tools.toShortIdOpt(blockHeight, txIds indexOf txid.toString, outIdx)
       } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
 
     case (chan, norm: NormalData, upd: ChannelUpdate)

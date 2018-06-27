@@ -79,9 +79,9 @@ case class ClosingData(announce: NodeAnnouncement,
       nextRemoteCommit.map(_.commitTx)
 
   lazy val frozenPublishedHashes =
-    localCommit.map(_.frozenHashes) ++
-      remoteCommit.map(_.frozenHashes) ++
-      nextRemoteCommit.map(_.frozenHashes)
+    localCommit.flatMap(_.frozenHashes) ++
+      remoteCommit.flatMap(_.frozenHashes) ++
+      nextRemoteCommit.flatMap(_.frozenHashes)
 
   def tier12States =
     revokedCommit.flatMap(_.getState) ++ localCommit.flatMap(_.getState) ++

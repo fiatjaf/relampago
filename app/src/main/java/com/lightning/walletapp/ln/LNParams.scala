@@ -6,6 +6,7 @@ import com.lightning.walletapp.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
+import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import fr.acinq.eclair.UInt64
 
@@ -84,7 +85,7 @@ case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, fee: Sato
 
 trait Broadcaster extends ChannelListener { me =>
   def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
-  def getBlockHashString(txid: BinaryData): Option[String]
+  def getBlockHashStrings(txid: BinaryData): StringVec
   def getStatus(txid: BinaryData): DepthAndDead
   def currentHeight: Long
   def perKwThreeSat: Long

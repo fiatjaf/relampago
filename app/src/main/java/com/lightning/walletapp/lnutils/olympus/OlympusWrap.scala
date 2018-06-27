@@ -75,10 +75,9 @@ object OlympusWrap extends OlympusProvider {
 
   // Olympus RPC interface
 
-  def failOver[T](run: Cloud => Obs[T], cs: CloudVec): Obs[T] = {
-    def tryAgainWithNextCloud(failure: Throwable) = failOver(run, cs.tail)
-    if (cs.isEmpty) Obs error new ProtocolException("Try again later")
-    else run(cs.head) onErrorResumeNext tryAgainWithNextCloud
+  def failOver[T](run: Cloud => Obs[T], onRunOut: Obs[T], cs: CloudVec): Obs[T] = {
+    def tryAgainWithNextCloud(failure: Throwable) = failOver(run, onRunOut, cs.tail)
+    if (cs.isEmpty) onRunOut else run(cs.head) onErrorResumeNext tryAgainWithNextCloud
   }
 
   def getBackup(key: BinaryData) = {
@@ -87,11 +86,11 @@ object OlympusWrap extends OlympusProvider {
     Obs.from(clouds).flatMap(_.connector getBackup key onErrorReturn empty)
   }
 
-  def getRates = failOver(_.connector.getRates, clouds)
-  def getBlock(hash: String) = failOver(_.connector getBlock hash, clouds)
-  def findNodes(query: String) = failOver(_.connector findNodes query, clouds)
-  def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, clouds)
-  def getChildTxs(txIds: BinaryDataSeq) = failOver(_.connector getChildTxs txIds, clouds)
+  def getBlock(hash: String) = failOver(_.connector getBlock hash, Obs.empty, clouds)
+  def getRates = failOver(_.connector.getRates, Obs error new ProtocolException, clouds)
+  def findNodes(query: String) = failOver(_.connector findNodes query, Obs error new ProtocolException, clouds)
+  def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, Obs error new ProtocolException, clouds)
+  def getChildTxs(txIds: BinaryDataSeq) = failOver(_.connector getChildTxs txIds, Obs error new ProtocolException, clouds)
 }
 
 trait OlympusProvider {
