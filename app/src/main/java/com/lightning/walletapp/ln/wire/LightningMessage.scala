@@ -134,6 +134,10 @@ case class NodeAnnouncement(signature: BinaryData,
 
 sealed trait NodeAddress
 case object Padding extends NodeAddress
+case class IPv4(ipv4: Inet4Address, port: Int) extends NodeAddress
+case class IPv6(ipv6: Inet6Address, port: Int) extends NodeAddress
+case class Tor2(tor2: BinaryData, port: Int) extends NodeAddress
+case class Tor3(tor3: BinaryData, port: Int) extends NodeAddress
 
 case object NodeAddress {
   def apply(isa: InetSocketAddress) = isa.getAddress match {
@@ -141,17 +145,6 @@ case object NodeAddress {
     case inet6Address: Inet6Address => IPv6(inet6Address, isa.getPort)
     case otherwise => throw new LightningException(otherwise.toString)
   }
-}
-
-case class IPv4(ipv4: Inet4Address, port: Int) extends NodeAddress
-case class IPv6(ipv6: Inet6Address, port: Int) extends NodeAddress
-
-case class Tor2(tor2: BinaryData, port: Int) extends NodeAddress {
-  require(tor2.size == 10, "Invalid Tor2 address length, should be 10")
-}
-
-case class Tor3(tor3: BinaryData, port: Int) extends NodeAddress {
-  require(tor3.size == 35, "Invalid Tor2 address length, should be 35")
 }
 
 // Not in a spec

@@ -86,11 +86,12 @@ object OlympusWrap extends OlympusProvider {
     Obs.from(clouds).flatMap(_.connector getBackup key onErrorReturn empty)
   }
 
+  def getRates = failOver(_.connector.getRates, tryLater, clouds)
   def getBlock(hash: String) = failOver(_.connector getBlock hash, Obs.empty, clouds)
-  def getRates = failOver(_.connector.getRates, Obs error new ProtocolException, clouds)
-  def findNodes(query: String) = failOver(_.connector findNodes query, Obs error new ProtocolException, clouds)
-  def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, Obs error new ProtocolException, clouds)
-  def getChildTxs(txIds: BinaryDataSeq) = failOver(_.connector getChildTxs txIds, Obs error new ProtocolException, clouds)
+  def findNodes(query: String) = failOver(_.connector findNodes query, tryLater, clouds)
+  def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, tryLater, clouds)
+  def getChildTxs(ids: BinaryDataSeq) = failOver(_.connector getChildTxs ids, tryLater, clouds)
+  private[this] val tryLater = Obs error new ProtocolException("Try again later")
 }
 
 trait OlympusProvider {
