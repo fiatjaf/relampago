@@ -214,7 +214,7 @@ class WalletApp extends Application { me =>
         // We should explain to user what exactly is going on here
         case Some(report) if report.finalCanSend < rd.firstMsat =>
 
-          val alias = report.chan.data.announce.alias take 16
+          val alias = report.chan.data.announce.alias
           val sendingNow = coloredOut apply MilliSatoshi(rd.firstMsat)
           val finalCanSend = coloredIn apply MilliSatoshi(report.finalCanSend)
           val capacity = coloredIn apply MilliSatoshi(Commitments.latestRemoteCommit(report.cs).spec.toRemoteMsat)

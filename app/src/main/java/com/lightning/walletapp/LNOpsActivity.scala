@@ -123,7 +123,7 @@ class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
         none, baseTextBuilder(warning.html), dialog_ok, dialog_cancel)
 
     chan { cs =>
-      val alias = chan.data.announce.alias take 16
+      val alias = chan.data.announce.alias
       val started = me time new Date(cs.startedAt)
       val capacity = cs.commitInput.txOut.amount
 
