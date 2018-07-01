@@ -97,13 +97,13 @@ object LightningMessageCodecs { me =>
     inet4Address => ByteVector(inet4Address.getAddress)
   )
 
-  def nodeaddress: Codec[NodeAddress] =
+  val nodeaddress: Codec[NodeAddress] =
     discriminated[NodeAddress].by(uint8)
       .typecase(cr = provide(Padding), tag = 0)
-      .typecase(cr = (ipv4address ~ uint16).xmap[IPv4](x => IPv4(x._1, x._2), x => x.ipv4 -> x.port), tag = 1)
-      .typecase(cr = (ipv6address ~ uint16).xmap[IPv6](x => IPv6(x._1, x._2), x => x.ipv6 -> x.port), tag = 2)
-      .typecase(cr = (binarydata(10) ~ uint16).xmap[Tor2](x => Tor2(x._1, x._2), x => x.tor2 -> x.port), tag = 3)
-      .typecase(cr = (binarydata(35) ~ uint16).xmap[Tor3](x => Tor3(x._1, x._2), x => x.tor3 -> x.port), tag = 4)
+      .typecase(cr = (ipv4address ~ uint16).xmap[IPv4](IPv4.tupled, x => x.ipv4 -> x.port), tag = 1)
+      .typecase(cr = (ipv6address ~ uint16).xmap[IPv6](IPv6.tupled, x => x.ipv6 -> x.port), tag = 2)
+      .typecase(cr = (binarydata(10) ~ uint16).xmap[Tor2](Tor2.tupled, x => x.tor2 -> x.port), tag = 3)
+      .typecase(cr = (binarydata(35) ~ uint16).xmap[Tor3](Tor3.tupled, x => x.tor3 -> x.port), tag = 4)
 
   def binarydata(size: Int): Codec[BinaryData] = bytes(size).xmap(vec2Bin, bin2Vec)
   val varsizebinarydata: Codec[BinaryData] = variableSizeBytes(value = bytes.xmap(vec2Bin, bin2Vec), size = uint16)
