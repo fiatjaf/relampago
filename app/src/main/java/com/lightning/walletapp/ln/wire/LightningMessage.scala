@@ -94,27 +94,22 @@ case class ChannelAnnouncement(nodeSignature1: BinaryData, nodeSignature2: Binar
 
 // PAYMENT ROUTE INFO
 
-trait FeeEstimate {
-  val feeBaseMsat: Long
-  val feeProportionalMillionths: Long
-  val estimate = (feeBaseMsat + feeProportionalMillionths * 10).toDouble
-}
-
 case class ChannelUpdate(signature: BinaryData, chainHash: BinaryData, shortChannelId: Long, timestamp: Long,
                          flags: BinaryData, cltvExpiryDelta: Int, htlcMinimumMsat: Long, feeBaseMsat: Long,
-                         feeProportionalMillionths: Long) extends RoutingMessage with FeeEstimate {
+                         feeProportionalMillionths: Long) extends RoutingMessage {
 
-  def toHop(nodeId: PublicKey) =
-    Hop(nodeId, shortChannelId, cltvExpiryDelta,
-      htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
+  val estimate = (feeBaseMsat + feeProportionalMillionths * 10).toDouble
+  def toHop(nodeId: PublicKey) = Hop(nodeId, shortChannelId, cltvExpiryDelta,
+    htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
 }
 
-case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int, htlcMinimumMsat: Long,
-               feeBaseMsat: Long, feeProportionalMillionths: Long) extends FeeEstimate {
+case class Hop(nodeId: PublicKey, shortChannelId: Long,
+               cltvExpiryDelta: Int, htlcMinimumMsat: Long,
+               feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
-  def humanDetails =
-    s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry delta: $cltvExpiryDelta blocks, " +
-      f"Routing fee: ${feeProportionalMillionths / 10000D}%2f of sum + baseline $feeBaseMsat msat"
+  val estimate = (feeBaseMsat + feeProportionalMillionths * 10).toDouble
+  def humanDetails = s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry: $cltvExpiryDelta blocks, " +
+    f"Routing fees: ${feeProportionalMillionths / 10000D}%2f%% of payment sum + baseline $feeBaseMsat msat"
 }
 
 // NODE ADDRESS HANDLING
@@ -124,12 +119,11 @@ case class NodeAnnouncement(signature: BinaryData,
                             nodeId: PublicKey, rgbColor: RGB, alias: String,
                             addresses: NodeAddressList) extends RoutingMessage {
 
-  lazy val socketAddresses = addresses collect {
-    case IPv4(addr, port) => new InetSocketAddress(addr, port)
-    case IPv6(addr, port) => new InetSocketAddress(addr, port)
-  }
-
   val identifier = (alias + nodeId.toString).toLowerCase
+  lazy val socketAddresses: List[InetSocketAddress] = addresses collect {
+    case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
+    case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
+  }
 }
 
 sealed trait NodeAddress

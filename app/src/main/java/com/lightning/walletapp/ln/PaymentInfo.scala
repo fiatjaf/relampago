@@ -54,8 +54,8 @@ object PaymentInfo {
   }
 
   def useRoute(route: PaymentRoute, rest: PaymentRouteVec, rd: RoutingData): FullOrEmptyRD = {
-    // Default is 9 + 1 block in case if block just appeared and there is a 1-block discrepancy between peers
-    val firstExpiry = LNParams.broadcaster.currentHeight + rd.pr.minFinalCltvExpiry.getOrElse(default = 10L)
+    // Default is 7 + 1 block in case if block just appeared and there is a 1-block discrepancy between peers
+    val firstExpiry = LNParams.broadcaster.currentHeight + rd.pr.minFinalCltvExpiry.getOrElse(0L) + 7L + 1L
     val firstPayloadVector = PerHopPayload(shortChannelId = 0L, rd.firstMsat, firstExpiry) +: Vector.empty
     val start = (firstPayloadVector, Vector.empty[PublicKey], rd.firstMsat, firstExpiry)
 
@@ -78,12 +78,9 @@ object PaymentInfo {
     }
   }
 
-  def without(rs: PaymentRouteVec, fn: Hop => Boolean) = rs.filterNot(_ exists fn)
-  def failHtlc(sharedSecret: BinaryData, failure: FailureMessage, add: UpdateAddHtlc) = {
-    // Will send an error onion which contains a detailed description back to payment sender
-    val reason = createErrorPacket(sharedSecret, failure)
-    CMDFailHtlc(add.id, reason)
-  }
+  def without(rs: PaymentRouteVec, fun: Hop => Boolean) = rs.filterNot(_ exists fun)
+  def failHtlc(sharedSecret: BinaryData, failure: FailureMessage, add: UpdateAddHtlc) =
+    CMDFailHtlc(reason = createErrorPacket(sharedSecret, failure), id = add.id)
 
   def withoutChan(chan: Long, rd: RoutingData, span: Long, msat: Long) = {
     val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == chan)
@@ -122,6 +119,7 @@ object PaymentInfo {
 
     parsed map {
       case ErrorPacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
+      case ErrorPacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case ErrorPacket(nodeKey, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
       case ErrorPacket(nodeKey, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
       case ErrorPacket(nodeKey, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
