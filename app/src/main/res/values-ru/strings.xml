@@ -26,9 +26,9 @@
         <item>Файл-слепок кошелька</item>
     </array>
 
-    <string name="create_wallet_creating">Создается новый кошелек\nЭто может занять некоторое время</string>
     <string name="restore_when">Когда вы создали кошелек?\nНе менйяте дату если не уверены</string>
-    <string name="restore_wallet_restoring">Кошелек восстанавливается\nЭто может занять некоторое время</string>
+    <string name="create_wallet_creating">Создается новый кошелек\nЭто может занять пару минут</string>
+    <string name="restore_wallet_restoring">Кошелек восстанавливается\nЭто может занять пару минут</string>
     <string name="restore_mnemonic_wrong">Нужно ровно 12 слов</string>
     <string name="restore_hint">Ваш мнемонический код</string>
 
@@ -120,9 +120,9 @@
 
     <array name="info_progress">
         <item>Синхронизация завершена</item>
-        <item><![CDATA[<font color=#FF9900>Остался %1$d день</font>]]></item>
-        <item><![CDATA[<font color=#FF9900>Осталось %1$d дня</font>]]></item>
-        <item><![CDATA[<font color=#FF9900>Осталось %1$d дней</font>]]></item>
+        <item><![CDATA[<font color=#FF9900>Синхронизация %1$d день</font>]]></item>
+        <item><![CDATA[<font color=#FF9900>Синхронизация %1$d дня</font>]]></item>
+        <item><![CDATA[<font color=#FF9900>Синхронизация %1$d дней</font>]]></item>
     </array>
 
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
@@ -273,14 +273,14 @@
 
     <!-- opening a new channel -->
     <array name="ln_ops_start_node_channels">
-        <item><![CDATA[<strong>Нет открытых каналов</strong>]]></item>
-        <item><![CDATA[<strong>%1$s</strong> открытый канал]]></item>
-        <item><![CDATA[<strong>%1$s</strong> открытых канала]]></item>
-        <item><![CDATA[<strong>%1$s</strong> открытых каналов]]></item>
-        <item><![CDATA[<i>Нет данных о каналах</i>]]></item>
+        <item><![CDATA[<strong>No public channels</strong>]]></item>
+        <item><![CDATA[<strong>%1$s</strong> public channel]]></item>
+        <item><![CDATA[<strong>%1$s</strong> public channels]]></item>
+        <item><![CDATA[<strong>%1$s</strong> public channels]]></item>
+        <item><![CDATA[<i>Public channels unknown</i>]]></item>
     </array>
 
     <string name="ln_ops_start_fund_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про Молнию</a></small><br><br>Создание канала]]></string>
-    <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>открытие канала</i></font><br><small>%2$s</small><br><br><font color=#999999>публичный ключ пира</font><br><small>%3$s</small>]]></string>
+    <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>открытие нового канала</i></font><br><small>%2$s</small><br><br><font color=#999999>публичный ключ пира</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
 </resources>
