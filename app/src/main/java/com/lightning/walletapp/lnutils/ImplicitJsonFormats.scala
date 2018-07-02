@@ -28,19 +28,11 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   }
 
   val json2String = (_: JsValue).convertTo[String]
-  def taggedJsonFmt[T](base: JsonFormat[T], tag: String) =
-    // Adds an external tag which can be later used to discern
-    // different children of the same super class
-    new JsonFormat[T] {
-      def read(serialized: JsValue) =
-        base read serialized
-
-      def write(internal: T) = {
-        val extension = "tag" -> JsString(tag)
-        val core = base.write(internal).asJsObject
-        JsObject(core.fields + extension)
-      }
-    }
+  def taggedJsonFmt[T](base: JsonFormat[T], extraTag: String): JsonFormat[T] = new JsonFormat[T] {
+    def write(unserialized: T): JsValue = JsObject(base.write(unserialized).asJsObject.fields + extension)
+    def read(serialized: JsValue): T = base read serialized
+    private val extension = "tag" -> JsString(extraTag)
+  }
 
   implicit object BigIntegerFmt extends JsonFormat[BigInteger] {
     def read(json: JsValue): BigInteger = new BigInteger(me json2String json)

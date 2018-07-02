@@ -34,8 +34,9 @@ case class AcceptChannel(temporaryChannelId: BinaryData, dustLimitSatoshis: Long
   lazy val dustLimitSat = Satoshi(dustLimitSatoshis)
 }
 
-case class FundingCreated(temporaryChannelId: BinaryData, fundingTxid: BinaryData,
-                          fundingOutputIndex: Int, signature: BinaryData) extends ChannelSetupMessage
+case class FundingCreated(temporaryChannelId: BinaryData,
+                          fundingTxid: BinaryData, fundingOutputIndex: Int,
+                          signature: BinaryData) extends ChannelSetupMessage
 
 case class FundingSigned(channelId: BinaryData, signature: BinaryData) extends ChannelSetupMessage
 
