@@ -240,7 +240,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       for (rd1 <- PaymentInfoWrap.inFlightPayments get rd.pr.paymentHash) {
         val receiverExpiry = rd.pr.minFinalCltvExpiry.getOrElse(default = 10L)
-        val receiver = s"Payee: ${rd.pr.nodeId.toString}, Expiry delta: $receiverExpiry blocks"
+        val receiver = s"Final payee: ${rd.pr.nodeId.toString}, Expiry: $receiverExpiry blocks"
         val routingPath = for (usedPaymentHop <- rd1.usedRoute) yield usedPaymentHop.humanDetails
         val fullPath = "Your wallet" +: routingPath :+ receiver mkString "\n-->\n"
         paymentRouting setOnClickListener onButtonTap(host share fullPath)
