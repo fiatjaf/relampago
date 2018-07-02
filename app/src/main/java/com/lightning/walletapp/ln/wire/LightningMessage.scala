@@ -66,12 +66,12 @@ case class RevokeAndAck(channelId: BinaryData, perCommitmentSecret: Scalar, next
 
 case class Error(channelId: BinaryData, data: BinaryData) extends ChannelMessage {
   // Error from remote peer means we need to close a channel, may contain some details
+  lazy val isSyncError = text contains "sync error"
+  lazy val text = new String(data, "UTF-8")
 
-  def exception = {
-    val text = new String(data, "UTF-8")
+  def exception =
     if (text.isEmpty) new LightningException("Error from remote peer")
     else new LightningException(s"Error from remote peer\n\n$text")
-  }
 }
 
 case class ChannelReestablish(channelId: BinaryData, nextLocalCommitmentNumber: Long,

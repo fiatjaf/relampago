@@ -411,6 +411,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     override def onProcessSuccess = { case (_, _, remote: wire.Error) => host onFail remote.exception.getMessage }
     override def onBecome = { case _ => updTitle.run }
 
+    override def onProcessSuccess = {
+      case (chan, _, remote: wire.Error) =>
+        val text = s"${remote.exception.getMessage}\n\n${MessageItem getHistoryString chan.data.announce.nodeId}"
+        UITask(mkCheckForm(_ => app setBuffer text, none, baseBuilder(null, text), dialog_ok, dialog_cancel)).run
+    }
+
     override def onException = {
       case _ \ CMDAddImpossible(_, code) =>
         // Non-fatal: can't add this payment, inform user why
