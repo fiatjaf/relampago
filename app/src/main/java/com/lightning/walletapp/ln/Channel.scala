@@ -470,7 +470,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (some: HasCommitments, err: Error, WAIT_FUNDING_DONE | NEGOTIATIONS | OPEN | OFFLINE) =>
         // REFUNDING is an exception here: no matter what happens we can't spend local in that state
-        if (!err.isSyncError) startLocalClose(some)
+        startLocalClose(some)
 
 
       case (some: HasCommitments, _: CMDShutdown, NEGOTIATIONS | OFFLINE) =>

@@ -127,6 +127,7 @@ class WalletApp extends Application { me =>
     val socketEventsListener = new ConnectionListener {
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
+        case error: Error if error.isSyncError => ConnectionManager.connections(nodeId).disconnect
         case error: Error if error.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process error)
         case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
         case _ =>
@@ -171,15 +172,7 @@ class WalletApp extends Application { me =>
     }
 
     def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel { self =>
-      def SEND(m: LightningMessage) = {
-
-        m match {
-          case cm: ChannelMessage => MessageItem.record(data.announce.nodeId, OutgoingMessage(System.currentTimeMillis, cm))
-          case _ =>
-        }
-
-        for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
-      }
+      def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
       def STORE(data: HasCommitments) = runAnd(data)(ChannelWrap put data)
 
       def CLOSEANDWATCH(cd: ClosingData) = {

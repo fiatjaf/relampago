@@ -64,14 +64,8 @@ object ConnectionManager {
 
     def disconnect = try socket.close catch none
     def intercept(message: LightningMessage) = {
-      // Update liveness on each incoming msg
+      // Update liveness on each incoming message
       lastMsg = System.currentTimeMillis
-
-      message match {
-        case cm: ChannelMessage => MessageItem.record(ann.nodeId, IncomingMessage(System.currentTimeMillis, cm))
-        case their: Init => MessageItem.record(ann.nodeId, IncomingMessage(System.currentTimeMillis, their))
-        case _ =>
-      }
 
       message match {
         case their: Init =>
@@ -100,24 +94,3 @@ class ConnectionListener {
   def onIncompatible(nodeId: PublicKey): Unit = none
   def onDisconnect(nodeId: PublicKey): Unit = none
 }
-
-// TEMP
-
-trait MessageItem {
-  val message: LightningMessage
-  val stamp: Long
-}
-
-object MessageItem {
-  import scala.collection.mutable
-  val history = mutable.Map.empty[BinaryData, Vector[MessageItem]] withDefaultValue Vector.empty
-  def getHistoryString(nodeId: BinaryData) = history(nodeId).map(_.toString).mkString("\n\n")
-
-  def record(nodeId: BinaryData, item: MessageItem) = {
-    if (history contains nodeId) history(nodeId) = item +: history(nodeId) take 40
-    else history(nodeId) = Vector(item)
-  }
-}
-
-case class IncomingMessage(stamp: Long, message: LightningMessage) extends MessageItem
-case class OutgoingMessage(stamp: Long, message: LightningMessage) extends MessageItem
