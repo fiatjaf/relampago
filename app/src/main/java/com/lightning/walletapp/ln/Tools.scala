@@ -6,6 +6,7 @@ import com.lightning.walletapp.ln.Tools.runAnd
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
 import scala.collection.mutable
+import fr.acinq.bitcoin.Bech32
 import crypto.RandomGenerator
 import scala.util.Try
 import java.util
@@ -44,11 +45,11 @@ object Tools {
       fundingHash.data(31).^(fundingOutputIndex).toByte
 
   def dnsLookup(host: String) = for {
-    record <- new Lookup(host, Type.SRV).run.toVector
-    srvRecord: SRVRecord = record.asInstanceOf[SRVRecord]
+    lookupResult <- new Lookup(host, Type.SRV).run.toVector
+    srvRecord: SRVRecord = lookupResult.asInstanceOf[SRVRecord]
     encoded: String = srvRecord.getTarget.toString.split('.').head
-    _ \ decoded <- Try(fr.acinq.bitcoin.Bech32 decode encoded).toOption.toVector
-    key <- Try(fr.acinq.bitcoin.Bech32 five2eight decoded).toOption.toVector
+    _ \ decoded <- Try(Bech32 decode encoded).toOption.toVector
+    key <- Try(Bech32 five2eight decoded).toOption.toVector
   } yield PublicKey(key) -> srvRecord.getPort
 
   def memoize[I, O](fun: I => O): I => O = new mutable.HashMap[I, O] {

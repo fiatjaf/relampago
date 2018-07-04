@@ -119,7 +119,7 @@ case class NodeAnnouncement(signature: BinaryData,
                             nodeId: PublicKey, rgbColor: RGB, alias: String,
                             addresses: NodeAddressList) extends RoutingMessage {
 
-  def nodeDomainTry: Future[String] = Future {
+  def nodeDomain: Future[String] = Future {
     val rawHost = new java.net.URL(alias).getHost
     s"_lightning._tcp.$rawHost."
   }
