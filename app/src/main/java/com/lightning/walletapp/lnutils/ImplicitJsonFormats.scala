@@ -24,14 +24,14 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   def json2BitVec(json: JsValue): Option[BitVector] = BitVector fromHex json2String(json)
   def sCodecJsonFmt[T](codec: Codec[T] /* Json <-> sCodec bridge */) = new JsonFormat[T] {
     def read(serialized: JsValue) = codec.decode(json2BitVec(serialized).get).require.value
-    def write(internal: T) = codec.encode(internal).require.toHex.toJson
+    def write(unserialized: T) = codec.encode(unserialized).require.toHex.toJson
   }
 
   val json2String = (_: JsValue).convertTo[String]
-  def taggedJsonFmt[T](base: JsonFormat[T], extraTag: String): JsonFormat[T] = new JsonFormat[T] {
-    def write(unserialized: T): JsValue = JsObject(base.write(unserialized).asJsObject.fields + extension)
-    def read(serialized: JsValue): T = base read serialized
-    private val extension = "tag" -> JsString(extraTag)
+  def taggedJsonFmt[T](base: JsonFormat[T], tag: String): JsonFormat[T] = new JsonFormat[T] {
+    def write(unserialized: T) = JsObject(base.write(unserialized).asJsObject.fields + extension)
+    def read(serialized: JsValue) = base read serialized
+    private val extension = "tag" -> JsString(tag)
   }
 
   implicit object BigIntegerFmt extends JsonFormat[BigInteger] {
