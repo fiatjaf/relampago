@@ -166,7 +166,8 @@ class LNStartFundActivity extends TimerActivity { me =>
     whenBackPressed = UITask {
       freshChan.listeners -= openListener
       ConnectionManager.listeners -= openListener
-      ConnectionManager.connections(announce.nodeId).disconnect
+      // Worker may have already been automatically removed on connection failure
+      try ConnectionManager.connections(announce.nodeId).disconnect catch none
       finish
     }
 

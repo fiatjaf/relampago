@@ -5,6 +5,7 @@ import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
 import java.util.concurrent.Executors
+import java.net.InetSocketAddress
 import fr.acinq.eclair.UInt64
 
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
@@ -123,6 +124,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // OPEN MODE
+
+
+      case (some: HasCommitments, isa: InetSocketAddress, OFFLINE) =>
+        // Node was OFFLINE, we have initiated a DNS lookup and discovered a new address
+        val d1 = some.modify(_.announce.addresses).setTo(NodeAddress(isa) :: Nil)
+        data = me STORE d1
 
 
       case (norm: NormalData, hop: Hop, OPEN | OFFLINE) =>

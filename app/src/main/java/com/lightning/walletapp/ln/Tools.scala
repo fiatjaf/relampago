@@ -2,10 +2,12 @@ package com.lightning.walletapp.ln
 
 import org.xbill.DNS.{Lookup, SRVRecord, Type}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+import com.lightning.walletapp.ln.wire.NodeAnnouncement
+import concurrent.ExecutionContext.Implicits.global
 import com.lightning.walletapp.ln.Tools.runAnd
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
-import scala.collection.mutable
+import java.net.InetSocketAddress
 import fr.acinq.bitcoin.Bech32
 import crypto.RandomGenerator
 import scala.util.Try
@@ -44,17 +46,22 @@ object Tools {
     else fundingHash.take(30) :+ fundingHash.data(30).^(fundingOutputIndex >> 8).toByte :+
       fundingHash.data(31).^(fundingOutputIndex).toByte
 
-  def dnsLookup(host: String) = for {
-    lookupResult <- new Lookup(host, Type.SRV).run.toVector
-    srvRecord: SRVRecord = lookupResult.asInstanceOf[SRVRecord]
-    encoded: String = srvRecord.getTarget.toString.split('.').head
-    _ \ decoded <- Try(Bech32 decode encoded).toOption.toVector
-    key <- Try(Bech32 five2eight decoded).toOption.toVector
-  } yield PublicKey(key) -> srvRecord.getPort
-
-  def memoize[I, O](fun: I => O): I => O = new mutable.HashMap[I, O] {
-    override def apply(argument: I) = getOrElseUpdate(argument, fun apply argument)
+  def keyTry(host: String): Try[PublicKey] = Try {
+    val _ \ decodedKey = Bech32 decode host.split('.').head
+    PublicKey(Bech32 five2eight decodedKey)
   }
+
+  def dns(nodeAnnounce: NodeAnnouncement) = for {
+    // This may fail when hostname is invalid, account for that
+    result <- new Lookup(nodeAnnounce.hostName, Type.SRV).run
+    record = result.asInstanceOf[SRVRecord]
+    host = record.getTarget.toString
+
+    finalDerivedKey <- keyTry(host).toOption
+    if finalDerivedKey == nodeAnnounce.nodeId
+    isa = new InetSocketAddress(host, record.getPort)
+    if isa != nodeAnnounce.workingAddress
+  } yield isa
 }
 
 object Features {

@@ -17,9 +17,9 @@ import scala.util.Success
 import android.os.Bundle
 import java.util.Date
 
-import com.lightning.walletapp.ln.Tools.{none, wrap, memoize, runAnd}
 import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
 import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
+import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
 import android.widget.{ArrayAdapter, Button, ListView}
 import com.lightning.walletapp.lnutils.PaymentTable
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
@@ -76,7 +76,7 @@ class LNOpsActivity extends TimerActivity { me =>
     case _ => txsConfs.head
   }
 
-  val getTotalSent: BinaryData => Vector[Long] = memoize { chanId =>
+  val getTotalSent: BinaryData => Vector[Long] = { chanId =>
     val cursor = db.select(PaymentTable.selectTotalSql, chanId, 0)
     RichCursor(cursor).vec(_ long PaymentTable.lastMsat)
   }

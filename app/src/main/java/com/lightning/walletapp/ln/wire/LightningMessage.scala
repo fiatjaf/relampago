@@ -1,14 +1,13 @@
 package com.lightning.walletapp.ln.wire
 
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
+import com.linkedin.urls.detection.{UrlDetector, UrlDetectorOptions}
 import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import com.lightning.walletapp.ln.LightningException
 import com.lightning.walletapp.ln.Tools.fromShortId
-import concurrent.ExecutionContext.Implicits.global
 import fr.acinq.bitcoin.Crypto
-import scala.concurrent.Future
 import fr.acinq.eclair.UInt64
 
 
@@ -119,16 +118,17 @@ case class NodeAnnouncement(signature: BinaryData,
                             nodeId: PublicKey, rgbColor: RGB, alias: String,
                             addresses: NodeAddressList) extends RoutingMessage {
 
-  def nodeDomain: Future[String] = Future {
-    val rawHost = new java.net.URL(alias).getHost
-    s"_lightning._tcp.$rawHost."
+  lazy val hostName = {
+    val purifiedUrl: String = alias.replaceAll("[^A-Za-z0-9.-]", " ")
+    val parser = new UrlDetector(purifiedUrl, UrlDetectorOptions.Default)
+    s"_lightning._tcp.${parser.detect.get(0).getHost}."
   }
 
-  val identifier = (alias + nodeId.toString).toLowerCase
-  lazy val socketAddresses: List[InetSocketAddress] = addresses collect {
+  lazy val identifier = (alias + nodeId.toString).toLowerCase
+  lazy val workingAddress: InetSocketAddress = addresses.collect {
     case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
     case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
-  }
+  }.head
 }
 
 sealed trait NodeAddress

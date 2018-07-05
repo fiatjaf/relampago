@@ -8,6 +8,7 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.ln.wire._
+import scala.collection.JavaConverters._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
@@ -17,6 +18,7 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import rx.lang.scala.{Observable => Obs}
+import android.net.{ConnectivityManager, Uri}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
@@ -25,7 +27,6 @@ import android.content.{ClipData, ClipboardManager, Context}
 import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import collection.JavaConverters.seqAsJavaListConverter
 import com.lightning.walletapp.lnutils.olympus.CloudAct
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
@@ -36,7 +37,6 @@ import org.bitcoinj.uri.BitcoinURI
 import android.app.Application
 import java.util.Collections
 import android.widget.Toast
-import android.net.Uri
 import scala.util.Try
 import java.io.File
 
@@ -66,6 +66,7 @@ class WalletApp extends Application { me =>
   def toast(code: Int): Unit = toast(me getString code)
   def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
+  def connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE).asInstanceOf[ConnectivityManager]
   def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => null != db case _ => false }
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
@@ -79,8 +80,9 @@ class WalletApp extends Application { me =>
   }
 
   def setBuffer(text: String) = {
-    clipboardManager setPrimaryClip ClipData.newPlainText("wallet", text)
+    val content = ClipData.newPlainText("wallet", text)
     me toast getString(copied_to_clipboard).format(text)
+    clipboardManager setPrimaryClip content
   }
 
   def mkNodeAnnouncement(nodeId: PublicKey, host: String, port: Int) = {
@@ -124,6 +126,13 @@ class WalletApp extends Application { me =>
     def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(htlc => htlc.add.paymentHash)
     def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
 
+    def updateChangedIPs = for {
+      chan <- notClosing if chan.state == OFFLINE
+      // Chan is offline and we are connected so maybe address has changed
+      con <- Option(connectivityManager.getActiveNetworkInfo) if con.isConnected
+      isa <- Try(Tools.dns(chan.data.announce).head)
+    } chan process isa
+
     val socketEventsListener = new ConnectionListener {
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
@@ -137,11 +146,11 @@ class WalletApp extends Application { me =>
       override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDLocalShutdown)
       override def onIncompatible(nodeId: PublicKey) = onTerminalError(nodeId)
 
-      override def onDisconnect(nodeId: PublicKey) = if (fromNode(notClosing, nodeId).nonEmpty) {
-        val delayedRetryAttempt = Obs from ConnectionManager.connections.get(nodeId) delay 5.seconds
-        delayedRetryAttempt.subscribe(worker => ConnectionManager connectTo worker.ann, none)
-        fromNode(notClosing, nodeId).foreach(_ process CMDOffline)
-      }
+      override def onDisconnect(nodeId: PublicKey) = for {
+        affectedChans <- Obs just fromNode(notClosing, nodeId) if affectedChans.nonEmpty
+        _ = affectedChans.foreach(affectedChan => affectedChan process CMDOffline)
+        announce <- Obs just affectedChans.head.data.announce delay 5.seconds
+      } ConnectionManager connectTo announce
     }
 
     val chainEventsListener = new TxTracker with BlocksListener {
@@ -279,8 +288,11 @@ class WalletApp extends Application { me =>
     def currentAddress = wallet currentAddress KeyPurpose.RECEIVE_FUNDS
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE // Returns all utxos
     def conf1Balance = wallet getBalance BalanceType.AVAILABLE_SPENDABLE // Uses coin selector
-    def blockingSend(txj: Transaction) = peerGroup.broadcastTransaction(txj, 1).broadcast.get.toString
     def shutDown = none
+
+    def blockingSend(txj: Transaction) =
+      peerGroup.broadcastTransaction(txj, 1)
+        .broadcast.get.toString
 
     def closingPubKeyScripts(cd: ClosingData) =
       cd.commitTxs.flatMap(_.txOut).map(_.publicKeyScript)
@@ -305,11 +317,15 @@ class WalletApp extends Application { me =>
       wallet.setCoinSelector(new MinDepthReachedCoinSelector)
 
       try {
+        // Deal with notifications
         Notificator.removeResyncNotification
         val shouldReschedule = ChannelManager.notClosingOrRefunding.exists(hasReceivedPayments)
-        val fastPeer = InetAddress getByName Uri.parse(OlympusWrap.clouds.head.connector.url).getHost
         if (shouldReschedule) Notificator.scheduleResyncNotificationOnceAgain
-        peerGroup addAddress new PeerAddress(app.params, fastPeer, 8333)
+
+        // Set fast peer and schedule dns lookup
+        val fastPeer = Uri.parse(OlympusWrap.clouds.head.connector.url)
+        peerGroup addAddress new PeerAddress(app.params, InetAddress getByName fastPeer.getHost, 8333)
+        obsOnIO.delay(10.seconds).map(_ => ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
       } catch none
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)

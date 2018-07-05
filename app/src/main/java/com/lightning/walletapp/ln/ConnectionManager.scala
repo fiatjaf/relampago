@@ -28,28 +28,27 @@ object ConnectionManager {
   }
 
   def connectTo(ann: NodeAnnouncement) = connections get ann.nodeId match {
-    case Some(doneWorker) if doneWorker.work.isCompleted => connections += ann.nodeId -> Worker(ann)
-    case Some(strangeWorker) if strangeWorker.savedInit == null => strangeWorker.disconnect
-    case Some(okWorker) => events.onOperational(ann.nodeId, okWorker.savedInit)
-    case None => connections += ann.nodeId -> Worker(ann)
+    case Some(strangeWorker) if null == strangeWorker.savedInit => strangeWorker.disconnect
+    case Some(connectedWorker) => events.onOperational(ann.nodeId, connectedWorker.savedInit)
+    case None => connections += ann.nodeId -> new Worker(ann)
   }
 
-  case class Worker(ann: NodeAnnouncement, buffer: Bytes = new Bytes(1024), socket: Socket = new Socket) {
-    implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-    val handler: TransportHandler = new TransportHandler(KeyPair(nodePublicKey.toBin, nodePrivateKey.toBin), ann.nodeId) {
-      def handleEnterOperationalState = handler process Init(globalFeatures = LNParams.globalFeatures, LNParams.localFeatures)
+  class Worker(ann: NodeAnnouncement) {
+    implicit val context = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
+    private val keyPair = KeyPair(nodePublicKey.toBin, nodePrivateKey.toBin)
+    private val buffer: Bytes = new Bytes(1024)
+    private val socket: Socket = new Socket
+
+    val handler: TransportHandler = new TransportHandler(keyPair, ann.nodeId) {
+      def handleEnterOperationalState = handler process Init(LNParams.globalFeatures, LNParams.localFeatures)
       def handleDecryptedIncomingData(data: BinaryData) = intercept(LightningMessageCodecs deserialize data)
       def handleEncryptedOutgoingData(data: BinaryData) = try socket.getOutputStream write data catch none
       def handleError = { case _ => events onTerminalError ann.nodeId }
     }
 
-    // Used to remove disconnected nodes
-    var lastMsg = System.currentTimeMillis
-    var savedInit: Init = _
-
     val work = Future {
       // First blocking connect, then send data
-      socket.connect(ann.socketAddresses.head, 7500)
+      socket.connect(ann.workingAddress, 7500)
       handler.init
 
       while (true) {
@@ -59,9 +58,13 @@ object ConnectionManager {
       }
     }
 
-    // Listener may trigger a reconnect after this
-    work onComplete { _ => events onDisconnect ann.nodeId }
+    work onComplete { _ =>
+      connections -= ann.nodeId
+      events onDisconnect ann.nodeId
+    }
 
+    var savedInit: Init = _
+    var lastMsg = System.currentTimeMillis
     def disconnect = try socket.close catch none
     def intercept(message: LightningMessage) = {
       // Update liveness on each incoming message

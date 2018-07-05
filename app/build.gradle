@@ -45,6 +45,7 @@ dependencies {
     compile 'com.github.kevinsawicki:http-request:6.0'
     compile 'info.hoang8f:android-segmented:1.0.6'
     compile 'org.scala-lang:scala-library:2.11.11'
+    compile 'org.apache.commons:commons-lang3:3.7'
     compile 'com.hootsuite.android:nachos:1.1.1'
     compile 'io.reactivex:rxscala_2.11:0.26.5'
     compile 'com.github.clans:fab:1.6.4'
