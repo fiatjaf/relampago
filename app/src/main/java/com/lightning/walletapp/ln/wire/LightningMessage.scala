@@ -118,7 +118,7 @@ case class NodeAnnouncement(signature: BinaryData,
                             nodeId: PublicKey, rgbColor: RGB, alias: String,
                             addresses: NodeAddressList) extends RoutingMessage {
 
-  lazy val hostName = {
+  lazy val unsafeHost = {
     val purifiedUrl: String = alias.replaceAll("[^A-Za-z0-9.-]", " ")
     val parser = new UrlDetector(purifiedUrl, UrlDetectorOptions.Default)
     s"_lightning._tcp.${parser.detect.get(0).getHost}."

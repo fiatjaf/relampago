@@ -3,7 +3,6 @@ package com.lightning.walletapp.ln
 import org.xbill.DNS.{Lookup, SRVRecord, Type}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import com.lightning.walletapp.ln.wire.NodeAnnouncement
-import concurrent.ExecutionContext.Implicits.global
 import com.lightning.walletapp.ln.Tools.runAnd
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
@@ -20,6 +19,7 @@ object \ {
 }
 
 object Tools {
+  type UserId = String
   type Bytes = Array[Byte]
   val random = new RandomGenerator
   def runAnd[T](result: T)(action: Any): T = result
@@ -47,13 +47,13 @@ object Tools {
       fundingHash.data(31).^(fundingOutputIndex).toByte
 
   def keyTry(host: String): Try[PublicKey] = Try {
-    val _ \ decodedKey = Bech32 decode host.split('.').head
-    PublicKey(Bech32 five2eight decodedKey)
+    val _ \ decoded = Bech32 decode host.split('.').head
+    PublicKey(Bech32 five2eight decoded)
   }
 
   def dns(nodeAnnounce: NodeAnnouncement) = for {
     // This may fail when hostname is invalid, account for that
-    result <- new Lookup(nodeAnnounce.hostName, Type.SRV).run
+    result <- new Lookup(nodeAnnounce.unsafeHost, Type.SRV).run
     record = result.asInstanceOf[SRVRecord]
     host = record.getTarget.toString
 

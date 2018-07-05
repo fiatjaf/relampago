@@ -11,9 +11,10 @@ import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndCl
 import com.lightning.walletapp.lnutils.olympus.{BlindMemo, BlindParam, CloudAct, CloudData}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
+import com.lightning.walletapp.ln.Tools.{Bytes, UserId}
+
 import com.lightning.walletapp.ln.crypto.ShaHashesWithIndex
 import com.lightning.walletapp.ln.crypto.ShaChain.Index
-import com.lightning.walletapp.ln.Tools.Bytes
 import fr.acinq.eclair.UInt64
 import scodec.bits.BitVector
 import java.math.BigInteger
@@ -279,4 +280,58 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val outRequestFmt =
     jsonFormat[Long, Set[String], Set[Long], Set[String], String,
       OutRequest](OutRequest.apply, "sat", "badNodes", "badChans", "from", "to")
+
+  // FundMsg
+
+  implicit object JsonMessageFmt extends JsonFormat[FundMsg] {
+    def write(unserialized: FundMsg): JsValue = unserialized match {
+      case unserialiedMessage: SignFundingTx => unserialiedMessage.toJson
+      case unserialiedMessage: FundingTxSigned => unserialiedMessage.toJson
+      case unserialiedMessage: BroadcastFundingTx => unserialiedMessage.toJson
+      case unserialiedMessage: FundingTxBroadcasted => unserialiedMessage.toJson
+      case unserialiedMessage: FundingTxCreated => unserialiedMessage.toJson
+      case unserialiedMessage: FundingTxAwaits => unserialiedMessage.toJson
+      case unserialiedMessage: Start => unserialiedMessage.toJson
+      case unserialiedMessage: Fail => unserialiedMessage.toJson
+    }
+
+    def read(serialized: JsValue): FundMsg =
+      serialized.asJsObject fields "tag" match {
+        case JsString("SignFundingTx") => serialized.convertTo[SignFundingTx]
+        case JsString("FundingTxSigned") => serialized.convertTo[FundingTxSigned]
+        case JsString("BroadcastFundingTx") => serialized.convertTo[BroadcastFundingTx]
+        case JsString("FundingTxBroadcasted") => serialized.convertTo[FundingTxBroadcasted]
+        case JsString("FundingTxCreated") => serialized.convertTo[FundingTxCreated]
+        case JsString("FundingTxAwaits") => serialized.convertTo[FundingTxAwaits]
+        case JsString("Start") => serialized.convertTo[Start]
+        case JsString("Fail") => serialized.convertTo[Fail]
+        case _ => throw new RuntimeException
+      }
+  }
+
+  implicit val failFmt: JsonFormat[Fail] =
+    taggedJsonFmt(jsonFormat[Int, String, String,
+      Fail](Fail.apply, "userId", "code", "reason"), tag = "Fail")
+
+  implicit val startFmt: JsonFormat[Start] =
+    taggedJsonFmt(jsonFormat[UserId, Satoshi, Option[String],
+      Start](Start.apply, "userId", "fundingAmount", "extra"), tag = "Start")
+
+  implicit val fundingTxCreatedFmt: JsonFormat[FundingTxCreated] = taggedJsonFmt(jsonFormat[Start, Long,
+    FundingTxCreated](FundingTxCreated.apply, "start", "expiration"), tag = "FundingTxCreated")
+
+  implicit val fundingTxAwaitsFmt: JsonFormat[FundingTxAwaits] = taggedJsonFmt(jsonFormat[Start, Long,
+    FundingTxAwaits](FundingTxAwaits.apply, "start", "expiration"), tag = "FundingTxAwaits")
+
+  implicit val fundingTxSignedFmt: JsonFormat[FundingTxSigned] = taggedJsonFmt(jsonFormat[UserId, BinaryData, Int,
+    FundingTxSigned](FundingTxSigned.apply, "userId", "txHash", "outIndex"), tag = "FundingTxSigned")
+
+  implicit val signFundingTxFmt: JsonFormat[SignFundingTx] = taggedJsonFmt(jsonFormat[UserId, BinaryData,
+    SignFundingTx](SignFundingTx.apply, "userId", "pubkeyScript"), tag = "SignFundingTx")
+
+  implicit val broadcastFundingTxFmt: JsonFormat[BroadcastFundingTx] = taggedJsonFmt(jsonFormat[UserId, BinaryData,
+    BroadcastFundingTx](BroadcastFundingTx.apply, "userId", "txHash"), tag = "BroadcastFundingTx")
+
+  implicit val fundingTxBroadcastedFmt: JsonFormat[FundingTxBroadcasted] = taggedJsonFmt(jsonFormat[UserId, Transaction,
+    FundingTxBroadcasted](FundingTxBroadcasted.apply, "userId", "tx"), tag = "FundingTxBroadcasted")
 }
