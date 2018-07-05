@@ -126,12 +126,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // OPEN MODE
 
 
-      case (some: HasCommitments, isa: InetSocketAddress, OFFLINE) =>
-        // Node was OFFLINE, we have initiated a DNS lookup and discovered a new address
-        val d1 = some.modify(_.announce.addresses).setTo(NodeAddress(isa) :: Nil)
-        data = me STORE d1
-
-
       case (norm: NormalData, hop: Hop, OPEN | OFFLINE) =>
         // Got either an empty Hop with shortChannelId or a final one
         // do not trigger listeners and silently update a current state
@@ -389,6 +383,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
         me SEND ChannelReestablish(some.commitments.channelId, some.commitments.localCommit.index + 1, some.commitments.remoteCommit.index,
           Some apply Scalar(yourLastPerCommitmentSecret), Some apply myCurrentPerCommitmentPoint)
+
+
+      case (some: HasCommitments, newIsa: InetSocketAddress, OFFLINE) =>
+        // Node was OFFLINE, we have initiated a DNS lookup and discovered a new address
+        val d1 = some.modify(_.announce.addresses).setTo(NodeAddress(newIsa) :: Nil)
+        data = me STORE d1
 
 
       case (wait: WaitFundingDoneData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, OFFLINE)

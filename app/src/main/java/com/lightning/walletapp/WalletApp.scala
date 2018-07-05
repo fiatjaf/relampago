@@ -128,9 +128,9 @@ class WalletApp extends Application { me =>
 
     def updateChangedIPs = for {
       chan <- notClosing if chan.state == OFFLINE
-      // Chan is offline and we are connected so maybe address has changed
+      // Chan is offline and we are online so maybe address has changed
       con <- Option(connectivityManager.getActiveNetworkInfo) if con.isConnected
-      isa <- Try(Tools.dns(chan.data.announce).head)
+      isa <- Try(dns(chan.data.announce).head)
     } chan process isa
 
     val socketEventsListener = new ConnectionListener {
@@ -317,15 +317,15 @@ class WalletApp extends Application { me =>
       wallet.setCoinSelector(new MinDepthReachedCoinSelector)
 
       try {
-        // Deal with notifications
         Notificator.removeResyncNotification
-        val shouldReschedule = ChannelManager.notClosingOrRefunding.exists(hasReceivedPayments)
-        if (shouldReschedule) Notificator.scheduleResyncNotificationOnceAgain
+        // Only reschedule a delayed notification if we have a receiving chans
+        if (ChannelManager.notClosingOrRefunding exists hasReceivedPayments)
+          Notificator.scheduleResyncNotificationOnceAgain
 
         // Set fast peer and schedule dns lookup
         val fastPeer = Uri.parse(OlympusWrap.clouds.head.connector.url)
         peerGroup addAddress new PeerAddress(app.params, InetAddress getByName fastPeer.getHost, 8333)
-        obsOnIO.delay(10.seconds).map(_ => ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
+        obsOnIO.delay(30.seconds).map(_ => ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
       } catch none
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)
