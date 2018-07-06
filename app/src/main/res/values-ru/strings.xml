@@ -89,7 +89,7 @@
 
     <string name="amount_hint_can_send"><![CDATA[<br><small>доступно %1$s</small>]]></string>
     <string name="amount_hint_can_receive"><![CDATA[<br><small>лимит %1$s</small>]]></string>
-    <string name="amount_hint_newchan"><![CDATA[<br><small>минимум %1$s<br>максимум %2$s<br>доступно %3$s</small>]]></string>
+    <string name="amount_hint_newchan"><![CDATA[<br><small>минимум %1$s<br>максимум %2$s</small>]]></string>
 
     <string name="dialog_pr_making">Создаю платежный запрос&#8230;</string>
     <string name="dialog_pr_expired">Этот платежный запрос устарел</string>

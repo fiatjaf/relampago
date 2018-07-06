@@ -118,15 +118,10 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def askForFunding(their: Init): TimerTask = UITask {
-      // Current feerate may be higher than hard capacity
-      // so choose the currently largest value
-
-      val maxCap = Satoshi(16777215L)
+      val maxCap = MilliSatoshi(math.min(app.kit.conf1Balance.value, 16777215L) * 1000L)
       val minCap = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, 300000L) * 1000L)
-      val canSend = MilliSatoshi(math.min(app.kit.conf1Balance.value, maxCap.amount) * 1000L)
-
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-      val txt = getString(amount_hint_newchan).format(denom withSign minCap, denom withSign maxCap, denom withSign canSend)
+      val txt = getString(amount_hint_newchan).format(denom withSign minCap, denom withSign maxCap)
       val rateManager = new RateManager(txt, content)
       val dummyKey = randomPrivKey.publicKey
 
@@ -153,12 +148,12 @@ class LNStartFundActivity extends TimerActivity { me =>
 
       def askAttempt(alert: AlertDialog) = rateManager.result match {
         case Success(ms) if ms < minCap => app toast dialog_sum_small
-        case Success(ms) if ms > canSend => app toast dialog_sum_big
+        case Success(ms) if ms > maxCap => app toast dialog_sum_big
         case Failure(reason) => app toast dialog_sum_empty
         case Success(ms) => rm(alert)(next(ms).start)
       }
 
-      def useMax(alert: AlertDialog) = rateManager setSum Try(canSend)
+      def useMax(alert: AlertDialog) = rateManager setSum Try(maxCap)
       val bld = baseBuilder(title = getString(ln_ops_start_fund_title).html, content)
       mkCheckFormNeutral(askAttempt, none, useMax, bld, dialog_next, dialog_cancel, dialog_max)
     }
