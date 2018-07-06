@@ -19,8 +19,8 @@ import language.postfixOps
 
 sealed trait Command
 case class CMDShutdown(scriptPubKey: Option[BinaryData] = None) extends Command
+case class CMDBestHeight(heightNow: Long, heightInit: Long) extends Command
 case class CMDConfirmed(tx: Transaction) extends Command
-case class CMDBestHeight(height: Long) extends Command
 case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
 case class CMDFeerate(sat: Long) extends Command
@@ -262,10 +262,10 @@ object Commitments {
   def addRemoteProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.remoteChanges.proposed).using(_ :+ proposal)
   def addLocalProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.localChanges.proposed).using(_ :+ proposal)
 
-  def findExpiredHtlc(c: Commitments, height: Long) =
-    c.localCommit.spec.htlcs.find(htlc => !htlc.incoming && htlc.add.amount > c.localParams.dustLimit && height - 72 > htlc.add.expiry) orElse
-      c.remoteCommit.spec.htlcs.find(htlc => htlc.incoming && htlc.add.amount > c.localParams.dustLimit && height - 72 > htlc.add.expiry) orElse
-      latestRemoteCommit(c).spec.htlcs.find(htlc => htlc.incoming && htlc.add.amount > c.localParams.dustLimit && height - 72 > htlc.add.expiry)
+  def findExpiredHtlc(c: Commitments, cmd: CMDBestHeight) =
+    c.localCommit.spec.htlcs.find(htlc => !htlc.incoming && cmd.heightNow > htlc.add.expiry && cmd.heightInit < htlc.add.expiry) orElse
+      c.remoteCommit.spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow > htlc.add.expiry && cmd.heightInit < htlc.add.expiry) orElse
+      latestRemoteCommit(c).spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow > htlc.add.expiry && cmd.heightInit < htlc.add.expiry)
 
   def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = for {
     _ <- CommitmentSpec.findHtlcById(latestRemoteCommit(commitments).spec, htlcId, !incomingRelativeToLocal)

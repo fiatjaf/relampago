@@ -109,8 +109,10 @@ class WalletApp extends Application { me =>
 
   object ChannelManager {
     var currentBlocksLeft = Int.MaxValue
-    val CMDLocalShutdown = CMDShutdown(None)
+    var initialChainHeight = broadcaster.currentHeight // last seen height
     val operationalListeners = Set(broadcaster, bag, GossipCatcher)
+    val CMDLocalShutdown = CMDShutdown(None)
+
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
@@ -164,9 +166,12 @@ class WalletApp extends Application { me =>
         currentBlocksLeft = blocksLeft
 
         if (currentBlocksLeft < 1) {
-          // Send out pending payments and report best height to channels
-          for (c <- all) c process CMDBestHeight(broadcaster.currentHeight)
+          // Send out pending payments and report current chain heights to channels
+          val cmd = CMDBestHeight(broadcaster.currentHeight, initialChainHeight)
+          // Set initial height to current to not show repeated warnings
+          initialChainHeight = cmd.heightNow
           PaymentInfoWrap.resolvePending
+          for (c <- all) c process cmd
         }
       }
 

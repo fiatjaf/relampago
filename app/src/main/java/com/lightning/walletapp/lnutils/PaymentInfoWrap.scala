@@ -104,8 +104,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
   override def onException = {
-    case _ \ CMDAddImpossible(rd, _) => me failOnUI rd
-    case chan \ HTLCExpiryException(norm, _) => chan startLocalClose norm
+    case _ \ HTLCExpiryException(norm, _) => // do nothing, prevent shutdown
+    case _ \ CMDAddImpossible(rd, _) => me failOnUI rd // prevent shutdown
     case chan \ _ => chan process app.ChannelManager.CMDLocalShutdown
   }
 

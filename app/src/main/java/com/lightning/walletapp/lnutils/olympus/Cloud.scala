@@ -29,14 +29,13 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
       (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
-      app.ChannelManager.notClosingOrRefunding.exists(isOperational) &&
-      isAuthEnabled =>
+      app.ChannelManager.notClosing.exists(isOperational) && isAuthEnabled =>
 
       val send = retry(getPaymentRequestBlindMemo, pick = pickInc, times = 4 to 5)
       val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
 
       for {
-        Tuple2(pr, memo) <- send1
+        pr \ memo <- send1
         if data.info.isEmpty && pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
         memoSaved = me BECOME CloudData(Some(pr, memo), clearTokens, actions)
       } retryFreshRequest(pr)
@@ -96,12 +95,10 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         val pubKeyR = ECKey.fromPublicOnly(HEX decode signerSessionPubKey)
         val ecBlind = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
 
+        val lang = app getString com.lightning.walletapp.R.string.lang
         val memo = BlindMemo(ecBlind params quantity, ecBlind tokens quantity, pubKeyR.getPublicKeyAsHex)
-        val req = connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
-          "lang" -> app.getString(com.lightning.walletapp.R.string.lang), "seskey" -> memo.key)
-
-        // Return payment request along with unblinding params
-        for (raw <- req) yield Tuple2(PaymentRequest read raw, memo)
+        connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
+          "lang" -> lang, "seskey" -> memo.key).map(PaymentRequest.read).map(pr => pr -> memo)
     }
 
   def retryFreshRequest(pr: PaymentRequest): Unit = {
