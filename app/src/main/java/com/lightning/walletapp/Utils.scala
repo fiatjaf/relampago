@@ -97,7 +97,6 @@ trait TimerActivity extends AppCompatActivity { me =>
   val exitTo: Class[_] => Unit = goto => wrap(finish)(goTo apply goto)
   val timer = new Timer
 
-  def finishMe(top: View) = finish
   def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
   def rm(prev: Dialog)(exe: => Unit) = wrap(prev.dismiss)(me delayUI exe)
   def baseTextBuilder(msg: CharSequence) = new Builder(me).setMessage(msg)

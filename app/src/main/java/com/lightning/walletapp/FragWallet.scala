@@ -250,8 +250,23 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       info.incoming match {
         case 0 if info.lastMsat == 0 && info.lastExpiry == 0 =>
           // Payment has not been sent yet because an on-chain wallet is still offline
+          // or we have retried too many times such that no possible payment route is left
           val title = lnTitleOutNoFee.format(humanStatus, coloredOut(info.firstSum), inFiat)
-          showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
+
+          rd.pr.fallbackAddress match {
+            case Some(fallbackAddress) if !PaymentInfoWrap.unsent.contains(rd.pr.paymentHash) =>
+              // Payment request contains a fallback on-chain address and this payment is not pending
+
+              val bld = baseBuilder(title.html, detailsWrapper)
+              val address = Address.fromString(app.params, fallbackAddress)
+              def sendOnChain = sendBtcPopup(address) setSum Try(rd.pr.amount.get)
+              mkCheckForm(none, sendOnChain, bld, dialog_ok, dialog_pay_onchain)
+
+            case _ =>
+              // This payment has not been tried at all yet
+              // or no fallback on-chain address is present in payment request
+              showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
+          }
 
         case 0 =>
           val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
@@ -325,23 +340,27 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       val header = wrap.fee match {
+        // This tx is dead so details do not matter
         case _ if txDead => sumOut format txsConfs.last
 
         case _ if wrap.visibleValue.isPositive =>
+          // This is an incominf tx, do not show a fee
           val inFiat = msatInFiatHuman(wrap.visibleValue)
           app.getString(btc_incoming_title).format(confs,
             coloredIn(wrap.visibleValue), inFiat)
 
-        case None =>
-          val inFiat = msatInFiatHuman(-wrap.visibleValue)
-          app.getString(btc_outgoing_title_no_fee).format(confs,
-            coloredOut(-wrap.visibleValue), inFiat)
-
         case Some(fee) =>
+          // This is an outgoing tx with fee
           val amount = Satoshi(-wrap.visibleValue.value)
           val paidFeePercent = fee.value / (amount.amount / 100D)
           app.getString(btc_outgoing_title).format(confs, coloredOut(amount),
             msatInFiatHuman(amount), coloredOut(fee), paidFeePercent)
+
+        case None =>
+          // Should never happen but whatever
+          val inFiat = msatInFiatHuman(-wrap.visibleValue)
+          app.getString(btc_outgoing_title_no_fee).format(confs,
+            coloredOut(-wrap.visibleValue), inFiat)
       }
 
       // See if CPFP can be applied
@@ -441,15 +460,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val hint = app.getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
     val rateManager = new RateManager(hint, content)
 
-    def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
-      // Once again filter out those channels which can receive a supplied amount
+    def makeRequest(sum: MilliSatoshi, preimg: BinaryData) = {
+      val onChainFallback = Some(app.kit.currentAddress.toString)
       val description = content.findViewById(R.id.inputDescription).asInstanceOf[EditText].getText.toString.trim
-      val routes = chansWithRoutes.filterKeys(channel => estimateCanReceive(channel) >= sum.amount).values.toVector
-      val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, description, None, routes)
+      val routes = chansWithRoutes.filterKeys(goodChannel => estimateCanReceive(goodChannel) >= sum.amount).values.toVector
+      val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimg, nodePrivateKey, description, onChainFallback, routes)
       val rd = emptyRD(pr, sum.amount, useCache = true)
 
       db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.paymentHashString)
-      db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN, System.currentTimeMillis,
+      db.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
         pr.description, rd.paymentHashString, sum.amount, 0L, 0L, NOCHANID)
 
       showQR(pr)
@@ -518,8 +537,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     for {
       res <- retry(OlympusWrap findNodes pr.nodeId.toString, pickInc, 2 to 3)
       announce \ connects <- res take 1 if announce.nodeId == pr.nodeId
-      rnv = RemoteNodeView(announce -> connects)
-    } UITask(proceed apply rnv).run
+      remoteNodeView = RemoteNodeView(announce -> connects)
+    } UITask(proceed apply remoteNodeView).run
     app toast ln_receive_nochan
   }
 

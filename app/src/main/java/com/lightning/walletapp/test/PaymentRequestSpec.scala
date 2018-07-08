@@ -88,7 +88,7 @@ class PaymentRequestSpec {
       assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
       assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
-      assert(pr.tags.collect { case u: UnknownTag => u }.size == 1) // fallback address
+      assert(pr.tags.collect { case u: FallbackAddressTag => u }.size == 1)
       assert(pr.tags.size == 3)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }

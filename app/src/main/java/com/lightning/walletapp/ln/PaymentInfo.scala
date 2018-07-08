@@ -54,8 +54,8 @@ object PaymentInfo {
   }
 
   def useRoute(route: PaymentRoute, rest: PaymentRouteVec, rd: RoutingData): FullOrEmptyRD = {
-    // Default is 7 + 1 block in case if block just appeared and there is a 1-block discrepancy between peers
-    val firstExpiry = LNParams.broadcaster.currentHeight + rd.pr.minFinalCltvExpiry.getOrElse(0L) + 7L + 1L
+    // Default is 9 + 1 block in case if block just appeared and there is a 1-block discrepancy between peers
+    val firstExpiry = LNParams.broadcaster.currentHeight + rd.pr.minFinalCltvExpiry.getOrElse(0L) + 9L + 1L
     val firstPayloadVector = PerHopPayload(shortChannelId = 0L, rd.firstMsat, firstExpiry) +: Vector.empty
     val start = (firstPayloadVector, Vector.empty[PublicKey], rd.firstMsat, firstExpiry)
 
