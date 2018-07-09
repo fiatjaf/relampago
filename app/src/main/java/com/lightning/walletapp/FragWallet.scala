@@ -59,7 +59,7 @@ class FragWallet extends Fragment {
 }
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
-  import host.{UITask, onButtonTap, mkForm, showForm, negBuilder, baseBuilder, negTextBuilder, onFastTap, str2View}
+  import host.{UITask, onButtonTap, mkForm, showForm, negBuilder, baseBuilder, negTextBuilder, str2View}
   import host.{onFail, TxProcessor, getSupportLoaderManager, rm, mkCheckForm, mkCheckFormNeutral, <, onTap, showDenomChooser}
   def getDescription(rawText: String) = if (rawText.isEmpty) s"<i>$noDesc</i>" else rawText take 140
 
@@ -379,11 +379,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  toggler setOnClickListener onFastTap {
-    val newImg = if (currentCut > minLinesNum) ic_expand_more_black_24dp else ic_expand_less_black_24dp
-    currentCut = if (currentCut > minLinesNum) minLinesNum else allItems.size
-    toggler setImageResource newImg
-    adapter.notifyDataSetChanged
+  toggler setOnClickListener new View.OnClickListener {
+    // This expands or collapses an on/off-chain payment list
+
+    def onClick(view: View) = {
+      val newImg = if (currentCut > minLinesNum) ic_expand_more_black_24dp else ic_expand_less_black_24dp
+      currentCut = if (currentCut > minLinesNum) minLinesNum else allItems.size
+      toggler setImageResource newImg
+      adapter.notifyDataSetChanged
+    }
   }
 
   new LoaderCallbacks[Cursor] { self =>
@@ -399,13 +403,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def recentPays = new ReactLoader[PaymentInfo](host) {
       val consume = (vec: InfoVec) => runAnd(lnItems = vec map LNWrap)(updList(btcItems ++ lnItems).run)
-      def createItem(richCursor: RichCursor) = bag toPaymentInfo richCursor
+      def createItem(shiftedRichCursor: RichCursor) = bag toPaymentInfo shiftedRichCursor
       def getCursor = bag.byRecent
     }
 
     def searchPays = new ReactLoader[PaymentInfo](host) {
       val consume = (vec: InfoVec) => runAnd(lnItems = vec map LNWrap)(updList(lnItems).run)
-      def createItem(richCursor: RichCursor) = bag toPaymentInfo richCursor
+      def createItem(shiftedRichCursor: RichCursor) = bag toPaymentInfo shiftedRichCursor
       def getCursor = bag byQuery lastQuery
     }
 
@@ -619,8 +623,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // END BTC SEND AND BOOST
 
   host setSupportActionBar toolbar
-  toolbar setOnClickListener onFastTap { if (!isSearching) showDenomChooser }
-  itemsList setOnItemClickListener onTap { pos => adapter.getItem(pos).generatePopup }
+  toolbar setOnClickListener new View.OnClickListener {
+    def onClick(view: View) = if (!isSearching) showDenomChooser
+  }
+
+  itemsList setOnItemClickListener onTap {
+    pos => adapter.getItem(pos).generatePopup
+  }
+
   itemsList setFooterDividersEnabled false
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter

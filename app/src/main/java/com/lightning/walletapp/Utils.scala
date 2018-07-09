@@ -182,8 +182,9 @@ trait TimerActivity extends AppCompatActivity { me =>
     def onItemClick(adapter: AdapterView[_], view: View, pos: Int, id: Long) = run(pos)
   }
 
-  def onButtonTap(exec: => Unit) = new OnClickListener { def onClick(view: View) = me hideKeys exec }
-  def onFastTap(fastExec: => Unit) = new OnClickListener { def onClick(view: View) = fastExec }
+  def onButtonTap(exec: => Unit): OnClickListener = {
+    new OnClickListener { def onClick(view: View) = me hideKeys exec }
+  }
 
   def share(exportedTextData: String): Unit = {
     val share = new Intent setAction Intent.ACTION_SEND setType "text/plain"
