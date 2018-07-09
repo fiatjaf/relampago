@@ -59,8 +59,8 @@ class FragWallet extends Fragment {
 }
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
-  import host.{UITask, onButtonTap, mkForm, showForm, negBuilder, baseBuilder, negTextBuilder, str2View}
-  import host.{onFail, TxProcessor, getSupportLoaderManager, rm, mkCheckForm, mkCheckFormNeutral, <, onTap, showDenomChooser}
+  import host.{UITask, onButtonTap, mkForm, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, TxProcessor}
+  import host.{onFail, getSupportLoaderManager, rm, mkCheckForm, mkCheckFormNeutral, <, onTap, showDenomChooser}
   def getDescription(rawText: String) = if (rawText.isEmpty) s"<i>$noDesc</i>" else rawText take 140
 
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
