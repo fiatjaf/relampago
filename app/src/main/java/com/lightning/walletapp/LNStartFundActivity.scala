@@ -166,9 +166,9 @@ class LNStartFundActivity extends TimerActivity { me =>
       finish
     }
 
-    // Wire up listeners and connect
+    // Wire up listeners
     freshChan.listeners += openListener
     ConnectionManager.listeners += openListener
-    ConnectionManager connectTo announce
+    ConnectionManager.connectTo(announce, notify = true)
   }
 }

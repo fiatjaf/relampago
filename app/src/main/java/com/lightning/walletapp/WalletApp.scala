@@ -133,7 +133,7 @@ class WalletApp extends Application { me =>
 
     def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
     def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(htlc => htlc.add.paymentHash)
-    def initConnect = for (chan <- notClosing) ConnectionManager connectTo chan.data.announce
+    def initConnect = for (c <- notClosing) ConnectionManager.connectTo(c.data.announce, notify = false)
 
     def updateChangedIPs = for {
       chan <- notClosing if chan.state == OFFLINE
@@ -159,7 +159,7 @@ class WalletApp extends Application { me =>
         affectedChans <- Obs just fromNode(notClosing, nodeId) if affectedChans.nonEmpty
         _ = affectedChans.foreach(affectedChan => affectedChan process CMDOffline)
         announce <- Obs just affectedChans.head.data.announce delay 5.seconds
-      } ConnectionManager connectTo announce
+      } ConnectionManager.connectTo(announce, notify = false)
     }
 
     val chainEventsListener = new TxTracker with BlocksListener {
