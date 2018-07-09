@@ -229,6 +229,17 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       paymentHash setOnClickListener onButtonTap(host share rd.paymentHashString)
       paymentDetails setText getDescription(info.description).html
 
+      val onChain = for (adr <- rd.pr.fallbackAddress) yield UITask {
+        val fallbackOnChainAddress = Address.fromString(app.params, adr)
+        val tryMSat = Try(rd.pr.amount.get)
+
+        sendBtcPopup(fallbackOnChainAddress) { txid =>
+          // Hide related off-chain payment once on-chain is sent
+          PaymentInfoWrap.updStatus(HIDDEN, rd.pr.paymentHash)
+          PaymentInfoWrap.uiNotify
+        } setSum tryMSat
+      }
+
       if (info.actualStatus == SUCCESS) {
         paymentHash setVisibility View.GONE
         paymentProof setVisibility View.VISIBLE
@@ -238,8 +249,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
       }
 
+      if (0 == info.incoming && info.actualStatus == FAILURE) {
+        for (responses <- PaymentInfo.errors get rd.pr.paymentHash) {
+          val history = responses.reverse.map(_.toString) mkString "\n===\n"
+          peerResponses setOnClickListener onButtonTap(host share history)
+          peerResponses setVisibility View.VISIBLE
+        }
+      }
+
       for (rd1 <- PaymentInfoWrap.inFlightPayments get rd.pr.paymentHash) {
-        val receiverExpiry = rd.pr.minFinalCltvExpiry.getOrElse(default = 10L)
+        val receiverExpiry = rd.pr.minFinalCltvExpiry.getOrElse(0L) + 9L + 1L
         val receiver = s"Final payee: ${rd.pr.nodeId.toString}, Expiry: $receiverExpiry blocks"
         val routingPath = for (usedPaymentHop <- rd1.usedRoute) yield usedPaymentHop.humanDetails
         val fullPath = "Your wallet" +: routingPath :+ receiver mkString "\n-->\n"
@@ -247,50 +266,40 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         paymentRouting setVisibility View.VISIBLE
       }
 
-      info.incoming match {
-        case 0 if info.lastMsat == 0 && info.lastExpiry == 0 =>
-          // Payment has not been sent yet because an on-chain wallet is still offline
-          // or we have retried too many times such that no possible payment route is left
+      def outgoingTitle = {
+        val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
+        val paidFeePercent = fee.amount / (info.firstMsat / 100D)
+        val title = lnTitleOut.format(humanStatus, coloredOut(info.firstSum), inFiat, coloredOut(fee), paidFeePercent)
+        val expiryBlocksPart = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
+        if (info.actualStatus == WAITING) s"$expiryBlocksPart<br>$title" else title
+      }
+
+      info.incoming -> onChain match {
+        case 0 \ Some(runnable) if info.lastMsat == 0 && info.lastExpiry == 0 && info.actualStatus == FAILURE =>
+          val bld = baseBuilder(lnTitleOutNoFee.format(humanStatus, coloredOut(info.firstSum), inFiat).html, detailsWrapper)
+          mkCheckFormNeutral(none, none, alert => rm(alert)(runnable.run), bld, dialog_cancel, -1, dialog_pay_onchain)
+
+        case 0 \ _ if info.lastMsat == 0 && info.lastExpiry == 0 =>
+          // Payment has not been tried yet because an on-chain wallet is still offline
           val title = lnTitleOutNoFee.format(humanStatus, coloredOut(info.firstSum), inFiat)
+          showForm(negBuilder(dialog_cancel, title.html, detailsWrapper).create)
 
-          rd.pr.fallbackAddress match {
-            case Some(fallbackAddress) if !PaymentInfoWrap.unsent.contains(rd.pr.paymentHash) =>
-              // Payment request contains a fallback on-chain address and this payment is not pending
+        case 0 \ Some(runnable) =>
+          val bld = baseBuilder(outgoingTitle.html, detailsWrapper)
+          if (info.actualStatus != FAILURE) showForm(negBuilder(dialog_cancel, outgoingTitle.html, detailsWrapper).create)
+          else mkCheckFormNeutral(alert => rm(alert)(none), doSend(rd), alert => rm(alert)(runnable.run), bld, dialog_cancel,
+            noResource = if (info.pr.isFresh) dialog_retry else -1, dialog_pay_onchain)
 
-              val bld = baseBuilder(title.html, detailsWrapper)
-              val address = Address.fromString(app.params, fallbackAddress)
-              def sendOnChain = sendBtcPopup(address) setSum Try(rd.pr.amount.get)
-              mkCheckForm(none, sendOnChain, bld, dialog_ok, dialog_pay_onchain)
+        case 0 \ _ =>
+          // Allow user to retry this payment while using excluded nodes and channels but only if pr has not expired yet
+          if (info.actualStatus != FAILURE) showForm(negBuilder(dialog_cancel, outgoingTitle.html, detailsWrapper).create)
+          else mkForm(none, doSend(rd), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_cancel,
+            noResource = if (info.pr.isFresh) dialog_retry else -1)
 
-            case _ =>
-              // This payment has not been tried at all yet
-              // or no fallback on-chain address is present in payment request
-              showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
-          }
-
-        case 0 =>
-          val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
-          val paidFeePercent = fee.amount / (info.firstMsat / 100D)
-
-          // Show how many blocks left until expiration if this payment is still in-flight
-          val title = lnTitleOut.format(humanStatus, coloredOut(info.firstSum), inFiat, coloredOut(fee), paidFeePercent)
-          val titleWithExpiry = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight) + "<br>" + title
-          val title1 = if (info.actualStatus == WAITING) titleWithExpiry else title
-
-          // Allow user to retry this payment using excluded nodes and channels when it is a failure and pr is not expired yet
-          if (info.actualStatus != FAILURE || !info.pr.isFresh) showForm(negBuilder(dialog_ok, title1.html, detailsWrapper).create)
-          else mkForm(doSend(rd), none, baseBuilder(title1.html, detailsWrapper), dialog_retry, dialog_cancel)
-
-          if (info.actualStatus == FAILURE)
-            for (errs <- PaymentInfo.errors get rd.pr.paymentHash) {
-              val history = errs.reverse.map(_.toString) mkString "\n===\n"
-              peerResponses setOnClickListener onButtonTap(host share history)
-              peerResponses setVisibility View.VISIBLE
-            }
-
-        case 1 =>
+        case 1 \ _ =>
+          // This is an incoming payment
           val title = lnTitleIn.format(humanStatus, coloredIn(info.firstSum), inFiat)
-          showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
+          showForm(negBuilder(dialog_cancel, title.html, detailsWrapper).create)
       }
     }
   }
@@ -552,7 +561,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // BTC SEND AND BOOST
 
-  def sendBtcPopup(addr: Address): RateManager = {
+  def sendBtcPopup(addr: Address)(and: String => Unit): RateManager = {
     val form = host.getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
     val hint = app.getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
     val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
@@ -560,12 +569,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def next(ms: MilliSatoshi) = new TxProcessor {
       def futureProcess(unsignedRequest: SendRequest) =
-        app.kit blockingSend app.kit.sign(unsignedRequest).tx
+        and(app.kit blockingSend app.kit.sign(unsignedRequest).tx)
 
       val pay = AddrData(ms, addr)
       def onTxFail(sendingError: Throwable) = {
         val bld = baseBuilder(messageWhenMakingTx(sendingError), null)
-        mkForm(sendBtcPopup(addr), none, bld, dialog_ok, dialog_cancel)
+        mkForm(sendBtcPopup(addr)(and), none, bld, dialog_ok, dialog_cancel)
       }
     }
 

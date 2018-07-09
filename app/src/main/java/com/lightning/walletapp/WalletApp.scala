@@ -99,8 +99,7 @@ class WalletApp extends Application { me =>
     private[this] val lnLink = s"(?im).*?($prefixes)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
 
     private def resolveURI(uri: BitcoinURI) = {
-      // We need to make some beforehand checks to fallback to onchain right away
-      val hasChans = ChannelManager.notClosingOrRefunding exists isOperational
+      val hasChans = ChannelManager.notClosing.exists(isOperational)
       val prOpt = Option(uri.getLightningRequest) map PaymentRequest.read
       val canOffChain = hasChans && prOpt.exists(_.isFresh)
       if (canOffChain) prOpt.get else uri

@@ -97,6 +97,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   val exitTo: Class[_] => Unit = goto => wrap(finish)(goTo apply goto)
   val timer = new Timer
 
+  def finishMe(top: View) = finish
   def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
   def rm(prev: Dialog)(exe: => Unit) = wrap(prev.dismiss)(me delayUI exe)
   def baseTextBuilder(msg: CharSequence) = new Builder(me).setMessage(msg)
@@ -111,12 +112,15 @@ trait TimerActivity extends AppCompatActivity { me =>
     mkCheckForm(alert => rm(alert)(ok), no, bld, okResource, noResource)
 
   def mkCheckForm(ok: AlertDialog => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) = {
-    val builderWithOkCancelButtons = bld.setPositiveButton(okResource, null).setNegativeButton(noResource, null)
-    val alert = showForm(builderWithOkCancelButtons.create)
+    // Create alert dialog with NEGATIVE button which removes a dialog and calls a respected provided function
+    // both POSITIVE and NEGATIVE buttons may be omitted by providing -1 as their resource ids
+    if (-1 != noResource) bld.setNegativeButton(noResource, null)
+    if (-1 != okResource) bld.setPositiveButton(okResource, null)
 
+    val alert = showForm(bld.create)
     try clickableTextField(alert findViewById android.R.id.message) catch none
-    alert getButton BUTTON_NEGATIVE setOnClickListener onButtonTap { rm(alert)(no) /* use manual dismiss */ }
-    alert getButton BUTTON_POSITIVE setOnClickListener onButtonTap { ok(alert) /* maybe dismiss later */ }
+    if (-1 != noResource) alert getButton BUTTON_NEGATIVE setOnClickListener onButtonTap(rm(alert)(no))
+    if (-1 != noResource) alert getButton BUTTON_POSITIVE setOnClickListener onButtonTap(ok(alert))
     alert
   }
 
@@ -124,7 +128,7 @@ trait TimerActivity extends AppCompatActivity { me =>
                          bld: Builder, okResource: Int, noResource: Int, neutralResource: Int) = {
 
     val alert = mkCheckForm(ok, no, bld.setNeutralButton(neutralResource, null), okResource, noResource)
-    alert getButton BUTTON_NEUTRAL setOnClickListener onButtonTap { neutral(alert) /* maybe dismiss later */ }
+    alert getButton BUTTON_NEUTRAL setOnClickListener onButtonTap(neutral apply alert)
     alert
   }
 

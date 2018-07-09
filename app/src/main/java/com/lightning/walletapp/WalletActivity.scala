@@ -136,9 +136,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def checkTransData = {
     returnToBase(view = null)
     app.TransData.value match {
-      case paymentRequest: PaymentRequest => FragWallet.worker sendPayment paymentRequest
-      case bu: BitcoinURI => FragWallet.worker sendBtcPopup bu.getAddress setSum Try(bu.getAmount)
-      case btcAddress: Address => FragWallet.worker sendBtcPopup btcAddress
+      case offChainPayRequest: PaymentRequest => FragWallet.worker sendPayment offChainPayRequest
+      case bu: BitcoinURI => FragWallet.worker.sendBtcPopup(bu.getAddress)(none) setSum Try(bu.getAmount)
+      case btcAddress: Address => FragWallet.worker.sendBtcPopup(btcAddress)(none)
       case FragWallet.REDIRECT => goChanDetails(null)
       case _ =>
     }

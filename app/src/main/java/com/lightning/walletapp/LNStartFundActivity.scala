@@ -118,7 +118,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def askForFunding(their: Init): TimerTask = UITask {
-      val maxCap = MilliSatoshi(math.min(app.kit.conf1Balance.value, 16777215L) * 1000L)
+      val maxCap = MilliSatoshi(math.min(app.kit.conf0Balance.value, 16777215L) * 1000L)
       val minCap = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, 300000L) * 1000L)
       val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
       val txt = getString(amount_hint_newchan).format(denom withSign minCap, denom withSign maxCap)
