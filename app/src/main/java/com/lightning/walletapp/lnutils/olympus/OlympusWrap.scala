@@ -53,8 +53,8 @@ object OlympusWrap extends OlympusProvider {
   // backup upload requests are also sent to all the clounds
   // and final filtering is done inside of each available cloud
   var clouds = RichCursor(db select OlympusTable.selectAllSql) vec toCloud
-  def tellClouds(data: Any) = for (cloud <- clouds) cloud doProcess data
-  def hasAuthEnabled = clouds.exists(_.isAuthEnabled)
+  def tellClouds(candidateData: Any) = for (cloud <- clouds) cloud doProcess candidateData
+  def backupExhausted = clouds.exists(cloud => cloud.auth == 1 && cloud.data.tokens.size <= 5)
 
   // SQL interface
 

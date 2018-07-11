@@ -19,7 +19,6 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
             val maxPriceMsat: Long = 5000000L) extends StateMachine[CloudData] { me =>
 
   private var isFree = true
-  def isAuthEnabled = auth == 1
   def BECOME(cloudData: CloudData) = {
     // Just save updated data to database on every change
     OlympusWrap.updData(cloudData.toJson.toString, identifier)
@@ -29,7 +28,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
       (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
-      app.ChannelManager.notClosing.exists(isOperational) && isAuthEnabled =>
+      app.ChannelManager.notClosing.exists(isOperational) && auth == 1 =>
 
       val send = retry(getPaymentRequestBlindMemo, pick = pickInc, times = 4 to 5)
       val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
@@ -77,7 +76,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       }
 
     case (_, act: CloudAct)
-      if isAuthEnabled || data.tokens.nonEmpty =>
+      if auth == 1 || data.tokens.nonEmpty =>
       // Backup is active or we have some tokens left
       // Keep processing until run out of tokens in any case
       me BECOME data.copy(acts = data.acts :+ act take 50)
