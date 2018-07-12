@@ -30,6 +30,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
       app.ChannelManager.notClosing.exists(isOperational) && auth == 1 =>
 
+      // Also executes if we have no actions to upload and a few tokens left
       val send = retry(getPaymentRequestBlindMemo, pick = pickInc, times = 4 to 5)
       val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
 
