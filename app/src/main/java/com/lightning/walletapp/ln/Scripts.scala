@@ -28,6 +28,11 @@ object Scripts { me =>
       case (true, multisig) => ScriptWitness(BinaryData.empty :: sig1 :: sig2 :: Script.write(multisig) :: Nil)
     }
 
+  def pubKeyScript(pub1: PublicKey, pub2: PublicKey) = {
+    val multisigScript = Scripts.multiSig2of2(pub1, pub2)
+    Script.write(Script pay2wsh multisigScript)
+  }
+
   def cltvBlocks(tx: Transaction): Long =
     if (tx.lockTime <= LockTimeThreshold) tx.lockTime else 0L
 

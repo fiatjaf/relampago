@@ -1,15 +1,10 @@
 package com.lightning.walletapp.ln
 
-import org.xbill.DNS.{Lookup, SRVRecord, Type}
-import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
-import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import com.lightning.walletapp.ln.Tools.runAnd
+import fr.acinq.bitcoin.Crypto.PrivateKey
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
-import java.net.InetSocketAddress
-import fr.acinq.bitcoin.Bech32
 import crypto.RandomGenerator
-import scala.util.Try
 import java.util
 
 
@@ -45,23 +40,6 @@ object Tools {
     if (fundingOutputIndex >= 65536 | fundingHash.size != 32) throw new LightningException
     else fundingHash.take(30) :+ fundingHash.data(30).^(fundingOutputIndex >> 8).toByte :+
       fundingHash.data(31).^(fundingOutputIndex).toByte
-
-  def keyTry(host: String): Try[PublicKey] = Try {
-    val _ \ decoded = Bech32 decode host.split('.').head
-    PublicKey(Bech32 five2eight decoded)
-  }
-
-  def dns(nodeAnnounce: NodeAnnouncement) = for {
-    // This may fail when hostname is invalid, account for that
-    result <- new Lookup(nodeAnnounce.unsafeHost, Type.SRV).run
-    record = result.asInstanceOf[SRVRecord]
-    host = record.getTarget.toString
-
-    finalDerivedKey <- keyTry(host).toOption
-    if finalDerivedKey == nodeAnnounce.nodeId
-    isa = new InetSocketAddress(host, record.getPort)
-    if isa != nodeAnnounce.workingAddress
-  } yield isa
 }
 
 object Features {

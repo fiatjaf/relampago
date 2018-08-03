@@ -68,32 +68,30 @@ class RequestActivity extends TimerActivity { me =>
   lazy val qrSize = getResources getDimensionPixelSize R.dimen.bitmap_qr_size
   lazy val disposable = getString(ln_qr_disposable)
 
-  override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
   var whenDestroy: Runnable = new Runnable { def run = none }
+  override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
 
   def INIT(state: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_qr_request)
+    val targetPayHash = app.TransData.value match {
+      case request: PaymentRequest => request.paymentHash
+      case _ => BinaryData.empty
+    }
 
-    app.TransData.value match {
+    val receivedListener = new ChannelListener {
+      override def settled(cs: Commitments) = for {
+        Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled
+        if add.paymentHash == targetPayHash
+      } showPaid.run
+    }
+
+    app.TransData checkAndMaybeErase {
       case pr: PaymentRequest => showInfo(drawAll(denom asString pr.amount.get, disposable.html), PaymentRequest write pr)
       case onChainAddress: Address => showInfo(drawBottom(Utils humanSix onChainAddress.toString), onChainAddress.toString)
       case _ => finish
     }
 
-    val receivedListener = new ChannelListener {
-      val targetPaymentHash = app.TransData.value match {
-        case request: PaymentRequest => request.paymentHash
-        case _ => BinaryData.empty
-      }
-
-      override def settled(cs: Commitments) = for {
-        Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled
-        if add.paymentHash == targetPaymentHash
-      } showPaid.run
-    }
-
-    app.TransData.value = null
-    whenDestroy = UITask(for (c <- app.ChannelManager.all) c.listeners -= receivedListener)
+    whenDestroy = UITask { for (c <- app.ChannelManager.all) c.listeners -= receivedListener }
     for (c <- app.ChannelManager.all) c.listeners += receivedListener
   } else me exitTo classOf[MainActivity]
 

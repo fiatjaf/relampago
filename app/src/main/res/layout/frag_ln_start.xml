@@ -19,6 +19,57 @@
         app:contentInsetRight="@dimen/app_padding"
         app:contentInsetEnd="@dimen/app_padding"/>
 
+    <LinearLayout
+        android:visibility="gone"
+        android:gravity="top|center"
+        android:orientation="vertical"
+        android:id="@+id/externalFundWrap"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            style="@style/Info"
+            android:textColor="#FFFFFFFF"
+            android:id="@+id/externalFundInfo"
+            android:layout_width="wrap_content"
+            android:layout_marginTop="@dimen/app_padding"
+            android:layout_marginBottom="@dimen/app_padding"/>
+
+        <Button
+            style="@style/Info"
+            android:layout_width="wrap_content"
+            android:text="@string/dialog_cancel"
+            android:id="@+id/externalFundCancel"
+            android:layout_marginBottom="@dimen/app_padding"/>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:visibility="gone"
+        android:gravity="top|center"
+        android:orientation="vertical"
+        android:background="@color/btc"
+        android:id="@+id/batchPresentWrap"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content">
+
+        <TextView
+            style="@style/Info"
+            android:textColor="#FFFFFFFF"
+            android:id="@+id/batchPresentInfo"
+            android:layout_width="wrap_content"
+            android:layout_marginTop="@dimen/app_padding"
+            android:layout_marginBottom="@dimen/app_padding"/>
+
+        <Button
+            style="@style/Info"
+            android:layout_width="wrap_content"
+            android:text="@string/dialog_cancel"
+            android:id="@+id/batchPresentCancel"
+            android:layout_marginBottom="@dimen/app_padding"/>
+
+    </LinearLayout>
+
     <ListView
         android:id="@+id/lnStartNodesList"
         style="@style/GrayDividerListView"/>

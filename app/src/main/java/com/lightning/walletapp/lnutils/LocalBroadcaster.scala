@@ -3,14 +3,14 @@ package com.lightning.walletapp.lnutils
 import collection.JavaConverters._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.Channel._
+import com.lightning.walletapp.ln.wire.FundMsg._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
-import com.lightning.walletapp.ln.wire.ChannelReestablish
+import com.lightning.walletapp.ln.wire.{ChannelReestablish, Fail}
 import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Sha256Hash
 import fr.acinq.bitcoin.BinaryData
-import java.util.Collections
 
 
 object LocalBroadcaster extends Broadcaster {
@@ -30,7 +30,7 @@ object LocalBroadcaster extends Broadcaster {
 
   def getBlockHashStrings(txid: BinaryData) = for {
     // Given a txid return a hash of containing blocks
-    // this may return multiple block hashes
+    // note that this may return many block hashes
 
     txj <- getTx(txid).toVector
     hashes <- Option(txj.getAppearsInHashes).toVector
@@ -42,12 +42,16 @@ object LocalBroadcaster extends Broadcaster {
       // Repeatedly spend everything we can in this state in case it was unsuccessful before
       val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
-      for (tx <- toSend) try app.kit blockingSend tx catch none
+      for (tx <- toSend) try app.kit blockSend tx catch none
+
+    case (chan, remote: WaitBroadcastRemoteData, _: ChannelReestablish) =>
+      // Check if funding takes too much time or whether it's dead if present in a wallet
+      val isOutdated = System.currentTimeMillis - remote.commitments.startedAt > 4 * 3600 * 1000L
+      if (isOutdated && remote.fail.isEmpty) chan process Fail(FAIL_PUBLISH_ERROR, "Expired funding")
 
     case (chan, wait: WaitFundingDoneData, _: ChannelReestablish) if wait.our.isEmpty =>
       // CMDConfirmed may be sent to an offline channel and there will be no reaction
       // so always double check a funding state here as a failsafe measure
-      // but only if we don't have our FundingLocked defined already
 
       for {
         txj <- getTx(wait.fundingTx.txid)
@@ -57,15 +61,8 @@ object LocalBroadcaster extends Broadcaster {
   }
 
   override def onBecome = {
-    case (_, wait: WaitFundingDoneData, _, _) =>
-      // Repeatedly send a funding tx in case it was unsuccessful before
-      val fundingScript = wait.commitments.commitInput.txOut.publicKeyScript
-      app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
-      app.kit.blockingSend(wait.fundingTx)
-
-    case (chan, norm: NormalData, OFFLINE, OPEN) =>
-      // Updated feerates may arrive sooner then channel gets open
-      // so inform channel about updated fees once it gets open
-      chan process CMDFeerate(perKwThreeSat)
+    // Repeatedly resend a funding tx, update feerate on becoming open
+    case (_, wait: WaitFundingDoneData, _, _) => app.kit blockSend wait.fundingTx
+    case (chan, _: NormalData, OFFLINE, OPEN) => chan process CMDFeerate(perKwThreeSat)
   }
 }

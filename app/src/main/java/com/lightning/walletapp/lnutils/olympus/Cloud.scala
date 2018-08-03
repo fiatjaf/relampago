@@ -19,6 +19,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
             val maxPriceMsat: Long = 5000000L) extends StateMachine[CloudData] { me =>
 
   private var isFree = true
+  def isAuthEnabled = auth == 1
   def BECOME(cloudData: CloudData) = {
     // Just save updated data to database on every change
     OlympusWrap.updData(cloudData.toJson.toString, identifier)
@@ -28,7 +29,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
       (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
-      app.ChannelManager.notClosing.exists(isOperational) && auth == 1 =>
+      app.ChannelManager.notClosing.exists(isOperational) && isAuthEnabled =>
 
       // Also executes if we have no actions to upload and a few tokens left
       val send = retry(getPaymentRequestBlindMemo, pick = pickInc, times = 4 to 5)
@@ -41,7 +42,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       } retryFreshRequest(pr)
 
     // Execute anyway if we are free and have available tokens and actions
-    case CloudData(_, (point, clear, signature) +: tokens, action +: _) \ CMDStart if isFree =>
+    case CloudData(_, (point, clear, signature) +: ts, action +: _) \ CMDStart if isFree =>
       val params = Seq("point" -> point, "cleartoken" -> clear, "clearsig" -> signature, BODY -> action.data.toString)
       // Be careful here: must make sure `doOnTerminate` changes `isFree` before `doOnCompleted` sends `CMDStart`
 
@@ -50,9 +51,9 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       send1.doOnCompleted(me doProcess CMDStart).foreach(onGotResponse, onGotResponse)
 
       def onGotResponse(response: Any) = response match {
-        case "done" => me BECOME data.copy(acts = data.acts diff Vector(action), tokens = tokens)
-        case err: Throwable if err.getMessage == "tokeninvalid" => me BECOME data.copy(tokens = tokens)
-        case err: Throwable if err.getMessage == "tokenused" => me BECOME data.copy(tokens = tokens)
+        case "done" => me BECOME data.copy(acts = data.acts diff Vector(action), tokens = ts)
+        case err: Throwable if err.getMessage == "tokeninvalid" => me BECOME data.copy(tokens = ts)
+        case err: Throwable if err.getMessage == "tokenused" => me BECOME data.copy(tokens = ts)
         case _ =>
       }
 
@@ -77,7 +78,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       }
 
     case (_, act: CloudAct)
-      if auth == 1 || data.tokens.nonEmpty =>
+      if isAuthEnabled || data.tokens.nonEmpty =>
       // Backup is active or we have some tokens left
       // Keep processing until run out of tokens in any case
       me BECOME data.copy(acts = data.acts :+ act take 50)
@@ -95,7 +96,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         val pubKeyR = ECKey.fromPublicOnly(HEX decode signerSessionPubKey)
         val ecBlind = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
 
-        val lang = app getString com.lightning.walletapp.R.string.lang
+        val lang = app.getString(com.lightning.walletapp.R.string.lang)
         val memo = BlindMemo(ecBlind params quantity, ecBlind tokens quantity, pubKeyR.getPublicKeyAsHex)
         connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
           "lang" -> lang, "seskey" -> memo.key).map(PaymentRequest.read).map(pr => pr -> memo)

@@ -39,14 +39,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     uiNotify
   }
 
-  def resolvePending = if (app.ChannelManager.currentBlocksLeft < 1) {
-    // Send all pending payments only if we have an updated chain height
+  def resolvePending: Unit = {
+    if (app.kit.peerGroup.numConnectedPeers < 1) return
+    if (app.ChannelManager.currentBlocksLeft > 0) return
     unsent.values foreach fetchAndSend
     unsent = Map.empty
   }
-
-  def fetchAndSend(rd: RoutingData) = app.ChannelManager.fetchRoutes(rd)
-    .foreach(app.ChannelManager.sendEither(_, failOnUI), exc => me failOnUI rd)
 
   private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
   def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
@@ -62,10 +60,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (fulfills.nonEmpty) uiNotify
   }
 
-  def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
+  def fetchAndSend(rd: RoutingData) = app.ChannelManager.fetchRoutes(rd).foreach(app.ChannelManager.sendEither(_, failOnUI), exc => me failOnUI rd)
   def updOkIncoming(m: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
   def updOkOutgoing(m: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
   def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
+  def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
@@ -103,12 +102,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
         updStatus(FAILURE, rd.pr.paymentHash)
     }
 
-  override def onException = {
-    case _ \ HTLCExpiryException(norm, _) => // do nothing, prevent shutdown
-    case _ \ CMDAddImpossible(rd, _) => me failOnUI rd // prevent shutdown
-    case chan \ _ => chan process app.ChannelManager.CMDLocalShutdown
-  }
-
   override def outPaymentAccepted(rd: RoutingData) = {
     // Payment has been accepted by channel so start local tracking
     inFlightPayments = inFlightPayments.updated(rd.pr.paymentHash, rd)
@@ -119,8 +112,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     // Save preimage right away, don't wait for their next commitSig
     me updOkOutgoing ok
 
-    inFlightPayments.values.find(_.pr.paymentHash == ok.paymentHash) foreach { rd =>
-      // Make payment searchable + routing optimization: record subroutes in database
+    inFlightPayments get ok.paymentHash foreach { rd =>
+      // Make payment searchable + optimization: record subroutes in database
       db.change(PaymentTable.newVirtualSql, rd.queryText, rd.paymentHashString)
       if (rd.usedRoute.nonEmpty) RouteWrap cacheSubRoutes rd
     }
@@ -185,7 +178,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onBecome = {
     case (chan, _, from, CLOSING) if from != CLOSING =>
-      // Mark dropped and frozen payments and let user know
+      // Mark invalid payments once channel becomes closed
       markFailedAndFrozen
       uiNotify
 
@@ -296,7 +289,7 @@ object Notificator {
 
   def scheduleResyncNotificationOnceAgain =
     try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-      System.currentTimeMillis + 1000L * 3600 * 24 * 10, getIntent) catch none
+      System.currentTimeMillis + 1000L * 3600 * 24 * 14, getIntent) catch none
 }
 
 class Notificator extends BroadcastReceiver {

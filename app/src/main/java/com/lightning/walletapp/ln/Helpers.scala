@@ -279,9 +279,9 @@ object Helpers {
                                  fundingTxHash: BinaryData, fundingTxOutputIndex: Int,
                                  remoteFirstPoint: Point) = {
 
-      val toLocalMsat = cmd.realFundingAmountSat * 1000L - cmd.pushMsat
+      val toLocalMsat = cmd.batch.fundingAmountSat * 1000L - cmd.pushMsat
       val commitmentInput = makeFundingInputInfo(fundingTxHash, fundingTxOutputIndex,
-        Satoshi(cmd.realFundingAmountSat), cmd.localParams.fundingPrivKey.publicKey,
+        Satoshi(cmd.batch.fundingAmountSat), cmd.localParams.fundingPrivKey.publicKey,
         remoteParams.fundingPubkey)
 
       val localPerCommitmentPoint = perCommitPoint(cmd.localParams.shaSeed, 0L)

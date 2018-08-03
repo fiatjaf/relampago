@@ -3,7 +3,6 @@ package com.lightning.walletapp.lnutils
 import com.lightning.walletapp.Utils.app
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
-import org.bitcoinj.core.Utils.HEX
 import android.text.Html
 
 
@@ -41,7 +40,7 @@ object IconGetter extends Html.ImageGetter {
 
 class StringOps(source: String) {
   def html = Html.fromHtml(source, IconGetter, null)
-  def binary = BinaryData(source getBytes "UTF-8")
-  def hex = HEX.encode(source getBytes "UTF-8")
+  def hex2asci = new String(BinaryData(source), "UTF-8")
+  def hex = BinaryData(source getBytes "UTF-8").toString
   def noSpaces = source.replace(" ", "")
 }

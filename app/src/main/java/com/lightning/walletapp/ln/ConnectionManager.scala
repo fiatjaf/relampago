@@ -21,15 +21,16 @@ object ConnectionManager {
 
   protected[this] val events = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = for (lst <- listeners) lst.onMessage(nodeId, msg)
-    override def onOperational(nodeId: PublicKey, their: Init) = for (lst <- listeners) lst.onOperational(nodeId, their)
     override def onTerminalError(nodeId: PublicKey) = for (lst <- listeners) lst.onTerminalError(nodeId)
     override def onIncompatible(nodeId: PublicKey) = for (lst <- listeners) lst.onIncompatible(nodeId)
+    override def onOperational(nodeId: PublicKey) = for (lst <- listeners) lst.onOperational(nodeId)
     override def onDisconnect(nodeId: PublicKey) = for (lst <- listeners) lst.onDisconnect(nodeId)
   }
 
   def connectTo(ann: NodeAnnouncement, notify: Boolean) = connections get ann.nodeId match {
-    case Some(goodWorker) => if (notify) events.onOperational(ann.nodeId, goodWorker.savedInit)
+    // Worker may already be present so in this case we immediately notify listeners if needed
     case None => connections += ann.nodeId -> new Worker(ann)
+    case _ => if (notify) events onOperational ann.nodeId
   }
 
   class Worker(ann: NodeAnnouncement) {
@@ -62,7 +63,6 @@ object ConnectionManager {
       events onDisconnect ann.nodeId
     }
 
-    var savedInit: Init = _
     var lastMsg = System.currentTimeMillis
     def disconnect = try socket.close catch none
     def intercept(message: LightningMessage) = {
@@ -71,10 +71,8 @@ object ConnectionManager {
 
       message match {
         case their: Init =>
-          // Save their Init for possible subsequent requests
           val isOk = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures)
-          if (isOk) events.onOperational(ann.nodeId, their) else events.onIncompatible(ann.nodeId)
-          if (isOk) savedInit = their
+          if (isOk) events.onOperational(ann.nodeId) else events.onIncompatible(ann.nodeId)
 
         case pg: Ping if pg.pongLength > 0 => handler process Pong("00" * pg.pongLength)
         case internalMessage => events.onMessage(ann.nodeId, internalMessage)
@@ -82,17 +80,17 @@ object ConnectionManager {
     }
   }
 
-  Obs interval 60.seconds foreach { _ =>
-    val outdated = System.currentTimeMillis - 1000 * 120
-    for (work <- connections.values if work.lastMsg < outdated)
-      work.disconnect
-  }
+  for {
+    _ <- Obs interval 60.seconds
+    outdated = System.currentTimeMillis - 1000L * 120
+    _ \ work <- connections if work.lastMsg < outdated
+  } work.disconnect
 }
 
 class ConnectionListener {
   def onMessage(nodeId: PublicKey, msg: LightningMessage): Unit = none
-  def onOperational(nodeId: PublicKey, their: Init): Unit = none
   def onTerminalError(nodeId: PublicKey): Unit = none
   def onIncompatible(nodeId: PublicKey): Unit = none
+  def onOperational(nodeId: PublicKey): Unit = none
   def onDisconnect(nodeId: PublicKey): Unit = none
 }

@@ -1,7 +1,6 @@
 package com.lightning.walletapp.ln.wire
 
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-import com.linkedin.urls.detection.{UrlDetector, UrlDetectorOptions}
 import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
@@ -67,8 +66,7 @@ case class CommitSig(channelId: BinaryData, signature: BinaryData, htlcSignature
 case class RevokeAndAck(channelId: BinaryData, perCommitmentSecret: Scalar, nextPerCommitmentPoint: Point) extends ChannelMessage
 
 case class Error(channelId: BinaryData, data: BinaryData) extends ChannelMessage {
-  def exception = new LightningException(reason = s"Error from remote peer\n\n$text")
-  lazy val isSyncError = text.toLowerCase contains "sync error"
+  def exception = new LightningException(reason = s"Remote channel message\n\n$text")
   lazy val text = new String(data, "UTF-8")
 }
 
@@ -81,8 +79,9 @@ case class ChannelReestablish(channelId: BinaryData, nextLocalCommitmentNumber: 
 case class AnnouncementSignatures(channelId: BinaryData, shortChannelId: Long, nodeSignature: BinaryData,
                                   bitcoinSignature: BinaryData) extends RoutingMessage
 
-case class ChannelAnnouncement(nodeSignature1: BinaryData, nodeSignature2: BinaryData, bitcoinSignature1: BinaryData,
-                               bitcoinSignature2: BinaryData, features: BinaryData, chainHash: BinaryData, shortChannelId: Long,
+case class ChannelAnnouncement(nodeSignature1: BinaryData, nodeSignature2: BinaryData,
+                               bitcoinSignature1: BinaryData, bitcoinSignature2: BinaryData,
+                               features: BinaryData, chainHash: BinaryData, shortChannelId: Long,
                                nodeId1: PublicKey, nodeId2: PublicKey, bitcoinKey1: PublicKey,
                                bitcoinKey2: PublicKey) extends RoutingMessage {
 
@@ -117,17 +116,18 @@ case class NodeAnnouncement(signature: BinaryData,
                             nodeId: PublicKey, rgbColor: RGB, alias: String,
                             addresses: NodeAddressList) extends RoutingMessage {
 
-  lazy val unsafeHost = {
-    val purifiedUrl: String = alias.replaceAll("[^A-Za-z0-9.-]", " ")
-    val parser = new UrlDetector(purifiedUrl, UrlDetectorOptions.Default)
-    s"_lightning._tcp.${parser.detect.get(0).getHost}."
-  }
-
   lazy val identifier = (alias + nodeId.toString).toLowerCase
   lazy val workingAddress: InetSocketAddress = addresses.collect {
     case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
     case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
   }.head
+
+  override def toString = {
+    val keyPart = nodeId.toString take 15
+    val cute = keyPart grouped 3 mkString "\u0020"
+    val address = workingAddress.getHostString
+    s"$address<br><small>$cute</small>"
+  }
 }
 
 sealed trait NodeAddress

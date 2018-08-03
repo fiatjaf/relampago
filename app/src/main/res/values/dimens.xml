@@ -8,7 +8,5 @@
     <dimen name="bitmap_bottom_size">90dp</dimen>
     <dimen name="bitmap_top_size">40dp</dimen>
     <dimen name="bitmap_qr_size">280dp</dimen>
-
-    <!-- app padding -->
     <dimen name="app_padding">10dp</dimen>
 </resources>

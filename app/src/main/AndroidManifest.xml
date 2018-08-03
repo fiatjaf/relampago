@@ -20,10 +20,10 @@
 
     <application
         android:name="com.lightning.walletapp.WalletApp"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@drawable/ic_launcher_testnet"
         android:fullBackupContent="false"
         android:allowBackup="false"
-        android:label="Bitcoin">
+        android:label="Testnet">
 
         <receiver android:enabled="true" android:process=":remote"
             android:name="com.lightning.walletapp.lnutils.Notificator">
@@ -86,7 +86,7 @@
             android:screenOrientation="portrait" android:theme="@style/NoBar"/>
 
         <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.LNOpsActivity"
-            android:screenOrientation="portrait" android:theme="@style/NoBar"/>
+            android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
         <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.LNStartActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>

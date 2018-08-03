@@ -1,24 +1,32 @@
-<FrameLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="fill_parent" android:layout_height="fill_parent">
+<LinearLayout
+    style="@style/StandardLinearLayoutPage"
+    xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <android.support.v4.view.ViewPager
+    <android.support.v7.widget.Toolbar
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:subtitleTextAppearance="@style/ToolbarSubtitleAppearance"
+        app:titleTextAppearance="@style/ToolbarTitleAppearance"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+        android:background="@android:color/black"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/chanPager"/>
+        android:layout_height="64sp"
+        android:id="@+id/toolbar"
 
-    <me.relex.circleindicator.CircleIndicator
-        android:layout_gravity="bottom|center"
-        android:id="@+id/chanPagerIndicator"
-        android:layout_width="wrap_content"
-        android:layout_height="48dp"/>
+        app:contentInsetLeft="@dimen/app_padding"
+        app:contentInsetStart="@dimen/app_padding"
+        app:contentInsetRight="@dimen/app_padding"
+        app:contentInsetEnd="@dimen/app_padding"/>
 
-    <ImageButton
-        android:onClick="finishMe"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+    <GridView
+        android:verticalSpacing="25dp"
+        android:horizontalSpacing="@dimen/app_padding"
+        android:scrollbarStyle="outsideOverlay"
         android:padding="@dimen/app_padding"
-        android:src="@drawable/ic_arrow_back_white_24dp"
-        android:background="?android:selectableItemBackground"/>
+        android:layout_height="match_parent"
+        android:layout_width="match_parent"
+        android:clipToPadding="false"
+        android:id="@+id/gridView"/>
 
-</FrameLayout>
+</LinearLayout>

@@ -6,11 +6,11 @@ android {
     buildToolsVersion '25.0.3'
 
     defaultConfig {
-        applicationId "com.lightning.walletapp"
+        applicationId "com.lightning.wallet"
         multiDexEnabled true
-        versionName "0.09"
+        versionName "0.1"
         minSdkVersion 21
-        versionCode 60
+        versionCode 61
     }
 
     buildTypes {
@@ -40,8 +40,10 @@ dependencies {
     compile 'com.google.zxing:core:3.3.0'
 
     // Misc
+    compile 'com.android.support:cardview-v7:25.3.1'
     compile 'com.android.support:appcompat-v7:25.3.1'
     compile 'com.android.support:recyclerview-v7:25.3.1'
+    compile 'com.neovisionaries:nv-websocket-client:2.5'
     compile 'com.github.kevinsawicki:http-request:6.0'
     compile 'info.hoang8f:android-segmented:1.0.6'
     compile 'org.scala-lang:scala-library:2.11.11'
@@ -49,5 +51,4 @@ dependencies {
     compile 'com.hootsuite.android:nachos:1.1.1'
     compile 'io.reactivex:rxscala_2.11:0.26.5'
     compile 'com.github.clans:fab:1.6.4'
-    compile 'dnsjava:dnsjava:2.1.8'
 }

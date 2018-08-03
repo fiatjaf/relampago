@@ -12,15 +12,17 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.Denomination._
 import android.support.v4.view.MenuItemCompat._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import scala.util.{Failure, Try}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
+import org.bitcoinj.core.{Address, Batch, TxWrap}
+import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
-import com.lightning.walletapp.lnutils.ImplicitJsonFormats.refundingDataFmt
+import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import android.support.v4.app.FragmentStatePagerAdapter
-import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
@@ -29,7 +31,6 @@ import org.bitcoinj.store.SPVBlockStore
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-import org.bitcoinj.core.Address
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
@@ -54,8 +55,9 @@ trait SearchBar { me =>
 
 trait HumanTimeDisplay {
   val host: TimerActivity
-  val time: Date => String = date =>
+  val time: Date => String = date => {
     new SimpleDateFormat(timeString) format date
+  }
 
   // Should be accessed after activity is initialized
   lazy val timeString = DateFormat is24HourFormat host match {
@@ -64,18 +66,14 @@ trait HumanTimeDisplay {
 
     case false if scrWidth < 2.5 & bigFont => "MM/dd/yy' <small>'h:mma'</small>'"
     case false if scrWidth < 2.5 => "MM/dd/yy' <small>'h:mma'</small>'"
-
-    case false if bigFont => "MMM dd, yyyy' <small>'h:mma'</small>'"
-    case false => "MMMM dd, yyyy' <small>'h:mma'</small>'"
+    case false => "MMM dd, yyyy' <small>'h:mma'</small>'"
 
     case true if scrWidth < 2.2 & bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
     case true if scrWidth < 2.2 => "d MMM yyyy' <small>'HH:mm'</small>'"
 
     case true if scrWidth < 2.4 & bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
     case true if scrWidth < 2.5 => "d MMM yyyy' <small>'HH:mm'</small>'"
-
-    case true if bigFont => "d MMM yyyy' <small>'HH:mm'</small>'"
-    case true => "d MMMM yyyy' <small>'HH:mm'</small>'"
+    case true => "d MMM yyyy' <small>'HH:mm'</small>'"
   }
 
   def when(now: Long, date: Date) = date.getTime match { case ago =>
@@ -135,27 +133,31 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def checkTransData = {
     returnToBase(view = null)
-    app.TransData.value match {
-      case offChainPayRequest: PaymentRequest => FragWallet.worker sendPayment offChainPayRequest
-      case bu: BitcoinURI => FragWallet.worker.sendBtcPopup(bu.getAddress)(none) setSum Try(bu.getAmount)
-      case btcAddress: Address => FragWallet.worker.sendBtcPopup(btcAddress)(none)
-      case FragWallet.REDIRECT => goChanDetails(null)
+    app.TransData checkAndMaybeErase {
+      case _: Started => me goTo classOf[LNStartActivity]
+      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+      case onChainAddress: Address => FragWallet.worker.sendBtcPopup(onChainAddress)(none)
+      case uri: BitcoinURI => FragWallet.worker.sendBtcPopup(uri.getAddress)(none) setSum Try(uri.getAmount)
+      case pr: PaymentRequest if app.ChannelManager.notClosingOrRefunding.isEmpty => maybeOfferBatch(pr)
+      case pr: PaymentRequest => FragWallet.worker sendPayment pr
+      case FragWallet.REDIRECT => goOps(null)
       case _ =>
     }
+  }
 
-    // Clear value in all cases except NodeAnnouncement, we'll need this one
-    val isNodeAnnounce = app.TransData.value.isInstanceOf[NodeAnnouncement]
-    if (isNodeAnnounce) me goTo classOf[LNStartFundActivity]
-    else app.TransData.value = null
+  def maybeOfferBatch(pr: PaymentRequest) = {
+    val batchTry: Try[Batch] = TxWrap findBestBatch pr
+    batchTry.foreach(batch => app.TransData.value = batch)
+    me goTo classOf[LNStartActivity]
   }
 
   // BUTTONS REACTIONS
 
   def goReceivePayment(top: View) = {
     val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
-    val operationalChannelsWithRoutes = operationalChannels.flatMap(channelAndHop).toMap
-    val maxCanReceive = MilliSatoshi(operationalChannelsWithRoutes.keys
-      .map(estimateCanReceive).reduceOption(_ max _) getOrElse 0L)
+    val operationalChannelsWithRoutes: Map[Channel, PaymentRoute] = operationalChannels.flatMap(channelAndHop).toMap
+    val maxCanReceiveMsat = operationalChannelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L
+    val maxCanReceive = MilliSatoshi(maxCanReceiveMsat)
 
     val reserveUnspent = getString(ln_receive_reserve) format coloredOut(maxCanReceive)
     val lnReceiveText = if (operationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_nochan)
@@ -202,28 +204,24 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def scanQR = rm(alert) {
+      // Just jump to QR scanner section
       walletPager.setCurrentItem(1, true)
     }
   }
 
-  def goChanDetails(top: View) = {
-    val nothingToShow = app.ChannelManager.all.isEmpty
-    if (nothingToShow) app toast ln_receive_nochan
-    else me goTo classOf[LNOpsActivity]
-  }
-
-  private[this] val tokensPrice = MilliSatoshi(1000000L)
+  val tokensPrice = MilliSatoshi(1000000L)
+  def goLNStart: Unit = me goTo classOf[LNStartActivity]
+  def goOps(top: View): Unit = me goTo classOf[LNOpsActivity]
   def goAddChannel(top: View) = if (OlympusWrap.backupExhausted) {
     val humanPrice = s"${coloredIn apply tokensPrice} <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
     val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
-    mkForm(me goTo classOf[LNStartActivity], none, warn, dialog_ok, dialog_cancel)
-  } else me goTo classOf[LNStartActivity]
+    mkCheckForm(alert => rm(alert)(goLNStart), none, warn, dialog_ok, dialog_cancel)
+  } else goLNStart
 
   def showDenomChooser = {
     val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
     val rate = msatInFiatHuman apply MilliSatoshi(100000000000L)
-    val inFiatTotal = msatInFiatHuman apply walletTotalSum
 
     val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
     val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
@@ -243,8 +241,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     denomChoiceList.getCheckedItemPosition
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
     denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    stateContent setText s"${coloredIn apply walletTotalSum}<br><small>$inFiatTotal</small>".html
-    mkForm(updateDenomination, none, negBuilder(dialog_ok, title, form), dialog_ok, dialog_cancel)
+    stateContent setText s"${coloredIn apply walletTotalSum}<br><small>${msatInFiatHuman apply walletTotalSum}</small>".html
+    mkCheckForm(alert => rm(alert)(updateDenomination), none, negBuilder(dialog_ok, title, form), dialog_ok, dialog_cancel)
   }
 
   // SETTINGS FORM
@@ -261,31 +259,22 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     recoverFunds.setEnabled(app.ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
 
     recoverFunds setOnClickListener onButtonTap {
-      // When wallet data is lost users may recover channel funds
-      // by fetching encrypted static channel params from server
+      def recover = OlympusWrap.getBackup(cloudId) foreach { backups =>
+        // Decrypt channel recovery data upon successful call and put them
+        // into an active channel list, then connect to remote peers
+
+        for {
+          encryptedBackup <- backups
+          ref <- AES.decode(encryptedBackup, cloudSecret) map to[RefundingData]
+          if !app.ChannelManager.all.flatMap(_ apply identity).exists(_.channelId == ref.commitments.channelId)
+        } app.ChannelManager.all +:= app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, ref)
+        app.ChannelManager.initConnect
+      }
 
       rm(menu) {
+        def go = runAnd(app toast dialog_recovering)(recover)
         val bld = baseTextBuilder(me getString channel_recovery_info)
-        mkForm(recover, none, bld, dialog_next, dialog_cancel)
-
-        def recover = {
-          OlympusWrap.getBackup(cloudId).foreach(backups => {
-            // Decrypt channel recovery data upon successful call and put
-            // them into an active channel list, then connect to peers
-
-            for {
-              encrypted <- backups
-              ref <- Try apply AES.decode(encrypted, cloudSecret) map to[RefundingData]
-              if !app.ChannelManager.all.exists(chan => chan(_.channelId) contains ref.commitments.channelId)
-            } app.ChannelManager.all +:= app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, ref)
-            // Now reconnect all fresh created channels
-            app.ChannelManager.initConnect
-            // Inform if not fine
-          }, onFail)
-
-          // Let user know it's happening
-          app toast dialog_recovering
-        }
+        mkCheckForm(alert => rm(alert)(go), none, bld, dialog_next, dialog_cancel)
       }
     }
 
@@ -301,7 +290,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
       rm(menu) {
         val bld = baseTextBuilder(me getString sets_rescan_ok)
-        mkForm(go, none, bld, dialog_ok, dialog_cancel)
+        mkCheckForm(alert => rm(alert)(go), none, bld, dialog_ok, dialog_cancel)
       }
 
       def go = try {

@@ -1,322 +1,280 @@
 package com.lightning.walletapp
 
 import spray.json._
-import me.relex.circleindicator._
+import android.widget._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
-import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import com.lightning.walletapp.ln.LNParams.broadcaster.getStatus
+
+import fr.acinq.bitcoin.{BinaryData, Satoshi}
+import com.lightning.walletapp.ln.Tools.{none, wrap}
+import android.view.{Menu, MenuItem, View, ViewGroup}
+import org.bitcoinj.core.{Block, FilteredBlock, Peer}
+import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
+import github.nisrulz.stackedhorizontalprogressbar.StackedHorizontalProgressBar
+import com.lightning.walletapp.lnutils.IconGetter.scrWidth
+import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
-import android.view.View.OnTouchListener
+import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
-import scala.util.Success
 import android.os.Bundle
 import java.util.Date
 
-import android.support.v4.app.{Fragment, FragmentStatePagerAdapter}
-import android.view.{LayoutInflater, MotionEvent, View, ViewGroup}
-import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
-import android.widget.{ArrayAdapter, Button, ListView}
-import com.lightning.walletapp.lnutils.PaymentTable
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 
-
-class LNOpsActivity extends TimerActivity { me =>
-  def resetIndicator = UITask(chanPagerIndicator setViewPager chanPager)
-  def INIT(s: Bundle) = if (app.isAlive) fillViewPager else me exitTo classOf[MainActivity]
-  lazy val chanPager = findViewById(R.id.chanPager).asInstanceOf[android.support.v4.view.ViewPager]
-  lazy val chanPagerIndicator = findViewById(R.id.chanPagerIndicator).asInstanceOf[CircleIndicator]
-  lazy val localChanCache = for (chan <- app.ChannelManager.all if me canDisplay chan.data) yield chan
+class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
+  val localChanCache = for (channel <- app.ChannelManager.all if me canDisplay channel.data) yield channel
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
-  lazy val paymentsInFlight = getResources getStringArray R.array.ln_in_flight_payments
-  lazy val blocksLeft = getResources getStringArray R.array.ln_status_left_blocks
-  lazy val totalPayments = getResources getStringArray R.array.ln_total_payments
-  lazy val txsConfs = getResources getStringArray R.array.txs_confs
+  lazy val presentChans = app.getResources getStringArray R.array.ln_chan_present
+  lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
+  lazy val toolbar = findViewById(R.id.toolbar).asInstanceOf[Toolbar]
+  lazy val otherState = getString(ln_info_status_other)
+  lazy val fundingInfo = getString(ln_info_funding)
+  lazy val host = me
 
-  lazy val basic = getString(ln_ops_chan_basic)
-  lazy val negotiations = getString(ln_ops_chan_negotiations)
-  lazy val unilateralClosing = getString(ln_ops_chan_unilateral_closing)
-  lazy val bilateralClosing = getString(ln_ops_chan_bilateral_closing)
-  lazy val statusLeft = getString(ln_ops_chan_unilateral_status_left)
-  lazy val refundStatus = getString(ln_ops_chan_refund_status)
-  lazy val amountStatus = getString(ln_ops_chan_amount_status)
-  lazy val commitStatus = getString(ln_ops_chan_commit_status)
+  val adapter = new BaseAdapter {
+    def getItem(position: Int) = localChanCache(position)
+    def getItemId(chanPosition: Int) = chanPosition
+    def getCount = localChanCache.size
 
-  val slidingFragmentAdapter =
-    new FragmentStatePagerAdapter(getSupportFragmentManager) {
-      def getItem(itemPosition: Int) = bundledFrag(itemPosition)
-      def getCount = localChanCache.size
-    }
-
-  val colors = new IndicatorColorProvider {
-    def getColor(position: Int) = localChanCache(position) match {
-      case chan if isOperational(chan) && chan.state == OPEN => R.drawable.green_radius
-      case chan if isOperational(chan) || isOpening(chan) => R.drawable.yellow_radius
-      case _ => R.drawable.white_radius
+    def getView(position: Int, savedView: View, parent: ViewGroup) = {
+      val card = if (null == savedView) getLayoutInflater.inflate(R.layout.chan_card, null) else savedView
+      val holder = if (null == card.getTag) new ViewHolder(card) else card.getTag.asInstanceOf[ViewHolder]
+      holder fillView getItem(position)
+      card
     }
   }
 
-  val touchListener = new OnTouchListener {
-    def onTouch(circle: View, event: MotionEvent): Boolean = {
-      if (event.getAction != MotionEvent.ACTION_DOWN) return false
-      val coords = event.getX / chanPagerIndicator.getWidth
-      val position = (localChanCache.size * coords).toInt
-      chanPager.setCurrentItem(position, false)
-      false
+  val becomeListener = new ChannelListener {
+    override def onBecome: PartialFunction[Transition, Unit] = {
+      case anyStateChange => UITask(adapter.notifyDataSetChanged).run
     }
   }
 
-  val humanStatus: DepthAndDead => String = {
-    case cfs \ false => app.plurOrZero(txsConfs, cfs)
-    case _ \ true => txsConfs.last
-    case _ => txsConfs.head
+  val blocksListener = new BlocksListener {
+    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) =
+      if (left < 1) UITask(adapter.notifyDataSetChanged).run
   }
 
-  val getTotalSent: BinaryData => Vector[Long] = { chanId =>
-    val cursor = db.select(PaymentTable.selectTotalSql, chanId, 0)
-    RichCursor(cursor).vec(_ long PaymentTable.lastMsat)
+  class ViewHolder(view: View) {
+    val extraInfo = view.findViewById(R.id.extraInfo)
+    val extraInfoText = view.findViewById(R.id.extraInfoText).asInstanceOf[TextView]
+    val addressAndKey = view.findViewById(R.id.addressAndKey).asInstanceOf[TextView]
+    val stackBar = view.findViewById(R.id.stackBar).asInstanceOf[StackedHorizontalProgressBar]
+    val stateAndConnectivity = view.findViewById(R.id.stateAndConnectivity).asInstanceOf[TextView]
+    def setExtraInfo(text: CharSequence) = wrap(extraInfo setVisibility View.VISIBLE)(extraInfoText setText text)
+    def setExtraInfo(resource: Int) = wrap(extraInfo setVisibility View.VISIBLE)(extraInfoText setText resource)
+
+    val wrappers =
+      view.findViewById(R.id.refundableAmount) ::
+        view.findViewById(R.id.paymentsInFlight) ::
+        view.findViewById(R.id.paymentsReceived) ::
+        view.findViewById(R.id.totalCapacity) ::
+        view.findViewById(R.id.paymentsSent) ::
+        view.findViewById(R.id.fundingDepth) ::
+        view.findViewById(R.id.canReceive) ::
+        view.findViewById(R.id.startedAt) ::
+        view.findViewById(R.id.refundFee) ::
+        view.findViewById(R.id.closedAt) ::
+        view.findViewById(R.id.canSend) ::
+        stackBar :: Nil
+
+    val refundableAmountText = view.findViewById(R.id.refundableAmountText).asInstanceOf[TextView]
+    val paymentsInFlightText = view.findViewById(R.id.paymentsInFlightText).asInstanceOf[TextView]
+    val paymentsReceivedText = view.findViewById(R.id.paymentsReceivedText).asInstanceOf[TextView]
+    val totalCapacityText = view.findViewById(R.id.totalCapacityText).asInstanceOf[TextView]
+    val paymentsSentText = view.findViewById(R.id.paymentsSentText).asInstanceOf[TextView]
+    val fundingDepthText = view.findViewById(R.id.fundingDepthText).asInstanceOf[TextView]
+    val canReceiveText = view.findViewById(R.id.canReceiveText).asInstanceOf[TextView]
+    val startedAtText = view.findViewById(R.id.startedAtText).asInstanceOf[TextView]
+    val refundFeeText = view.findViewById(R.id.refundFeeText).asInstanceOf[TextView]
+    val closedAtText = view.findViewById(R.id.closedAtText).asInstanceOf[TextView]
+    val canSendText = view.findViewById(R.id.canSendText).asInstanceOf[TextView]
+    stackBar setMax 1000
+    view setTag this
+
+    def visibleExcept(gone: Int*) =
+      for (textWrapper <- wrappers) {
+        val isGone = gone contains textWrapper.getId
+        textWrapper setVisibility viewMap(!isGone)
+      }
+
+    def fillView(chan: Channel) = {
+      val state = stateStatusColor(chan)
+      val connect = connectivityStatusColor(chan)
+      val stateConnect = s"<strong>$state</strong><br>$connect"
+      addressAndKey setText chan.data.announce.toString.html
+      stateAndConnectivity setText stateConnect.html
+      extraInfo setVisibility View.GONE
+
+      chan { cs =>
+        val capacity = cs.commitInput.txOut.amount
+        val started = me time new Date(cs.startedAt)
+        val commitFee = Satoshi(cs.reducedRemoteState.feesSat)
+        val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
+        val txDepth \ _ = LNParams.broadcaster.getStatus(Commitments fundingTxid cs)
+        val canSendMsat \ canReceiveMsat = estimateCanSend(chan) -> estimateCanReceive(chan)
+        val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amount.amount).sum / 1000L)
+        val refundable = Satoshi(Commitments.latestRemoteCommit(cs).spec.toRemoteMsat / 1000L)
+        val valueReceived = Satoshi(getStat(cs.channelId, 1) / 1000L)
+        val valueSent = Satoshi(getStat(cs.channelId, 0) / 1000L)
+
+        stackBar setProgress (canSendMsat / capacity.amount).toInt
+        fundingDepthText setText fundingInfo.format(txDepth, threshold)
+        stackBar setSecondaryProgress (canReceiveMsat / capacity.amount).toInt
+        canReceiveText setText denom.withSign(Satoshi(canReceiveMsat) / 1000L).html
+        canSendText setText denom.withSign(Satoshi(canSendMsat) / 1000L).html
+        refundableAmountText setText denom.withSign(refundable).html
+        totalCapacityText setText denom.withSign(capacity).html
+        refundFeeText setText denom.withSign(commitFee).html
+        startedAtText setText started.html
+
+        paymentsInFlightText setText denom.withSign(valueInFlight).html
+        paymentsReceivedText setText sumOrNothing(valueReceived).html
+        paymentsSentText setText sumOrNothing(valueSent).html
+
+        chan.data match {
+          case _: WaitFundingDoneData =>
+            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive,
+              R.id.closedAt, R.id.paymentsSent, R.id.paymentsReceived,
+              R.id.paymentsInFlight)
+
+          case remote: WaitBroadcastRemoteData =>
+            if (remote.fail.isDefined) setExtraInfo(text = remote.fail.get.reason)
+            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive, R.id.closedAt,
+              R.id.paymentsSent, R.id.paymentsReceived, R.id.paymentsInFlight)
+
+          case _: NormalData if isOperational(chan) =>
+            val canNotReceive = txDepth > 6 && channelAndHop(chan).isEmpty
+            if (canNotReceive) setExtraInfo(resource = ln_info_no_receive)
+            visibleExcept(R.id.fundingDepth, R.id.closedAt)
+
+          case _: NormalData | _: NegotiationsData =>
+            setExtraInfo(resource = ln_info_coop_attempt)
+            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive,
+              R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
+
+          case cd: ClosingData =>
+            setExtraInfo(text = me closedBy cd)
+            val closeDate = new Date(cd.closedAt)
+            closedAtText setText time(closeDate).html
+
+            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive,
+              if (cd.mutualClose.isEmpty) -1 else R.id.refundFee,
+              R.id.fundingDepth, R.id.paymentsInFlight)
+
+          case otherwise =>
+            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive,
+              R.id.refundFee, R.id.closedAt, R.id.paymentsSent, R.id.fundingDepth,
+              R.id.paymentsReceived, R.id.paymentsInFlight)
+        }
+
+        // MENU PART
+
+        def warnAndMaybeClose(channelClosureWarning: String) =
+          mkCheckForm(alert => rm(alert)(chan process app.ChannelManager.CMDLocalShutdown),
+            none, baseTextBuilder(channelClosureWarning.html), dialog_ok, dialog_cancel)
+
+        view setOnClickListener onButtonTap {
+          val finalActions = if (CLOSING == chan.state) chanActions take 1 else chanActions
+          val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+          val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.toString.html, lst).create)
+          lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, finalActions)
+          lst setDividerHeight 0
+          lst setDivider null
+
+          def proceedCoopCloseOrWarn(startCoopClosing: => Unit) = rm(alert) {
+            val fundingOrOpenButOffline = isOperational(chan) || isOpening(chan)
+            val fundingOrOpenAndOnline = fundingOrOpenButOffline && chan.state != OFFLINE
+
+            if (fundingOrOpenAndOnline && inFlightHtlcs(chan).isEmpty) startCoopClosing
+            else if (fundingOrOpenAndOnline) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
+            else if (fundingOrOpenButOffline) warnAndMaybeClose(me getString ln_chan_force_offline_details)
+            else warnAndMaybeClose(me getString ln_chan_force_details)
+          }
+
+          def closeToWallet = {
+            // Simple case: send refunding transaction to this wallet
+            warnAndMaybeClose(me getString ln_chan_close_confirm_local)
+          }
+
+          def closeToAddress = app.getBufferTry map app.toAddress foreach { address =>
+            val text = me getString ln_chan_close_confirm_address format humanSix(address.toString)
+            val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(address).getProgram)
+            mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html),
+              dialog_ok, dialog_cancel)
+          }
+
+          lst setOnItemClickListener onTap {
+            case 0 => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
+            case 1 => proceedCoopCloseOrWarn(startCoopClosing = closeToAddress)
+            case 2 => proceedCoopCloseOrWarn(startCoopClosing = closeToWallet)
+          }
+        }
+      }
+    }
   }
 
-  def bundledFrag(pos: Int) = {
-    val frag = new ChanDetailsFrag
-    val fragmentArguments = new Bundle
-    fragmentArguments.putInt("pos", pos)
-    frag setArguments fragmentArguments
-    frag
+  override def onDestroy = wrap(super.onDestroy) {
+    app.kit.peerGroup removeBlocksDownloadedEventListener blocksListener
+    for (chan <- localChanCache) chan.listeners -= becomeListener
   }
 
-  def fillViewPager = {
-    setContentView(R.layout.activity_ln_ops)
-    chanPagerIndicator.colorProvider = colors
-    chanPagerIndicator setOnTouchListener touchListener
-    chanPager setAdapter slidingFragmentAdapter
-    resetIndicator.run
+  override def onOptionsItemSelected(m: MenuItem) = {
+    if (m.getItemId == R.id.actionAddEntity) me exitTo classOf[LNStartActivity]
+    true
   }
+
+  override def onCreateOptionsMenu(menu: Menu) = {
+    getMenuInflater.inflate(R.menu.add_entity, menu)
+    true
+  }
+
+  def INIT(state: Bundle) = if (app.isAlive) {
+    wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln_ops)
+    wrap(gridView setAdapter adapter)(getSupportActionBar setTitle action_ln_details)
+    getSupportActionBar setSubtitle app.plurOrZero(presentChans, localChanCache.size)
+    app.kit.peerGroup addBlocksDownloadedEventListener blocksListener
+    for (chan <- localChanCache) chan.listeners += becomeListener
+    gridView setNumColumns math.round(scrWidth / 2.4).toInt
+  } else me exitTo classOf[MainActivity]
+
+  // UTILS
+
+  def stateStatusColor(c: Channel): String = c.state match {
+    case OPEN if isOperational(c) => me getString ln_info_status_open
+    case WAIT_FUNDING_DONE => me getString ln_info_status_opening
+    case NEGOTIATIONS => me getString ln_info_status_negotiations
+    case OPEN => me getString ln_info_status_shutdown
+    case _ => otherState format c.state
+  }
+
+  def connectivityStatusColor(c: Channel) = c.state match {
+    case OFFLINE | CLOSING => me getString ln_info_state_offline
+    case _ => me getString ln_info_state_online
+  }
+
+  def closedBy(cd: ClosingData) =
+    if (cd.remoteCommit.nonEmpty) me getString ln_info_close_remote
+    else if (cd.nextRemoteCommit.nonEmpty) me getString ln_info_close_remote
+    else if (cd.mutualClose.nonEmpty) me getString ln_info_close_coop
+    else me getString ln_info_close_local
 
   def canDisplay(chanData: ChannelData) = chanData match {
     case ref: RefundingData => ref.remoteLatestPoint.isDefined
     case otherwise => true
   }
-}
 
-class ChanDetailsFrag extends Fragment with HumanTimeDisplay { me =>
-  override def onCreateView(i: LayoutInflater, v: ViewGroup, b: Bundle) =
-    i.inflate(R.layout.frag_view_pager_chan, v, false)
+  def sumOrNothing(sum: Satoshi) = sum match {
+    case Satoshi(0L) => me getString ln_info_nothing
+    case something => denom withSign something
+  }
 
-  override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
-  var whenDestroy: Runnable = new Runnable { def run = none }
-  lazy val host = getActivity.asInstanceOf[LNOpsActivity]
-  import host._
-
-  override def onViewCreated(view: View, s: Bundle) = {
-    val chan = localChanCache(getArguments getInt "pos")
-    val lnOpsAction = view.findViewById(R.id.lnOpsAction).asInstanceOf[Button]
-    val lnOpsDescription = Utils clickableTextField view.findViewById(R.id.lnOpsDescription)
-    def warnAndForceClose = warnAndMaybeClose(host getString ln_chan_force_details)
-
-    def warnAndMaybeClose(warning: String) =
-      mkForm(chan process app.ChannelManager.CMDLocalShutdown,
-        none, baseTextBuilder(warning.html), dialog_ok, dialog_cancel)
-
-    chan { cs =>
-      val alias = chan.data.announce.alias
-      val started = me time new Date(cs.startedAt)
-      val capacity = cs.commitInput.txOut.amount
-
-      def showCoopOptions = {
-        val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-        val alert = showForm(negBuilder(dialog_cancel, host getString ln_chan_actions, lst).create)
-        lst setAdapter new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, chanActions)
-        lst setDividerHeight 0
-        lst setDivider null
-
-        def proceedCoopCloseOrWarn(startCoopClosing: => Unit) = rm(alert) {
-          val fundingOrOpenButOffline = isOperational(chan) || isOpening(chan)
-          val fundingOrOpenAndOnline = fundingOrOpenButOffline && chan.state != OFFLINE
-
-          if (fundingOrOpenAndOnline && inFlightHtlcs(chan).isEmpty) startCoopClosing
-          else if (fundingOrOpenAndOnline) warnAndMaybeClose(host getString ln_chan_close_inflight_details)
-          else if (fundingOrOpenButOffline) warnAndMaybeClose(host getString ln_chan_force_offline_details)
-          else warnAndForceClose
-        }
-
-        def shareInfo = host share {
-          val cId = cs.channelId.toString
-          val w = LNParams.nodePublicKey.toString
-          val peer = chan.data.announce.nodeId.toString
-          s"Wallet: $w\n\nPeer: $peer\n\nChannel: $cId"
-        }
-
-        def closeToWallet = {
-          // Simple case: send refunding transaction to this wallet
-          warnAndMaybeClose(host getString ln_chan_close_confirm_local)
-        }
-
-        def closeToAddress = {
-          app.getBufferTry map app.toAddress match {
-            // Users have an option to provide a custom address
-            // to omit a useless intermediary in-wallet transaction
-
-            case Success(address) =>
-              val where = humanSix(address.toString)
-              val text = host.getString(ln_chan_close_confirm_address).format(where).html
-              val customFinalPubKeyScript: Option[BinaryData] = Some(ScriptBuilder.createOutputScript(address).getProgram)
-              mkForm(chan process CMDShutdown(customFinalPubKeyScript), none, baseTextBuilder(text), dialog_ok, dialog_cancel)
-
-            case _ =>
-              // No address is present
-              app toast err_no_data
-          }
-        }
-
-        lst setOnItemClickListener onTap {
-          case 3 => proceedCoopCloseOrWarn(startCoopClosing = closeToWallet)
-          case 2 => proceedCoopCloseOrWarn(startCoopClosing = closeToAddress)
-          case 1 => host share chan.data.asInstanceOf[HasCommitments].toJson.toString
-          case 0 => shareInfo
-        }
-      }
-
-      def manageOther = UITask {
-        // Just show basic channel info here since we don't know the specifics about it
-        val text = basic.format(chan.state, alias, started, coloredIn apply capacity).html
-        lnOpsAction setVisibility View.GONE
-        lnOpsDescription setText text
-      }
-
-      def manageFunding(wait: WaitFundingDoneData) = UITask {
-        val fundingTxId = Commitments fundingTxid wait.commitments
-        val fundingStatus = humanStatus(LNParams.broadcaster getStatus fundingTxId)
-        val threshold = math.max(wait.commitments.remoteParams.minimumDepth, LNParams.minDepth)
-        lnOpsDescription setText host.getString(ln_ops_chan_opening).format(chan.state, alias, started,
-          coloredIn(capacity), app.plurOrZero(txsConfs, threshold), fundingTxId.toString, fundingStatus).html
-
-        // Show channel actions with cooperative closing options
-        lnOpsAction setOnClickListener onButtonTap(showCoopOptions)
-        lnOpsAction setVisibility View.VISIBLE
-        lnOpsAction setText ln_chan_actions
-      }
-
-      def manageOpen = UITask {
-        val totalSent = getTotalSent(cs.channelId)
-        val valueSent = coloredOut apply MilliSatoshi(totalSent.sum)
-        val paymentsSent = app.plurOrZero(totalPayments, totalSent.size)
-        val inFlightHTLC = app.plurOrZero(paymentsInFlight, inFlightHtlcs(chan).size)
-
-        val canSend = MilliSatoshi(Channel estimateCanSend chan)
-        val canReceive = MilliSatoshi(Channel estimateCanReceive chan)
-        val canSend1 = if (canSend.amount < 0L) coloredOut(canSend) else coloredIn(canSend)
-        val canReceive1 = if (canReceive.amount < 0L) coloredOut(canReceive) else coloredIn(canReceive)
-        val openTemplate = if (channelAndHop(chan).isEmpty) ln_ops_chan_open_no_receive else ln_ops_chan_open
-
-        val commitFee = MilliSatoshi(cs.reducedRemoteState.feesSat * 1000L)
-        val refundable = MilliSatoshi(Commitments.latestRemoteCommit(cs).spec.toRemoteMsat)
-        lnOpsDescription setText host.getString(openTemplate).format(chan.state, alias,
-          coloredIn(capacity), coloredIn(refundable), coloredOut(commitFee), canSend1,
-          canReceive1, inFlightHTLC, paymentsSent, valueSent).html
-
-        // Show channel actions with cooperative closing options
-        lnOpsAction setOnClickListener onButtonTap(showCoopOptions)
-        lnOpsAction setVisibility View.VISIBLE
-        lnOpsAction setText ln_chan_actions
-      }
-
-      def manageNegotiations(cs: Commitments) = UITask {
-        val refundable = MilliSatoshi(cs.localCommit.spec.toLocalMsat)
-        val inFlightHTLC = app.plurOrZero(paymentsInFlight, inFlightHtlcs(chan).size)
-        lnOpsDescription setText negotiations.format(chan.state, alias, started,
-          coloredIn(capacity), coloredIn(refundable), inFlightHTLC).html
-
-        // Show warning and proceed with an uncooperative closing
-        lnOpsAction setOnClickListener onButtonTap(warnAndForceClose)
-        lnOpsAction setVisibility View.VISIBLE
-        lnOpsAction setText ln_chan_force
-      }
-
-      def manageClosing(close: ClosingData) = UITask {
-        // Show the best current closing with most confirmations
-        val closedTimestamp = me time new Date(close.closedAt)
-        lnOpsAction setVisibility View.GONE
-
-        close.bestClosing match {
-          case Left(mutualClosingTx) =>
-            val fee = capacity - mutualClosingTx.allOutputsAmount
-            val status = humanStatus apply getStatus(mutualClosingTx.txid)
-            val refundable = MilliSatoshi(close.commitments.localCommit.spec.toLocalMsat) - fee
-            val view = commitStatus.format(mutualClosingTx.txid.toString, status, coloredOut apply fee)
-            lnOpsDescription setText bilateralClosing.format(chan.state, alias, started, closedTimestamp,
-              coloredIn(capacity), coloredIn(refundable), view).html
-
-          case Right(info) =>
-            val tier12View = info.getState collect {
-              case ShowDelayed(_ \ true \ _, _, fee, amt) =>
-                val deadDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-                host.getString(ln_ops_chan_unilateral_status_dead).format(deadDetails, coloredIn apply amt)
-
-              case ShowReady(_, fee, amt) =>
-                val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-                host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
-
-              case show @ ShowDelayed(_ \ false \ _, _, fee, amt) if show.isPublishable =>
-                // This fails if input is spent by our peer, happens when we publish a revoked commit
-                val doneDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-                host.getString(ln_ops_chan_unilateral_status_done).format(doneDetails, coloredIn apply amt)
-
-              case ShowDelayed(_ \ false \ left, _, fee, amt) =>
-                val leftDetails = amountStatus.format(denom formatted amt + fee, coloredOut apply fee)
-                statusLeft.format(app.plurOrZero(blocksLeft, left), leftDetails, coloredIn apply amt)
-            }
-
-            val humanTier12View = tier12View take 2 mkString "<br><br>"
-            val status = humanStatus apply getStatus(info.commitTx.txid)
-            val commitFee = coloredOut(capacity - info.commitTx.allOutputsAmount)
-            val balance = MilliSatoshi(close.commitments.localCommit.spec.toLocalMsat)
-            val commitView = commitStatus.format(info.commitTx.txid.toString, status, commitFee)
-            val refundsView = if (tier12View.isEmpty) new String else refundStatus + humanTier12View
-
-            val isRemote = close.remoteCommit.nonEmpty || close.nextRemoteCommit.nonEmpty
-            val startedByWhom = if (isRemote) ln_ops_unilateral_peer else ln_ops_unilateral_you
-            lnOpsDescription setText unilateralClosing.format(chan.state, host getString startedByWhom, alias,
-              started, closedTimestamp, coloredIn(capacity), coloredIn(balance), commitView + refundsView).html
-        }
-      }
-
-      val detailsListener = new ChannelListener {
-        override def onBecome: PartialFunction[Transition, Unit] = {
-          case (_, wait: WaitFundingDoneData, _, _) => manageFunding(wait).run
-          case (_, _: NormalData, _, _) if isOperational(chan) => manageOpen.run
-          case (_, norm: NormalData, _, _) => manageNegotiations(norm.commitments).run
-          case (_, negs: NegotiationsData, _, _) => manageNegotiations(negs.commitments).run
-          case (_, close: ClosingData, _, _) => manageClosing(close).run
-          case _ => manageOther.run
-        }
-
-        override def onProcessSuccess = {
-          // Simply update current UI on each new block
-          case (_, _, _: CMDBestHeight) => nullOnBecome(chan)
-        }
-      }
-
-      val transitionListener = new ChannelListener {
-        override def onBecome: PartialFunction[Transition, Unit] = {
-          case (_, _, from, OFFLINE) if from != OFFLINE => resetIndicator.run
-          case (_, _, from, CLOSING) if from != CLOSING => resetIndicator.run
-          case (_, _, OFFLINE | WAIT_FUNDING_DONE, OPEN) => resetIndicator.run
-        }
-      }
-
-      lnOpsDescription setOnLongClickListener new View.OnLongClickListener {
-        def onLongClick(descriptionText: View) = runAnd(true)(showCoopOptions)
-      }
-
-      val listeners = Vector(transitionListener, detailsListener)
-      whenDestroy = UITask(chan.listeners --= listeners)
-      detailsListener nullOnBecome chan
-      chan.listeners ++= listeners
-    }
+  def getStat(chanId: BinaryData, direction: Int) = {
+    // Direction = 0 = untgoing = lastMast, = 1 = incoming = firstMsat
+    val cursor = LNParams.db.select(PaymentTable.selectStatSql, chanId, direction)
+    RichCursor(cursor) headTry { case RichCursor(с1) => с1 getLong direction } getOrElse 0L
   }
 }

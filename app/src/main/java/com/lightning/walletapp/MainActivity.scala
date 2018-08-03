@@ -3,11 +3,11 @@ package com.lightning.walletapp
 import R.string._
 import android.widget._
 import com.lightning.walletapp.Utils._
-import com.lightning.walletapp.ln.Tools.{none, runAnd}
+
+import java.io.{File, FileInputStream}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
 import com.google.common.io.{ByteStreams, Files}
-import java.io.{File, FileInputStream}
-
+import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import ln.wire.LightningMessageCodecs.walletZygoteCodec
 import org.ndeftools.util.activity.NfcReaderActivity
 import org.bitcoinj.wallet.WalletProtobufSerializer
@@ -97,13 +97,14 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   // MISC
 
   def goRestoreWallet(view: View) = {
+
     val restoreOptions = getResources getStringArray R.array.restore_options
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, restoreOptions)
     val alert = showForm(negBuilder(dialog_cancel, null, lst).create)
-
-    lst setDivider null
     lst setDividerHeight 0
+    lst setDivider null
+
     lst setOnItemClickListener onTap {
       case 0 => rm(alert)(exitRestoreWallet)
       case 1 => proceedWithMigrationFile

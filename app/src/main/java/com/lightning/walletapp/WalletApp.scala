@@ -14,17 +14,15 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
+import com.google.common.util.concurrent.Service.State._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import rx.lang.scala.{Observable => Obs}
-import android.net.{ConnectivityManager, Uri}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
-import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import android.content.{ClipData, ClipboardManager, Context}
-import com.google.common.util.concurrent.Service.State.{RUNNING, STARTING}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.CloudAct
@@ -32,8 +30,10 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
+import android.net.ConnectivityManager
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
+import java.net.InetSocketAddress
 import android.app.Application
 import java.util.Collections
 import android.widget.Toast
@@ -42,7 +42,7 @@ import java.io.File
 
 
 class WalletApp extends Application { me =>
-  lazy val params = org.bitcoinj.params.MainNetParams.get
+  lazy val params = org.bitcoinj.params.TestNet3Params.get
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
   lazy val chainFile = new File(getFilesDir, chainFileName)
@@ -66,11 +66,11 @@ class WalletApp extends Application { me =>
   def toast(code: Int): Unit = toast(me getString code)
   def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-  def connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE).asInstanceOf[ConnectivityManager]
   def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => null != db case _ => false }
   def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
   def toAddress(rawText: String) = Address.fromString(app.params, rawText)
+  def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
 
   Utils.appReference = me
   override def onCreate = wrap(super.onCreate) {
@@ -97,19 +97,22 @@ class WalletApp extends Application { me =>
     private[this] val prefixes = PaymentRequest.prefixes.values mkString "|"
     private[this] val nodeLink = "([a-fA-F0-9]{66})@([a-zA-Z0-9:\\.\\-_]+):([0-9]+)".r
     private[this] val lnLink = s"(?im).*?($prefixes)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
+    private[this] val funder = "(lnbcfunder|lntbfunder|lnbcrtfunder):([a-z0-9]+)".r
 
-    private def resolveURI(uri: BitcoinURI) = {
-      val hasChans = ChannelManager.notClosing.exists(isOperational)
-      val prOpt = Option(uri.getLightningRequest) map PaymentRequest.read
-      val canOffChain = hasChans && prOpt.exists(_.isFresh)
-      if (canOffChain) prOpt.get else uri
+    case object DoNotEraseValue
+    type Checker = PartialFunction[Any, Any]
+    def checkAndMaybeErase(check: Checker) = check(value) match {
+      // Sometimes we need to forward a value between activity switches
+      case DoNotEraseValue => Tools log "app.TransData.value retained"
+      case _ => value = null
     }
 
     def recordValue(rawText: String) = value = rawText match {
-      case _ if rawText startsWith "bitcoin" => self resolveURI new BitcoinURI(params, rawText)
-      case _ if rawText startsWith "BITCOIN" => self resolveURI new BitcoinURI(params, rawText.toLowerCase)
+      case _ if rawText startsWith "bitcoin" => new BitcoinURI(params, rawText)
+      case _ if rawText startsWith "BITCOIN" => new BitcoinURI(params, rawText.toLowerCase)
       case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), host, port.toInt)
       case lnLink(prefix, req) => PaymentRequest read s"$prefix$req".toLowerCase
+      case funder(_, paramsHex) => to[Started](paramsHex.hex2asci)
       case _ => toAddress(rawText)
     }
   }
@@ -127,32 +130,38 @@ class WalletApp extends Application { me =>
     def notClosing = for (c <- all if c.state != CLOSING) yield c
 
     def onlineReports = for {
+    // Operational channels have commitments by definition
       chan <- all if isOperational(chan) && chan.state == OPEN
-      // Operational channels have commitments by definition
     } yield ChanReport(chan, chan(identity).get)
 
+    def delayedPublishes = {
+      // Select all ShowDelayed which can't be published yet because cltv/csv delay is not cleared
+      val statuses = all.map(_.data).collect { case cd: ClosingData => cd.bestClosing.getState }.flatten
+      statuses.collect { case sd: ShowDelayed if !sd.isPublishable && sd.delay > Long.MinValue => sd }
+    }
+
+    def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(_.add.paymentHash)
     def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
-    def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(htlc => htlc.add.paymentHash)
     def initConnect = for (c <- notClosing) ConnectionManager.connectTo(c.data.announce, notify = false)
 
     def updateChangedIPs = for {
       chan <- notClosing if chan.state == OFFLINE
-      // Chan is offline and we are online so maybe address has changed
-      con <- Option(connectivityManager.getActiveNetworkInfo) if con.isConnected
-      isa <- Try(dns(chan.data.announce).head)
-    } chan process isa
+      cm = getSystemService(Context.CONNECTIVITY_SERVICE).asInstanceOf[ConnectivityManager]
+      currentNetworkStatus <- Option(cm.getActiveNetworkInfo) if currentNetworkStatus.isConnected
+      res <- retry(OlympusWrap findNodes chan.data.announce.nodeId.toString, pickInc, 2 to 3)
+      announce \ _ <- res take 1
+    } chan process announce
 
     val socketEventsListener = new ConnectionListener {
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
-        case error: Error if error.isSyncError => ConnectionManager.connections(nodeId).disconnect
-        case error: Error if error.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process error)
+        case errAll: Error if errAll.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process errAll)
         case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
         case _ =>
       }
 
-      override def onOperational(nodeId: PublicKey, their: Init) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
       override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDLocalShutdown)
+      override def onOperational(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
       override def onIncompatible(nodeId: PublicKey) = onTerminalError(nodeId)
 
       override def onDisconnect(nodeId: PublicKey) = for {
@@ -164,7 +173,9 @@ class WalletApp extends Application { me =>
 
     val chainEventsListener = new TxTracker with BlocksListener {
       override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
-      override def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = onChainDownload(left)
+      def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (a isGreaterThan b) onChainTx(txj)
+      def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (b isGreaterThan a) onChainTx(txj)
+      def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = onChainDownload(left)
       override def onChainDownloadStarted(peer: Peer, left: Int) = onChainDownload(left)
 
       def onChainDownload(blocksLeft: Int) = {
@@ -182,19 +193,16 @@ class WalletApp extends Application { me =>
         }
       }
 
-      def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = {
-        // Always attempt to extract a payment preimage by simply assuming
-        // any incoming tx may contain it, also send all txs to chans
-
-        val cmdSpent = CMDSpent(txj)
-        for (c <- all) c process cmdSpent
-        bag.extractPreimage(cmdSpent.tx)
+      def onChainTx(txj: Transaction) = {
+        val cmdOnChainSpent = CMDSpent(txj)
+        for (c <- all) c process cmdOnChainSpent
+        bag.extractPreimage(cmdOnChainSpent.tx)
       }
     }
 
     def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel { self =>
       def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
-      def STORE(data: HasCommitments) = runAnd(data)(ChannelWrap put data)
+      def STORE(updatedChannelData: HasCommitments) = runAnd(updatedChannelData)(ChannelWrap put updatedChannelData)
 
       def CLOSEANDWATCH(cd: ClosingData) = {
         val tier12txs = for (state <- cd.tier12States) yield state.txn
@@ -208,7 +216,7 @@ class WalletApp extends Application { me =>
       def ASKREFUNDTX(ref: RefundingData) = {
         // Failsafe check in case if we are still in REFUNDING state after app is restarted
         val txsObs = OlympusWrap getChildTxs Seq(ref.commitments.commitInput.outPoint.txid)
-        txsObs.foreach(txs => for (tx <- txs) self process CMDSpent(tx), none)
+        txsObs.foreach(txs => txs map CMDSpent foreach process, none)
       }
 
       def ASKREFUNDPEER(some: HasCommitments, point: Point) = {
@@ -235,13 +243,12 @@ class WalletApp extends Application { me =>
 
         // We should explain to user what exactly is going on here
         case Some(report) if report.finalCanSend < rd.firstMsat =>
-
-          val alias = report.chan.data.announce.alias
           val sendingNow = coloredOut apply MilliSatoshi(rd.firstMsat)
           val finalCanSend = coloredIn apply MilliSatoshi(report.finalCanSend)
           val capacity = coloredIn apply MilliSatoshi(Commitments.latestRemoteCommit(report.cs).spec.toRemoteMsat)
           val hardReserve = coloredOut apply Satoshi(report.cs.remoteParams.channelReserveSatoshis + report.cs.reducedRemoteState.feesSat)
-          Left(getString(err_ln_second_reserve).format(alias, hardReserve, coloredOut(report.softReserve), capacity, finalCanSend, sendingNow).html)
+          Left(getString(err_ln_second_reserve).format(report.chan.data.announce.alias, hardReserve, coloredOut(report.softReserve),
+            capacity, finalCanSend, sendingNow).html)
 
         case None => Left(me getString err_ln_no_chan)
         case Some(reportWhichIsFine) => Right(rd)
@@ -300,11 +307,8 @@ class WalletApp extends Application { me =>
     def currentAddress = wallet currentAddress KeyPurpose.RECEIVE_FUNDS
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE // Returns all utxos
     def conf1Balance = wallet getBalance BalanceType.AVAILABLE_SPENDABLE // Uses coin selector
+    def blockSend(txj: Transaction) = peerGroup.broadcastTransaction(txj, 1).broadcast.get
     def shutDown = none
-
-    def blockingSend(txj: Transaction) =
-      peerGroup.broadcastTransaction(txj, 1)
-        .broadcast.get.toString
 
     def closingPubKeyScripts(cd: ClosingData) =
       cd.commitTxs.flatMap(_.txOut).map(_.publicKeyScript)
@@ -318,26 +322,22 @@ class WalletApp extends Application { me =>
     }
 
     def useCheckPoints(time: Long) = {
-      val pts = getAssets open "checkpoints.txt"
+      val pts = getAssets open "checkpoints-testnet.txt"
       CheckpointManager.checkpoint(params, pts, store, time)
     }
 
     def setupAndStartDownload = {
       wallet.addTransactionConfidenceEventListener(ChannelManager.chainEventsListener)
+      wallet.addCoinsReceivedEventListener(ChannelManager.chainEventsListener)
       wallet.addCoinsSentEventListener(ChannelManager.chainEventsListener)
       wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
       wallet.setCoinSelector(new MinDepthReachedCoinSelector)
 
       try {
         Notificator.removeResyncNotification
-        // Only reschedule a delayed notification if we have a receiving chans
-        if (ChannelManager.notClosingOrRefunding exists hasReceivedPayments) Notificator.scheduleResyncNotificationOnceAgain
-        obsOnIO.delay(30.seconds).map(delayed => ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
-
-        // Set fast peer and schedule dns lookup
-        val fastPeer = OlympusWrap.clouds.head.connector.url
-        val ia = InetAddress getByName Uri.parse(fastPeer).getHost
-        peerGroup addAddress new PeerAddress(app.params, ia, 8333)
+        val shouldReSchedule = ChannelManager.notClosingOrRefunding exists hasReceivedPayments
+        obsOnIO.delay(30.seconds).map(_ => ChannelManager.updateChangedIPs).foreach(none)
+        if (shouldReSchedule) Notificator.scheduleResyncNotificationOnceAgain
       } catch none
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)

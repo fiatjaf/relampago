@@ -12,9 +12,8 @@ import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.LNMessageVector
-import org.bitcoinj.wallet.SendRequest
+import org.bitcoinj.core.Batch
 import fr.acinq.eclair.UInt64
-import language.postfixOps
 
 
 sealed trait Command
@@ -29,9 +28,9 @@ case object CMDProceed extends Command
 case object CMDOffline extends Command
 case object CMDOnline extends Command
 
-case class CMDOpenChannel(localParams: LocalParams, tempChanId: BinaryData, initialFeeratePerKw: Long,
-                          pushMsat: Long, remoteInit: Init, dummyRequest: SendRequest, outIndex: Int,
-                          realFundingAmountSat: Long) extends Command
+case class CMDOpenChannel(localParams: LocalParams, tempChanId: BinaryData,
+                          initialFeeratePerKw: Long, batch: Batch,
+                          pushMsat: Long) extends Command
 
 case class CMDFailMalformedHtlc(id: Long, onionHash: BinaryData, code: Int) extends Command
 case class CMDFulfillHtlc(id: Long, preimage: BinaryData) extends Command
@@ -46,11 +45,30 @@ case class InitData(announce: NodeAnnouncement) extends ChannelData
 case class WaitAcceptData(announce: NodeAnnouncement, cmd: CMDOpenChannel) extends ChannelData
 case class WaitFundingData(announce: NodeAnnouncement, cmd: CMDOpenChannel, accept: AcceptChannel) extends ChannelData
 
-case class WaitFundingSignedData(announce: NodeAnnouncement, localParams: LocalParams, channelId: BinaryData,
-                                 remoteParams: AcceptChannel, fundingTx: Transaction, localSpec: CommitmentSpec,
-                                 localCommitTx: CommitTx, remoteCommit: RemoteCommit) extends ChannelData
+// Funding tx may arrive locally or from external funder
+case class WaitFundingSignedCore(localParams: LocalParams, channelId: BinaryData,
+                                 remoteParams: AcceptChannel, localSpec: CommitmentSpec,
+                                 localCommitTx: CommitTx, remoteCommit: RemoteCommit) {
+
+  def makeCommitments(signedLocalCommitTx: CommitTx) =
+    Commitments(localParams, remoteParams, LocalCommit(index = 0L, localSpec, Nil, signedLocalCommitTx), remoteCommit,
+      localChanges = Changes(Vector.empty, Vector.empty, Vector.empty), remoteChanges = Changes(Vector.empty, Vector.empty, Vector.empty),
+      localNextHtlcId = 0L, remoteNextHtlcId = 0L, remoteNextCommitInfo = Right(Tools.randomPrivKey.toPoint), localCommitTx.input,
+      remotePerCommitmentSecrets = ShaHashesWithIndex(Map.empty, None), channelId)
+}
+
+case class WaitFundingSignedRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore, txHash: BinaryData) extends ChannelData {
+  def makeWaitBroadcastRemoteData(signedCommit: CommitTx) = WaitBroadcastRemoteData(announce, core, txHash, core makeCommitments signedCommit)
+}
+
+case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSignedCore, fundingTx: Transaction) extends ChannelData {
+  def makeWaitFundingDoneData(signedCommit: CommitTx) = WaitFundingDoneData(announce, None, None, fundingTx, core makeCommitments signedCommit)
+}
 
 // All the data below will be stored
+case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore, txHash: BinaryData,
+                                   commitments: Commitments, fail: Option[Fail] = None) extends HasCommitments
+
 case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked],
                                their: Option[FundingLocked], fundingTx: Transaction,
                                commitments: Commitments) extends HasCommitments
@@ -73,85 +91,76 @@ case class ClosingData(announce: NodeAnnouncement,
                        refundRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
                        closedAt: Long = System.currentTimeMillis) extends HasCommitments {
 
-  lazy val commitTxs =
-    localCommit.map(_.commitTx) ++
-      remoteCommit.map(_.commitTx) ++
-      nextRemoteCommit.map(_.commitTx)
+  private lazy val realTier12Closings =
+    revokedCommit ++ localCommit ++ remoteCommit ++
+      nextRemoteCommit ++ refundRemoteCommit
 
-  lazy val frozenPublishedHashes =
-    localCommit.flatMap(_.frozenHashes) ++
-      remoteCommit.flatMap(_.frozenHashes) ++
-      nextRemoteCommit.flatMap(_.frozenHashes)
+  lazy val commitTxs = realTier12Closings.map(_.commitTx)
+  lazy val frozenPublishedHashes = realTier12Closings.flatMap(_.frozenHashes)
+  def tier12States: Seq[PublishStatus] = realTier12Closings.flatMap(_.getState)
 
-  def tier12States =
-    revokedCommit.flatMap(_.getState) ++ localCommit.flatMap(_.getState) ++
-      remoteCommit.flatMap(_.getState) ++ nextRemoteCommit.flatMap(_.getState) ++
-      refundRemoteCommit.flatMap(_.getState)
-
-  def bestClosing = {
-    val allClosings = mutualClose.map(Left.apply) ++
-      revokedCommit.map(Right.apply) ++ localCommit.map(Right.apply) ++
-        remoteCommit.map(Right.apply) ++ nextRemoteCommit.map(Right.apply) ++
-        refundRemoteCommit.map(Right.apply)
-
-    allClosings maxBy {
-      case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ _ => cfs }
-      case Right(info) => getStatus(info.commitTx.txid) match { case cfs \ _ => cfs }
+  def bestClosing: CommitPublished = {
+    // At least one closing is guaranteed to be here
+    val mutualWrappers = mutualClose map MutualCommitPublished
+    mutualWrappers ++ realTier12Closings maxBy { commitPublished =>
+      val confirmations \ isDead = getStatus(commitPublished.commitTx.txid)
+      if (isDead) -confirmations else confirmations
     }
   }
 
-  def isOutdated = {
+  def isOutdated: Boolean = {
     val allConfirmedOrDead = bestClosing match {
-      case Left(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }
-      case Right(info) => info.getState.map(_.txn.txid).map(getStatus) forall { case cfs \ isDead => cfs > minDepth || isDead }
+      case MutualCommitPublished(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }
+      case info => info.getState.map(state => state.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
     }
 
-    val hardDelay: Long = closedAt + 1000L * 3600 * 24 * 30
+    val hardDelay = closedAt + 1000L * 3600 * 24 * 28
     allConfirmedOrDead || hardDelay < System.currentTimeMillis
   }
 }
 
 sealed trait CommitPublished {
-  def getState: Seq[PublishStatus]
+  def frozenHashes: Seq[BinaryData] = Nil
+  def getState: Seq[PublishStatus] = Nil
   val commitTx: Transaction
 }
 
-sealed trait FrozenHashProvider {
-  def frozenHashes: Seq[BinaryData]
-}
+case class LocalCommitPublished(claimMainDelayed: Seq[ClaimDelayedOutputTx], claimHtlcSuccess: Seq[SuccessAndClaim],
+                                claimHtlcTimeout: Seq[TimeoutAndClaim], commitTx: Transaction) extends CommitPublished {
 
-case class LocalCommitPublished(claimMainDelayed: Seq[ClaimDelayedOutputTx],
-                                claimHtlcSuccess: Seq[SuccessAndClaim], claimHtlcTimeout: Seq[TimeoutAndClaim],
-                                commitTx: Transaction) extends CommitPublished with FrozenHashProvider {
+  override def frozenHashes = for {
+    claimTimeout \ _ <- claimHtlcTimeout
+  } yield claimTimeout.add.paymentHash
 
-  def frozenHashes = for (t1 \ _ <- claimHtlcTimeout) yield t1.add.paymentHash
-
-  def getState = {
-    val success = for (t1 \ t2 <- claimHtlcSuccess) yield HideReady(t1.tx) :: csvShowDelayed(t1, t2) :: Nil
-    val timeout = for (t1 \ t2 <- claimHtlcTimeout) yield HideDelayed(cltv(commitTx, t1.tx), t1.tx) :: csvShowDelayed(t1, t2) :: Nil
-    val main = for (t1 <- claimMainDelayed) yield ShowDelayed(csv(commitTx, t1.tx), t1.tx, t1 -- t1, t1.tx.allOutputsAmount) :: Nil
+  override def getState = {
+    val success = for (tier1 \ tier2 <- claimHtlcSuccess) yield HideReady(tier1.tx) :: csvShowDelayed(tier1, tier2, commitTx) :: Nil
+    val timeout = for (t1 \ t2 <- claimHtlcTimeout) yield HideDelayed(cltv(commitTx, t1.tx), t1.tx) :: csvShowDelayed(t1, t2, commitTx) :: Nil
+    val main = for (t1 <- claimMainDelayed) yield ShowDelayed(csv(commitTx, t1.tx), t1.tx, commitTx, t1 -- t1, t1.tx.allOutputsAmount) :: Nil
     main.flatten ++ success.flatten ++ timeout.flatten
   }
 }
 
-case class RemoteCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx],
-                                 claimHtlcSuccess: Seq[ClaimHtlcSuccessTx], claimHtlcTimeout: Seq[ClaimHtlcTimeoutTx],
-                                 commitTx: Transaction) extends CommitPublished with FrozenHashProvider {
+case class RemoteCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimHtlcSuccess: Seq[ClaimHtlcSuccessTx],
+                                 claimHtlcTimeout: Seq[ClaimHtlcTimeoutTx], commitTx: Transaction) extends CommitPublished {
 
-  def frozenHashes = for (ClaimHtlcTimeoutTx(Some(add), _, _) <- claimHtlcTimeout) yield add.paymentHash
+  override def frozenHashes = for {
+    claimTimeout <- claimHtlcTimeout
+    add <- claimTimeout.addOpt
+  } yield add.paymentHash
 
-  def getState = {
-    val timeout = for (t1 <- claimHtlcTimeout) yield ShowDelayed(cltv(commitTx, t1.tx), t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
-    val success = for (t1 <- claimHtlcSuccess) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
+  override def getState = {
+    val timeout = for (t1 <- claimHtlcTimeout) yield ShowDelayed(cltv(commitTx, t1.tx), t1.tx, commitTx, t1 -- t1, t1.tx.allOutputsAmount)
+    val success = for (tier1 <- claimHtlcSuccess) yield ShowReady(tier1.tx, tier1 -- tier1, tier1.tx.allOutputsAmount)
     val main = for (t1 <- claimMain) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
     main ++ success ++ timeout
   }
 }
 
+case class MutualCommitPublished(commitTx: Transaction) extends CommitPublished
 case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimTheirMainPenalty: Seq[MainPenaltyTx],
                                   htlcPenalty: Seq[HtlcPenaltyTx], commitTx: Transaction) extends CommitPublished {
 
-  def getState = {
+  override def getState = {
     val main = for (t1 <- claimMain) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
     val their = for (t1 <- claimTheirMainPenalty) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
     val penalty = for (t1 <- htlcPenalty) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)

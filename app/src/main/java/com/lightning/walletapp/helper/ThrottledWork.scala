@@ -13,7 +13,7 @@ abstract class ThrottledWork[T, V] {
   private def doWork(workInput: T) =
     work(workInput).doAfterTerminate { lastWork foreach addWork }
       .doOnTerminate { isWorking = false }.doOnSubscribe { isWorking = true }
-      .doOnSubscribe { lastWork = None }.subscribe(res => process(workInput, res), error)
+      .doOnSubscribe { lastWork = None }.subscribe(process(workInput, _), error)
 
   def addWork(data: T): Unit =
     // Postpone next work if not done yet

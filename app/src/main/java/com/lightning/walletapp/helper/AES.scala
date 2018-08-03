@@ -6,6 +6,7 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.aesZygoteCodec
 import com.lightning.walletapp.ln.wire.AESZygote
 import scodec.bits.BitVector
 import javax.crypto.Cipher
+import scala.util.Try
 
 
 object AES {
@@ -21,17 +22,15 @@ object AES {
   private[this] val ivLength = 16
 
   def encode(plain: String, key: Bytes) = {
-    // Takes any input string and returns a zygote
-
-    val initVec = random getBytes ivLength
-    val cipher = enc(plain getBytes "UTF-8", key, initVec)
-    val zygote = AESZygote(v = 1, initVec, cipher)
+    val initVector = random getBytes ivLength
+    val cipher = enc(plain getBytes "UTF-8", key, initVector)
+    val zygote = AESZygote(v = 1, initVector, cipher)
     aesZygoteCodec.encode(zygote).require.toHex
   }
 
-  def decode(raw: String, key: Bytes) = {
-    val bitVector = BitVector.fromHex(raw).get
-    val zygote = aesZygoteCodec.decode(bitVector).require.value
+  def decode(raw: String, key: Bytes) = Try {
+    val rawBitVector = BitVector.fromHex(raw).get
+    val zygote = aesZygoteCodec.decode(rawBitVector).require.value
     new String(dec(zygote.ciphertext, key, zygote.iv), "UTF-8")
   }
 }

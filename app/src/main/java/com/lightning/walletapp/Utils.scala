@@ -31,10 +31,10 @@ import android.os.Bundle
 
 import android.content.DialogInterface.{BUTTON_NEUTRAL, BUTTON_POSITIVE, BUTTON_NEGATIVE}
 import com.lightning.walletapp.lnutils.IconGetter.{scrWidth, maxDialog}
-import org.bitcoinj.wallet.{DefaultCoinSelector, SendRequest, Wallet}
+import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
-import com.lightning.walletapp.ln.Tools.{none, wrap}
 import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
+import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import android.content.{Context, Intent}
@@ -51,7 +51,7 @@ object Utils {
   var denom: Denomination = _
   var fiatName: String = _
 
-  val fileName = "SegwitMainnet"
+  val fileName = "SegwitTestnet"
   val dbFileName = s"$fileName.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
@@ -59,6 +59,7 @@ object Utils {
   lazy val app = appReference
   lazy val sumIn = app getString txs_sum_in
   lazy val sumOut = app getString txs_sum_out
+  lazy val noDesc = app getString ln_no_description
   lazy val denoms = List(SatDenomination, FinDenomination, BtcDenomination)
   val coloredOut: MilliSatoshi => String = amt => sumOut.format(denom withSign amt)
   val coloredIn: MilliSatoshi => String = amt => sumIn.format(denom withSign amt)
@@ -70,6 +71,7 @@ object Utils {
   val fiatMap = Map(typeUSD -> strDollar, typeEUR -> strEuro, typeJPY -> strYen, typeCNY -> strYuan)
   val revFiatMap = Map(strDollar -> typeUSD, strEuro -> typeEUR, strYen -> typeJPY, strYuan -> typeCNY)
   def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
+  def getDescription(rawText: String) = if (rawText.isEmpty) s"<i>$noDesc</i>" else rawText take 140
   def humanSix(adr: String) = adr grouped 6 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {
@@ -93,9 +95,23 @@ object Utils {
 }
 
 trait TimerActivity extends AppCompatActivity { me =>
-  val goTo: Class[_] => Unit = me startActivity new Intent(me, _)
-  val exitTo: Class[_] => Unit = goto => wrap(finish)(goTo apply goto)
+  override def onDestroy = wrap(super.onDestroy)(timer.cancel)
+  override def onCreate(savedActivityInstanceState: Bundle) = {
+    Thread setDefaultUncaughtExceptionHandler new UncaughtHandler(me)
+    super.onCreate(savedActivityInstanceState)
+    INIT(savedActivityInstanceState)
+  }
+
   val timer = new Timer
+  val goTo: Class[_] => Any = target => {
+    me startActivity new Intent(this, target)
+    app.TransData.DoNotEraseValue
+  }
+
+  val exitTo: Class[_] => Any = target => {
+    me startActivity new Intent(this, target)
+    runAnd(app.TransData.DoNotEraseValue)(finish)
+  }
 
   def finishMe(top: View) = finish
   def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
@@ -107,10 +123,6 @@ trait TimerActivity extends AppCompatActivity { me =>
   def onFail(error: CharSequence): Unit = UITask(me showForm negBuilder(dialog_ok, null, error).create).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
 
-  def mkForm(ok: => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) =
-    // Used for forms which do not need to check user input and can be dismissed right away
-    mkCheckForm(alert => rm(alert)(ok), no, bld, okResource, noResource)
-
   def mkCheckForm(ok: AlertDialog => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) = {
     // Create alert dialog with NEGATIVE button which removes a dialog and calls a respected provided function
     // both POSITIVE and NEGATIVE buttons may be omitted by providing -1 as their resource ids
@@ -118,17 +130,23 @@ trait TimerActivity extends AppCompatActivity { me =>
     if (-1 != okResource) bld.setPositiveButton(okResource, null)
 
     val alert = showForm(bld.create)
+    val posAct = me onButtonTap ok(alert)
+    val negAct = me onButtonTap rm(alert)(no)
     try clickableTextField(alert findViewById android.R.id.message) catch none
-    if (-1 != noResource) alert getButton BUTTON_NEGATIVE setOnClickListener onButtonTap(rm(alert)(no))
-    if (-1 != noResource) alert getButton BUTTON_POSITIVE setOnClickListener onButtonTap(ok(alert))
+    if (-1 != noResource) alert getButton BUTTON_NEGATIVE setOnClickListener negAct
+    if (-1 != okResource) alert getButton BUTTON_POSITIVE setOnClickListener posAct
     alert
   }
 
   def mkCheckFormNeutral(ok: AlertDialog => Unit, no: => Unit, neutral: AlertDialog => Unit,
                          bld: Builder, okResource: Int, noResource: Int, neutralResource: Int) = {
 
-    val alert = mkCheckForm(ok, no, bld.setNeutralButton(neutralResource, null), okResource, noResource)
-    alert getButton BUTTON_NEUTRAL setOnClickListener onButtonTap(neutral apply alert)
+    val bld1 = bld.setNeutralButton(neutralResource, null)
+    val alert = mkCheckForm(ok, no, bld1, okResource, noResource)
+    val neutralAct = me onButtonTap neutral(alert)
+
+    // Extend base dialog with a special neutral button
+    alert getButton BUTTON_NEUTRAL setOnClickListener neutralAct
     alert
   }
 
@@ -146,18 +164,9 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   def INIT(savedInstanceState: Bundle): Unit
-  override def onCreate(savedActivityInstanceState: Bundle) = {
-    Thread setDefaultUncaughtExceptionHandler new UncaughtHandler(me)
-    super.onCreate(savedActivityInstanceState)
-    INIT(savedActivityInstanceState)
-  }
-
-  override def onDestroy = wrap(super.onDestroy)(timer.cancel)
   implicit def str2View(textFieldData: CharSequence): LinearLayout = {
     val view = getLayoutInflater.inflate(R.layout.frag_top_tip, null).asInstanceOf[LinearLayout]
-    val contentTextField = Utils clickableTextField view.findViewById(R.id.titleTip)
-    contentTextField setTextIsSelectable true
-    contentTextField setText textFieldData
+    Utils clickableTextField view.findViewById(R.id.titleTip) setText textFieldData
     view setBackgroundColor 0x22AAAAAA
     view
   }
@@ -182,9 +191,8 @@ trait TimerActivity extends AppCompatActivity { me =>
     def onItemClick(adapter: AdapterView[_], view: View, pos: Int, id: Long) = run(pos)
   }
 
-  def onButtonTap(exec: => Unit): OnClickListener = {
-    new OnClickListener { def onClick(view: View) = me hideKeys exec }
-  }
+  def onButtonTap(exec: => Unit) = new OnClickListener { def onClick(view: View) = me hideKeys exec }
+  def onFastTap(fastExec: => Unit) = new OnClickListener { def onClick(view: View) = fastExec }
 
   def share(exportedTextData: String): Unit = {
     val share = new Intent setAction Intent.ACTION_SEND setType "text/plain"
@@ -219,14 +227,14 @@ trait TimerActivity extends AppCompatActivity { me =>
       val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
       val feesOptions = Array(txtFeeRisky.html, txtFeeLive.html)
 
-      def proceed = lst.getCheckedItemPosition match {
+      def proceed = <(lst.getCheckedItemPosition match {
         // Allow user to choose an economical fee when sending a manual transaction
         case 0 => self futureProcess plainRequest(RatesSaver.rates.feeSix div 2)
         case 1 => self futureProcess plainRequest(RatesSaver.rates.feeSix)
-      }
+      }, onTxFail)(none)
 
       val bld = baseBuilder(getString(step_fees).format(sumOut format pay.destination).html, form)
-      mkForm(ok = <(proceed, onTxFail)(none), none, bld, dialog_pay, dialog_cancel)
+      mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_pay, dialog_cancel)
       lst setAdapter new ArrayAdapter(me, singleChoice, feesOptions)
       lst.setItemChecked(0, true)
     }
@@ -235,8 +243,7 @@ trait TimerActivity extends AppCompatActivity { me =>
       val unsignedRequestWithFee = pay.getRequest
       unsignedRequestWithFee.feePerKb = selectedFeePerKb
       app.kit.wallet addLocalInputsToTx unsignedRequestWithFee
-      app.kit.wallet maybeAddOpReturnPubKeyHash unsignedRequestWithFee
-      unsignedRequestWithFee
+      TxWrap maybeAddOpReturn unsignedRequestWithFee
     }
 
     def messageWhenMakingTx: PartialFunction[Throwable, CharSequence] = {
@@ -299,7 +306,6 @@ class RateManager(extra: String, val content: View) { me =>
 trait PayData {
   // Emptying a wallet needs special handling
   def isAll = app.kit.conf1Balance equals cn
-  def onClick(activity: TimerActivity)
   def getRequest: SendRequest
   def destination: String
   def cn: Coin
@@ -307,14 +313,11 @@ trait PayData {
 
 case class AddrData(cn: Coin, address: Address) extends PayData {
   def getRequest = if (isAll) emptyWallet(address) else to(address, cn)
-  def onClick(activity: TimerActivity) = app setBuffer address.toString
   def destination = humanSix(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
-  // This will only be used for funding of LN payment channels as destination is unreadable
   def getRequest = if (isAll) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
-  def onClick(activity: TimerActivity) = activity goTo classOf[LNOpsActivity]
   def destination = app getString txs_p2wsh
 }
 
@@ -329,15 +332,20 @@ trait BlocksListener extends PeerDataEventListener {
   def onPreMessageReceived(peer: Peer, message: Message) = message
 }
 
-abstract class TxTracker
+trait TxTracker
 extends WalletCoinsSentEventListener
+with WalletCoinsReceivedEventListener
 with TransactionConfidenceEventListener {
+
   def txConfirmed(txj: Transaction): Unit = none
-  def onTransactionConfidenceChanged(wallet: Wallet, txj: Transaction) =
+  def onTransactionConfidenceChanged(w: Wallet, txj: Transaction) =
     if (txj.getConfidence.getDepthInBlocks == minDepth) txConfirmed(txj)
 }
 
-class MinDepthReachedCoinSelector extends DefaultCoinSelector {
-  override def shouldSelect(txj: Transaction) = if (null == txj) true
-    else txj.getConfidence.getDepthInBlocks >= minDepth
+class MinDepthReachedCoinSelector
+extends org.bitcoinj.wallet.DefaultCoinSelector {
+
+  override def shouldSelect(txj: Transaction): Boolean =
+    if (null != txj) txj.getConfidence.getDepthInBlocks >= minDepth
+    else true
 }

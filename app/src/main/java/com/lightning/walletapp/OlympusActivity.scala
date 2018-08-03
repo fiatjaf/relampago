@@ -94,18 +94,19 @@ class OlympusActivity extends TimerActivity { me =>
 
   def updateCloud(cloud: Cloud)(url: String, auth: Int) = {
     // Just update mutable fields and insert them into database
-    // Won't be re-addded because of INSERT IGNORE sql
+    // won't be re-addded because of INSERT IGNORE sql
     cloud.connector = new Connector(url)
     cloud.auth = auth
     onUpdate
   }
 
-  override def onOptionsItemSelected(m: MenuItem) = runAnd(result = true) {
-    if (m.getItemId == R.id.actionAddOlympus) new FormManager(addNewCloud, olympus_add)
+  override def onOptionsItemSelected(m: MenuItem) = {
+    if (m.getItemId == R.id.actionAddEntity) new FormManager(addNewCloud, olympus_add)
+    true
   }
 
   override def onCreateOptionsMenu(menu: Menu) = {
-    getMenuInflater.inflate(R.menu.olympus, menu)
+    getMenuInflater.inflate(R.menu.add_entity, menu)
     true
   }
 

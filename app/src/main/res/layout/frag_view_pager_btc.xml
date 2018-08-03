@@ -52,9 +52,7 @@
                 android:layout_width="wrap_content"
                 android:onClick="viewMnemonic"/>
 
-            <View
-                android:id="@+id/actionDivider"
-                style="@style/GrayDivider"/>
+            <View style="@style/GrayDivider"/>
 
             <TextView
                 style="@style/MarginInfo"
@@ -89,8 +87,8 @@
             fab:fab_colorPressed="@color/ln"
             fab:fab_colorNormal="@color/ln"
             fab:fab_colorRipple="@color/ln"
-            android:onClick="goChanDetails"
             style="@style/FabButton"
+            android:onClick="goOps"
             fab:fab_size="mini"/>
 
         <com.github.clans.fab.FloatingActionButton

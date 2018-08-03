@@ -2,11 +2,124 @@ package org.bitcoinj.core
 
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
+import org.bitcoinj.wallet.SendRequest._
 import scala.collection.JavaConverters._
-import com.lightning.walletapp.{AddrData, P2WSHData}
-import org.bitcoinj.wallet.WalletTransaction.Pool.{UNSPENT, SPENT, PENDING}
-import scala.util.Try
+import com.lightning.walletapp.ln.Tools._
+import com.lightning.walletapp.ln.Scripts._
+import com.lightning.walletapp.Denomination._
+import org.bitcoinj.wallet.WalletTransaction.Pool._
+import com.lightning.walletapp.lnutils.ImplicitConversions._
 
+import scala.util.{Success, Try}
+import fr.acinq.bitcoin.{BinaryData, Satoshi}
+import com.lightning.walletapp.{AddrData, P2WSHData}
+import com.lightning.walletapp.Denomination.mSat2Coin
+import com.lightning.walletapp.lnutils.RatesSaver
+import org.bitcoinj.script.ScriptBuilder
+import org.bitcoinj.wallet.SendRequest
+
+
+// Holds an unsigned channel funding tx with dummy pubkeyScript
+case class Batch(unsigned: SendRequest, dummyScript: BinaryData, pr: PaymentRequest) {
+  val fundOutIdx = new PubKeyScriptIndexFinder(unsigned.tx).findPubKeyScriptIndex(dummyScript)
+  val fundingAmountSat = unsigned.tx.getOutput(fundOutIdx).getValue.value
+
+  def replaceDummy(realScript: BinaryData) = {
+    val realOut = new TransactionOutput(app.params, null, Coin valueOf fundingAmountSat, realScript)
+    val withReplacedDummy = unsigned.tx.getOutputs.asScala.patch(fundOutIdx, List(realOut), replaced = 1)
+
+    unsigned.tx.clearOutputs
+    // First remove all existing outs, then fill in updated
+    for (out <- withReplacedDummy) unsigned.tx addOutput out
+    // This mutates an inner tx, only use once!
+    unsigned
+  }
+
+  def asString(source: Int) = {
+    val base = app getString source
+    val request = getDescription(pr.description)
+    val onchainSum = coloredOut apply pr.amount.get
+    val onchainFee = coloredOut apply unsigned.tx.getFee
+    val channelSum = coloredIn apply Satoshi(fundingAmountSat)
+    base.format(request, onchainSum, channelSum, onchainFee).html
+  }
+}
+
+object TxWrap {
+  def maybeAddOpReturn(req: SendRequest) = {
+    val key = req.tx.getInput(0).getConnectedRedeemData(app.kit.wallet).getFullKey
+    val noMyOuts = !req.tx.getOutputs.asScala.exists(output => output isMine app.kit.wallet)
+    if (noMyOuts) req.tx.addOutput(Coin.ZERO, ScriptBuilder createOpReturnScript key.getPubKeyHash)
+    req
+  }
+
+  def findBestBatch(pr: PaymentRequest) = Try {
+    // Any of these three might throw and thus work as guards
+    val where = Address.fromString(app.params, pr.fallbackAddress.get)
+    val sum = mSat2Coin(pr.amount.get)
+
+    require(sum > LNParams.dust, "Dust can't be paid onchain")
+    val dummyScript = pubKeyScript(randomPrivKey.publicKey, randomPrivKey.publicKey)
+    val addrScript = ScriptBuilder.createOutputScript(where).getProgram
+    val emptyThreshold = Coin.valueOf(LNParams.minCapacitySat * 2)
+    val suggestedChanSum = Coin.valueOf(5000000L)
+    val totalBalance = app.kit.conf1Balance
+
+    val candidates = for (idx <- 0 to 10) yield Try {
+      // Try out a number of amounts to determine the largest change
+      val increase = sum add Coin.valueOf(LNParams.minCapacitySat * idx)
+      val shouldEmpty = totalBalance minus increase isLessThan emptyThreshold
+      val req = if (shouldEmpty) emptyWallet(where) else to(where, increase)
+
+      req.feePerKb = RatesSaver.rates.feeSix
+      app.kit.wallet addLocalInputsToTx req
+      req
+    }
+
+    val corrected = candidates collect {
+      case Success(req) if req.tx.getOutputs.size == 1 =>
+        // Tx has only one output, this means it empties a wallet
+        // channel amount is total sum subtracted from requested sum
+        val channelSat = req.tx.getOutput(0).getValue minus sum
+
+        req.tx.clearOutputs
+        req.tx.addOutput(sum, where)
+        req.tx.addOutput(channelSat, dummyScript)
+        channelSat -> req
+
+      case Success(req) if req.tx.getOutputs.size == 2 =>
+        // Tx has two outputs so there is some change which will be used for channel
+        // Depending on whether change is below max chan size we return it as is or adjusted down
+        val payee \ change = req.tx.getOutputs.asScala.partition(_.getScriptBytes sameElements addrScript)
+        // Payee sum may have an excessive amount which should be added to a change sum
+        val realChangeSat = change.head.getValue.plus(payee.head.getValue minus sum)
+
+        if (realChangeSat.value > LNParams.maxCapacity.amount) {
+          // Change amount exceeds max chan capacity so lower it down
+          val reducedChangeSum = realChangeSat minus suggestedChanSum
+
+          req.tx.clearOutputs
+          req.tx.addOutput(sum, where)
+          req.tx.addOutput(suggestedChanSum, dummyScript)
+          // Add a real change output with subtracted channel capacity
+          req.tx.addOutput(reducedChangeSum, change.head.getScriptPubKey)
+          suggestedChanSum -> req
+
+        } else {
+          req.tx.clearOutputs
+          req.tx.addOutput(sum, where)
+          // Change becomes a channel capacity here
+          req.tx.addOutput(realChangeSat, dummyScript)
+          realChangeSat -> req
+        }
+    }
+
+    // It may fail here because after filtering we may have no items at all
+    val filtered = corrected filter { case amount \ _ => amount.value > LNParams.minCapacitySat }
+    val _ \ finalRequest = filtered maxBy { case bestAmount \ _ => bestAmount.value }
+    Batch(maybeAddOpReturn(finalRequest), dummyScript, pr)
+  }
+}
 
 class TxWrap(val tx: Transaction) {
   private val nativeSentFromMe = tx.getInputs.asScala.flatMap(inOuts).foldLeft(Coin.ZERO) {

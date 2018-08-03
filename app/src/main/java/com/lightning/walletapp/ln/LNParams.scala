@@ -13,14 +13,17 @@ import fr.acinq.eclair.UInt64
 
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
-  val chainHash = Block.LivenetGenesisBlock.hash
+  val chainHash = Block.TestnetGenesisBlock.hash
   val theirReserveToFundingRatio = 50
   val localFeatures = "02"
   val globalFeatures = ""
   val minDepth = 1
 
   val maxCltvDelta = 7 * 144L
+  val minCapacitySat = 300000L
+  final val dust = Satoshi(5460L)
   final val maxHtlcValueMsat = 4000000000L
+  final val maxCapacity = Satoshi(16777215L)
   final val minHtlcValue = MilliSatoshi(1000L)
 
   var db: LNOpenHelper = _
@@ -41,7 +44,7 @@ object LNParams { me =>
   }
 
   def isFeeNotOk(msat: Long, fee: Long, hops: Int) =
-    fee > 10000 * (hops + 1) + msat / 25
+    fee > 10000 * (hops + 1) + msat / 50
 
   // On-chain fee calculations
   def shouldUpdateFee(network: Long, commit: Long) = {
@@ -51,9 +54,9 @@ object LNParams { me =>
 
   def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (n <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: n :: Nil)
-    LocalParams(maxHtlcValueInFlightMsat = UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay = 2000, maxAcceptedHtlcs = 20,
+    LocalParams(maxHtlcValueInFlightMsat = UInt64(2000000000L), theirReserve, toSelfDelay = 144, maxAcceptedHtlcs = 25,
       fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey,
-      dustLimit = Satoshi(5460L), shaSeed = sha256(sha.privateKey.toBin), isFunder = true)
+      dustLimit = dust, shaSeed = sha256(sha.privateKey.toBin), isFunder = true)
   }
 }
 
@@ -74,14 +77,15 @@ trait PublishStatus {
 trait DelayedPublishStatus extends PublishStatus {
   // Is publishable if parent depth > 0 AND parent is not dead AND no CLTV or CSV delays
   override def isPublishable = parent match { case pd \ false \ 0L => pd > 0L case _ => false }
+  def delay = parent match { case pd \ false \ blocksLeft => blocksLeft case _ => Long.MinValue }
   val parent: (DepthAndDead, Long)
 }
 
 case class HideReady(txn: Transaction) extends PublishStatus
 case class ShowReady(txn: Transaction, fee: Satoshi, amount: Satoshi) extends PublishStatus
 case class HideDelayed(parent: (DepthAndDead, Long), txn: Transaction) extends DelayedPublishStatus
-case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, fee: Satoshi, amount: Satoshi)
-  extends DelayedPublishStatus
+case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, commitTx: Transaction,
+                       fee: Satoshi, amount: Satoshi) extends DelayedPublishStatus
 
 trait Broadcaster extends ChannelListener { me =>
   def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
@@ -109,6 +113,6 @@ trait Broadcaster extends ChannelListener { me =>
   }
 
   val blocksPerDay = 144
-  def csvShowDelayed(t1: TransactionWithInputInfo, t2: TransactionWithInputInfo) =
-    ShowDelayed(csv(t1.tx, t2.tx), t2.tx, t1 -- t2, t2.tx.allOutputsAmount)
+  def csvShowDelayed(t1: TransactionWithInputInfo, t2: TransactionWithInputInfo, commitTx: Transaction) =
+    ShowDelayed(csv(t1.tx, t2.tx), t2.tx, commitTx, t1 -- t2, t2.tx.allOutputsAmount)
 }
