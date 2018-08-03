@@ -604,7 +604,7 @@ object Channel {
 
   def isOpening(chan: Channel) = chan.data.isInstanceOf[WaitFundingDoneData] || chan.data.isInstanceOf[WaitBroadcastRemoteData]
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case otherwise => false }
-  def inFlightHtlcs(chan: Channel) = chan(Commitments.latestRemoteCommit(_).spec.htlcs) getOrElse Set.empty
+  def inFlightHtlcs(chan: Channel) = chan(_.reducedRemoteState.htlcs) getOrElse Set.empty
   def hasReceivedPayments(chan: Channel) = chan(_.remoteNextHtlcId).exists(_ > 0)
 
   def channelAndHop(chan: Channel) = for {

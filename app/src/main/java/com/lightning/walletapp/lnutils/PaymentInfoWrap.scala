@@ -29,11 +29,11 @@ import rx.lang.scala.{Observable => Obs}
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   var inFlightPayments = Map.empty[BinaryData, RoutingData]
-  var unsent = Map.empty[BinaryData, RoutingData]
+  var unsentPayments = Map.empty[BinaryData, RoutingData]
 
   def addPendingPayment(rd: RoutingData) = {
-    // Add payment to unsents and try to resolve it
-    unsent = unsent.updated(rd.pr.paymentHash, rd)
+    // Add payment to unsentPayments and try to resolve it later
+    unsentPayments = unsentPayments.updated(rd.pr.paymentHash, rd)
     me insertOrUpdateOutgoingPayment rd
     resolvePending
     uiNotify
@@ -42,8 +42,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def resolvePending: Unit = {
     if (app.kit.peerGroup.numConnectedPeers < 1) return
     if (app.ChannelManager.currentBlocksLeft > 0) return
-    unsent.values foreach fetchAndSend
-    unsent = Map.empty
+    unsentPayments.values foreach fetchAndSend
   }
 
   private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
@@ -105,6 +104,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def outPaymentAccepted(rd: RoutingData) = {
     // Payment has been accepted by channel so start local tracking
     inFlightPayments = inFlightPayments.updated(rd.pr.paymentHash, rd)
+    unsentPayments = unsentPayments - rd.pr.paymentHash
     me insertOrUpdateOutgoingPayment rd
   }
 
@@ -177,14 +177,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onBecome = {
-    case (chan, _, from, CLOSING) if from != CLOSING =>
-      // Mark invalid payments once channel becomes closed
-      markFailedAndFrozen
-      uiNotify
-
-    case (chan, _, WAIT_FUNDING_DONE, OPEN) =>
-      // It should now be possible to buy tokens
-      OlympusWrap tellClouds OlympusWrap.CMDStart
+    case (_, _, OFFLINE, OPEN) => resolvePending
+    case (_, _, WAIT_FUNDING_DONE, OPEN) => OlympusWrap tellClouds OlympusWrap.CMDStart
+    case (_, _, from, CLOSING) if from != CLOSING => runAnd(markFailedAndFrozen)(uiNotify)
   }
 }
 

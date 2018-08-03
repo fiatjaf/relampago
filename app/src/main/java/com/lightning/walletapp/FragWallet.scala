@@ -533,7 +533,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def doSend(rd: RoutingData) =
     app.ChannelManager checkIfSendable rd match {
-      case Right(okRD) => PaymentInfoWrap addPendingPayment okRD
+      case Right(rd1) => PaymentInfoWrap addPendingPayment rd1
       case Left(sanityCheckErrorMsg) => onFail(sanityCheckErrorMsg)
     }
 

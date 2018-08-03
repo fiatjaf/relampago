@@ -129,9 +129,8 @@ class WalletApp extends Application { me =>
     def notClosingOrRefunding = for (c <- all if c.state != CLOSING && c.state != REFUNDING) yield c
     def notClosing = for (c <- all if c.state != CLOSING) yield c
 
-    def onlineReports = for {
-    // Operational channels have commitments by definition
-      chan <- all if isOperational(chan) && chan.state == OPEN
+    def chanReports = for {
+      chan <- all if isOperational(chan)
     } yield ChanReport(chan, chan(identity).get)
 
     def delayedPublishes = {
@@ -234,10 +233,9 @@ class WalletApp extends Application { me =>
     }
 
     def checkIfSendable(rd: RoutingData) = {
-      val bestRepOpt = onlineReports.sortBy(rep => -rep.finalCanSend).headOption
+      val bestRepOpt = chanReports.sortBy(rep => -rep.finalCanSend).headOption
       val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
-      if (activeInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_in_flight)
-      else if (frozenInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_frozen)
+      if (frozenInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_frozen)
       else if (isPaid.isSuccess) Left(me getString err_ln_fulfilled)
       else bestRepOpt match {
 
@@ -258,7 +256,7 @@ class WalletApp extends Application { me =>
     def fetchRoutes(rd: RoutingData) = {
       // First we collect chans which in principle can handle a given payment sum right now
       // after we get the results we first prioritize cheapest routes and then routes which belong to less busy chans
-      val from = onlineReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
+      val from = chanReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
 
       def withHints = for {
         tag <- Obs from rd.pr.routingInfo
@@ -287,19 +285,15 @@ class WalletApp extends Application { me =>
 
     def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
       // Find a local channel which is online, can send an amount and belongs to a correct peer
-      // or do the work required to reverse the payment in case if no channel is found
+      case Right(rd) if activeInFlightHashes contains rd.pr.paymentHash =>
+      case Left(emptyRD) => noRoutes(emptyRD)
 
       case Right(rd) =>
-        // Empty used route means we're sending to our peer and it's nodeId is our target
+        // Empty used route means we're sending to our peer and its nodeId is our target
         val targetId = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
-        val chans = onlineReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan }
-        val targetChannelOpt = chans.find(peerChannel => targetId == peerChannel.data.announce.nodeId)
-        targetChannelOpt.map(_ process rd) getOrElse sendEither(useRoutesLeft(rd), noRoutes)
-
-      case Left(emptyRD) =>
-        // All routes have been filtered out
-        // or there were no routes at all
-        noRoutes(emptyRD)
+        val chans = chanReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan }
+        val res = chans collectFirst { case chan if chan.data.announce.nodeId == targetId => chan process rd }
+        res getOrElse sendEither(useRoutesLeft(rd), noRoutes)
     }
   }
 

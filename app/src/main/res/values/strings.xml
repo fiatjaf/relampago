@@ -153,7 +153,6 @@
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum</string>
     <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already</string>
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
-    <string name="err_ln_in_flight">Failed because this payment is currently in-flight</string>
     <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 
     <string name="err_ln_no_chan">Failed because no channel is online, please check your phone connectivity and try again in a few seconds</string>
