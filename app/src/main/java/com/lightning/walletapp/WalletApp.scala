@@ -19,7 +19,9 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import rx.lang.scala.{Observable => Obs}
+import android.net.{ConnectivityManager, Uri}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
+import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import android.content.{ClipData, ClipboardManager, Context}
@@ -30,10 +32,8 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
-import android.net.ConnectivityManager
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
-import java.net.InetSocketAddress
 import android.app.Application
 import java.util.Collections
 import android.widget.Toast
@@ -42,7 +42,7 @@ import java.io.File
 
 
 class WalletApp extends Application { me =>
-  lazy val params = org.bitcoinj.params.TestNet3Params.get
+  lazy val params = org.bitcoinj.params.MainNetParams.get
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
   lazy val chainFile = new File(getFilesDir, chainFileName)
@@ -322,7 +322,7 @@ class WalletApp extends Application { me =>
     }
 
     def useCheckPoints(time: Long) = {
-      val pts = getAssets open "checkpoints-testnet.txt"
+      val pts = getAssets open "checkpoints.txt"
       CheckpointManager.checkpoint(params, pts, store, time)
     }
 
@@ -335,9 +335,14 @@ class WalletApp extends Application { me =>
 
       try {
         Notificator.removeResyncNotification
-        val shouldReSchedule = ChannelManager.notClosingOrRefunding exists hasReceivedPayments
-        obsOnIO.delay(30.seconds).map(_ => ChannelManager.updateChangedIPs).foreach(none)
-        if (shouldReSchedule) Notificator.scheduleResyncNotificationOnceAgain
+        // Only reschedule a delayed notification if we have a receiving chans
+        if (ChannelManager.notClosingOrRefunding exists hasReceivedPayments) Notificator.scheduleResyncNotificationOnceAgain
+        obsOnIO.delay(30.seconds).map(delayed => ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
+
+        // Set fast peer
+        val fastPeer = OlympusWrap.clouds.head.connector.url
+        val ia = InetAddress getByName Uri.parse(fastPeer).getHost
+        peerGroup addAddress new PeerAddress(app.params, ia, 8333)
       } catch none
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)

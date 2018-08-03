@@ -4,8 +4,7 @@ import spray.json._
 import android.database.sqlite._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-
-import com.lightning.walletapp.ln.Tools.{none, runAnd}
+import com.lightning.walletapp.ln.Tools.{random, none, runAnd}
 import com.lightning.walletapp.lnutils.olympus.CloudData
 import android.content.Context
 import android.net.Uri
@@ -137,7 +136,7 @@ object RevokedTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-  extends SQLiteOpenHelper(context, name, null, 2) {
+  extends SQLiteOpenHelper(context, name, null, 1) {
 
   val base = getWritableDatabase
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = none
@@ -159,8 +158,12 @@ class LNOpenHelper(context: Context, name: String)
     dbs execSQL RevokedTable.createSql
     dbs execSQL RouteTable.createSql
 
+    // Randomize an order of two available default servers
+    val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val test: Array[AnyRef] = Array("test-server-1", "http://192.210.203.16:9003", emptyData, "1", "0", "0")
-    dbs.execSQL(OlympusTable.newSql, test)
+    val dev1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9103", emptyData, "1", ord1, "0")
+    val dev2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9103", emptyData, "0", ord2, "1")
+    dbs.execSQL(OlympusTable.newSql, dev1)
+    dbs.execSQL(OlympusTable.newSql, dev2)
   }
 }

@@ -266,7 +266,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       viewTxOutside setOnClickListener onButtonTap {
         val parentCommitTxid = stat.commitTx.txid.toString
-        val uri = s"https://testnet.smartbit.com.au/tx/$parentCommitTxid"
+        val uri = s"https://smartbit.com.au/tx/$parentCommitTxid"
         host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
       }
 
@@ -319,7 +319,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         history = responses.reverse.map(_.toString) mkString "\n==\n"
         rd1 <- PaymentInfoWrap.inFlightPayments.get(rd.pr.paymentHash)
         routingPath = for (usedPaymentHop <- rd1.usedRoute) yield usedPaymentHop.humanDetails
-        receiver = s"Final payee: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry}"
+        receiver = s"Payee: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
         fullDebugData = ("Your wallet" +: routingPath :+ receiver mkString "\n-->\n") + s"\n\n$history"
         _ = paymentDebug setOnClickListener onButtonTap(host share fullDebugData)
       } paymentDebug setVisibility View.VISIBLE
@@ -405,7 +405,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       lst setDivider null
 
       viewTxOutside setOnClickListener onButtonTap {
-        val uri = s"https://testnet.smartbit.com.au/tx/" + wrap.tx.getHashAsString
+        val uri = s"https://smartbit.com.au/tx/" + wrap.tx.getHashAsString
         host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
       }
 
