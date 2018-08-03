@@ -14,6 +14,7 @@ import com.lightning.walletapp.ln.wire.FundMsg._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.helper.ThrottledWork
+import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
@@ -83,11 +84,16 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   private[this] var nodes = Vector.empty[StartNodeView]
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
 
+  val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
+  val acinqAnnouncement = app.mkNodeAnnouncement(nodeId = acinqKey, host = "34.239.230.56", 9735)
+  val acinq = HardcodedNodeView(acinqAnnouncement, "<strong>Recommended ACINQ node</strong>")
+
   new ThrottledWork[String, AnnounceChansNumVec] {
     def error(error: Throwable) = Tools errlog error
     def work(userQuery: String) = findNodes(userQuery)
     def process(userQuery: String, results: AnnounceChansNumVec) = {
-      nodes = for (announce <- results) yield RemoteNodeView(announce)
+      val remoteNodeViewWraps = for (result <- results) yield RemoteNodeView(result)
+      nodes = if (userQuery.isEmpty) acinq +: remoteNodeViewWraps else remoteNodeViewWraps
       host.UITask(adapter.notifyDataSetChanged).run
     }
 

@@ -145,9 +145,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
   }
 
-  def maybeOfferBatch(pr: PaymentRequest) = {
-    val batchTry: Try[Batch] = TxWrap findBestBatch pr
-    batchTry.foreach(batch => app.TransData.value = batch)
+  def maybeOfferBatch(pr: PaymentRequest): Unit = {
+    // We have no channels so offer a new one with a batch maybe
+    app.TransData.value = TxWrap findBestBatch pr getOrElse null
     me goTo classOf[LNStartActivity]
   }
 
