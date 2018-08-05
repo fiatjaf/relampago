@@ -180,7 +180,7 @@
     <string name="ex_fund_connected"><![CDATA[<small>connected to <i>%1$s</i></small><br>expires at <strong>%2$s</strong><br>funding amount %3$s<br>funding fee %4$s]]></string>
     <string name="ex_fund_accept"><![CDATA[<small>funding from <i>%1$s</i></small><br>capacity %2$s<br>funding fee %3$s]]></string>
 
-    <string name="ln_open_batch_inform"><![CDATA[Your payment request is going to be fulfilled along with a payment channel opening in a single Bitcoin transaction]]></string>
+    <string name="ln_open_batch_inform"><![CDATA[A single Bitcoin transaction will be used to fulfill a payment request and open your first channel]]></string>
     <string name="ln_open_batch_confirm"><![CDATA[Would you like to fulfill a payment request and use a remaining change to open a payment channel?<br><br><small>%1$s</small><br><br>request %2$s<br>channel %3$s<br>fee %4$s]]></string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->

@@ -14,7 +14,6 @@ import com.lightning.walletapp.ln.Tools.{none, wrap}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
-import github.nisrulz.stackedhorizontalprogressbar.StackedHorizontalProgressBar
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
@@ -60,9 +59,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   class ViewHolder(view: View) {
     val extraInfo = view.findViewById(R.id.extraInfo)
+    val baseBar = view.findViewById(R.id.baseBar).asInstanceOf[ProgressBar]
+    val overBar = view.findViewById(R.id.overBar).asInstanceOf[ProgressBar]
     val extraInfoText = view.findViewById(R.id.extraInfoText).asInstanceOf[TextView]
     val addressAndKey = view.findViewById(R.id.addressAndKey).asInstanceOf[TextView]
-    val stackBar = view.findViewById(R.id.stackBar).asInstanceOf[StackedHorizontalProgressBar]
     val stateAndConnectivity = view.findViewById(R.id.stateAndConnectivity).asInstanceOf[TextView]
     def setExtraInfo(text: CharSequence) = wrap(extraInfo setVisibility View.VISIBLE)(extraInfoText setText text)
     def setExtraInfo(resource: Int) = wrap(extraInfo setVisibility View.VISIBLE)(extraInfoText setText resource)
@@ -79,7 +79,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         view.findViewById(R.id.refundFee) ::
         view.findViewById(R.id.closedAt) ::
         view.findViewById(R.id.canSend) ::
-        stackBar :: Nil
+        baseBar :: overBar :: Nil
 
     val refundableAmountText = view.findViewById(R.id.refundableAmountText).asInstanceOf[TextView]
     val paymentsInFlightText = view.findViewById(R.id.paymentsInFlightText).asInstanceOf[TextView]
@@ -92,7 +92,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     val refundFeeText = view.findViewById(R.id.refundFeeText).asInstanceOf[TextView]
     val closedAtText = view.findViewById(R.id.closedAtText).asInstanceOf[TextView]
     val canSendText = view.findViewById(R.id.canSendText).asInstanceOf[TextView]
-    stackBar setMax 1000
+    baseBar setMax 1000
+    overBar setMax 1000
     view setTag this
 
     def visibleExcept(gone: Int*) =
@@ -121,15 +122,20 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         val valueReceived = Satoshi(getStat(cs.channelId, 1) / 1000L)
         val valueSent = Satoshi(getStat(cs.channelId, 0) / 1000L)
 
-        stackBar setProgress (canSendMsat / capacity.amount).toInt
+        val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
+        val reserveAndFee = cs.reducedRemoteState.feesSat + cs.remoteParams.channelReserveSatoshis
+
+        baseBar setProgress barCanSend.toInt
+        baseBar setSecondaryProgress (barCanSend + canReceiveMsat / capacity.amount).toInt
+        overBar setProgress (reserveAndFee * 1000L / capacity.amount).toInt
+
+        startedAtText setText started.html
         fundingDepthText setText fundingInfo.format(txDepth, threshold)
-        stackBar setSecondaryProgress (canReceiveMsat / capacity.amount).toInt
         canReceiveText setText denom.withSign(Satoshi(canReceiveMsat) / 1000L).html
         canSendText setText denom.withSign(Satoshi(canSendMsat) / 1000L).html
         refundableAmountText setText denom.withSign(refundable).html
         totalCapacityText setText denom.withSign(capacity).html
         refundFeeText setText denom.withSign(commitFee).html
-        startedAtText setText started.html
 
         paymentsInFlightText setText denom.withSign(valueInFlight).html
         paymentsReceivedText setText sumOrNothing(valueReceived).html
@@ -137,14 +143,14 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
         chan.data match {
           case _: WaitFundingDoneData =>
-            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive,
-              R.id.closedAt, R.id.paymentsSent, R.id.paymentsReceived,
-              R.id.paymentsInFlight)
+            visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+              R.id.closedAt, R.id.paymentsSent, R.id.paymentsReceived, R.id.paymentsInFlight)
 
           case remote: WaitBroadcastRemoteData =>
             if (remote.fail.isDefined) setExtraInfo(text = remote.fail.get.reason)
-            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive, R.id.closedAt,
-              R.id.paymentsSent, R.id.paymentsReceived, R.id.paymentsInFlight)
+            visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+              R.id.closedAt, R.id.paymentsSent, R.id.paymentsReceived,
+              R.id.paymentsInFlight)
 
           case _: NormalData if isOperational(chan) =>
             val canNotReceive = txDepth > 6 && channelAndHop(chan).isEmpty
@@ -153,20 +159,21 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
           case _: NormalData | _: NegotiationsData =>
             setExtraInfo(resource = ln_info_coop_attempt)
-            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive,
-              R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
+            visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend,
+              R.id.canReceive, R.id.refundFee, R.id.fundingDepth,
+              R.id.closedAt)
 
           case cd: ClosingData =>
             setExtraInfo(text = me closedBy cd)
             val closeDate = new Date(cd.closedAt)
             closedAtText setText time(closeDate).html
 
-            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive,
-              if (cd.mutualClose.isEmpty) -1 else R.id.refundFee,
-              R.id.fundingDepth, R.id.paymentsInFlight)
+            visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+              if (cd.mutualClose.isEmpty) -1 else R.id.refundFee, R.id.fundingDepth,
+              R.id.paymentsInFlight)
 
           case otherwise =>
-            visibleExcept(R.id.stackBar, R.id.canSend, R.id.canReceive,
+            visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
               R.id.refundFee, R.id.closedAt, R.id.paymentsSent, R.id.fundingDepth,
               R.id.paymentsReceived, R.id.paymentsInFlight)
         }

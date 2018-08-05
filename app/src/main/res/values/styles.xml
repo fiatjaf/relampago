@@ -10,7 +10,7 @@
     </style>
 
     <style name="StandardLinearLayoutPage" parent="StandardLinearLayout">
-        <item name="android:background">#FFE6EBED</item>
+        <item name="android:background">#F5F5F5</item>
     </style>
 
     <style name="LineLinearLayout">
@@ -21,7 +21,7 @@
         <item name="android:paddingTop">12dp</item>
     </style>
 
-    <style name="CardLinearLayoutWhite">
+    <style name="CardLinearLayout">
         <item name="android:orientation">horizontal</item>
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>

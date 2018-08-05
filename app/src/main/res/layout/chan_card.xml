@@ -13,7 +13,7 @@
         android:layout_height="match_parent"
         android:padding="@dimen/app_padding">
 
-        <LinearLayout style="@style/CardLinearLayoutWhite">
+        <LinearLayout style="@style/CardLinearLayout">
 
             <TextView
                 style="@style/BaseText"
@@ -30,16 +30,31 @@
 
         </LinearLayout>
 
-        <github.nisrulz.stackedhorizontalprogressbar.StackedHorizontalProgressBar
-            android:progressDrawable="@drawable/stacked_horizontal_progress"
-            android:layout_marginBottom="@dimen/app_padding"
-            style="?android:attr/progressBarStyleHorizontal"
-            android:layout_marginTop="@dimen/app_padding"
-            android:layout_height="wrap_content"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:id="@+id/stackBar"/>
+            android:layout_height="match_parent">
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/totalCapacity">
+            <ProgressBar
+                android:progressDrawable="@drawable/stacked_horizontal_progress"
+                android:layout_marginBottom="@dimen/app_padding"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_marginTop="@dimen/app_padding"
+                android:layout_height="wrap_content"
+                android:layout_width="match_parent"
+                android:id="@+id/baseBar"/>
+
+            <ProgressBar
+                android:progressDrawable="@drawable/overlay_horizontal_progress"
+                android:layout_marginBottom="@dimen/app_padding"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_marginTop="@dimen/app_padding"
+                android:layout_height="wrap_content"
+                android:layout_width="match_parent"
+                android:id="@+id/overBar"/>
+
+        </FrameLayout>
+
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/totalCapacity">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_capacity"/>
 
             <TextView
@@ -50,7 +65,7 @@
 
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/canSend">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/canSend">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_can_send"/>
 
             <TextView
@@ -61,7 +76,7 @@
 
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/canReceive">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/canReceive">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_can_receive"/>
 
             <TextView
@@ -72,7 +87,7 @@
 
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/refundableAmount">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/refundableAmount">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_refundable"/>
 
             <TextView
@@ -83,7 +98,7 @@
 
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/refundFee">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/refundFee">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_fee"/>
 
             <TextView
@@ -99,32 +114,32 @@
             android:layout_marginTop="@dimen/app_padding"
             android:layout_marginBottom="@dimen/app_padding"/>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/startedAt">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/startedAt">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_started"/>
             <TextView style="@style/CardBaseText" android:gravity="end" android:id="@+id/startedAtText"/>
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/closedAt">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/closedAt">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_closed"/>
             <TextView style="@style/CardBaseText" android:gravity="end" android:id="@+id/closedAtText"/>
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/paymentsSent">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/paymentsSent">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_sent"/>
             <TextView style="@style/CardBaseText" android:gravity="end" android:id="@+id/paymentsSentText"/>
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/paymentsReceived">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/paymentsReceived">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_received"/>
             <TextView style="@style/CardBaseText" android:gravity="end" android:id="@+id/paymentsReceivedText"/>
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/paymentsInFlight">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/paymentsInFlight">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_in_flight"/>
             <TextView style="@style/CardBaseText" android:gravity="end" android:id="@+id/paymentsInFlightText"/>
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayoutWhite" android:id="@+id/fundingDepth">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/fundingDepth">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_depth"/>
             <TextView style="@style/CardBaseText" android:gravity="end" android:id="@+id/fundingDepthText"/>
         </LinearLayout>

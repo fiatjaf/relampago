@@ -2,22 +2,14 @@
     <item android:id="@android:id/background">
         <shape>
             <corners android:radius="2dp"/>
-            <solid android:color="@color/bg"/>
+            <solid android:color="@android:color/transparent"/>
         </shape>
-    </item>
-    <item android:id="@android:id/secondaryProgress">
-        <clip>
-            <shape>
-                <corners android:radius="2dp"/>
-                <solid android:color="@color/shpbr_secondary_progress"/>
-            </shape>
-        </clip>
     </item>
     <item android:id="@android:id/progress">
         <clip>
             <shape>
                 <corners android:radius="2dp"/>
-                <solid android:color="@color/shpbr_primary_progress"/>
+                <solid android:color="@color/bg"/>
             </shape>
         </clip>
     </item>

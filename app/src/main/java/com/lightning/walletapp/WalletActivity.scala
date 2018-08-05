@@ -16,8 +16,8 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import scala.util.{Failure, Try}
+import org.bitcoinj.core.{Address, TxWrap}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
-import org.bitcoinj.core.{Address, Batch, TxWrap}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
@@ -145,8 +145,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
   }
 
-  def maybeOfferBatch(pr: PaymentRequest): Unit = {
-    // We have no channels so offer a new one with a batch maybe
+  def maybeOfferBatch(pr: PaymentRequest) = {
+    // TransData should be set to batch or null to erase previous
     app.TransData.value = TxWrap findBestBatch pr getOrElse null
     me goTo classOf[LNStartActivity]
   }
