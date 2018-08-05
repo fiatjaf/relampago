@@ -252,12 +252,6 @@
         <item><![CDATA[%1$s channels in total]]></item>
     </array>
 
-    <array name="ln_status_left_blocks">
-        <item><![CDATA[<i>broadcasting</i>]]></item>
-        <item><![CDATA[<i>%1$s block left</i>]]></item>
-        <item><![CDATA[<i>%1$s blocks left</i>]]></item>
-    </array>
-
     <array name="ln_status_expiry">
         <item><![CDATA[expired, got stuck]]></item>
         <item><![CDATA[expires in %1$s block]]></item>

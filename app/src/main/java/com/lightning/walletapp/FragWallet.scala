@@ -66,7 +66,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
   val imageMap = Array(await, await, conf1, dead, frozen)
 
-  val blocksLeft = app.getResources getStringArray R.array.ln_status_left_blocks
   val paymentStates = app.getResources getStringArray R.array.ln_payment_states
   val expiryLeft = app.getResources getStringArray R.array.ln_status_expiry
   val syncOps = app.getResources getStringArray R.array.info_progress
@@ -241,27 +240,31 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   case class ShowDelayedWrap(stat: ShowDelayed) extends ItemWrap {
     val getDate = new java.util.Date(System.currentTimeMillis + stat.delay)
+    val humanSum = sumIn.format(denom formatted stat.amount)
+
+    def humanWhen = {
+      val now = System.currentTimeMillis
+      val blocksAsMsecs = now + 600000L * stat.delay
+      val future = new java.util.Date(blocksAsMsecs)
+      when(now, future)
+    }
 
     def fillView(holder: ViewHolder) = {
-      val left = app.plurOrZero(blocksLeft, stat.delay)
-      val humanSum = sumIn.format(denom formatted stat.amount)
       holder.transactSum setText s"<img src='btc'/>$humanSum".html
       holder.transactWhat setVisibility viewMap(isTablet)
       holder.transactCircle setImageResource await
       holder.transactWhat setText btc_refunding
-      holder.transactWhen setText left.html
+      holder.transactWhen setText humanWhen
     }
 
     def generatePopup = {
-      val humanAmount = coloredIn(stat.amount)
       val inFiat = msatInFiatHuman(stat.amount)
       val base = app.getString(btc_pending_title)
-      val left = app.plurOrZero(blocksLeft, stat.delay)
       val paidFeePercent = stat.fee.amount / (stat.amount.amount / 100D)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
       val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
-      val title = base.format(left, humanAmount, inFiat, coloredOut(stat.fee), paidFeePercent)
+      val title = base.format(humanWhen, humanSum, inFiat, coloredOut(stat.fee), paidFeePercent)
       showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
       viewTxOutside setOnClickListener onButtonTap {

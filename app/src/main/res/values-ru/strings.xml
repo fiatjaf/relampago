@@ -256,13 +256,6 @@
         <item><![CDATA[Всего %1$s каналов]]></item>
     </array>
 
-    <array name="ln_status_left_blocks">
-        <item><![CDATA[отправляется]]></item>
-        <item><![CDATA[через %1$s блок]]></item>
-        <item><![CDATA[через %1$s блока]]></item>
-        <item><![CDATA[через %1$s блоков]]></item>
-    </array>
-
     <array name="ln_status_expiry">
         <item><![CDATA[застрявший платеж]]></item>
         <item><![CDATA[остался %1$s блок]]></item>
