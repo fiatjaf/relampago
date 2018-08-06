@@ -95,16 +95,16 @@ case class ChannelUpdate(signature: BinaryData, chainHash: BinaryData, shortChan
                          flags: BinaryData, cltvExpiryDelta: Int, htlcMinimumMsat: Long, feeBaseMsat: Long,
                          feeProportionalMillionths: Long) extends RoutingMessage {
 
-  lazy val feeEstimate = math.max(feeBaseMsat + feeProportionalMillionths * 10, 0).toDouble
-  def toHop(nodeId: PublicKey) = Hop(nodeId, shortChannelId, cltvExpiryDelta, htlcMinimumMsat,
-    feeBaseMsat, feeProportionalMillionths)
+  lazy val feeEstimate = feeBaseMsat + feeProportionalMillionths * 10
+  def toHop(nodeId: PublicKey) = Hop(nodeId, shortChannelId, cltvExpiryDelta,
+    htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
 }
 
 case class Hop(nodeId: PublicKey, shortChannelId: Long,
                cltvExpiryDelta: Int, htlcMinimumMsat: Long,
                feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
-  lazy val feeEstimate = math.max(feeBaseMsat + feeProportionalMillionths * 10, 0).toDouble
+  lazy val feeEstimate = feeBaseMsat + feeProportionalMillionths * 10
   def humanDetails = s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry: $cltvExpiryDelta blocks, " +
     f"Routing fees: ${feeProportionalMillionths / 10000D}%2f%% of payment sum + baseline $feeBaseMsat msat"
 }

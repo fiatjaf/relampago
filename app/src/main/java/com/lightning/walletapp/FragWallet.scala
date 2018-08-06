@@ -531,8 +531,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val description = getDescription(pr.description)
         val bld = baseBuilder(app.getString(ln_send_title).format(description).html, content)
         def useOnchain(alert: AlertDialog) = rm(alert) { for (runnable <- runnableOpt) runnable.run }
-        if (runnableOpt.isEmpty || pr.amount.isEmpty) mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
-        else mkCheckFormNeutral(sendAttempt, none, useOnchain, bld, dialog_ok, dialog_cancel, dialog_pay_onchain)
+        if (pr.amount.forall(_ <= maxCanSend) || runnableOpt.isEmpty) mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
+        else mkCheckFormNeutral(sendAttempt, none, useOnchain, bld, dialog_pay, dialog_cancel, dialog_pay_onchain)
         for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
       }
     }
