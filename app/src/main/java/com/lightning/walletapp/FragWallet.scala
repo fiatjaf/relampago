@@ -395,8 +395,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val humanOutputs = for {
         Success(pay) <- wrap payDatas wrap.visibleValue.isPositive
-        valueTransferred = s"<small>${denom withSign pay.cn}</small><br>"
-      } yield s"$valueTransferred${marking format pay.destination}".html
+        formatted = marking format pay.destination
+      } yield formatted.html
 
       val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip,
         humanOutputs.toArray) { override def isEnabled(pos: Int) = false }

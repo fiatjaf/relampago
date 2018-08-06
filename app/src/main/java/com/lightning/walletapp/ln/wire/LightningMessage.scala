@@ -125,8 +125,7 @@ case class NodeAnnouncement(signature: BinaryData,
   override def toString = {
     val keyPart = nodeId.toString take 15
     val cute = keyPart grouped 3 mkString "\u0020"
-    val address = workingAddress.getHostString
-    s"$address<br><small>$cute</small>"
+    s"${alias take 16}<br><small>$cute</small>"
   }
 }
 

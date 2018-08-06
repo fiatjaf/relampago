@@ -312,13 +312,13 @@ trait PayData {
 }
 
 case class AddrData(cn: Coin, address: Address) extends PayData {
-  def getRequest = if (isAll) emptyWallet(address) else to(address, cn)
-  def destination = humanSix(address.toString)
+  def getRequest: SendRequest = if (isAll) emptyWallet(address) else to(address, cn)
+  def destination = s"<small>${denom withSign cn}</small><br>" + humanSix(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
   def getRequest = if (isAll) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
-  def destination = app getString txs_p2wsh
+  def destination = s"<small>${denom withSign cn}</small><br>" + app.getString(txs_p2wsh)
 }
 
 abstract class TextChangedWatcher extends TextWatcher {
