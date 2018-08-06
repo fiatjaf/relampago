@@ -121,8 +121,8 @@
     <string name="btc_pending_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br><small>delayed channel refunding</small><br>%1$s<br><br>pending %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
     <string name="btc_refunding">Refunding transaction</string>
 
-    <string name="txs_sum_out"><![CDATA[<font color=#E31300>%1$s</font>]]></string>
-    <string name="txs_sum_in"><![CDATA[<font color=#76B041>%1$s</font>]]></string>
+    <string name="txs_sum_out"><![CDATA[<font color=#E31300><small><tt>–</tt> </small>%1$s</font>]]></string>
+    <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><small><tt>+</tt> </small>%1$s</font>]]></string>
     <string name="txs_view_outside">View on SmartBit site</string>
     <string name="txs_share_body">Share raw transaction</string>
     <string name="txs_p2wsh">Channel funding</string>
@@ -224,10 +224,10 @@
     <string name="ln_info_no_receive">Receiving is not enabled by peer</string>
     <string name="ln_info_coop_attempt">Trying to close cooperatively&#8230;</string>
     <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>disconnected</small></font>]]></string>
-    <string name="ln_info_state_online"><![CDATA[<font color=#76B041><small>online</small></font>]]></string>
+    <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>online</small></font>]]></string>
     <string name="ln_info_nothing"><![CDATA[<i>nothing</i>]]></string>
 
-    <string name="ln_info_status_open"><![CDATA[<font color=#76B041>OPEN</font>]]></string>
+    <string name="ln_info_status_open"><![CDATA[<font color=#6AAB38>OPEN</font>]]></string>
     <string name="ln_info_status_opening"><![CDATA[<font color=#FF9900>OPENING</font>]]></string>
     <string name="ln_info_status_shutdown"><![CDATA[<font color=#FF9900>SHUTDOWN</font>]]></string>
     <string name="ln_info_status_negotiations"><![CDATA[<font color=#FF9900>NEGOTIATION</font>]]></string>

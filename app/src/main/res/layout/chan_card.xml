@@ -92,7 +92,7 @@
 
             <TextView
                 style="@style/CardBaseText"
-                android:textColor="#76B041"
+                android:textColor="#6AAB38"
                 android:id="@+id/refundableAmountText"
                 android:gravity="end"/>
 
