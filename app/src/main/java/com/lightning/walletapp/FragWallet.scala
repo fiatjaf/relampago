@@ -284,7 +284,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate: java.util.Date = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
-      val desc = getDescription(info.description)
       val marking = if (info.incoming == 1) sumIn else sumOut
       val humanSum = marking.format(denom formatted info.firstSum)
 
@@ -292,12 +291,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       holder.transactCircle setImageResource imageMap(info.actualStatus)
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
-      holder.transactWhat setText desc.html
+      holder.transactWhat setText getDescription(info.description).html
     }
 
     def generatePopup = {
       val inFiat = msatInFiatHuman(info.firstSum)
-      val noResource = if (info.pr.isFresh) dialog_retry else -1
+      val noRetry = if (info.pr.isFresh) dialog_retry else -1
       val rd = emptyRD(info.pr, info.firstMsat, useCache = false)
       val humanStatus = s"<strong>${paymentStates apply info.actualStatus}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
@@ -348,16 +347,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         case 0 \ Some(runnable) =>
           val bld = baseBuilder(outgoingTitle.html, detailsWrapper)
-          // We have a fallback onchain address so display it if payment was not successfull
+          def useOnchain(alert: AlertDialog) = rm(alert)(runnable.run)
+          // Offer a fallback onchain address if payment was not successfull
           if (info.actualStatus != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckFormNeutral(alert => rm(alert)(none), doSend(rd), alert => rm(alert)(runnable.run), bld,
-            dialog_ok, noResource, dialog_pay_onchain)
+          else mkCheckFormNeutral(alert => rm(alert)(none), doSend(rd), useOnchain, bld, dialog_ok, noRetry, dialog_pay_onchain)
 
-        case 0 \ _ =>
-          // Allow user to retry this payment while using excluded nodes and channels
+        case 0 \ None =>
+          val bld = baseBuilder(outgoingTitle.html, detailsWrapper)
+          // Only allow user to retry this payment while using excluded nodes and channels but not an onchain option
           if (info.actualStatus != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckForm(alert => rm(alert)(none), doSend(rd), baseBuilder(outgoingTitle.html, detailsWrapper),
-            dialog_ok, noResource)
+          else mkCheckForm(alert => rm(alert)(none), doSend(rd), bld, dialog_ok, noRetry)
 
         case 1 \ _ =>
           // This is an incoming payment
@@ -528,8 +527,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           }
         }
 
-        val text = app getString ln_send_title format getDescription(pr.description)
-        mkCheckForm(sendAttempt, none, baseBuilder(text.html, content), dialog_pay, dialog_cancel)
+        val runnableOpt = onChainRunnable(pr)
+        val description = getDescription(pr.description)
+        val bld = baseBuilder(app.getString(ln_send_title).format(description).html, content)
+        def useOnchain(alert: AlertDialog) = rm(alert) { for (runnable <- runnableOpt) runnable.run }
+        if (runnableOpt.isEmpty || pr.amount.isEmpty) mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
+        else mkCheckFormNeutral(sendAttempt, none, useOnchain, bld, dialog_ok, dialog_cancel, dialog_pay_onchain)
         for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
       }
     }
