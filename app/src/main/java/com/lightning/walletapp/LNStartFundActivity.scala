@@ -191,7 +191,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           askExternalFundingConfirm(started).run
 
         case (_, wait: WaitBroadcastRemoteData, sent: FundingTxBroadcasted) =>
-          // #5 we have got a funder confirmation sooner than an on-chain event
+          // #5 we have got a funder confirmation sooner than an onchain event
           freshChan process CMDSpent(sent.tx)
           app.kit blockSend sent.tx
       }

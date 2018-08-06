@@ -341,7 +341,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           mkCheckFormNeutral(alert => rm(alert)(none), none, alert => rm(alert)(runnable.run), bld, dialog_ok, -1, dialog_pay_onchain)
 
         case 0 \ _ if info.lastMsat == 0 && info.lastExpiry == 0 =>
-          // Payment has not been tried yet because an on-chain wallet is still offline
+          // Payment has not been tried yet because an onchain wallet is still offline
           val title = lnTitleOutNoFee.format(humanStatus, coloredOut(info.firstSum), inFiat)
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
@@ -551,7 +551,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val tryMSat = Try(pr.amount.get)
 
       sendBtcPopup(fallback) { txj =>
-        // Hide off-chain payment once on-chain is sent
+        // Hide offchain payment once onchain is sent
         PaymentInfoWrap.updStatus(HIDDEN, pr.paymentHash)
         PaymentInfoWrap.uiNotify
       } setSum tryMSat
