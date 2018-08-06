@@ -241,7 +241,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     denomChoiceList.getCheckedItemPosition
     denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
     denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    stateContent setText s"${denom formatted walletTotalSum}<br><small>${msatInFiatHuman apply walletTotalSum}</small>".html
+    stateContent setText s"${denom withSign walletTotalSum}<br><small>${msatInFiatHuman apply walletTotalSum}</small>".html
     mkCheckForm(alert => rm(alert)(updateDenomination), none, negBuilder(dialog_ok, title, form), dialog_ok, dialog_cancel)
   }
 
