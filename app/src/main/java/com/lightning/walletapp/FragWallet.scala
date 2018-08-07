@@ -112,7 +112,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     override def onException = {
       case _ \ CMDAddImpossible(rd, code) =>
-        // Non-fatal: can't add this payment, inform user why
+        // Remove this payment from unsent when failed
+        PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash
         val bld = negTextBuilder(dialog_ok, app getString code)
         UITask(host showForm bld.create).run
         PaymentInfoWrap failOnUI rd
