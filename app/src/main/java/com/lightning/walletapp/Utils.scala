@@ -233,7 +233,7 @@ trait TimerActivity extends AppCompatActivity { me =>
         case 1 => self futureProcess plainRequest(RatesSaver.rates.feeSix)
       }, onTxFail)(none)
 
-      val bld = baseBuilder(getString(step_fees).format(sumOut format pay.destination).html, form)
+      val bld = baseBuilder(getString(step_fees).format(pay destination coloredOut).html, form)
       mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_pay, dialog_cancel)
       lst setAdapter new ArrayAdapter(me, singleChoice, feesOptions)
       lst.setItemChecked(0, true)
@@ -305,20 +305,25 @@ class RateManager(extra: String, val content: View) { me =>
 
 trait PayData {
   // Emptying a wallet needs special handling
+  def destination(mark: MilliSatoshi => String): String
   def isAll = app.kit.conf1Balance equals cn
   def getRequest: SendRequest
-  def destination: String
   def cn: Coin
+
+  def transform(mark: MilliSatoshi => String) = {
+    val formattedAmount = mark apply coin2MSat(cn)
+    s"<small>$formattedAmount</small><br>"
+  }
 }
 
 case class AddrData(cn: Coin, address: Address) extends PayData {
   def getRequest: SendRequest = if (isAll) emptyWallet(address) else to(address, cn)
-  def destination = s"<small>${denom withSign cn}</small><br>" + humanSix(address.toString)
+  def destination(mark: MilliSatoshi => String) = transform(mark) + humanSix(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
   def getRequest = if (isAll) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
-  def destination = s"<small>${denom withSign cn}</small><br>" + app.getString(txs_p2wsh)
+  def destination(mark: MilliSatoshi => String) = transform(mark) + app.getString(txs_p2wsh)
 }
 
 abstract class TextChangedWatcher extends TextWatcher {

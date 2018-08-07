@@ -387,16 +387,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def generatePopup = {
       val confs = app.plurOrZero(txsConfs, txDepth)
-      val marking = if (wrap.visibleValue.isPositive) sumIn else sumOut
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
       val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
       val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
 
       val humanOutputs = for {
-        Success(pay) <- wrap payDatas wrap.visibleValue.isPositive
-        formatted = marking format pay.destination
-      } yield formatted.html
+        Success(pay) <- wrap.payDatas(wrap.visibleValue.isPositive)
+        marking = if (wrap.visibleValue.isPositive) coloredIn else coloredOut
+      } yield pay.destination(marking).html
 
       val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip,
         humanOutputs.toArray) { override def isEnabled(pos: Int) = false }
