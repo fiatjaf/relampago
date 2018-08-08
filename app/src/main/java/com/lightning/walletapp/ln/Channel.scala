@@ -52,7 +52,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     Tuple3(data, change, state) match {
       case (InitData(announce), cmd: CMDOpenChannel, WAIT_FOR_INIT) =>
         BECOME(WaitAcceptData(announce, cmd), WAIT_FOR_ACCEPT) SEND OpenChannel(LNParams.chainHash, cmd.tempChanId,
-          cmd.batch.fundingAmountSat, cmd.pushMsat, cmd.localParams.dustLimit.amount, cmd.localParams.maxHtlcValueInFlightMsat,
+          cmd.fundingSat, cmd.pushMsat, cmd.localParams.dustLimit.amount, cmd.localParams.maxHtlcValueInFlightMsat,
           cmd.localParams.channelReserveSat, LNParams.minHtlcValue.amount, cmd.initialFeeratePerKw, cmd.localParams.toSelfDelay,
           cmd.localParams.maxAcceptedHtlcs, cmd.localParams.fundingPrivKey.publicKey, cmd.localParams.revocationBasepoint,
           cmd.localParams.paymentBasepoint, cmd.localParams.delayedPaymentBasepoint, cmd.localParams.htlcBasepoint,
@@ -61,9 +61,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>
         if (accept.dustLimitSatoshis > cmd.localParams.channelReserveSat) throw new LightningException("Our channel reserve is less than their dust")
-        if (accept.channelReserveSatoshis > cmd.batch.fundingAmountSat / 10) throw new LightningException("Their proposed reserve is too high")
         if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
-        if (accept.dustLimitSatoshis < 546L) throw new LightningException("Their onchain dust limit is too low")
+        if (accept.channelReserveSatoshis > cmd.fundingSat / 10) throw new LightningException("Their proposed reserve is too high")
+        if (accept.dustLimitSatoshis < 546L) throw new LightningException("Their on-chain dust limit is too low")
         if (accept.maxAcceptedHtlcs > 483) throw new LightningException("They can accept too many payments")
         if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
         if (accept.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")

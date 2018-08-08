@@ -8,7 +8,6 @@ import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-
 import fr.acinq.bitcoin.{BinaryData, Satoshi}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
 import android.view.{Menu, MenuItem, View, ViewGroup}
@@ -21,6 +20,9 @@ import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
 import android.os.Bundle
 import java.util.Date
+
+import android.content.Intent
+import android.net.Uri
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
@@ -111,14 +113,15 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       extraInfo setVisibility View.GONE
 
       chan { cs =>
+        val fundTxId = Commitments fundingTxid cs
         val capacity = cs.commitInput.txOut.amount
         val started = me time new Date(cs.startedAt)
         val commitFee = Satoshi(cs.reducedRemoteState.feesSat)
-        val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
-        val txDepth \ _ = LNParams.broadcaster.getStatus(Commitments fundingTxid cs)
+        val txDepth \ _ = LNParams.broadcaster.getStatus(fundTxId)
         val canSendMsat \ canReceiveMsat = estimateCanSend(chan) -> estimateCanReceive(chan)
         val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amount.amount).sum / 1000L)
         val refundable = Satoshi(Commitments.latestRemoteCommit(cs).spec.toRemoteMsat / 1000L)
+        val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
         val valueReceived = Satoshi(getStat(cs.channelId, 1) / 1000L)
         val valueSent = Satoshi(getStat(cs.channelId, 0) / 1000L)
 
@@ -185,7 +188,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             none, baseTextBuilder(channelClosureWarning.html), dialog_ok, dialog_cancel)
 
         view setOnClickListener onButtonTap {
-          val finalActions = if (CLOSING == chan.state) chanActions take 1 else chanActions
+          val finalActions = if (CLOSING == chan.state) chanActions take 2 else chanActions
           val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
           val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.toString.html, lst).create)
           lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, finalActions)
@@ -214,10 +217,16 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
               dialog_ok, dialog_cancel)
           }
 
+          def viewFunding = {
+            val uri = s"https://testnet.smartbit.com.au/tx/$fundTxId"
+            host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
+          }
+
           lst setOnItemClickListener onTap {
-            case 0 => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
-            case 1 => proceedCoopCloseOrWarn(startCoopClosing = closeToAddress)
-            case 2 => proceedCoopCloseOrWarn(startCoopClosing = closeToWallet)
+            case 3 => proceedCoopCloseOrWarn(startCoopClosing = closeToWallet)
+            case 2 => proceedCoopCloseOrWarn(startCoopClosing = closeToAddress)
+            case 1 => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
+            case 0 => viewFunding
           }
         }
       }

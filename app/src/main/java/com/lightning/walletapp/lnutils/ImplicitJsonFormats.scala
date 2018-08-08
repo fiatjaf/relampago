@@ -146,7 +146,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val failFmt: JsonFormat[Fail] =
     taggedJsonFmt(jsonFormat[Int, String, String,
-      Fail](Fail.apply, "userId", "code", "reason"), tag = "Fail")
+      Fail](Fail.apply, "code", "reason", "userId"), tag = "Fail")
 
   implicit val startFmt: JsonFormat[Start] =
     taggedJsonFmt(jsonFormat[UserId, Satoshi, String, Int, Option[String],

@@ -29,7 +29,7 @@ case object CMDOffline extends Command
 case object CMDOnline extends Command
 
 case class CMDOpenChannel(localParams: LocalParams, tempChanId: BinaryData,
-                          initialFeeratePerKw: Long, batch: Batch,
+                          initialFeeratePerKw: Long, batch: Batch, fundingSat: Long,
                           pushMsat: Long) extends Command
 
 case class CMDFailMalformedHtlc(id: Long, onionHash: BinaryData, code: Int) extends Command

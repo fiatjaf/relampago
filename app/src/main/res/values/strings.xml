@@ -178,7 +178,7 @@
 
     <string name="ex_fund_connecting"><![CDATA[<small>connecting to <i>%1$s</i></small><br>expires at <strong>%2$s</strong><br>funding amount %3$s<br>funding fee %4$s]]></string>
     <string name="ex_fund_connected"><![CDATA[<small>connected to <i>%1$s</i></small><br>expires at <strong>%2$s</strong><br>funding amount %3$s<br>funding fee %4$s]]></string>
-    <string name="ex_fund_accept"><![CDATA[<small>funding from <i>%1$s</i></small><br>capacity %2$s<br>funding fee %3$s]]></string>
+    <string name="ex_fund_accept"><![CDATA[<small><i>%1$s</i></small><br>capacity %2$s<br>funding fee %3$s]]></string>
 
     <string name="ln_open_batch_inform"><![CDATA[A single Bitcoin transaction will be used to fulfill a payment request and open your first channel]]></string>
     <string name="ln_open_batch_confirm"><![CDATA[Would you like to fulfill a payment request and use a remaining change to open a payment channel?<br><br><small>%1$s</small><br><br>request %2$s<br>channel %3$s<br>fee %4$s]]></string>
@@ -241,6 +241,7 @@
     <string name="ln_chan_force">Force close</string>
 
     <array name="ln_chan_actions_list">
+        <item>View funding transaction</item>
         <item><![CDATA[Export channel snapshot<br><font color=#999999><small>contains private key material</small></font>]]></item>
         <item><![CDATA[Close to specified address<br><font color=#999999><small>copy an address before proceeding</small></font>]]></item>
         <item>Close to this wallet</item>
