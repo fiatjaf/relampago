@@ -164,8 +164,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onProcessSuccess = {
+    case (_, wbr: WaitBroadcastRemoteData, _: CMDBestHeight) if wbr.isFailed =>
+      val fundingScript: BinaryData = wbr.commitments.commitInput.txOut.publicKeyScript
+      app.kit.wallet.removeWatchedScripts(Collections singletonList fundingScript)
+      db.change(ChannelTable.killSql, wbr.commitments.channelId)
+
     case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
-      val fundingScript = close.commitments.commitInput.txOut.publicKeyScript
+      val fundingScript: BinaryData = close.commitments.commitInput.txOut.publicKeyScript
       app.kit.wallet.removeWatchedScripts(Collections singletonList fundingScript)
       app.kit.wallet.removeWatchedScripts(app.kit closingPubKeyScripts close)
       db.change(ChannelTable.killSql, close.commitments.channelId)
@@ -253,19 +258,10 @@ object GossipCatcher extends ChannelListener {
   // Catch ChannelUpdate to enable funds receiving
 
   override def onProcessSuccess = {
-    case (chan, norm: NormalData, _: CMDBestHeight)
-      // GUARD: don't have an extra hop, get the block
-      if norm.commitments.extraHop.isEmpty =>
-
-      // Extract funding txid and it's output index
-      val txid = Commitments fundingTxid norm.commitments
-      val outIdx = norm.commitments.commitInput.outPoint.index
-
-      for {
-        hash <- broadcaster getBlockHashStrings txid
-        blockHeight \ txIds <- OlympusWrap getBlock hash
-        shortChannelId <- Tools.toShortIdOpt(blockHeight, txIds indexOf txid.toString, outIdx)
-      } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
+    case (chan, norm: NormalData, _: CMDBestHeight) if norm.commitments.extraHop.isEmpty => for {
+      blockHeight \ txIndex <- OlympusWrap.getShortId(txid = Commitments fundingTxid norm.commitments)
+      shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
+    } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
 
     case (chan, norm: NormalData, upd: ChannelUpdate)
       // GUARD: we already have an old or empty Hop, replace it with a new one

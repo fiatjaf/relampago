@@ -221,7 +221,7 @@
     <string name="ln_info_close_coop">Closed cooperatively</string>
     <string name="ln_info_close_local">Force-closed by your wallet</string>
     <string name="ln_info_close_remote">Force-closed by remote peer</string>
-    <string name="ln_info_no_receive">Receiving is not enabled by peer</string>
+    <string name="ln_info_no_receive">Receiving not yet enabled by peer</string>
     <string name="ln_info_coop_attempt">Trying to close cooperatively&#8230;</string>
     <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>disconnected</small></font>]]></string>
     <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>online</small></font>]]></string>

@@ -157,12 +157,12 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
     val operationalChannelsWithRoutes: Map[Channel, PaymentRoute] = operationalChannels.flatMap(channelAndHop).toMap
     val maxCanReceiveMsat = operationalChannelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L
-    val maxCanReceive = MilliSatoshi(maxCanReceiveMsat)
+    val maxCanReceive = MilliSatoshi(math abs maxCanReceiveMsat)
 
     val reserveUnspent = getString(ln_receive_reserve) format coloredOut(maxCanReceive)
     val lnReceiveText = if (operationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_nochan)
       else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_option).format(me getString ln_receive_6conf)
-      else if (maxCanReceive < minHtlcValue) getString(ln_receive_option).format(reserveUnspent)
+      else if (maxCanReceiveMsat < 0L) getString(ln_receive_option).format(reserveUnspent)
       else getString(ln_receive_option).format(me getString ln_receive_ok)
 
     val options = Array(lnReceiveText.html, getString(btc_receive_option).html)
@@ -173,7 +173,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     lst setDividerHeight 0
     lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options) {
-      override def isEnabled(position: Int) = position != 0 || maxCanReceive >= minHtlcValue
+      override def isEnabled(position: Int) = position != 0 || maxCanReceiveMsat > 0L
     }
 
     def onChain = rm(alert) {

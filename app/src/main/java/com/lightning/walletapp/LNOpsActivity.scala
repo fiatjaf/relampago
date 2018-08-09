@@ -14,19 +14,19 @@ import android.view.{Menu, MenuItem, View, ViewGroup}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
-import com.lightning.walletapp.lnutils.PaymentTable
+import com.lightning.walletapp.lnutils.{ChannelTable, PaymentTable}
 import com.lightning.walletapp.helper.RichCursor
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
 import android.os.Bundle
-import java.util.Date
+import java.util.{Collections, Date}
 
 import android.content.Intent
 import android.net.Uri
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  val localChanCache = for (channel <- app.ChannelManager.all if me canDisplay channel.data) yield channel
+  var localChanCache = for (channel <- app.ChannelManager.all if me canDisplay channel.data) yield channel
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
   lazy val presentChans = app.getResources getStringArray R.array.ln_chan_present
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
@@ -188,10 +188,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             none, baseTextBuilder(channelClosureWarning.html), dialog_ok, dialog_cancel)
 
         view setOnClickListener onButtonTap {
-          val finalActions = if (CLOSING == chan.state) chanActions take 2 else chanActions
           val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
           val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.toString.html, lst).create)
-          lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, finalActions)
+          lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, me menu chan.data)
           lst setDividerHeight 0
           lst setDivider null
 
@@ -280,12 +279,18 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def canDisplay(chanData: ChannelData) = chanData match {
     case ref: RefundingData => ref.remoteLatestPoint.isDefined
-    case otherwise => true
+    case _ => true
   }
 
-  def sumOrNothing(sum: Satoshi) = sum match {
+  def menu(chanData: ChannelData) = chanData match {
+    case wbr: WaitBroadcastRemoteData if wbr.fail.isDefined => chanActions take 2
+    case _: RefundingData | _: ClosingData => chanActions take 2
+    case _ => chanActions
+  }
+
+  def sumOrNothing(sats: Satoshi) = sats match {
     case Satoshi(0L) => me getString ln_info_nothing
-    case something => denom withSign something
+    case _ => denom withSign sats
   }
 
   def getStat(chanId: BinaryData, direction: Int) = {

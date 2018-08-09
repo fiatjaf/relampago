@@ -27,8 +27,8 @@ object OlympusWrap extends OlympusProvider {
   type RequestAndMemo = (PaymentRequest, BlindMemo)
   type AnnounceChansNum = (NodeAnnouncement, Int)
   type ClearToken = (String, String, String)
-  type BlockHeightAndTxs = (Long, StringVec)
   type TokensInfo = (String, String, Int)
+  type BlockHeightAndTxIdx = (Long, Int)
   type HttpParam = (String, String)
 
   // Shortcuts for Olympus RPC return data types
@@ -87,9 +87,9 @@ object OlympusWrap extends OlympusProvider {
   }
 
   def getRates = failOver(_.connector.getRates, tryLater, clouds)
-  def getBlock(hash: String) = failOver(_.connector getBlock hash, Obs.empty, clouds)
   def findNodes(query: String) = failOver(_.connector findNodes query, tryLater, clouds)
   def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, tryLater, clouds)
+  def getShortId(txid: BinaryData) = failOver(_.connector getShortId txid, Obs.empty, clouds)
   def getChildTxs(ids: BinaryDataSeq) = failOver(_.connector getChildTxs ids, tryLater, clouds)
   private[this] val tryLater = Obs error new ProtocolException("Try again later")
 }
@@ -97,7 +97,7 @@ object OlympusWrap extends OlympusProvider {
 trait OlympusProvider {
   def findRoutes(out: OutRequest): Obs[PaymentRouteVec]
   def findNodes(query: String): Obs[AnnounceChansNumVec]
-  def getBlock(hash: String): Obs[BlockHeightAndTxs]
+  def getShortId(txid: BinaryData): Obs[BlockHeightAndTxIdx]
   def getChildTxs(txIds: BinaryDataSeq): Obs[TxSeq]
   def getBackup(key: BinaryData): Obs[StringVec]
   def getRates: Obs[Result]
@@ -112,9 +112,9 @@ class Connector(val url: String) extends OlympusProvider {
     }
 
   def getRates = ask[Result]("rates/get")
-  def getBlock(hash: String) = ask[BlockHeightAndTxs]("block/get", "hash" -> hash)
   def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
+  def getShortId(txid: BinaryData) = ask[BlockHeightAndTxIdx]("shortid/get", "txid" -> txid.toString)
   def getChildTxs(txIds: BinaryDataSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
   def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.hex)
   def http(requestPath: String) = post(s"$url/$requestPath", true).trustAllCerts.trustAllHosts.connectTimeout(15000)

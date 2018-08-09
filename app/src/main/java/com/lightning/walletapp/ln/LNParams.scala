@@ -87,9 +87,8 @@ case class HideDelayed(parent: (DepthAndDead, Long), txn: Transaction) extends D
 case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, commitTx: Transaction,
                        fee: Satoshi, amount: Satoshi) extends DelayedPublishStatus
 
-trait Broadcaster extends ChannelListener { me =>
+trait Broadcaster extends ChannelListener {
   def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
-  def getBlockHashStrings(txid: BinaryData): StringVec
   def getStatus(txid: BinaryData): DepthAndDead
   def currentHeight: Long
   def perKwThreeSat: Long
@@ -114,5 +113,5 @@ trait Broadcaster extends ChannelListener { me =>
 
   val blocksPerDay = 144
   def csvShowDelayed(t1: TransactionWithInputInfo, t2: TransactionWithInputInfo, commitTx: Transaction) =
-    ShowDelayed(csv(t1.tx, t2.tx), t2.tx, commitTx, t1 -- t2, t2.tx.allOutputsAmount)
+    ShowDelayed(parent = csv(t1.tx, t2.tx), t2.tx, commitTx, fee = t1 -- t2, t2.tx.allOutputsAmount)
 }

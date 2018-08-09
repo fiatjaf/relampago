@@ -245,9 +245,9 @@
 
     <array name="ln_chan_actions_list">
         <item>View funding transaction</item>
-        <item><![CDATA[Передать слепок канала<br><font color=#999999><small>содержит приватные данные</small></font>]]></item>
-        <item><![CDATA[Закрыть на адрес<br><font color=#999999><small>c начала скопируйте адрес</small></font>]]></item>
-        <item>Закрыть в этот кошелек</item>
+        <item><![CDATA[Export channel snapshot<br><font color=#999999><small>contains private key material</small></font>]]></item>
+        <item><![CDATA[Close to specified address<br><font color=#999999><small>copy an address before proceeding</small></font>]]></item>
+        <item>Close to this wallet</item>
     </array>
 
     <array name="ln_chan_present">
