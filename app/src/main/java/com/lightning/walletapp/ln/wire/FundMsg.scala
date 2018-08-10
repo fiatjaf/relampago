@@ -20,9 +20,9 @@ object FundMsg {
 
 // Setup
 trait FundMsg { def userId: UserId }
-case class Fail(code: Int, reason: String, userId: UserId = "noUserId") extends FundMsg
 case class Started(start: Start, expiry: Long, fee: Satoshi) extends FundMsg { def userId: UserId = start.userId }
 case class Start(userId: UserId, fundingAmount: Satoshi, host: String, port: Int, extra: Option[String] = None) extends FundMsg
+case class Fail(code: Int, reason: String, userId: UserId = "noUserId") extends FundMsg { def report = s"Funding ID: $userId<br>$reason" }
 
 // Switching remote peers
 case class PrepareFundingTx(userId: UserId, pubkeyScript: BinaryData) extends FundMsg

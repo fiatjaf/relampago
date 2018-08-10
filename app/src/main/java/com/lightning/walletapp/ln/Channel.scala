@@ -548,7 +548,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   private def startShutdown(norm: NormalData, finalScriptPubKey: BinaryData) = {
     val localShutdownMessage = Shutdown(norm.commitments.channelId, finalScriptPubKey)
     val norm1 = norm.modify(_.localShutdown) setTo Some(localShutdownMessage)
-    BECOME(norm1, OPEN) SEND localShutdownMessage
+    BECOME(me STORE norm1, OPEN) SEND localShutdownMessage
   }
 
   private def startMutualClose(some: HasCommitments, tx: Transaction) = some match {
@@ -597,15 +597,23 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
+  def hasReceivedPayments(chan: Channel) = chan(_.remoteNextHtlcId).exists(_ > 0)
+  def inFlightHtlcs(chan: Channel) = chan(_.reducedRemoteState.htlcs) getOrElse Set.empty
   def estimateCanReceiveCapped(chan: Channel) = math.min(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
   // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve, peer's balance can't go below their channel reserve
   def estimateCanReceive(chan: Channel) = chan(cs => cs.localCommit.spec.toRemoteMsat - cs.localParams.channelReserveSat * 1000L) getOrElse 0L
   def estimateCanSend(chan: Channel) = chan(_.reducedRemoteState.canSendMsat) getOrElse 0L
 
-  def isOpening(chan: Channel) = chan.data.isInstanceOf[WaitFundingDoneData] || chan.data.isInstanceOf[WaitBroadcastRemoteData]
-  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None) => true case otherwise => false }
-  def inFlightHtlcs(chan: Channel) = chan(_.reducedRemoteState.htlcs) getOrElse Set.empty
-  def hasReceivedPayments(chan: Channel) = chan(_.remoteNextHtlcId).exists(_ > 0)
+  def isOpening(chan: Channel): Boolean = chan.data match {
+    case remote: WaitBroadcastRemoteData => remote.fail.isEmpty
+    case wait: WaitFundingDoneData => true
+    case _ => false
+  }
+
+  def isOperational(chan: Channel) = chan.data match {
+    case NormalData(_, _, None, None) => true
+    case _ => false
+  }
 
   def channelAndHop(chan: Channel) = for {
     Some(maybeDummyExtraHop) <- chan(_.extraHop)

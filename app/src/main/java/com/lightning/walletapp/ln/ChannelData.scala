@@ -65,7 +65,8 @@ case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSi
   def makeWaitFundingDoneData(signedCommit: CommitTx) = WaitFundingDoneData(announce, None, None, fundingTx, core makeCommitments signedCommit)
 }
 
-// All the data below will be stored
+// ALL THE DATA BELOW WILL BE STORED
+
 case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore, txHash: BinaryData,
                                    commitments: Commitments, fail: Option[Fail] = None) extends HasCommitments {
 

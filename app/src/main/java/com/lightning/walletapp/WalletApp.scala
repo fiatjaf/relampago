@@ -126,8 +126,11 @@ class WalletApp extends Application { me =>
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
     var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
     def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
-    def notClosingOrRefunding = for (c <- all if c.state != CLOSING && c.state != REFUNDING) yield c
     def notClosing = for (c <- all if c.state != CLOSING) yield c
+
+    def notClosingOrRefunding: Vector[Channel] = for {
+      chan <- all if isOpening(chan) || isOperational(chan)
+    } yield chan
 
     def chanReports = for {
       chan <- all if isOperational(chan)

@@ -8,21 +8,22 @@ import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+
 import fr.acinq.bitcoin.{BinaryData, Satoshi}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
+
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
-import com.lightning.walletapp.lnutils.{ChannelTable, PaymentTable}
+import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
-import android.os.Bundle
-import java.util.{Collections, Date}
-
 import android.content.Intent
+import android.os.Bundle
 import android.net.Uri
+import java.util.Date
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
@@ -150,7 +151,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
               R.id.closedAt, R.id.paymentsSent, R.id.paymentsReceived, R.id.paymentsInFlight)
 
           case remote: WaitBroadcastRemoteData =>
-            if (remote.fail.isDefined) setExtraInfo(text = remote.fail.get.reason)
+            if (remote.fail.isDefined) setExtraInfo(text = remote.fail.get.report.html)
             visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
               R.id.closedAt, R.id.paymentsSent, R.id.paymentsReceived,
               R.id.paymentsInFlight)
@@ -175,7 +176,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
               if (cd.mutualClose.isEmpty) -1 else R.id.refundFee, R.id.fundingDepth,
               R.id.paymentsInFlight)
 
-          case otherwise =>
+          case _ =>
             visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
               R.id.refundFee, R.id.closedAt, R.id.paymentsSent, R.id.fundingDepth,
               R.id.paymentsReceived, R.id.paymentsInFlight)
