@@ -175,10 +175,11 @@ object PaymentRequest {
     }
 
     def decode(input: String): AmountOption = input.lastOption match {
-      case Some('p') => Some(MilliSatoshi apply input.dropRight(1).toLong / 10)
-      case Some('n') => Some(MilliSatoshi apply input.dropRight(1).toLong * 100)
-      case Some('u') => Some(MilliSatoshi apply input.dropRight(1).toLong * 100000)
-      case Some('m') => Some(MilliSatoshi apply input.dropRight(1).toLong * 100000000)
+      case Some('p') => Some(MilliSatoshi apply input.dropRight(1).toLong / 10L)
+      case Some('n') => Some(MilliSatoshi apply input.dropRight(1).toLong * 100L)
+      case Some('u') => Some(MilliSatoshi apply input.dropRight(1).toLong * 100000L)
+      case Some('m') => Some(MilliSatoshi apply input.dropRight(1).toLong * 100000000L)
+      case _ if input.nonEmpty => Some(MilliSatoshi apply input.toLong * 100000000000L)
       case _ => None
     }
 
@@ -328,7 +329,7 @@ object PaymentRequest {
 
     // Will throw on unknown prefix, this is fine
     val prefix = prefixes.values.find(hrp.startsWith).get
-    val amountOpt = Amount decode hrp.drop(prefix.length)
+    val amountOpt = Amount.decode(hrp drop prefix.length)
 
     val pr = PaymentRequest(prefix, amountOpt, Timestamp decode data0, pub, tags.toVector, signature)
     require(Crypto.verifySignature(messageHash, r -> s, pub), "Invalid payment request signature")
