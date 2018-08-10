@@ -27,7 +27,7 @@ import java.util.Date
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  var localChanCache = for (channel <- app.ChannelManager.all if me canDisplay channel.data) yield channel
+  val localChanCache = for (channel <- app.ChannelManager.all if me canDisplay channel.data) yield channel
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
   lazy val presentChans = app.getResources getStringArray R.array.ln_chan_present
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]

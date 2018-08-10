@@ -29,7 +29,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
       (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
-      app.ChannelManager.notClosing.exists(isOperational) && isAuthEnabled =>
+      isAuthEnabled =>
 
       // Also executes if we have no actions to upload and a few tokens left
       val send = retry(getPaymentRequestBlindMemo, pick = pickInc, times = 4 to 5)
@@ -103,7 +103,8 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     }
 
   def retryFreshRequest(pr: PaymentRequest): Unit = {
+    val ok = app.ChannelManager.notClosing.exists(isOperational)
     val rd = emptyRD(pr, pr.unsafeMsat, useCache = true)
-    PaymentInfoWrap addPendingPayment rd
+    if (ok) PaymentInfoWrap addPendingPayment rd
   }
 }
