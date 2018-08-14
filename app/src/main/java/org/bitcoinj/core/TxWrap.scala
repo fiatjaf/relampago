@@ -31,7 +31,6 @@ case class Batch(unsigned: SendRequest, dummyScript: BinaryData, pr: PaymentRequ
     unsigned.tx.clearOutputs
     // First remove all existing outs, then fill in updated
     for (out <- withReplacedDummy) unsigned.tx addOutput out
-    // This mutates an inner tx, only use once!
     unsigned
   }
 
@@ -54,11 +53,10 @@ object TxWrap {
   }
 
   def findBestBatch(pr: PaymentRequest) = Try {
-    // Any of these three might throw and thus work as guards
+    // Any of these two might throw and thus work as guards
     val where = Address.fromString(app.params, pr.fallbackAddress.get)
     val sum = mSat2Coin(pr.amount.get)
 
-    require(sum > LNParams.dust, "Dust can't be paid onchain")
     val dummyScript = pubKeyScript(randomPrivKey.publicKey, randomPrivKey.publicKey)
     val addrScript = ScriptBuilder.createOutputScript(where).getProgram
     val emptyThreshold = Coin.valueOf(LNParams.minCapacitySat * 2)
@@ -80,7 +78,7 @@ object TxWrap {
       case Success(req) if req.tx.getOutputs.size == 1 =>
         // Tx has only one output, this means it empties a wallet
         // channel amount is total sum subtracted from requested sum
-        val channelSat = req.tx.getOutput(0).getValue minus sum
+        val channelSat = req.tx.getOutput(0).getValue.minus(sum)
 
         req.tx.clearOutputs
         req.tx.addOutput(sum, where)
@@ -96,7 +94,7 @@ object TxWrap {
 
         if (realChangeSat.value > LNParams.maxCapacity.amount) {
           // Change amount exceeds max chan capacity so lower it down
-          val reducedChangeSum = realChangeSat minus suggestedChanSum
+          val reducedChangeSum = realChangeSat.minus(suggestedChanSum)
 
           req.tx.clearOutputs
           req.tx.addOutput(sum, where)

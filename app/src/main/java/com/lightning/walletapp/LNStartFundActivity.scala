@@ -214,7 +214,7 @@ class LNStartFundActivity extends TimerActivity { me =>
         case (_, _: WaitFundingDoneData, WAIT_FUNDING_DONE, WAIT_FUNDING_DONE) =>
           // #6 we have received a remote funding tx and may exit to ops page
           freshChan.listeners = app.ChannelManager.operationalListeners
-          ExternalFunder.disconnectWSWrap(wsw, inform = false)
+          ExternalFunder.eliminateWSWrap(wsw, inform = false)
           app.TransData.value = FragWallet.REDIRECT
           me exitTo classOf[WalletActivity]
       }
@@ -235,9 +235,9 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     lazy val efListener = new ExternalFunderListener {
-      override def onMessage(msg: FundMsg) = freshChan process msg
-      // Exit this page on disconnect (indirectly on funder Fail)
-      override def onDisconnect: Unit = whenBackPressed.run
+      // Exit this page once disconnected for whatever reason
+      override def onMsg(msg: FundMsg) = freshChan process msg
+      override def onRejection: Unit = whenBackPressed.run
     }
 
     lazy val openListener =

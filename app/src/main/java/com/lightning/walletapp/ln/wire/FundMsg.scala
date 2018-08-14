@@ -1,7 +1,10 @@
 package com.lightning.walletapp.ln.wire
 
-import com.lightning.walletapp.ln.Tools.UserId
+import spray.json._
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import com.lightning.walletapp.lnutils.ImplicitConversions._
 import fr.acinq.bitcoin.{Satoshi, BinaryData, Transaction}
+import com.lightning.walletapp.ln.Tools.UserId
 
 
 object FundMsg {
@@ -13,14 +16,18 @@ object FundMsg {
   val FAIL_RESERVE_EXPIRED = 202
   val FAIL_AMOUNT_TOO_LARGE = 203
   val FAIL_AMOUNT_TOO_SMALL = 204
-  val FAIL_FUNDING_PENDING = 205
+  val FAIL_FUNDING_IS_TRIED = 205
   val FAIL_FUNDING_EXISTS = 206
   val FAIL_PUBLISH_ERROR = 207
 }
 
 // Setup
 trait FundMsg { def userId: UserId }
-case class Started(start: Start, expiry: Long, fee: Satoshi) extends FundMsg { def userId: UserId = start.userId }
+case class Started(start: Start, expiry: Long, fee: Satoshi) extends FundMsg {
+  val endPoint = s"ws://${start.host}:${start.port}/${start.toJson.toString.hex}"
+  def userId: UserId = start.userId
+}
+
 case class Start(userId: UserId, fundingAmount: Satoshi, host: String, port: Int, extra: Option[String] = None) extends FundMsg
 case class Fail(code: Int, reason: String, userId: UserId = "noUserId") extends FundMsg { def report = s"Funding ID: $userId<br>$reason" }
 

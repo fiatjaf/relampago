@@ -18,15 +18,15 @@ object ExternalFunder {
   var worker = Option.empty[WSWrap]
   def setWSWrap(newWSWrap: WSWrap) = {
     // This is guaranteed to disconnect it
-    for (old <- worker) disconnectWSWrap(old)
+    for (old <- worker) eliminateWSWrap(old)
     newWSWrap.ws.connectAsynchronously
     worker = Some(newWSWrap)
   }
 
-  def disconnectWSWrap(oldWorker: WSWrap, inform: Boolean = true) =
+  def eliminateWSWrap(oldWorker: WSWrap, inform: Boolean = true) =
     for (currentWrap <- worker if currentWrap.params == oldWorker.params) {
       // Only disconnect if old websocket wrapper is also a current wrapper
-      if (inform) for (lst <- currentWrap.listeners) lst.onDisconnect
+      if (inform) for (lst <- currentWrap.listeners) lst.onRejection
       currentWrap.listeners = Set.empty
       currentWrap.ws.clearListeners
       currentWrap.ws.disconnect
@@ -35,9 +35,7 @@ object ExternalFunder {
 }
 
 case class WSWrap(params: Started) { self =>
-  val point = params.start.host + ":" + params.start.port
-  val loaded = "ws://" + point + "/" + params.start.toJson.toString.hex
-  val ws: WebSocket = (new WebSocketFactory).createSocket(loaded, 7500)
+  val ws = (new WebSocketFactory).createSocket(params.endPoint, 7500)
   var listeners: Set[ExternalFunderListener] = Set.empty
   var lastMessage: FundMsg = params.start
   var attemptsLeft: Int = 5
@@ -54,24 +52,31 @@ case class WSWrap(params: Started) { self =>
 
   ws addListener new WebSocketAdapter {
     override def onConnected(websocket: WebSocket, headers: JavaListMap) = attemptsLeft = 5
-    override def onTextMessage(ws: WebSocket, message: String) = for (lst <- listeners) lst onMessage to[FundMsg](message)
-    override def onDisconnected(ws: WebSocket, scf: WebSocketFrame, ccf: WebSocketFrame, cbs: Boolean) = onConnectError(ws, null)
+    override def onTextMessage(ws: WebSocket, remoteMessage: String) = lastMessage = to[FundMsg](remoteMessage)
+    override def onDisconnected(ws: WebSocket, s: WebSocketFrame, e: WebSocketFrame, cbs: Boolean) = onConnectError(ws, null)
 
     override def onConnectError(ws: WebSocket, reason: WebSocketException) = if (shouldReconnect) {
       Obs.just(attemptsLeft -= 1).delay(5.seconds).foreach(in5Sec => for (lst <- listeners) lst.onAttempt)
       for (listener <- listeners) listener.onOffline
-    } else ExternalFunder disconnectWSWrap self
+    } else ExternalFunder eliminateWSWrap self
+  }
+
+  ws addListener new WebSocketAdapter {
+    // lastMessage is guaranteed to be updated at this point
+    override def onTextMessage(ws: WebSocket, msg: String) =
+      for (lst <- listeners) lst onMsg lastMessage
   }
 
   listeners += new ExternalFunderListener {
-    override def onMessage(msg: FundMsg) = lastMessage = msg
+    // We need this detachable listener in case of disconnect
+    // since a reconnection observer itself can not be cancelled
     override def onAttempt = ws.recreate.connectAsynchronously
   }
 }
 
 class ExternalFunderListener {
-  def onMessage(msg: FundMsg): Unit = none
-  def onDisconnect: Unit = none
+  def onMsg(msg: FundMsg): Unit = none
+  def onRejection: Unit = none
   def onAttempt: Unit = none
   def onOffline: Unit = none
 }

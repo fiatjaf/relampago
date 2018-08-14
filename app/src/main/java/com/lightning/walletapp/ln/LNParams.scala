@@ -6,7 +6,6 @@ import com.lightning.walletapp.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
-import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import fr.acinq.eclair.UInt64
 

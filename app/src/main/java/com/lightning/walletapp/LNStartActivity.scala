@@ -69,7 +69,7 @@ object FragLNStart {
 }
 
 class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
-  def rmCurrentRemoteFunder = for (currentWSWrap <- ExternalFunder.worker) ExternalFunder disconnectWSWrap currentWSWrap
+  def rmCurrentRemoteFunder = for (currentWSWrap <- ExternalFunder.worker) ExternalFunder eliminateWSWrap currentWSWrap
   override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_ln_start, vg, false)
 
   override def onDestroy = {
@@ -151,23 +151,23 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
           .updated(FAIL_INTERNAL_ERROR, err_fund_internal_error)
           .updated(FAIL_RESERVE_FAILED, err_fund_reserve_failed)
           .updated(FAIL_RESERVE_EXPIRED, err_fund_reserve_expired)
-          .updated(FAIL_FUNDING_PENDING, err_fund_funding_pending)
+          .updated(FAIL_FUNDING_IS_TRIED, err_fund_funding_pending)
           .updated(FAIL_FUNDING_EXISTS, err_fund_funding_exists)
           .updated(FAIL_PUBLISH_ERROR, err_publish_error)
 
       freshWSWrap.listeners += new ExternalFunderListener {
-        override def onDisconnect = host.UITask(externalFundWrap setVisibility View.GONE).run
+        override def onRejection = host.UITask(externalFundWrap setVisibility View.GONE).run
         override def onOffline = funderInfo(freshWSWrap, R.color.material_blue_grey_800, ex_fund_connecting).run
-        override def onMessage(msg: FundMsg) = funderInfo(freshWSWrap, R.color.ln, ex_fund_connected).run
+        override def onMsg(message: FundMsg) = funderInfo(freshWSWrap, R.color.ln, ex_fund_connected).run
       }
 
       freshWSWrap.listeners += new ExternalFunderListener {
-        override def onMessage(message: FundMsg) = message match {
-          case _: Fail => ExternalFunder disconnectWSWrap freshWSWrap
+        override def onMsg(message: FundMsg) = message match {
+          case _: Fail => ExternalFunder eliminateWSWrap freshWSWrap
           case _ => Tools log s"Websocket got $message"
         }
 
-        override def onDisconnect = freshWSWrap.lastMessage match {
+        override def onRejection = freshWSWrap.lastMessage match {
           case fail: Fail if err2String contains fail.code => host onFail getString(err2String apply fail.code)
           case unexpectedErrorCode: Fail => host onFail getString(err2String apply FAIL_INTERNAL_ERROR)
           case _ => host.UITask(app toast err_fund_disconnect).run
