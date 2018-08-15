@@ -521,7 +521,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
   private def signFunding(cmd: CMDOpenChannel, accept: AcceptChannel, txHash: BinaryData, outIndex: Int) = {
     val (localSpec: CommitmentSpec, localCommitTx: CommitTx, remoteSpec: CommitmentSpec, remoteCommitTx: CommitTx) =
-      Funding.makeFirstFunderCommitTxs(cmd, accept, txHash, outIndex, accept.firstPerCommitmentPoint)
+      Funding.makeFirstCommitTxs(cmd, accept, txHash, outIndex, accept.firstPerCommitmentPoint)
 
     val chanId = Tools.toLongId(txHash, outIndex)
     val localSigOfRemoteTx = Scripts.sign(remoteCommitTx, cmd.localParams.fundingPrivKey)

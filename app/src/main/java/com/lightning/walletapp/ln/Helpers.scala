@@ -274,19 +274,26 @@ object Helpers {
       InputInfo(outPoint, fundingTxOut, Script write multisig)
     }
 
-    // Assuming we are always a funder
-    def makeFirstFunderCommitTxs(cmd: CMDOpenChannel, remoteParams: AcceptChannel,
-                                 fundingTxHash: BinaryData, fundingTxOutputIndex: Int,
-                                 remoteFirstPoint: Point) = {
+    def makeFirstCommitTxs(cmd: CMDOpenChannel,
+                           remoteParams: AcceptChannel, fundingTxHash: BinaryData,
+                           fundingTxOutputIndex: Int, remoteFirstPoint: Point) = {
 
-      val funding = Satoshi(cmd.fundingSat)
-      val toLocalMsat = cmd.fundingSat * 1000L - cmd.pushMsat
-      val commitmentInput = makeFundingInputInfo(fundingTxHash, fundingTxOutputIndex,
-        funding, cmd.localParams.fundingPrivKey.publicKey, remoteParams.fundingPubkey)
+      val toLocalMsat = if (cmd.localParams.isFunder) cmd.fundingSat * 1000 - cmd.pushMsat else cmd.pushMsat
+      val toRemoteMsat = if (cmd.localParams.isFunder) cmd.pushMsat else cmd.fundingSat * 1000 - cmd.pushMsat
 
-      val localPerCommitmentPoint = perCommitPoint(cmd.localParams.shaSeed, 0L)
       val localSpec = CommitmentSpec(cmd.initialFeeratePerKw, toLocalMsat, cmd.pushMsat)
       val remoteSpec = CommitmentSpec(cmd.initialFeeratePerKw, cmd.pushMsat, toLocalMsat)
+
+      if (!cmd.localParams.isFunder) {
+        val fees = Scripts.commitTxFee(remoteParams.dustLimitSat, remoteSpec).amount
+        val missing = remoteSpec.toLocalMsat / 1000 - cmd.localParams.channelReserveSat - fees
+        if (missing < 0) throw new LightningException("They are funder and can not afford fees")
+      }
+
+      val localPerCommitmentPoint = perCommitPoint(cmd.localParams.shaSeed, 0L)
+      val commitmentInput = makeFundingInputInfo(fundingTxHash, fundingTxOutputIndex,
+        Satoshi(cmd.fundingSat), cmd.localParams.fundingPrivKey.publicKey, remoteParams.fundingPubkey)
+
       val (localCommitTx, _, _) = makeLocalTxs(0L, cmd.localParams, remoteParams, commitmentInput, localPerCommitmentPoint, localSpec)
       val (remoteCommitTx, _, _, _, _) = makeRemoteTxs(0L, cmd.localParams, remoteParams, commitmentInput, remoteFirstPoint, remoteSpec)
       (localSpec, localCommitTx, remoteSpec, remoteCommitTx)
