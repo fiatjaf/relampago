@@ -12,7 +12,6 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import scala.util.{Success, Try}
 import fr.acinq.bitcoin.{BinaryData, Satoshi}
-import com.lightning.walletapp.{AddrData, P2WSHData}
 import com.lightning.walletapp.Denomination.mSat2Coin
 import com.lightning.walletapp.lnutils.RatesSaver
 import org.bitcoinj.script.ScriptBuilder
@@ -36,11 +35,11 @@ case class Batch(unsigned: SendRequest, dummyScript: BinaryData, pr: PaymentRequ
 
   def asString(source: Int) = {
     val base = app getString source
-    val request = getDescription(pr.description)
+    val info = getDescription(pr.description)
     val onchainSum = coloredOut apply pr.amount.get
     val onchainFee = coloredOut apply unsigned.tx.getFee
-    val channelSum = coloredIn apply Satoshi(fundingAmountSat)
-    base.format(request, onchainSum, channelSum, onchainFee).html
+    val channelSum = coloredChan apply Satoshi(fundingAmountSat)
+    base.format(info, onchainSum, channelSum, onchainFee).html
   }
 }
 
@@ -139,17 +138,8 @@ class TxWrap(val tx: Transaction) {
     else if (valueWithoutFee.isZero) nativeSentToMe // This is a to-itself transaction, hide the fee
     else valueWithoutFee // This is an outgoing tx, subtract the fee
 
-  // Depending on whether this is an incoming or outgoing transaction
-  // we collect either outputs which belong to us or the foreign ones
-
-  def payDatas(incoming: Boolean) =
-    tx.getOutputs.asScala filter { out =>
-      out.isMine(app.kit.wallet) == incoming
-    } map outputToPayData
-
-  private def outputToPayData(out: TransactionOutput) = Try(out.getScriptPubKey) map {
-    case publicKeyScript if publicKeyScript.isSentToP2WSH => P2WSHData(out.getValue, publicKeyScript)
-    case publicKeyScript => AddrData(out.getValue, publicKeyScript getToAddress app.params)
+  def directedScriptPubKeysWithValueTry(incoming: Boolean) = tx.getOutputs.asScala.collect {
+    case out if out.isMine(app.kit.wallet) == incoming => Try(out.getScriptPubKey -> out.getValue)
   }
 
   private def inOuts(input: TransactionInput): Option[TransactionOutput] =

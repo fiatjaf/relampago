@@ -121,6 +121,7 @@
     <string name="btc_pending_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br><small>delayed channel refunding</small><br>%1$s<br><br>pending %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
     <string name="btc_refunding">Refunding transaction</string>
 
+    <string name="txs_sum_chan"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
     <string name="txs_sum_out"><![CDATA[<font color=#E31300><tt>-</tt>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><tt>+</tt>%1$s</font>]]></string>
     <string name="txs_view_outside">View on SmartBit site</string>

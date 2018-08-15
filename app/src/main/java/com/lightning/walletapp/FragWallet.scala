@@ -393,10 +393,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
       val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
 
-      val humanOutputs = for {
-        Success(pay) <- wrap.payDatas(wrap.visibleValue.isPositive)
-        marking = if (wrap.visibleValue.isPositive) coloredIn else coloredOut
-      } yield pay.destination(marking).html
+      val defaultMarking = if (wrap.visibleValue.isPositive) coloredIn else coloredOut
+      val humanOutputs = wrap directedScriptPubKeysWithValueTry wrap.visibleValue.isPositive collect {
+        case Success(pks \ value) if pks.isSentToP2WSH => P2WSHData(value, pks).destination(coloredChan).html
+        case Success(pks \ value) => AddrData(value, pks getToAddress app.params).destination(defaultMarking).html
+      }
 
       val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip,
         humanOutputs.toArray) { override def isEnabled(pos: Int) = false }
