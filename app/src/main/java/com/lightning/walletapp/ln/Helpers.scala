@@ -278,15 +278,15 @@ object Helpers {
                            remoteParams: AcceptChannel, fundingTxHash: BinaryData,
                            fundingTxOutputIndex: Int, remoteFirstPoint: Point) = {
 
-      val toLocalMsat = if (cmd.localParams.isFunder) cmd.fundingSat * 1000 - cmd.pushMsat else cmd.pushMsat
-      val toRemoteMsat = if (cmd.localParams.isFunder) cmd.pushMsat else cmd.fundingSat * 1000 - cmd.pushMsat
+      val toLocalMsat = if (cmd.localParams.isFunder) cmd.fundingSat * 1000L - cmd.pushMsat else cmd.pushMsat
+      val toRemoteMsat = if (cmd.localParams.isFunder) cmd.pushMsat else cmd.fundingSat * 1000L - cmd.pushMsat
 
-      val localSpec = CommitmentSpec(cmd.initialFeeratePerKw, toLocalMsat, cmd.pushMsat)
-      val remoteSpec = CommitmentSpec(cmd.initialFeeratePerKw, cmd.pushMsat, toLocalMsat)
+      val localSpec = CommitmentSpec(cmd.initialFeeratePerKw, toLocalMsat, toRemoteMsat)
+      val remoteSpec = CommitmentSpec(cmd.initialFeeratePerKw, toRemoteMsat, toLocalMsat)
 
       if (!cmd.localParams.isFunder) {
         val fees = Scripts.commitTxFee(remoteParams.dustLimitSat, remoteSpec).amount
-        val missing = remoteSpec.toLocalMsat / 1000 - cmd.localParams.channelReserveSat - fees
+        val missing = remoteSpec.toLocalMsat / 1000L - cmd.localParams.channelReserveSat - fees
         if (missing < 0) throw new LightningException("They are funder and can not afford fees")
       }
 

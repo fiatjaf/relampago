@@ -59,15 +59,47 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
 
 
+      case (WaitFundingDataFundee(announce, localParams), open: OpenChannel, WAIT_FOR_INIT) =>
+        if (LNParams.chainHash != open.chainHash) throw new LightningException("They have provided a wrong chain hash")
+        if (open.fundingSatoshis < LNParams.minCapacitySat) throw new LightningException("Their proposed capacity is too small")
+        if (open.pushMsat > 1000L * open.fundingSatoshis) throw new LightningException("They are trying to push more than proposed capacity")
+        if (open.dustLimitSatoshis > open.channelReserveSatoshis) throw new LightningException("Their dust limit exceeds their channel reserve")
+        if (open.feeratePerKw < LNParams.minFeeratePerKw) throw new LightningException("Their proposed opening on-chain fee is too small")
+        if (open.toSelfDelay > LNParams.maxToSelfDelay) throw new LightningException("Their toSelfDelay is too high")
+        if (open.dustLimitSatoshis < 546L) throw new LightningException("Their on-chain dust limit is too low")
+        if (open.maxAcceptedHtlcs > 483) throw new LightningException("They can accept too many payments")
+
+        val toLocalMsat \ toRemoteMsat = (open.pushMsat, open.fundingSatoshis * 1000L - open.pushMsat)
+        if (toLocalMsat <= open.channelReserveSatoshis * 1000L && toRemoteMsat <= open.channelReserveSatoshis * 1000L)
+          throw new LightningException("Both toLocal and toRemote amounts are less than total channel reserve")
+
+        if (open.fundingSatoshis / open.channelReserveSatoshis < LNParams.channelReserveToFundingRatio / 5)
+          throw new LightningException("Their proposed channel reserve is too high relative to capacity")
+
+        val firstPerCommitPoint = Generators.perCommitPoint(localParams.shaSeed, 0L)
+        val accept = AcceptChannel(open.temporaryChannelId, localParams.dustLimit.amount,
+          localParams.maxHtlcValueInFlightMsat, localParams.channelReserveSat, LNParams.minDepth,
+          LNParams.minHtlcValue.amount, localParams.toSelfDelay, localParams.maxAcceptedHtlcs,
+          localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint,
+          localParams.paymentBasepoint, localParams.delayedPaymentBasepoint,
+          localParams.htlcBasepoint, firstPerCommitPoint)
+
+        val remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis,
+          open.maxHtlcValueInFlightMsat, open.channelReserveSatoshis, open.htlcMinimumMsat,
+          minimumDepth = 6, open.toSelfDelay, open.maxAcceptedHtlcs, open.fundingPubkey,
+          open.revocationBasepoint, open.paymentBasepoint, open.delayedPaymentBasepoint,
+          open.htlcBasepoint, open.firstPerCommitmentPoint)
+
+
       case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>
         if (accept.dustLimitSatoshis > cmd.localParams.channelReserveSat) throw new LightningException("Our channel reserve is less than their dust")
         if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
         if (accept.channelReserveSatoshis > cmd.fundingSat / 10) throw new LightningException("Their proposed reserve is too high")
+        if (accept.toSelfDelay > LNParams.maxToSelfDelay) throw new LightningException("Their toSelfDelay is too high")
         if (accept.dustLimitSatoshis < 546L) throw new LightningException("Their on-chain dust limit is too low")
         if (accept.maxAcceptedHtlcs > 483) throw new LightningException("They can accept too many payments")
         if (accept.htlcMinimumMsat > 10000L) throw new LightningException("Their htlcMinimumMsat too high")
         if (accept.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
-        if (accept.toSelfDelay > 14 * 144) throw new LightningException("Their toSelfDelay is too high")
         if (accept.minimumDepth > 6L) throw new LightningException("Their minimumDepth is too high")
         BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
 
@@ -246,6 +278,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA d1 doProcess CMDHTLCProcess
 
 
+      case (norm: NormalData, fee: UpdateFee, OPEN) if !norm.commitments.localParams.isFunder =>
+        val d1 = norm.modify(_.commitments) setTo Commitments.receiveFee(norm.commitments, fee)
+        me UPDATA d1
+
+
       case (norm: NormalData, CMDFeerate(satPerKw), OPEN) if norm.commitments.localParams.isFunder =>
         val shouldUpdate = LNParams.shouldUpdateFee(satPerKw, norm.commitments.localCommit.spec.feeratePerKw)
         if (shouldUpdate) Commitments.sendFee(norm.commitments, satPerKw) foreach { case c1 \ feeUpdateMessage =>
@@ -322,8 +359,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
             startShutdown(norm, commitments.localParams.defaultFinalScriptPubKey)
             doProcess(CMDProceed)
 
-          // Nothing to do here
-          case notReadyYet =>
+          // Not ready
+          case _ =>
         }
 
 
@@ -400,9 +437,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // No in-flight HTLCs here, just proceed with negotiations
       case (neg: NegotiationsData, cr: ChannelReestablish, OFFLINE) =>
-        // According to spec we need to re-send a last closing sig here
-        val lastSigned = neg.localProposals.head.localClosingSigned
-        List(neg.localShutdown, lastSigned) foreach SEND
+        // Last closing signed may be empty if we are not a funder of this channel
+        val lastClosingSignedOpt = neg.localProposals.headOption.map(_.localClosingSigned)
+        neg.localShutdown +: lastClosingSignedOpt.toVector foreach SEND
         BECOME(neg, NEGOTIATIONS)
 
 

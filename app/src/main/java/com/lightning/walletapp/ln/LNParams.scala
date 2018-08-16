@@ -13,12 +13,14 @@ import fr.acinq.eclair.UInt64
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
   val chainHash = Block.LivenetGenesisBlock.hash
-  val theirReserveToFundingRatio = 50
+  val channelReserveToFundingRatio = 100
   val localFeatures = "02"
   val globalFeatures = ""
   val minDepth = 1
 
   val maxCltvDelta = 7 * 144L
+  val maxToSelfDelay = 10 * 144L
+
   val minCapacitySat = 300000L
   final val dust = Satoshi(5460L)
   final val minFeeratePerKw = 253
@@ -52,11 +54,11 @@ object LNParams { me =>
     mismatch < -0.25 || mismatch > 0.25
   }
 
-  def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long) = {
+  def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (n <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: n :: Nil)
     LocalParams(maxHtlcValueInFlightMsat = UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay = 2000, maxAcceptedHtlcs = 25,
       fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey,
-      dustLimit = dust, shaSeed = sha256(sha.privateKey.toBin), isFunder = true)
+      dustLimit = dust, shaSeed = sha256(sha.privateKey.toBin), isFunder)
   }
 }
 
