@@ -286,11 +286,26 @@ object Commitments {
     htlcOut <- CommitmentSpec.findHtlcById(commitments.localCommit.spec, htlcId, incomingRelativeToLocal)
   } yield htlcOut.add
 
-  def sendFee(c: Commitments, ratePerKw: Long) = {
-    val updateFee = UpdateFee(c.channelId, ratePerKw)
-    val c1 = addLocalProposal(c, proposal = updateFee)
+  def ifSenderCanAffordFees(cs: Commitments) = {
+    val reduced = CommitmentSpec.reduce(cs.localCommit.spec, cs.localChanges.acked, cs.remoteChanges.proposed)
+    val feesSat = if (cs.localParams.isFunder) 0L else Scripts.commitTxFee(cs.localParams.dustLimit, reduced).amount
+    if (reduced.toRemoteMsat / 1000L - feesSat - cs.localParams.channelReserveSat < 0L) throw new LightningException
+    cs -> reduced
+  }
+
+  def sendFee(commitments: Commitments, ratePerKw: Long) = {
+    if (!commitments.localParams.isFunder) throw new LightningException
+    val updateFeeMessage = UpdateFee(commitments.channelId, ratePerKw)
+    val c1 = addLocalProposal(commitments, updateFeeMessage)
     if (c1.reducedRemoteState.canSendMsat < 0L) None
-    else Some(c1, updateFee)
+    else Some(c1 -> updateFeeMessage)
+  }
+
+  def receiveFee(commitments: Commitments, fee: UpdateFee) = {
+    if (commitments.localParams.isFunder) throw new LightningException
+    if (fee.feeratePerKw < minFeeratePerKw) throw new LightningException
+    val c1 \ _ = Commitments ifSenderCanAffordFees addRemoteProposal(commitments, fee)
+    c1
   }
 
   def sendAdd(c: Commitments, rd: RoutingData) =
@@ -324,16 +339,11 @@ object Commitments {
     else if (add.paymentHash.size != 32) throw new LightningException
     else {
 
-      val c1 = addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(_ + 1)
       // We should both check if WE can accept another HTLC and if PEER can send another HTLC
       // let's compute the current commitment *as seen by us* with this change taken into account
-      val reduced = CommitmentSpec.reduce(c1.localCommit.spec, c1.localChanges.acked, c1.remoteChanges.proposed)
-      val feesSat = if (c.localParams.isFunder) 0L else Scripts.commitTxFee(c.localParams.dustLimit, reduced).amount
-      val totalInFlightMsat = UInt64(reduced.htlcs.map(_.add.amountMsat).sum)
-
-      if (totalInFlightMsat > c.localParams.maxHtlcValueInFlightMsat) throw new LightningException
+      val c1 \ reduced = Commitments ifSenderCanAffordFees addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(_ + 1)
+      if (UInt64(reduced.htlcs.map(_.add.amountMsat).sum) > c.localParams.maxHtlcValueInFlightMsat) throw new LightningException
       if (reduced.htlcs.count(_.incoming) > c.localParams.maxAcceptedHtlcs) throw new LightningException
-      if (reduced.toRemoteMsat / 1000L - feesSat - c.localParams.channelReserveSat < 0L) throw new LightningException
       c1
     }
 

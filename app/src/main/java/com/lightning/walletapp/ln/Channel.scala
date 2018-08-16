@@ -246,14 +246,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA d1 doProcess CMDHTLCProcess
 
 
-      case (norm: NormalData, CMDFeerate(satPerKw), OPEN) =>
-        val localCommitFee = norm.commitments.localCommit.spec.feeratePerKw
-        val shouldUpdate = LNParams.shouldUpdateFee(satPerKw, localCommitFee)
-
-        if (shouldUpdate) Commitments.sendFee(norm.commitments, satPerKw) foreach { case c1 \ msg =>
+      case (norm: NormalData, CMDFeerate(satPerKw), OPEN) if norm.commitments.localParams.isFunder =>
+        val shouldUpdate = LNParams.shouldUpdateFee(satPerKw, norm.commitments.localCommit.spec.feeratePerKw)
+        if (shouldUpdate) Commitments.sendFee(norm.commitments, satPerKw) foreach { case c1 \ feeUpdateMessage =>
           // We send a fee update if current chan unspendable reserve + commitTx fee can afford it
           // otherwise we fail silently in hope that fee will drop or we will receive a payment
-          me UPDATA norm.copy(commitments = c1) SEND msg
+          me UPDATA norm.copy(commitments = c1) SEND feeUpdateMessage
           doProcess(CMDProceed)
         }
 
@@ -307,11 +305,16 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if inFlightHtlcs(me).isEmpty =>
 
         our -> their match {
-          case Some(ourSig) \ Some(theirSig) =>
-            // Got both shutdowns without HTLCs in-flight so can start closing negotiations
+          case Some(ourSig) \ Some(theirSig) if commitments.localParams.isFunder =>
+            // Got both shutdowns without HTLCs in-flight so can send a first closing since we are the funder
             val firstProposed = Closing.makeFirstClosing(commitments, ourSig.scriptPubKey, theirSig.scriptPubKey)
             val neg = NegotiationsData(announce, commitments, ourSig, theirSig, firstProposed :: Nil)
             BECOME(me STORE neg, NEGOTIATIONS) SEND firstProposed.localClosingSigned
+
+          case Some(ourSig) \ Some(theirSig) =>
+            // Got both shutdowns without HTLCs in-flight so wait for funder's proposal
+            val neg = NegotiationsData(announce, commitments, ourSig, theirSig, Nil)
+            BECOME(me STORE neg, NEGOTIATIONS)
 
           case None \ Some(theirSig) =>
             // We have previously received their Shutdown so can respond
