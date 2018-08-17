@@ -4,7 +4,6 @@ import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
-import com.lightning.walletapp.ln.Scripts.CommitTx
 import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
 
@@ -59,7 +58,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
 
 
-      case (WaitFundingDataFundee(announce, localParams), open: OpenChannel, WAIT_FOR_INIT) =>
+      case (InitDataFundee(announce, localParams), open: OpenChannel, WAIT_FOR_INIT) =>
         if (LNParams.chainHash != open.chainHash) throw new LightningException("They have provided a wrong chain hash")
         if (open.fundingSatoshis < LNParams.minCapacitySat) throw new LightningException("Their proposed capacity is too small")
         if (open.pushMsat > 1000L * open.fundingSatoshis) throw new LightningException("They are trying to push more than proposed capacity")
@@ -84,11 +83,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           localParams.paymentBasepoint, localParams.delayedPaymentBasepoint,
           localParams.htlcBasepoint, firstPerCommitPoint)
 
-        val remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis,
-          open.maxHtlcValueInFlightMsat, open.channelReserveSatoshis, open.htlcMinimumMsat,
-          minimumDepth = 6, open.toSelfDelay, open.maxAcceptedHtlcs, open.fundingPubkey,
-          open.revocationBasepoint, open.paymentBasepoint, open.delayedPaymentBasepoint,
-          open.htlcBasepoint, open.firstPerCommitmentPoint)
+        BECOME(WaitFundingCreatedRemote(announce, localParams, AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis,
+          open.maxHtlcValueInFlightMsat, open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = 6, open.toSelfDelay,
+          open.maxAcceptedHtlcs, open.fundingPubkey, open.revocationBasepoint, open.paymentBasepoint, open.delayedPaymentBasepoint,
+          open.htlcBasepoint, open.firstPerCommitmentPoint), open), WAIT_FOR_FUNDING) SEND accept
 
 
       case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>
@@ -104,13 +102,34 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         BECOME(WaitFundingData(announce, cmd, accept), WAIT_FOR_FUNDING)
 
 
-      // LOCAL FUNDING FLOW
+      case (WaitFundingCreatedRemote(announce, localParams, accept, open),
+        FundingCreated(_, txHash, outIndex, remoteSig), WAIT_FOR_FUNDING) =>
+
+        val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) =
+          Funding.makeFirstCommitTxs(localParams, open.fundingSatoshis, open.pushMsat,
+            open.feeratePerKw, accept, txHash, outIndex, open.firstPerCommitmentPoint)
+
+        val signedLocalCommitTx = Scripts.addSigs(localCommitTx, localParams.fundingPrivKey.publicKey,
+          accept.fundingPubkey, Scripts.sign(localCommitTx, localParams.fundingPrivKey), remoteSig)
+
+        if (Scripts.checkValid(signedLocalCommitTx).isSuccess) {
+          val channelId = Tools.toLongId(fundingHash = txHash, outIndex)
+          val rc = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, open.firstPerCommitmentPoint)
+          val wfcs = WaitFundingSignedCore(localParams, channelId, accept, localSpec, signedLocalCommitTx, rc)
+          val wait = WaitBroadcastRemoteData(announce, wfcs, txHash, wfcs makeCommitments signedLocalCommitTx)
+          val localSigOfRemoteTx = Scripts.sign(remoteCommitTx, localParams.fundingPrivKey)
+          val fundingSigned = FundingSigned(channelId, localSigOfRemoteTx)
+          BECOME(me STORE wait, WAIT_FUNDING_DONE) SEND fundingSigned
+        } else throw new LightningException
+
+
+      // LOCAL FUNDER FLOW
 
 
       case (WaitFundingData(announce, cmd, accept), CMDFunding(fundTx), WAIT_FOR_FUNDING) =>
         // They have accepted our proposal, let them sign a first commit so we can broadcast a funding later
         if (fundTx.txOut(cmd.batch.fundOutIdx).amount.amount != cmd.batch.fundingAmountSat) throw new LightningException
-        val core \ fundingCreatedMessage = signFunding(cmd, accept, txHash = fundTx.hash, outIndex = cmd.batch.fundOutIdx)
+        val core \ fundingCreatedMessage = signLocalFunding(cmd, accept, txHash = fundTx.hash, outIndex = cmd.batch.fundOutIdx)
         BECOME(WaitFundingSignedData(announce, core, fundTx), WAIT_FUNDING_SIGNED) SEND fundingCreatedMessage
 
 
@@ -122,12 +141,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         }
 
 
-      // REMOTE FUNDING FLOW
+      // REMOTE FUNDER/FUNDEE FLOW
 
 
       // We have asked an external funder to prepare a funding tx and got a positive response
       case (WaitFundingData(announce, cmd, accept), ready: FundingTxReady, WAIT_FOR_FUNDING) =>
-        val core \ fundingCreatedMessage = signFunding(cmd, accept, ready.txHash, ready.outIndex)
+        val core \ fundingCreatedMessage = signLocalFunding(cmd, accept, ready.txHash, ready.outIndex)
         val data = WaitFundingSignedRemoteData(announce, core, txHash = ready.txHash)
         BECOME(data, WAIT_FUNDING_SIGNED) SEND fundingCreatedMessage
 
@@ -563,14 +582,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     events onProcessSuccess Tuple3(me, data, change)
   }
 
-  private def signFunding(cmd: CMDOpenChannel, accept: AcceptChannel, txHash: BinaryData, outIndex: Int) = {
-    val (localSpec: CommitmentSpec, localCommitTx: CommitTx, remoteSpec: CommitmentSpec, remoteCommitTx: CommitTx) =
-      Funding.makeFirstCommitTxs(cmd, accept, txHash, outIndex, accept.firstPerCommitmentPoint)
+  private def signLocalFunding(cmd: CMDOpenChannel, accept: AcceptChannel, txHash: BinaryData, outIndex: Int) = {
+    val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstCommitTxs(cmd.localParams, cmd.fundingSat,
+      cmd.pushMsat, cmd.initialFeeratePerKw, accept, txHash, outIndex, accept.firstPerCommitmentPoint)
 
-    val chanId = Tools.toLongId(txHash, outIndex)
     val localSigOfRemoteTx = Scripts.sign(remoteCommitTx, cmd.localParams.fundingPrivKey)
-    val firstRemoteCommit = RemoteCommit(0L, remoteSpec, remoteCommitTx.tx.txid, accept.firstPerCommitmentPoint)
-    val wfsc = WaitFundingSignedCore(cmd.localParams, chanId, accept, localSpec, localCommitTx, firstRemoteCommit)
+    val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, accept.firstPerCommitmentPoint)
+    val wfsc = WaitFundingSignedCore(cmd.localParams, Tools.toLongId(txHash, outIndex), accept, localSpec, localCommitTx, firstRemoteCommit)
     wfsc -> FundingCreated(cmd.tempChanId, txHash, outIndex, localSigOfRemoteTx)
   }
 
@@ -666,8 +684,8 @@ object Channel {
 }
 
 case class ChanReport(chan: Channel, cs: Commitments) {
-  def finalCanSend = estimateCanSend(chan) - softReserve.amount * 1000L
-  val softReserve: Satoshi = cs.commitInput.txOut.amount / 50
+  def finalCanSend: Long = estimateCanSend(chan) - softReserve.amount * 1000L
+  val softReserve = if (cs.localParams.isFunder) cs.commitInput.txOut.amount / 50L else Satoshi(0L)
 }
 
 trait ChannelListener {

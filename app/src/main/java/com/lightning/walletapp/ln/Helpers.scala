@@ -274,28 +274,28 @@ object Helpers {
       InputInfo(outPoint, fundingTxOut, Script write multisig)
     }
 
-    def makeFirstCommitTxs(cmd: CMDOpenChannel,
-                           remoteParams: AcceptChannel, fundingTxHash: BinaryData,
-                           fundingTxOutputIndex: Int, remoteFirstPoint: Point) = {
+    def makeFirstCommitTxs(localParams: LocalParams, fundingSat: Long, pushMsat: Long, initialFeeratePerKw: Long,
+                           remoteParams: AcceptChannel, fundingTxHash: BinaryData, fundingTxOutputIndex: Int,
+                           remoteFirstPoint: Point) = {
 
-      val toLocalMsat = if (cmd.localParams.isFunder) cmd.fundingSat * 1000L - cmd.pushMsat else cmd.pushMsat
-      val toRemoteMsat = if (cmd.localParams.isFunder) cmd.pushMsat else cmd.fundingSat * 1000L - cmd.pushMsat
+      val toLocalMsat = if (localParams.isFunder) fundingSat * 1000L - pushMsat else pushMsat
+      val toRemoteMsat = if (localParams.isFunder) pushMsat else fundingSat * 1000L - pushMsat
 
-      val localSpec = CommitmentSpec(cmd.initialFeeratePerKw, toLocalMsat, toRemoteMsat)
-      val remoteSpec = CommitmentSpec(cmd.initialFeeratePerKw, toRemoteMsat, toLocalMsat)
+      val localSpec = CommitmentSpec(initialFeeratePerKw, toLocalMsat, toRemoteMsat)
+      val remoteSpec = CommitmentSpec(initialFeeratePerKw, toRemoteMsat, toLocalMsat)
 
-      if (!cmd.localParams.isFunder) {
+      if (!localParams.isFunder) {
         val fees = Scripts.commitTxFee(remoteParams.dustLimitSat, remoteSpec).amount
-        val missing = remoteSpec.toLocalMsat / 1000L - cmd.localParams.channelReserveSat - fees
+        val missing = remoteSpec.toLocalMsat / 1000L - localParams.channelReserveSat - fees
         if (missing < 0) throw new LightningException("They are funder and can not afford fees")
       }
 
-      val localPerCommitmentPoint = perCommitPoint(cmd.localParams.shaSeed, 0L)
+      val localPerCommitmentPoint = perCommitPoint(localParams.shaSeed, 0L)
       val commitmentInput = makeFundingInputInfo(fundingTxHash, fundingTxOutputIndex,
-        Satoshi(cmd.fundingSat), cmd.localParams.fundingPrivKey.publicKey, remoteParams.fundingPubkey)
+        Satoshi(fundingSat), localParams.fundingPrivKey.publicKey, remoteParams.fundingPubkey)
 
-      val (localCommitTx, _, _) = makeLocalTxs(0L, cmd.localParams, remoteParams, commitmentInput, localPerCommitmentPoint, localSpec)
-      val (remoteCommitTx, _, _, _, _) = makeRemoteTxs(0L, cmd.localParams, remoteParams, commitmentInput, remoteFirstPoint, remoteSpec)
+      val (localCommitTx, _, _) = makeLocalTxs(0L, localParams, remoteParams, commitmentInput, localPerCommitmentPoint, localSpec)
+      val (remoteCommitTx, _, _, _, _) = makeRemoteTxs(0L, localParams, remoteParams, commitmentInput, remoteFirstPoint, remoteSpec)
       (localSpec, localCommitTx, remoteSpec, remoteCommitTx)
     }
   }
