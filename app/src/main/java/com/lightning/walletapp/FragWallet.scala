@@ -35,6 +35,7 @@ import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
+import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
 import android.app.AlertDialog
 import android.content.Intent
@@ -393,10 +394,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
       val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
 
-      val defaultMarking = if (wrap.visibleValue.isPositive) coloredIn else coloredOut
+      val color = if (wrap.visibleValue.isPositive) coloredIn else coloredOut
       val humanOutputs = wrap directedScriptPubKeysWithValueTry wrap.visibleValue.isPositive collect {
-        case Success(pks \ value) if pks.isSentToP2WSH => P2WSHData(value, pks).destination(coloredChan).html
-        case Success(pks \ value) => AddrData(value, pks getToAddress app.params).destination(defaultMarking).html
+        case Success(chanFunding \ value) if chanFunding.isSentToP2WSH => P2WSHData(value, chanFunding).destination(coloredChan).html
+        case Success(pks \ value) if !ScriptPattern.isOpReturn(pks) => AddrData(value, pks getToAddress app.params).destination(color).html
       }
 
       val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip,

@@ -138,7 +138,7 @@ class TxWrap(val tx: Transaction) {
     else if (valueWithoutFee.isZero) nativeSentToMe // This is a to-itself transaction, hide the fee
     else valueWithoutFee // This is an outgoing tx, subtract the fee
 
-  def directedScriptPubKeysWithValueTry(incoming: Boolean) = tx.getOutputs.asScala.collect {
+  def directedScriptPubKeysWithValueTry(incoming: Boolean) = tx.getOutputs.asScala collect {
     case out if out.isMine(app.kit.wallet) == incoming => Try(out.getScriptPubKey -> out.getValue)
   }
 
