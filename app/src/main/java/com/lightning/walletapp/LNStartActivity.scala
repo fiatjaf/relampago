@@ -13,6 +13,7 @@ import com.lightning.walletapp.StartNodeView._
 import com.lightning.walletapp.ln.wire.FundMsg._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
+import com.lightning.walletapp.Utils.app.TransData.nodeLink
 import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
@@ -20,6 +21,8 @@ import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
 import android.os.Bundle
 import java.util.Date
+
+import fr.acinq.bitcoin.Crypto.PublicKey
 
 
 class LNStartActivity extends ScanActivity { me =>
@@ -236,4 +239,12 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
     val key = humanNode(channelAnnouncement.nodeId.toString, separator)
     base.format(channelAnnouncement.alias, humanConnects, key)
   }
+}
+
+// GETTING INCOMING CHANNEL
+
+case class IncomingChannelRequest(action: String, uri: String, callback: String, k1: String) {
+  val nodeView = HardcodedNodeView(app.mkNodeAnnouncement(PublicKey(key), host, port.toInt), chansNumber.last)
+  val requestUri = s"$uri?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}"
+  lazy val nodeLink(key, host, port) = uri
 }

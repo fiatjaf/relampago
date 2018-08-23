@@ -44,9 +44,8 @@ case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 // INCOMING CHANNEL
 
-case class InitDataFundee(announce: NodeAnnouncement, localParams: LocalParams) extends ChannelData
-case class WaitFundingCreatedRemote(announce: NodeAnnouncement, localParams: LocalParams, remoteParams: AcceptChannel,
-                                    open: OpenChannel) extends ChannelData
+case class WaitFundingCreatedRemote(announce: NodeAnnouncement, localParams: LocalParams,
+                                    remoteParams: AcceptChannel, open: OpenChannel) extends ChannelData
 
 // OUTGOING CHANNEL
 

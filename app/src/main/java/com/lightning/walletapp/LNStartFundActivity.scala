@@ -10,6 +10,7 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.StartNodeView._
+import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -19,12 +20,12 @@ import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.script.ScriptBuilder
 import org.bitcoinj.wallet.SendRequest
+import fr.acinq.bitcoin.MilliSatoshi
 import android.app.AlertDialog
 import org.bitcoinj.core.Batch
 import java.util.Collections
 import android.os.Bundle
 
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 import android.widget.{ImageButton, TextView}
 import scala.util.{Failure, Success, Try}
 
@@ -39,17 +40,18 @@ class LNStartFundActivity extends TimerActivity { me =>
     setContentView(R.layout.activity_ln_start_fund)
 
     app.TransData checkAndMaybeErase {
-      case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(remoteNodeView.asString(nodeFundView, "<br>"), ann)
-      case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(hardcodedNodeView.asString(nodeFundView, "<br>"), ann)
-      case ann: NodeAnnouncement => proceed(HardcodedNodeView(ann, chansNumber.last).asString(nodeFundView, "<br>"), ann)
+      case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(nodeFundView, "<br>"), ann)
+      case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(nodeFundView, "<br>"), ann)
+      case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, chansNumber.last).asString(nodeFundView, "<br>"), ann)
+      case icr: IncomingChannelRequest => proceed(Some(icr), icr.nodeView.asString(nodeFundView, "<br>"), icr.nodeView.ann)
       case _ => finish
     }
 
     // Or back if resources are freed
   } else me exitTo classOf[MainActivity]
 
-  def proceed(asString: String, ann: NodeAnnouncement) = {
-    val freshChan = app.ChannelManager.createChannel(Set.empty, InitData apply ann)
+  def proceed(icrOpt: Option[IncomingChannelRequest], asString: String, ann: NodeAnnouncement) = {
+    val freshChan = app.ChannelManager.createChannel(bootstrap = InitData(ann), initialListeners = Set.empty)
     lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
     lnStartFundDetails setText asString.html
 
@@ -61,8 +63,16 @@ class LNStartFundActivity extends TimerActivity { me =>
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        case err: Error if nodeId == ann.nodeId => onException(freshChan -> err.exception)
+        // Immediately liquidate a channel and exit this page in case of remote error
+
+        case open: OpenChannel if nodeId == ann.nodeId =>
+          val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
+          val theirUnspendableReserveSat = open.channelReserveSatoshis / LNParams.channelReserveToFundingRatio
+          val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = false)
+          freshChan process Tuple2(open, localParams)
+
         case msg: ChannelSetupMessage if nodeId == ann.nodeId => freshChan process msg
+        case err: Error if nodeId == ann.nodeId => onException(freshChan -> err.exception)
         case _ =>
       }
 
@@ -119,7 +129,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       OlympusWrap tellClouds act
     }
 
-    def localOpenListener = new LocalOpenListener {
+    def localWalletListener = new LocalOpenListener {
       // Asks user to provide a funding amount manually
 
       def askLocalFundingConfirm = UITask {
@@ -234,6 +244,23 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
     }
 
+    def remoteOpenFundeeListener(icr: IncomingChannelRequest) = new OpenListener {
+      override def onOperational(remoteFunderNodeId: PublicKey) = get(icr.requestUri, true)
+        .trustAllCerts.trustAllHosts.body
+
+      override def onBecome = {
+        case (_, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>
+          // Preliminary negotiations are complete, save channel and wait for their tx
+          freshChan.listeners = app.ChannelManager.operationalListeners
+          app.ChannelManager.all +:= freshChan
+          saveChan(wait)
+
+          // Tell wallet activity to redirect to ops
+          app.TransData.value = FragWallet.REDIRECT
+          me exitTo classOf[WalletActivity]
+      }
+    }
+
     lazy val efListener = new ExternalFunderListener {
       // Exit this page once disconnected for whatever reason
       override def onMsg(msg: FundMsg) = freshChan process msg
@@ -241,10 +268,11 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     lazy val openListener =
-      ExternalFunder.worker -> FragLNStart.batchOpt match {
-        case Some(workingWsw) \ None => remoteOpenListener(workingWsw)
-        case None \ Some(realBatch) => localBatchListener(realBatch)
-        case _ => localOpenListener
+      ExternalFunder.worker -> FragLNStart.batchOpt -> icrOpt match {
+        case Some(onlineWsw) \ None \ None => remoteOpenListener(onlineWsw)
+        case None \ None \ Some(icr) => remoteOpenFundeeListener(icr)
+        case None \ Some(batch) \ None => localBatchListener(batch)
+        case _ => localWalletListener
       }
 
     whenBackPressed = UITask {

@@ -58,7 +58,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
 
 
-      case (InitDataFundee(announce, localParams), open: OpenChannel, WAIT_FOR_INIT) =>
+      case (InitData(announce), Tuple2(localParams: LocalParams, open: OpenChannel), WAIT_FOR_INIT) =>
         if (LNParams.chainHash != open.chainHash) throw new LightningException("They have provided a wrong chain hash")
         if (open.fundingSatoshis < LNParams.minCapacitySat) throw new LightningException("Their proposed capacity is too small")
         if (open.pushMsat > 1000L * open.fundingSatoshis) throw new LightningException("They are trying to push more than proposed capacity")
@@ -67,6 +67,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if (open.toSelfDelay > LNParams.maxToSelfDelay) throw new LightningException("Their toSelfDelay is too high")
         if (open.dustLimitSatoshis < 546L) throw new LightningException("Their on-chain dust limit is too low")
         if (open.maxAcceptedHtlcs > 483) throw new LightningException("They can accept too many payments")
+        if (open.pushMsat < 0) throw new LightningException("Their pushMsat is negative")
 
         val toLocalMsat \ toRemoteMsat = (open.pushMsat, open.fundingSatoshis * 1000L - open.pushMsat)
         if (toLocalMsat <= open.channelReserveSatoshis * 1000L && toRemoteMsat <= open.channelReserveSatoshis * 1000L)
@@ -119,7 +120,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           val wait = WaitBroadcastRemoteData(announce, wfcs, txHash, wfcs makeCommitments signedLocalCommitTx)
           val localSigOfRemoteTx = Scripts.sign(remoteCommitTx, localParams.fundingPrivKey)
           val fundingSigned = FundingSigned(channelId, localSigOfRemoteTx)
-          BECOME(me STORE wait, WAIT_FUNDING_DONE) SEND fundingSigned
+          BECOME(wait, WAIT_FUNDING_DONE) SEND fundingSigned
         } else throw new LightningException
 
 

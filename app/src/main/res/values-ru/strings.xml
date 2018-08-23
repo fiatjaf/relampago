@@ -271,7 +271,7 @@
         <item><![CDATA[<strong>%1$s</strong> public channel]]></item>
         <item><![CDATA[<strong>%1$s</strong> public channels]]></item>
         <item><![CDATA[<strong>%1$s</strong> public channels]]></item>
-        <item><![CDATA[<i>Public channels unknown</i>]]></item>
+        <item><![CDATA[<i>Opening negotiations</i>]]></item>
     </array>
 
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from external source</strong>]]></string>
