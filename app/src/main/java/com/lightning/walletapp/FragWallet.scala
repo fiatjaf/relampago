@@ -640,6 +640,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   app.kit.peerGroup addConnectedEventListener peersListener
   app.kit.wallet addCoinsReceivedEventListener txsListener
   app.kit.wallet addCoinsSentEventListener txsListener
-  <(updBtcItems, onFail)(none)
   react(new String)
+  updBtcItems
 }
