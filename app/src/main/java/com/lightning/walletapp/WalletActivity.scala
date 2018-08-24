@@ -138,17 +138,27 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
       case onChainAddress: Address => FragWallet.worker.sendBtcPopup(onChainAddress)(none)
       case uri: BitcoinURI => FragWallet.worker.sendBtcPopup(uri.getAddress)(none) setSum Try(uri.getAmount)
-      case pr: PaymentRequest if app.ChannelManager.notClosingOrRefunding.isEmpty => maybeOfferBatch(pr)
-      case pr: PaymentRequest => FragWallet.worker sendPayment pr
       case FragWallet.REDIRECT => goOps(null)
+
+      case pr: PaymentRequest =>
+        val okChans = app.ChannelManager.notClosingOrRefunding
+        if (okChans.nonEmpty) FragWallet.worker sendPayment pr else {
+          // TransData should be set to batch or null to erase previous
+          app.TransData.value = TxWrap findBestBatch pr getOrElse null
+          me goTo classOf[LNStartActivity]
+          app toast ln_empty
+        }
+
+      case lnUrl: LNUrl =>
+        app toast ln_url_resolving
+        lnUrl.resolve.foreach(lnUrlDataItem => {
+          // Happens in some time so lnUrl is gone
+          app.TransData.value = lnUrlDataItem
+          me goTo classOf[LNStartActivity]
+        }, Tools.errlog)
+
       case _ =>
     }
-  }
-
-  def maybeOfferBatch(pr: PaymentRequest) = {
-    // TransData should be set to batch or null to erase previous
-    app.TransData.value = TxWrap findBestBatch pr getOrElse null
-    me goTo classOf[LNStartActivity]
   }
 
   // BUTTONS REACTIONS

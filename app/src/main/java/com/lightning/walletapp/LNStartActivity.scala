@@ -11,6 +11,9 @@ import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.StartNodeView._
 import com.lightning.walletapp.ln.wire.FundMsg._
+import com.github.kevinsawicki.http.HttpRequest._
+import com.lightning.walletapp.lnutils.JsonHttpUtils._
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
@@ -19,10 +22,9 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
+import fr.acinq.bitcoin.Bech32
 import android.os.Bundle
 import java.util.Date
-
-import fr.acinq.bitcoin.Crypto.PublicKey
 
 
 class LNStartActivity extends ScanActivity { me =>
@@ -243,8 +245,18 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 
 // GETTING INCOMING CHANNEL
 
-case class IncomingChannelRequest(action: String, uri: String, callback: String, k1: String) {
+sealed trait LNUrlData
+case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
   val nodeView = HardcodedNodeView(app.mkNodeAnnouncement(PublicKey(key), host, port.toInt), chansNumber.last)
-  val requestUri = s"$uri?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}"
+  val requestUri = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}"
   lazy val nodeLink(key, host, port) = uri
+}
+
+// LNURL HANDLER
+
+case class LNUrl(bech32url: String) {
+  private[this] val _ \ decoded = Bech32 decode bech32url
+  private[this] val finalDecoded = Bech32 five2eight decoded
+  def resolve = obsOnIO.map(_ => get(new String(finalDecoded.toArray, "UTF-8"), true)
+    .trustAllCerts.trustAllHosts.connectTimeout(15000).body) map to[LNUrlData]
 }

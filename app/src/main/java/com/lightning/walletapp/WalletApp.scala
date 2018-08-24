@@ -97,7 +97,8 @@ class WalletApp extends Application { me =>
   object TransData { self =>
     var value: Any = new String
     private[this] val prefixes = PaymentRequest.prefixes.values mkString "|"
-    private[this] val lnLink = s"(?im).*?($prefixes)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
+    private[this] val lnUrl = s"(?im).*?(lnurl)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
+    private[this] val lnPayReq = s"(?im).*?($prefixes)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
     private[this] val funder = "(lnbcfunder|lntbfunder|lnbcrtfunder):([a-z0-9]+)".r
     val nodeLink = "([a-fA-F0-9]{66})@([a-zA-Z0-9:\\.\\-_]+):([0-9]+)".r
 
@@ -109,11 +110,12 @@ class WalletApp extends Application { me =>
       case _ => value = null
     }
 
-    def recordValue(rawText: String) = value = rawText match {
+    def recordValue(rawText: String) = value = rawText take 2880 match {
       case _ if rawText startsWith "bitcoin" => new BitcoinURI(params, rawText)
       case _ if rawText startsWith "BITCOIN" => new BitcoinURI(params, rawText.toLowerCase)
       case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), host, port.toInt)
-      case lnLink(prefix, req) => PaymentRequest read s"$prefix$req".toLowerCase
+      case lnPayReq(prefix, req) => PaymentRequest.read(s"$prefix$req".toLowerCase)
+      case lnUrl(prefix, data) => LNUrl(s"$prefix$data".toLowerCase)
       case funder(_, paramsHex) => to[Started](paramsHex.hex2asci)
       case _ => toAddress(rawText)
     }

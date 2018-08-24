@@ -11,6 +11,7 @@ import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndCl
 import com.lightning.walletapp.lnutils.olympus.{BlindMemo, BlindParam, CloudAct, CloudData}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
+import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData}
 import com.lightning.walletapp.ln.Tools.{Bytes, UserId}
 
 import com.lightning.walletapp.ln.crypto.ShaHashesWithIndex
@@ -117,6 +118,22 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val cloudActFmt = jsonFormat[BinaryData, Seq[HttpParam], String, CloudAct](CloudAct.apply, "data", "plus", "path")
   implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
   implicit val ratesFmt = jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
+
+  // LNURL
+
+  implicit object LNUrlDataFmt extends JsonFormat[LNUrlData] {
+    def write(unserialized: LNUrlData): JsValue = unserialized match {
+      case unserialiedMessage: IncomingChannelRequest => unserialiedMessage.toJson
+    }
+
+    def read(serialized: JsValue): LNUrlData = serialized.asJsObject fields "tag" match {
+      case JsString("channelRequest") => serialized.convertTo[IncomingChannelRequest]
+      case _ => throw new RuntimeException
+    }
+  }
+
+  implicit val incomingChannelRequestFmt: JsonFormat[IncomingChannelRequest] = taggedJsonFmt(jsonFormat[String, String, String,
+    IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1"), tag = "channelRequest")
 
   // FundMsg
 
