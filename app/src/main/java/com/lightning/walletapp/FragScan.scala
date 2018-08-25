@@ -15,7 +15,7 @@ import android.os.Bundle
 
 trait ScanActivity extends TimerActivity {
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
-  def returnToBase(view: View) = walletPager.setCurrentItem(0, true)
+  def returnToBase(view: View) = walletPager.setCurrentItem(0, false)
   def checkTransData: Unit
 }
 

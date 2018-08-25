@@ -672,7 +672,7 @@ object Channel {
 
   def isOpening(chan: Channel): Boolean = chan.data match {
     case remote: WaitBroadcastRemoteData => remote.fail.isEmpty
-    case wait: WaitFundingDoneData => true
+    case _: WaitFundingDoneData => true
     case _ => false
   }
 

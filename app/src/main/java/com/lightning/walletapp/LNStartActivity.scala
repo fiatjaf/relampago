@@ -44,6 +44,7 @@ class LNStartActivity extends ScanActivity { me =>
     if (m.getItemId == R.id.actionScan) walletPager.setCurrentItem(1, true)
   }
 
+  override def onResume = wrap(super.onResume)(me returnToBase null)
   override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
     // Called after FragLNStart sets its toolbar as actionbar
     getMenuInflater.inflate(R.menu.ln_start, menu)
@@ -56,7 +57,12 @@ class LNStartActivity extends ScanActivity { me =>
   } else me exitTo classOf[MainActivity]
 
   def checkTransData = {
-    returnToBase(view = null)
+    app.TransData.value match {
+      case _: Batch => me returnToBase null
+      case _: Started => me returnToBase null
+      case _ => // Normal mode or switching
+    }
+
     app.TransData checkAndMaybeErase {
       case _: Address => me exitTo classOf[WalletActivity]
       case _: BitcoinURI => me exitTo classOf[WalletActivity]

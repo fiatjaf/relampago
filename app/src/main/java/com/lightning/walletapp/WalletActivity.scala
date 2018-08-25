@@ -96,6 +96,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   override def onDestroy = wrap(super.onDestroy)(stopDetecting)
+  override def onResume = wrap(super.onResume)(me returnToBase null)
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionSettings) makeSettingsForm
   }
@@ -138,7 +139,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   // EXTERNAL DATA CHECK
 
   def checkTransData = {
-    returnToBase(view = null)
+    app.TransData.value match {
+      case _: LNUrl => me returnToBase null
+      case _: Address => me returnToBase null
+      case _: BitcoinURI => me returnToBase null
+      case _: PaymentRequest => me returnToBase null
+      case _ => // Switching activity
+    }
+
     app.TransData checkAndMaybeErase {
       case _: Started => me goTo classOf[LNStartActivity]
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
@@ -148,7 +156,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
       case pr: PaymentRequest =>
         val okChans = app.ChannelManager.notClosingOrRefunding
-        if (okChans.nonEmpty) FragWallet.worker sendPayment pr else {
+        if (okChans.nonEmpty) FragWallet.worker.sendPayment(pr) else {
           // TransData should be set to batch or null to erase previous
           app.TransData.value = TxWrap findBestBatch pr getOrElse null
           me goTo classOf[LNStartActivity]
