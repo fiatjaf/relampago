@@ -251,7 +251,7 @@ class WalletApp extends Application { me =>
           Left(getString(err_ln_second_reserve).format(report.chan.data.announce.alias, hardReserve, coloredOut(report.softReserve),
             capacity, finalCanSend, sendingNow).html)
 
-        case None => Left(me getString err_ln_no_chan)
+        case None => Left(me getString ln_no_open_chans)
         case Some(reportWhichIsFine) => Right(rd)
       }
     }
@@ -274,7 +274,7 @@ class WalletApp extends Application { me =>
       }
 
       val paymentRoutesObs =
-        if (from.isEmpty) Obs error new LightningException(me getString err_ln_no_chan)
+        if (from.isEmpty) Obs error new LightningException(me getString ln_no_open_chans)
         else if (rd.pr.routingInfo.isEmpty) getRoutes(targetId = rd.pr.nodeId)
         else Obs.zip(withHints).map(_.flatten.toVector)
 

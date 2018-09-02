@@ -160,7 +160,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val maxCanReceive = MilliSatoshi(math abs maxCanReceiveMsat)
 
     val reserveUnspent = getString(ln_receive_reserve) format coloredOut(maxCanReceive)
-    val lnReceiveText = if (operationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_nochan)
+    val lnReceiveText = if (operationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_no_open_chans)
       else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_option).format(me getString ln_receive_6conf)
       else if (maxCanReceiveMsat < 0L) getString(ln_receive_option).format(reserveUnspent)
       else getString(ln_receive_option).format(me getString ln_receive_ok)

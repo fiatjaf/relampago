@@ -144,8 +144,8 @@
     <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><small><br><br>Make a QR-code with onchain wallet address, can be used to receive regular Bitcoin transactions</small>]]></string>
     <string name="ln_receive_6conf"><![CDATA[&#9888; Can\'t ask for Lightning payments because your peer is not ready yet. Typically peers become ready once a channel funding Bitcoin transaction gets 6 confirmations]]></string>
     <string name="ln_receive_reserve"><![CDATA[&#9888; Can\'t ask for Lightning payments yet because first you need to spend at least %1$s in order to make some space for receiving]]></string>
-    <string name="ln_receive_ok">Make a QR-code with a Lightning Payment Request, can be used to receive fast offchain payments</string>
-    <string name="ln_receive_nochan">No payment channels found</string>
+    <string name="ln_receive_ok">Make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</string>
+    <string name="ln_no_open_chans">No open channels found</string>
 
     <string name="err_ln_peer_offline">Could not connect to remote peer at %1$s</string>
     <string name="err_ln_no_data_loss_protect">Data loss protection is not provided by this peer</string>
@@ -156,7 +156,6 @@
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
     <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 
-    <string name="err_ln_no_chan">Failed because no channel is online, please check your phone connectivity and try again in a few seconds</string>
     <string name="err_ln_still_opening">Failed because a payment channel is not open yet\n\nFunding transaction needs to get enough confirmations before a channel can be used to send payments</string>
     <string name="err_ln_second_reserve"><![CDATA[Failed because a channel balance is too low when soft reserve is taken into account<br><br>%1$s<br><br>hard reserve %2$s<br>soft reserve %3$s<br><br>capacity %4$s<br>can send %5$s<br>sending %6$s]]></string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>

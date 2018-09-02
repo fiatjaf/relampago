@@ -508,7 +508,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val openingChannels = app.ChannelManager.notClosingOrRefunding.filter(isOpening)
       val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
       if (operationalChannels.isEmpty && openingChannels.nonEmpty) onFail(app getString err_ln_still_opening)
-      else if (operationalChannels.isEmpty) app toast ln_receive_nochan else {
+      else if (operationalChannels.isEmpty) app toast ln_no_open_chans else {
 
         val maxCanSendUncapped = operationalChannels.map(estimateCanSend).max
         val maxCanSend = MilliSatoshi apply math.min(maxCanSendUncapped, LNParams.maxHtlcValueMsat)
