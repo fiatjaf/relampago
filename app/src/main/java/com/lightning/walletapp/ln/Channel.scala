@@ -58,7 +58,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
 
 
-      case (InitData(announce), Tuple2(localParams: LocalParams, open: OpenChannel), WAIT_FOR_INIT) =>
+      case (InitData(announce), Tuple2(open: OpenChannel, localParams: LocalParams), WAIT_FOR_INIT) =>
         if (LNParams.chainHash != open.chainHash) throw new LightningException("They have provided a wrong chain hash")
         if (open.fundingSatoshis < LNParams.minCapacitySat) throw new LightningException("Their proposed capacity is too small")
         if (open.pushMsat > 1000L * open.fundingSatoshis) throw new LightningException("They are trying to push more than proposed capacity")

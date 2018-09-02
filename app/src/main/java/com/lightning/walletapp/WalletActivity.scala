@@ -2,6 +2,7 @@ package com.lightning.walletapp
 
 import android.view._
 import android.widget._
+import scala.concurrent.duration._
 import com.lightning.walletapp.ln._
 import android.text.format.DateUtils._
 import com.lightning.walletapp.Utils._
@@ -150,12 +151,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         }
 
       case lnUrl: LNUrl =>
-        app toast ln_url_resolving
-        lnUrl.resolve.foreach(lnUrlDataItem => {
-          // Happens in some time so lnUrl is gone
-          app.TransData.value = lnUrlDataItem
-          me goTo classOf[LNStartActivity]
-        }, Tools.errlog)
+        lnUrl.resolve.doOnSubscribe(app toast ln_url_resolving).delay(2.seconds)
+          .map(obtainedRemoteData => app.TransData.value = obtainedRemoteData)
+          .foreach(_ => me goTo classOf[LNStartFundActivity], none)
 
       case _ =>
     }

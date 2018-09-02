@@ -68,8 +68,8 @@ class LNStartFundActivity extends TimerActivity { me =>
         case open: OpenChannel if nodeId == ann.nodeId =>
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val theirUnspendableReserveSat = open.channelReserveSatoshis / LNParams.channelReserveToFundingRatio
-          val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = false)
-          freshChan process Tuple2(open, localParams)
+          freshChan process Tuple2(LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript,
+            System.currentTimeMillis, isFunder = false), open)
 
         case msg: ChannelSetupMessage if nodeId == ann.nodeId => freshChan process msg
         case err: Error if nodeId == ann.nodeId => onException(freshChan -> err.exception)
@@ -245,8 +245,10 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def remoteOpenFundeeListener(icr: IncomingChannelRequest) = new OpenListener {
-      override def onOperational(remoteFunderNodeId: PublicKey) = get(icr.requestUri, true)
-        .trustAllCerts.trustAllHosts.body
+      // Once becoming connected this listener automatically calls peer's HTTP endpoint
+
+      override def onOperational(remoteFunderNodeId: PublicKey) =
+        get(icr.requestUri, true).trustAllCerts.trustAllHosts.body
 
       override def onBecome = {
         case (_, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>
