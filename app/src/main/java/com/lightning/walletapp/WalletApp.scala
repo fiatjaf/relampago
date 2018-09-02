@@ -28,12 +28,14 @@ import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.CloudAct
+import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
+import scala.concurrent.Future
 import android.app.Application
 import java.util.Collections
 import android.widget.Toast
@@ -330,17 +332,11 @@ class WalletApp extends Application { me =>
       wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
       wallet.setCoinSelector(new MinDepthReachedCoinSelector)
 
-      try {
-        Notificator.removeResyncNotification
-        // Only reschedule a delayed notification if we have a receiving chans
-        if (ChannelManager.notClosingOrRefunding exists hasReceivedPayments) Notificator.scheduleResyncNotificationOnceAgain
-        obsOnIO.delay(30.seconds).map(delayed => ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
-
-        // Set fast peer
-        val fastPeer = OlympusWrap.clouds.head.connector.url
-        val ia = InetAddress getByName Uri.parse(fastPeer).getHost
-        peerGroup addAddress new PeerAddress(app.params, ia, 8333)
-      } catch none
+      Future {
+        val host = Uri.parse(OlympusWrap.clouds.head.connector.url).getHost
+        val peer = new PeerAddress(app.params, InetAddress getByName host, 8333)
+        peerGroup addAddress peer
+      }
 
       peerGroup addPeerDiscovery new DnsDiscovery(params)
       peerGroup.setMinRequiredProtocolVersion(70015)
@@ -349,6 +345,10 @@ class WalletApp extends Application { me =>
       peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
+      Notificator.removeResyncNotification
+      // Only reschedule a delayed notification if we have chans which were used to receive payments
+      if (ChannelManager.notClosingOrRefunding exists hasReceivedPayments) Notificator.scheduleResyncNotificationOnceAgain
+      obsOnIO.delay(30.seconds).doOnCompleted(ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
       // Try to clear act leftovers if no channels left
