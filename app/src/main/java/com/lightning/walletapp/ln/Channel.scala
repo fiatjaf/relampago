@@ -58,9 +58,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
 
 
-      case (InitData(announce), Tuple2(open: OpenChannel, localParams: LocalParams), WAIT_FOR_INIT) =>
+      case (InitData(announce), Tuple2(localParams: LocalParams, open: OpenChannel), WAIT_FOR_INIT) =>
         if (LNParams.chainHash != open.chainHash) throw new LightningException("They have provided a wrong chain hash")
         if (open.fundingSatoshis < LNParams.minCapacitySat) throw new LightningException("Their proposed capacity is too small")
+        if (open.channelFlags << ~0 < 0) throw new LightningException("They are offering a public channel and we only support private ones")
         if (open.pushMsat > 1000L * open.fundingSatoshis) throw new LightningException("They are trying to push more than proposed capacity")
         if (open.dustLimitSatoshis > open.channelReserveSatoshis) throw new LightningException("Their dust limit exceeds their channel reserve")
         if (open.feeratePerKw < LNParams.minFeeratePerKw) throw new LightningException("Their proposed opening on-chain fee is too small")
@@ -84,10 +85,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           localParams.paymentBasepoint, localParams.delayedPaymentBasepoint,
           localParams.htlcBasepoint, firstPerCommitPoint)
 
-        BECOME(WaitFundingCreatedRemote(announce, localParams, AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis,
-          open.maxHtlcValueInFlightMsat, open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = 6, open.toSelfDelay,
-          open.maxAcceptedHtlcs, open.fundingPubkey, open.revocationBasepoint, open.paymentBasepoint, open.delayedPaymentBasepoint,
-          open.htlcBasepoint, open.firstPerCommitmentPoint), open), WAIT_FOR_FUNDING) SEND accept
+        BECOME(WaitFundingCreatedRemote(announce, localParams, remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis,
+          open.maxHtlcValueInFlightMsat, open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = 6, open.toSelfDelay, open.maxAcceptedHtlcs,
+          open.fundingPubkey, open.revocationBasepoint, open.paymentBasepoint, open.delayedPaymentBasepoint, open.htlcBasepoint,
+          open.firstPerCommitmentPoint), open), WAIT_FOR_FUNDING) SEND accept
 
 
       case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>

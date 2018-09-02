@@ -98,8 +98,8 @@
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
-    <string name="btc_empty">Нет монет</string>
-    <string name="ln_empty">Нет каналов</string>
+    <string name="btc_empty">No onchain funds</string>
+    <string name="ln_empty">No offchain funds</string>
     <string name="btc_status_operational">Кошелек онлайн</string>
     <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Поиск узлов&#8230;</font>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>минимум %1$s<br>максимум %2$s<br>баланс %3$s</small>]]></string>

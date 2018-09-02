@@ -36,7 +36,7 @@ object LocalBroadcaster extends Broadcaster {
 
     case (chan, wbr: WaitBroadcastRemoteData, _: ChannelReestablish) =>
       // Check if funding takes too much time or whether it's dead if present in a wallet
-      val isOutdated = System.currentTimeMillis - wbr.commitments.startedAt > 4 * 3600 * 1000L
+      val isOutdated = wbr.commitments.startedAt < System.currentTimeMillis - 3600 * 4 * 1000L
       if (isOutdated && wbr.fail.isEmpty) chan process Fail(FAIL_PUBLISH_ERROR, "Funding has expired")
 
     case (chan, wait: WaitFundingDoneData, _: ChannelReestablish) if wait.our.isEmpty =>

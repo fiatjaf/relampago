@@ -78,7 +78,7 @@ case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFunding
                                    commitments: Commitments, fail: Option[Fail] = None) extends HasCommitments {
 
   // Failed channels will be automatically removed in one day after being started
-  def isFailed = fail.isDefined && commitments.startedAt < System.currentTimeMillis - 86400000L
+  def isFailed = fail.isDefined && commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 1000L
 }
 
 case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked],

@@ -10,7 +10,6 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.StartNodeView._
-import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -63,13 +62,10 @@ class LNStartFundActivity extends TimerActivity { me =>
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        // Immediately liquidate a channel and exit this page in case of remote error
-
-        case open: OpenChannel if nodeId == ann.nodeId =>
-          val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
-          val theirUnspendableReserveSat = open.channelReserveSatoshis / LNParams.channelReserveToFundingRatio
-          freshChan process Tuple2(LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript,
-            System.currentTimeMillis, isFunder = false), open)
+        // Opening channel only gets setup messages, never normal channel messages, exits even if error was sent to another chan
+        case open: OpenChannel if nodeId == ann.nodeId && app.ChannelManager.fromNode(app.ChannelManager.notClosing, nodeId).size <= 10 =>
+          freshChan process Tuple2(LNParams.makeLocalParams(theirReserve = open.fundingSatoshis / LNParams.channelReserveToFundingRatio,
+            ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram, System.currentTimeMillis, isFunder = false), open)
 
         case msg: ChannelSetupMessage if nodeId == ann.nodeId => freshChan process msg
         case err: Error if nodeId == ann.nodeId => onException(freshChan -> err.exception)
@@ -216,10 +212,12 @@ class LNStartFundActivity extends TimerActivity { me =>
 
         case (_, wait: WaitBroadcastRemoteData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
           // #4 peer has signed our first commit so we can ask funder to broadcast a tx
-          wsw send BroadcastFundingTx(wsw.params.userId, txHash = wait.txHash)
-          freshChan.listeners ++= app.ChannelManager.operationalListeners
-          app.ChannelManager.all +:= freshChan
+          // important: first save a channel here, then ask for a funding broadcast
+
           saveChan(wait)
+          app.ChannelManager.all +:= freshChan
+          freshChan.listeners ++= app.ChannelManager.operationalListeners
+          wsw send BroadcastFundingTx(wsw.params.userId, txHash = wait.txHash)
 
         case (_, _: WaitFundingDoneData, WAIT_FUNDING_DONE, WAIT_FUNDING_DONE) =>
           // #6 we have received a remote funding tx and may exit to ops page
@@ -245,10 +243,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def remoteOpenFundeeListener(icr: IncomingChannelRequest) = new OpenListener {
-      // Once becoming connected this listener automatically calls peer's HTTP endpoint
-
-      override def onOperational(remoteFunderNodeId: PublicKey) =
-        get(icr.requestUri, true).trustAllCerts.trustAllHosts.body
+      override def onOperational(remoteFunderNodeId: PublicKey) = icr.requestChannel
 
       override def onBecome = {
         case (_, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>

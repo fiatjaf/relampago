@@ -87,7 +87,7 @@
     <string name="dialog_sum_empty">Please provide an amount</string>
     <string name="dialog_sum_small">Amount is too small</string>
     <string name="dialog_sum_big">Amount is too large</string>
-    <string name="dialog_pay_onchain">Pay onchain</string>
+    <string name="dialog_pay_onchain">Pay on-chain</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_retry">Retry</string>
     <string name="dialog_boost">CPFP</string>
@@ -97,8 +97,8 @@
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
-    <string name="btc_empty">No funds</string>
-    <string name="ln_empty">No open channels</string>
+    <string name="btc_empty">No on-chain funds</string>
+    <string name="ln_empty">No off-chain funds</string>
     <string name="btc_status_operational">Wallet is operational</string>
     <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>wallet balance %3$s</small>]]></string>
