@@ -145,6 +145,7 @@
     <string name="ln_receive_6conf"><![CDATA[&#9888; Can\'t ask for Lightning payments because your peer is not ready yet. Typically peers become ready once a channel funding Bitcoin transaction gets 6 confirmations]]></string>
     <string name="ln_receive_reserve"><![CDATA[&#9888; Can\'t ask for Lightning payments yet because first you need to spend at least %1$s in order to make some space for receiving]]></string>
     <string name="ln_receive_ok">Make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</string>
+    <string name="ln_chan_offline">Channel is offline, waiting&#8230;</string>
     <string name="ln_no_open_chans">No open channels found</string>
 
     <string name="err_ln_peer_offline">Could not connect to remote peer at %1$s</string>
