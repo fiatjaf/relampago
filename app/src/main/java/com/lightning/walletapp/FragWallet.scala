@@ -100,14 +100,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   val chanListener = new ChannelListener {
-    // Display various channel errors to user
     // should be removed once frag is destroyed
+    // prevent remote error spamming by using trigger
+    private[this] var firstTimeError = true
 
     override def onProcessSuccess = {
-      case (chan, data: HasCommitments, remoteError: wire.Error) => UITask {
+      case (chan, data: HasCommitments, remoteError: wire.Error) if firstTimeError => UITask {
         val bld = baseBuilder(chan.data.announce.toString.html, remoteError.exception.getMessage)
         def close(alert: AlertDialog) = rm(alert)(chan process app.ChannelManager.CMDLocalShutdown)
         mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_force)
+        firstTimeError = false
       }.run
     }
 
