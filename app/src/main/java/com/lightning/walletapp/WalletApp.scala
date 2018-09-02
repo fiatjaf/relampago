@@ -348,7 +348,7 @@ class WalletApp extends Application { me =>
       Notificator.removeResyncNotification
       // Only reschedule a delayed notification if we have chans which were used to receive payments
       if (ChannelManager.notClosingOrRefunding exists hasReceivedPayments) Notificator.scheduleResyncNotificationOnceAgain
-      obsOnIO.delay(30.seconds).doOnCompleted(ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
+      obsOnIO.delay(20.seconds).doOnCompleted(ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
       // Try to clear act leftovers if no channels left
