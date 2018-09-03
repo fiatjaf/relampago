@@ -54,7 +54,7 @@ object Features {
       bitset.get(OPTION_DATA_LOSS_PROTECT_MANDATORY)
 }
 
-class LightningException(reason: String = "LN exception") extends RuntimeException(reason)
+class LightningException(reason: String = "Failure") extends RuntimeException(reason)
 case class HTLCExpiryException(norm: NormalData, htlc: Htlc) extends LightningException
 case class CMDAddImpossible(rd: RoutingData, code: Int) extends LightningException
 

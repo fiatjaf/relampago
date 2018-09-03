@@ -132,8 +132,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     }
   }
 
-  implicit val incomingChannelRequestFmt: JsonFormat[IncomingChannelRequest] = taggedJsonFmt(jsonFormat[String, String, String,
-    IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1"), tag = "channelRequest")
+  implicit val incomingChannelRequestFmt: JsonFormat[IncomingChannelRequest] = taggedJsonFmt(jsonFormat[String, String, String, Long, Long,
+    IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1", "capacitySat", "pushMsat"), tag = "channelRequest")
 
   // FundMsg
 
