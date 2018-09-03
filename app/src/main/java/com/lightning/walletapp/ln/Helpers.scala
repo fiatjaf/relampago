@@ -68,19 +68,24 @@ object Helpers {
     }
 
     def makeFirstClosing(commitments: Commitments, localScriptPubkey: BinaryData, remoteScriptPubkey: BinaryData) = {
-      val estimatedWeight = Transaction.weight(Scripts.addSigs(makeFunderClosingTx(commitments.commitInput, localScriptPubkey,
-        remoteScriptPubkey, Satoshi(0), Satoshi(0), commitments.localCommit.spec), commitments.localParams.fundingPrivKey.publicKey,
-        commitments.remoteParams.fundingPubkey, "aa" * 71, "bb" * 71).tx)
+      val closingTx = Scripts.addSigs(makeClosingTx(commitments.commitInput, localScriptPubkey, remoteScriptPubkey, Satoshi(0),
+        Satoshi(0), commitments.localCommit.spec, commitments.localParams.isFunder), commitments.localParams.fundingPrivKey.publicKey,
+        commitments.remoteParams.fundingPubkey, "aa" * 71, "bb" * 71)
 
-      // There is no need for a high fee in a mutual closing tx
-      val closingFee = Scripts.weight2fee(LNParams.broadcaster.perKwSixSat / 2, estimatedWeight)
+      // There is no need for a high fee in a mutual closing tx AND mutual fee can't be bigger than last commit tx fee
+      val computedClosingFee = Scripts.weight2fee(LNParams.broadcaster.perKwSixSat / 2, Transaction weight closingTx.tx)
+      val lastCommitFee = commitments.commitInput.txOut.amount - commitments.localCommit.commitTx.tx.allOutputsAmount
+      val closingFee = if (computedClosingFee > lastCommitFee) lastCommitFee else computedClosingFee
       makeClosing(commitments, closingFee, localScriptPubkey, remoteScriptPubkey)
     }
 
     def makeClosing(commitments: Commitments, closingFee: Satoshi, local: BinaryData, remote: BinaryData) = {
-      val theirDustIsHigherThanOurs = commitments.localParams.dustLimit < commitments.remoteParams.dustLimitSat
+      val theirDustIsHigherThanOurs: Boolean = commitments.localParams.dustLimit < commitments.remoteParams.dustLimitSat
       val dustLimit = if (theirDustIsHigherThanOurs) commitments.remoteParams.dustLimitSat else commitments.localParams.dustLimit
-      val closing = makeFunderClosingTx(commitments.commitInput, local, remote, dustLimit, closingFee, commitments.localCommit.spec)
+
+      val closing: ClosingTx =
+        makeClosingTx(commitments.commitInput, local, remote, dustLimit,
+          closingFee, commitments.localCommit.spec, commitments.localParams.isFunder)
 
       val localClosingSig = Scripts.sign(closing, commitments.localParams.fundingPrivKey)
       val closingSigned = ClosingSigned(commitments.channelId, closingFee.amount, localClosingSig)
@@ -89,14 +94,14 @@ object Helpers {
       ClosingTxProposed(closing, closingSigned)
     }
 
-    def makeFunderClosingTx(commitTxInput: InputInfo, localScriptPubKey: BinaryData, remoteScriptPubKey: BinaryData,
-                            dustLimit: Satoshi, closingFee: Satoshi, spec: CommitmentSpec): ClosingTx = {
+    def makeClosingTx(commitTxInput: InputInfo, localScriptPubKey: BinaryData, remoteScriptPubKey: BinaryData,
+                      dustLimit: Satoshi, closingFee: Satoshi, spec: CommitmentSpec, localIsFunder: Boolean) = {
 
-      require(spec.htlcs.isEmpty, "No HTLCs allowed")
-      val toRemoteAmount: Satoshi = MilliSatoshi(spec.toRemoteMsat)
-      val toLocalAmount: Satoshi = MilliSatoshi(spec.toLocalMsat) - closingFee
-      val toLocalOutput = if (toLocalAmount < dustLimit) Nil else TxOut(toLocalAmount, localScriptPubKey) :: Nil
+      require(spec.htlcs.isEmpty, "No pending HTLCs allowed")
+      val toRemoteAmount: Satoshi = if (localIsFunder) MilliSatoshi(spec.toRemoteMsat) else MilliSatoshi(spec.toRemoteMsat) - closingFee
+      val toLocalAmount: Satoshi = if (localIsFunder) MilliSatoshi(spec.toLocalMsat) - closingFee else MilliSatoshi(spec.toLocalMsat)
       val toRemoteOutput = if (toRemoteAmount < dustLimit) Nil else TxOut(toRemoteAmount, remoteScriptPubKey) :: Nil
+      val toLocalOutput = if (toLocalAmount < dustLimit) Nil else TxOut(toLocalAmount, localScriptPubKey) :: Nil
       val input = TxIn(commitTxInput.outPoint, BinaryData.empty, sequence = 0xffffffffL) :: Nil
       val tx = Transaction(2, input, toLocalOutput ++ toRemoteOutput, lockTime = 0)
       ClosingTx(commitTxInput, LexicographicalOrdering sort tx)

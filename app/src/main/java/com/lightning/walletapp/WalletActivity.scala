@@ -115,13 +115,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrap(me setDetecting true)(me initNfc state)
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
-
-    timer.schedule(UITask {
-      val x = "lightning:lnurl1dp68gurn8ghj7amhwuh8ymmzw3jhstnrdakj7ar9wd6z7cnvwauzu6nndahr7ufav33ryep5vyenxwfhxucnxwf4vgmrqctxx9jrye35xpjkvv3j8qukzer9v5ek2dmpxf3xvcf4vg6rjveex3nrxvmy8qmnwdrzvsmnjvgf3mr4v"
-      app.TransData.recordValue(x)
-      checkTransData
-    }, 5000)
-
   } else me exitTo classOf[MainActivity]
 
   // NFC

@@ -490,9 +490,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // NEGOTIATIONS MODE
 
 
-      case (neg @ NegotiationsData(_, commitments,
-        localShutdown, remoteShutdown, ClosingTxProposed(_, localClosingSigned) +: _, _),
+      case (neg @ NegotiationsData(_, commitments, localShutdown, remoteShutdown, localProposals, _),
         ClosingSigned(channelId, remoteClosingFee, remoteClosingSig), NEGOTIATIONS) =>
+
+        val lastLocalFee = localProposals.headOption.map(_.localClosingSigned.feeSatoshis) getOrElse {
+          // If we are fundee and we were waiting for them to send their first proposal, we don't have a lastLocalClosingFee
+          val closing = Closing.makeFirstClosing(commitments, localShutdown.scriptPubKey, remoteShutdown.scriptPubKey)
+          closing.localClosingSigned.feeSatoshis
+        }
 
         val ClosingTxProposed(closing, closingSigned) =
           Closing.makeClosing(commitments, Satoshi(remoteClosingFee),
@@ -503,12 +508,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
             commitments.remoteParams.fundingPubkey, closingSigned.signature, remoteClosingSig)
 
         Scripts checkValid signedClose match {
-          case Success(okClose) if remoteClosingFee == localClosingSigned.feeSatoshis =>
-            // Our current and their proposed fees are equal for this tx, can broadcast
+          case Success(okClose) if remoteClosingFee == lastLocalFee =>
+            // Our current and their proposed fees are equal for this tx
             startMutualClose(neg, okClose.tx)
 
           case Success(okClose) =>
-            val nextCloseFee = Satoshi(localClosingSigned.feeSatoshis + remoteClosingFee) / 4 * 2
+            val nextCloseFee = Satoshi(lastLocalFee + remoteClosingFee) / 4 * 2
             val nextProposed = Closing.makeClosing(commitments, nextCloseFee, localShutdown.scriptPubKey, remoteShutdown.scriptPubKey)
             if (remoteClosingFee == nextCloseFee.amount) startMutualClose(neg, okClose.tx) SEND nextProposed.localClosingSigned else {
               val d1 = me STORE neg.copy(lastSignedTx = Some(okClose), localProposals = nextProposed +: neg.localProposals)
@@ -517,7 +522,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
           case Failure(why) =>
             startLocalClose(neg)
-            // Show error details to user
+            // This will show error details to user
             throw new LightningException(why.getMessage)
         }
 
