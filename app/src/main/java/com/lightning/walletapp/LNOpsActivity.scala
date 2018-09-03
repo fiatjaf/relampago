@@ -10,9 +10,9 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import fr.acinq.bitcoin.{BinaryData, Satoshi}
-import com.lightning.walletapp.ln.Tools.{none, wrap}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
+import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
 import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
 
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
@@ -117,7 +117,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         val fundTxId = Commitments fundingTxid cs
         val capacity = cs.commitInput.txOut.amount
         val started = me time new Date(cs.startedAt)
-        val commitFee = Satoshi(cs.reducedRemoteState.feesSat)
+        val breakFee = Satoshi(cs.reducedRemoteState.myFeeSat)
         val txDepth \ _ = LNParams.broadcaster.getStatus(fundTxId)
         val canSendMsat \ canReceiveMsat = estimateCanSend(chan) -> estimateCanReceive(chan)
         val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amount.amount).sum / 1000L)
@@ -127,11 +127,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         val valueSent = Satoshi(getStat(cs.channelId, 0) / 1000L)
 
         val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
-        val reserveAndFee = cs.reducedRemoteState.feesSat + cs.remoteParams.channelReserveSatoshis
-
-        baseBar setProgress barCanSend.toInt
+        val reserveAndFee = cs.reducedRemoteState.myFeeSat + cs.remoteParams.channelReserveSatoshis
         baseBar setSecondaryProgress (barCanSend + canReceiveMsat / capacity.amount).toInt
         overBar setProgress (reserveAndFee * 1000L / capacity.amount).toInt
+        baseBar setProgress barCanSend.toInt
 
         startedAtText setText started.html
         fundingDepthText setText fundingInfo.format(txDepth, threshold)
@@ -139,7 +138,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         canSendText setText denom.withSign(Satoshi(canSendMsat) / 1000L).html
         refundableAmountText setText denom.withSign(refundable).html
         totalCapacityText setText denom.withSign(capacity).html
-        refundFeeText setText denom.withSign(commitFee).html
+        refundFeeText setText denom.withSign(breakFee).html
 
         paymentsInFlightText setText denom.withSign(valueInFlight).html
         paymentsReceivedText setText sumOrNothing(valueReceived).html
@@ -150,11 +149,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
               R.id.closedAt, R.id.paymentsSent, R.id.paymentsReceived, R.id.paymentsInFlight)
 
-          case remote: WaitBroadcastRemoteData =>
-            if (remote.fail.isDefined) setExtraInfo(text = remote.fail.get.report.html)
-            visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
-              R.id.closedAt, R.id.paymentsSent, R.id.paymentsReceived,
-              R.id.paymentsInFlight)
+          case remoteWait: WaitBroadcastRemoteData =>
+            if (remoteWait.fail.isDefined) setExtraInfo(text = remoteWait.fail.get.report.html)
+            visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive, R.id.closedAt,
+              R.id.paymentsSent, R.id.paymentsReceived, R.id.paymentsInFlight)
 
           case _: NormalData if isOperational(chan) =>
             val canNotReceive = txDepth > 6 && channelAndHop(chan).isEmpty
@@ -237,9 +235,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     for (chan <- localChanCache) chan.listeners -= becomeListener
   }
 
-  override def onOptionsItemSelected(m: MenuItem) = {
+  override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionAddEntity) me exitTo classOf[LNStartActivity]
-    true
   }
 
   override def onCreateOptionsMenu(menu: Menu) = {

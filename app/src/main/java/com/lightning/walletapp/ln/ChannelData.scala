@@ -259,19 +259,21 @@ case class LocalCommit(index: Long, spec: CommitmentSpec, htlcTxsAndSigs: Seq[Ht
 case class RemoteCommit(index: Long, spec: CommitmentSpec, txid: BinaryData, remotePerCommitmentPoint: Point)
 case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: BinaryData, remoteSig: BinaryData)
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
-case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, feesSat: Long)
 
-case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
-                       remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
-                       remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point], commitInput: InputInfo,
-                       remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, extraHop: Option[Hop] = None,
+case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long, theirFeeSat: Long)
+case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit, remoteCommit: RemoteCommit, localChanges: Changes,
+                       remoteChanges: Changes, localNextHtlcId: Long, remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point],
+                       commitInput: InputInfo, remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, extraHop: Option[Hop] = None,
                        startedAt: Long = System.currentTimeMillis) { me =>
 
   lazy val reducedRemoteState = {
-    // Current HTLC set | estimated amount of money we can send *from our peer's point of view* | current commit fee
     val reduced = CommitmentSpec.reduce(Commitments.latestRemoteCommit(me).spec, remoteChanges.acked, localChanges.proposed)
-    val feesSat = if (localParams.isFunder) Scripts.commitTxFee(remoteParams.dustLimitSat, spec = reduced).amount else 0L
-    ReducedState(reduced.htlcs, reduced.toRemoteMsat - (feesSat + remoteParams.channelReserveSatoshis) * 1000L, feesSat)
+    val commitFeeSat = Scripts.commitTxFee(dustLimit = remoteParams.dustLimitSat, spec = reduced).amount
+    val myFeeSat \ theirFeeSat = if (localParams.isFunder) commitFeeSat -> 0L else 0L -> commitFeeSat
+
+    val canSendMsat = reduced.toRemoteMsat - (myFeeSat + remoteParams.channelReserveSatoshis) * 1000L
+    val canReceiveMsat = localCommit.spec.toRemoteMsat - (theirFeeSat + localParams.channelReserveSat) * 1000L
+    ReducedState(reduced.htlcs, canSendMsat, canReceiveMsat, myFeeSat, theirFeeSat)
   }
 }
 

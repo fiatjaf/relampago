@@ -62,10 +62,13 @@ class LNStartFundActivity extends TimerActivity { me =>
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        // Opening channel only gets setup messages, never normal channel messages, exits even if error was sent to another chan
-        case open: OpenChannel if nodeId == ann.nodeId && app.ChannelManager.fromNode(app.ChannelManager.notClosing, nodeId).size <= 10 =>
-          freshChan process Tuple2(LNParams.makeLocalParams(theirReserve = open.fundingSatoshis / LNParams.channelReserveToFundingRatio,
-            ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram, System.currentTimeMillis, isFunder = false), open)
+        // Immediately liquidate a channel and exit this page in case of remote error
+
+        case open: OpenChannel if nodeId == ann.nodeId =>
+          val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
+          val theirUnspendableReserveSat = open.fundingSatoshis / LNParams.channelReserveToFundingRatio
+          freshChan process Tuple2(LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript,
+            System.currentTimeMillis, isFunder = false), open)
 
         case msg: ChannelSetupMessage if nodeId == ann.nodeId => freshChan process msg
         case err: Error if nodeId == ann.nodeId => onException(freshChan -> err.exception)

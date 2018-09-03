@@ -664,8 +664,7 @@ object Channel {
   def hasReceivedPayments(chan: Channel) = chan(_.remoteNextHtlcId).exists(_ > 0)
   def inFlightHtlcs(chan: Channel) = chan(_.reducedRemoteState.htlcs) getOrElse Set.empty
   def estimateCanReceiveCapped(chan: Channel) = math.min(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
-  // Somewhat counterintuitive: localParams.channelReserveSat is THEIR unspendable reseve, peer's balance can't go below their channel reserve
-  def estimateCanReceive(chan: Channel) = chan(cs => cs.localCommit.spec.toRemoteMsat - cs.localParams.channelReserveSat * 1000L) getOrElse 0L
+  def estimateCanReceive(chan: Channel) = chan(_.reducedRemoteState.canReceiveMsat) getOrElse 0L
   def estimateCanSend(chan: Channel) = chan(_.reducedRemoteState.canSendMsat) getOrElse 0L
 
   def isOpening(chan: Channel): Boolean = chan.data match {
@@ -686,7 +685,7 @@ object Channel {
 }
 
 case class ChanReport(chan: Channel, cs: Commitments) {
-  def finalCanSend: Long = estimateCanSend(chan) - softReserve.amount * 1000L
+  def estimateFinalCanSend: Long = estimateCanSend(chan) - softReserve.amount * 1000L
   val softReserve = if (cs.localParams.isFunder) cs.commitInput.txOut.amount / 50L else Satoshi(0L)
 }
 

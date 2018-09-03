@@ -138,7 +138,8 @@ class WalletApp extends Application { me =>
 
     def chanReports = for {
       chan <- all if isOperational(chan)
-    } yield ChanReport(chan, chan(identity).get)
+      commitments <- chan apply identity
+    } yield ChanReport(chan, commitments)
 
     def delayedPublishes = {
       // Select all ShowDelayed which can't be published yet because cltv/csv delay is not cleared
@@ -240,19 +241,19 @@ class WalletApp extends Application { me =>
     }
 
     def checkIfSendable(rd: RoutingData) = {
-      val bestRepOpt = chanReports.sortBy(rep => -rep.finalCanSend).headOption
+      val bestRepOpt = chanReports.sortBy(rep => -rep.estimateFinalCanSend).headOption
       val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
       if (frozenInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_frozen)
       else if (isPaid.isSuccess) Left(me getString err_ln_fulfilled)
       else bestRepOpt match {
 
         // We should explain to user what exactly is going on here
-        case Some(report) if report.finalCanSend < rd.firstMsat =>
+        case Some(rep) if rep.estimateFinalCanSend < rd.firstMsat =>
           val sendingNow = coloredOut apply MilliSatoshi(rd.firstMsat)
-          val finalCanSend = coloredIn apply MilliSatoshi(report.finalCanSend)
-          val capacity = coloredIn apply MilliSatoshi(Commitments.latestRemoteCommit(report.cs).spec.toRemoteMsat)
-          val hardReserve = coloredOut apply Satoshi(report.cs.remoteParams.channelReserveSatoshis + report.cs.reducedRemoteState.feesSat)
-          Left(getString(err_ln_second_reserve).format(report.chan.data.announce.alias, hardReserve, coloredOut(report.softReserve),
+          val finalCanSend = coloredIn apply MilliSatoshi(rep.estimateFinalCanSend)
+          val capacity = coloredIn apply MilliSatoshi(Commitments.latestRemoteCommit(rep.cs).spec.toRemoteMsat)
+          val hardReserve = coloredOut apply Satoshi(rep.cs.reducedRemoteState.myFeeSat + rep.cs.remoteParams.channelReserveSatoshis)
+          Left(getString(err_ln_second_reserve).format(rep.chan.data.announce.alias, hardReserve, coloredOut(rep.softReserve),
             capacity, finalCanSend, sendingNow).html)
 
         case None => Left(me getString ln_no_open_chans)
@@ -263,7 +264,7 @@ class WalletApp extends Application { me =>
     def fetchRoutes(rd: RoutingData) = {
       // First we collect chans which in principle can handle a given payment sum right now
       // after we get the results we first prioritize cheapest routes and then routes which belong to less busy chans
-      val from = chanReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
+      val from = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
 
       def withHints = for {
         tag <- Obs from rd.pr.routingInfo
@@ -298,7 +299,7 @@ class WalletApp extends Application { me =>
       case Right(rd) =>
         // Empty used route means we're sending to our peer and its nodeId is our target
         val targetId = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
-        val chans = chanReports collect { case rep if rep.finalCanSend >= rd.firstMsat => rep.chan }
+        val chans = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan }
         val res = chans collectFirst { case chan if chan.data.announce.nodeId == targetId => chan process rd }
         res getOrElse sendEither(useRoutesLeft(rd), noRoutes)
     }
