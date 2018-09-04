@@ -22,5 +22,10 @@
         android:id="@+id/recoverChannelFunds"
         android:text="@string/sets_chan_recover"/>
 
+    <Button
+        style="@style/TransButton"
+        android:id="@+id/exportWalletSnapshot"
+        android:text="@string/sets_migrator"/>
+
     <View style="@style/GrayDivider"/>
 </LinearLayout>

@@ -19,12 +19,14 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import scala.util.{Failure, Try}
 import org.bitcoinj.core.{Address, TxWrap}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
-import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
+import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started, WalletZygote}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
+import android.support.v4.content.FileProvider
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
 import com.lightning.walletapp.helper.AES
@@ -32,9 +34,12 @@ import org.bitcoinj.store.SPVBlockStore
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+import com.google.common.io.Files
+import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
+import java.io.File
 
 
 trait SearchBar { me =>
@@ -264,6 +269,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
     val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
+    val exportWalletSnapshot = form.findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
     recoverFunds.setEnabled(app.ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
 
     recoverFunds setOnClickListener onButtonTap {
@@ -313,6 +319,36 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     viewMnemonic setOnClickListener onButtonTap {
       // Can be accessed here and from page button
       rm(menu)(me viewMnemonic null)
+    }
+
+    exportWalletSnapshot setOnClickListener onButtonTap {
+      // Users may export a whole wallet snapshot and restore later
+      // but warn them about all the risks involved before proceeding
+      rm(menu)(openForm)
+
+      def openForm = {
+        def proceed = <(createZygote, onFail)(none)
+        val bld = me baseTextBuilder getString(migrator_usage_warning).html
+        mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_ok, dialog_cancel)
+      }
+
+      def createZygote = {
+        val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
+        val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
+        val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
+        val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
+
+        val name = s"Bitcoin Wallet Snapshot ${new Date}.txt"
+        val walletSnapshotFilePath = new File(getCacheDir, "images")
+        if (!walletSnapshotFilePath.isFile) walletSnapshotFilePath.mkdirs
+        val savedFile = new File(walletSnapshotFilePath, name)
+        Files.write(encoded.require.toByteArray, savedFile)
+
+        val fileURI = FileProvider.getUriForFile(me, "com.lightning.walletapp", savedFile)
+        val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
+        share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
+        me startActivity Intent.createChooser(share, "Choose an app")
+      }
     }
   }
 }

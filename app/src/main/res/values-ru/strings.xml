@@ -50,6 +50,16 @@
         как только вы откроете первый канал.<br><br>Эти талоны защитят вас от случайной потери денег в каналах
     ]]></string>
 
+    <string name="migrator_usage_warning"><![CDATA[
+        Migration tool creates a full snapshot of current wallet state which can be used
+        to fully restore your wallet at a later time, possibly on another device.<br><br>
+        <strong>Two use cases for this tool</strong><br>
+        1. Moving wallet data from one phone to another.<br>
+        2. Deleting wallet and restoring it a bit later.<br><br>
+        This tool <strong>SHOULD NOT</strong> be used to store a long-term backup
+        of your wallet or create multiple copies of the same wallet on many devices!
+    ]]></string>
+
     <!-- Olympus server -->
     <string name="olympus_actions">Добавить, убрать, переместить</string>
     <string name="olympus_backup">Бэкап-сервер</string>
@@ -68,7 +78,7 @@
     <!-- menu and fab -->
     <string name="sets_manage_olympus">Настроить бэкап-сервера</string>
     <string name="sets_chan_recover">Восстановитель каналов</string>
-    <string name="sets_zygote">Мигратор кошелька</string>
+    <string name="sets_migrator">Сохранить снимок кошелька</string>
     <string name="sets_mnemonic">Мнемонический код</string>
     <string name="sets_rescan">Рескан блокчейна</string>
 

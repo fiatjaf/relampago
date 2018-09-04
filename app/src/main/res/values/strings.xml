@@ -50,6 +50,16 @@
         your first channel becomes open.<br><br>These tokens will safeguard you from accidental money loss for the next 50 payment channels.
     ]]></string>
 
+    <string name="migrator_usage_warning"><![CDATA[
+        Migration tool creates a full snapshot of current wallet state which can be used
+        to fully restore your wallet at a later time, possibly on another device.<br><br>
+        <strong>Two use cases for this tool</strong><br>
+        1. Moving wallet data from one phone to another.<br>
+        2. Deleting wallet and restoring it a bit later.<br><br>
+        This tool <strong>SHOULD NOT</strong> be used to store a long-term backup
+        of your wallet or create multiple copies of the same wallet on many devices!
+    ]]></string>
+
     <!-- Olympus server -->
     <string name="olympus_actions">Add, remove or reorder</string>
     <string name="olympus_backup">Use as backup server</string>
@@ -67,7 +77,7 @@
     <!-- menu and fab -->
     <string name="sets_manage_olympus">Manage Olympus servers</string>
     <string name="sets_chan_recover">Use channel recovery tool</string>
-    <string name="sets_zygote">Use wallet migration tool</string>
+    <string name="sets_migrator">Use wallet migration tool</string>
     <string name="sets_mnemonic">View mnemonic phrase</string>
     <string name="sets_rescan">Rescan blockchain</string>
 
