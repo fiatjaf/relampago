@@ -65,7 +65,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   override def onNoNfcIntentFound = {
     val processIntent = (getIntent.getFlags & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0
-    val dataOpt = Seq(getIntent.getDataString, getIntent getStringExtra Intent.EXTRA_TEXT) find null.!=
+    val dataOpt = Seq(getIntent.getDataString, getIntent getStringExtra Intent.EXTRA_TEXT).find(null.!=)
     if (processIntent) <(dataOpt foreach app.TransData.recordValue, readFail)(ok => next) else next
   }
 
@@ -79,9 +79,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   // STARTUP LOGIC
 
   def next: Unit = (app.walletFile.exists, app.isAlive) match {
-    // Find out what exactly should be done once user opens an app
-    // depends on both wallet app file existence and runtime objects presence
-    case (false, _) => findViewById(R.id.mainChoice) setVisibility View.VISIBLE
+    // What exactly should be done depends on wallet app file existence and runtime objects presence
+    case (false, _) => findViewById(R.id.mainChoice).asInstanceOf[View] setVisibility View.VISIBLE
     case (true, true) => MainActivity.proceed.run
 
     case (true, false) =>

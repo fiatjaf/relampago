@@ -8,20 +8,20 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import android.text.Layout.Alignment.ALIGN_NORMAL
 import android.graphics.Bitmap.Config.ARGB_8888
+import android.support.v4.content.FileProvider
 import com.google.zxing.qrcode.QRCodeWriter
 import android.graphics.Bitmap.createBitmap
 import fr.acinq.bitcoin.BinaryData
 import org.bitcoinj.core.Address
 import android.content.Intent
 import android.view.View
-import android.net.Uri
+import android.os.Bundle
 
 import android.widget.{ImageButton, ImageView, LinearLayout}
 import com.google.zxing.{BarcodeFormat, EncodeHintType}
-import com.lightning.walletapp.ln.Tools.{wrap, none}
+import com.lightning.walletapp.ln.Tools.{none, wrap}
 import android.text.{StaticLayout, TextPaint}
 import java.io.{File, FileOutputStream}
-import android.os.{Bundle, Environment}
 
 
 object QRGen {
@@ -43,15 +43,6 @@ object QRGen {
     val qrBitmap = createBitmap(wid, height, ARGB_8888)
     qrBitmap.setPixels(pixels, 0, wid, 0, 0, wid, height)
     qrBitmap
-  }
-}
-
-object FileOps {
-  def shell(name: String) = {
-    val path = Environment.getExternalStorageDirectory
-    val dir = new File(path.getAbsolutePath)
-    if (!dir.exists) dir.mkdirs
-    new File(dir, name)
   }
 }
 
@@ -108,10 +99,7 @@ class RequestActivity extends TimerActivity { me =>
 
   def setView(displayedImage: Bitmap) = {
     shareQR setOnClickListener onButtonTap {
-      <(me saveImage displayedImage, onFail) { file =>
-        val share = new Intent setAction Intent.ACTION_SEND setType "image/png"
-        me startActivity share.putExtra(Intent.EXTRA_STREAM, Uri fromFile file)
-      }
+      <(me shareBitmap displayedImage, onFail)(none)
     }
 
     // Enable after QR is fully generated
@@ -166,12 +154,17 @@ class RequestActivity extends TimerActivity { me =>
     newPaint
   }
 
-  def saveImage(bits: Bitmap) = {
-    val imageFile = FileOps shell "qr.png"
-    val stream = new FileOutputStream(imageFile)
-    bits.compress(Bitmap.CompressFormat.PNG, 80, stream)
-    stream.flush
-    stream.close
-    imageFile
+  def shareBitmap(bitmap: Bitmap) = {
+    val paymentRequestFilePath = new File(getCacheDir, "images")
+    if (!paymentRequestFilePath.isFile) paymentRequestFilePath.mkdirs
+    val out = new FileOutputStream(s"$paymentRequestFilePath/qr.png")
+    bitmap.compress(Bitmap.CompressFormat.PNG, 90, out)
+    out.close
+
+    val savedFile = new File(paymentRequestFilePath, "qr.png")
+    val fileURI = FileProvider.getUriForFile(me, "com.lightning.walletapp", savedFile)
+    val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
+    share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
+    me startActivity Intent.createChooser(share, "Choose an app")
   }
 }

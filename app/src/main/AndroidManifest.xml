@@ -3,8 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
@@ -25,7 +24,21 @@
         android:allowBackup="false"
         android:label="Bitcoin">
 
-        <receiver android:enabled="true" android:process=":remote"
+        <provider
+            android:name="android.support.v4.content.FileProvider"
+            android:authorities="com.lightning.walletapp"
+            android:grantUriPermissions="true"
+            android:exported="false">
+
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/filepaths"/>
+
+        </provider>
+
+        <receiver
+            android:enabled="true"
+            android:process=":remote"
             android:name="com.lightning.walletapp.lnutils.Notificator">
 
             <intent-filter>

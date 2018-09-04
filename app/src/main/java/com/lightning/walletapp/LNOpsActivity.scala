@@ -61,7 +61,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   class ViewHolder(view: View) {
-    val extraInfo = view.findViewById(R.id.extraInfo)
+    val extraInfo = view.findViewById(R.id.extraInfo).asInstanceOf[View]
     val baseBar = view.findViewById(R.id.baseBar).asInstanceOf[ProgressBar]
     val overBar = view.findViewById(R.id.overBar).asInstanceOf[ProgressBar]
     val extraInfoText = view.findViewById(R.id.extraInfoText).asInstanceOf[TextView]
@@ -71,17 +71,17 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     def setExtraInfo(resource: Int) = wrap(extraInfo setVisibility View.VISIBLE)(extraInfoText setText resource)
 
     val wrappers =
-      view.findViewById(R.id.refundableAmount) ::
-        view.findViewById(R.id.paymentsInFlight) ::
-        view.findViewById(R.id.paymentsReceived) ::
-        view.findViewById(R.id.totalCapacity) ::
-        view.findViewById(R.id.paymentsSent) ::
-        view.findViewById(R.id.fundingDepth) ::
-        view.findViewById(R.id.canReceive) ::
-        view.findViewById(R.id.startedAt) ::
-        view.findViewById(R.id.refundFee) ::
-        view.findViewById(R.id.closedAt) ::
-        view.findViewById(R.id.canSend) ::
+      view.findViewById(R.id.refundableAmount).asInstanceOf[View] ::
+        view.findViewById(R.id.paymentsInFlight).asInstanceOf[View] ::
+        view.findViewById(R.id.paymentsReceived).asInstanceOf[View] ::
+        view.findViewById(R.id.totalCapacity).asInstanceOf[View] ::
+        view.findViewById(R.id.paymentsSent).asInstanceOf[View] ::
+        view.findViewById(R.id.fundingDepth).asInstanceOf[View] ::
+        view.findViewById(R.id.canReceive).asInstanceOf[View] ::
+        view.findViewById(R.id.startedAt).asInstanceOf[View] ::
+        view.findViewById(R.id.refundFee).asInstanceOf[View] ::
+        view.findViewById(R.id.closedAt).asInstanceOf[View] ::
+        view.findViewById(R.id.canSend).asInstanceOf[View] ::
         baseBar :: overBar :: Nil
 
     val refundableAmountText = view.findViewById(R.id.refundableAmountText).asInstanceOf[TextView]

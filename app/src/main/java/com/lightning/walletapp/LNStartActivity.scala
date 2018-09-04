@@ -21,12 +21,11 @@ import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Address
+import rx.lang.scala.Observable
 import org.bitcoinj.core.Batch
 import fr.acinq.bitcoin.Bech32
 import android.os.Bundle
 import java.util.Date
-
-import rx.lang.scala.Observable
 
 
 class LNStartActivity extends ScanActivity { me =>
@@ -249,21 +248,19 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 
 sealed trait LNUrlData
 case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long) extends LNUrlData {
-  def isCorrect(open: OpenChannel) = capacity == open.fundingSatoshis && push * 1000L == open.pushMsat
+  def requestChannel = get(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&public=0", true).trustAllCerts.trustAllHosts.body
+  def isCorrect(openChannelMsg: OpenChannel) = capacity == openChannelMsg.fundingSatoshis && push * 1000L == openChannelMsg.pushMsat
   val nodeView = HardcodedNodeView(app.mkNodeAnnouncement(PublicKey(key), host, port.toInt), chansNumber.last)
-  def requestChannel = println("REQUESTING CHANNEL") //get(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&public=0", true).trustAllCerts.trustAllHosts.body
   lazy val nodeLink(key, host, port) = uri
 }
 
 // LNURL HANDLER
 
 case class LNUrl(bech32url: String) {
-  val dummy = IncomingChannelRequest("03dc39d7f43720c2c0f86778dfd2a77049fa4a44b4f0a8afb62f3921567de41375@192.210.203.16:9735", "", "", 1000000L, 200000L)
-
-
   private[this] val _ \ decoded = Bech32 decode bech32url
   private[this] val finalDecoded = Bech32 five2eight decoded
-  def resolve: Observable[LNUrlData] = obsOnIO.map(_ => dummy)
-//    obsOnIO.map(_ => get(new String(finalDecoded.toArray, "UTF-8"), true)
-//    .trustAllCerts.trustAllHosts.connectTimeout(15000).body) map to[LNUrlData]
+
+  def resolve: Observable[LNUrlData] =
+    obsOnIO.map(_ => get(new String(finalDecoded.toArray, "UTF-8"), true)
+      .trustAllCerts.trustAllHosts.connectTimeout(15000).body) map to[LNUrlData]
 }
