@@ -329,7 +329,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       def openForm = {
         def proceed = <(createZygote, onFail)(none)
         val bld = me baseTextBuilder getString(migrator_usage_warning).html
-        mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_ok, dialog_cancel)
+        mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
       }
 
       def createZygote = {

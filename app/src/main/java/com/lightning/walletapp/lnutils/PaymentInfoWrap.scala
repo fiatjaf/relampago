@@ -13,16 +13,11 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import android.support.v4.app.NotificationCompat
 import com.lightning.walletapp.helper.RichCursor
-import com.lightning.walletapp.MainActivity
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
-import com.lightning.walletapp.R
 import java.util.Collections
 
-import android.app.{AlarmManager, NotificationManager, PendingIntent}
-import android.content.{BroadcastReceiver, Context, Intent}
 import fr.acinq.bitcoin.{BinaryData, Transaction}
 import rx.lang.scala.{Observable => Obs}
 
@@ -174,11 +169,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       app.kit.wallet.removeWatchedScripts(Collections singletonList fundingScript)
       app.kit.wallet.removeWatchedScripts(app.kit closingPubKeyScripts close)
       db.change(ChannelTable.killSql, close.commitments.channelId)
-
-    case (_, _: NormalData, _: UpdateAddHtlc) =>
-      // We have just accepted an incoming payment
-      // must periodically watch this chan from now on
-      Notificator.scheduleResyncNotificationOnceAgain
   }
 
   override def onBecome = {
@@ -269,28 +259,5 @@ object GossipCatcher extends ChannelListener {
       // Set a fresh update for this channel and process no further updates afterwards
       chan.process(upd toHop chan.data.announce.nodeId)
       chan.listeners -= GossipCatcher
-  }
-}
-
-object Notificator {
-  private[this] val notificatorClass = classOf[Notificator]
-  def removeResyncNotification = getAlarmManager cancel getIntent
-  def getIntent = PendingIntent.getBroadcast(app, 0, new Intent(app, notificatorClass), 0)
-  def getAlarmManager = app.getSystemService(Context.ALARM_SERVICE).asInstanceOf[AlarmManager]
-
-  def scheduleResyncNotificationOnceAgain =
-    try getAlarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,
-      System.currentTimeMillis + 1000L * 3600 * 24 * 10, getIntent) catch none
-}
-
-class Notificator extends BroadcastReceiver {
-  private[this] val mainClass = classOf[MainActivity]
-
-  def onReceive(ct: Context, intent: Intent) = {
-    val manager = ct.getSystemService(Context.NOTIFICATION_SERVICE).asInstanceOf[NotificationManager]
-    val targetIntent = PendingIntent.getActivity(ct, 0, new Intent(ct, mainClass), PendingIntent.FLAG_UPDATE_CURRENT)
-    try manager.notify(1, new NotificationCompat.Builder(ct).setContentIntent(targetIntent).setSmallIcon(R.drawable.dead)
-      .setContentTitle(ct getString R.string.notice_sync_title).setContentText(ct getString R.string.notice_sync_body)
-      .setAutoCancel(true).build) catch none
   }
 }

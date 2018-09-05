@@ -348,9 +348,6 @@ class WalletApp extends Application { me =>
       peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
-      Notificator.removeResyncNotification
-      // Only reschedule a delayed notification if we have chans which were used to receive payments
-      if (ChannelManager.notClosingOrRefunding exists hasReceivedPayments) Notificator.scheduleResyncNotificationOnceAgain
       obsOnIO.delay(20.seconds).doOnCompleted(ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)

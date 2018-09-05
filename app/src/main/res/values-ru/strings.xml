@@ -208,8 +208,6 @@
     <string name="ln_no_description">Описание отсутствует</string>
     <string name="ln_proof">Подписанный платежный запрос: %1$s\n\nPreimage платежа: %2$s</string>
     <string name="ln_qr_disposable"><![CDATA[Платеж валиден 2 дня<br>Не используйте его повторно]]></string>
-    <string name="notice_sync_body">Откройте Bitcoin Кошелек-Молнию</string>
-    <string name="notice_sync_title">Требуется синхронизация</string>
 
     <!-- see PaymentInfo.scala -->
     <array name="ln_payment_states">

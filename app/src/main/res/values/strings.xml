@@ -205,8 +205,6 @@
     <string name="ln_no_description">No description provided</string>
     <string name="ln_proof">Signed payment request: %1$s\n\nPayment preimage: %2$s</string>
     <string name="ln_qr_disposable"><![CDATA[Request is valid for 2 days<br>Do not reuse this QR code]]></string>
-    <string name="notice_sync_body">Please open Bitcoin Lightning Wallet</string>
-    <string name="notice_sync_title">Synchronization required</string>
 
     <!-- see PaymentInfo.scala -->
     <array name="ln_payment_states">
