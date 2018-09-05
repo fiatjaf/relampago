@@ -7,7 +7,7 @@ android {
 
     defaultConfig {
         versionName "0.1"
-        applicationId "com.lightning.wallet"
+        applicationId "com.lightning.walletapp"
         multiDexEnabled true
         targetSdkVersion 26
         minSdkVersion 21
