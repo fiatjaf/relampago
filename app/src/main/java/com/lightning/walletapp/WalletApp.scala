@@ -19,7 +19,6 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import rx.lang.scala.{Observable => Obs}
-import android.net.{ConnectivityManager, Uri}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
@@ -39,6 +38,7 @@ import scala.concurrent.Future
 import android.app.Application
 import java.util.Collections
 import android.widget.Toast
+import android.net.Uri
 import scala.util.Try
 import java.io.File
 
@@ -153,9 +153,8 @@ class WalletApp extends Application { me =>
 
     def updateChangedIPs = for {
       chan <- notClosing if chan.state == OFFLINE
-      cm = getSystemService(Context.CONNECTIVITY_SERVICE).asInstanceOf[ConnectivityManager]
-      currentNetworkStatus <- Option(cm.getActiveNetworkInfo) if currentNetworkStatus.isConnected
-      res <- retry(OlympusWrap findNodes chan.data.announce.nodeId.toString, pickInc, 2 to 3)
+      peerNodeId = chan.data.announce.nodeId.toString
+      res <- OlympusWrap findNodes peerNodeId
       announce \ _ <- res take 1
     } chan process announce
 
