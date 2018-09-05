@@ -20,13 +20,6 @@ import android.os.Bundle
 import android.view.View
 
 
-trait ViewSwitch {
-  val views: List[View]
-  def setVis(ms: Int*) = views zip ms foreach {
-    case (view, state) => view setVisibility state
-  }
-}
-
 object MainActivity {
   var proceed: Runnable = _
 

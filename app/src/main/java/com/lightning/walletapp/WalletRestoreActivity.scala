@@ -31,11 +31,12 @@ class WhenPicker(host: TimerActivity, start: Long)
   }
 }
 
-class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActivity { me =>
-  lazy val views = findViewById(R.id.restoreInfo) :: findViewById(R.id.restoreProgress) :: Nil
+class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
+  lazy val restoreProgress = findViewById(R.id.restoreProgress).asInstanceOf[View]
   lazy val restoreCode = findViewById(R.id.restoreCode).asInstanceOf[NachoTextView]
   lazy val restoreWallet = findViewById(R.id.restoreWallet).asInstanceOf[Button]
   lazy val restoreWhen = findViewById(R.id.restoreWhen).asInstanceOf[Button]
+  lazy val restoreInfo = findViewById(R.id.restoreInfo).asInstanceOf[View]
   lazy val dp = new WhenPicker(me, 1526817600 * 1000L)
 
   def INIT(state: Bundle) = {
@@ -66,7 +67,8 @@ class WalletRestoreActivity extends TimerActivity with ViewSwitch with FirstActi
 
   def doRecoverWallet =
     app.kit = new app.WalletKit {
-      setVis(View.GONE, View.VISIBLE)
+      restoreInfo setVisibility View.GONE
+      restoreProgress setVisibility View.VISIBLE
       startAsync
 
       def startUp = {
