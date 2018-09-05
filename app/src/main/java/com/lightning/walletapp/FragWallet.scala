@@ -527,7 +527,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
           case Success(ms) => rm(alert) {
             me doSend emptyRD(pr, firstMsat = ms.amount, useCache = true)
-            val isOnline = operationalChannels.exists(chan => OPEN == chan.state)
+            val isOnline = operationalChannels.exists(_.state == OPEN)
             if (!isOnline) app toast ln_chan_offline
           }
         }
