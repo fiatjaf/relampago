@@ -136,7 +136,7 @@ object RevokedTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-  extends SQLiteOpenHelper(context, name, null, 1) {
+extends SQLiteOpenHelper(context, name, null, 1) {
 
   val base = getWritableDatabase
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = none

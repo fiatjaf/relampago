@@ -284,9 +284,9 @@ object Commitments {
   def addLocalProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.localChanges.proposed).using(_ :+ proposal)
 
   def findExpiredHtlc(c: Commitments, cmd: CMDBestHeight) =
-    c.localCommit.spec.htlcs.find(htlc => !htlc.incoming && cmd.heightNow > htlc.add.expiry && cmd.heightInit < htlc.add.expiry) orElse
-      c.remoteCommit.spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow > htlc.add.expiry && cmd.heightInit < htlc.add.expiry) orElse
-      latestRemoteCommit(c).spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow > htlc.add.expiry && cmd.heightInit < htlc.add.expiry)
+    c.localCommit.spec.htlcs.find(htlc => !htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry) orElse
+      c.remoteCommit.spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry) orElse
+      latestRemoteCommit(c).spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry)
 
   def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = for {
     _ <- CommitmentSpec.findHtlcById(latestRemoteCommit(commitments).spec, htlcId, !incomingRelativeToLocal)

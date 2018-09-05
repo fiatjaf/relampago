@@ -115,12 +115,12 @@
             android:layout_marginBottom="@dimen/app_padding"/>
 
         <LinearLayout style="@style/CardLinearLayout" android:id="@+id/startedAt">
-            <TextView style="@style/CardBaseText" android:text="@string/ln_info_started"/>
+            <TextView style="@style/CardBaseText" android:layout_weight="4" android:text="@string/ln_info_started"/>
             <TextView style="@style/CardBaseText" android:gravity="end" android:id="@+id/startedAtText"/>
         </LinearLayout>
 
         <LinearLayout style="@style/CardLinearLayout" android:id="@+id/closedAt">
-            <TextView style="@style/CardBaseText" android:text="@string/ln_info_closed"/>
+            <TextView style="@style/CardBaseText" android:layout_weight="4" android:text="@string/ln_info_closed"/>
             <TextView style="@style/CardBaseText" android:gravity="end" android:id="@+id/closedAtText"/>
         </LinearLayout>
 
