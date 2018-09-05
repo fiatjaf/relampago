@@ -51,13 +51,14 @@
     ]]></string>
 
     <string name="migrator_usage_warning"><![CDATA[
-        Migration tool creates a full snapshot of current wallet state which can be used
-        to fully restore your wallet at a later time, possibly on another device.<br><br>
+        Migration tool creates a snapshot file which can be used to fully
+        restore your wallet at a later time, possibly on another device.<br><br>
         <strong>Two use cases for this tool</strong><br>
         1. Moving wallet data from one phone to another.<br>
         2. Deleting wallet and restoring it a bit later.<br><br>
-        This tool <strong>SHOULD NOT</strong> be used to store a long-term backup
-        of your wallet or create multiple copies of the same wallet on many devices!
+        This tool <strong>SHOULD NOT</strong> be used to store a long-term backup of
+        your wallet or create multiple copies of the same wallet on many devices!<br><br>
+        Snapshot file is <strong>NOT</strong> encrypted so never put it to public places!
     ]]></string>
 
     <!-- Olympus server -->
