@@ -1,13 +1,15 @@
 package com.lightning.walletapp
 
+import android.content.pm.PackageManager
 import android.view._
 import com.journeyapps.barcodescanner._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.Utils.app
 import android.support.v4.view.ViewPager
-import android.support.v4.app.Fragment
+import android.support.v4.app.{ActivityCompat, Fragment}
 import android.os.Bundle
+import android.support.v4.content.ContextCompat
 
 
 trait ScanActivity extends TimerActivity {
@@ -27,17 +29,14 @@ class FragScan extends Fragment with BarcodeCallback { me =>
     inflator.inflate(R.layout.frag_view_pager_scan, vg, false)
 
   override def onViewCreated(view: View, savedInstanceState: Bundle) = {
+    val camDenied = ContextCompat.checkSelfPermission(host, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
+    if (camDenied) ActivityCompat.requestPermissions(host, Array(android.Manifest.permission.CAMERA), 102)
     barcodeReader = view.findViewById(R.id.reader).asInstanceOf[BarcodeView]
-    barcodeReader decodeContinuous me
   }
 
   override def setUserVisibleHint(isVisibleToUser: Boolean) = {
-    if (isAdded) if (isVisibleToUser) barcodeReader.resume else {
-      getFragmentManager.beginTransaction.detach(me).attach(me).commit
-      barcodeReader.pause
-    }
-
-    // Remove snapshot traces if stopped
+    if (isAdded && isVisibleToUser) runAnd(barcodeReader decodeContinuous me)(barcodeReader.resume)
+    else if (isAdded) runAnd(getFragmentManager.beginTransaction.detach(me).attach(me).commit)(barcodeReader.pause)
     super.setUserVisibleHint(isVisibleToUser)
   }
 
