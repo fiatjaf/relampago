@@ -1,15 +1,16 @@
 package com.lightning.walletapp
 
-import android.content.pm.PackageManager
 import android.view._
 import com.journeyapps.barcodescanner._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.R.string._
+
+import android.support.v4.app.{ActivityCompat, Fragment}
+import android.support.v4.content.ContextCompat
+import android.content.pm.PackageManager
 import com.lightning.walletapp.Utils.app
 import android.support.v4.view.ViewPager
-import android.support.v4.app.{ActivityCompat, Fragment}
 import android.os.Bundle
-import android.support.v4.content.ContextCompat
 
 
 trait ScanActivity extends TimerActivity {
