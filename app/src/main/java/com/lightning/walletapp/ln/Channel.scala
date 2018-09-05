@@ -628,7 +628,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
   def startLocalClose(some: HasCommitments): Unit =
     // Something went wrong and we decided to spend our CURRENT commit transaction
-    // BUT if we're at negotiations AND we have a signed mutual closing tx then send it
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
       case (_, neg: NegotiationsData) if neg.lastSignedTx.isDefined => startMutualClose(neg, neg.lastSignedTx.get.tx)
       case (localClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(localCommit = localClaim :: Nil)
