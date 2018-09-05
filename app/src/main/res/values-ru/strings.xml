@@ -23,7 +23,7 @@
 
     <array name="restore_options">
         <item>Мнемонический код</item>
-        <item>Файл-слепок кошелька</item>
+        <item>Файл-снапшот кошелька</item>
     </array>
 
     <string name="restore_when">Когда вы создали кошелек?\nНе менйяте дату если не уверены</string>

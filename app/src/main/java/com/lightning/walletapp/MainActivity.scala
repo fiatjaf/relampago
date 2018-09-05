@@ -97,7 +97,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   // MISC
 
   def goRestoreWallet(view: View) = {
-
     val restoreOptions = getResources getStringArray R.array.restore_options
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, restoreOptions)
