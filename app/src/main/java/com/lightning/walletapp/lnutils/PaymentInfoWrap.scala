@@ -237,10 +237,12 @@ object BadEntityWrap {
     val cursor = db.select(BadEntityTable.selectSql, params = System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
     val fromAsString = for (peerPubKey: PublicKey <- from.toSet) yield peerPubKey.toString
+    val badChansAsLong = for (shortChanId: String <- badChans) yield shortChanId.toLong
 
-    // One of blacklisted nodes may become our peer or final payee so we remove them from bad nodes
-    OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, badNodes - targetId.toString -- fromAsString,
-      for (shortChanId: String <- badChans) yield shortChanId.toLong, fromAsString, targetId.toString)
+    // One of blacklisted nodes may become our peer or final payee
+    val filteredBadNodes = badNodes - targetId.toString -- fromAsString
+    OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, filteredBadNodes,
+      badChansAsLong, fromAsString, targetId.toString)
   }
 }
 
