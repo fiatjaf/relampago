@@ -132,7 +132,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
       def askLocalFundingConfirm = UITask {
         val maxCap = MilliSatoshi(math.min(app.kit.conf0Balance.value, LNParams.maxCapacity.amount) * 1000L)
-        val minCap = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat, LNParams.minCapacitySat) * 1000L)
+        val minCap = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat * 3, LNParams.minCapacitySat) * 1000L)
 
         val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
         val capacityHints = getString(amount_hint_newchan).format(denom withSign minCap,
