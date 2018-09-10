@@ -4,8 +4,8 @@
 
     <Button
         style="@style/TransButton"
-        android:id="@+id/paymentHash"
-        android:text="@string/ln_share_hash"/>
+        android:id="@+id/paymentRequest"
+        android:text="@string/ln_share_pr"/>
 
     <Button
         style="@style/TransButton"

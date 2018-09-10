@@ -68,9 +68,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
-    db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.paymentHashString)
+    db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
     db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
-      rd.pr.description, rd.paymentHashString, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
+      rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
   def markFailedAndFrozen = db txWrap {
@@ -109,7 +109,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     inFlightPayments get ok.paymentHash foreach { rd =>
       // Make payment searchable + optimization: record subroutes in database
-      db.change(PaymentTable.newVirtualSql, rd.queryText, rd.paymentHashString)
+      db.change(PaymentTable.newVirtualSql, rd.queryText, rd.pr.paymentHash)
       if (rd.usedRoute.nonEmpty) RouteWrap cacheSubRoutes rd
     }
   }

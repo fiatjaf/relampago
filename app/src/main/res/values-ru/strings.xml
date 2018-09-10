@@ -202,7 +202,7 @@
 
     <string name="ln_status_peer">Выберите пира</string>
     <string name="ln_share_debug">Debug info</string>
-    <string name="ln_share_hash">Хэш платежа</string>
+    <string name="ln_share_pr">Платежный запрос</string>
     <string name="ln_share_proof">Доказательство платежа</string>
     <string name="ln_description_hint">добавьте описание</string>
     <string name="ln_no_description">Описание отсутствует</string>

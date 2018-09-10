@@ -199,7 +199,7 @@
 
     <string name="ln_status_peer">Select peer</string>
     <string name="ln_share_debug">Share debug info</string>
-    <string name="ln_share_hash">Share payment hash</string>
+    <string name="ln_share_pr">Share Payment Request</string>
     <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_description_hint">add some description</string>
     <string name="ln_no_description">No description provided</string>

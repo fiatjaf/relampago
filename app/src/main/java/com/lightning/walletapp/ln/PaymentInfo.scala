@@ -191,9 +191,8 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long, lastExpiry: Long,
                        callsLeft: Int, useCache: Boolean) {
 
-  // Allow users to search by payment description, recipient nodeId, payment hash
-  lazy val queryText = s"${pr.description} ${pr.nodeId.toString} $paymentHashString"
-  lazy val paymentHashString = pr.paymentHash.toString
+  // Allow users to search by payment description OR recipient nodeId OR payment hash
+  lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toString}"
 }
 
 case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int,

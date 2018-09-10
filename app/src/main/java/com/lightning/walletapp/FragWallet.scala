@@ -305,18 +305,20 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val humanStatus = s"<strong>${paymentStates apply info.actualStatus}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
+      val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
       val paymentProof = detailsWrapper.findViewById(R.id.paymentProof).asInstanceOf[Button]
       val paymentDebug = detailsWrapper.findViewById(R.id.paymentDebug).asInstanceOf[Button]
-      val paymentHash = detailsWrapper.findViewById(R.id.paymentHash).asInstanceOf[Button]
-      paymentHash setOnClickListener onButtonTap(host share rd.paymentHashString)
+      lazy val serializedPR = PaymentRequest write info.pr
+
+      paymentRequest setOnClickListener onButtonTap(host share serializedPR)
       paymentDetails setText getDescription(info.description).html
 
       if (info.actualStatus == SUCCESS) {
-        paymentHash setVisibility View.GONE
+        paymentRequest setVisibility View.GONE
         paymentProof setVisibility View.VISIBLE
         paymentProof setOnClickListener onButtonTap {
-          val serialized = PaymentRequest.write(pr = info.pr)
-          host share lnProof.format(serialized, info.preimage.toString)
+          // Signed payment request along with a preimage is a proof
+          host share lnProof.format(serializedPR, info.preimage.toString)
         }
       }
 
@@ -476,9 +478,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimg, nodePrivateKey, info, onChainFallback, routes)
       val rd = emptyRD(pr, sum.amount, useCache = true)
 
-      db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.paymentHashString)
+      db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.pr.paymentHash)
       db.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
-        pr.description, rd.paymentHashString, sum.amount, 0L, 0L, NOCHANID)
+        pr.description, rd.pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
 
       app.TransData.value = pr
       host goTo classOf[RequestActivity]
