@@ -308,7 +308,10 @@ class WalletApp extends Application { me =>
     def currentAddress = wallet currentAddress KeyPurpose.RECEIVE_FUNDS
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE // Returns all utxos
     def conf1Balance = wallet getBalance BalanceType.AVAILABLE_SPENDABLE // Uses coin selector
-    def blockSend(txj: Transaction) = peerGroup.broadcastTransaction(txj, 1).broadcast.get
+    def blockSend(txj: Transaction) = {
+      txj.getParams
+      peerGroup.broadcastTransaction(txj, 1).broadcast.get
+    }
     def shutDown = none
 
     def closingPubKeyScripts(cd: ClosingData) =

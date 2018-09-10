@@ -199,11 +199,6 @@ class LNStartFundActivity extends TimerActivity { me =>
         case (_, _: InitData, started: Started) if started.start == wsw.params.start =>
           // #2 funder has returned a Started which is identical to the one we have
           askExternalFundingConfirm(started).run
-
-        case (_, wait: WaitBroadcastRemoteData, sent: FundingTxBroadcasted) =>
-          // #5 we have got a funder confirmation sooner than an onchain event
-          freshChan process CMDSpent(sent.tx)
-          app.kit blockSend sent.tx
       }
 
       override def onBecome = {
@@ -219,10 +214,10 @@ class LNStartFundActivity extends TimerActivity { me =>
           saveChan(wait)
           app.ChannelManager.all +:= freshChan
           freshChan.listeners ++= app.ChannelManager.operationalListeners
-          wsw send BroadcastFundingTx(wsw.params.userId, txHash = wait.txHash)
+          wsw send BroadcastFundingTx(wsw.params.userId, wait.txHash)
 
         case (_, _: WaitFundingDoneData, WAIT_FUNDING_DONE, WAIT_FUNDING_DONE) =>
-          // #6 we have received a remote funding tx and may exit to ops page
+          // #5 we have received a remote funding tx and may exit to ops page
           freshChan.listeners = app.ChannelManager.operationalListeners
           ExternalFunder.eliminateWSWrap(wsw, inform = false)
           app.TransData.value = FragWallet.REDIRECT
