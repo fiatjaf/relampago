@@ -3,6 +3,7 @@ package com.lightning.walletapp.ln.wire
 import scodec.codecs._
 import LightningMessageCodecs._
 import fr.acinq.bitcoin.BinaryData
+import scodec.Attempt
 
 
 sealed trait FailureMessage
@@ -39,7 +40,8 @@ case class ExpiryTooSoon(update: ChannelUpdate) extends Update
 
 object FailureMessageCodecs {
   private val sha256Codec = binarydata(32) withContext "sha256Codec"
-  private val channelUpdateWithLengthCodec = variableSizeBytes(uint16, channelUpdateCodec) withContext "channelUpdate"
+  private val channelUpdateCodecWithType = lightningMessageCodec.narrow[ChannelUpdate](Attempt successful _.asInstanceOf[ChannelUpdate], identity)
+  private val channelUpdateWithLengthCodec = variableSizeBytes(value = choice(channelUpdateCodecWithType, channelUpdateCodec), size = uint16)
   private val disabled = (binarydata(2) withContext "flags") :: channelUpdateWithLengthCodec
   private val amount = (uint64 withContext "amountMsat") :: channelUpdateWithLengthCodec
   private val expiry = (uint32 withContext "expiry") :: channelUpdateWithLengthCodec
