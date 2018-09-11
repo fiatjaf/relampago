@@ -24,6 +24,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import android.content.{ClipData, ClipboardManager, Context}
+
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.CloudAct
@@ -262,7 +263,7 @@ class WalletApp extends Application { me =>
 
     def fetchRoutes(rd: RoutingData) = {
       // First we collect chans which in principle can handle a given payment sum right now
-      // after we get the results we first prioritize cheapest routes and then routes which belong to less busy chans
+      // after we get the results we first prioritize cheapest routes and then routes which belong to currently less busy chans
       val from = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
 
       def withHints = for {
@@ -279,8 +280,7 @@ class WalletApp extends Application { me =>
 
       val paymentRoutesObs =
         if (from.isEmpty) Obs error new LightningException(me getString ln_no_open_chans)
-        else if (rd.pr.routingInfo.isEmpty) getRoutes(targetId = rd.pr.nodeId)
-        else Obs.zip(withHints).map(_.flatten.toVector)
+        else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
 
       for {
         routes <- paymentRoutesObs
