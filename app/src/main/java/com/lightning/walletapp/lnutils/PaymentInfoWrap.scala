@@ -80,7 +80,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def failOnUI(rd: RoutingData) = {
-    // Fail a payment and let user know
+    // Fail this payment on UI and remove from unsent
+    // it may still be in unsent if no routes were found
+    unsentPayments = unsentPayments - rd.pr.paymentHash
     updStatus(FAILURE, rd.pr.paymentHash)
     uiNotify
   }
