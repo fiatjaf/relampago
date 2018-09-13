@@ -263,10 +263,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case _ => otherState format c.state
   }
 
-  def connectivityStatusColor(c: Channel) = c.state match {
-    case OFFLINE | CLOSING => me getString ln_info_state_offline
-    case _ => me getString ln_info_state_online
-  }
+  def connectivityStatusColor(c: Channel) =
+    ConnectionManager.connections get c.data.announce.nodeId match {
+      case Some(w) if w.socket.isConnected => me getString ln_info_state_online
+      case _ => me getString ln_info_state_offline
+    }
 
   def closedBy(cd: ClosingData) =
     if (cd.remoteCommit.nonEmpty) me getString ln_info_close_remote

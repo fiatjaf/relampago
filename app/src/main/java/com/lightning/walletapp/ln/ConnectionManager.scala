@@ -36,8 +36,8 @@ object ConnectionManager {
   class Worker(ann: NodeAnnouncement) {
     implicit val context = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
     private val keyPair = KeyPair(nodePublicKey.toBin, nodePrivateKey.toBin)
-    private val buffer: Bytes = new Bytes(1024)
-    private val socket: Socket = new Socket
+    private val buffer = new Bytes(1024)
+    val socket = new Socket
 
     val handler: TransportHandler = new TransportHandler(keyPair, ann.nodeId) {
       def handleEnterOperationalState = handler process Init(LNParams.globalFeatures, LNParams.localFeatures)
