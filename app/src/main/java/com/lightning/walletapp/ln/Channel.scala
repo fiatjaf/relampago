@@ -468,11 +468,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (some: HasCommitments, CMDOnline, OFFLINE) =>
-        val ShaHashesWithIndex(hashes, lastIndex) = some.commitments.remotePerCommitmentSecrets
-        val yourLastPerCommitmentSecret = lastIndex.map(ShaChain.moves).flatMap(ShaChain getHash hashes).getOrElse(Sphinx zeroes 32)
-        val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
-        me SEND ChannelReestablish(some.commitments.channelId, some.commitments.localCommit.index + 1, some.commitments.remoteCommit.index,
-          Some apply Scalar(yourLastPerCommitmentSecret), Some apply myCurrentPerCommitmentPoint)
+        // According to BOLD a first message on connection should be reestablish
+        me SEND makeReestablish(some, some.commitments.localCommit.index + 1)
 
 
       case (some: HasCommitments, newAnn: NodeAnnouncement, OFFLINE)
@@ -587,6 +584,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
     // Change has been successfully processed
     events onProcessSuccess Tuple3(me, data, change)
+  }
+
+  def makeReestablish(some: HasCommitments, nextRemoteRevocationNumber: Long) = {
+    val ShaHashesWithIndex(hashes, lastIndex) = some.commitments.remotePerCommitmentSecrets
+    val yourLastPerCommitmentSecret = lastIndex.map(ShaChain.moves).flatMap(ShaChain getHash hashes).getOrElse(Sphinx zeroes 32)
+    val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
+    ChannelReestablish(some.commitments.channelId, nextRemoteRevocationNumber, some.commitments.remoteCommit.index,
+      Some apply Scalar(yourLastPerCommitmentSecret), Some apply myCurrentPerCommitmentPoint)
   }
 
   private def signLocalFunding(cmd: CMDOpenChannel, accept: AcceptChannel, txHash: BinaryData, outIndex: Int) = {

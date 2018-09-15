@@ -231,11 +231,10 @@ class WalletApp extends Application { me =>
       }
 
       def ASKREFUNDPEER(some: HasCommitments, point: Point) = {
-        val msg = "please publish your local commitment" getBytes "UTF-8"
         val ref = RefundingData(some.announce, Some(point), some.commitments)
         val fundingScript = some.commitments.commitInput.txOut.publicKeyScript
         app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
-        BECOME(STORE(ref), REFUNDING) SEND Error(ref.commitments.channelId, msg)
+        BECOME(STORE(ref), REFUNDING) SEND makeReestablish(some, Long.MaxValue)
       }
 
       // First add listeners, then call
