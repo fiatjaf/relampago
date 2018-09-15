@@ -152,13 +152,6 @@ class WalletApp extends Application { me =>
     def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
     def initConnect = for (c <- notClosing) ConnectionManager.connectTo(c.data.announce, notify = false)
 
-    def updateChangedIPs = for {
-      chan <- notClosing if chan.state == OFFLINE
-      peerNodeId = chan.data.announce.nodeId.toString
-      res <- OlympusWrap findNodes peerNodeId
-      announce \ _ <- res take 1
-    } chan process announce
-
     val socketEventsListener = new ConnectionListener {
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
@@ -350,7 +343,14 @@ class WalletApp extends Application { me =>
       peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
-      obsOnIO.delay(20.seconds).doOnCompleted(ChannelManager.updateChangedIPs).foreach(none, Tools.errlog)
+      for {
+        _ <- obsOnIO delay 20.seconds
+        chan <- ChannelManager.notClosing if chan.state == OFFLINE
+        // Enough time passes and we have offline channels, possibly remote peer IP has changed
+        res <- retry(OlympusWrap findNodes chan.data.announce.nodeId.toString, pickInc, 1 to 2)
+        announce \ _ <- res take 1
+      } chan process announce
+
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
       // Try to clear act leftovers if no channels left
