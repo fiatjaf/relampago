@@ -469,6 +469,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (some: HasCommitments, CMDOnline, OFFLINE) =>
         // According to BOLD a first message on connection should be reestablish
+        // will specifically NOT work in REFUNDING to not let them know beforehand
         me SEND makeReestablish(some, some.commitments.localCommit.index + 1)
 
 
