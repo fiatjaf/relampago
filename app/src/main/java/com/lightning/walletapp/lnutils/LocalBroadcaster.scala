@@ -34,10 +34,9 @@ object LocalBroadcaster extends Broadcaster {
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockSend tx catch none
 
-    case (chan, wbr: WaitBroadcastRemoteData, _: ChannelReestablish) =>
-      // Check if funding takes too much time or whether it's dead if present in a wallet
-      val isOutdated = wbr.commitments.startedAt < System.currentTimeMillis - 3600 * 4 * 1000L
-      if (isOutdated && wbr.fail.isEmpty) chan process Fail(FAIL_PUBLISH_ERROR, "Funding has expired")
+    case (chan, wbr: WaitBroadcastRemoteData, _: ChannelReestablish) if wbr.isOutdated && wbr.fail.isEmpty =>
+      // External funder may never publish our funding tx so we should mark it as failure once enough time passes
+      chan process Fail(FAIL_PUBLISH_ERROR, "Funding has expired")
 
     case (chan, wait: WaitFundingDoneData, _: ChannelReestablish) if wait.our.isEmpty =>
       // CMDConfirmed may be sent to an offline channel and there will be no reaction
