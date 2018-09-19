@@ -41,14 +41,14 @@ trait Denomination {
 
   def formatted(msat: MilliSatoshi): String
   def withSign(msat: MilliSatoshi): String
+  val amountInTxt: String
   val fmt: DecimalFormat
   val factor: Long
-  val txt: String
 }
 
 object SatDenomination extends Denomination {
   val fmt = new DecimalFormat("###,###,###.###")
-  val txt = app getString amount_hint_sat
+  val amountInTxt = app getString amount_hint_sat
   val factor = 1000L
 
   fmt setDecimalFormatSymbols symbols
@@ -64,7 +64,7 @@ object SatDenomination extends Denomination {
 
 object FinDenomination extends Denomination {
   val fmt = new DecimalFormat("###,##0.0000###")
-  val txt = app getString amount_hint_fin
+  val amountInTxt = app getString amount_hint_fin
   val factor = 10000000L
 
   fmt setDecimalFormatSymbols symbols
@@ -85,7 +85,7 @@ object FinDenomination extends Denomination {
 
 object BtcDenomination extends Denomination {
   val fmt = new DecimalFormat("##0.000########")
-  val txt = app getString amount_hint_btc
+  val amountInTxt = app getString amount_hint_btc
   val factor = 100000000000L
 
   fmt setDecimalFormatSymbols symbols

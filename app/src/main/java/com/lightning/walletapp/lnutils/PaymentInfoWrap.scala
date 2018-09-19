@@ -91,7 +91,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     app.ChannelManager checkIfSendable rd match {
       case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
         // Local conditions have not changed and we are still able to resend
-        me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
+        // the first attempt may have been made through a Proxy node, remove this constraint for the next try
+        me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, throughPeers = Set.empty, useCache = false)
 
       case _ =>
         // UI will be updated a bit later
@@ -218,7 +219,7 @@ object RouteWrap {
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
     val cursor = db.select(RouteTable.selectSql, targetId, System.currentTimeMillis)
     val routeTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRoute]
-    // Channels could be closed so make sure we still have a matching channel for this cached route
+    // Channels could be closed or excluded so make sure we still have a matching channel for cached route
     val validRouteTry = for (rt <- routeTry if from contains rt.head.nodeId) yield Obs just Vector(rt)
 
     db.change(RouteTable.killSql, targetId)

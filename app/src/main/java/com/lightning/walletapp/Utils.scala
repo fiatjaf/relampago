@@ -143,12 +143,13 @@ trait TimerActivity extends AppCompatActivity { me =>
   def mkCheckFormNeutral(ok: AlertDialog => Unit, no: => Unit, neutral: AlertDialog => Unit,
                          bld: Builder, okResource: Int, noResource: Int, neutralResource: Int) = {
 
-    val bld1 = bld.setNeutralButton(neutralResource, null)
-    val alert = mkCheckForm(ok, no, bld1, okResource, noResource)
+    if (-1 != neutralResource) bld.setNeutralButton(neutralResource, null)
+    val alert = mkCheckForm(ok, no, bld, okResource, noResource)
     val neutralAct = me onButtonTap neutral(alert)
 
-    // Extend base dialog with a special neutral button
-    alert getButton BUTTON_NEUTRAL setOnClickListener neutralAct
+    // Extend base dialog with a special NEUTRAL button
+    // NEUTRAL button may be omitted by providing -1 as its resource id
+    if (-1 != neutralResource) alert getButton BUTTON_NEUTRAL setOnClickListener neutralAct
     alert
   }
 
@@ -268,13 +269,14 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 }
 
-class RateManager(extra: String, val content: View) { me =>
+class RateManager(val content: View) { me =>
   val satInput = content.findViewById(R.id.inputAmount).asInstanceOf[EditText]
   val hintDenom = Utils clickableTextField content.findViewById(R.id.hintDenom)
   val fiatType = content.findViewById(R.id.fiatType).asInstanceOf[SegmentedGroup]
   val fiatInput = content.findViewById(R.id.fiatInputAmount).asInstanceOf[EditText]
   def result: TryMSat = Try(denom rawString2MSat satInput.getText.toString.noSpaces)
   def setSum(res: TryMSat) = satInput.setText(res map denom.asString getOrElse null)
+  def hint(ex: String) = runAnd(me)(hintDenom setText denom.amountInTxt.format(ex).html)
   def fiatDecimal = BigDecimal(fiatInput.getText.toString.noSpaces)
 
   val fiatListener = new TextChangedWatcher {
@@ -300,7 +302,6 @@ class RateManager(extra: String, val content: View) { me =>
 
   satInput addTextChangedListener bitListener
   fiatInput addTextChangedListener fiatListener
-  hintDenom setText denom.txt.format(extra).html
   fiatType check revFiatMap(fiatName)
   satInput.requestFocus
 }
@@ -343,7 +344,6 @@ trait TxTracker
 extends WalletCoinsSentEventListener
 with WalletCoinsReceivedEventListener
 with TransactionConfidenceEventListener {
-
   def txConfirmed(txj: Transaction): Unit = none
   def onTransactionConfidenceChanged(w: Wallet, txj: Transaction) =
     if (txj.getConfidence.getDepthInBlocks == minDepth) txConfirmed(txj)
@@ -351,7 +351,6 @@ with TransactionConfidenceEventListener {
 
 class MinDepthReachedCoinSelector
 extends org.bitcoinj.wallet.DefaultCoinSelector {
-
   override def shouldSelect(txj: Transaction): Boolean =
     if (null != txj) txj.getConfidence.getDepthInBlocks >= minDepth
     else true

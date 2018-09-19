@@ -36,10 +36,10 @@ object PaymentInfo {
   var errors = Map.empty[BinaryData, FailureTryVec] withDefaultValue Vector.empty
   private[this] var replacedChans = Set.empty[Long]
 
-  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
+  def emptyRD(pr: PaymentRequest, firstMsat: Long, throughPeers: Set[PublicKey], useCache: Boolean) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
-      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache)
+      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, throughPeers, useCache)
   }
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
@@ -189,7 +189,7 @@ object PaymentInfo {
 case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv: Long)
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
                        onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long, lastExpiry: Long,
-                       callsLeft: Int, useCache: Boolean) {
+                       callsLeft: Int, throughPeers: Set[PublicKey], useCache: Boolean) {
 
   // Allow users to search by payment description OR recipient nodeId OR payment hash
   lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toString}"

@@ -103,9 +103,8 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     }
 
   def retryFreshRequest(pr: PaymentRequest): Unit = {
-    // Find a channel which is capable of sending, may be offline
     val ok = app.ChannelManager.notClosing.exists(isOperational)
-    val rd = emptyRD(pr, pr.unsafeMsat, useCache = true)
+    val rd = emptyRD(pr, pr.unsafeMsat, Set.empty, useCache = true)
     if (ok) PaymentInfoWrap addPendingPayment rd
   }
 }

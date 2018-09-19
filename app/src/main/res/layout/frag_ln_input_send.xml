@@ -1,0 +1,17 @@
+<LinearLayout
+    style="@style/StandardLinearLayout"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <include layout="@layout/frag_input_fiat_converter"/>
+
+    <LinearLayout
+        android:visibility="gone"
+        android:id="@+id/guaranteedContainer"
+        style="@style/StandardLinearLayout">
+
+        <Button
+            style="@style/TransButton"
+            android:id="@+id/deliveryHint"/>
+
+        <View style="@style/GrayDivider"/>
+    </LinearLayout>
+</LinearLayout>

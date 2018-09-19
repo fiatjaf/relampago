@@ -261,6 +261,7 @@ class WalletApp extends Application { me =>
       // First we collect chans which in principle can handle a given payment sum right now
       // after we get the results we first prioritize cheapest routes and then routes which belong to currently less busy chans
       val from = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
+      val from1 = if (rd.throughPeers.nonEmpty) from.filter(rd.throughPeers.contains) else from
 
       def withHints = for {
         tag <- Obs from rd.pr.routingInfo
@@ -268,14 +269,14 @@ class WalletApp extends Application { me =>
         completeRoutes = partialRoutes.map(_ ++ tag.route)
       } yield Obs just completeRoutes
 
-      def getRoutes(targetId: PublicKey) = from contains targetId match {
-        case false if rd.useCache => RouteWrap.findRoutes(from, targetId, rd)
-        case false => BadEntityWrap.findRoutes(from, targetId, rd)
+      def getRoutes(targetId: PublicKey) = from1 contains targetId match {
+        case false if rd.useCache => RouteWrap.findRoutes(from1, targetId, rd)
+        case false => BadEntityWrap.findRoutes(from1, targetId, rd)
         case true => Obs just Vector(Vector.empty)
       }
 
       val paymentRoutesObs =
-        if (from.isEmpty) Obs error new LightningException(me getString ln_no_open_chans)
+        if (from1.isEmpty) Obs error new LightningException(me getString ln_no_open_chans)
         else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
 
       for {

@@ -18,10 +18,12 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
-import android.os.{Bundle, Handler}
 import scala.util.{Failure, Success, Try}
+import android.os.{Build, Bundle, Handler}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
+import android.content.{DialogInterface, Intent}
 import android.database.{ContentObserver, Cursor}
+import android.transition.{Slide, TransitionManager}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
@@ -36,9 +38,9 @@ import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
+import fr.acinq.bitcoin.Crypto.PublicKey
 import android.support.v4.app.Fragment
 import android.app.AlertDialog
-import android.content.Intent
 import android.net.Uri
 
 
@@ -290,18 +292,17 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def fillView(holder: ViewHolder) = {
       val marking = if (info.incoming == 1) sumIn else sumOut
       val humanSum = marking.format(denom formatted info.firstSum)
-
-      holder.transactSum setText s"<img src='ln'/>$humanSum".html
       holder.transactCircle setImageResource imageMap(info.actualStatus)
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
       holder.transactWhat setText getDescription(info.description).html
+      holder.transactSum setText s"<img src='ln'/>$humanSum".html
     }
 
     def generatePopup = {
       val inFiat = msatInFiatHuman(info.firstSum)
       val noRetry = if (info.pr.isFresh) dialog_retry else -1
-      val rd = emptyRD(info.pr, info.firstMsat, useCache = false)
+      val rd = emptyRD(info.pr, info.firstMsat, Set.empty, useCache = false)
       val humanStatus = s"<strong>${paymentStates apply info.actualStatus}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
@@ -468,15 +469,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def receive(chansWithRoutes: Map[Channel, PaymentRoute], maxCanReceive: MilliSatoshi) = {
     val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
-    val hint = app.getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
-    val rateManager = new RateManager(hint, content)
+    val baseHint = app.getString(amount_hint_can_receive).format(denom withSign maxCanReceive)
+    val rateManager = new RateManager(content) hint baseHint
 
     def makeRequest(sum: MilliSatoshi, preimg: BinaryData) = {
       val onChainFallback = Some(app.kit.currentAddress.toString)
       val info = content.findViewById(R.id.inputDescription).asInstanceOf[EditText].getText.toString.trim
       val routes = chansWithRoutes.filterKeys(chan => estimateCanReceiveCapped(chan) >= sum.amount).values.toVector
       val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimg, nodePrivateKey, info, onChainFallback, routes)
-      val rd = emptyRD(pr, sum.amount, useCache = true)
+      val rd = emptyRD(pr, sum.amount, Set.empty, useCache = true)
 
       db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.pr.paymentHash)
       db.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
@@ -506,41 +507,73 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def sendPayment(pr: PaymentRequest) =
     if (PaymentRequest.prefixes(chainHash) != pr.prefix) app toast err_general
     else if (pr.nodeId == nodePublicKey) app toast err_self_payment
-    else if (!pr.isFresh) app toast dialog_pr_expired else {
+    else if (!pr.isFresh) app toast dialog_pr_expired
+    else {
 
       // This fetches normal channels which MAY be offline currently, this is fine
       val openingChannels = app.ChannelManager.notClosingOrRefunding.filter(isOpening)
       val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
       if (operationalChannels.isEmpty && openingChannels.nonEmpty) onFail(app getString err_ln_still_opening)
-      else if (operationalChannels.isEmpty) app toast ln_no_open_chans else {
+      else if (operationalChannels.isEmpty) app toast ln_no_open_chans
+      else {
 
-        val maxCanSendUncapped = operationalChannels.map(estimateCanSend).max
-        val maxCanSend = MilliSatoshi apply math.min(maxCanSendUncapped, LNParams.maxHtlcValueMsat)
-        val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
-        val hint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
-        val rateManager = new RateManager(hint, content)
+        val baseContent = host.getLayoutInflater.inflate(R.layout.frag_ln_input_send, null, false).asInstanceOf[LinearLayout]
+        val guaranteedContainer = baseContent.findViewById(R.id.guaranteedContainer).asInstanceOf[LinearLayout]
+        val deliveryHint = baseContent.findViewById(R.id.deliveryHint).asInstanceOf[Button]
 
-        def sendAttempt(alert: AlertDialog) = rateManager.result match {
-          case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
-          case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
-          case Success(ms) if pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
-          case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
+        val runnableOpt = onChainRunnable(pr)
+        val description = getDescription(pr.description)
+        val maxCanSend = MilliSatoshi(LNParams.maxHtlcValueMsat min operationalChannels.map(estimateCanSend).max)
+        val bld = baseBuilder(title = app.getString(ln_send_title).format(description).html, baseContent)
+        val baseHint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
+        val rateManager = new RateManager(baseContent) hint baseHint
+
+        def sendAttempt(throughPeers: Set[PublicKey], alert: AlertDialog) = rateManager.result match {
+          case Success(ms) if maxCanSend < ms || pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
+          case Success(ms) if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
           case Failure(reason) => app toast dialog_sum_empty
 
           case Success(ms) => rm(alert) {
-            me doSend emptyRD(pr, firstMsat = ms.amount, useCache = true)
+            me doSend emptyRD(pr, ms.amount, throughPeers, useCache = true)
+            // Inform that channels are offline and some wait will happen
             val isOnline = operationalChannels.exists(_.state == OPEN)
             if (!isOnline) app toast ln_chan_offline
           }
         }
 
-        val runnableOpt = onChainRunnable(pr)
-        val description = getDescription(pr.description)
-        val bld = baseBuilder(app.getString(ln_send_title).format(description).html, content)
         def useOnchain(alert: AlertDialog) = rm(alert) { for (runnable <- runnableOpt) runnable.run }
-        if (pr.amount.forall(_ <= maxCanSend) || runnableOpt.isEmpty) mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
-        else mkCheckFormNeutral(sendAttempt, none, useOnchain, bld, dialog_pay, dialog_cancel, dialog_pay_onchain)
+        val neutralRes = if (pr.amount.forall(askedAmount => maxCanSend > askedAmount) || runnableOpt.isEmpty) -1 else dialog_pay_onchain
+        val alert = mkCheckFormNeutral(alert => sendAttempt(Set.empty, alert), none, useOnchain, bld, dialog_pay, dialog_cancel, neutralRes)
+
+        case class GuaranteedOffer(rep: ChanReport) {
+          val relayNodeLink = new RelayNode(rep.chan.data.announce, pr.nodeId) { def onGuaranteedAmountRefreshed = updateHint }
+          bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = relayNodeLink.disconnect }
+          rateManager.satInput addTextChangedListener new TextChangedWatcher { def onTextChanged(s: CharSequence, st: Int, b: Int, c: Int) = updateHint }
+
+          def updateHint: Unit = Tuple2(rateManager.result, relayNodeLink.directSend) match {
+            case Failure(_) \ _ => actionAndText(app toast dialog_sum_empty, app getString amount_hint_empty)
+            case Success(ms) \ _ if ms.amount <= 0L => actionAndText(app toast dialog_sum_empty, app getString amount_hint_empty)
+            case Success(ms) \ _ if maxCanSend < ms => actionAndText(app toast dialog_sum_big, app getString amount_hint_too_high)
+
+            case Success(ms) \ direct if direct < ms =>
+              val why = app.getString(amount_hint_regular).format(denom formatted direct)
+              actionAndText(action = sendAttempt(Set.empty, alert), text = why)
+
+            case Success(ms) \ direct => UITask {
+              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) TransitionManager.beginDelayedTransition(baseContent, new Slide)
+              actionAndText(action = sendAttempt(throughPeers = Set(RelayNode.relayNodeKey, pr.nodeId), alert), app getString amount_hint_direct)
+              guaranteedContainer setVisibility View.VISIBLE
+            }.run
+          }
+
+          def actionAndText(action: => Unit, text: String) = {
+            deliveryHint setOnClickListener onButtonTap(action)
+            deliveryHint setText text.html
+          }
+        }
+
         for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
+        RelayNode.relayPeerReports.headOption foreach GuaranteedOffer
       }
     }
 
@@ -566,9 +599,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def sendBtcPopup(addr: Address)(and: Transaction => Unit): RateManager = {
     val form = host.getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
-    val hint = app.getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
+    val baseHint = app.getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
     val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
-    val rateManager = new RateManager(hint, form)
+    val rateManager = new RateManager(form) hint baseHint
 
     def next(ms: MilliSatoshi) = new TxProcessor {
       def futureProcess(unsignedRequest: SendRequest) = {

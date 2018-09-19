@@ -88,9 +88,16 @@
     <string name="action_ln_open">Open new channel</string>
 
     <!-- dialogs -->
+    <string name="amount_hint_fin"><![CDATA[Amount in Finney%1$s]]></string>
     <string name="amount_hint_sat"><![CDATA[Amount in Satoshi%1$s]]></string>
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
-    <string name="amount_hint_fin"><![CDATA[Amount in Finney%1$s]]></string>
+    <string name="amount_hint_empty"><![CDATA[<font color=#FF9900>Enter an amount first</font>]]></string>
+    <string name="amount_hint_too_high"><![CDATA[<font color=#FF9900>Can not send that much</font>]]></string>
+    <string name="amount_hint_regular"><![CDATA[Tap for a regular payment<br><small>max guaranteed is %1$s</small>]]></string>
+    <string name="amount_hint_direct"><![CDATA[<font color=#0099FE>Tap to pay via Proxy node<br><small>Guaranteed payment is possible</small></font>]]></string>
+    <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>balance %3$s</small>]]></string>
+    <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
+    <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
 
     <string name="dialog_pr_making">Making payment request&#8230;</string>
     <string name="dialog_pr_expired">Expired payment request</string>
@@ -108,20 +115,16 @@
     <string name="dialog_ok">OK</string>
 
     <!-- notifications -->
-    <string name="btc_empty">No on-chain funds</string>
-    <string name="ln_empty">No off-chain funds</string>
-    <string name="btc_status_operational">Wallet is operational</string>
-    <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
-    <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>wallet balance %3$s</small>]]></string>
-    <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
-    <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
-
     <array name="info_progress">
         <item>Sync is complete</item>
         <item><![CDATA[<font color=#FF9900>Sync: %1$d day behind</font>]]></item>
         <item><![CDATA[<font color=#FF9900>Sync: %1$d days behind</font>]]></item>
     </array>
 
+    <string name="btc_empty">No on-chain funds</string>
+    <string name="ln_empty">No off-chain funds</string>
+    <string name="btc_status_operational">Wallet is operational</string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>

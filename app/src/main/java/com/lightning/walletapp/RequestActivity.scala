@@ -11,17 +11,18 @@ import android.graphics.Bitmap.Config.ARGB_8888
 import android.support.v4.content.FileProvider
 import com.google.zxing.qrcode.QRCodeWriter
 import android.graphics.Bitmap.createBitmap
+import android.transition.TransitionManager
 import fr.acinq.bitcoin.BinaryData
 import org.bitcoinj.core.Address
 import android.content.Intent
 import android.view.View
-import android.os.Bundle
 
 import android.widget.{ImageButton, ImageView, LinearLayout}
 import com.google.zxing.{BarcodeFormat, EncodeHintType}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
 import android.text.{StaticLayout, TextPaint}
 import java.io.{File, FileOutputStream}
+import android.os.{Build, Bundle}
 
 
 object QRGen {
@@ -47,8 +48,9 @@ object QRGen {
 }
 
 class RequestActivity extends TimerActivity { me =>
-  lazy val reqOptions = findViewById(R.id.reqOptions).asInstanceOf[LinearLayout]
+  lazy val reqContainer = findViewById(R.id.reqContainer).asInstanceOf[LinearLayout]
   lazy val reqFulfilled = findViewById(R.id.reqFulfilled).asInstanceOf[LinearLayout]
+  lazy val reqOptions = findViewById(R.id.reqOptions).asInstanceOf[LinearLayout]
   lazy val shareText = findViewById(R.id.shareText).asInstanceOf[ImageButton]
   lazy val shareQR = findViewById(R.id.shareQR).asInstanceOf[ImageButton]
   lazy val reqCode = findViewById(R.id.reqCode).asInstanceOf[ImageView]
@@ -65,7 +67,7 @@ class RequestActivity extends TimerActivity { me =>
   def INIT(state: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_qr_request)
     val targetPayHash = app.TransData.value match {
-      case request: PaymentRequest => request.paymentHash
+      case pr: PaymentRequest => pr.paymentHash
       case _ => BinaryData.empty
     }
 
@@ -82,13 +84,16 @@ class RequestActivity extends TimerActivity { me =>
       case _ => finish
     }
 
-    whenDestroy = UITask { for (c <- app.ChannelManager.all) c.listeners -= receivedListener }
-    for (c <- app.ChannelManager.all) c.listeners += receivedListener
+    whenDestroy = UITask { for (channel <- app.ChannelManager.all) channel.listeners -= receivedListener }
+    for (channel <- app.ChannelManager.all) channel.listeners += receivedListener
   } else me exitTo classOf[MainActivity]
 
   def showPaid = UITask {
-    reqOptions setVisibility View.GONE
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
+      TransitionManager beginDelayedTransition reqContainer
+
     reqFulfilled setVisibility View.VISIBLE
+    reqOptions setVisibility View.GONE
   }
 
   def showInfo(renderBitmap: Bitmap => Bitmap, data: String) = {
@@ -162,7 +167,7 @@ class RequestActivity extends TimerActivity { me =>
     out.close
 
     val savedFile = new File(paymentRequestFilePath, "qr.png")
-    val fileURI = FileProvider.getUriForFile(me, "com.lightning.walletapp", savedFile)
+    val fileURI = FileProvider.getUriForFile(me, "com.lightning.wallet", savedFile)
     val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
     share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
     me startActivity Intent.createChooser(share, "Choose an app")
