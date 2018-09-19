@@ -266,7 +266,7 @@ class WalletApp extends Application { me =>
       } yield Obs just completeRoutes
 
       def getRoutes(targetId: PublicKey) = from1 contains targetId match {
-//        case false if rd.useCache => RouteWrap.findRoutes(from1, targetId, rd)
+        case false if rd.useCache => RouteWrap.findRoutes(from1, targetId, rd)
         case false => BadEntityWrap.findRoutes(from1, targetId, rd)
         case true => Obs just Vector(Vector.empty)
       }
