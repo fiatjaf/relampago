@@ -555,13 +555,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
             case Success(ms) \ _ if ms.amount <= 0L => actionAndText(app toast dialog_sum_empty, app getString amount_hint_empty)
             case Success(ms) \ _ if maxCanSend < ms => actionAndText(app toast dialog_sum_big, app getString amount_hint_too_high)
 
-            case Success(ms) \ direct if direct < ms =>
-              val why = app.getString(amount_hint_regular).format(denom formatted direct)
-              actionAndText(action = sendAttempt(Set.empty, alert), text = why)
-
-            case Success(ms) \ direct => UITask {
+            case Success(ms) \ relay => UITask {
+              val regularPaymentText = app.getString(amount_hint_regular).format(denom formatted relay)
+              val peerRelayErrorText = app.getString(amount_hint_payee_err).format(denom formatted relay)
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) TransitionManager.beginDelayedTransition(baseContent, new Slide)
-              actionAndText(action = sendAttempt(throughPeers = Set(RelayNode.relayNodeKey, pr.nodeId), alert), app getString amount_hint_direct)
+              if (relay >= ms) actionAndText(sendAttempt(Set(RelayNode.relayNodeKey, pr.nodeId), alert), app getString amount_hint_direct)
+              else if (RelayNode.hasOtherPeers) actionAndText(sendAttempt(Set.empty, alert), regularPaymentText)
+              else actionAndText(app toast dialog_sum_big, peerRelayErrorText)
               guaranteedContainer setVisibility View.VISIBLE
             }.run
           }
@@ -572,7 +572,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           }
         }
 
-        for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
+        for (asked <- pr.amount) rateManager setSum Try(asked)
         RelayNode.relayPeerReports.headOption foreach GuaranteedOffer
       }
     }

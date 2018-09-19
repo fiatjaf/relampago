@@ -18,6 +18,7 @@ object RelayNode {
   final val relaySockPort = 8089
   final val relayNodeKey = PublicKey("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd")
   def relayPeerReports = app.ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == relayNodeKey)
+  def hasOtherPeers = app.ChannelManager.notClosingOrRefunding.exists(_.data.announce.nodeId != relayNodeKey)
 }
 
 abstract class RelayNode(ann: NodeAnnouncement, payeeNodeId: PublicKey) { me =>

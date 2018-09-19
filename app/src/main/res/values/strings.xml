@@ -93,8 +93,9 @@
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
     <string name="amount_hint_empty"><![CDATA[<font color=#FF9900>Enter an amount first</font>]]></string>
     <string name="amount_hint_too_high"><![CDATA[<font color=#FF9900>Can not send that much</font>]]></string>
+    <string name="amount_hint_direct"><![CDATA[<font color=#0099FE>Tap for guaranteed payment</font>]]></string>
     <string name="amount_hint_regular"><![CDATA[Tap for a regular payment<br><small>max guaranteed is %1$s</small>]]></string>
-    <string name="amount_hint_direct"><![CDATA[<font color=#0099FE>Tap to pay via Proxy node<br><small>Guaranteed payment is possible</small></font>]]></string>
+    <string name="amount_hint_payee_err"><![CDATA[<font color=#FF9900>Can not relay that much</font><br><small>max possible is %1$s</small>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>balance %3$s</small>]]></string>
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
