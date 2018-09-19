@@ -156,11 +156,7 @@ class WalletApp extends Application { me =>
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
         case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
         case errAll: Error if errAll.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process errAll)
-        case m: ChannelMessage => notClosing.find(chan => chan(commitments => commitments.channelId) contains m.channelId) match {
-          case None => for (w <- ConnectionManager.connections get nodeId) w.handler process Error(m.channelId, "No channel" getBytes "UTF-8")
-          case Some(existingChannel) => existingChannel process m
-        }
-
+        case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
         case _ =>
       }
 
