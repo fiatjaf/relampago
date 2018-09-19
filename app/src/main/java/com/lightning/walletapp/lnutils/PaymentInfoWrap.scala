@@ -68,9 +68,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
-    db.change(PaymentTable.updLastParamsSql, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
-    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
-      rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
+    db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
+    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis, rd.pr.description,
+      rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
   def markFailedAndFrozen = db txWrap {
