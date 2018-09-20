@@ -11,7 +11,7 @@ android {
         multiDexEnabled true
         targetSdkVersion 26
         minSdkVersion 21
-        versionCode 67
+        versionCode 68
     }
 
     buildTypes {

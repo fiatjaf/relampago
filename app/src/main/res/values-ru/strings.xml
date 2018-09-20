@@ -36,7 +36,7 @@
     <string name="mnemonic_info"><font color="#E31300">Мнемонический код важен!</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> зачем он нужен и сохраните его прямо сейчас</string>
     <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>Зачем нужен бэкап-сервер</a>\n<small>не меняйте настройки внизу\nесли не знаете что делате</small></string>
     <string name="boost_details"><![CDATA[Хотите поднять комиссию для этой транзакции и подтвердить ее быстрее?<br><br>сейчас %1$s<br>после CPFP %2$s<br>]]></string>
-    <string name="read_settings"><![CDATA[<small>Bitcoin Кошелек-Молния<br><a href=http://lightning-wallet.com>Прочитайте инструкцию</a><br>v0.1&#8211;67</small>]]></string>
+    <string name="read_settings"><![CDATA[<small>Bitcoin Кошелек-Молния<br><a href=http://lightning-wallet.com>Прочитайте инструкцию</a><br>v0.1&#8211;68</small>]]></string>
 
     <string name="channel_recovery_info">
         Восстановитель каналов скачивает резервные копии ваших потерянных каналов с бэкап-серверов и использует
