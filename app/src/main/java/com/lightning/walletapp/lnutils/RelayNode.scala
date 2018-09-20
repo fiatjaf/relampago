@@ -25,7 +25,7 @@ abstract class RelayNode(ann: NodeAnnouncement, payeeNodeId: PublicKey) { me =>
   val endPoint = s"ws://${ann.workingAddress.getHostString}:$relaySockPort/ws"
   val ws = (new WebSocketFactory).createSocket(endPoint, 7500)
   type RelayChannelInfos = Seq[RelayChannelInfo]
-  var directSend = MilliSatoshi(0L)
+  var directSend: Option[MilliSatoshi] = None
 
   ws addListener new WebSocketAdapter {
     override def onDisconnected(ws: WebSocket, s: WebSocketFrame, e: WebSocketFrame, cbs: Boolean) =
@@ -35,7 +35,8 @@ abstract class RelayNode(ann: NodeAnnouncement, payeeNodeId: PublicKey) { me =>
       val balances = to[RelayChannelInfos](raw).filter(_.peerNodeId == payeeNodeId).map(_.balances)
       val fromMe2Relay = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse 0L
       val fromRelay2Payee = balances.map(_.canSendMsat).reduceOption(_ max _) getOrElse 0L
-      directSend = MilliSatoshi(fromMe2Relay min fromRelay2Payee)
+      val canSend = MilliSatoshi(fromMe2Relay min fromRelay2Payee)
+      directSend = if (balances.isEmpty) None else Some(canSend)
       onGuaranteedAmountRefreshed
     }
   }

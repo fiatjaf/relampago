@@ -555,7 +555,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
             case Success(ms) \ _ \ visibility if ms.amount <= 0L => upd(app toast dialog_sum_empty, app getString amount_hint_empty, visibility)
             case Success(ms) \ _ \ visibility if maxCanSend < ms => upd(app toast dialog_sum_big, app getString amount_hint_too_high, visibility)
 
-            case Success(ms) \ relay \ visibility => UITask {
+            case Success(ms) \ Some(relay) \ visibility =>
               val restrictedRouting = Set(RelayNode.relayNodeKey, pr.nodeId)
               val regularPaymentText = app.getString(amount_hint_regular).format(denom formatted relay)
               val peerRelayErrorText = app.getString(amount_hint_payee_err).format(denom formatted relay)
@@ -565,14 +565,17 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
               if (shouldShowButtonAnyway) upd(sendAttempt(restrictedRouting, alert), app getString amount_hint_direct, View.VISIBLE)
               else if (relay < ms && RelayNode.hasOtherPeers) upd(sendAttempt(Set.empty, alert), regularPaymentText, visibility)
               else if (relay < ms) upd(app toast dialog_sum_big, peerRelayErrorText, View.VISIBLE)
-            }.run
+
+            case _ \ None \ visibility =>
+              val unknownPaymentText = app getString amount_hint_unknown
+              upd(sendAttempt(Set.empty, alert), unknownPaymentText, visibility)
           }
 
-          def upd(action: => Unit, text: String, vs: Int) = {
-            deliveryHint setOnClickListener onButtonTap(action)
+          def upd(action: => Unit, text: String, vs: Int) = UITask {
+            deliveryHint setOnClickListener onButtonTap(exec = action)
             guaranteedContainer setVisibility vs
             deliveryHint setText text.html
-          }
+          }.run
         }
 
         for (asked <- pr.amount) rateManager setSum Try(asked)
