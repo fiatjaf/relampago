@@ -44,13 +44,6 @@ case class Batch(unsigned: SendRequest, dummyScript: BinaryData, pr: PaymentRequ
 }
 
 object TxWrap {
-  def maybeAddOpReturn(req: SendRequest) = {
-    val key = req.tx.getInput(0).getConnectedRedeemData(app.kit.wallet).getFullKey
-    val noMyOuts = !req.tx.getOutputs.asScala.exists(output => output isMine app.kit.wallet)
-    if (noMyOuts) req.tx.addOutput(Coin.ZERO, ScriptBuilder createOpReturnScript key.getPubKeyHash)
-    req
-  }
-
   def findBestBatch(pr: PaymentRequest) = Try {
     // Any of these two might throw and thus work as guards
     val where = Address.fromString(app.params, pr.fallbackAddress.get)
@@ -114,7 +107,7 @@ object TxWrap {
     // It may fail here because after filtering we may have no items at all
     val filtered = corrected filter { case amount \ _ => amount.value > LNParams.minCapacitySat }
     val _ \ finalRequest = filtered maxBy { case bestAmount \ _ => bestAmount.value }
-    Batch(maybeAddOpReturn(finalRequest), dummyScript, pr)
+    Batch(finalRequest, dummyScript, pr)
   }
 }
 
