@@ -550,24 +550,27 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = relayNodeLink.disconnect }
           rateManager.satInput addTextChangedListener new TextChangedWatcher { def onTextChanged(s: CharSequence, st: Int, b: Int, c: Int) = updateHint }
 
-          def updateHint: Unit = Tuple2(rateManager.result, relayNodeLink.directSend) match {
-            case Failure(_) \ _ => actionAndText(app toast dialog_sum_empty, app getString amount_hint_empty)
-            case Success(ms) \ _ if ms.amount <= 0L => actionAndText(app toast dialog_sum_empty, app getString amount_hint_empty)
-            case Success(ms) \ _ if maxCanSend < ms => actionAndText(app toast dialog_sum_big, app getString amount_hint_too_high)
+          def updateHint: Unit = rateManager.result -> relayNodeLink.directSend -> guaranteedContainer.getVisibility match {
+            case Failure(_) \ _ \ visibility => upd(app toast dialog_sum_empty, app getString amount_hint_empty, visibility)
+            case Success(ms) \ _ \ visibility if ms.amount <= 0L => upd(app toast dialog_sum_empty, app getString amount_hint_empty, visibility)
+            case Success(ms) \ _ \ visibility if maxCanSend < ms => upd(app toast dialog_sum_big, app getString amount_hint_too_high, visibility)
 
-            case Success(ms) \ relay => UITask {
+            case Success(ms) \ relay \ visibility => UITask {
+              val restrictedRouting = Set(RelayNode.relayNodeKey, pr.nodeId)
               val regularPaymentText = app.getString(amount_hint_regular).format(denom formatted relay)
               val peerRelayErrorText = app.getString(amount_hint_payee_err).format(denom formatted relay)
+              val shouldShowButtonAnyway = relay >= ms && (RelayNode.hasOtherPeers || visibility == View.VISIBLE)
+
               if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) TransitionManager.beginDelayedTransition(baseContent, new Slide)
-              if (relay >= ms) actionAndText(sendAttempt(Set(RelayNode.relayNodeKey, pr.nodeId), alert), app getString amount_hint_direct)
-              else if (RelayNode.hasOtherPeers) actionAndText(sendAttempt(Set.empty, alert), regularPaymentText)
-              else actionAndText(app toast dialog_sum_big, peerRelayErrorText)
-              guaranteedContainer setVisibility View.VISIBLE
+              if (shouldShowButtonAnyway) upd(sendAttempt(restrictedRouting, alert), app getString amount_hint_direct, View.VISIBLE)
+              else if (relay < ms && RelayNode.hasOtherPeers) upd(sendAttempt(Set.empty, alert), regularPaymentText, visibility)
+              else if (relay < ms) upd(app toast dialog_sum_big, peerRelayErrorText, View.VISIBLE)
             }.run
           }
 
-          def actionAndText(action: => Unit, text: String) = {
+          def upd(action: => Unit, text: String, vs: Int) = {
             deliveryHint setOnClickListener onButtonTap(action)
+            guaranteedContainer setVisibility vs
             deliveryHint setText text.html
           }
         }
