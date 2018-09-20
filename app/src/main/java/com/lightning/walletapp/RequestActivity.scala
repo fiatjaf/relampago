@@ -167,7 +167,7 @@ class RequestActivity extends TimerActivity { me =>
     out.close
 
     val savedFile = new File(paymentRequestFilePath, "qr.png")
-    val fileURI = FileProvider.getUriForFile(me, "com.lightning.wallet", savedFile)
+    val fileURI = FileProvider.getUriForFile(me, "com.lightning.walletapp", savedFile)
     val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
     share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
     me startActivity Intent.createChooser(share, "Choose an app")
