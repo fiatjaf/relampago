@@ -546,11 +546,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val alert = mkCheckFormNeutral(alert => sendAttempt(Set.empty, alert), none, useOnchain, bld, dialog_pay, dialog_cancel, neutralRes)
 
         case class GuaranteedOffer(rep: ChanReport) {
-          val relayNodeLink = new RelayNode(rep.chan.data.announce, pr.nodeId) { def onGuaranteedAmountRefreshed = updateHint }
-          bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = relayNodeLink.disconnect }
+          val relayLink = new RelayNode(rep.chan.data.announce, pr.nodeId) { def onGuaranteedAmountRefreshed = updateHint }
+          bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = relayLink.disconnect }
           rateManager.satInput addTextChangedListener new TextChangedWatcher { def onTextChanged(s: CharSequence, st: Int, b: Int, c: Int) = updateHint }
 
-          def updateHint: Unit = rateManager.result -> relayNodeLink.directSend -> guaranteedContainer.getVisibility match {
+          def updateHint: Unit = rateManager.result -> relayLink.directSend -> guaranteedContainer.getVisibility match {
             case Failure(_) \ _ \ visibility => upd(app toast dialog_sum_empty, app getString amount_hint_empty, visibility)
             case Success(ms) \ _ \ visibility if ms.amount <= 0L => upd(app toast dialog_sum_empty, app getString amount_hint_empty, visibility)
             case Success(ms) \ _ \ visibility if maxCanSend < ms => upd(app toast dialog_sum_big, app getString amount_hint_too_high, visibility)
