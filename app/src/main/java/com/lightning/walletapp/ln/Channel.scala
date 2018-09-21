@@ -407,7 +407,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // If next_local_commitment_number is 1 in both the channel_reestablish it sent
         // and received, then the node MUST retransmit funding_locked, otherwise it MUST NOT
         if (cr.nextLocalCommitmentNumber == 1 && norm.commitments.localCommit.index == 0)
-          me SEND makeFundingLocked(norm.commitments)
+          if (norm.localShutdown.isEmpty && norm.remoteShutdown.isEmpty)
+            me SEND makeFundingLocked(norm.commitments)
 
         // First we clean up unacknowledged updates
         val localDelta = norm.commitments.localChanges.proposed collect { case u: UpdateAddHtlc => true }
