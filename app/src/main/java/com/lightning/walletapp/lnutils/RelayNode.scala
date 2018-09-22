@@ -18,15 +18,15 @@ object RelayNode {
   final val relaySockPort = 8089
   final val relayNodeKey = PublicKey("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd")
   def relayPeerReports = app.ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == relayNodeKey)
-  def hasRelayOnly = app.ChannelManager.notClosingOrRefunding.forall(_.data.announce.nodeId == relayNodeKey)
+  def hasRelayPeerOnly = app.ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == relayNodeKey)
 }
 
 abstract class RelayNode(payeeNodeId: PublicKey) { me =>
-  type RelayChannelInfos = Seq[RelayChannelInfo]
-  var directSend: Option[MilliSatoshi] = None
+  var canDeliver: Option[MilliSatoshi] = None
   var wsOpt: Option[WebSocket] = None
 
   def start(ann: NodeAnnouncement) = {
+    type RelayChannelInfos = Seq[RelayChannelInfo]
     val endPoint = s"ws://${ann.workingAddress.getHostString}:$relaySockPort/ws"
     val ws = (new WebSocketFactory).createSocket(endPoint, 7500)
     ws.connectAsynchronously
@@ -41,14 +41,14 @@ abstract class RelayNode(payeeNodeId: PublicKey) { me =>
         val fromMe2Relay = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse 0L
         // 10 sat for routing + 4000000 sat max amount / 0.01% = 400 so in total we have to reserve 410 sat
         val fromRelay2Payee = balances.map(_.canSendMsat - 410000L).reduceOption(_ max _) getOrElse 0L
-        val canSend = MilliSatoshi(fromMe2Relay min fromRelay2Payee max 0L)
-        directSend = if (balances.isEmpty) None else Some(canSend)
-        onData
+        val deliverableThroughRelay = MilliSatoshi(fromMe2Relay min fromRelay2Payee max 0L)
+        canDeliver = if (balances.isEmpty) None else Some(deliverableThroughRelay)
+        onDataUpdated
       }
     }
   }
 
-  def onData: Unit
+  def onDataUpdated: Unit
   def disconnect = for (ws: WebSocket <- wsOpt)
     runAnd(ws.clearListeners)(ws.disconnect)
 }

@@ -64,7 +64,7 @@
         style="@style/StdText"
         android:id="@+id/hintDenom"
         android:paddingBottom="25dp"
-        android:layout_width="wrap_content"/>
+        android:layout_width="fill_parent"/>
 
     <View style="@style/GrayDivider"/>
 </LinearLayout>

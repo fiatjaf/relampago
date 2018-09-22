@@ -4,7 +4,6 @@ import spray.json._
 import android.view._
 import android.widget._
 import org.bitcoinj.core._
-
 import collection.JavaConverters._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
@@ -19,11 +18,11 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
+import android.os.{Bundle, Handler}
 import scala.util.{Failure, Success, Try}
-import android.os.{Build, Bundle, Handler}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
+import android.content.{DialogInterface, Intent}
 import android.database.{ContentObserver, Cursor}
-import android.transition.{Slide, TransitionManager}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
@@ -40,7 +39,6 @@ import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
 import android.app.AlertDialog
-import android.content.{DialogInterface, Intent}
 import android.net.Uri
 
 
@@ -517,47 +515,40 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       else if (operationalChannels.isEmpty) app toast ln_no_open_chans
       else {
 
-        val baseContent = host.getLayoutInflater.inflate(R.layout.frag_ln_input_send, null, false).asInstanceOf[LinearLayout]
-        val guaranteedContainer = baseContent.findViewById(R.id.guaranteedContainer).asInstanceOf[LinearLayout]
-        val deliveryHint = baseContent.findViewById(R.id.deliveryHint).asInstanceOf[TextView]
-
         val runnableOpt = onChainRunnable(pr)
         val description = getDescription(pr.description)
-        val maxCanSend = MilliSatoshi(LNParams.maxHtlcValueMsat min operationalChannels.map(estimateCanSend).max)
-        val neutralRes = if (pr.amount.forall(_ <= maxCanSend) || runnableOpt.isEmpty) -1 else dialog_pay_onchain
+        val maxCappedSend = MilliSatoshi(LNParams.maxHtlcValueMsat min operationalChannels.map(estimateCanSend).max)
+        val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
+        val rateManager = new RateManager(baseContent) hint app.getString(amount_hint_can_send).format(denom withSign maxCappedSend)
         val bld = baseBuilder(title = app.getString(ln_send_title).format(description).html, baseContent)
-        val baseHint = app.getString(amount_hint_can_send).format(denom withSign maxCanSend)
-        val rateManager = new RateManager(baseContent) hint baseHint
 
-        val link = new RelayNode(pr.nodeId) {
-          def onData = Tuple2(rateManager.result, directSend) match {
-            case Failure(_) \ _ => upd(app getString amount_hint_empty, guaranteedContainer.getVisibility)
-            case Success(ms) \ _ if ms.amount <= 0L => upd(app getString amount_hint_empty, guaranteedContainer.getVisibility)
-            case Success(ms) \ _ if maxCanSend < ms => upd(app getString amount_hint_too_high, guaranteedContainer.getVisibility)
-            case _ \ None => upd(app getString amount_hint_unknown, guaranteedContainer.getVisibility)
+        val relayLink = new RelayNode(pr.nodeId) {
+          override def onDataUpdated = canDeliver match {
+            case Some(relayable) if relayable >= maxCappedSend || RelayNode.hasRelayPeerOnly =>
+              val deliverable: MilliSatoshi = if (relayable >= maxCappedSend) maxCappedSend else relayable
+              val finalHint = app.getString(amount_hint_can_deliver).format(denom withSign deliverable)
+              rateManager hint finalHint
 
-            case Success(ms) \ Some(relay) =>
-              if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) TransitionManager.beginDelayedTransition(baseContent, new Slide)
-              if (ms > relay && RelayNode.hasRelayOnly) upd(app.getString(amount_hint_payee_err).format(denom formatted relay), View.VISIBLE)
-              else upd(app.getString(amount_hint_regular).format(denom formatted relay), guaranteedContainer.getVisibility)
+            case _ =>
+              // We have other peers or relayable is unknown
+              val template = app.getString(amount_hint_can_send)
+              val finalHint = template.format(denom withSign maxCappedSend)
+              rateManager hint finalHint
           }
-
-          def upd(text: String, mode: Int) = UITask {
-            guaranteedContainer setVisibility mode
-            deliveryHint setText text.html
-          }.run
         }
 
-        def sendAttempt(alert: AlertDialog) = rateManager.result match {
-          case Success(ms) if maxCanSend < ms || pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
-          case Success(ms) if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
-          case Failure(reason) => app toast dialog_sum_empty
+        def sendAttempt(alert: AlertDialog) = Tuple2(rateManager.result, relayLink.canDeliver) match {
+          case Success(ms) \ Some(relay) if relay < ms && RelayNode.hasRelayPeerOnly => app toast dialog_sum_big
+          case Success(ms) \ _ if maxCappedSend < ms || pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
+          case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
+          case Failure(emptyAmount) \ _ => app toast dialog_sum_empty
 
-          case Success(ms) => rm(alert) {
-            val guaranteedPeers = Set(RelayNode.relayNodeKey, pr.nodeId)
-            val canRelay = link.directSend.exists(fromRelay2Payee => ms <= fromRelay2Payee)
-            if (canRelay) me doSend emptyRD(pr, ms.amount, guaranteedPeers, useCache = true)
+          case Success(ms) \ _ => rm(alert) {
+            val canGuaranteeDelivery = relayLink.canDeliver.exists(deliverableSum => ms <= deliverableSum)
+            val peers = Set(RelayNode.relayNodeKey, pr.nodeId) ++ pr.routingInfo.map(_.route.head.nodeId)
+            if (canGuaranteeDelivery) me doSend emptyRD(pr, ms.amount, peers, useCache = true)
             else me doSend emptyRD(pr, ms.amount, Set.empty, useCache = true)
+
             // Inform that channels are offline and some wait will happen
             val isOnline = operationalChannels.exists(_.state == OPEN)
             if (!isOnline) app toast ln_chan_offline
@@ -565,10 +556,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
 
         for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
-        for (rep <- RelayNode.relayPeerReports.headOption) link start rep.chan.data.announce
-        bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = link.disconnect }
-        rateManager.satInput addTextChangedListener new TextChangedWatcher { def onTextChanged(s: CharSequence, st: Int, b: Int, c: Int) = link.onData }
-        mkCheckFormNeutral(sendAttempt, none, alert => rm(alert) { for (onChain <- runnableOpt) onChain.run }, bld, dialog_pay, dialog_cancel, neutralRes)
+        for (rep <- RelayNode.relayPeerReports.headOption) relayLink start rep.chan.data.announce
+        bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = relayLink.disconnect }
+        mkCheckFormNeutral(sendAttempt, none, alert => rm(alert) { for (onChain <- runnableOpt) onChain.run }, bld, dialog_pay, dialog_cancel,
+          if (pr.amount.forall(askedSum => maxCappedSend >= askedSum) || runnableOpt.isEmpty) -1 else dialog_pay_onchain)
       }
     }
 
