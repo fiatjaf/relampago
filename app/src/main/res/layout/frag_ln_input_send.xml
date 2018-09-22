@@ -8,8 +8,9 @@
         android:id="@+id/guaranteedContainer"
         style="@style/StandardLinearLayout">
 
-        <Button
-            style="@style/TransButton"
+        <TextView
+            style="@style/MarginInfo"
+            android:layout_width="wrap_content"
             android:id="@+id/deliveryHint"/>
 
         <View style="@style/GrayDivider"/>
