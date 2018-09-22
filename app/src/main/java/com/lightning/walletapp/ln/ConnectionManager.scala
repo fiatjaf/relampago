@@ -2,6 +2,7 @@ package com.lightning.walletapp.ln
 
 import scala.concurrent._
 import scala.concurrent.duration._
+import scala.collection.JavaConverters._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.Features._
@@ -9,6 +10,7 @@ import com.lightning.walletapp.ln.Features._
 import rx.lang.scala.{Observable => Obs}
 import com.lightning.walletapp.ln.Tools.{Bytes, none}
 import com.lightning.walletapp.ln.crypto.Noise.KeyPair
+import java.util.concurrent.ConcurrentHashMap
 import fr.acinq.bitcoin.Crypto.PublicKey
 import java.util.concurrent.Executors
 import fr.acinq.bitcoin.BinaryData
@@ -17,7 +19,7 @@ import java.net.Socket
 
 object ConnectionManager {
   var listeners = Set.empty[ConnectionListener]
-  var connections = Map.empty[PublicKey, Worker]
+  val connections = new ConcurrentHashMap[PublicKey, Worker].asScala
 
   protected[this] val events = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = for (lst <- listeners) lst.onMessage(nodeId, msg)
