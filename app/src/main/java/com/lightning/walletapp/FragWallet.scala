@@ -517,7 +517,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         val runnableOpt = onChainRunnable(pr)
         val description = getDescription(pr.description)
-        val maxCappedSend = MilliSatoshi(LNParams.maxHtlcValueMsat min operationalChannels.map(estimateCanSend).max)
+        val maxPossibleSend = pr.amount.map(_.amount * 2) getOrElse LNParams.maxHtlcValueMsat
+        val maxCappedSend = MilliSatoshi(maxPossibleSend min operationalChannels.map(estimateCanSend).max)
         val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
         val rateManager = new RateManager(baseContent) hint app.getString(amount_hint_can_send).format(denom withSign maxCappedSend)
         val bld = baseBuilder(title = app.getString(ln_send_title).format(description).html, baseContent)
@@ -539,8 +540,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         def sendAttempt(alert: AlertDialog) = Tuple2(rateManager.result, relayLink.canDeliver) match {
           case Success(ms) \ Some(relay) if relay < ms && RelayNode.hasRelayPeerOnly => app toast dialog_sum_big
-          case Success(ms) \ _ if maxCappedSend < ms || pr.amount.exists(_ * 2 < ms) => app toast dialog_sum_big
           case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
+          case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
           case Failure(emptyAmount) \ _ => app toast dialog_sum_empty
 
           case Success(ms) \ _ => rm(alert) {
@@ -559,7 +560,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         for (rep <- RelayNode.relayPeerReports.headOption) relayLink start rep.chan.data.announce
         bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = relayLink.disconnect }
         mkCheckFormNeutral(sendAttempt, none, alert => rm(alert) { for (onChain <- runnableOpt) onChain.run }, bld, dialog_pay, dialog_cancel,
-          if (pr.amount.forall(askedSum => maxCappedSend >= askedSum) || runnableOpt.isEmpty) -1 else dialog_pay_onchain)
+          if (pr.amount.exists(askedSum => maxCappedSend >= askedSum) || runnableOpt.isEmpty) -1 else dialog_pay_onchain)
       }
     }
 
