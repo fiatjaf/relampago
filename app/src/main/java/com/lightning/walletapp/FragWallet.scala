@@ -517,14 +517,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         val runnableOpt = onChainRunnable(pr)
         val description = getDescription(pr.description)
-        val maxPossibleSend = pr.amount.map(_.amount * 2) getOrElse LNParams.maxHtlcValueMsat
-        val maxCappedSend = MilliSatoshi(maxPossibleSend min operationalChannels.map(estimateCanSend).max)
+        val requestedTimesTwoOrCapped = pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat
+        val maxCappedSend = MilliSatoshi(requestedTimesTwoOrCapped min operationalChannels.map(estimateCanSend).max)
         val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
         val rateManager = new RateManager(baseContent) hint app.getString(amount_hint_can_send).format(denom withSign maxCappedSend)
         val bld = baseBuilder(title = app.getString(ln_send_title).format(description).html, baseContent)
 
         val relayLink = new RelayNode(pr.nodeId) {
           override def onDataUpdated = canDeliver match {
+            // relayable is what can be sent through relay node channels only
             case Some(relayable) if relayable >= maxCappedSend || RelayNode.hasRelayPeerOnly =>
               val deliverable: MilliSatoshi = if (relayable >= maxCappedSend) maxCappedSend else relayable
               val finalHint = app.getString(amount_hint_can_deliver).format(denom withSign deliverable)
