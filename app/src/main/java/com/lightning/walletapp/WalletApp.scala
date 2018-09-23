@@ -172,11 +172,11 @@ class WalletApp extends Application { me =>
     }
 
     val chainEventsListener = new TxTracker with BlocksListener {
-      override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
-      def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (a isGreaterThan b) onChainTx(txj)
-      def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (b isGreaterThan a) onChainTx(txj)
-      def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = onChainDownload(left)
       override def onChainDownloadStarted(peer: Peer, left: Int) = onChainDownload(left)
+      override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
+      def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = onChainDownload(left)
+      def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
+      def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
 
       def onChainDownload(blocksLeft: Int) = {
         // Should wait until all blocks are downloaded
