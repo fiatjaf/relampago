@@ -52,6 +52,6 @@ object LocalBroadcaster extends Broadcaster {
   override def onBecome = {
     // Repeatedly resend a funding tx, update feerate on becoming open
     case (_, wait: WaitFundingDoneData, _, _) => app.kit blockSend wait.fundingTx
-    case (chan, _: NormalData, OFFLINE, OPEN) => chan process CMDFeerate(perKwThreeSat)
+    case (chan, _: NormalData, SLEEPING, OPEN) => chan process CMDFeerate(perKwThreeSat)
   }
 }

@@ -162,13 +162,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // Funder was not able to broadcast a funding tx, record their fail locally
-      case (wait: WaitBroadcastRemoteData, fail: Fail, OFFLINE | WAIT_FUNDING_DONE) =>
+      case (wait: WaitBroadcastRemoteData, fail: Fail, SLEEPING | WAIT_FUNDING_DONE) =>
         val d1 = me STORE wait.copy(fail = Some apply fail)
         me UPDATA d1
 
 
       // We have asked an external funder to broadcast a funding tx and got an onchain event
-      case (wait: WaitBroadcastRemoteData, CMDSpent(fundTx), OFFLINE | WAIT_FUNDING_DONE) if wait.txHash == fundTx.hash =>
+      case (wait: WaitBroadcastRemoteData, CMDSpent(fundTx), SLEEPING | WAIT_FUNDING_DONE) if wait.txHash == fundTx.hash =>
         val d1 = me STORE WaitFundingDoneData(wait.announce, our = None, their = None, fundTx, wait.commitments)
         me UPDATA d1
 
@@ -196,7 +196,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // OPEN MODE
 
 
-      case (norm: NormalData, hop: Hop, OPEN | OFFLINE) =>
+      case (norm: NormalData, hop: Hop, OPEN | SLEEPING) =>
         // Got either an empty Hop with shortChannelId or a final one
         // do not trigger listeners and silently update a current state
         val d1 = norm.modify(_.commitments.extraHop) setTo Some(hop)
@@ -314,7 +314,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         }
 
 
-      case (norm: NormalData, cmd: CMDBestHeight, OPEN | OFFLINE) =>
+      case (norm: NormalData, cmd: CMDBestHeight, OPEN | SLEEPING) =>
         val expiredPayment = Commitments.findExpiredHtlc(norm.commitments, cmd)
         if (expiredPayment.nonEmpty) throw HTLCExpiryException(norm, expiredPayment.get)
 
@@ -395,7 +395,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case _ =>
         }
 
-      case (norm: NormalData, cr: ChannelReestablish, OFFLINE)
+      case (norm: NormalData, cr: ChannelReestablish, SLEEPING)
         // GUARD: we have started in NORMAL state but their nextRemoteRevocationNumber is too far away
         if norm.commitments.localCommit.index < cr.nextRemoteRevocationNumber && cr.myCurrentPerCommitmentPoint.isDefined =>
         val secret = Generators.perCommitSecret(norm.commitments.localParams.shaSeed, cr.nextRemoteRevocationNumber - 1)
@@ -403,7 +403,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         else throw new LightningException
 
 
-      case (norm: NormalData, cr: ChannelReestablish, OFFLINE) =>
+      case (norm: NormalData, cr: ChannelReestablish, SLEEPING) =>
         // If next_local_commitment_number is 1 in both the channel_reestablish it sent
         // and received, then the node MUST retransmit funding_locked, otherwise it MUST NOT
         if (cr.nextLocalCommitmentNumber == 1 && norm.commitments.localCommit.index == 0)
@@ -446,44 +446,44 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // We're exiting a sync state while funding tx is still not provided
-      case (remote: WaitBroadcastRemoteData, cr: ChannelReestablish, OFFLINE) =>
+      case (remote: WaitBroadcastRemoteData, cr: ChannelReestablish, SLEEPING) =>
         // Need to check whether a funding is present in a listener
         BECOME(remote, WAIT_FUNDING_DONE)
 
 
       // We're exiting a sync state while waiting for their FundingLocked
-      case (wait: WaitFundingDoneData, cr: ChannelReestablish, OFFLINE) =>
+      case (wait: WaitFundingDoneData, cr: ChannelReestablish, SLEEPING) =>
         BECOME(wait, WAIT_FUNDING_DONE)
         wait.our foreach SEND
 
 
       // No in-flight HTLCs here, just proceed with negotiations
-      case (neg: NegotiationsData, cr: ChannelReestablish, OFFLINE) =>
+      case (neg: NegotiationsData, cr: ChannelReestablish, SLEEPING) =>
         // Last closing signed may be empty if we are not a funder of this channel
         val lastClosingSignedOpt = neg.localProposals.headOption.map(_.localClosingSigned)
         neg.localShutdown +: lastClosingSignedOpt.toVector foreach SEND
         BECOME(neg, NEGOTIATIONS)
 
 
-      // SYNC: ONLINE/OFFLINE
+      // SYNC: ONLINE/SLEEPING
 
 
-      case (some: HasCommitments, CMDOnline, OFFLINE) =>
+      case (some: HasCommitments, CMDOnline, SLEEPING) =>
         // According to BOLD a first message on connection should be reestablish
         // will specifically NOT work in REFUNDING to not let them know beforehand
         me SEND makeReestablish(some, some.commitments.localCommit.index + 1)
 
 
-      case (some: HasCommitments, newAnn: NodeAnnouncement, OFFLINE)
+      case (some: HasCommitments, newAnn: NodeAnnouncement, SLEEPING)
         if some.announce.nodeId == newAnn.nodeId && Announcements.checkSig(newAnn) =>
-        // Node was OFFLINE for a long time so we have initiated a new announcement search
+        // Node was SLEEPING for a long time so we have initiated a new announcement search
         data = me STORE some.modify(_.announce).setTo(newAnn)
 
 
-      case (wait: WaitBroadcastRemoteData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, OFFLINE)
-      case (wait: WaitFundingDoneData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, OFFLINE)
-      case (negs: NegotiationsData, CMDOffline, NEGOTIATIONS) => BECOME(negs, OFFLINE)
-      case (norm: NormalData, CMDOffline, OPEN) => BECOME(norm, OFFLINE)
+      case (wait: WaitBroadcastRemoteData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
+      case (wait: WaitFundingDoneData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
+      case (negs: NegotiationsData, CMDOffline, NEGOTIATIONS) => BECOME(negs, SLEEPING)
+      case (norm: NormalData, CMDOffline, OPEN) => BECOME(norm, SLEEPING)
 
 
       // NEGOTIATIONS MODE
@@ -566,16 +566,16 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (null, close: ClosingData, null) => super.become(close, CLOSING)
       case (null, init: InitData, null) => super.become(init, WAIT_FOR_INIT)
-      case (null, wait: WaitFundingDoneData, null) => super.become(wait, OFFLINE)
-      case (null, wait: WaitBroadcastRemoteData, null) => super.become(wait, OFFLINE)
-      case (null, negs: NegotiationsData, null) => super.become(negs, OFFLINE)
-      case (null, norm: NormalData, null) => super.become(norm, OFFLINE)
+      case (null, wait: WaitFundingDoneData, null) => super.become(wait, SLEEPING)
+      case (null, wait: WaitBroadcastRemoteData, null) => super.become(wait, SLEEPING)
+      case (null, negs: NegotiationsData, null) => super.become(negs, SLEEPING)
+      case (null, norm: NormalData, null) => super.become(norm, SLEEPING)
 
 
       // ENDING A CHANNEL
 
 
-      case (some: HasCommitments, _: CMDShutdown, NEGOTIATIONS | OFFLINE) =>
+      case (some: HasCommitments, _: CMDShutdown, NEGOTIATIONS | SLEEPING) =>
         // Disregard custom scriptPubKey and always refund to local wallet
         // CMDShutdown in WAIT_FUNDING_DONE and OPEN may be cooperative
         startLocalClose(some)
@@ -665,7 +665,7 @@ object Channel {
   // Operational
   val WAIT_FUNDING_DONE = "OPENING"
   val NEGOTIATIONS = "NEGOTIATIONS"
-  val OFFLINE = "OFFLINE"
+  val SLEEPING = "SLEEPING"
   val OPEN = "OPEN"
 
   // No tears, only dreams now

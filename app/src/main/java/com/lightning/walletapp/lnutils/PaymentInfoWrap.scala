@@ -175,7 +175,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onBecome = {
-    case (_, _, OFFLINE, OPEN) => resolvePending
+    case (_, _, SLEEPING, OPEN) => resolvePending
     case (_, _, WAIT_FUNDING_DONE, OPEN) => OlympusWrap tellClouds OlympusWrap.CMDStart
     case (_, _, from, CLOSING) if from != CLOSING => runAnd(markFailedAndFrozen)(uiNotify)
   }

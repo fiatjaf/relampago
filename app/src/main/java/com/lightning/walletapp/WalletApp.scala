@@ -342,7 +342,7 @@ class WalletApp extends Application { me =>
 
       for {
         _ <- obsOnIO delay 20.seconds
-        chan <- ChannelManager.notClosing if chan.state == OFFLINE
+        chan <- ChannelManager.notClosing if chan.state == SLEEPING
         // Enough time passes and we have offline channels, possibly remote peer IP has changed
         res <- retry(OlympusWrap findNodes chan.data.announce.nodeId.toString, pickInc, 1 to 2)
         announce \ _ <- res take 1

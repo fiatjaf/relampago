@@ -193,11 +193,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           lst setDividerHeight 0
           lst setDivider null
 
-          def proceedCoopCloseOrWarn(startCoopClosing: => Unit) = rm(alert) {
+          def proceedCoopCloseOrWarn(startClosing: => Unit) = rm(alert) {
             val fundingOrOpenButOffline = isOperational(chan) || isOpening(chan)
-            val fundingOrOpenAndOnline = fundingOrOpenButOffline && chan.state != OFFLINE
+            val fundingOrOpenAndOnline = fundingOrOpenButOffline && chan.state != SLEEPING
 
-            if (fundingOrOpenAndOnline && inFlightHtlcs(chan).isEmpty) startCoopClosing
+            if (fundingOrOpenAndOnline && inFlightHtlcs(chan).isEmpty) startClosing
             else if (fundingOrOpenAndOnline) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
             else if (fundingOrOpenButOffline) warnAndMaybeClose(me getString ln_chan_force_offline_details)
             else warnAndMaybeClose(me getString ln_chan_force_details)
@@ -220,8 +220,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
               Uri parse s"https://smartbit.com.au/tx/$fundTxId")
 
           lst setOnItemClickListener onTap {
-            case 3 => proceedCoopCloseOrWarn(startCoopClosing = closeToWallet)
-            case 2 => proceedCoopCloseOrWarn(startCoopClosing = closeToAddress)
+            case 3 => proceedCoopCloseOrWarn(startClosing = closeToWallet)
+            case 2 => proceedCoopCloseOrWarn(startClosing = closeToAddress)
             case 1 => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
             case 0 => viewFunding
           }
