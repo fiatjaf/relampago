@@ -193,9 +193,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     lst setDivider null
     lst setDividerHeight 0
     lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
-    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options) {
-      override def isEnabled(position: Int) = position != 0 || maxCanReceiveMsat >= 0L
-    }
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
 
     def onChain = rm(alert) {
       app.TransData.value = app.kit.currentAddress

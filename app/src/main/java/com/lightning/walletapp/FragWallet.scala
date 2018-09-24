@@ -517,25 +517,27 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         val runnableOpt = onChainRunnable(pr)
         val description = getDescription(pr.description)
-        val requestedTimesTwoOrCapped = pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat
-        val maxCappedSend = MilliSatoshi(requestedTimesTwoOrCapped min operationalChannels.map(estimateCanSend).max)
+        val maxLocalCanSend = operationalChannels.map(estimateCanSend).max
+        val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalCanSend)
         val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
         val rateManager = new RateManager(baseContent) hint app.getString(amount_hint_can_send).format(denom withSign maxCappedSend)
         val bld = baseBuilder(title = app.getString(ln_send_title).format(description).html, baseContent)
 
         val relayLink = new RelayNode(pr.nodeId) {
+          def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
+            (pr.amount.isEmpty && relayable >= maxCappedSend) || // No sum asked and we can deliver max amount
+              pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
+              RelayNode.hasRelayPeerOnly // We only have a relay node as peer
+
           override def onDataUpdated = canDeliver match {
-            // relayable is what can be sent through relay node channels only
-            case Some(relayable) if relayable >= maxCappedSend || RelayNode.hasRelayPeerOnly =>
-              val deliverable: MilliSatoshi = if (relayable >= maxCappedSend) maxCappedSend else relayable
-              val finalHint = app.getString(amount_hint_can_deliver).format(denom withSign deliverable)
-              rateManager hint finalHint
+            case Some(relayable) if canShowGuaranteedDeliveryHint(relayable) =>
+              val deliverable = if (relayable > maxCappedSend) maxCappedSend else relayable
+              rateManager hint app.getString(amount_hint_can_deliver).format(denom withSign deliverable)
 
             case _ =>
-              // We have other peers or relayable is unknown
+              val canSendHuman = denom withSign maxCappedSend
               val template = app.getString(amount_hint_can_send)
-              val finalHint = template.format(denom withSign maxCappedSend)
-              rateManager hint finalHint
+              rateManager hint template.format(canSendHuman)
           }
         }
 
@@ -546,11 +548,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           case Failure(emptyAmount) \ _ => app toast dialog_sum_empty
 
           case Success(ms) \ _ => rm(alert) {
-            val canGuaranteeDelivery = relayLink.canDeliver.exists(deliverableSum => ms <= deliverableSum)
-            val peers = Set(RelayNode.relayNodeKey, pr.nodeId) ++ pr.routingInfo.map(_.route.head.nodeId)
+            val peers = Set(RelayNode.relayNodeKey, pr.nodeId)
+            val canGuaranteeDelivery = relayLink.canDeliver.exists(relayable => ms <= relayable)
             if (canGuaranteeDelivery) me doSend emptyRD(pr, ms.amount, peers, useCache = true)
             else me doSend emptyRD(pr, ms.amount, Set.empty, useCache = true)
-
             // Inform that channels are offline and some wait will happen
             val isOnline = operationalChannels.exists(_.state == OPEN)
             if (!isOnline) app toast ln_chan_offline
