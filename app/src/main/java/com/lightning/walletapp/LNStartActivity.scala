@@ -180,8 +180,8 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
         }
 
         override def onRejection = freshWSWrap.lastMessage match {
-          case fail: Fail if err2String contains fail.code => host onFail getString(err2String apply fail.code)
-          case unexpectedErrorCode: Fail => host onFail getString(err2String apply FAIL_INTERNAL_ERROR)
+          case Fail(code, _, _) if err2String contains code => host onFail getString(err2String apply code)
+          case _: Fail => host onFail getString(err2String apply FAIL_INTERNAL_ERROR)
           case _ => host.UITask(app toast err_fund_disconnect).run
         }
       }
@@ -192,7 +192,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
       setNormalMode(me)
     }
 
-    setNormalMode = frag => {
+    setNormalMode = _ => {
       // Hide a batch funding notification
       batchPresentWrap setVisibility View.GONE
       FragLNStart.batchOpt = None

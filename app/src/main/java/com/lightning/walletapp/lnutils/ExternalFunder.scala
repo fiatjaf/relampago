@@ -56,7 +56,7 @@ case class WSWrap(params: Started) { self =>
     override def onDisconnected(ws: WebSocket, s: WebSocketFrame, e: WebSocketFrame, cbs: Boolean) = onConnectError(ws, null)
 
     override def onConnectError(ws: WebSocket, reason: WebSocketException) = if (shouldReconnect) {
-      Obs.just(attemptsLeft -= 1).delay(5.seconds).foreach(in5Sec => for (lst <- listeners) lst.onAttempt)
+      Obs.just(attemptsLeft -= 1).delay(5.seconds).foreach(_ => for (lst <- listeners) lst.onAttempt)
       for (listener <- listeners) listener.onOffline
     } else ExternalFunder eliminateWSWrap self
   }

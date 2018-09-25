@@ -161,8 +161,8 @@ class LNStartFundActivity extends TimerActivity { me =>
         def askAttempt(alert: AlertDialog) = rateManager.result match {
           case Success(ms) if ms < minCap => app toast dialog_sum_small
           case Success(ms) if ms > maxCap => app toast dialog_sum_big
-          case Failure(reason) => app toast dialog_sum_empty
           case Success(ms) => rm(alert)(next(ms).start)
+          case _ => app toast dialog_sum_empty
         }
 
         def useMax(alert: AlertDialog) = rateManager setSum Try(maxCap)

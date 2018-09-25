@@ -8,8 +8,8 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import rx.lang.scala.{Observable => Obs}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
+import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import com.lightning.walletapp.ln.wire.NodeAnnouncement
-import com.lightning.walletapp.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 
@@ -34,7 +34,7 @@ abstract class RelayNode(payeeNodeId: PublicKey) { me =>
 
     ws addListener new WebSocketAdapter {
       override def onDisconnected(ws: WebSocket, s: WebSocketFrame, e: WebSocketFrame, cbs: Boolean) =
-        Obs.just(null).delay(2.seconds).foreach(in2Sec => ws.recreate.connectAsynchronously)
+        Obs.just(null).delay(2.seconds).doOnTerminate(ws.recreate.connectAsynchronously).foreach(none)
 
       override def onTextMessage(ws: WebSocket, raw: String) = {
         val balances = to[RelayChannelInfos](raw).filter(_.peerNodeId == payeeNodeId).map(_.balances)

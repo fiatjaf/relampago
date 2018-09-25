@@ -147,8 +147,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     val alert = mkCheckForm(ok, no, bld, okResource, noResource)
     val neutralAct = me onButtonTap neutral(alert)
 
-    // Extend base dialog with a special NEUTRAL button
-    // NEUTRAL button may be omitted by providing -1 as its resource id
+    // Extend base dialog with a special NEUTRAL button, may be omitted by providing -1
     if (-1 != neutralResource) alert getButton BUTTON_NEUTRAL setOnClickListener neutralAct
     alert
   }
@@ -191,7 +190,7 @@ trait TimerActivity extends AppCompatActivity { me =>
   } catch none finally me delayUI exec
 
   def onTap(run: Int => Unit): OnItemClickListener = new OnItemClickListener {
-    def onItemClick(adapter: AdapterView[_], view: View, pos: Int, id: Long) = run(pos)
+    def onItemClick(a: AdapterView[_], view: View, pos: Int, id: Long) = run(pos)
   }
 
   def onButtonTap(exec: => Unit) = new OnClickListener { def onClick(view: View) = me hideKeys exec }

@@ -91,7 +91,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           open.firstPerCommitmentPoint), open), WAIT_FOR_FUNDING) SEND accept
 
 
-      case (wait @ WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>
+      case (WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>
         if (accept.dustLimitSatoshis > cmd.localParams.channelReserveSat) throw new LightningException("Our channel reserve is less than their dust")
         if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
         if (accept.channelReserveSatoshis > cmd.fundingSat / 10) throw new LightningException("Their proposed reserve is too high")
@@ -374,7 +374,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
             val neg = NegotiationsData(announce, commitments, ourSig, theirSig, Nil)
             BECOME(me STORE neg, NEGOTIATIONS)
 
-          case None \ Some(theirSig) =>
+          case None \ theirSigOpt if theirSigOpt.isDefined =>
             // We have previously received their Shutdown so can respond
             // send CMDProceed once to make sure we still have nothing to sign
             startShutdown(norm, commitments.localParams.defaultFinalScriptPubKey)
@@ -411,8 +411,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
             me SEND makeFundingLocked(norm.commitments)
 
         // First we clean up unacknowledged updates
-        val localDelta = norm.commitments.localChanges.proposed collect { case u: UpdateAddHtlc => true }
-        val remoteDelta = norm.commitments.remoteChanges.proposed collect { case u: UpdateAddHtlc => true }
+        val localDelta = norm.commitments.localChanges.proposed collect { case _: UpdateAddHtlc => true }
+        val remoteDelta = norm.commitments.remoteChanges.proposed collect { case _: UpdateAddHtlc => true }
         val c1 = norm.commitments.modifyAll(_.localChanges.proposed, _.remoteChanges.proposed).setTo(Vector.empty)
           .modify(_.remoteNextHtlcId).using(_ - remoteDelta.size).modify(_.localNextHtlcId).using(_ - localDelta.size)
 
@@ -446,19 +446,19 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // We're exiting a sync state while funding tx is still not provided
-      case (remote: WaitBroadcastRemoteData, cr: ChannelReestablish, SLEEPING) =>
+      case (remote: WaitBroadcastRemoteData, _: ChannelReestablish, SLEEPING) =>
         // Need to check whether a funding is present in a listener
         BECOME(remote, WAIT_FUNDING_DONE)
 
 
       // We're exiting a sync state while waiting for their FundingLocked
-      case (wait: WaitFundingDoneData, cr: ChannelReestablish, SLEEPING) =>
+      case (wait: WaitFundingDoneData, _: ChannelReestablish, SLEEPING) =>
         BECOME(wait, WAIT_FUNDING_DONE)
         wait.our foreach SEND
 
 
       // No in-flight HTLCs here, just proceed with negotiations
-      case (neg: NegotiationsData, cr: ChannelReestablish, SLEEPING) =>
+      case (neg: NegotiationsData, _: ChannelReestablish, SLEEPING) =>
         // Last closing signed may be empty if we are not a funder of this channel
         val lastClosingSignedOpt = neg.localProposals.headOption.map(_.localClosingSigned)
         neg.localShutdown +: lastClosingSignedOpt.toVector foreach SEND
@@ -490,7 +490,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (neg @ NegotiationsData(_, commitments, localShutdown, remoteShutdown, localProposals, _),
-        ClosingSigned(channelId, remoteClosingFee, remoteClosingSig), NEGOTIATIONS) =>
+        ClosingSigned(_, remoteClosingFee, remoteClosingSig), NEGOTIATIONS) =>
 
         val lastLocalFee = localProposals.headOption.map(_.localClosingSigned.feeSatoshis) getOrElse {
           // If we are fundee and we were waiting for them to send their first proposal, we don't have a lastLocalClosingFee

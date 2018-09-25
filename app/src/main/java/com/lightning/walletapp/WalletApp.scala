@@ -249,7 +249,7 @@ class WalletApp extends Application { me =>
             capacity, finalCanSend, sendingNow).html)
 
         case None => Left(me getString ln_no_open_chans)
-        case Some(reportWhichIsFine) => Right(rd)
+        case _ => Right(rd)
       }
     }
 

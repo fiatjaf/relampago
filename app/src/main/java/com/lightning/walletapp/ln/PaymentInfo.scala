@@ -50,7 +50,7 @@ object PaymentInfo {
   def useRoutesLeft(rd: RoutingData) = useFirstRoute(rd.routes, rd)
   def useFirstRoute(rest: PaymentRouteVec, rd: RoutingData) = rest match {
     case firstRoute +: restOfRoutes => useRoute(firstRoute, restOfRoutes, rd)
-    case noRoutesLeft => Left(rd)
+    case _ => Left(rd)
   }
 
   def useRoute(route: PaymentRoute, rest: PaymentRouteVec, rd: RoutingData): FullOrEmptyRD = {
@@ -120,9 +120,9 @@ object PaymentInfo {
     parsed map {
       case ErrorPacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case ErrorPacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
-      case ErrorPacket(nodeKey, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
-      case ErrorPacket(nodeKey, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
-      case ErrorPacket(nodeKey, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case ErrorPacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case ErrorPacket(_, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case ErrorPacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
 
       case ErrorPacket(nodeKey, u: Update) =>
         val isHonest = Announcements.checkSig(u.update, nodeKey)

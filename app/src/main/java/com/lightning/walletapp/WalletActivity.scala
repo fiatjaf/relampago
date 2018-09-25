@@ -10,13 +10,10 @@ import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
-import com.lightning.walletapp.Denomination._
-import android.support.v4.view.MenuItemCompat._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
-import scala.util.{Failure, Try}
 import org.bitcoinj.core.{Address, TxWrap}
 import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
@@ -25,6 +22,7 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import android.support.v4.app.FragmentStatePagerAdapter
+import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
 import android.support.v4.content.FileProvider
 import com.github.clans.fab.FloatingActionMenu
@@ -51,7 +49,7 @@ trait SearchBar { me =>
 
   def setupSearch(menu: Menu) = {
     val item = menu findItem R.id.action_search
-    searchView = getActionView(item).asInstanceOf[SearchView]
+    searchView = item.getActionView.asInstanceOf[SearchView]
     searchView setOnQueryTextListener new SearchView.OnQueryTextListener {
       def onQueryTextChange(queryText: String) = runAnd(true)(me react queryText)
       def onQueryTextSubmit(queryText: String) = true
@@ -134,7 +132,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def readNdefMessage(m: Message) =
     <(app.TransData recordValue ndefMessageString(m),
-      fail => app toast err_no_data)(ok => checkTransData)
+      _ => app toast err_no_data)(_ => checkTransData)
 
   // EXTERNAL DATA CHECK
 
@@ -150,18 +148,23 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     app.TransData checkAndMaybeErase {
       case _: Started => me goTo classOf[LNStartActivity]
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-      case onChainAddress: Address => FragWallet.worker.sendBtcPopup(onChainAddress)(none)
-      case uri: BitcoinURI => FragWallet.worker.sendBtcPopup(uri.getAddress)(none) setSum Try(uri.getAmount)
+      case address: Address => FragWallet.worker.sendBtcPopup(address)(none)
       case FragWallet.REDIRECT => goOps(null)
 
+      case uri: BitcoinURI =>
+        // Bitcoin URI may possibly have an amount which we then fill in
+        val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
+        manager setSum scala.util.Try(uri.getAmount)
+
+      case pr: PaymentRequest if app.ChannelManager.notClosingOrRefunding.nonEmpty =>
+        // We have open or at least opening channels so show a form or message to user
+        FragWallet.worker sendPayment pr
+
       case pr: PaymentRequest =>
-        val okChans = app.ChannelManager.notClosingOrRefunding
-        if (okChans.nonEmpty) FragWallet.worker.sendPayment(pr) else {
-          // TransData should be set to batch or null to erase previous
-          app.TransData.value = TxWrap findBestBatch pr getOrElse null
-          me goTo classOf[LNStartActivity]
-          app toast ln_empty
-        }
+        // TransData should be set to batch or null to erase previous
+        app.TransData.value = TxWrap findBestBatch pr getOrElse null
+        me goTo classOf[LNStartActivity]
+        app toast ln_empty
 
       case lnUrl: LNUrl =>
         lnUrl.resolve.doOnSubscribe(app toast ln_url_resolving).delay(2.seconds)
@@ -216,10 +219,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     lst setDivider null
 
     def pasteRequest = rm(alert) {
-      app.getBufferTry map app.TransData.recordValue match {
-        case Failure(junkDataProvided) => app toast err_no_data
-        case _ => checkTransData
-      }
+      val resultTry = app.getBufferTry map app.TransData.recordValue
+      if (resultTry.isSuccess) checkTransData else app toast err_no_data
     }
 
     def scanQR = rm(alert) {

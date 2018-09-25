@@ -7,10 +7,8 @@ import com.softwaremill.quicklens._
 import scala.util.Try
 import java.nio.ByteOrder
 import scala.language.postfixOps
-import com.lightning.walletapp.ln.Tools.runAnd
 import com.lightning.walletapp.ln.wire.UpdateAddHtlc
 import fr.acinq.bitcoin.SigVersion.SIGVERSION_WITNESS_V0
-import fr.acinq.bitcoin.SigVersion.SIGVERSION_BASE
 import ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
 
 
