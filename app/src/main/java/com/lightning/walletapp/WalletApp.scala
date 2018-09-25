@@ -324,7 +324,7 @@ class WalletApp extends Application { me =>
       wallet.addTransactionConfidenceEventListener(ChannelManager.chainEventsListener)
       wallet.addCoinsReceivedEventListener(ChannelManager.chainEventsListener)
       wallet.addCoinsSentEventListener(ChannelManager.chainEventsListener)
-      wallet.autosaveToFile(walletFile, 400, MILLISECONDS, null)
+      wallet.autosaveToFile(walletFile, 1000, MILLISECONDS, null)
       wallet.setCoinSelector(new MinDepthReachedCoinSelector)
 
       Future {
