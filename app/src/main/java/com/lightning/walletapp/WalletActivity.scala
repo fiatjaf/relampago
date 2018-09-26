@@ -2,7 +2,6 @@ package com.lightning.walletapp
 
 import android.view._
 import android.widget._
-import scala.concurrent.duration._
 import com.lightning.walletapp.ln._
 import android.text.format.DateUtils._
 import com.lightning.walletapp.Utils._
@@ -28,6 +27,7 @@ import android.support.v4.content.FileProvider
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
 import com.lightning.walletapp.helper.AES
+import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.store.SPVBlockStore
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
@@ -149,6 +149,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case _: Started => me goTo classOf[LNStartActivity]
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
       case address: Address => FragWallet.worker.sendBtcPopup(address)(none)
+      case ln: LNUrl => ln.resolve.foreach(initConnection, none)
       case FragWallet.REDIRECT => goOps(null)
 
       case uri: BitcoinURI =>
@@ -166,14 +167,22 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         me goTo classOf[LNStartActivity]
         app toast ln_empty
 
-      case lnUrl: LNUrl =>
-        lnUrl.resolve.doOnSubscribe(app toast ln_url_resolving).delay(2.seconds)
-          .map(obtainedRemoteData => app.TransData.value = obtainedRemoteData)
-          .foreach(_ => me goTo classOf[LNStartFundActivity], none)
-
       case _ =>
     }
   }
+
+  def initConnection(icr: IncomingChannelRequest) =
+    ConnectionManager.listeners += new ConnectionListener { self =>
+      ConnectionManager.connectTo(icr.nodeView.ann, notify = true)
+      app toast ln_url_resolving
+
+      override def onOperational(nodeId: PublicKey) = {
+        // Immediately remove this listener and make request
+        // this is done to make sure we have an LN connection
+        ConnectionManager.listeners -= self
+        icr.requestChannel
+      }
+    }
 
   // BUTTONS REACTIONS
 

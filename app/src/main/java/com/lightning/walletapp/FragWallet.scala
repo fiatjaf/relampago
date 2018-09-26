@@ -27,6 +27,7 @@ import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
+import com.lightning.walletapp.ln.wire.{LightningMessage, OpenChannel}
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
@@ -34,6 +35,7 @@ import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
+import fr.acinq.bitcoin.Crypto.PublicKey
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
@@ -97,6 +99,26 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (a isGreaterThan b) updBtcItems
     def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (b isGreaterThan a) updBtcItems
     override def txConfirmed(txj: Transaction) = UITask(adapter.notifyDataSetChanged).run
+  }
+
+  val connectionListener = new ConnectionListener {
+    override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+      // Connected remote peer may make a decision to open an incoming channel any time
+      // in this case we present user with a balance breakdown, manual approval is needed
+
+      case open: OpenChannel if open.channelFlags == 0.toByte =>
+        val yourBalance = coloredChan apply MilliSatoshi(open.pushMsat)
+        val peerBalance = denom withSign MilliSatoshi(open.fundingSatoshis * 1000L - open.pushMsat)
+        val title = app.getString(ln_ops_start_fund_incoming_title).format(yourBalance, peerBalance).html
+        mkCheckForm(alert => rm(alert)(proceed), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
+
+        def proceed = ConnectionManager.connections get nodeId foreach { ann =>
+          // Remote peer may disconnect while we are deciding whether to open a chan
+          // otherwise supply a funding page with open message and peer announcement
+          app.TransData.value = Tuple2(open, ann)
+          host goTo classOf[LNStartFundActivity]
+        }
+    }
   }
 
   val chanListener = new ChannelListener {
@@ -454,6 +476,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // WORKER EVENT HANDLERS
 
   def onFragmentDestroy = {
+    ConnectionManager.listeners -= connectionListener
     for (c <- app.ChannelManager.all) c.listeners -= chanListener
     app.kit.wallet removeTransactionConfidenceEventListener txsListener
     app.kit.peerGroup removeBlocksDownloadedEventListener blocksTitleListener
@@ -660,6 +683,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter
 
+  ConnectionManager.listeners += connectionListener
   for (c <- app.ChannelManager.all) c.listeners += chanListener
   app.kit.wallet addTransactionConfidenceEventListener txsListener
   app.kit.peerGroup addBlocksDownloadedEventListener blocksTitleListener

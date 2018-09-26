@@ -255,7 +255,6 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 sealed trait LNUrlData
 case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long) extends LNUrlData {
   def requestChannel = get(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&public=0", true).trustAllCerts.trustAllHosts.body
-  def isCorrect(openChannelMsg: OpenChannel) = capacity == openChannelMsg.fundingSatoshis && push * 1000L == openChannelMsg.pushMsat
   val nodeView = HardcodedNodeView(app.mkNodeAnnouncement(PublicKey(key), host, port.toInt), chansNumber.last)
   lazy val nodeLink(key, host, port) = uri
 }
@@ -266,7 +265,7 @@ case class LNUrl(bech32url: String) {
   private[this] val _ \ decoded = Bech32 decode bech32url
   private[this] val finalDecoded = Bech32 five2eight decoded
 
-  def resolve: Observable[LNUrlData] =
+  def resolve: Observable[IncomingChannelRequest] =
     obsOnIO.map(_ => get(new String(finalDecoded.toArray, "UTF-8"), true)
-      .trustAllCerts.trustAllHosts.connectTimeout(15000).body) map to[LNUrlData]
+      .trustAllCerts.trustAllHosts.connectTimeout(7500).body) map to[IncomingChannelRequest]
 }

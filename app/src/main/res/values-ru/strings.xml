@@ -284,6 +284,11 @@
         <item><![CDATA[<i>Opening negotiations</i>]]></item>
     </array>
 
+    <string name="ln_ops_start_fund_incoming_title"><![CDATA[
+        <small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small>
+        <br><br>remote peer wants to open an incoming payment channel to you, all the opening costs are on them<br><br>Your balance: %1$s<br>Peer\'s balance: %2$s
+    ]]></string>
+
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from external source</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from local wallet</strong>]]></string>
     <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>открытие нового канала</i></font><br><small>%2$s</small><br><br><font color=#999999>публичный ключ пира</font><br><small>%3$s</small>]]></string>

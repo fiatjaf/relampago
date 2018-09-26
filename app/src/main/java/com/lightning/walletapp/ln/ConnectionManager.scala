@@ -35,7 +35,7 @@ object ConnectionManager {
     case _ => if (notify) events onOperational ann.nodeId
   }
 
-  class Worker(ann: NodeAnnouncement) {
+  class Worker(val ann: NodeAnnouncement) {
     implicit val context = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
     private val keyPair = KeyPair(nodePublicKey.toBin, nodePrivateKey.toBin)
     private val buffer = new Bytes(1024)
