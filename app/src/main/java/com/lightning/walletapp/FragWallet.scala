@@ -101,37 +101,41 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     override def txConfirmed(txj: Transaction) = UITask(adapter.notifyDataSetChanged).run
   }
 
+  // To fight spamming
+  private[this] var errorsSent = 0
+  private[this] var openMessagesSent = 0
+
   val connectionListener = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-      // Connected remote peer may make a decision to open an incoming channel any time
-      // in this case we present user with a balance breakdown, manual approval is needed
-
-      case open: OpenChannel if open.channelFlags == 0.toByte =>
-        val yourBalance = coloredChan apply MilliSatoshi(open.pushMsat)
-        val peerBalance = denom withSign MilliSatoshi(open.fundingSatoshis * 1000L - open.pushMsat)
-        val title = app.getString(ln_ops_start_fund_incoming_title).format(yourBalance, peerBalance).html
-        mkCheckForm(alert => rm(alert)(proceed), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
-
-        def proceed = ConnectionManager.connections get nodeId foreach { ann =>
-          // Remote peer may disconnect while we are deciding whether to open a chan
-          // otherwise supply a funding page with open message and peer announcement
-          app.TransData.value = Tuple2(open, ann)
+      case open: OpenChannel if openMessagesSent <= 5 && open.channelFlags == 0.toByte =>
+        def proceed: Unit = ConnectionManager.connections get nodeId foreach { worker =>
+          val nodeView = HardcodedNodeView(worker.ann, StartNodeView.incomingChannel)
+          app.TransData.value = IncomingChannelParams(nodeView, open)
           host goTo classOf[LNStartFundActivity]
         }
+
+        UITask {
+          val yourBalance = coloredIn apply MilliSatoshi(open.pushMsat)
+          val capacity = denom withSign MilliSatoshi(open.fundingSatoshis * 1000L)
+          val title = app.getString(ln_ops_start_fund_incoming_title).format(yourBalance, capacity).html
+          mkCheckForm(alert => rm(alert)(proceed), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
+          openMessagesSent += 1
+        }.run
+
+      case _ =>
     }
   }
 
   val chanListener = new ChannelListener {
     // should be removed once frag is destroyed
     // prevent remote error spamming by using trigger
-    private[this] var firstTimeError = true
 
     override def onProcessSuccess = {
-      case (chan, data: HasCommitments, remoteError: wire.Error) if firstTimeError => UITask {
+      case (chan, data: HasCommitments, remoteError: wire.Error) if errorsSent <= 5 => UITask {
         val bld = baseBuilder(chan.data.announce.toString.html, remoteError.exception.getMessage)
         def close(alert: AlertDialog) = rm(alert)(chan process app.ChannelManager.CMDLocalShutdown)
         mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_force)
-        firstTimeError = false
+        errorsSent += 1
       }.run
     }
 
@@ -693,4 +697,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   app.kit.wallet addCoinsSentEventListener txsListener
   react(new String)
   updBtcItems
+
+  println(s"-- ${LNParams.nodePublicKey}")
+  val ann = app.mkNodeAnnouncement(PublicKey("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd"), "5.9.138.164", 9935)
+  ConnectionManager.connectTo(ann, notify = false)
 }

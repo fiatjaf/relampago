@@ -21,7 +21,7 @@ object AES {
   def dec(data: Bytes, key: Bytes, initVector: Bytes) = cipher(key, initVector, Cipher.DECRYPT_MODE) doFinal data
   private[this] val ivLength = 16
 
-  def encode(plain: String, key: Bytes) = {
+  def encHex(plain: String, key: Bytes) = {
     val initVector = random getBytes ivLength
     val cipher = enc(plain getBytes "UTF-8", key, initVector)
     val zygote = AESZygote(v = 1, initVector, cipher)

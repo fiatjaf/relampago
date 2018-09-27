@@ -12,6 +12,9 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.StartNodeView._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import android.widget.{ImageButton, TextView}
+import scala.util.{Success, Try}
+
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.CloudAct
 import com.lightning.walletapp.ln.Scripts.pubKeyScript
@@ -24,9 +27,6 @@ import android.app.AlertDialog
 import org.bitcoinj.core.Batch
 import java.util.Collections
 import android.os.Bundle
-
-import android.widget.{ImageButton, TextView}
-import scala.util.{Failure, Success, Try}
 
 
 class LNStartFundActivity extends TimerActivity { me =>
@@ -42,14 +42,14 @@ class LNStartFundActivity extends TimerActivity { me =>
       case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(nodeFundView, "<br>"), ann)
       case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(nodeFundView, "<br>"), ann)
       case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, chansNumber.last).asString(nodeFundView, "<br>"), ann)
-      case icr: IncomingChannelRequest => proceed(Some(icr), icr.nodeView.asString(nodeFundView, "<br>"), icr.nodeView.ann)
+      case icp: IncomingChannelParams => proceed(Some(icp), icp.nodeView.asString(nodeFundView, "<br>"), icp.nodeView.ann)
       case _ => finish
     }
 
     // Or back if resources are freed
   } else me exitTo classOf[MainActivity]
 
-  def proceed(icrOpt: Option[IncomingChannelRequest], asString: String, ann: NodeAnnouncement) = {
+  def proceed(icrOpt: Option[IncomingChannelParams], asString: String, ann: NodeAnnouncement) = {
     val freshChan = app.ChannelManager.createChannel(bootstrap = InitData(ann), initialListeners = Set.empty)
     lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
     lnStartFundDetails setText asString.html
@@ -62,16 +62,9 @@ class LNStartFundActivity extends TimerActivity { me =>
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        case open: OpenChannel if nodeId == ann.nodeId && icrOpt.exists(_ isCorrect open) =>
-          val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
-          val theirUnspendableReserveSat = open.fundingSatoshis / LNParams.channelReserveToFundingRatio
-          freshChan process Tuple2(LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript,
-            System.currentTimeMillis, isFunder = false), open)
-
-        case _: OpenChannel if nodeId == ann.nodeId => onException(freshChan -> new LightningException)
-        case error: Error if nodeId == ann.nodeId => onException(freshChan -> error.exception)
+        case err: Error if nodeId == ann.nodeId => onException(freshChan -> err.exception)
         case msg: ChannelSetupMessage if nodeId == ann.nodeId => freshChan process msg
-        case _ =>
+        case _ => // We only listen to setup messages here to avoid conflicts
       }
 
       override def onException = {
@@ -122,7 +115,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
       // Attempt to save a channel on the cloud right away
       val refund = RefundingData(some.announce, None, some.commitments)
-      val encrypted = AES.encode(refund.toJson.toString, LNParams.cloudSecret)
+      val encrypted = AES.encHex(refund.toJson.toString, LNParams.cloudSecret)
       val act = CloudAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
       OlympusWrap tellClouds act
     }
@@ -142,14 +135,13 @@ class LNStartFundActivity extends TimerActivity { me =>
           val dummyScript = pubKeyScript(dummyKey, dummyKey)
           val pay = P2WSHData(msat, dummyScript)
 
-          def futureProcess(unsignedRequest: SendRequest) = {
-            val fee: Long = LNParams.broadcaster.perKwThreeSat
-            val batch = Batch(unsignedRequest, dummyScript, null)
+          def futureProcess(unsigned: SendRequest) = {
+            val fee = LNParams.broadcaster.perKwThreeSat
+            val batch = Batch(unsigned, dummyScript, null)
             val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
             val theirUnspendableReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
             val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
-            val cmd = CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat, pushMsat = 0L)
-            freshChan process cmd
+            freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat, pushMsat = 0L)
           }
 
           def onTxFail(fundingError: Throwable) = {
@@ -179,7 +171,7 @@ class LNStartFundActivity extends TimerActivity { me =>
         val title = getString(ln_ops_start_fund_local_title).html
 
         mkCheckForm(alert => rm(alert) {
-          val fee: Long = LNParams.broadcaster.perKwThreeSat
+          val fee = LNParams.broadcaster.perKwThreeSat
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val theirUnspendableReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
           val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
@@ -227,7 +219,7 @@ class LNStartFundActivity extends TimerActivity { me =>
         val content = getString(ex_fund_accept).format(started.start.host, capacity, fundingFee)
 
         mkCheckForm(alert => rm(alert) {
-          val fee: Long = LNParams.broadcaster.perKwThreeSat
+          val fee = LNParams.broadcaster.perKwThreeSat
           val remoteFundSat = started.start.fundingAmount.amount
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val theirUnspendableReserveSat = wsw.params.start.fundingAmount.amount / LNParams.channelReserveToFundingRatio
@@ -237,8 +229,12 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
     }
 
-    def remoteOpenFundeeListener(icr: IncomingChannelRequest) = new OpenListener {
-      override def onOperational(remoteFunderNodeId: PublicKey) = icr.requestChannel
+    def remoteOpenFundeeListener(open: OpenChannel) = new OpenListener {
+      // In this special case we already have their OpenChannel and connection is active
+      val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
+      val theirUnspendableReserveSat = open.fundingSatoshis / LNParams.channelReserveToFundingRatio
+      freshChan process Tuple2(LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript,
+        System.currentTimeMillis, isFunder = false), open)
 
       override def onBecome = {
         case (_, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>
@@ -262,7 +258,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     lazy val openListener =
       ExternalFunder.worker -> FragLNStart.batchOpt -> icrOpt match {
         case Some(onlineWsw) \ None \ None => remoteOpenListener(onlineWsw)
-        case None \ None \ Some(icr) => remoteOpenFundeeListener(icr)
+        case None \ None \ Some(icp) => remoteOpenFundeeListener(icp.open)
         case None \ Some(batch) \ None => localBatchListener(batch)
         case _ => localWalletListener
       }

@@ -226,6 +226,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
 object StartNodeView {
   lazy val nodeView = app getString ln_ops_start_node_view
   lazy val nodeFundView = app getString ln_ops_start_fund_node_view
+  lazy val incomingChannel = app getString ln_ops_start_fund_incoming_channel
   lazy val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
 }
 
@@ -253,10 +254,11 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 // GETTING INCOMING CHANNEL
 
 sealed trait LNUrlData
+case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
 case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long) extends LNUrlData {
   def requestChannel = get(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&public=0", true).trustAllCerts.trustAllHosts.body
-  val nodeView = HardcodedNodeView(app.mkNodeAnnouncement(PublicKey(key), host, port.toInt), chansNumber.last)
-  lazy val nodeLink(key, host, port) = uri
+  def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), host, port.toInt)
+  val nodeLink(key, host, port) = uri
 }
 
 // LNURL HANDLER
@@ -264,8 +266,6 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String, cap
 case class LNUrl(bech32url: String) {
   private[this] val _ \ decoded = Bech32 decode bech32url
   private[this] val finalDecoded = Bech32 five2eight decoded
-
-  def resolve: Observable[IncomingChannelRequest] =
-    obsOnIO.map(_ => get(new String(finalDecoded.toArray, "UTF-8"), true)
-      .trustAllCerts.trustAllHosts.connectTimeout(7500).body) map to[IncomingChannelRequest]
+  def resolve = obsOnIO.map(_ => get(new String(finalDecoded.toArray, "UTF-8"), true)
+    .trustAllCerts.trustAllHosts.connectTimeout(7500).body) map to[IncomingChannelRequest]
 }

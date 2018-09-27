@@ -146,11 +146,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     app.TransData checkAndMaybeErase {
+      case FragWallet.REDIRECT => goOps(null)
       case _: Started => me goTo classOf[LNStartActivity]
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+      case lnLink: LNUrl => lnLink.resolve.foreach(initConnection, none)
       case address: Address => FragWallet.worker.sendBtcPopup(address)(none)
-      case ln: LNUrl => ln.resolve.foreach(initConnection, none)
-      case FragWallet.REDIRECT => goOps(null)
 
       case uri: BitcoinURI =>
         // Bitcoin URI may possibly have an amount which we then fill in
@@ -173,12 +173,12 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def initConnection(icr: IncomingChannelRequest) =
     ConnectionManager.listeners += new ConnectionListener { self =>
-      ConnectionManager.connectTo(icr.nodeView.ann, notify = true)
+      // This is done to make sure we definitely have an LN connection
+      ConnectionManager.connectTo(icr.getAnnounce, notify = true)
       app toast ln_url_resolving
 
       override def onOperational(nodeId: PublicKey) = {
-        // Immediately remove this listener and make request
-        // this is done to make sure we have an LN connection
+        // Immediately remove listener and make a request
         ConnectionManager.listeners -= self
         icr.requestChannel
       }
