@@ -697,8 +697,4 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   app.kit.wallet addCoinsSentEventListener txsListener
   react(new String)
   updBtcItems
-
-  println(s"-- ${LNParams.nodePublicKey}")
-  val ann = app.mkNodeAnnouncement(PublicKey("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd"), "5.9.138.164", 9935)
-  ConnectionManager.connectTo(ann, notify = false)
 }
