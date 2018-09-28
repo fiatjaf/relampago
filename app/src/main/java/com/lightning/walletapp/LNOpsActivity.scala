@@ -12,7 +12,7 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import fr.acinq.bitcoin.{BinaryData, Satoshi}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
-import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
+import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
