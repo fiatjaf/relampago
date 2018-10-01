@@ -102,12 +102,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   // To fight spamming
-  private[this] var errorsSent = 0
-  private[this] var openMessagesSent = 0
+  private[this] var errorLimit = 5
+  private[this] var openMessageLimit = 5
 
   val connectionListener = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-      case open: OpenChannel if openMessagesSent <= 5 && open.channelFlags == 0.toByte =>
+      case open: OpenChannel if openMessageLimit > 0 && open.channelFlags == 0.toByte =>
         def proceed: Unit = ConnectionManager.connections get nodeId foreach { worker =>
           val nodeView = HardcodedNodeView(worker.ann, StartNodeView.incomingChannel)
           app.TransData.value = IncomingChannelParams(nodeView, open)
@@ -119,7 +119,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           val capacity = denom withSign MilliSatoshi(open.fundingSatoshis * 1000L)
           val title = app.getString(ln_ops_start_fund_incoming_title).format(yourBalance, capacity).html
           mkCheckForm(alert => rm(alert)(proceed), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
-          openMessagesSent += 1
+          openMessageLimit -= 1
         }.run
 
       case _ =>
@@ -131,11 +131,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     // prevent remote error spamming by using trigger
 
     override def onProcessSuccess = {
-      case (chan, data: HasCommitments, remoteError: wire.Error) if errorsSent <= 5 => UITask {
+      case (chan, data: HasCommitments, remoteError: wire.Error) if errorLimit > 0 => UITask {
         val bld = baseBuilder(chan.data.announce.toString.html, remoteError.exception.getMessage)
         def close(alert: AlertDialog) = rm(alert)(chan process app.ChannelManager.CMDLocalShutdown)
         mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_force)
-        errorsSent += 1
+        errorLimit -= 1
       }.run
     }
 
