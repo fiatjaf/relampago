@@ -111,13 +111,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     me updOkOutgoing ok
 
     inFlightPayments get ok.paymentHash foreach { rd =>
-      // Make payment searchable + optimization: record subroutes in database
+      // Make payment searchable + optimization: record sub-routes in database
       db.change(PaymentTable.newVirtualSql, rd.queryText, rd.pr.paymentHash)
       if (rd.usedRoute.nonEmpty) RouteWrap cacheSubRoutes rd
     }
   }
 
-  override def sentSig(cs: Commitments) = db txWrap {
+  override def sentSig(cs: Commitments, remoteTx: Transaction) = db txWrap {
     for (waitRevocation <- cs.remoteNextCommitInfo.left) {
       val activeHtlcs = waitRevocation.nextRemoteCommit.spec.htlcs
       for (Htlc(_, add) <- activeHtlcs if add.amount > cs.localParams.dustLimit)

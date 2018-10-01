@@ -9,9 +9,9 @@ import com.lightning.walletapp.ln.AddErrorCodes._
 import com.lightning.walletapp.ln.LNParams.broadcaster._
 import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction}
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
-import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.LNMessageVector
+import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{LNMessageVector, RedeemScriptAndSig}
 import org.bitcoinj.core.Batch
 import fr.acinq.eclair.UInt64
 
@@ -180,6 +180,10 @@ case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimThei
     main ++ their ++ penalty
   }
 }
+
+case class RevocationInfo(feeRate: Long, dustLimit: Long, finalScriptPubKey: BinaryData, toSelfDelay: Int,
+                          localPubKey: PublicKey, remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey,
+                          redeemScriptsToSigs: List[RedeemScriptAndSig], claimMainTxSig: BinaryData, claimPenaltyTxSig: BinaryData)
 
 // COMMITMENTS
 
@@ -405,7 +409,7 @@ object Commitments {
     val c1 = c.copy(remoteNextCommitInfo = Left apply WaitingForRevocation(remoteCommit1, commitSig, c.localCommit.index),
       localChanges = localChanges1, remoteChanges = remoteChanges1)
 
-    c1 -> commitSig
+    c1 -> commitSig -> remoteCommitTx.tx
   }
 
   def receiveCommit(c: Commitments, commit: CommitSig) = {

@@ -5,7 +5,7 @@ import scodec.codecs._
 import java.math.BigInteger
 import fr.acinq.eclair.UInt64
 import com.lightning.walletapp.ln.crypto.Sphinx
-import com.lightning.walletapp.ln.{LightningException, PerHopPayload}
+import com.lightning.walletapp.ln.{LightningException, PerHopPayload, RevocationInfo}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import fr.acinq.bitcoin.{BinaryData, Crypto}
 import scodec.bits.{BitVector, ByteVector}
@@ -14,9 +14,10 @@ import scodec.{Attempt, Codec, Err}
 
 
 object LightningMessageCodecs { me =>
+  type NodeAddressList = List[NodeAddress]
   type BitVectorAttempt = Attempt[BitVector]
   type LNMessageVector = Vector[LightningMessage]
-  type NodeAddressList = List[NodeAddress]
+  type RedeemScriptAndSig = (BinaryData, BinaryData)
   type AddressPort = (InetAddress, Int)
   type RGB = (Byte, Byte, Byte)
 
@@ -348,6 +349,18 @@ object LightningMessageCodecs { me =>
 
   // Not in a spec
 
+  private val revocationInfo =
+    (uint64 withContext "feeRate") ::
+      (uint64 withContext "dustLimit") ::
+      (varsizebinarydata withContext "finalScriptPubKey") ::
+      (uint16 withContext "toSelfDelay") ::
+      (publicKey withContext "localPubKey") ::
+      (publicKey withContext "remoteRevocationPubkey") ::
+      (publicKey withContext "remoteDelayedPaymentKey") ::
+      (listOfN(uint16, varsizebinarydata ~ signature) withContext "redeemScriptsToSigs") ::
+      (signature withContext "claimMainTxSig") ::
+      (signature withContext "claimPenaltyTxSig")
+
   private val walletZygote =
     (uint16 withContext "v") ::
       (varsizebinarydataLong withContext "db") ::
@@ -359,6 +372,7 @@ object LightningMessageCodecs { me =>
       (varsizebinarydataLong withContext "iv") ::
       (varsizebinarydataLong withContext "ciphertext")
 
+  val revocationInfoCodec = revocationInfo.as[RevocationInfo]
   val walletZygoteCodec = walletZygote.as[WalletZygote]
   val aesZygoteCodec = aesZygote.as[AESZygote]
 }

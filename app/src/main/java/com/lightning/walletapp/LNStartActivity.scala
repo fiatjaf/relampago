@@ -266,6 +266,6 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String, cap
 case class LNUrl(bech32url: String) {
   private[this] val _ \ decoded = Bech32 decode bech32url
   private[this] val finalDecoded = Bech32 five2eight decoded
-  def resolve = obsOnIO.map(_ => get(new String(finalDecoded.toArray, "UTF-8"), true)
-    .trustAllCerts.trustAllHosts.connectTimeout(7500).body) map to[IncomingChannelRequest]
+  private def fetch = get(bin2readable(finalDecoded.toArray), true).trustAllCerts.trustAllHosts
+  def resolve = obsOnIO.map(_ => fetch.connectTimeout(7500).body) map to[IncomingChannelRequest]
 }

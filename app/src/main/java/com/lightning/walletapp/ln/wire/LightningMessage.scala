@@ -1,11 +1,11 @@
 package com.lightning.walletapp.ln.wire
 
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
+import com.lightning.walletapp.ln.Tools.{bin2readable, fromShortId}
 import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import com.lightning.walletapp.ln.LightningException
-import com.lightning.walletapp.ln.Tools.fromShortId
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
 
@@ -67,7 +67,7 @@ case class RevokeAndAck(channelId: BinaryData, perCommitmentSecret: Scalar, next
 
 case class Error(channelId: BinaryData, data: BinaryData) extends ChannelMessage {
   def exception = new LightningException(reason = s"Remote channel message\n\n$text")
-  lazy val text = new String(data, "UTF-8")
+  lazy val text = bin2readable(data)
 }
 
 case class ChannelReestablish(channelId: BinaryData, nextLocalCommitmentNumber: Long,

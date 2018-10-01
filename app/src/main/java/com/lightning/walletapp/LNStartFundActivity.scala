@@ -115,7 +115,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
       // Attempt to save a channel on the cloud right away
       val refund = RefundingData(some.announce, None, some.commitments)
-      val encrypted = AES.encHex(refund.toJson.toString, LNParams.cloudSecret)
+      val encrypted = AES.encReadable2Hex(refund.toJson.toString, LNParams.cloudSecret)
       val act = CloudAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
       OlympusWrap tellClouds act
     }

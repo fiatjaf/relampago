@@ -117,7 +117,6 @@ class WalletApp extends Application { me =>
       case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), host, port.toInt)
       case lnPayReq(prefix, req) => PaymentRequest.read(s"$prefix$req".toLowerCase)
       case lnUrl(prefix, data) => LNUrl(s"$prefix$data".toLowerCase)
-      case funder(_, paramsHex) => to[Started](paramsHex.hex2asci)
       case _ => toAddress(rawText)
     }
   }

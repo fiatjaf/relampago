@@ -295,7 +295,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
         for {
           encryptedBackup <- backups
-          ref <- AES.decode(encryptedBackup, cloudSecret) map to[RefundingData]
+          ref <- AES.decHex2Readable(encryptedBackup, cloudSecret) map to[RefundingData]
           if !app.ChannelManager.all.flatMap(_ apply identity).exists(_.channelId == ref.commitments.channelId)
         } app.ChannelManager.all +:= app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, ref)
         app.ChannelManager.initConnect

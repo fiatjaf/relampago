@@ -18,6 +18,7 @@ object Tools {
   type Bytes = Array[Byte]
   val random = new RandomGenerator
   def runAnd[T](result: T)(action: Any): T = result
+  def bin2readable(bin: Bytes) = new String(bin, "UTF-8")
   def errlog(error: Throwable): Unit = error.printStackTrace
   def log(message: String): Unit = android.util.Log.d("LN", message)
   def randomPrivKey = PrivateKey(random getBytes 32, compressed = true)
@@ -36,10 +37,9 @@ object Tools {
     if (txIndex < 0) None else Some(result)
   }
 
-  def toLongId(fundingHash: BinaryData, fundingOutputIndex: Int): BinaryData =
-    if (fundingOutputIndex >= 65536 | fundingHash.size != 32) throw new LightningException
-    else fundingHash.take(30) :+ fundingHash.data(30).^(fundingOutputIndex >> 8).toByte :+
-      fundingHash.data(31).^(fundingOutputIndex).toByte
+  def toLongId(fundingHash: BinaryData, fundingOutputIndex: Int) =
+    if (fundingOutputIndex >= 65536 | fundingHash.size != 32) throw new LightningException("Funding index > 65535 or funding hash != 32")
+    else fundingHash.take(30) :+ fundingHash.data(30).^(fundingOutputIndex >> 8).toByte :+ fundingHash.data(31).^(fundingOutputIndex).toByte
 }
 
 object Features {

@@ -27,9 +27,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
 
+    override def sentSig(cs: Commitments, remoteTx: Transaction) = for (lst <- listeners) lst.sentSig(cs, remoteTx)
+    override def fulfillReceived(updateFulfill: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived updateFulfill
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
-    override def fulfillReceived(ok: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived ok
-    override def sentSig(cs: Commitments) = for (lst <- listeners) lst sentSig cs
     override def settled(cs: Commitments) = for (lst <- listeners) lst settled cs
   }
 
@@ -276,17 +276,17 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Propose new remote commit via commit tx sig
         val nextRemotePoint = norm.commitments.remoteNextCommitInfo.right.get
-        val c1 \ commitSig = Commitments.sendCommit(norm.commitments, nextRemotePoint)
-        val d1 = me STORE norm.copy(commitments = c1)
-        me UPDATA d1 SEND commitSig
-        events sentSig c1
+        val c1 \ commitSig \ remoteTx = Commitments.sendCommit(norm.commitments, nextRemotePoint)
+        val d1RemoteSigSent = me STORE norm.copy(commitments = c1)
+        me UPDATA d1RemoteSigSent SEND commitSig
+        events.sentSig(c1, remoteTx)
 
 
       case (norm: NormalData, sig: CommitSig, OPEN) =>
         // We received a commit sig from them, now we can update our local commit
         val c1 \ revokeAndAck = Commitments.receiveCommit(norm.commitments, sig)
-        val d1 = me STORE norm.copy(commitments = c1)
-        me UPDATA d1 SEND revokeAndAck
+        val d1LocalSigReceived = me STORE norm.copy(commitments = c1)
+        me UPDATA d1LocalSigReceived SEND revokeAndAck
         // Clear remote commit first
         doProcess(CMDProceed)
         events settled c1
@@ -600,9 +600,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstCommitTxs(cmd.localParams, cmd.fundingSat,
       cmd.pushMsat, cmd.initialFeeratePerKw, accept, txHash, outIndex, accept.firstPerCommitmentPoint)
 
+    val longId = Tools.toLongId(txHash, outIndex)
     val localSigOfRemoteTx = Scripts.sign(remoteCommitTx, cmd.localParams.fundingPrivKey)
     val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, accept.firstPerCommitmentPoint)
-    val wfsc = WaitFundingSignedCore(cmd.localParams, Tools.toLongId(txHash, outIndex), accept, localSpec, localCommitTx, firstRemoteCommit)
+    val wfsc = WaitFundingSignedCore(cmd.localParams, longId, accept, localSpec, localCommitTx, firstRemoteCommit)
     wfsc -> FundingCreated(cmd.tempChanId, txHash, outIndex, localSigOfRemoteTx)
   }
 
@@ -712,8 +713,8 @@ trait ChannelListener {
   def onException: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
 
-  def fulfillReceived(ok: UpdateFulfillHtlc): Unit = none
+  def sentSig(cs: Commitments, remoteTx: Transaction): Unit = none
+  def fulfillReceived(updateFulfill: UpdateFulfillHtlc): Unit = none
   def outPaymentAccepted(rd: RoutingData): Unit = none
-  def sentSig(cs: Commitments): Unit = none
   def settled(cs: Commitments): Unit = none
 }

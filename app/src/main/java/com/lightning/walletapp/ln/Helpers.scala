@@ -254,8 +254,8 @@ object Helpers {
         val htlcPenaltyTxs = for {
           TxOut(_, publicKeyScript) <- tx.txOut
           redeemScript <- redeemMap get publicKeyScript
-          htlcPenaltyTx <- Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey,
-            LNParams.broadcaster.perKwThreeSat, commitments.localParams.dustLimit).toOption
+          htlcPenaltyTx <- Scripts.makeHtlcPenaltyTx(finder, redeemScript,
+            finalScriptPubKey, feeRate, commitments.localParams.dustLimit).toOption
 
           sig = Scripts.sign(htlcPenaltyTx, remoteRevocationPrivkey)
           signed = Scripts.addSigs(htlcPenaltyTx, sig, remoteRevocationPubkey)

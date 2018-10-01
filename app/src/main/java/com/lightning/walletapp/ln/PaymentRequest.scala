@@ -225,8 +225,7 @@ object PaymentRequest {
 
         case dTag if dTag == Bech32.map('d') =>
           val description = Bech32 five2eight input.slice(3, len + 3)
-          val text = new String(description.toArray, "UTF-8")
-          DescriptionTag(text)
+          DescriptionTag(Tools bin2readable description.toArray)
 
         case hTag if hTag == Bech32.map('h') =>
           val hash = Bech32 five2eight input.slice(3, len + 3)

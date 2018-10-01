@@ -40,7 +40,6 @@ object IconGetter extends Html.ImageGetter {
 
 class StringOps(source: String) {
   def html = Html.fromHtml(source, IconGetter, null)
-  def hex2asci = new String(BinaryData(source), "UTF-8")
   def hex = BinaryData(source getBytes "UTF-8").toString
   def noSpaces = source.replace(" ", "")
 }
