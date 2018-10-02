@@ -350,16 +350,16 @@ object LightningMessageCodecs { me =>
   // Not in a spec
 
   private val revocationInfo =
-    (uint64 withContext "feeRate") ::
+    (listOfN(uint16, varsizebinarydata ~ signature) withContext "redeemScriptsToSigs") ::
+      (optional(bool, signature) withContext "claimMainTxSig") ::
+      (optional(bool, signature) withContext "claimPenaltyTxSig") ::
+      (uint64 withContext "feeRate") ::
       (uint64 withContext "dustLimit") ::
       (varsizebinarydata withContext "finalScriptPubKey") ::
       (uint16 withContext "toSelfDelay") ::
       (publicKey withContext "localPubKey") ::
       (publicKey withContext "remoteRevocationPubkey") ::
-      (publicKey withContext "remoteDelayedPaymentKey") ::
-      (listOfN(uint16, varsizebinarydata ~ signature) withContext "redeemScriptsToSigs") ::
-      (signature withContext "claimMainTxSig") ::
-      (signature withContext "claimPenaltyTxSig")
+      (publicKey withContext "remoteDelayedPaymentKey")
 
   private val walletZygote =
     (uint16 withContext "v") ::

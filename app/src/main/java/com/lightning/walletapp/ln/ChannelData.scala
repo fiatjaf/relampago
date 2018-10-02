@@ -181,9 +181,9 @@ case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimThei
   }
 }
 
-case class RevocationInfo(feeRate: Long, dustLimit: Long, finalScriptPubKey: BinaryData, toSelfDelay: Int,
-                          localPubKey: PublicKey, remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey,
-                          redeemScriptsToSigs: List[RedeemScriptAndSig], claimMainTxSig: BinaryData, claimPenaltyTxSig: BinaryData)
+case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig], claimMainTxSig: Option[BinaryData], claimPenaltyTxSig: Option[BinaryData],
+                          feeRate: Long, dustLimit: Long, finalScriptPubKey: BinaryData, toSelfDelay: Int, localPubKey: PublicKey,
+                          remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey)
 
 // COMMITMENTS
 
@@ -399,17 +399,16 @@ object Commitments {
 
     // Generate signatures
     val sortedHtlcTxs = (htlcTimeoutTxs ++ htlcSuccessTxs).sortBy(_.input.outPoint.index)
-    val htlcSigs = for (info <- sortedHtlcTxs) yield Scripts.sign(info, htlcKey)
+    val htlcSigs = for (info <- sortedHtlcTxs) yield Scripts.sign(htlcKey)(info)
 
     // Update commitment data
     val remoteChanges1 = c.remoteChanges.copy(acked = Vector.empty, signed = c.remoteChanges.acked)
     val localChanges1 = c.localChanges.copy(proposed = Vector.empty, signed = c.localChanges.proposed)
-    val commitSig = CommitSig(c.channelId, Scripts.sign(remoteCommitTx, c.localParams.fundingPrivKey), htlcSigs.toList)
+    val commitSig = CommitSig(c.channelId, Scripts.sign(c.localParams.fundingPrivKey)(remoteCommitTx), htlcSigs.toList)
     val remoteCommit1 = RemoteCommit(c.remoteCommit.index + 1, spec, remoteCommitTx.tx.txid, remoteNextPerCommitmentPoint)
-    val c1 = c.copy(remoteNextCommitInfo = Left apply WaitingForRevocation(remoteCommit1, commitSig, c.localCommit.index),
-      localChanges = localChanges1, remoteChanges = remoteChanges1)
-
-    c1 -> commitSig -> remoteCommitTx.tx
+    val wait = WaitingForRevocation(nextRemoteCommit = remoteCommit1, commitSig, localCommitIndexSnapshot = c.localCommit.index)
+    val c1 = c.copy(remoteNextCommitInfo = Left(wait), localChanges = localChanges1, remoteChanges = remoteChanges1)
+    c1 -> wait -> remoteCommitTx.tx
   }
 
   def receiveCommit(c: Commitments, commit: CommitSig) = {
@@ -426,11 +425,11 @@ object Commitments {
 
     val sortedHtlcTxs = (htlcTimeoutTxs ++ htlcSuccessTxs).sortBy(_.input.outPoint.index)
     val signedLocalCommitTx = Scripts.addSigs(localCommitTx, c.localParams.fundingPrivKey.publicKey,
-      c.remoteParams.fundingPubkey, Scripts.sign(localCommitTx, c.localParams.fundingPrivKey), commit.signature)
+      c.remoteParams.fundingPubkey, Scripts.sign(c.localParams.fundingPrivKey)(localCommitTx), commit.signature)
 
     if (commit.htlcSignatures.size != sortedHtlcTxs.size) throw new LightningException
     if (Scripts.checkValid(signedLocalCommitTx).isFailure) throw new LightningException
-    val htlcSigs = for (info <- sortedHtlcTxs) yield Scripts.sign(info, localHtlcKey)
+    val htlcSigs = for (info <- sortedHtlcTxs) yield Scripts.sign(localHtlcKey)(info)
     val combined = (sortedHtlcTxs, htlcSigs, commit.htlcSignatures).zipped.toList
 
     val htlcTxsAndSigs = combined collect {

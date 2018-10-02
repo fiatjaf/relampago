@@ -184,8 +184,8 @@ class TransactionsSpec {
       val commitTxNumber = 0x404142434445L
       val commitTx = {
         val txinfo = makeCommitTx(commitInput, commitTxNumber, localPaymentPriv.toPoint, remotePaymentPriv.toPoint, true, localDustLimit, localRevocationPriv.publicKey, toLocalDelay, localDelayedPaymentPriv.publicKey, remotePaymentPriv.publicKey, localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, spec)
-        val localSig = Scripts.sign(txinfo, localPaymentPriv)
-        val remoteSig = Scripts.sign(txinfo, remotePaymentPriv)
+        val localSig = Scripts.sign(localPaymentPriv)(txinfo)
+        val remoteSig = Scripts.sign(remotePaymentPriv)(txinfo)
         Scripts.addSigs(txinfo, localFundingPriv.publicKey, remoteFundingPriv.publicKey, localSig, remoteSig)
       }
 
@@ -204,8 +204,8 @@ class TransactionsSpec {
       {
         // either party spends local->remote htlc output with htlc timeout tx
         for (htlcTimeoutTx <- htlcTimeoutTxs) {
-          val localSig = sign(htlcTimeoutTx, localHtlcPriv)
-          val remoteSig = sign(htlcTimeoutTx, remoteHtlcPriv)
+          val localSig = sign(localHtlcPriv)(htlcTimeoutTx)
+          val remoteSig = sign(remoteHtlcPriv)(htlcTimeoutTx)
           val signed = addSigs(htlcTimeoutTx, localSig, remoteSig)
           assert(checkValid(signed).isSuccess)
         }
@@ -215,7 +215,7 @@ class TransactionsSpec {
         // remote spends local->remote htlc1/htlc3 output directly in case of success
         for ((htlc, paymentPreimage) <- (htlc1, paymentPreimage1) :: (htlc3, paymentPreimage3) :: Nil) {
           val claimHtlcSuccessTx = makeClaimHtlcSuccessTx(new PubKeyScriptIndexFinder(commitTx.tx), remoteHtlcPriv.publicKey, localHtlcPriv.publicKey, localRevocationPriv.publicKey, finalPubKeyScript, htlc, feeratePerKw, localDustLimit).get
-          val localSig = sign(claimHtlcSuccessTx, remoteHtlcPriv)
+          val localSig = sign(remoteHtlcPriv)(claimHtlcSuccessTx)
           val signed = addSigs(claimHtlcSuccessTx, localSig, paymentPreimage)
           assert(checkValid(signed).isSuccess)
         }
@@ -224,8 +224,8 @@ class TransactionsSpec {
       {
         // local spends remote->local htlc2/htlc4 output with htlc success tx using payment preimage
         for ((htlcSuccessTx, paymentPreimage) <- (htlcSuccessTxs(0), paymentPreimage2) :: (htlcSuccessTxs(1), paymentPreimage4) :: Nil) {
-          val localSig = sign(htlcSuccessTx, localHtlcPriv)
-          val remoteSig = sign(htlcSuccessTx, remoteHtlcPriv)
+          val localSig = sign(localHtlcPriv)(htlcSuccessTx)
+          val remoteSig = sign(remoteHtlcPriv)(htlcSuccessTx)
           val signedTx = addSigs(htlcSuccessTx, localSig, remoteSig, paymentPreimage)
           assert(checkValid(signedTx).isSuccess)
           // check remote sig
@@ -236,7 +236,7 @@ class TransactionsSpec {
       {
         // remote spends main output
         val claimP2WPKHOutputTx = makeClaimP2WPKHOutputTx(commitTx.tx, remotePaymentPriv.publicKey, finalPubKeyScript, feeratePerKw, localDustLimit).get
-        val localSig = sign(claimP2WPKHOutputTx, remotePaymentPriv)
+        val localSig = sign(remotePaymentPriv)(claimP2WPKHOutputTx)
         val signedTx = addSigs(claimP2WPKHOutputTx, localSig, remotePaymentPriv.publicKey)
         assert(checkValid(signedTx).isSuccess)
       }
@@ -244,7 +244,7 @@ class TransactionsSpec {
       {
         // remote spends remote->local htlc output directly in case of timeout
         val claimHtlcTimeoutTx = makeClaimHtlcTimeoutTx(new PubKeyScriptIndexFinder(commitTx.tx), remoteHtlcPriv.publicKey, localHtlcPriv.publicKey, localRevocationPriv.publicKey, finalPubKeyScript, htlc2, feeratePerKw, localDustLimit).get
-        val localSig = sign(claimHtlcTimeoutTx, remoteHtlcPriv)
+        val localSig = sign(remoteHtlcPriv)(claimHtlcTimeoutTx)
         val signed = addSigs(claimHtlcTimeoutTx, localSig)
         assert(checkValid(signed).isSuccess)
       }
@@ -253,7 +253,7 @@ class TransactionsSpec {
         // remote spends offered HTLC output with revocation key
         val script = Script.write(Scripts.htlcOffered(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, Crypto.ripemd160(htlc1.paymentHash)))
         val htlcPenaltyTx = makeHtlcPenaltyTx(new PubKeyScriptIndexFinder(commitTx.tx), script, finalPubKeyScript, feeratePerKw, localDustLimit).get
-        val sig = sign(htlcPenaltyTx, localRevocationPriv)
+        val sig = sign(localRevocationPriv)(htlcPenaltyTx)
         val signed = addSigs(htlcPenaltyTx, sig, localRevocationPriv.publicKey)
         assert(checkValid(signed).isSuccess)
       }
@@ -262,7 +262,7 @@ class TransactionsSpec {
         // remote spends received HTLC output with revocation key
         val script = Script.write(Scripts.htlcReceived(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, Crypto.ripemd160(htlc2.paymentHash), htlc2.expiry))
         val htlcPenaltyTx = makeHtlcPenaltyTx(new PubKeyScriptIndexFinder(commitTx.tx), script, finalPubKeyScript, feeratePerKw, localDustLimit).get
-        val sig = sign(htlcPenaltyTx, localRevocationPriv)
+        val sig = sign(localRevocationPriv)(htlcPenaltyTx)
         val signed = addSigs(htlcPenaltyTx, sig, localRevocationPriv.publicKey)
         assert(checkValid(signed).isSuccess)
       }

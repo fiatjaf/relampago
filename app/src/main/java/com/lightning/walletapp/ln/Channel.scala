@@ -27,7 +27,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
 
-    override def sentSig(cs: Commitments, remoteTx: Transaction) = for (lst <- listeners) lst.sentSig(cs, remoteTx)
+    override def sentSig(cs: Commitments, wait: WaitingForRevocation, remoteTx: Transaction) = for (lst <- listeners) lst.sentSig(cs, wait, remoteTx)
     override def fulfillReceived(updateFulfill: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived updateFulfill
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
     override def settled(cs: Commitments) = for (lst <- listeners) lst settled cs
@@ -112,14 +112,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
             open.feeratePerKw, accept, txHash, outIndex, open.firstPerCommitmentPoint)
 
         val signedLocalCommitTx = Scripts.addSigs(localCommitTx, localParams.fundingPrivKey.publicKey,
-          accept.fundingPubkey, Scripts.sign(localCommitTx, localParams.fundingPrivKey), remoteSig)
+          accept.fundingPubkey, Scripts.sign(localParams.fundingPrivKey)(localCommitTx), remoteSig)
 
         if (Scripts.checkValid(signedLocalCommitTx).isSuccess) {
           val channelId = Tools.toLongId(fundingHash = txHash, outIndex)
           val rc = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, open.firstPerCommitmentPoint)
           val wfcs = WaitFundingSignedCore(localParams, channelId, accept, localSpec, signedLocalCommitTx, rc)
           val wait = WaitBroadcastRemoteData(announce, wfcs, txHash, wfcs makeCommitments signedLocalCommitTx)
-          val localSigOfRemoteTx = Scripts.sign(remoteCommitTx, localParams.fundingPrivKey)
+          val localSigOfRemoteTx = Scripts.sign(localParams.fundingPrivKey)(remoteCommitTx)
           val fundingSigned = FundingSigned(channelId, localSigOfRemoteTx)
           BECOME(wait, WAIT_FUNDING_DONE) SEND fundingSigned
         } else throw new LightningException
@@ -276,10 +276,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Propose new remote commit via commit tx sig
         val nextRemotePoint = norm.commitments.remoteNextCommitInfo.right.get
-        val c1 \ commitSig \ remoteTx = Commitments.sendCommit(norm.commitments, nextRemotePoint)
+        val c1 \ wait \ remoteTx = Commitments.sendCommit(norm.commitments, nextRemotePoint)
         val d1RemoteSigSent = me STORE norm.copy(commitments = c1)
-        me UPDATA d1RemoteSigSent SEND commitSig
-        events.sentSig(c1, remoteTx)
+        me UPDATA d1RemoteSigSent SEND wait.sent
+        events.sentSig(c1, wait, remoteTx)
 
 
       case (norm: NormalData, sig: CommitSig, OPEN) =>
@@ -601,15 +601,17 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       cmd.pushMsat, cmd.initialFeeratePerKw, accept, txHash, outIndex, accept.firstPerCommitmentPoint)
 
     val longId = Tools.toLongId(txHash, outIndex)
-    val localSigOfRemoteTx = Scripts.sign(remoteCommitTx, cmd.localParams.fundingPrivKey)
+    val localSigOfRemoteTx = Scripts.sign(cmd.localParams.fundingPrivKey)(remoteCommitTx)
     val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, accept.firstPerCommitmentPoint)
     val wfsc = WaitFundingSignedCore(cmd.localParams, longId, accept, localSpec, localCommitTx, firstRemoteCommit)
     wfsc -> FundingCreated(cmd.tempChanId, txHash, outIndex, localSigOfRemoteTx)
   }
 
-  private def verifyTheirFirstRemoteCommitTxSig(core: WaitFundingSignedCore, remoteSig: BinaryData) =
-    Scripts checkValid Scripts.addSigs(core.localCommitTx, core.localParams.fundingPrivKey.publicKey,
-      core.remoteParams.fundingPubkey, Scripts.sign(core.localCommitTx, core.localParams.fundingPrivKey), remoteSig)
+  private def verifyTheirFirstRemoteCommitTxSig(core: WaitFundingSignedCore, remoteSig: BinaryData) = Scripts checkValid {
+    val ourFirstCommitLocalSig: BinaryData = Scripts.sign(key = core.localParams.fundingPrivKey)(txinfo = core.localCommitTx)
+    Scripts.addSigs(core.localCommitTx, core.localParams.fundingPrivKey.publicKey, core.remoteParams.fundingPubkey,
+      ourFirstCommitLocalSig, remoteSig)
+  }
 
   private def makeFundingLocked(cs: Commitments) = {
     val first = Generators.perCommitPoint(cs.localParams.shaSeed, 1L)
@@ -713,7 +715,7 @@ trait ChannelListener {
   def onException: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
 
-  def sentSig(cs: Commitments, remoteTx: Transaction): Unit = none
+  def sentSig(cs: Commitments, wait: WaitingForRevocation, remoteTx: Transaction): Unit = none
   def fulfillReceived(updateFulfill: UpdateFulfillHtlc): Unit = none
   def outPaymentAccepted(rd: RoutingData): Unit = none
   def settled(cs: Commitments): Unit = none

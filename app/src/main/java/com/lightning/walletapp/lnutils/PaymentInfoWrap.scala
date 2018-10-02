@@ -117,7 +117,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
   }
 
-  override def sentSig(cs: Commitments, remoteTx: Transaction) = db txWrap {
+  override def sentSig(cs: Commitments, wait: WaitingForRevocation, remoteTx: Transaction) = db txWrap {
+    val bigEnoughHtlcs = wait.nextRemoteCommit.spec.htlcs.filter(_.add.amount > cs.localParams.dustLimit)
+
     for (waitRevocation <- cs.remoteNextCommitInfo.left) {
       val activeHtlcs = waitRevocation.nextRemoteCommit.spec.htlcs
       for (Htlc(_, add) <- activeHtlcs if add.amount > cs.localParams.dustLimit)
