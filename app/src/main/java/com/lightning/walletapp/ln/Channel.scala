@@ -544,7 +544,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val nextRemoteCommitEither = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
 
         Tuple3(GETREV(tx), nextRemoteCommitEither, some) match {
-          case (_, _, close: ClosingData) if close.refundRemoteCommit.nonEmpty => Tools log s"Existing refund"
+          case (_, _, close: ClosingData) if close.refundRemoteCommit.nonEmpty => Tools log s"Existing refund $tx"
           case (_, _, close: ClosingData) if close.mutualClose.exists(_.txid == tx.txid) => Tools log s"Existing mutual $tx"
           case (_, _, close: ClosingData) if close.localCommit.exists(_.commitTx.txid == tx.txid) => Tools log s"Existing local $tx"
           case (_, _, close: ClosingData) if close.localProposals.exists(_.unsignedTx.tx.txid == tx.txid) => startMutualClose(close, tx)
@@ -665,7 +665,6 @@ object Channel {
   val WAIT_FOR_FUNDING = "WAIT-FOR-FUNDING"
   val WAIT_FUNDING_SIGNED = "WAIT-FUNDING-SIGNED"
 
-  // Operational
   val WAIT_FUNDING_DONE = "OPENING"
   val NEGOTIATIONS = "NEGOTIATIONS"
   val SLEEPING = "SLEEPING"

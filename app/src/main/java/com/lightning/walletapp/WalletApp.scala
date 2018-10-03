@@ -217,8 +217,8 @@ class WalletApp extends Application { me =>
 
         for {
           raw <- RichCursor(cursor).headTry(_ string RevokedInfoTable.info).toOption
-          riDecode <- revocationInfoCodec.decode(BitVector.fromHex(raw).get).toOption
-        } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(riDecode.value, tx)
+          riDecodeResult <- revocationInfoCodec.decode(BitVector.fromHex(raw).get).toOption
+        } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(riDecodeResult.value, tx)
       }
 
       def CLOSEANDWATCH(cd: ClosingData) = {

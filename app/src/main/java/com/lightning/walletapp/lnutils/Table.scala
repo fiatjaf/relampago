@@ -58,7 +58,8 @@ object BadEntityTable extends Table {
     /* id index is created automatically */
     /* unique resId index is created automatically */
     CREATE INDEX idx1$table ON $table ($expire, $amount);
-    COMMIT"""
+    COMMIT
+    """
 }
 
 object RouteTable extends Table {
@@ -77,7 +78,8 @@ object RouteTable extends Table {
     /* id index is created automatically */
     /* unique targetNode index is created automatically */
     CREATE INDEX idx1$table ON $table ($targetNode, $expire);
-    COMMIT"""
+    COMMIT
+    """
 }
 
 object PaymentTable extends Table {
@@ -102,7 +104,8 @@ object PaymentTable extends Table {
 
   val createVSql = s"""
     CREATE VIRTUAL TABLE $fts$table
-    USING $fts($search, $hash)"""
+    USING $fts($search, $hash)
+    """
 
   val createSql = s"""
     CREATE TABLE $table (
@@ -115,7 +118,8 @@ object PaymentTable extends Table {
     /* hash index is created automatically */
     CREATE INDEX idx1$table ON $table ($status);
     CREATE INDEX idx2$table ON $table ($chanId);
-    COMMIT"""
+    COMMIT
+    """
 }
 
 object RevokedInfoTable extends Table {
@@ -134,7 +138,8 @@ object RevokedInfoTable extends Table {
 
     CREATE INDEX idx2$table ON $table ($chanId, $myBalance, $uploaded);
     CREATE INDEX idx1$table ON $table ($txId);
-    COMMIT"""
+    COMMIT
+    """
 }
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
