@@ -118,7 +118,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         if (Scripts.checkValid(signedLocalCommitTx).isSuccess) {
           val channelId = Tools.toLongId(fundingHash = txHash, outIndex)
-          val rc = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, open.firstPerCommitmentPoint)
+          val rc = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, Some(remoteCommitTx.tx), open.firstPerCommitmentPoint)
           val wfcs = WaitFundingSignedCore(localParams, channelId, accept, localSpec, signedLocalCommitTx, rc)
           val wait = WaitBroadcastRemoteData(announce, wfcs, txHash, wfcs makeCommitments signedLocalCommitTx)
           val localSigOfRemoteTx = Scripts.sign(localParams.fundingPrivKey)(remoteCommitTx)
@@ -602,7 +602,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
     val longId = Tools.toLongId(txHash, outIndex)
     val localSigOfRemoteTx = Scripts.sign(cmd.localParams.fundingPrivKey)(remoteCommitTx)
-    val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, accept.firstPerCommitmentPoint)
+    val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, Some(remoteCommitTx.tx), accept.firstPerCommitmentPoint)
     val wfsc = WaitFundingSignedCore(cmd.localParams, longId, accept, localSpec, localCommitTx, firstRemoteCommit)
     wfsc -> FundingCreated(cmd.tempChanId, txHash, outIndex, localSigOfRemoteTx)
   }
