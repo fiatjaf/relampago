@@ -40,10 +40,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     unsentPayments.values foreach fetchAndSend
   }
 
-  private def toRevoked(rc: RichCursor) = Tuple2(BinaryData(rc string RevokedTable.h160), rc long RevokedTable.expiry)
-  def saveRevoked(h160: BinaryData, expiry: Long, number: Long) = db.change(RevokedTable.newSql, h160, expiry, number)
-  def getAllRevoked(number: Long) = RichCursor apply db.select(RevokedTable.selectSql, number) vec toRevoked
-
   def extractPreimage(candidateTx: Transaction) = {
     val fulfills = candidateTx.txIn.map(_.witness.stack) collect {
       case Seq(_, pre, _) if pre.size == 32 => UpdateFulfillHtlc(NOCHANID, 0L, pre)
@@ -117,22 +113,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
   }
 
-  override def sentSig(cs: Commitments, wait: WaitingForRevocation, remoteTx: Transaction) = db txWrap {
-    val bigEnoughHtlcs = wait.nextRemoteCommit.spec.htlcs.filter(_.add.amount > cs.localParams.dustLimit)
-
-    for (waitRevocation <- cs.remoteNextCommitInfo.left) {
-      val activeHtlcs = waitRevocation.nextRemoteCommit.spec.htlcs
-      for (Htlc(_, add) <- activeHtlcs if add.amount > cs.localParams.dustLimit)
-        saveRevoked(add.hash160, add.expiry, waitRevocation.nextRemoteCommit.index)
-    }
-  }
-
   override def settled(cs: Commitments) = {
     // Update affected record states in a database
     // then retry failed payments where possible
 
     db txWrap {
-      for (Htlc(true, addPayment) \ _ <- cs.localCommit.spec.fulfilled) me updOkIncoming addPayment
+      for (Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled) me updOkIncoming add
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
 

@@ -181,9 +181,16 @@ case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimThei
   }
 }
 
-case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig], claimMainTxSig: Option[BinaryData], claimPenaltyTxSig: Option[BinaryData],
-                          feeRate: Long, dustLimit: Long, finalScriptPubKey: BinaryData, toSelfDelay: Int, localPubKey: PublicKey,
-                          remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey)
+case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig], claimMainTxSig: Option[BinaryData],
+                          claimPenaltyTxSig: Option[BinaryData], feeRate: Long, dustLimit: Long, finalScriptPubKey: BinaryData,
+                          toSelfDelay: Int, localPubKey: PublicKey, remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey) {
+
+  lazy val dustLim = Satoshi(dustLimit)
+  def makeClaimP2WPKHOutput(tx: Transaction) = Scripts.makeClaimP2WPKHOutputTx(tx, localPubKey, finalScriptPubKey, feeRate, dustLim)
+  def makeHtlcPenalty(finder: PubKeyScriptIndexFinder)(rs: BinaryData) = Scripts.makeHtlcPenaltyTx(finder, rs, finalScriptPubKey, feeRate, dustLim)
+  def makeMainPenalty(tx: Transaction) = Scripts.makeMainPenaltyTx(tx, remoteRevocationPubkey, finalScriptPubKey, toSelfDelay, remoteDelayedPaymentKey,
+    feeRate, dustLim)
+}
 
 // COMMITMENTS
 

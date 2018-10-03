@@ -214,12 +214,6 @@ case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, statu
 }
 
 trait PaymentInfoBag { me =>
-  // Manage Revoked HTLC parameters
-  type RevokedHashExpiry = (BinaryData, Long)
-  def getAllRevoked(number: Long): Vector[RevokedHashExpiry]
-  def saveRevoked(hash: BinaryData, expiry: Long, number: Long)
-
-  // Manage payments list
   def extractPreimage(tx: Transaction)
   def getPaymentInfo(hash: BinaryData): Try[PaymentInfo]
   def updStatus(paymentStatus: Int, hash: BinaryData)

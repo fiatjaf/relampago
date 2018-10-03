@@ -27,7 +27,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
 
-    override def sentSig(cs: Commitments, wait: WaitingForRevocation, remoteTx: Transaction) = for (lst <- listeners) lst.sentSig(cs, wait, remoteTx)
     override def fulfillReceived(updateFulfill: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived updateFulfill
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
     override def settled(cs: Commitments) = for (lst <- listeners) lst settled cs
@@ -39,6 +38,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   def SEND(msg: LightningMessage): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def STORE(content: HasCommitments): HasCommitments
+  def GETREV(remoteBreachTx: Transaction): Option[RevokedCommitPublished]
+  def REV(cs: Commitments, wait: WaitingForRevocation, tx: Transaction): Unit
+
   def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
     // Transition should always be defined before vars are updated
@@ -279,8 +281,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val c1 \ wait \ remoteTx = Commitments.sendCommit(norm.commitments, nextRemotePoint)
         val d1RemoteSigSent = me STORE norm.copy(commitments = c1)
         me UPDATA d1RemoteSigSent SEND wait.sent
-        events.sentSig(c1, wait, remoteTx)
-
+        REV(c1, wait, remoteTx)
 
       case (norm: NormalData, sig: CommitSig, OPEN) =>
         // We received a commit sig from them, now we can update our local commit
@@ -540,10 +541,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (some: HasCommitments, CMDSpent(tx), _)
         // GUARD: tx which spends our funding is broadcasted, must react
         if tx.txIn.exists(input => some.commitments.commitInput.outPoint == input.outPoint) =>
-        val revokedOpt = Closing.claimRevokedRemoteCommitTxOutputs(some.commitments, tx, LNParams.bag)
         val nextRemoteCommitEither = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
 
-        Tuple3(revokedOpt, nextRemoteCommitEither, some) match {
+        Tuple3(GETREV(tx), nextRemoteCommitEither, some) match {
           case (_, _, close: ClosingData) if close.refundRemoteCommit.nonEmpty => Tools log s"Existing refund"
           case (_, _, close: ClosingData) if close.mutualClose.exists(_.txid == tx.txid) => Tools log s"Existing mutual $tx"
           case (_, _, close: ClosingData) if close.localCommit.exists(_.commitTx.txid == tx.txid) => Tools log s"Existing local $tx"
@@ -715,7 +715,6 @@ trait ChannelListener {
   def onException: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
 
-  def sentSig(cs: Commitments, wait: WaitingForRevocation, remoteTx: Transaction): Unit = none
   def fulfillReceived(updateFulfill: UpdateFulfillHtlc): Unit = none
   def outPaymentAccepted(rd: RoutingData): Unit = none
   def settled(cs: Commitments): Unit = none

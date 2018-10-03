@@ -4,7 +4,7 @@ import spray.json._
 import android.database.sqlite._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import com.lightning.walletapp.ln.Tools.{random, none, runAnd}
+import com.lightning.walletapp.ln.Tools.{random, runAnd}
 import com.lightning.walletapp.lnutils.olympus.CloudData
 import android.content.Context
 import android.net.Uri
@@ -118,31 +118,34 @@ object PaymentTable extends Table {
     COMMIT"""
 }
 
-object RevokedTable extends Table {
-  val (table, h160, expiry, number) = ("revoked", "h160", "expiry", "number")
-  val newSql = s"INSERT INTO $table ($h160, $expiry, $number) VALUES (?, ?, ?)"
-  val selectSql = s"SELECT * FROM $table WHERE $number = ?"
+object RevokedInfoTable extends Table {
+  val (table, txId, chanId, myBalance, info, uploaded) = ("revokedinfo", "txid", "chanid", "mybalance", "info", "uploaded")
+  val selectLocalSql = s"SELECT * FROM $table WHERE $chanId = ? AND $myBalance < ? AND $uploaded = 0 LIMIT 100"
+  val newSql = s"INSERT INTO $table ($txId, $chanId, $myBalance, $info, $uploaded) VALUES (?, ?, ?, ?, 0)"
+  val setUploadedSql = s"UPDATE $table SET $uploaded = 1 WHERE $txId = ?"
+  val selectTxIdSql = s"SELECT * FROM $table WHERE $txId = ?"
 
   val createSql = s"""
     CREATE TABLE $table (
-      $id INTEGER PRIMARY KEY AUTOINCREMENT, $h160 STRING NOT NULL,
-      $expiry INTEGER NOT NULL, $number INTEGER NOT NULL
+      $id INTEGER PRIMARY KEY AUTOINCREMENT, $txId STRING NOT NULL,
+      $chanId STRING NOT NULL, $myBalance INTEGER NOT NULL,
+      $info STRING NOT NULL, $uploaded INTEGER NOT NULL
     );
 
-    /* id index is created automatically */
-    CREATE INDEX idx1$table ON $table ($number);
+    CREATE INDEX idx2$table ON $table ($chanId, $myBalance, $uploaded);
+    CREATE INDEX idx1$table ON $table ($txId);
     COMMIT"""
 }
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-extends SQLiteOpenHelper(context, name, null, 1) {
+extends SQLiteOpenHelper(context, name, null, 2) {
 
   val base = getWritableDatabase
-  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = none
   // Note: BinaryData and PublicKey should always yield raw strings for this to work
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
+  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = dbs execSQL RevokedInfoTable.createSql
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.walletapp/table/$tbl"
 
   def txWrap(run: => Unit) = try {
@@ -151,12 +154,12 @@ extends SQLiteOpenHelper(context, name, null, 1) {
   } finally base.endTransaction
 
   def onCreate(dbs: SQLiteDatabase) = {
+    dbs execSQL RevokedInfoTable.createSql
     dbs execSQL BadEntityTable.createSql
     dbs execSQL PaymentTable.createVSql
     dbs execSQL PaymentTable.createSql
     dbs execSQL ChannelTable.createSql
     dbs execSQL OlympusTable.createSql
-    dbs execSQL RevokedTable.createSql
     dbs execSQL RouteTable.createSql
 
     // Randomize an order of two available default servers

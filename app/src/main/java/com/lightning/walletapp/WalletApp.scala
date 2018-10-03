@@ -25,19 +25,23 @@ import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import android.content.{ClipData, ClipboardManager, Context}
 
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.CloudAct
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
+import com.lightning.walletapp.helper.RichCursor
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
+import scodec.Attempt.Successful
 import scala.concurrent.Future
 import android.app.Application
 import java.util.Collections
+import scodec.bits.BitVector
 import android.widget.Toast
 import android.net.Uri
 import scala.util.Try
@@ -100,7 +104,6 @@ class WalletApp extends Application { me =>
     private[this] val prefixes = PaymentRequest.prefixes.values mkString "|"
     private[this] val lnUrl = s"(?im).*?(lnurl)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
     private[this] val lnPayReq = s"(?im).*?($prefixes)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
-    private[this] val funder = "(lnbcfunder|lntbfunder|lnbcrtfunder):([a-z0-9]+)".r
     val nodeLink = "([a-fA-F0-9]{66})@([a-zA-Z0-9:\\.\\-_]+):([0-9]+)".r
 
     case object DoNotEraseValue
@@ -128,7 +131,7 @@ class WalletApp extends Application { me =>
     val CMDLocalShutdown = CMDShutdown(None)
 
     // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-    var all: Vector[Channel] = for (data <- ChannelWrap.get) yield createChannel(operationalListeners, data)
+    var all: Vector[Channel] = for (chanState <- ChannelWrap.get) yield createChannel(operationalListeners, chanState)
     def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
     def notClosing = for (c <- all if c.state != CLOSING) yield c
 
@@ -203,6 +206,21 @@ class WalletApp extends Application { me =>
       def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
       def STORE(updatedChannelData: HasCommitments) = runAnd(updatedChannelData)(ChannelWrap put updatedChannelData)
 
+      def REV(cs: Commitments, wait: WaitingForRevocation, tx: fr.acinq.bitcoin.Transaction) = {
+        val htlcs = wait.nextRemoteCommit.spec.htlcs.filter(_.add.amount > cs.localParams.dustLimit)
+        for (Successful(bitVector) <- Helpers.Closing.makeRevocationInfo(cs, htlcs, tx) map revocationInfoCodec.encode)
+          db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, wait.nextRemoteCommit.spec.toLocalMsat, bitVector.toHex)
+      }
+
+      def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
+        val cursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
+
+        for {
+          raw <- RichCursor(cursor).headTry(_ string RevokedInfoTable.info).toOption
+          riDecode <- revocationInfoCodec.decode(BitVector.fromHex(raw).get).toOption
+        } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(riDecode.value, tx)
+      }
+
       def CLOSEANDWATCH(cd: ClosingData) = {
         val tier12txs = for (state <- cd.tier12States) yield state.txn
         if (tier12txs.nonEmpty) OlympusWrap tellClouds CloudAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
@@ -215,7 +233,7 @@ class WalletApp extends Application { me =>
       def ASKREFUNDTX(ref: RefundingData) = {
         // Failsafe check in case if we are still in REFUNDING state after app is restarted
         val txsObs = OlympusWrap getChildTxs Seq(ref.commitments.commitInput.outPoint.txid)
-        txsObs.foreach(txs => txs map CMDSpent foreach process, none)
+        txsObs.foreach(_ map CMDSpent foreach process, none)
       }
 
       def ASKREFUNDPEER(some: HasCommitments, point: Point) = {
