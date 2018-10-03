@@ -222,7 +222,7 @@ object Helpers {
       val htlcPenaltySigs = for {
         TxOut(_, publicKeyScript) <- tx.txOut
         redeemScript <- redeemMap get publicKeyScript
-        penalty <-  ri.makeHtlcPenalty(finder)(redeemScript).toOption
+        penalty <- ri.makeHtlcPenalty(finder)(redeemScript).toOption
         htlcSig = Scripts.sign(remoteRevocationPrivkey)(penalty)
       } yield Tuple2(redeemScript, htlcSig)
 
