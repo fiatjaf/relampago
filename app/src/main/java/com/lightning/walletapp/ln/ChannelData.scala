@@ -268,7 +268,7 @@ case class LocalParams(maxHtlcValueInFlightMsat: UInt64, channelReserveSat: Long
 
 case class WaitingForRevocation(nextRemoteCommit: RemoteCommit, sent: CommitSig, localCommitIndexSnapshot: Long)
 case class LocalCommit(index: Long, spec: CommitmentSpec, htlcTxsAndSigs: Seq[HtlcTxAndSigs], commitTx: CommitTx)
-case class RemoteCommit(index: Long, spec: CommitmentSpec, txid: BinaryData, txOpt: Option[Transaction], remotePerCommitmentPoint: Point)
+case class RemoteCommit(index: Long, spec: CommitmentSpec, txid: BinaryData, txOpt: Option[Transaction], remotePerCommitmentPoint: Point) // TODO: remove later
 case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: BinaryData, remoteSig: BinaryData)
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 

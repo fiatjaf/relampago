@@ -8,20 +8,38 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
+import language.postfixOps
 import java.math.BigInteger
 import java.net.ProtocolException
+import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.ln.PaymentRequest
 import com.lightning.walletapp.helper.RichCursor
-import com.lightning.walletapp.lnutils.OlympusTable
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
+import com.lightning.walletapp.lnutils.{OlympusTable, RevokedInfoTable}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, OutRequest}
 import fr.acinq.bitcoin.{BinaryData, Transaction}
 import rx.lang.scala.{Observable => Obs}
 
 
+trait CloudAct {
+  def onDone: Unit
+  val plus: Seq[HttpParam]
+  val data: BinaryData
+  val path: String
+}
+
 case class CloudData(info: Option[RequestAndMemo], tokens: Vector[ClearToken], acts: CloudActVec)
-case class CloudAct(data: BinaryData, plus: Seq[HttpParam], path: String)
+case class CerberusAct(data: BinaryData, plus: Seq[HttpParam], path: String, txids: StringVec) extends CloudAct {
+  // This is an act for uploading a pack of RevocationInfo objects, affected records should be marked once uploaded
+  def setUploaded = for (txid <- txids) db.change(RevokedInfoTable.setUploadedSql, txid)
+  def onDone = db txWrap setUploaded
+}
+
+case class UploadAct(data: BinaryData, plus: Seq[HttpParam], path: String) extends CloudAct {
+  // This is a basic act for uploading data such as channels and refunding txs, needs no actions
+  def onDone = none
+}
 
 object OlympusWrap extends OlympusProvider {
   type RequestAndMemo = (PaymentRequest, BlindMemo)
@@ -55,6 +73,7 @@ object OlympusWrap extends OlympusProvider {
   var clouds = RichCursor(db select OlympusTable.selectAllSql) vec toCloud
   def tellClouds(candidateData: Any) = for (cloud <- clouds) cloud doProcess candidateData
   def backupExhausted = clouds.exists(cloud => cloud.isAuthEnabled && cloud.data.tokens.size <= 5)
+  def pendingWatchTxIds = clouds.flatMap(_.data.acts) collect { case ca: CerberusAct => ca.txids } flatten
 
   // SQL interface
 

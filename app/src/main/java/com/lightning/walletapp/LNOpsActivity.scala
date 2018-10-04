@@ -137,11 +137,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         canSendText setText denom.withSign(Satoshi(canSendMsat) / 1000L).html
         refundableAmountText setText denom.withSign(refundable).html
         totalCapacityText setText denom.withSign(capacity).html
-        refundFeeText setText denom.withSign(breakFee).html
 
-        paymentsInFlightText setText denom.withSign(valueInFlight).html
+        paymentsInFlightText setText sumOrNothing(valueInFlight).html
         paymentsReceivedText setText sumOrNothing(valueReceived).html
         paymentsSentText setText sumOrNothing(valueSent).html
+        refundFeeText setText sumOrNothing(breakFee).html
 
         chan.data match {
           case _: WaitFundingDoneData =>

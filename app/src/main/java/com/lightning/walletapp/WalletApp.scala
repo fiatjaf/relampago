@@ -28,7 +28,7 @@ import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import com.lightning.walletapp.lnutils.olympus.CloudAct
+import com.lightning.walletapp.lnutils.olympus.UploadAct
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import com.lightning.walletapp.helper.RichCursor
@@ -210,28 +210,24 @@ class WalletApp extends Application { me =>
         // remote commit before it gets dropped forever
 
         remoteTx <- cs.remoteCommit.txOpt
-        myBalance = cs.remoteCommit.spec.toLocalMsat
+        myBalance = cs.localCommit.spec.toLocalMsat
         largeEnoughHtlcs = cs.remoteCommit.spec.htlcs.filter(_.add.amount > cs.localParams.dustLimit)
         revInfo = Helpers.Closing.makeRevocationInfo(commitments = cs, largeEnoughHtlcs, remoteTx, rev.perCommitmentSecret)
-
-        _ = println(revInfo)
-
       } db.change(RevokedInfoTable.newSql, remoteTx.txid, cs.channelId, myBalance, revocationInfoCodec.encode(revInfo).require.toHex)
 
       def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
+        // Extract RevocationInfo for a given breach transaction
         val cursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
-        val rc = RichCursor(cursor).headTry(_ string RevokedInfoTable.info)
 
         for {
-          raw <- rc.toOption
-          bitVec <- BitVector.fromHex(raw)
-          revInfo <- revocationInfoCodec.decode(bitVec).toOption
+          raw <- RichCursor(cursor).headTry(_ string RevokedInfoTable.info).toOption
+          revInfo <- revocationInfoCodec.decode(BitVector.fromHex(raw).get).toOption
         } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(revInfo.value, tx)
       }
 
       def CLOSEANDWATCH(cd: ClosingData) = {
         val tier12txs = for (state <- cd.tier12States) yield state.txn
-        if (tier12txs.nonEmpty) OlympusWrap tellClouds CloudAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
+        if (tier12txs.nonEmpty) OlympusWrap tellClouds UploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
         repeat(OlympusWrap getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
         // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
         kit.wallet.addWatchedScripts(kit closingPubKeyScripts cd)

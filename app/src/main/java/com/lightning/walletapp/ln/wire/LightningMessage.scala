@@ -1,13 +1,15 @@
 package com.lightning.walletapp.ln.wire
 
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-import com.lightning.walletapp.ln.Tools.{bin2readable, fromShortId}
-import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
-import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
+import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import com.lightning.walletapp.ln.LightningException
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
+
+import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
+import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
+import com.lightning.walletapp.ln.Tools.{bin2readable, fromShortId}
 
 
 trait LightningMessage
@@ -146,4 +148,5 @@ case object NodeAddress {
 // Not in a spec
 case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)
 case class WalletZygote(v: Int, db: BinaryData, wallet: BinaryData, chain: BinaryData)
+case class CerberusPayload(payloads: Vector[AESZygote], halfTxIds: StringVec)
 case class AESZygote(v: Int, iv: BinaryData, ciphertext: BinaryData)

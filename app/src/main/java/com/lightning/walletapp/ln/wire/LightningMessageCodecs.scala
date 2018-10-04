@@ -18,7 +18,6 @@ object LightningMessageCodecs { me =>
   type BitVectorAttempt = Attempt[BitVector]
   type LNMessageVector = Vector[LightningMessage]
   type RedeemScriptAndSig = (BinaryData, BinaryData)
-  type AddressPort = (InetAddress, Int)
   type RGB = (Byte, Byte, Byte)
 
   def serialize(msg: LightningMessage): BinaryData =
@@ -50,8 +49,8 @@ object LightningMessageCodecs { me =>
   }
 
   // BinaryData <-> ByteVector
-  private val vec2Bin = (vec: ByteVector) => BinaryData(vec.toArray)
-  private val bin2Vec = (bin: BinaryData) => ByteVector(bin.data)
+  val vec2Bin = (vec: ByteVector) => BinaryData(vec.toArray)
+  val bin2Vec = (bin: BinaryData) => ByteVector(bin.data)
 
   def der2wire(signature: BinaryData): BinaryData =
     Crypto decodeSignature signature match { case (r, s) =>
@@ -372,7 +371,13 @@ object LightningMessageCodecs { me =>
       (varsizebinarydataLong withContext "iv") ::
       (varsizebinarydataLong withContext "ciphertext")
 
-  val revocationInfoCodec = revocationInfo.as[RevocationInfo]
-  val walletZygoteCodec = walletZygote.as[WalletZygote]
   val aesZygoteCodec = aesZygote.as[AESZygote]
+
+  private val cerberusPayload =
+    (vectorOfN(uint16, aesZygoteCodec) withContext "payloads") ::
+      (vectorOfN(uint16, utf8) withContext "halfTxIds")
+
+  val walletZygoteCodec = walletZygote.as[WalletZygote]
+  val revocationInfoCodec = revocationInfo.as[RevocationInfo]
+  val cerberusPayloadCodec = cerberusPayload.as[CerberusPayload]
 }

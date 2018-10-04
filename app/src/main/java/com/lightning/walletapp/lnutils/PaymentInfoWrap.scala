@@ -10,16 +10,17 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import com.lightning.walletapp.helper.{AES, RichCursor}
+import fr.acinq.bitcoin.{BinaryData, Transaction}
+import rx.lang.scala.{Observable => Obs}
+
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
-import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import com.lightning.walletapp.helper.RichCursor
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.cerberusPayloadCodec
+import com.lightning.walletapp.lnutils.olympus.{CerberusAct, OlympusWrap}
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import java.util.Collections
-
-import fr.acinq.bitcoin.{BinaryData, Transaction}
-import rx.lang.scala.{Observable => Obs}
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
@@ -114,11 +115,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def settled(cs: Commitments) = {
-    // Update affected record states in a database
-    // then retry failed payments where possible
+    // Update affected record states in a database, then retry failed payments where possible
+    val fulfilledIncoming = for (Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled) yield add
 
     db txWrap {
-      for (Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled) me updOkIncoming add
+      fulfilledIncoming foreach updOkIncoming
+      // Malformed payments are returned by our direct peer and should never be retried again
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
 
@@ -139,6 +141,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       }
     }
 
+    uiNotify
     if (cs.localCommit.spec.fulfilled.nonEmpty) {
       // Let the clouds know since they may be waiting
       // also vibrate to let a user know it's fulfilled
@@ -146,7 +149,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       com.lightning.walletapp.Vibrator.vibrate
     }
 
-    uiNotify
+    if (fulfilledIncoming.nonEmpty) {
+      def revokedItem(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
+      def encode(txid: String, info: String) = Tuple2(AES.encBytes(info.getBytes, txid.getBytes), txid take 16)
+      val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat)
+      val unsentInfos = RichCursor(cursor).vec(revokedItem).toMap -- OlympusWrap.pendingWatchTxIds take 100
+      val encodedInfos = for (txid \ info <- unsentInfos) yield txid -> encode(txid, info)
+      //encodedInfos.toSeq.grouped(20).map(_.unzip).map { case txids \ list => CerberusAct(cerberusPayloadCodec.encode(list.toVector).require.toByteArray, Nil, "", txids.toVector) }
+    }
   }
 
   override def onProcessSuccess = {

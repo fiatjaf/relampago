@@ -4,11 +4,11 @@ import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Scripts._
+import com.lightning.walletapp.lnutils.olympus._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
-import com.lightning.walletapp.lnutils.olympus.{BlindMemo, BlindParam, CloudAct, CloudData}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
 import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData}
@@ -115,7 +115,27 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     jsonFormat[String, Option[MilliSatoshi], Long, PublicKey, Vector[Tag], BinaryData,
       PaymentRequest](PaymentRequest.apply, "prefix", "amount", "timestamp", "nodeId", "tags", "signature")
 
-  implicit val cloudActFmt = jsonFormat[BinaryData, Seq[HttpParam], String, CloudAct](CloudAct.apply, "data", "plus", "path")
+  implicit object CloudActFmt extends JsonFormat[CloudAct] {
+    def write(unserialized: CloudAct): JsValue = unserialized match {
+      case unserialiedMessage: CerberusAct => unserialiedMessage.toJson
+      case unserialiedMessage: UploadAct => unserialiedMessage.toJson
+    }
+
+    def read(serialized: JsValue): CloudAct = serialized.asJsObject.fields get "tag" match {
+      case Some(s: JsString) if s.value == "CerberusAct" => serialized.convertTo[CerberusAct]
+      case Some(s: JsString) if s.value == "UploadAct" => serialized.convertTo[UploadAct]
+      case None => serialized.convertTo[UploadAct] // TODO: remove later
+    }
+  }
+
+  implicit val uploadActFmt =
+    taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String,
+      UploadAct](UploadAct.apply, "data", "plus", "path"), tag = "UploadAct")
+
+  implicit val cerberusActFmt =
+    taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String, StringVec,
+      CerberusAct](CerberusAct.apply, "data", "plus", "path", "txids"), tag = "CerberusAct")
+
   implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
   implicit val ratesFmt = jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
 

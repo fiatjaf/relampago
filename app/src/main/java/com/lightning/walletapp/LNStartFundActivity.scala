@@ -16,7 +16,7 @@ import android.widget.{ImageButton, TextView}
 import scala.util.{Success, Try}
 
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import com.lightning.walletapp.lnutils.olympus.CloudAct
+import com.lightning.walletapp.lnutils.olympus.UploadAct
 import com.lightning.walletapp.ln.Scripts.pubKeyScript
 import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
@@ -116,7 +116,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       // Attempt to save a channel on the cloud right away
       val refund = RefundingData(some.announce, None, some.commitments)
       val encrypted = AES.encReadable2Hex(refund.toJson.toString, LNParams.cloudSecret)
-      val act = CloudAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
+      val act = UploadAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
       OlympusWrap tellClouds act
     }
 

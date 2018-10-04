@@ -9,6 +9,7 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
+import com.lightning.walletapp.ln.Tools.wrap
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Utils.HEX
 import org.bitcoinj.core.ECKey
@@ -51,9 +52,14 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       send1.doOnCompleted(me doProcess CMDStart).foreach(onGotResponse, onGotResponse)
 
       def onGotResponse(response: Any) = response match {
-        case "done" => me BECOME data.copy(acts = data.acts diff Vector(action), tokens = ts)
         case err: Throwable if err.getMessage == "tokeninvalid" => me BECOME data.copy(tokens = ts)
         case err: Throwable if err.getMessage == "tokenused" => me BECOME data.copy(tokens = ts)
+
+        case "done" =>
+          val acts1 = data.acts diff Vector(action)
+          val data1 = data.copy(acts = acts1, tokens = ts)
+          wrap(me BECOME data1)(action.onDone)
+
         case _ =>
       }
 
