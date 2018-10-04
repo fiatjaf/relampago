@@ -414,8 +414,7 @@ object Commitments {
     val commitSig = CommitSig(c.channelId, Scripts.sign(c.localParams.fundingPrivKey)(remoteCommitTx), htlcSigs.toList)
     val remoteCommit1 = RemoteCommit(c.remoteCommit.index + 1, spec, remoteCommitTx.tx.txid, Some(remoteCommitTx.tx), remoteNextPerCommitmentPoint)
     val wait = WaitingForRevocation(nextRemoteCommit = remoteCommit1, commitSig, localCommitIndexSnapshot = c.localCommit.index)
-    val c1 = c.copy(remoteNextCommitInfo = Left(wait), localChanges = localChanges1, remoteChanges = remoteChanges1)
-    c1 -> wait -> remoteCommitTx.tx
+    c.copy(remoteNextCommitInfo = Left(wait), localChanges = localChanges1, remoteChanges = remoteChanges1) -> commitSig
   }
 
   def receiveCommit(c: Commitments, commit: CommitSig) = {
@@ -469,7 +468,7 @@ object Commitments {
       val remoteChanges1 = c.remoteChanges.copy(signed = Vector.empty)
 
       c.copy(localChanges = localChanges1, remoteChanges = remoteChanges1, remoteCommit = wait.nextRemoteCommit,
-        remoteNextCommitInfo = Right apply rev.nextPerCommitmentPoint, remotePerCommitmentSecrets = secrets1)
+        remoteNextCommitInfo = Right(rev.nextPerCommitmentPoint), remotePerCommitmentSecrets = secrets1)
 
     // Unexpected revocation when we have Point
     case _ => throw new LightningException

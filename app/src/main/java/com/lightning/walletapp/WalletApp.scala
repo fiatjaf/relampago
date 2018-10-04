@@ -37,7 +37,6 @@ import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
-import scodec.Attempt.Successful
 import scala.concurrent.Future
 import android.app.Application
 import java.util.Collections
@@ -206,19 +205,28 @@ class WalletApp extends Application { me =>
       def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
       def STORE(updatedChannelData: HasCommitments) = runAnd(updatedChannelData)(ChannelWrap put updatedChannelData)
 
-      def REV(cs: Commitments, wait: WaitingForRevocation, tx: fr.acinq.bitcoin.Transaction) = {
-        val htlcs = wait.nextRemoteCommit.spec.htlcs.filter(_.add.amount > cs.localParams.dustLimit)
-        for (Successful(bitVector) <- Helpers.Closing.makeRevocationInfo(cs, htlcs, tx) map revocationInfoCodec.encode)
-          db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, wait.nextRemoteCommit.spec.toLocalMsat, bitVector.toHex)
-      }
+      def REV(cs: Commitments, rev: RevokeAndAck) = for {
+        // We use old commitments to save a punishment for
+        // remote commit before it gets dropped forever
+
+        remoteTx <- cs.remoteCommit.txOpt
+        myBalance = cs.remoteCommit.spec.toLocalMsat
+        largeEnoughHtlcs = cs.remoteCommit.spec.htlcs.filter(_.add.amount > cs.localParams.dustLimit)
+        revInfo = Helpers.Closing.makeRevocationInfo(commitments = cs, largeEnoughHtlcs, remoteTx, rev.perCommitmentSecret)
+
+        _ = println(revInfo)
+
+      } db.change(RevokedInfoTable.newSql, remoteTx.txid, cs.channelId, myBalance, revocationInfoCodec.encode(revInfo).require.toHex)
 
       def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
         val cursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
+        val rc = RichCursor(cursor).headTry(_ string RevokedInfoTable.info)
 
         for {
-          raw <- RichCursor(cursor).headTry(_ string RevokedInfoTable.info).toOption
-          riDecodeResult <- revocationInfoCodec.decode(BitVector.fromHex(raw).get).toOption
-        } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(riDecodeResult.value, tx)
+          raw <- rc.toOption
+          bitVec <- BitVector.fromHex(raw)
+          revInfo <- revocationInfoCodec.decode(bitVec).toOption
+        } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(revInfo.value, tx)
       }
 
       def CLOSEANDWATCH(cd: ClosingData) = {

@@ -38,8 +38,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   def SEND(msg: LightningMessage): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def STORE(content: HasCommitments): HasCommitments
-  def GETREV(remoteBreachTx: Transaction): Option[RevokedCommitPublished]
-  def REV(cs: Commitments, wait: WaitingForRevocation, tx: Transaction): Unit
+  def GETREV(tx: Transaction): Option[RevokedCommitPublished]
+  def REV(cs: Commitments, rev: RevokeAndAck): Unit
 
   def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
@@ -278,10 +278,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Propose new remote commit via commit tx sig
         val nextRemotePoint = norm.commitments.remoteNextCommitInfo.right.get
-        val c1 \ wait \ remoteTx = Commitments.sendCommit(norm.commitments, nextRemotePoint)
+        val c1 \ commitSig = Commitments.sendCommit(norm.commitments, nextRemotePoint)
         val d1RemoteSigSent = me STORE norm.copy(commitments = c1)
-        me UPDATA d1RemoteSigSent SEND wait.sent
-        REV(c1, wait, remoteTx)
+        me UPDATA d1RemoteSigSent SEND commitSig
+
 
       case (norm: NormalData, sig: CommitSig, OPEN) =>
         // We received a commit sig from them, now we can update our local commit
@@ -298,6 +298,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val c1 = Commitments.receiveRevocation(norm.commitments, rev)
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 doProcess CMDHTLCProcess
+        // Old commit which has tx to discard
+        REV(norm.commitments, rev)
 
 
       case (norm: NormalData, fee: UpdateFee, OPEN) if !norm.commitments.localParams.isFunder =>
