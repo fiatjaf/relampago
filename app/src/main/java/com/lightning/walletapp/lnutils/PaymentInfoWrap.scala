@@ -22,6 +22,7 @@ import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import java.util.Collections
+import scodec.bits.BitVector
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
@@ -155,16 +156,22 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       def txidAndInfo(rc: RichCursor) = (rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
       val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat)
       val unsentInfos = (RichCursor(cursor).vec(txidAndInfo).toMap -- OlympusWrap.pendingWatchTxIds) take 100
-      val encrypted = for (txid \ infoHex <- unsentInfos.toSeq) yield txid -> AES.encHex(infoHex, txid)
+
+      val encrypted = for {
+        txid \ info <- unsentInfos.toSeq
+        txidBitVector <- BitVector fromHex txid
+        infoBitVector <- BitVector fromHex info
+        txidBytes: Bytes = txidBitVector.toByteArray
+        infoBytes: Bytes = infoBitVector.toByteArray
+      } yield txid -> AES.encBytes(infoBytes, txidBytes)
 
       for {
-        pack <- encrypted grouped 4
+        pack <- encrypted grouped 20
         txids \ payloads = pack.unzip
         halfTxIds = for (txid <- txids) yield txid take 16
         cp = CerberusPayload(payloads.toVector, halfTxIds.toVector)
         data = LightningMessageCodecs.serialize(cerberusPayloadCodec encode cp)
-        act = CerberusAct(data, Nil, "cerberus/watch", txids.toVector)
-      } println(act)
+      } OlympusWrap tellClouds CerberusAct(data, Nil, "cerberus/watch", txids.toVector)
     }
   }
 

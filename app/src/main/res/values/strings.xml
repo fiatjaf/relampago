@@ -63,7 +63,7 @@
 
     <!-- Olympus server -->
     <string name="olympus_actions">Add, remove or reorder</string>
-    <string name="olympus_backup">Use as backup server</string>
+    <string name="olympus_backup">Watchtower and backups</string>
     <string name="olympus_edit">Edit Olympus server</string>
     <string name="olympus_add">Add Olympus server</string>
     <string name="olympus_hint">Server host:port</string>
