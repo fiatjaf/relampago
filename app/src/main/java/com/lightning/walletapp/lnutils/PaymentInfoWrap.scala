@@ -10,14 +10,15 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import com.lightning.walletapp.helper.{AES, RichCursor}
-import fr.acinq.bitcoin.{BinaryData, Transaction}
-import rx.lang.scala.{Observable => Obs}
 
+import rx.lang.scala.{Observable => Obs}
+import fr.acinq.bitcoin.{BinaryData, Transaction}
+import com.lightning.walletapp.helper.{AES, RichCursor}
+import com.lightning.walletapp.lnutils.olympus.{CerberusAct, OlympusWrap}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.cerberusPayloadCodec
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.cerberusPayloadCodec
-import com.lightning.walletapp.lnutils.olympus.{CerberusAct, OlympusWrap}
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import java.util.Collections
@@ -150,12 +151,20 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     if (fulfilledIncoming.nonEmpty) {
-      def revokedItem(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
-      def encode(txid: String, info: String) = Tuple2(AES.encBytes(info.getBytes, txid.getBytes), txid take 16)
+      // Select revoked txs which peer might be tempted to spend, remove the ones already being uploaded
+      def txidAndInfo(rc: RichCursor) = (rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
       val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat)
-      val unsentInfos = RichCursor(cursor).vec(revokedItem).toMap -- OlympusWrap.pendingWatchTxIds take 100
-      val encodedInfos = for (txid \ info <- unsentInfos) yield txid -> encode(txid, info)
-      //encodedInfos.toSeq.grouped(20).map(_.unzip).map { case txids \ list => CerberusAct(cerberusPayloadCodec.encode(list.toVector).require.toByteArray, Nil, "", txids.toVector) }
+      val unsentInfos = (RichCursor(cursor).vec(txidAndInfo).toMap -- OlympusWrap.pendingWatchTxIds) take 100
+      val encrypted = for (txid \ infoHex <- unsentInfos.toSeq) yield txid -> AES.encHex(infoHex, txid)
+
+      for {
+        pack <- encrypted grouped 4
+        txids \ payloads = pack.unzip
+        halfTxIds = for (txid <- txids) yield txid take 16
+        cp = CerberusPayload(payloads.toVector, halfTxIds.toVector)
+        data = LightningMessageCodecs.serialize(cerberusPayloadCodec encode cp)
+        act = CerberusAct(data, Nil, "cerberus/watch", txids.toVector)
+      } println(act)
     }
   }
 

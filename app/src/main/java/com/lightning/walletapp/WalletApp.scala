@@ -42,6 +42,7 @@ import android.app.Application
 import java.util.Collections
 import scodec.bits.BitVector
 import android.widget.Toast
+import scodec.DecodeResult
 import android.net.Uri
 import scala.util.Try
 import java.io.File
@@ -209,20 +210,22 @@ class WalletApp extends Application { me =>
         // We use old commitments to save a punishment for
         // remote commit before it gets dropped forever
 
-        remoteTx <- cs.remoteCommit.txOpt
+        tx <- cs.remoteCommit.txOpt
         myBalance = cs.localCommit.spec.toLocalMsat
         largeEnoughHtlcs = cs.remoteCommit.spec.htlcs.filter(_.add.amount > cs.localParams.dustLimit)
-        revInfo = Helpers.Closing.makeRevocationInfo(commitments = cs, largeEnoughHtlcs, remoteTx, rev.perCommitmentSecret)
-      } db.change(RevokedInfoTable.newSql, remoteTx.txid, cs.channelId, myBalance, revocationInfoCodec.encode(revInfo).require.toHex)
+        revInfo = Helpers.Closing.makeRevocationInfo(commitments = cs, largeEnoughHtlcs, tx, rev.perCommitmentSecret)
+      } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, revocationInfoCodec.encode(revInfo).require.toHex)
 
       def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
         // Extract RevocationInfo for a given breach transaction
         val cursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
+        val rc = RichCursor(cursor).headTry(_ string RevokedInfoTable.info)
 
         for {
-          raw <- RichCursor(cursor).headTry(_ string RevokedInfoTable.info).toOption
-          revInfo <- revocationInfoCodec.decode(BitVector.fromHex(raw).get).toOption
-        } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(revInfo.value, tx)
+          raw <- rc.toOption
+          bitVec <- BitVector fromHex raw
+          DecodeResult(ri, _) <- revocationInfoCodec.decode(bitVec).toOption
+        } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri, tx)
       }
 
       def CLOSEANDWATCH(cd: ClosingData) = {

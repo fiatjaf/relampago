@@ -26,7 +26,7 @@ import java.util.Date
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  val localChanCache = for (channel <- app.ChannelManager.all if me canDisplay channel.data) yield channel
+  lazy val localChanCache = for (channel <- app.ChannelManager.all if me canDisplay channel.data) yield channel
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
   lazy val presentChans = app.getResources getStringArray R.array.ln_chan_present
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
@@ -145,7 +145,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
         chan.data match {
           case _: WaitFundingDoneData =>
-            visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+            visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
               R.id.closedAt, R.id.paymentsSent, R.id.paymentsReceived, R.id.paymentsInFlight)
 
           case remoteWait: WaitBroadcastRemoteData =>
@@ -160,9 +160,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
           case _: NormalData | _: NegotiationsData =>
             setExtraInfo(resource = ln_info_coop_attempt)
-            visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend,
-              R.id.canReceive, R.id.refundFee, R.id.fundingDepth,
-              R.id.closedAt)
+            visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
+              R.id.canReceive, R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
 
           case cd: ClosingData =>
             setExtraInfo(text = me closedBy cd)

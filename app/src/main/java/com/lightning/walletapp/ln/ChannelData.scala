@@ -459,9 +459,9 @@ object Commitments {
 
   def receiveRevocation(c: Commitments, rev: RevokeAndAck) = c.remoteNextCommitInfo match {
     case Left(_) if c.remoteCommit.remotePerCommitmentPoint != rev.perCommitmentSecret.toPoint =>
-      throw new LightningException
+      throw new LightningException("Peer has supplied a wrong per commitment secret")
 
-    case Left(wait: WaitingForRevocation) =>
+    case Left(wait) =>
       val nextIndex = ShaChain.largestTxIndex - c.remoteCommit.index
       val secrets1 = ShaChain.addHash(c.remotePerCommitmentSecrets, rev.perCommitmentSecret.toBin, nextIndex)
       val localChanges1 = c.localChanges.copy(signed = Vector.empty, acked = c.localChanges.acked ++ c.localChanges.signed)
