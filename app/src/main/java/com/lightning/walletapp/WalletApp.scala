@@ -212,8 +212,9 @@ class WalletApp extends Application { me =>
 
         tx <- cs.remoteCommit.txOpt
         myBalance = cs.localCommit.spec.toLocalMsat
-        revInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret)
-      } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, revocationInfoCodec.encode(revInfo).require.toHex)
+        revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret)
+        revocationInfoHex = revocationInfoCodec.encode(value = revocationInfo).require.toHex
+      } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, revocationInfoHex)
 
       def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
         // Extract RevocationInfo for a given breach transaction
