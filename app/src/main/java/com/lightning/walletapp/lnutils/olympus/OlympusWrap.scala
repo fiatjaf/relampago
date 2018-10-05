@@ -73,11 +73,7 @@ object OlympusWrap extends OlympusProvider {
   var clouds = RichCursor(db select OlympusTable.selectAllSql) vec toCloud
   def tellClouds(candidateData: Any) = for (cloud <- clouds) cloud doProcess candidateData
   def backupExhausted = clouds.exists(cloud => cloud.isAuthEnabled && cloud.data.tokens.size <= 5)
-  def pendingWatchTxIds = clouds.flatMap(_.data.acts) collect {
-    case ca: CerberusAct =>
-      println(ca.txids)
-      ca.txids
-  } flatten
+  def pendingWatchTxIds = clouds.flatMap(_.data.acts) collect { case ca: CerberusAct => ca.txids } flatten
 
   // SQL interface
 
