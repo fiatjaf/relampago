@@ -212,8 +212,7 @@ class WalletApp extends Application { me =>
 
         tx <- cs.remoteCommit.txOpt
         myBalance = cs.localCommit.spec.toLocalMsat
-        largeEnoughHtlcs = cs.remoteCommit.spec.htlcs.filter(_.add.amount > cs.localParams.dustLimit)
-        revInfo = Helpers.Closing.makeRevocationInfo(commitments = cs, largeEnoughHtlcs, tx, rev.perCommitmentSecret)
+        revInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret)
       } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, revocationInfoCodec.encode(revInfo).require.toHex)
 
       def GETREV(tx: fr.acinq.bitcoin.Transaction) = {

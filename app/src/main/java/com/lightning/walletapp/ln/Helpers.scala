@@ -195,8 +195,8 @@ object Helpers {
       RemoteCommitPublished(claimMain.toOption.toSeq, Nil, Nil, commitTx)
     }
 
-    def makeRevocationInfo(commitments: Commitments, htlcs: Set[Htlc],
-                           tx: Transaction, perCommitSecret: Scalar) = {
+    def makeRevocationInfo(commitments: Commitments, tx: Transaction,
+                           perCommitSecret: Scalar): RevocationInfo = {
 
       val remotePerCommitmentPoint = perCommitSecret.toPoint
       val localPrivkey = derivePrivKey(commitments.localParams.paymentKey, remotePerCommitmentPoint)
@@ -210,6 +210,7 @@ object Helpers {
       val claimPenaltySig = ri.makeMainPenalty(tx) map Scripts.sign(remoteRevocationPrivkey)
 
       val finder = new PubKeyScriptIndexFinder(tx)
+      val htlcs = commitments.remoteCommit.spec.htlcs
       val localHtlc = derivePubKey(commitments.localParams.htlcBasepoint, remotePerCommitmentPoint)
       val remoteHtlc = derivePubKey(commitments.remoteParams.htlcBasepoint, remotePerCommitmentPoint)
       val remoteRev = revocationPubKey(commitments.localParams.revocationBasepoint, remotePerCommitmentPoint)
@@ -220,9 +221,10 @@ object Helpers {
 
       val htlcPenaltySigs = for {
         TxOut(_, publicKeyScript) <- tx.txOut
+        // Small HTLCs won't make it into tx outputs
         redeemScript <- redeemMap get publicKeyScript
-        penalty <- ri.makeHtlcPenalty(finder)(redeemScript).toOption
-        htlcSig = Scripts.sign(remoteRevocationPrivkey)(penalty)
+        penaltyTx <- ri.makeHtlcPenalty(finder)(redeemScript).toOption
+        htlcSig = Scripts.sign(remoteRevocationPrivkey)(penaltyTx)
       } yield Tuple2(redeemScript, htlcSig)
 
       ri.copy(redeemScriptsToSigs = htlcPenaltySigs.toList,
