@@ -213,9 +213,8 @@ object Helpers {
       val localHtlc = derivePubKey(commitments.localParams.htlcBasepoint, remotePerCommitmentPoint)
       val remoteHtlc = derivePubKey(commitments.remoteParams.htlcBasepoint, remotePerCommitmentPoint)
       val remoteRev = revocationPubKey(commitments.localParams.revocationBasepoint, remotePerCommitmentPoint)
-      // We extract HTLCs from next remote commit so their directionality is reversed since we need them from our pov
-      val offered = for (Htlc(true, add) <- htlcs) yield Scripts.htlcOffered(remoteHtlc, localHtlc, remoteRev, add.hash160)
-      val received = for (Htlc(false, add) <- htlcs) yield Scripts.htlcReceived(remoteHtlc, localHtlc, remoteRev, add.hash160, add.expiry)
+      val offered = for (Htlc(false, add) <- htlcs) yield Scripts.htlcOffered(remoteHtlc, localHtlc, remoteRev, add.hash160)
+      val received = for (Htlc(true, add) <- htlcs) yield Scripts.htlcReceived(remoteHtlc, localHtlc, remoteRev, add.hash160, add.expiry)
       val redeemScripts = for (redeem <- offered ++ received) yield Tuple2(Script.write(Script pay2wsh redeem), Script write redeem)
       val redeemMap = redeemScripts.toMap
 
