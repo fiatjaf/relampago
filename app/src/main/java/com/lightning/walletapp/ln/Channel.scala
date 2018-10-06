@@ -590,11 +590,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     events onProcessSuccess Tuple3(me, data, change)
   }
 
-  def makeReestablish(some: HasCommitments, nextRemoteRevocationNumber: Long) = {
+  def makeReestablish(some: HasCommitments, nextLocalCommitmentNumber: Long) = {
     val ShaHashesWithIndex(hashes, lastIndex) = some.commitments.remotePerCommitmentSecrets
     val yourLastPerCommitmentSecret = lastIndex.map(ShaChain.moves).flatMap(ShaChain getHash hashes).getOrElse(Sphinx zeroes 32)
     val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
-    ChannelReestablish(some.commitments.channelId, nextRemoteRevocationNumber, some.commitments.remoteCommit.index,
+    ChannelReestablish(some.commitments.channelId, nextLocalCommitmentNumber, some.commitments.remoteCommit.index,
       Some apply Scalar(yourLastPerCommitmentSecret), Some apply myCurrentPerCommitmentPoint)
   }
 
