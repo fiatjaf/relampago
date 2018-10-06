@@ -297,10 +297,12 @@ object Commitments {
   def addRemoteProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.remoteChanges.proposed).using(_ :+ proposal)
   def addLocalProposal(c: Commitments, proposal: LightningMessage) = c.modify(_.localChanges.proposed).using(_ :+ proposal)
 
-  def findExpiredHtlc(c: Commitments, cmd: CMDBestHeight) =
-    c.localCommit.spec.htlcs.find(htlc => !htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry) orElse
-      c.remoteCommit.spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry) orElse
-      latestRemoteCommit(c).spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry)
+  def findExpiredHtlc(c: Commitments, cmd: CMDBestHeight) = {
+    val threshold = c.extraHop.map(_.cltvExpiryDelta / 2) getOrElse 1
+    c.localCommit.spec.htlcs.find(h => !h.incoming && cmd.heightNow > h.add.expiry - threshold && cmd.heightInit < h.add.expiry - threshold) orElse
+      c.remoteCommit.spec.htlcs.find(h => h.incoming && cmd.heightNow > h.add.expiry - threshold && cmd.heightInit < h.add.expiry - threshold) orElse
+      latestRemoteCommit(c).spec.htlcs.find(h => h.incoming && cmd.heightNow > h.add.expiry - threshold && cmd.heightInit < h.add.expiry - threshold)
+  }
 
   def getHtlcCrossSigned(commitments: Commitments, incomingRelativeToLocal: Boolean, htlcId: Long) = for {
     _ <- CommitmentSpec.findHtlcById(latestRemoteCommit(commitments).spec, htlcId, !incomingRelativeToLocal)
