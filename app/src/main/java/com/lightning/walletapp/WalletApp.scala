@@ -22,9 +22,8 @@ import rx.lang.scala.{Observable => Obs}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
-import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import android.content.{ClipData, ClipboardManager, Context}
-
+import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -213,8 +212,9 @@ class WalletApp extends Application { me =>
         tx <- cs.remoteCommit.txOpt
         myBalance = cs.localCommit.spec.toLocalMsat
         revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret)
-        revocationInfoHex = revocationInfoCodec.encode(value = revocationInfo).require.toHex
-      } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, revocationInfoHex)
+        serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
+      } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
+
 
       def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
         // Extract RevocationInfo for a given breach transaction
@@ -222,8 +222,8 @@ class WalletApp extends Application { me =>
         val rc = RichCursor(cursor).headTry(_ string RevokedInfoTable.info)
 
         for {
-          raw <- rc.toOption
-          bitVec <- BitVector fromHex raw
+          serialized <- rc.toOption
+          bitVec = BitVector(BinaryData(serialized).data)
           DecodeResult(ri, _) <- revocationInfoCodec.decode(bitVec).toOption
         } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri, tx)
       }

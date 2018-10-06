@@ -153,25 +153,24 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     if (fulfilledIncoming.nonEmpty) {
       // Select revoked txs which peer might be tempted to spend, remove the ones already being uploaded
-      def txidAndInfo(shiftedRc: RichCursor) = (shiftedRc string RevokedInfoTable.txId, shiftedRc string RevokedInfoTable.info)
-      val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat - dust.amount * 1000L)
+      def txidAndInfo(rc: RichCursor) = (rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
+      val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat)
       val unsentInfos = (RichCursor(cursor).vec(txidAndInfo).toMap -- OlympusWrap.pendingWatchTxIds) take 100
 
       val encrypted = for {
-        txid \ info <- unsentInfos.toSeq
-        txidBitVector <- BitVector fromHex txid
-        infoBitVector <- BitVector fromHex info
-        txidBytes: Bytes = txidBitVector.toByteArray
-        infoBytes: Bytes = infoBitVector.toByteArray
-      } yield txid -> AES.encBytes(infoBytes, txidBytes)
+        txid \ revInfo <- unsentInfos.toSeq
+        txidBytes = BinaryData(txid).toArray
+        revInfoBytes = BinaryData(revInfo).toArray
+        enc = AES.encBytes(revInfoBytes, txidBytes)
+      } yield txid -> enc
 
       for {
         pack <- encrypted grouped 20
-        txids \ payloads = pack.unzip
+        txids \ zygotePayloads = pack.unzip
         halfTxIds = for (txid <- txids) yield txid take 16
-        cp = CerberusPayload(payloads.toVector, halfTxIds.toVector)
-        data = LightningMessageCodecs.serialize(cerberusPayloadCodec encode cp)
-      } OlympusWrap tellClouds CerberusAct(data, Nil, "cerberus/watch", txids.toVector)
+        cp = CerberusPayload(zygotePayloads.toVector, halfTxIds.toVector)
+        binary = LightningMessageCodecs.serialize(cerberusPayloadCodec encode cp)
+      } OlympusWrap tellClouds CerberusAct(binary, Nil, "cerberus/watch", txids.toVector)
     }
   }
 
