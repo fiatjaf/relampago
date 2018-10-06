@@ -22,7 +22,6 @@ import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import java.util.Collections
-import scodec.bits.BitVector
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
