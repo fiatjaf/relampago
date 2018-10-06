@@ -440,7 +440,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           // the new sig but their revocation was lost during the disconnection, they'll resend us the revocation
           case Left(wait) if wait.nextRemoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendRevocation
           case Right(_) if c1.remoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendRevocation
-          case _ => throw new LightningException
+          case _ => throw new LightningException("Sync error")
         }
 
         BECOME(norm.copy(commitments = c1), OPEN)
