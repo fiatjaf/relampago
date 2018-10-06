@@ -247,7 +247,7 @@ class WalletApp extends Application { me =>
         val ref = RefundingData(some.announce, Some(point), some.commitments)
         val fundingScript = some.commitments.commitInput.txOut.publicKeyScript
         app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
-        BECOME(STORE(ref), REFUNDING) SEND makeReestablish(some, Long.MaxValue)
+        BECOME(STORE(ref), REFUNDING) SEND makeReestablish(some, 0L)
       }
 
       // First add listeners, then call
