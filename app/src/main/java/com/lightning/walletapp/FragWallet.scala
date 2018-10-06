@@ -153,12 +153,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val bld = negTextBuilder(dialog_ok, app.getString(err_ln_expired).format(paymentHash).html)
         UITask(host showForm bld.setCustomTitle(chan.data.announce.toString.html).create).run
 
-      case chan \ internal => UITask {
+      case _ \ internal =>
         // Internal error has happened, show stack trace
-        val bld = negTextBuilder(dialog_ok, UncaughtHandler toText internal)
-        def close(alert: AlertDialog) = rm(alert)(chan process app.ChannelManager.CMDLocalShutdown)
-        mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_force)
-      }.run
+        val stackTrace = UncaughtHandler toText internal
+        val bld = negTextBuilder(dialog_ok, stackTrace)
+        UITask(host showForm bld.create).run
     }
   }
 
