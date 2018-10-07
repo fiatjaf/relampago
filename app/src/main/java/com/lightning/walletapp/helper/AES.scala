@@ -12,7 +12,7 @@ import scala.util.Try
 
 object AES {
   def cipher(key: Bytes, initVector: Bytes, mode: Int) =
-    Cipher getInstance "AES/CBC/PKCS7Padding" match { case aesCipher =>
+    Cipher getInstance "AES/CBC/PKCS5Padding" match { case aesCipher =>
       val ivParameterSpec: IvParameterSpec = new IvParameterSpec(initVector)
       aesCipher.init(mode, new SecretKeySpec(key, "AES"), ivParameterSpec)
       aesCipher
@@ -45,7 +45,6 @@ object AES {
     decZygote(aesz.require.value, key)
   }
 
-  def decZygote(aesz: AESZygote, key: Bytes) = Try {
-    dec(aesz.ciphertext, key, aesz.iv)
-  }
+  def decZygote(aesz: AESZygote, key: Bytes) =
+    Try apply dec(aesz.ciphertext, key, aesz.iv)
 }
