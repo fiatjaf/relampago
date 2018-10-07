@@ -151,9 +151,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     if (fulfilledIncoming.nonEmpty) {
+      val balanceDeltaAboveDustThreshold = cs.localCommit.spec.toLocalMsat - dust.amount * 1000L
       // Select revoked txs which peer might be tempted to spend, remove the ones already being uploaded
       def txidAndInfo(rc: RichCursor) = (rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
-      val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat)
+      val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, balanceDeltaAboveDustThreshold)
       val unsentInfos = (RichCursor(cursor).vec(txidAndInfo).toMap -- OlympusWrap.pendingWatchTxIds) take 100
 
       val encrypted = for {
