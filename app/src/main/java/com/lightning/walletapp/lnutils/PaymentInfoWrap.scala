@@ -166,7 +166,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       for {
         pack <- encrypted grouped 20
         txids \ zygotePayloads = pack.unzip
-        halfTxIds = for (txid <- txids) yield txid take 16
+        halfTxIds = for (txid <- txids) yield txid take 16 // 8 bytes
         cp = CerberusPayload(zygotePayloads.toVector, halfTxIds.toVector)
         binary = LightningMessageCodecs.serialize(cerberusPayloadCodec encode cp)
       } OlympusWrap tellClouds CerberusAct(binary, Nil, "cerberus/watch", txids.toVector)
