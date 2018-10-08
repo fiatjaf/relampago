@@ -151,27 +151,30 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     if (fulfilledIncoming.nonEmpty) {
-      val balanceDeltaAboveDustThreshold = cs.localCommit.spec.toLocalMsat - dust.amount * 1000L
-      // Select revoked txs which peer might be tempted to spend, remove the ones already being uploaded
-      def txidAndInfo(rc: RichCursor) = (rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
-      val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, balanceDeltaAboveDustThreshold)
-      val unsentInfos = (RichCursor(cursor).vec(txidAndInfo).toMap -- OlympusWrap.pendingWatchTxIds) take 100
-
-      val encrypted = for {
-        txid \ revInfo <- unsentInfos.toSeq
-        txidBytes = BinaryData(txid).toArray
-        revInfoBytes = BinaryData(revInfo).toArray
-        enc = AES.encBytes(revInfoBytes, txidBytes)
-      } yield txid -> enc
-
-      for {
-        pack <- encrypted grouped 20
-        txids \ zygotePayloads = pack.unzip
-        halfTxIds = for (txid <- txids) yield txid take 16 // 8 bytes
-        cp = CerberusPayload(zygotePayloads.toVector, halfTxIds.toVector)
-        binary = LightningMessageCodecs.serialize(cerberusPayloadCodec encode cp)
-      } OlympusWrap tellClouds CerberusAct(binary, Nil, "cerberus/watch", txids.toVector)
+      val threshold = cs.localCommit.spec.toLocalMsat - dust.amount * 1000L
+      getVulnerableRevInfos(threshold, cs.channelId) foreach OlympusWrap.tellClouds
     }
+  }
+
+  def getVulnerableRevInfos(balanceDeltaAboveDustThreshold: Long, channelId: BinaryData) = {
+    def txidAndInfo(rc: RichCursor) = (rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
+    val cursor = db.select(RevokedInfoTable.selectLocalSql, params = channelId, balanceDeltaAboveDustThreshold)
+    val unsentInfos = (RichCursor(cursor).vec(txidAndInfo).toMap -- OlympusWrap.pendingWatchTxIds) take 100
+
+    val encrypted = for {
+      txid \ revInfo <- unsentInfos.toSeq
+      txidBytes = BinaryData(txid).toArray
+      revInfoBytes = BinaryData(revInfo).toArray
+      enc = AES.encBytes(revInfoBytes, txidBytes)
+    } yield txid -> enc
+
+    for {
+      pack <- encrypted grouped 20
+      txids \ zygotePayloads = pack.unzip
+      halfTxIds = for (txid <- txids) yield txid take 16
+      cp = CerberusPayload(zygotePayloads.toVector, halfTxIds.toVector)
+      bin = LightningMessageCodecs.serialize(cerberusPayloadCodec encode cp)
+    } yield CerberusAct(bin, Nil, "cerberus/watch", txids.toVector)
   }
 
   override def onProcessSuccess = {
