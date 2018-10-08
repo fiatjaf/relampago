@@ -30,7 +30,8 @@ class RevokedInfoSpec {
     db.change(RevokedInfoTable.newSql, txid3, chanId, 600000000L, serialized1)
     db.change(RevokedInfoTable.newSql, txid4, chanId, 900000000L, serialized1)
 
-    val cerberusPayloadHex = PaymentInfoWrap.getVulnerableRevInfos(900000000L, chanId).next.data.toString
+    val cerberusAct = PaymentInfoWrap.getVulnerableRevInfos(900000000L, chanId).next
+    val cerberusPayloadHex = cerberusAct.data.toString
 
     // Taken from Olympus
     val cerberusPayloadBitVec = BitVector(BinaryData(cerberusPayloadHex).data)
@@ -47,5 +48,8 @@ class RevokedInfoSpec {
       revBitVec <- AES.decZygote(aesz, fullTxidBin) map BitVector.apply
       DecodeResult(ri1, _) <- revocationInfoCodec.decode(revBitVec).toOption
     } assert(ri1 == ri)
+
+    cerberusAct.onDone
+    assert(PaymentInfoWrap.getVulnerableRevInfos(900000000L, chanId).isEmpty)
   }
 }
