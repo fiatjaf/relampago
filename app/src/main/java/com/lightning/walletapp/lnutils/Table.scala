@@ -124,7 +124,7 @@ object PaymentTable extends Table {
 
 object RevokedInfoTable extends Table {
   val (table, txId, chanId, myBalance, info, uploaded) = ("revokedinfo", "txid", "chanid", "mybalance", "info", "uploaded")
-  val selectLocalSql = s"SELECT * FROM $table WHERE $chanId = ? AND $myBalance < ? AND $uploaded = 0 LIMIT 400"
+  val selectLocalSql = s"SELECT * FROM $table WHERE $chanId = ? AND $myBalance < ? AND $uploaded = 0 ORDER BY $myBalance ASC LIMIT 400"
   val newSql = s"INSERT INTO $table ($txId, $chanId, $myBalance, $info, $uploaded) VALUES (?, ?, ?, ?, 0)"
   val setUploadedSql = s"UPDATE $table SET $uploaded = 1 WHERE $txId = ?"
   val selectTxIdSql = s"SELECT * FROM $table WHERE $txId = ?"
