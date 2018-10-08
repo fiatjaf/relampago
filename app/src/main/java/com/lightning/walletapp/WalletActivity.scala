@@ -59,10 +59,6 @@ trait SearchBar { me =>
 
 trait HumanTimeDisplay {
   val host: TimerActivity
-  val time: Date => String = date => {
-    new SimpleDateFormat(timeString) format date
-  }
-
   // Should be accessed after activity is initialized
   lazy val timeString = DateFormat is24HourFormat host match {
     case false if scrWidth < 2.2 & bigFont => "MM/dd/yy' <small>'h:mma'</small>'"
@@ -80,9 +76,10 @@ trait HumanTimeDisplay {
     case true => "d MMM yyyy' <small>'HH:mm'</small>'"
   }
 
-  def when(now: Long, date: Date) = date.getTime match { case ago =>
+  val time: Date => String = new SimpleDateFormat(timeString) format _
+  def when(now: Long, thenDate: Date) = thenDate.getTime match { case ago =>
     if (now - ago < 129600000) getRelativeTimeSpanString(ago, now, 0).toString
-    else time(date)
+    else time(thenDate)
   }
 }
 
@@ -157,7 +154,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
         manager setSum scala.util.Try(uri.getAmount)
 
-      case pr: PaymentRequest if app.ChannelManager.notClosingOrRefunding.nonEmpty =>
+      case pr: PaymentRequest if ChannelManager.notClosingOrRefunding.nonEmpty =>
         // We have open or at least opening channels so show a form or message to user
         FragWallet.worker sendPayment pr
 
@@ -187,7 +184,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   // BUTTONS REACTIONS
 
   def goReceivePayment(top: View) = {
-    val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
+    val operationalChannels = ChannelManager.notClosingOrRefunding.filter(isOperational)
     val operationalChannelsWithRoutes: Map[Channel, PaymentRoute] = operationalChannels.flatMap(channelAndHop).toMap
     val maxCanReceiveMsat = operationalChannelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L
     val maxCanReceive = MilliSatoshi(maxCanReceiveMsat)
@@ -248,7 +245,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   } else goLNStart
 
   def showDenomChooser = {
-    val lnTotalMsat = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
+    val lnTotalMsat = ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
     val rate = msatInFiatHuman apply MilliSatoshi(100000000000L)
 
@@ -286,7 +283,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
     val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
     val exportWalletSnapshot = form.findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
-    recoverFunds.setEnabled(app.ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
+    recoverFunds.setEnabled(ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
 
     recoverFunds setOnClickListener onButtonTap {
       def recover = OlympusWrap.getBackup(cloudId) foreach { backups =>
@@ -296,9 +293,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         for {
           encryptedBackup <- backups
           ref <- AES.decHex2Readable(encryptedBackup, cloudSecret) map to[RefundingData]
-          if !app.ChannelManager.all.flatMap(_ apply identity).exists(_.channelId == ref.commitments.channelId)
-        } app.ChannelManager.all +:= app.ChannelManager.createChannel(app.ChannelManager.operationalListeners, ref)
-        app.ChannelManager.initConnect
+          if !ChannelManager.all.flatMap(_ apply identity).exists(_.channelId == ref.commitments.channelId)
+        } ChannelManager.all +:= ChannelManager.createChannel(ChannelManager.operationalListeners, ref)
+        ChannelManager.initConnect
       }
 
       rm(menu) {

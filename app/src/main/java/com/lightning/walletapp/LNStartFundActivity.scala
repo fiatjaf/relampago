@@ -50,7 +50,7 @@ class LNStartFundActivity extends TimerActivity { me =>
   } else me exitTo classOf[MainActivity]
 
   def proceed(icrOpt: Option[IncomingChannelParams], asString: String, ann: NodeAnnouncement) = {
-    val freshChan = app.ChannelManager.createChannel(bootstrap = InitData(ann), initialListeners = Set.empty)
+    val freshChan = ChannelManager.createChannel(bootstrap = InitData(ann), initialListeners = Set.empty)
     lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
     lnStartFundDetails setText asString.html
 
@@ -89,8 +89,8 @@ class LNStartFundActivity extends TimerActivity { me =>
 
         case (_, wait: WaitFundingDoneData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
           // Preliminary negotiations are complete, save channel and broadcast a fund tx
-          freshChan.listeners = app.ChannelManager.operationalListeners
-          app.ChannelManager.all +:= freshChan
+          freshChan.listeners = ChannelManager.operationalListeners
+          ChannelManager.all +:= freshChan
           saveChan(wait)
 
           // Broadcast a funding transaction
@@ -202,13 +202,13 @@ class LNStartFundActivity extends TimerActivity { me =>
           // important: first save a channel here, then ask for a funding broadcast
 
           saveChan(wait)
-          app.ChannelManager.all +:= freshChan
-          freshChan.listeners ++= app.ChannelManager.operationalListeners
+          ChannelManager.all +:= freshChan
+          freshChan.listeners ++= ChannelManager.operationalListeners
           wsw send BroadcastFundingTx(wsw.params.userId, wait.txHash)
 
         case (_, _: WaitFundingDoneData, WAIT_FUNDING_DONE, WAIT_FUNDING_DONE) =>
           // #5 we have received a remote funding tx and may exit to ops page
-          freshChan.listeners = app.ChannelManager.operationalListeners
+          freshChan.listeners = ChannelManager.operationalListeners
           ExternalFunder.eliminateWSWrap(wsw, inform = false)
           app.TransData.value = FragWallet.REDIRECT
           me exitTo classOf[WalletActivity]
@@ -239,8 +239,8 @@ class LNStartFundActivity extends TimerActivity { me =>
       override def onBecome = {
         case (_, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>
           // Preliminary negotiations are complete, save channel and wait for their tx
-          freshChan.listeners = app.ChannelManager.operationalListeners
-          app.ChannelManager.all +:= freshChan
+          freshChan.listeners = ChannelManager.operationalListeners
+          ChannelManager.all +:= freshChan
           saveChan(wait)
 
           // Tell wallet activity to redirect to ops

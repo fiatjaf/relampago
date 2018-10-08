@@ -10,15 +10,15 @@ import rx.lang.scala.{Observable => Obs}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import com.lightning.walletapp.ln.wire.NodeAnnouncement
+import com.lightning.walletapp.ChannelManager
 import fr.acinq.bitcoin.Crypto.PublicKey
-import com.lightning.walletapp.Utils.app
 
 
 object RelayNode {
   final val relaySockPort = 8089
   final val relayNodeKey = PublicKey("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd")
-  def relayPeerReports = app.ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == relayNodeKey)
-  def hasRelayPeerOnly = app.ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == relayNodeKey)
+  def relayPeerReports = ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == relayNodeKey)
+  def hasRelayPeerOnly = ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == relayNodeKey)
 }
 
 abstract class RelayNode(payeeNodeId: PublicKey) { me =>

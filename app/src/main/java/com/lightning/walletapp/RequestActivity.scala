@@ -84,8 +84,8 @@ class RequestActivity extends TimerActivity { me =>
       case _ => finish
     }
 
-    whenDestroy = UITask { for (channel <- app.ChannelManager.all) channel.listeners -= receivedListener }
-    for (channel <- app.ChannelManager.all) channel.listeners += receivedListener
+    whenDestroy = UITask { for (channel <- ChannelManager.all) channel.listeners -= receivedListener }
+    for (channel <- ChannelManager.all) channel.listeners += receivedListener
   } else me exitTo classOf[MainActivity]
 
   def showPaid = UITask {

@@ -7,6 +7,7 @@ import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
+import com.lightning.walletapp.ChannelManager
 import fr.acinq.eclair.UInt64
 
 
@@ -33,7 +34,7 @@ object LNParams { me =>
   var extendedCloudKey: ExtendedPrivateKey = _
 
   lazy val bag = PaymentInfoWrap
-  lazy val broadcaster: Broadcaster = LocalBroadcaster
+  lazy val broadcaster: Broadcaster = ChannelManager
   lazy val nodePublicKey: PublicKey = nodePrivateKey.publicKey
   lazy val nodePrivateKey: PrivateKey = extendedNodeKey.privateKey
   lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin.data)

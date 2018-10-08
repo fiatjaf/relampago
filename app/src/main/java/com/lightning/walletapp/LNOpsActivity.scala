@@ -26,7 +26,7 @@ import java.util.Date
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  lazy val localChanCache = for (channel <- app.ChannelManager.all if me canDisplay channel.data) yield channel
+  lazy val localChanCache = for (channel <- ChannelManager.all if me canDisplay channel.data) yield channel
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
   lazy val presentChans = app.getResources getStringArray R.array.ln_chan_present
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
@@ -181,7 +181,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         // MENU PART
 
         def warnAndMaybeClose(channelClosureWarning: String) =
-          mkCheckForm(alert => rm(alert)(chan process app.ChannelManager.CMDLocalShutdown),
+          mkCheckForm(alert => rm(alert)(chan process ChannelManager.CMDLocalShutdown),
             none, baseTextBuilder(channelClosureWarning.html), dialog_ok, dialog_cancel)
 
         view setOnClickListener onButtonTap {

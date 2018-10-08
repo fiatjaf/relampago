@@ -132,8 +132,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     override def onProcessSuccess = {
       case (chan, data: HasCommitments, remoteError: wire.Error) if errorLimit > 0 => UITask {
+        def close(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
         val bld = baseBuilder(chan.data.announce.toString.html, remoteError.exception.getMessage)
-        def close(alert: AlertDialog) = rm(alert)(chan process app.ChannelManager.CMDLocalShutdown)
         mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_force)
         errorLimit -= 1
       }.run
@@ -192,14 +192,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def updTitle = {
     val btcTotalSum = app.kit.conf0Balance
-    val lnTotalSum = app.ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
+    val lnTotalSum = ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val lnFunds = if (lnTotalSum < 1) lnEmpty else denom withSign MilliSatoshi(lnTotalSum)
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
 
     val subtitleText =
       if (app.kit.peerGroup.numConnectedPeers < 1) statusConnecting
-      else if (app.ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay) statusOperational
-      else app.plurOrZero(syncOps, app.ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
+      else if (ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay) statusOperational
+      else app.plurOrZero(syncOps, ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
 
     customTitle setText s"""
       <img src="btc"/><strong>$btcFunds</strong><br>
@@ -227,7 +227,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var allItems = Vector.empty[ItemWrap]
 
   def updPaymentList = {
-    val delayedWraps = app.ChannelManager.delayedPublishes map ShowDelayedWrap
+    val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
 
@@ -481,7 +481,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def onFragmentDestroy = {
     ConnectionManager.listeners -= connectionListener
-    for (c <- app.ChannelManager.all) c.listeners -= chanListener
+    for (c <- ChannelManager.all) c.listeners -= chanListener
     app.kit.wallet removeTransactionConfidenceEventListener txsListener
     app.kit.peerGroup removeBlocksDownloadedEventListener blocksTitleListener
     app.kit.peerGroup removeDisconnectedEventListener peersListener
@@ -535,9 +535,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     else if (!pr.isFresh) app toast dialog_pr_expired
     else {
 
-      // This fetches normal channels which MAY be offline currently, this is fine
-      val openingChannels = app.ChannelManager.notClosingOrRefunding.filter(isOpening)
-      val operationalChannels = app.ChannelManager.notClosingOrRefunding.filter(isOperational)
+      // This fetches normal channels which MAY be offline currently
+      val openingChannels = ChannelManager.notClosingOrRefunding.filter(isOpening)
+      val operationalChannels = ChannelManager.notClosingOrRefunding.filter(isOperational)
       if (operationalChannels.isEmpty && openingChannels.nonEmpty) onFail(app getString err_ln_still_opening)
       else if (operationalChannels.isEmpty) app toast ln_no_open_chans
       else {
@@ -594,7 +594,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
   def doSend(rd: RoutingData) =
-    app.ChannelManager checkIfSendable rd match {
+    ChannelManager checkIfSendable rd match {
       case Right(rd1) => PaymentInfoWrap addPendingPayment rd1
       case Left(sanityCheckErrorMsg) => onFail(sanityCheckErrorMsg)
     }
@@ -688,7 +688,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   itemsList setAdapter adapter
 
   ConnectionManager.listeners += connectionListener
-  for (c <- app.ChannelManager.all) c.listeners += chanListener
+  for (c <- ChannelManager.all) c.listeners += chanListener
   app.kit.wallet addTransactionConfidenceEventListener txsListener
   app.kit.peerGroup addBlocksDownloadedEventListener blocksTitleListener
   app.kit.peerGroup addDisconnectedEventListener peersListener

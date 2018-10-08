@@ -19,6 +19,7 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.cerberusPayloadCod
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
+import com.lightning.walletapp.ChannelManager
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import java.util.Collections
@@ -36,11 +37,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     uiNotify
   }
 
-  def resolvePending: Unit = {
-    if (app.kit.peerGroup.numConnectedPeers < 1) return
-    if (app.ChannelManager.currentBlocksLeft > 0) return
-    unsentPayments.values foreach fetchAndSend
-  }
+  def resolvePending =
+    if (ChannelManager.currentBlocksLeft < 1)
+      if (app.kit.peerGroup.numConnectedPeers > 0)
+        unsentPayments.values foreach fetchAndSend
 
   def extractPreimage(candidateTx: Transaction) = {
     val fulfills = candidateTx.txIn.map(_.witness.stack) collect {
@@ -52,7 +52,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (fulfills.nonEmpty) uiNotify
   }
 
-  def fetchAndSend(rd: RoutingData) = app.ChannelManager.fetchRoutes(rd).foreach(app.ChannelManager.sendEither(_, failOnUI), exc => me failOnUI rd)
+  def fetchAndSend(rd: RoutingData) = ChannelManager.fetchRoutes(rd).foreach(ChannelManager.sendEither(_, failOnUI), exc => me failOnUI rd)
   def updOkIncoming(m: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
   def updOkOutgoing(m: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
   def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
@@ -73,8 +73,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   def markFailedAndFrozen = db txWrap {
     db change PaymentTable.updFailWaitingAndFrozenSql
-    for (hash <- app.ChannelManager.activeInFlightHashes) updStatus(WAITING, hash)
-    for (hash <- app.ChannelManager.frozenInFlightHashes) updStatus(FROZEN, hash)
+    for (hash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, hash)
+    for (hash <- ChannelManager.frozenInFlightHashes) updStatus(FROZEN, hash)
   }
 
   def failOnUI(rd: RoutingData) = {
@@ -86,7 +86,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def newRoutes(rd: RoutingData) =
-    app.ChannelManager checkIfSendable rd match {
+    ChannelManager checkIfSendable rd match {
       case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
         // Local conditions have not changed and we are still able to resend
         // the first attempt may have been made through a Proxy node, remove this constraint for the next try
@@ -132,7 +132,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
           case Some(Some(prunedRD) \ excludes) =>
             for (entity <- excludes) BadEntityWrap.putEntity tupled entity
-            app.ChannelManager.sendEither(useRoutesLeft(prunedRD), newRoutes)
+            ChannelManager.sendEither(useRoutesLeft(prunedRD), newRoutes)
 
           case _ =>
             // May happen after app restart

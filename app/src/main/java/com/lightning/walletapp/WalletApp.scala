@@ -13,10 +13,12 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
+import com.lightning.walletapp.ln.wire.FundMsg._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.google.common.util.concurrent.Service.State._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
 
 import rx.lang.scala.{Observable => Obs}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
@@ -123,204 +125,6 @@ class WalletApp extends Application { me =>
     }
   }
 
-  object ChannelManager {
-    var currentBlocksLeft = Int.MaxValue
-    var initialChainHeight = broadcaster.currentHeight // last seen height
-    val operationalListeners = Set(broadcaster, bag, GossipCatcher)
-    val CMDLocalShutdown = CMDShutdown(None)
-
-    // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-    var all: Vector[Channel] = for (chanState <- ChannelWrap.get) yield createChannel(operationalListeners, chanState)
-    def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
-    def notClosing = for (c <- all if c.state != CLOSING) yield c
-
-    def notClosingOrRefunding: Vector[Channel] = for {
-      chan <- all if isOpening(chan) || isOperational(chan)
-    } yield chan
-
-    def chanReports = for {
-      chan <- all if isOperational(chan)
-      commitments <- chan apply identity
-    } yield ChanReport(chan, commitments)
-
-    def delayedPublishes = {
-      // Select all ShowDelayed which can't be published yet because cltv/csv delay is not cleared
-      val statuses = all.map(_.data).collect { case cd: ClosingData => cd.bestClosing.getState }.flatten
-      statuses.collect { case sd: ShowDelayed if !sd.isPublishable && sd.delay > Long.MinValue => sd }
-    }
-
-    def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(_.add.paymentHash)
-    def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
-    def initConnect = for (c <- notClosing) ConnectionManager.connectTo(c.data.announce, notify = false)
-
-    val socketEventsListener = new ConnectionListener {
-      override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
-        case errAll: Error if errAll.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process errAll)
-        case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
-        case _ =>
-      }
-
-      override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDLocalShutdown)
-      override def onOperational(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
-      override def onIncompatible(nodeId: PublicKey) = onTerminalError(nodeId)
-
-      override def onDisconnect(nodeId: PublicKey) = for {
-        affectedChans <- Obs just fromNode(notClosing, nodeId) if affectedChans.nonEmpty
-        _ = affectedChans.foreach(affectedChan => affectedChan process CMDOffline)
-        announce <- Obs just affectedChans.head.data.announce delay 5.seconds
-      } ConnectionManager.connectTo(announce, notify = false)
-    }
-
-    val chainEventsListener = new TxTracker with BlocksListener {
-      override def onChainDownloadStarted(peer: Peer, left: Int) = onChainDownload(left)
-      override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
-      def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = onChainDownload(left)
-      def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
-      def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
-
-      def onChainDownload(blocksLeft: Int) = {
-        // Should wait until all blocks are downloaded
-        // otherwise peers may lie about current height
-        currentBlocksLeft = blocksLeft
-
-        if (currentBlocksLeft < 1) {
-          // Send out pending payments and report current chain heights to channels
-          val cmd = CMDBestHeight(broadcaster.currentHeight, initialChainHeight)
-          // Set initial height to current to not show repeated warnings
-          initialChainHeight = cmd.heightNow
-          PaymentInfoWrap.resolvePending
-          for (c <- all) c process cmd
-        }
-      }
-
-      def onChainTx(txj: Transaction) = {
-        val cmdOnChainSpent = CMDSpent(txj)
-        for (c <- all) c process cmdOnChainSpent
-        bag.extractPreimage(cmdOnChainSpent.tx)
-      }
-    }
-
-    def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel { self =>
-      def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
-      def STORE(updatedChannelData: HasCommitments) = runAnd(updatedChannelData)(ChannelWrap put updatedChannelData)
-
-      def REV(cs: Commitments, rev: RevokeAndAck) = for {
-        // We use old commitments to save a punishment for
-        // remote commit before it gets dropped forever
-
-        tx <- cs.remoteCommit.txOpt
-        myBalance = cs.localCommit.spec.toLocalMsat
-        revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret)
-        serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
-      } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
-
-
-      def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
-        // Extract RevocationInfo for a given breach transaction
-        val cursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
-        val rc = RichCursor(cursor).headTry(_ string RevokedInfoTable.info)
-
-        for {
-          serialized <- rc.toOption
-          bitVec = BitVector(BinaryData(serialized).data)
-          DecodeResult(ri, _) <- revocationInfoCodec.decode(bitVec).toOption
-        } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri, tx)
-      }
-
-      def CLOSEANDWATCH(cd: ClosingData) = {
-        val tier12txs = for (state <- cd.tier12States) yield state.txn
-        if (tier12txs.nonEmpty) OlympusWrap tellClouds UploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
-        repeat(OlympusWrap getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
-        // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
-        kit.wallet.addWatchedScripts(kit closingPubKeyScripts cd)
-        BECOME(STORE(cd), CLOSING)
-      }
-
-      def ASKREFUNDTX(ref: RefundingData) = {
-        // Failsafe check in case if we are still in REFUNDING state after app is restarted
-        val txsObs = OlympusWrap getChildTxs Seq(ref.commitments.commitInput.outPoint.txid)
-        txsObs.foreach(_ map CMDSpent foreach process, none)
-      }
-
-      def ASKREFUNDPEER(some: HasCommitments, point: Point) = {
-        val ref = RefundingData(some.announce, Some(point), some.commitments)
-        val fundingScript = some.commitments.commitInput.txOut.publicKeyScript
-        app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
-        BECOME(STORE(ref), REFUNDING) SEND makeReestablish(some, 0L)
-      }
-
-      // First add listeners, then call
-      // doProcess on current thread
-      listeners = initialListeners
-      doProcess(bootstrap)
-    }
-
-    def checkIfSendable(rd: RoutingData) = {
-      val bestRepOpt = chanReports.sortBy(rep => -rep.estimateFinalCanSend).headOption
-      val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
-      if (frozenInFlightHashes contains rd.pr.paymentHash) Left(me getString err_ln_frozen)
-      else if (isPaid.isSuccess) Left(me getString err_ln_fulfilled)
-      else bestRepOpt match {
-
-        // We should explain to user what exactly is going on here
-        case Some(rep) if rep.estimateFinalCanSend < rd.firstMsat =>
-          val sendingNow = coloredOut apply MilliSatoshi(rd.firstMsat)
-          val finalCanSend = coloredIn apply MilliSatoshi(rep.estimateFinalCanSend)
-          val capacity = coloredIn apply MilliSatoshi(Commitments.latestRemoteCommit(rep.cs).spec.toRemoteMsat)
-          val hardReserve = coloredOut apply Satoshi(rep.cs.reducedRemoteState.myFeeSat + rep.cs.remoteParams.channelReserveSatoshis)
-          Left(getString(err_ln_second_reserve).format(rep.chan.data.announce.alias, hardReserve, coloredOut(rep.softReserve),
-            capacity, finalCanSend, sendingNow).html)
-
-        case None => Left(me getString ln_no_open_chans)
-        case _ => Right(rd)
-      }
-    }
-
-    def fetchRoutes(rd: RoutingData) = {
-      // First we collect chans which in principle can handle a given payment sum right now
-      // after we get the results we first prioritize cheapest routes and then routes which belong to currently less busy chans
-      val from = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
-      val from1 = if (rd.throughPeers.nonEmpty) from.filter(rd.throughPeers.contains) else from
-
-      def withHints = for {
-        tag <- Obs from rd.pr.routingInfo
-        partialRoutes <- getRoutes(tag.route.head.nodeId)
-        completeRoutes = partialRoutes.map(_ ++ tag.route)
-      } yield Obs just completeRoutes
-
-      def getRoutes(targetId: PublicKey) = from1 contains targetId match {
-        case false if rd.useCache => RouteWrap.findRoutes(from1, targetId, rd)
-        case false => BadEntityWrap.findRoutes(from1, targetId, rd)
-        case true => Obs just Vector(Vector.empty)
-      }
-
-      val paymentRoutesObs =
-        if (from1.isEmpty) Obs error new LightningException(me getString ln_no_open_chans)
-        else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
-
-      for {
-        routes <- paymentRoutesObs
-        cheapest = routes.sortBy(route => route.map(hop => hop.feeEstimate).sum)
-        busyMap = all.map(chan => chan.data.announce.nodeId -> inFlightHtlcs(chan).size).toMap
-        unloadest = cheapest.sortBy(route => if (route.nonEmpty) busyMap(route.head.nodeId) else 0)
-      } yield useFirstRoute(unloadest, rd)
-    }
-
-    def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
-      // Find a local channel which is online, can send an amount and belongs to a correct peer
-      case Right(rd) if activeInFlightHashes contains rd.pr.paymentHash =>
-      case Left(emptyRD) => noRoutes(emptyRD)
-
-      case Right(rd) =>
-        // Empty used route means we're sending to our peer and its nodeId is our target
-        val targetId = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
-        val chans = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan }
-        val res = chans collectFirst { case chan if chan.data.announce.nodeId == targetId => chan process rd }
-        res getOrElse sendEither(useRoutesLeft(rd), noRoutes)
-    }
-  }
-
   abstract class WalletKit extends AbstractKit {
     def currentAddress = wallet currentAddress KeyPurpose.RECEIVE_FUNDS
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE // Returns all utxos
@@ -380,6 +184,250 @@ class WalletApp extends Application { me =>
       ChannelManager.initConnect
       RatesSaver.initialize
     }
+  }
+}
+
+object ChannelManager extends Broadcaster {
+  val CMDLocalShutdown: Command = CMDShutdown(None)
+  val operationalListeners: Set[ChannelListener] = Set(ChannelManager, bag, GossipCatcher)
+  private[this] var initialChainHeight: Long = app.kit.wallet.getLastBlockSeenHeight
+  var currentBlocksLeft: Int = Int.MaxValue
+
+  val socketEventsListener = new ConnectionListener {
+    override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+      case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
+      case errAll: Error if errAll.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process errAll)
+      case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
+      case _ =>
+    }
+
+    override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDLocalShutdown)
+    override def onOperational(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
+    override def onIncompatible(nodeId: PublicKey) = onTerminalError(nodeId)
+
+    override def onDisconnect(nodeId: PublicKey) = for {
+      affectedChans <- Obs just fromNode(notClosing, nodeId) if affectedChans.nonEmpty
+      _ = affectedChans.foreach(affectedChan => affectedChan process CMDOffline)
+      announce <- Obs just affectedChans.head.data.announce delay 5.seconds
+    } ConnectionManager.connectTo(announce, notify = false)
+  }
+
+  val chainEventsListener = new TxTracker with BlocksListener {
+    override def onChainDownloadStarted(peer: Peer, left: Int) = onChainDownload(left)
+    override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
+    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = onChainDownload(left)
+    def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
+    def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
+
+    def onChainDownload(blocksLeft: Int) = {
+      // Track progress and how many blocks done
+      currentBlocksLeft = blocksLeft
+
+      if (currentBlocksLeft < 1) {
+        val cmd = CMDBestHeight(currentHeight, initialChainHeight)
+        // Update initial height to prevent repeated HTLC warnings
+        initialChainHeight = cmd.heightNow
+        PaymentInfoWrap.resolvePending
+        for (c <- all) c process cmd
+      }
+    }
+
+    def onChainTx(txj: Transaction) = {
+      val cmdOnChainSpent = CMDSpent(txj)
+      for (c <- all) c process cmdOnChainSpent
+      bag.extractPreimage(cmdOnChainSpent.tx)
+    }
+  }
+
+  // BROADCASTER IMPLEMENTATION
+
+  def perKwSixSat = RatesSaver.rates.feeSix.value / 4
+  def perKwThreeSat = RatesSaver.rates.feeThree.value / 4
+  def currentHeight = app.kit.wallet.getLastBlockSeenHeight
+
+  def getTx(txid: BinaryData) = {
+    val wrapped = Sha256Hash wrap txid.toArray
+    Option(app.kit.wallet getTransaction wrapped)
+  }
+
+  def getStatus(txid: BinaryData) = getTx(txid) map { tx =>
+    val isTxDead = tx.getConfidence.getConfidenceType == DEAD
+    tx.getConfidence.getDepthInBlocks -> isTxDead
+  } getOrElse 0 -> false
+
+  override def onProcessSuccess = {
+    case (_, close: ClosingData, _: Command) =>
+      // Repeatedly spend everything we can in this state in case it was unsuccessful before
+      val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
+      val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
+      for (tx <- toSend) try app.kit blockSend tx catch none
+
+    case (chan, wbr: WaitBroadcastRemoteData, _: ChannelReestablish) if wbr.isOutdated && wbr.fail.isEmpty =>
+      // External funder may never publish our funding tx so we should mark it as failure once enough time passes
+      chan process Fail(FAIL_PUBLISH_ERROR, "Funding has expired")
+
+    case (chan, wait: WaitFundingDoneData, _: ChannelReestablish) if wait.our.isEmpty =>
+      // CMDConfirmed may be sent to an offline channel and there will be no reaction
+      // so always double check a funding state here as a failsafe measure
+
+      for {
+        txj <- getTx(wait.fundingTx.txid)
+        depth \ isDead = getStatus(wait.fundingTx.txid)
+        if depth >= LNParams.minDepth && !isDead
+      } chan process CMDConfirmed(txj)
+  }
+
+  override def onBecome = {
+    // Repeatedly resend a funding tx, update feerate on becoming open
+    case (_, wait: WaitFundingDoneData, _, _) => app.kit blockSend wait.fundingTx
+    case (chan, _: NormalData, SLEEPING, OPEN) => chan process CMDFeerate(perKwThreeSat)
+  }
+
+  // CHANNEL CREATION AND MANAGEMENT
+
+  // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
+  var all: Vector[Channel] = for (chanState <- ChannelWrap.get) yield createChannel(operationalListeners, chanState)
+  def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
+  def notClosing = for (c <- all if c.state != CLOSING) yield c
+
+  def notClosingOrRefunding: Vector[Channel] = for {
+    chan <- all if isOpening(chan) || isOperational(chan)
+  } yield chan
+
+  def chanReports = for {
+    chan <- all if isOperational(chan)
+    commitments <- chan apply identity
+  } yield ChanReport(chan, commitments)
+
+  def delayedPublishes = {
+    // Select all ShowDelayed which can't be published yet because cltv/csv delay is not cleared
+    val statuses = all.map(_.data).collect { case cd: ClosingData => cd.bestClosing.getState }.flatten
+    statuses.collect { case sd: ShowDelayed if !sd.isPublishable && sd.delay > Long.MinValue => sd }
+  }
+
+  def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(_.add.paymentHash)
+  def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
+  def initConnect = for (c <- notClosing) ConnectionManager.connectTo(c.data.announce, notify = false)
+
+  def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new Channel { self =>
+    def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
+    def STORE(updatedChannelData: HasCommitments) = runAnd(updatedChannelData)(ChannelWrap put updatedChannelData)
+
+    def REV(cs: Commitments, rev: RevokeAndAck) = for {
+    // We use old commitments to save a punishment for
+    // remote commit before it gets dropped forever
+
+      tx <- cs.remoteCommit.txOpt
+      myBalance = cs.localCommit.spec.toLocalMsat
+      revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret)
+      serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
+    } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
+
+
+    def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
+      // Extract RevocationInfo for a given breach transaction
+      val cursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
+      val rc = RichCursor(cursor).headTry(_ string RevokedInfoTable.info)
+
+      for {
+        serialized <- rc.toOption
+        bitVec = BitVector(BinaryData(serialized).data)
+        DecodeResult(ri, _) <- revocationInfoCodec.decode(bitVec).toOption
+      } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri, tx)
+    }
+
+    def CLOSEANDWATCH(cd: ClosingData) = {
+      val tier12txs = for (state <- cd.tier12States) yield state.txn
+      if (tier12txs.nonEmpty) OlympusWrap tellClouds UploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
+      repeat(OlympusWrap getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
+      // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
+      app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
+      BECOME(STORE(cd), CLOSING)
+    }
+
+    def ASKREFUNDTX(ref: RefundingData) = {
+      // Failsafe check in case if we are still in REFUNDING state after app is restarted
+      val txsObs = OlympusWrap getChildTxs Seq(ref.commitments.commitInput.outPoint.txid)
+      txsObs.foreach(_ map CMDSpent foreach process, none)
+    }
+
+    def ASKREFUNDPEER(some: HasCommitments, point: Point) = {
+      val ref = RefundingData(some.announce, Some(point), some.commitments)
+      val fundingScript = some.commitments.commitInput.txOut.publicKeyScript
+      app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
+      BECOME(STORE(ref), REFUNDING) SEND makeReestablish(some, 0L)
+    }
+
+    // First add listeners, then call
+    // doProcess on current thread
+    listeners = initialListeners
+    doProcess(bootstrap)
+  }
+
+  // SENDING PAYMENTS
+
+  def checkIfSendable(rd: RoutingData) = {
+    val bestRepOpt = chanReports.sortBy(rep => -rep.estimateFinalCanSend).headOption
+    val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
+    if (frozenInFlightHashes contains rd.pr.paymentHash) Left(app getString err_ln_frozen)
+    else if (isPaid.isSuccess) Left(app getString err_ln_fulfilled)
+    else bestRepOpt match {
+
+      // We should explain to user what exactly is going on here
+      case Some(rep) if rep.estimateFinalCanSend < rd.firstMsat =>
+        val sendingNow = coloredOut apply MilliSatoshi(rd.firstMsat)
+        val finalCanSend = coloredIn apply MilliSatoshi(rep.estimateFinalCanSend)
+        val capacity = coloredIn apply MilliSatoshi(Commitments.latestRemoteCommit(rep.cs).spec.toRemoteMsat)
+        val hardReserve = coloredOut apply Satoshi(rep.cs.reducedRemoteState.myFeeSat + rep.cs.remoteParams.channelReserveSatoshis)
+        Left(app.getString(err_ln_second_reserve).format(rep.chan.data.announce.alias, hardReserve, coloredOut(rep.softReserve),
+          capacity, finalCanSend, sendingNow).html)
+
+      case None => Left(app getString ln_no_open_chans)
+      case _ => Right(rd)
+    }
+  }
+
+  def fetchRoutes(rd: RoutingData) = {
+    // First we collect chans which in principle can handle a given payment sum right now
+    // after we get the results we first prioritize cheapest routes and then routes which belong to currently less busy chans
+    val from = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
+    val from1 = if (rd.throughPeers.nonEmpty) from.filter(rd.throughPeers.contains) else from
+
+    def withHints = for {
+      tag <- Obs from rd.pr.routingInfo
+      partialRoutes <- getRoutes(tag.route.head.nodeId)
+      completeRoutes = partialRoutes.map(_ ++ tag.route)
+    } yield Obs just completeRoutes
+
+    def getRoutes(targetId: PublicKey) = from1 contains targetId match {
+      case false if rd.useCache => RouteWrap.findRoutes(from1, targetId, rd)
+      case false => BadEntityWrap.findRoutes(from1, targetId, rd)
+      case true => Obs just Vector(Vector.empty)
+    }
+
+    val paymentRoutesObs =
+      if (from1.isEmpty) Obs error new LightningException(app getString ln_no_open_chans)
+      else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
+
+    for {
+      routes <- paymentRoutesObs
+      cheapest = routes.sortBy(route => route.map(hop => hop.feeEstimate).sum)
+      busyMap = all.map(chan => chan.data.announce.nodeId -> inFlightHtlcs(chan).size).toMap
+      unloadest = cheapest.sortBy(route => if (route.nonEmpty) busyMap(route.head.nodeId) else 0)
+    } yield useFirstRoute(unloadest, rd)
+  }
+
+  def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
+    // Find a local channel which is online, can send an amount and belongs to a correct peer
+    case Right(rd) if activeInFlightHashes contains rd.pr.paymentHash =>
+    case Left(emptyRD) => noRoutes(emptyRD)
+
+    case Right(rd) =>
+      // Empty used route means we're sending to our peer and its nodeId is our target
+      val targetId = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
+      val chans = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan }
+      val res = chans collectFirst { case chan if chan.data.announce.nodeId == targetId => chan process rd }
+      res getOrElse sendEither(useRoutesLeft(rd), noRoutes)
   }
 }
 

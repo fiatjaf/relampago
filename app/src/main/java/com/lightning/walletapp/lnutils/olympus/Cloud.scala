@@ -9,6 +9,7 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
+import com.lightning.walletapp.ChannelManager
 import com.lightning.walletapp.ln.Tools.wrap
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Utils.HEX
@@ -66,7 +67,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     // We do not have any acts or tokens but have a memo
     case CloudData(Some(pr \ memo), _, _) \ CMDStart if isFree =>
       // Payment may still be unsent OR in-flight OR fulfilled OR failed already
-      val isInFlight = app.ChannelManager.activeInFlightHashes contains pr.paymentHash
+      val isInFlight = ChannelManager.activeInFlightHashes contains pr.paymentHash
 
       if (!isInFlight) {
         // Assume that payment has been fulfilled and try to obtain storage tokens
@@ -109,7 +110,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     }
 
   def retryFreshRequest(pr: PaymentRequest): Unit = {
-    val ok = app.ChannelManager.notClosing.exists(isOperational)
+    val ok = ChannelManager.notClosing.exists(isOperational)
     val rd = emptyRD(pr, pr.unsafeMsat, Set.empty, useCache = true)
     if (ok) PaymentInfoWrap addPendingPayment rd
   }

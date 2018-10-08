@@ -11,6 +11,7 @@ import rx.lang.scala.{Observable => Obs}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.Fiat2Btc
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import org.bitcoinj.core.Transaction.DEFAULT_TX_FEE
+import com.lightning.walletapp.ChannelManager
 import rx.lang.scala.schedulers.IOScheduler
 import com.lightning.walletapp.AbstractKit
 import com.lightning.walletapp.Utils.app
@@ -46,7 +47,7 @@ object RatesSaver {
 
     rates = Rates(sensibleSix take 2, sensibleThree take 2, newFiat, System.currentTimeMillis)
     // Channels may become open sooner then we get updated fees so inform channels once we get updated fees
-    for (c <- app.ChannelManager.notClosingOrRefunding) c process CMDFeerate(LNParams.broadcaster.perKwThreeSat)
+    for (c <- ChannelManager.notClosingOrRefunding) c process CMDFeerate(LNParams.broadcaster.perKwThreeSat)
     app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
   }
 
