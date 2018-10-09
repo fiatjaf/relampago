@@ -276,8 +276,9 @@ object GossipCatcher extends ChannelListener {
 
     case (chan, norm: NormalData, upd: ChannelUpdate)
       // GUARD: we already have an old or empty Hop, replace it with a new one
-      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
-      // Set a fresh update for this channel and process no further updates afterwards
+      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId)
+        && Announcements.checkSig(upd, chan.data.announce.nodeId) =>
+
       chan.process(upd toHop chan.data.announce.nodeId)
       chan.listeners -= GossipCatcher
   }
