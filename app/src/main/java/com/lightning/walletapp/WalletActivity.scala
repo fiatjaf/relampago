@@ -286,16 +286,23 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     recoverFunds.setEnabled(ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
 
     recoverFunds setOnClickListener onButtonTap {
-      def recover = OlympusWrap.getBackup(cloudId) foreach { backups =>
-        // Decrypt channel recovery data upon successful call and put them
-        // into an active channel list, then connect to remote peers
+      def recover = OlympusWrap getBackup cloudId foreach { backups =>
+        // Decrypt channel recovery data and put it to channels list if it is not present already
+        // then try to get new NodeAnnouncement for refunding channels, otherwise use an old one
 
         for {
           encryptedBackup <- backups
           ref <- AES.decHex2Readable(encryptedBackup, cloudSecret) map to[RefundingData]
           if !ChannelManager.all.flatMap(_ apply identity).exists(_.channelId == ref.commitments.channelId)
         } ChannelManager.all +:= ChannelManager.createChannel(ChannelManager.operationalListeners, ref)
-        ChannelManager.initConnect
+
+        for {
+          chan <- ChannelManager.all if chan.state == REFUNDING
+          // Try to connect right away and maybe use new address later
+          _ = ConnectionManager.connectTo(chan.data.announce, notify = false)
+          // Can call findNodes without `retry` wrapper because it gives `Obs.empty` on error
+          Vector(ann1 \ _, _*) <- OlympusWrap findNodes chan.data.announce.nodeId.toString
+        } chan process ann1
       }
 
       rm(menu) {

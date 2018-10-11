@@ -171,10 +171,9 @@ class WalletApp extends Application { me =>
       for {
         _ <- obsOnIO delay 20.seconds
         chan <- ChannelManager.notClosing if chan.state == SLEEPING
-        // Enough time passes and we have offline channels, possibly remote peer IP has changed
-        res <- retry(OlympusWrap findNodes chan.data.announce.nodeId.toString, pickInc, 1 to 2)
-        announce \ _ <- res take 1
-      } chan process announce
+        // Can call findNodes without `retry` wrapper because it gives `Obs.empty` on error
+        Vector(ann1 \ _, _*) <- OlympusWrap findNodes chan.data.announce.nodeId.toString
+      } chan process ann1
 
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)

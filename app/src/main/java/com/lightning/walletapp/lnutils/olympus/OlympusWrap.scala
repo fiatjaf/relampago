@@ -106,7 +106,7 @@ object OlympusWrap extends OlympusProvider {
   }
 
   def getRates = failOver(_.connector.getRates, tryLater, clouds)
-  def findNodes(query: String) = failOver(_.connector findNodes query, tryLater, clouds)
+  def findNodes(query: String) = failOver(_.connector findNodes query, Obs.empty, clouds)
   def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, tryLater, clouds)
   def getShortId(txid: BinaryData) = failOver(_.connector getShortId txid, Obs.empty, clouds)
   def getChildTxs(ids: BinaryDataSeq) = failOver(_.connector getChildTxs ids, tryLater, clouds)
