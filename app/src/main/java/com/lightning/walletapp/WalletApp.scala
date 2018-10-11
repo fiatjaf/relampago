@@ -226,25 +226,19 @@ object ChannelManager extends Broadcaster {
     var onBlock: Int => Unit = oneTimeRun
     lazy val oneTimeRun: Int => Unit = left => {
       // Let currentBlocksLeft become less than MaxValue
-      runAnd(onBlock = standard)(standard apply left)
+      runAnd(onBlock = standardRun)(standardRun apply left)
+      val cmd = CMDBestHeight(currentHeight, initialChainHeight)
+      for (channel <- all) channel process cmd
       PaymentInfoWrap.resolvePending
     }
 
-    lazy val standard: Int => Unit = left => {
+    lazy val standardRun: Int => Unit = left =>
       // LN payment before BTC peers on app start: tried in `oneTimeRun`
       // LN payment before BTC peers on app restart: tried in `oneTimeRun`
       // LN payment after BTC peers on app start: tried immediately since `currentBlocksLeft` < `Int.MacValue`
       // LN payment after BTC peers on app restart: tried immediately since `currentBlocksLeft` < `Int.MacValue`
       // LN payment after BTC peers disconnected: tried in `oneTimeRun` because `onPeerDisconnected` resets `onBlock`
-
-      currentBlocksLeft = left
-      if (currentBlocksLeft < 1) {
-        val cmd = CMDBestHeight(currentHeight, initialChainHeight)
-        // Update initial height to prevent repeated HTLC warnings
-        initialChainHeight = cmd.heightNow
-        for (c <- all) c process cmd
-      }
-    }
+      if (currentBlocksLeft < 1) initialChainHeight = currentHeight else currentBlocksLeft = left
 
     def onChainTx(txj: Transaction) = {
       val cmdOnChainSpent = CMDSpent(txj)
