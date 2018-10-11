@@ -38,8 +38,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def resolvePending =
-    if (ChannelManager.currentBlocksLeft < 1)
-      if (app.kit.peerGroup.numConnectedPeers > 0)
+    if (app.kit.peerGroup.numConnectedPeers > 0)
+      if (ChannelManager.currentBlocksLeft < Int.MaxValue)
         unsentPayments.values foreach fetchAndSend
 
   def extractPreimage(candidateTx: Transaction) = {
