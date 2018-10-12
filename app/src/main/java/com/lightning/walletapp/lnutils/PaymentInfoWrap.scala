@@ -85,18 +85,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     uiNotify
   }
 
-  def newRoutes(rd: RoutingData) =
-    ChannelManager checkIfSendable rd match {
-      case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
-        // Local conditions have not changed and we are still able to resend
-        // the first attempt may have been made through a Proxy node, remove this constraint for the next try
-        me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, throughPeers = Set.empty, useCache = false)
-
-      case _ =>
-        // UI will be updated a bit later
-        updStatus(FAILURE, rd.pr.paymentHash)
-    }
-
   override def outPaymentAccepted(rd: RoutingData) = {
     // Payment has been accepted by channel so start local tracking
     inFlightPayments = inFlightPayments.updated(rd.pr.paymentHash, rd)
@@ -118,6 +106,17 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def settled(cs: Commitments) = {
     // Update affected record states in a database, then retry failed payments where possible
     val fulfilledIncoming = for (Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled) yield add
+
+    def newRoutes(rd: RoutingData) =
+      ChannelManager checkIfSendable rd match {
+        case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
+          // First attempt may have been made through a Proxy node, remove this constraint for next try
+          me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, throughPeers = Set.empty, useCache = false)
+
+        case _ =>
+          // UI will be updated upstream
+          updStatus(FAILURE, rd.pr.paymentHash)
+      }
 
     db txWrap {
       fulfilledIncoming foreach updOkIncoming
@@ -150,8 +149,16 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       com.lightning.walletapp.Vibrator.vibrate
     }
 
-    if (fulfilledIncoming.nonEmpty) {
-      val threshold = cs.localCommit.spec.toLocalMsat - dust.amount * 1000L
+    val shouldCheckRevokedStates = {
+      // We should try to upload revoked states when we have a fulfilled incoming payment
+      // or in 4% of failed outgoing payments since uploading on each fail may require an excessive amount of storage tokens
+      val haveFailedOutgoingAttempts = cs.localCommit.spec.malformed.nonEmpty || cs.localCommit.spec.failed.nonEmpty
+      fulfilledIncoming.nonEmpty || haveFailedOutgoingAttempts && (random nextInt 100) < 4
+    }
+
+    if (shouldCheckRevokedStates) {
+      // Do not consider too small deltas, peer won't publish those
+      val threshold = cs.localCommit.spec.toLocalMsat - dust.amount * 2 * 1000L
       getVulnerableRevInfos(threshold, cs.channelId) foreach OlympusWrap.tellClouds
     }
   }
