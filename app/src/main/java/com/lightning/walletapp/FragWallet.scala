@@ -191,9 +191,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // UPDATING TITLE
 
   def updTitle = {
+    val lnTotal = for {
+      chan <- ChannelManager.notClosingOrRefunding
+      commit <- chan(Commitments.latestRemoteCommit)
+    } yield commit.spec.toRemoteMsat
+
     val btcTotalSum = app.kit.conf0Balance
-    val lnTotalSum = ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
-    val lnFunds = if (lnTotalSum < 1) lnEmpty else denom withSign MilliSatoshi(lnTotalSum)
+    val lnTotalSum = MilliSatoshi(lnTotal.sum)
+    val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom withSign lnTotalSum
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
 
     val subtitleText =
