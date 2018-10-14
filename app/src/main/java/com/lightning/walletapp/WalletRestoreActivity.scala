@@ -59,7 +59,7 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
       MnemonicCode.INSTANCE.getWordList)
   }
 
-  def recWallet(button: View) = hideKeys(doRecoverWallet)
+  def recWallet(button: View) = doRecoverWallet
   override def onBackPressed = wrap(super.onBackPressed)(app.kit.stopAsync)
   def getMnemo = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")
   def setWhen(button: View) = mkCheckForm(alert => rm(alert)(restoreWhen setText dp.humanTime),

@@ -57,8 +57,8 @@ class FragWallet extends Fragment {
 }
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
-  import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, onFastTap, str2View, onTap}
-  import host.{onFail, TxProcessor, getSupportLoaderManager, mkCheckForm, rm, mkCheckFormNeutral, <, showDenomChooser}
+  import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail}
+  import host.{TxProcessor, getSupportLoaderManager, mkCheckForm, rm, mkCheckFormNeutral, <, showDenomChooser}
 
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
   val customTitle = frag.findViewById(R.id.customTitle).asInstanceOf[TextView]
@@ -181,7 +181,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
   }
 
-  toggler setOnClickListener onFastTap {
+  toggler setOnClickListener onButtonTap {
     val newImg = if (currentCut > minLinesNum) ic_explode_24dp else ic_implode_24dp
     currentCut = if (currentCut > minLinesNum) minLinesNum else allItems.size
     toggler setImageResource newImg
@@ -684,7 +684,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   host setSupportActionBar toolbar
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
-  toolbar setOnClickListener onFastTap { if (!isSearching) showDenomChooser }
+  toolbar setOnClickListener onButtonTap { if (!isSearching) showDenomChooser }
   // Only update a minimized payments list to eliminate possible performance slowdowns
   host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
   itemsList setOnItemClickListener onTap { position => adapter.getItem(position).generatePopup }
