@@ -39,7 +39,7 @@ object PaymentInfo {
   def emptyRD(pr: PaymentRequest, firstMsat: Long, throughPeers: Set[PublicKey], useCache: Boolean) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
-      lastMsat = 0L, lastExpiry = 0L, callsLeft = 3, throughPeers, useCache)
+      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, throughPeers, useCache)
   }
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {

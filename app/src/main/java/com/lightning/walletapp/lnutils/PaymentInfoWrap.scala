@@ -107,6 +107,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     // Update affected record states in a database, then retry failed payments where possible
     val fulfilledIncoming = for (Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled) yield add
 
+    def maybeWatchInfos(watch: Boolean) = if (watch) {
+      // Collect vulnerable infos from all channels on finalized off-chain payments
+      val infos = ChannelManager.notClosingOrRefunding.flatMap(getVulnerableRevInfos)
+      getCerberusActs(infos.toMap) foreach OlympusWrap.tellClouds
+    }
+
     def newRoutes(rd: RoutingData) =
       ChannelManager checkIfSendable rd match {
         case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
@@ -116,6 +122,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
         case _ =>
           // UI will be updated upstream
           updStatus(FAILURE, rd.pr.paymentHash)
+          // We have multiple vulnerable states currently
+          // because of multiple failed payment attempts
+          maybeWatchInfos(fulfilledIncoming.isEmpty)
       }
 
     db txWrap {
@@ -142,34 +151,29 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     uiNotify
+    maybeWatchInfos(fulfilledIncoming.nonEmpty)
     if (cs.localCommit.spec.fulfilled.nonEmpty) {
       // Let the clouds know since they may be waiting
       // also vibrate to let a user know it's fulfilled
       OlympusWrap tellClouds OlympusWrap.CMDStart
       com.lightning.walletapp.Vibrator.vibrate
     }
-
-    val shouldCheckRevokedStates = {
-      // We should try to upload revoked states when we have a fulfilled incoming payment
-      // or in 4% of failed outgoing payments since uploading on each fail may require an excessive amount of storage tokens
-      val haveFailedOutgoingAttempts = cs.localCommit.spec.malformed.nonEmpty || cs.localCommit.spec.failed.nonEmpty
-      fulfilledIncoming.nonEmpty || haveFailedOutgoingAttempts && (random nextInt 100) < 4
-    }
-
-    if (shouldCheckRevokedStates) {
-      // Do not consider too small deltas, peer won't publish those
-      val threshold = cs.localCommit.spec.toLocalMsat - dust.amount * 2 * 1000L
-      getVulnerableRevInfos(threshold, cs.channelId) foreach OlympusWrap.tellClouds
-    }
   }
 
-  def getVulnerableRevInfos(balanceDeltaAboveDustThreshold: Long, channelId: BinaryData) = {
-    def txidAndInfo(rc: RichCursor) = (rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
-    val cursor = db.select(RevokedInfoTable.selectLocalSql, params = channelId, balanceDeltaAboveDustThreshold)
-    val unsentInfos = (RichCursor(cursor).vec(txidAndInfo).toMap -- OlympusWrap.pendingWatchTxIds) take 100
+  type TxIdAndRevInfoMap = Map[String, String]
+  def getVulnerableRevInfos(chan: Channel) = chan(identity) map { cs =>
+    // Find previous channel states which peer might be tempted to spend but omit too small deltas
+    def toTxidAndInfo(shiftedRc: RichCursor) = (shiftedRc string RevokedInfoTable.txId, shiftedRc string RevokedInfoTable.info)
+    val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat - dust.amount * 4 * 1000L)
+    RichCursor(cursor) vec toTxidAndInfo
+  } getOrElse Vector.empty
+
+  def getCerberusActs(infos: TxIdAndRevInfoMap) = {
+    // Remove currently pending infos and limit max number of uploads
+    val notPendingInfos = infos -- OlympusWrap.pendingWatchTxIds take 100
 
     val encrypted = for {
-      txid \ revInfo <- unsentInfos.toSeq
+      txid \ revInfo <- notPendingInfos
       txidBytes = BinaryData(txid).toArray
       revInfoBytes = BinaryData(revInfo).toArray
       enc = AES.encBytes(revInfoBytes, txidBytes)
