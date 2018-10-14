@@ -21,6 +21,7 @@ import com.lightning.walletapp.ln.LNParams.minDepth
 import android.view.inputmethod.InputMethodManager
 import com.lightning.walletapp.lnutils.RatesSaver
 import android.support.v7.app.AppCompatActivity
+import ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
 import fr.acinq.bitcoin.MilliSatoshi
@@ -39,10 +40,6 @@ import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import android.content.{Context, Intent}
 import java.util.{Timer, TimerTask}
-
-import ViewGroup.LayoutParams.WRAP_CONTENT
-import InputMethodManager.HIDE_NOT_ALWAYS
-import Context.INPUT_METHOD_SERVICE
 
 
 object Utils {
