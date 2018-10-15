@@ -335,7 +335,6 @@ object ChannelManager extends Broadcaster {
       serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
     } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
 
-
     def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
       // Extract RevocationInfo for a given breach transaction
       val cursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)

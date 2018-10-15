@@ -107,12 +107,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     // Update affected record states in a database, then retry failed payments where possible
     val fulfilledIncoming = for (Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled) yield add
 
-    def maybeWatchInfos(watch: Boolean) = if (watch) {
-      // Collect vulnerable infos from all channels on finalized off-chain payments
-      val infos = ChannelManager.notClosingOrRefunding.flatMap(getVulnerableRevInfos)
-      getCerberusActs(infos.toMap) foreach OlympusWrap.tellClouds
-    }
-
     def newRoutes(rd: RoutingData) =
       ChannelManager checkIfSendable rd match {
         case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
@@ -122,9 +116,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
         case _ =>
           // UI will be updated upstream
           updStatus(FAILURE, rd.pr.paymentHash)
-          // We have multiple vulnerable states currently
-          // because of multiple failed payment attempts
-          maybeWatchInfos(fulfilledIncoming.isEmpty)
       }
 
     db txWrap {
@@ -151,16 +142,20 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     uiNotify
-    maybeWatchInfos(fulfilledIncoming.nonEmpty)
     if (cs.localCommit.spec.fulfilled.nonEmpty) {
       // Let the clouds know since they may be waiting
       // also vibrate to let a user know it's fulfilled
       OlympusWrap tellClouds OlympusWrap.CMDStart
       com.lightning.walletapp.Vibrator.vibrate
     }
+
+    if (fulfilledIncoming.nonEmpty) {
+      // Collect vulnerable infos from all channels on finalized off-chain payments
+      val infos = ChannelManager.notClosingOrRefunding.flatMap(getVulnerableRevInfos)
+      getCerberusActs(infos.toMap) foreach OlympusWrap.tellClouds
+    }
   }
 
-  type TxIdAndRevInfoMap = Map[String, String]
   def getVulnerableRevInfos(chan: Channel) = chan(identity) map { cs =>
     // Find previous channel states which peer might be tempted to spend but omit too small deltas
     def toTxidAndInfo(shiftedRc: RichCursor) = (shiftedRc string RevokedInfoTable.txId, shiftedRc string RevokedInfoTable.info)
@@ -168,6 +163,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     RichCursor(cursor) vec toTxidAndInfo
   } getOrElse Vector.empty
 
+  type TxIdAndRevInfoMap = Map[String, String]
   def getCerberusActs(infos: TxIdAndRevInfoMap) = {
     // Remove currently pending infos and limit max number of uploads
     val notPendingInfos = infos -- OlympusWrap.pendingWatchTxIds take 100
