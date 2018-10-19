@@ -307,11 +307,11 @@ object Scripts { me =>
                   remoteHtlcPubkey: PublicKey, spec: CommitmentSpec) = {
 
     val finder = new PubKeyScriptIndexFinder(commitTx)
-    def makeHtlcTx(redeem: ScriptEltSeq, pubKey: ScriptEltSeq, amount: Satoshi, fee: Satoshi, expiry: Long) = {
+    def makeHtlcTx(redeem: ScriptEltSeq, pubKeyScript: ScriptEltSeq, amount: Satoshi, fee: Satoshi, expiry: Long) = {
       val index = finder.findPubKeyScriptIndex(pubkeyScript = Script.write(Script pay2wsh redeem), Option apply amount)
       val inputInfo = InputInfo(OutPoint(commitTx, index), commitTx.txOut(index), Script write redeem)
       val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, 0x00000000L) :: Nil
-      val txOut = TxOut(amount - fee, pubKey) :: Nil
+      val txOut = TxOut(amount - fee, pubKeyScript) :: Nil
       val tx = Transaction(2, txIn, txOut, expiry)
       inputInfo -> tx
     }
