@@ -222,6 +222,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
         case JsString("ClaimHtlcTimeoutTx") => json.convertTo[ClaimHtlcTimeoutTx]
         case JsString("ClaimP2WPKHOutputTx") => json.convertTo[ClaimP2WPKHOutputTx]
         case JsString("ClaimDelayedOutputTx") => json.convertTo[ClaimDelayedOutputTx]
+        case JsString("ClaimDelayedOutputPenaltyTx") => json.convertTo[ClaimDelayedOutputPenaltyTx]
         case JsString("MainPenaltyTx") => json.convertTo[MainPenaltyTx]
         case JsString("HtlcPenaltyTx") => json.convertTo[HtlcPenaltyTx]
         case JsString("ClosingTx") => json.convertTo[ClosingTx]
@@ -236,6 +237,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case transactionWithInputInfo: ClaimHtlcTimeoutTx => transactionWithInputInfo.toJson
       case transactionWithInputInfo: ClaimP2WPKHOutputTx => transactionWithInputInfo.toJson
       case transactionWithInputInfo: ClaimDelayedOutputTx => transactionWithInputInfo.toJson
+      case transactionWithInputInfo: ClaimDelayedOutputPenaltyTx => transactionWithInputInfo.toJson
       case transactionWithInputInfo: MainPenaltyTx => transactionWithInputInfo.toJson
       case transactionWithInputInfo: HtlcPenaltyTx => transactionWithInputInfo.toJson
       case transactionWithInputInfo: ClosingTx => transactionWithInputInfo.toJson
@@ -268,6 +270,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val htlcPenaltyTxFmt = taggedJsonFmt(jsonFormat[InputInfo, Transaction,
     HtlcPenaltyTx](HtlcPenaltyTx.apply, "input", "tx"), tag = "HtlcPenaltyTx")
+
+  implicit val claimDelayedOutputPenaltyTxFmt = taggedJsonFmt(jsonFormat[InputInfo, Transaction,
+    ClaimDelayedOutputPenaltyTx](ClaimDelayedOutputPenaltyTx.apply, "input", "tx"), tag = "ClaimDelayedOutputPenaltyTx")
 
   implicit val closingTxFmt = taggedJsonFmt(jsonFormat[InputInfo, Transaction,
     ClosingTx](ClosingTx.apply, "input", "tx"), tag = "ClosingTx")
