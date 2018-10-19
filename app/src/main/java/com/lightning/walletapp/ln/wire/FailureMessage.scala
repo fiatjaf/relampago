@@ -71,7 +71,7 @@ object FailureMessageCodecs {
     .typecase(cr = provide(IncorrectPaymentAmount), tag = PERM | 16)
     .typecase(cr = provide(FinalExpiryTooSoon), tag = 17)
     .typecase(cr = (uint32 withContext "expiry").as[FinalIncorrectCltvExpiry], tag = 18)
-    .typecase(cr = (uint32 withContext "amountMsat").as[FinalIncorrectHtlcAmount], tag = 19)
+    .typecase(cr = (uint64 withContext "amountMsat").as[FinalIncorrectHtlcAmount], tag = 19)
     .typecase(cr = disabled.as[ChannelDisabled], tag = UPDATE | 20)
     .typecase(cr = provide(ExpiryTooFar), tag = 21)
 }
