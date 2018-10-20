@@ -54,7 +54,6 @@ object Scripts { me =>
   }
 
   // LN SCRIPTS
-  // @formatter:off
 
   def toLocalDelayed(revocationPubkey: PublicKey, toSelfDelay: Int,
                      localDelayedPaymentPubkey: PublicKey): ScriptEltSeq =
@@ -120,8 +119,6 @@ object Scripts { me =>
         OP_CHECKSIG ::
       OP_ENDIF ::
     OP_ENDIF :: Nil
-
-  // @formatter:on
 
   // TRANSACTION TEMPLATES
 

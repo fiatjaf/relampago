@@ -552,7 +552,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // This may be one of our own 1st tier transactions
         // or they may broadcast a 2nd tier, catch all of them
         if cd.revokedCommit.exists(_ spendsFromRevoked htlcTx) => for {
-          revCommitPublished <- cd.revokedCommit.find(_ spendsFromRevoked htlcTx)
+          revCommitPublished <- cd.revokedCommit if revCommitPublished spendsFromRevoked htlcTx
           Some(punishTx) <- Closing.claimRevokedHtlcTxOutputs(cd.commitments, revCommitPublished.commitTx, htlcTx)
           punishTxj = com.lightning.walletapp.lnutils.ImplicitConversions.bitcoinLibTx2bitcoinjTx(punishTx)
         } com.lightning.walletapp.Utils.app.kit blockSend punishTxj
