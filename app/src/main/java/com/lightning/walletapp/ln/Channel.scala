@@ -550,7 +550,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (cd: ClosingData, CMDSpent(htlcTx), CLOSING)
         // This may be one of our own 1st tier transactions
-        // or they may broadcast a 2nd tier, catch all of them
+        // or they may broadcast their 1st tier, catch all of them
         if cd.revokedCommit.exists(_ spendsFromRevoked htlcTx) => for {
           revCommitPublished <- cd.revokedCommit if revCommitPublished spendsFromRevoked htlcTx
           Some(punishTx) <- Closing.claimRevokedHtlcTxOutputs(cd.commitments, revCommitPublished.commitTx, htlcTx)
