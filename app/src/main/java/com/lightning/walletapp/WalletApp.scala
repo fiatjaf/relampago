@@ -347,6 +347,14 @@ object ChannelManager extends Broadcaster {
       } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri, tx)
     }
 
+    def CLOSEANDWATCHREVHTLC(cd: ClosingData) = {
+      // After publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
+      // our job here is to watch every output of every revoked commit tx and re-spend it before their CSV delay runs out
+      repeat(OlympusWrap getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ map CMDSpent foreach process, none)
+      app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
+      BECOME(STORE(cd), CLOSING)
+    }
+
     def CLOSEANDWATCH(cd: ClosingData) = {
       val tier12txs = for (state <- cd.tier12States) yield state.txn
       if (tier12txs.nonEmpty) OlympusWrap tellClouds UploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")

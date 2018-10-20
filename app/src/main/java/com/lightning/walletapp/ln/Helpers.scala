@@ -3,6 +3,7 @@ package com.lightning.walletapp.ln
 import fr.acinq.bitcoin._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Scripts._
+import com.lightning.walletapp.ln.crypto.ShaChain._
 import com.lightning.walletapp.ln.crypto.Generators._
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import scala.util.{Success, Try}
@@ -259,6 +260,32 @@ object Helpers {
 
       RevokedCommitPublished(claimMainTx.toSeq,
         claimPenaltyTx.toSeq, htlcPenaltyTxs, tx)
+    }
+
+    def claimRevokedHtlcTxOutputs(commitments: Commitments, commitTx: Transaction, htlcTx: Transaction) = {
+      val txNumber = Scripts.obscuredCommitTxNumber(number = Scripts.decodeTxNumber(commitTx.txIn.head.sequence, commitTx.lockTime),
+        !commitments.localParams.isFunder, commitments.remoteParams.paymentBasepoint, commitments.localParams.paymentBasepoint)
+
+      val index = moves(largestTxIndex - txNumber)
+      getHash(commitments.remotePerCommitmentSecrets.hashes)(index) map { perCommitSecret =>
+        // This is something which spends from revoked commit tx, try as if it's Success or Timeout
+
+        val remotePerCommitmentSecretScalar = Scalar(perCommitSecret)
+        val remotePerCommitmentPoint = remotePerCommitmentSecretScalar.toPoint
+        val remoteDelayedPaymentPubkey = derivePubKey(commitments.remoteParams.delayedPaymentBasepoint, remotePerCommitmentPoint)
+        val remoteRevocationPrivkey = revocationPrivKey(commitments.localParams.revocationSecret, remotePerCommitmentSecretScalar)
+
+        for {
+          penaltyHtlcTx <- Scripts.makeClaimDelayedOutputPenaltyTx(htlcTx, commitments.localParams.dustLimit,
+            remoteRevocationPrivkey.publicKey, commitments.localParams.toSelfDelay, remoteDelayedPaymentPubkey,
+            commitments.localParams.defaultFinalScriptPubKey, LNParams.broadcaster.perKwThreeSat,
+            commitments.localParams.dustLimit).toOption
+
+          sig = Scripts.sign(remoteRevocationPrivkey)(penaltyHtlcTx)
+          signed = Scripts.addSigs(penaltyHtlcTx, revocationSig = sig)
+          penalty <- Scripts.checkValid(signed).toOption
+        } yield penalty.tx
+      }
     }
   }
 

@@ -37,6 +37,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
   def SEND(msg: LightningMessage): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
+  def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit
   def STORE(content: HasCommitments): HasCommitments
   def GETREV(tx: Transaction): Option[RevokedCommitPublished]
   def REV(cs: Commitments, rev: RevokeAndAck): Unit
@@ -547,6 +548,16 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         BECOME(me STORE d1, CLOSING)
 
 
+      case (cd: ClosingData, CMDSpent(htlcTx), CLOSING)
+        // This may be one of our own 1st tier transactions
+        // or they may broadcast a 2nd tier, catch all of them
+        if cd.revokedCommit.exists(_ spendsFromRevoked htlcTx) => for {
+          revCommitPublished <- cd.revokedCommit.find(_ spendsFromRevoked htlcTx)
+          Some(punishTx) <- Closing.claimRevokedHtlcTxOutputs(cd.commitments, revCommitPublished.commitTx, htlcTx)
+          punishTxj = com.lightning.walletapp.lnutils.ImplicitConversions.bitcoinLibTx2bitcoinjTx(punishTx)
+        } com.lightning.walletapp.Utils.app.kit blockSend punishTxj
+
+
       case (some: HasCommitments, CMDSpent(tx), _)
         // GUARD: tx which spends our funding is broadcasted, must react
         if tx.txIn.exists(input => some.commitments.commitInput.outPoint == input.outPoint) =>
@@ -558,8 +569,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case (_, _, close: ClosingData) if close.localCommit.exists(_.commitTx.txid == tx.txid) => Tools log s"Existing local $tx"
           case (_, _, close: ClosingData) if close.localProposals.exists(_.unsignedTx.tx.txid == tx.txid) => startMutualClose(close, tx)
           case (_, _, negs: NegotiationsData) if negs.localProposals.exists(_.unsignedTx.tx.txid == tx.txid) => startMutualClose(negs, tx)
-          case (Some(claim), _, closingData: ClosingData) => BECOME(me STORE closingData.modify(_.revokedCommit).using(claim +: _), CLOSING)
-          case (Some(claim), _, _) => BECOME(me STORE ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil), CLOSING)
+          case (Some(claim), _, closingData: ClosingData) => me CLOSEANDWATCHREVHTLC closingData.modify(_.revokedCommit).using(claim +: _)
+          case (Some(claim), _, _) => me CLOSEANDWATCHREVHTLC ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil)
           case (_, Left(nextRemote), _) if nextRemote.txid == tx.txid => startRemoteNextClose(some, nextRemote)
           case _ if some.commitments.remoteCommit.txid == tx.txid => startRemoteCurrentClose(some)
           case _ => startLocalClose(some)

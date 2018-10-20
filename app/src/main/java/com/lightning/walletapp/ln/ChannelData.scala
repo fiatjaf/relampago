@@ -173,6 +173,9 @@ case class MutualCommitPublished(commitTx: Transaction) extends CommitPublished
 case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimTheirMainPenalty: Seq[MainPenaltyTx],
                                   htlcPenalty: Seq[HtlcPenaltyTx], commitTx: Transaction) extends CommitPublished {
 
+  def spendsFromRevoked(htlcTx: Transaction): Boolean =
+    htlcTx.txIn.map(_.outPoint.txid).contains(commitTx.txid)
+
   override def getState = {
     val main = for (t1 <- claimMain) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
     val their = for (t1 <- claimTheirMainPenalty) yield ShowReady(t1.tx, t1 -- t1, t1.tx.allOutputsAmount)
