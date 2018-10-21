@@ -61,6 +61,7 @@ class RevokedInfoSpec {
       override def STORE(content: HasCommitments): HasCommitments = content
       override def ASKREFUNDPEER(some: HasCommitments, point: Point): Unit = none
       override def CLOSEANDWATCH(close: ClosingData): Unit = none
+      override def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit = none
       override def GETREV(tx: Transaction): Option[RevokedCommitPublished] = None
       data = NormalData(announce = null, commitments = c1)
     }
@@ -95,6 +96,7 @@ class RevokedInfoSpec {
       override def STORE(content: HasCommitments): HasCommitments = content
       override def ASKREFUNDPEER(some: HasCommitments, point: Point): Unit = none
       override def CLOSEANDWATCH(close: ClosingData): Unit = none
+      override def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit = none
       override def GETREV(tx: Transaction): Option[RevokedCommitPublished] = None
       data = NormalData(announce = null, commitments = c2)
     }
