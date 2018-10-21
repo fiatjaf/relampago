@@ -276,10 +276,9 @@ object Helpers {
         val remoteRevocationPrivkey = revocationPrivKey(commitments.localParams.revocationSecret, remotePerCommitmentSecretScalar)
 
         for {
-          penaltyHtlcTx <- Scripts.makeClaimDelayedOutputPenaltyTx(htlcTx, commitments.localParams.dustLimit,
-            remoteRevocationPrivkey.publicKey, commitments.localParams.toSelfDelay, remoteDelayedPaymentPubkey,
-            commitments.localParams.defaultFinalScriptPubKey, LNParams.broadcaster.perKwThreeSat,
-            commitments.localParams.dustLimit).toOption
+          penaltyHtlcTx <- Scripts.makeClaimDelayedOutputPenaltyTx(htlcTx, remoteRevocationPrivkey.publicKey,
+            commitments.localParams.toSelfDelay, remoteDelayedPaymentPubkey, commitments.localParams.defaultFinalScriptPubKey,
+            LNParams.broadcaster.perKwThreeSat, commitments.localParams.dustLimit).toOption
 
           sig = Scripts.sign(remoteRevocationPrivkey)(penaltyHtlcTx)
           signed = Scripts.addSigs(penaltyHtlcTx, revocationSig = sig)

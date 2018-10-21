@@ -7,6 +7,7 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.Helpers.Funding
 import com.lightning.walletapp.ln.Scripts._
 import com.lightning.walletapp.ln.crypto.Generators
+import com.lightning.walletapp.ln.crypto.Generators._
 import com.lightning.walletapp.ln.wire.UpdateAddHtlc
 import fr.acinq.bitcoin.{BinaryData, Btc, MilliBtc, OutPoint, Satoshi, Script, Transaction, TxOut, _}
 import fr.acinq.bitcoin.Crypto.{sign => _, _}
@@ -20,6 +21,28 @@ import scala.util.{Failure, Random, Success, Try}
 class TransactionsSpec {
   def allTests = {
 
+    {
+      val htlcTx = Transaction.read("02000000014ae539d5b7967b50fc3071f5460927275d195e46868dc81a2cf400256572f3ca000000000000000000012a6b010000000000220020633a5f65a0247fa919f14ceab9ff5afd00cf9de5a36b09530d53facb9a43ea7300000000")
+      val dustLimit = Satoshi(1100L)
+      val remoteRevocationPubkey = PublicKey("02fead8896083932987c1293a34826a5293abab9ead093280cb78283434a2767da")
+      val toSelfDelay = 144
+      val remoteDelayedPaymentPubkey = PublicKey("0221c61fca26c469d6e64ae22b10173767f4ac26a0eac3187e601ea9639c1ab960")
+      val defaultFinalScriptPubKey = BinaryData("0014888dbbd7998f9f80d4f82b4f9ce6d5882f310aec")
+      val feeratePerKwPenalty = 10000L
+      val resultPenaltyTx = Transaction.read("0200000001fdefba99dc8708aff81e1479c454dac7d6e1eb689b44dee43915f4a4882e947c0000000000ffffffff013858010000000000160014888dbbd7998f9f80d4f82b4f9ce6d5882f310aec00000000")
+      val singnedPenaltyTx = Transaction.read("02000000000101fdefba99dc8708aff81e1479c454dac7d6e1eb689b44dee43915f4a4882e947c0000000000ffffffff013858010000000000160014888dbbd7998f9f80d4f82b4f9ce6d5882f310aec0347304402204765cf132741a5c367b1a9de300f129595d7e03f64d9347ae9e83212caa8c09b0220414e891d3e896aaf29e4b0b89091d9d9d53d0d23ed7a5dc7391e1a36e5ddae3b0101014d632102fead8896083932987c1293a34826a5293abab9ead093280cb78283434a2767da67029000b275210221c61fca26c469d6e64ae22b10173767f4ac26a0eac3187e601ea9639c1ab96068ac00000000")
+      val remotePerCommitmentSecret = Scalar("4fedc052c833811ff298ebad5107911a394d0f87d0113554377f822b9f8b9417")
+      val remoteRevocationPrivkey = revocationPrivKey(PrivateKey("e1d4a574e8757e0ce365410ff57f1cf82d37a63d3c87faad02bd85599bc935c101"), remotePerCommitmentSecret)
+
+      val notSigned = Scripts.makeClaimDelayedOutputPenaltyTx(htlcTx,
+        remoteRevocationPubkey, toSelfDelay, remoteDelayedPaymentPubkey,
+        defaultFinalScriptPubKey, feeratePerKwPenalty,
+        dustLimit).get
+
+      val sig = Scripts.sign(remoteRevocationPrivkey)(notSigned)
+      val signed = Scripts.addSigs(notSigned, revocationSig = sig)
+      Transaction.correctlySpends(signed.tx, Seq(htlcTx), ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS)
+    }
 
     {
       println("encode/decode sequence and locktime (one example)")

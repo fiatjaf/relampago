@@ -435,9 +435,9 @@ object Scripts { me =>
     HtlcPenaltyTx(inputInfo, tx)
   }
 
-  def makeClaimDelayedOutputPenaltyTx(delayedOutputTx: Transaction, localDustLimit: Satoshi, localRevocationPubkey: PublicKey,
-                                      toLocalDelay: Int, localDelayedPaymentPubkey: PublicKey, localFinalScriptPubKey: BinaryData,
-                                      feeratePerKw: Long, dustLimit: Satoshi): Try[ClaimDelayedOutputPenaltyTx] = Try {
+  def makeClaimDelayedOutputPenaltyTx(delayedOutputTx: Transaction, localRevocationPubkey: PublicKey, toLocalDelay: Int,
+                                      localDelayedPaymentPubkey: PublicKey, localFinalScriptPubKey: BinaryData, feeratePerKw: Long,
+                                      dustLimit: Satoshi): Try[ClaimDelayedOutputPenaltyTx] = Try {
 
     val finder = new PubKeyScriptIndexFinder(delayedOutputTx)
     val redeem = toLocalDelayed(localRevocationPubkey, toLocalDelay, localDelayedPaymentPubkey)
