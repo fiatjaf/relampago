@@ -151,7 +151,7 @@ object RevokedInfoTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-extends SQLiteOpenHelper(context, name, null, 5) {
+extends SQLiteOpenHelper(context, name, null, 3) {
 
   val base = getWritableDatabase
   // Note: BinaryData and PublicKey should always yield raw strings for this to work
