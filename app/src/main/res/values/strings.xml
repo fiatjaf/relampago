@@ -285,4 +285,9 @@
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
     <string name="ln_ops_start_fund_incoming_channel">incoming channel</string>
     <string name="ln_url_resolving">Resolving request</string>
+
+    <!-- Olympus log messages -->
+    <string name="olympus_log_channel_backup">Saved an encrypted backup for a channel %1$s</string>
+    <string name="olympus_log_watch_payments">Started watching %1$s old channel states</string>
+    <string name="olympus_log_refunding_tx">Scheduled a delayed refunding transaction</string>
 </resources>

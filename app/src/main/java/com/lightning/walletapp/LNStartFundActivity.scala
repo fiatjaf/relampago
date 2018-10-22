@@ -15,8 +15,8 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import android.widget.{ImageButton, TextView}
 import scala.util.{Success, Try}
 
+import com.lightning.walletapp.lnutils.olympus.ChannelUploadAct
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import com.lightning.walletapp.lnutils.olympus.UploadAct
 import com.lightning.walletapp.ln.Scripts.pubKeyScript
 import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
@@ -109,15 +109,11 @@ class LNStartFundActivity extends TimerActivity { me =>
       // error here will halt all further progress
       freshChan STORE some
 
-      // Start watching a channel funding script and save a channel
-      val fundingScript = some.commitments.commitInput.txOut.publicKeyScript
-      app.kit.wallet.addWatchedScripts(Collections singletonList fundingScript)
-
-      // Attempt to save a channel on the cloud right away
-      val refund = RefundingData(some.announce, None, some.commitments)
-      val encrypted = AES.encReadable2Hex(refund.toJson.toString, LNParams.cloudSecret)
-      val act = UploadAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put")
-      OlympusWrap tellClouds act
+      // Start watching a channel funding script and save a channel, order an encrypted backup upload
+      app.kit.wallet.addWatchedScripts(Collections singletonList some.commitments.commitInput.txOut.publicKeyScript)
+      val encrypted = AES.encReadable2Hex(RefundingData(some.announce, None, some.commitments).toJson.toString, LNParams.cloudSecret)
+      val channelUploadAct = ChannelUploadAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put", some.announce.alias)
+      OlympusWrap tellClouds channelUploadAct
     }
 
     def localWalletListener = new LocalOpenListener {

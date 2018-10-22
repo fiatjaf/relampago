@@ -151,7 +151,7 @@ object RevokedInfoTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-extends SQLiteOpenHelper(context, name, null, 2) {
+extends SQLiteOpenHelper(context, name, null, 5) {
 
   val base = getWritableDatabase
   // Note: BinaryData and PublicKey should always yield raw strings for this to work
@@ -185,7 +185,8 @@ extends SQLiteOpenHelper(context, name, null, 2) {
   }
 
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
-    // Should work for large version gap because CREATE IF EXISTS
+    // Should work even for updates across many version ranges
+    // because each table and index has CREATE IF EXISTS prefix
     dbs execSQL RevokedInfoTable.createSql
     dbs execSQL OlympusLogTable.createSql
   }

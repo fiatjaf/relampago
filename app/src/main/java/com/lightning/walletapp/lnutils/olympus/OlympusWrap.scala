@@ -1,6 +1,7 @@
 package com.lightning.walletapp.lnutils.olympus
 
 import spray.json._
+import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.LNParams._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
@@ -11,12 +12,13 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import language.postfixOps
 import java.math.BigInteger
 import java.net.ProtocolException
+import com.lightning.walletapp.Utils.app
 import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.ln.PaymentRequest
 import com.lightning.walletapp.helper.RichCursor
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
-import com.lightning.walletapp.lnutils.{OlympusTable, RevokedInfoTable}
+import com.lightning.walletapp.lnutils.{OlympusLogTable, OlympusTable, RevokedInfoTable}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, OutRequest}
 import fr.acinq.bitcoin.{BinaryData, Transaction}
 import rx.lang.scala.{Observable => Obs}
@@ -29,16 +31,29 @@ trait CloudAct {
   val path: String
 }
 
+// TODO: UploadAct is here for legacy reasons, remove later
 case class CloudData(info: Option[RequestAndMemo], tokens: Vector[ClearToken], acts: CloudActVec)
+case class LegacyAct(data: BinaryData, plus: Seq[HttpParam], path: String) extends CloudAct { def onDone = none }
 case class CerberusAct(data: BinaryData, plus: Seq[HttpParam], path: String, txids: StringVec) extends CloudAct {
   // This is an act for uploading a pack of RevocationInfo objects, affected records should be marked once uploaded
-  def setUploaded = for (txid <- txids) db.change(RevokedInfoTable.setUploadedSql, txid)
-  def onDone = db txWrap setUploaded
+
+  def onDone = db txWrap {
+    val text = app.getString(olympus_log_refunding_tx).format(txids.size)
+    for (oldTxid <- txids) db.change(RevokedInfoTable.setUploadedSql, oldTxid)
+    db.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
+  }
 }
 
-case class UploadAct(data: BinaryData, plus: Seq[HttpParam], path: String) extends CloudAct {
-  // This is a basic act for uploading data such as channels and refunding txs, needs no actions
-  def onDone = none
+case class TxUploadAct(data: BinaryData, plus: Seq[HttpParam], path: String) extends CloudAct {
+  // This is an act for uploading refunding transactions when channel gets closed uncooperatively
+  def onDone = db.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
+  def text = app.getString(olympus_log_refunding_tx)
+}
+
+case class ChannelUploadAct(data: BinaryData, plus: Seq[HttpParam], path: String, alias: String) extends CloudAct {
+  // This is an act for uploading a channel encrypted backup once a transaction for a new channel gets broadcasted
+  def onDone = db.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
+  def text = app.getString(olympus_log_channel_backup).format(alias)
 }
 
 object OlympusWrap extends OlympusProvider {

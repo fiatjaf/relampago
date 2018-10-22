@@ -31,7 +31,7 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCode
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import com.lightning.walletapp.lnutils.olympus.UploadAct
+import com.lightning.walletapp.lnutils.olympus.TxUploadAct
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import com.lightning.walletapp.helper.RichCursor
@@ -357,7 +357,7 @@ object ChannelManager extends Broadcaster {
 
     def CLOSEANDWATCH(cd: ClosingData) = {
       val tier12txs = for (state <- cd.tier12States) yield state.txn
-      if (tier12txs.nonEmpty) OlympusWrap tellClouds UploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
+      if (tier12txs.nonEmpty) OlympusWrap tellClouds TxUploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
       repeat(OlympusWrap getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
       // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
       app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)

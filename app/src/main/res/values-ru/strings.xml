@@ -287,4 +287,9 @@
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
     <string name="ln_ops_start_fund_incoming_channel">входящий канал</string>
     <string name="ln_url_resolving">Resolving request</string>
+
+    <!-- Olympus log messages -->
+    <string name="olympus_log_channel_backup">Сохранен зашифрованный бекап для канала «%1$s»</string>
+    <string name="olympus_log_watch_payments">Начато наблюдение за %1$s старыми состояниями</string>
+    <string name="olympus_log_refunding_tx">Сохранена отложенная возвратная транзакция</string>
 </resources>
