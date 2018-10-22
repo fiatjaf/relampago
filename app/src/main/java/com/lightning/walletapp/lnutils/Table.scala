@@ -19,10 +19,22 @@ object OlympusTable extends Table {
   val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
   val createSql = s"""
-    CREATE TABLE $table (
+    CREATE TABLE IF NOT EXISTS $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $identifier TEXT NOT NULL UNIQUE,
       $url STRING NOT NULL UNIQUE, $data STRING NOT NULL, $auth INTEGER NOT NULL,
       $order INTEGER NOT NULL, $removable INTEGER NOT NULL
+    )"""
+}
+
+object OlympusLogTable extends Table {
+  val (table, tokensUsed, explanation, stamp) = ("olympuslog", "tokensused", "explanation", "stamp")
+  val newSql = s"INSERT INTO $table ($tokensUsed, $explanation, $stamp) VALUES (?, ?, ?)"
+  val selectAllSql = s"SELECT * FROM $table LIMIT 48"
+
+  val createSql = s"""
+    CREATE TABLE IF NOT EXISTS $table (
+      $id INTEGER PRIMARY KEY AUTOINCREMENT, $tokensUsed INTEGER NOT NULL,
+      $explanation STRING NOT NULL, $stamp INTEGER NOT NULL
     )"""
 }
 
@@ -34,7 +46,7 @@ object ChannelTable extends Table {
   val killSql = s"DELETE FROM $table WHERE $identifier = ?"
 
   val createSql = s"""
-    CREATE TABLE $table (
+    CREATE TABLE IF NOT EXISTS $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $identifier TEXT NOT NULL UNIQUE,
       $data STRING NOT NULL
@@ -48,16 +60,15 @@ object BadEntityTable extends Table {
   val updSql = s"UPDATE $table SET $expire = ?, $amount = ? WHERE $resId = ?"
 
   val createSql = s"""
-    CREATE TABLE $table (
+    CREATE TABLE IF NOT EXISTS $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT,
       $resId STRING NOT NULL UNIQUE,
       $expire INTEGER NOT NULL,
       $amount INTEGER NOT NULL
     );
 
-    /* id index is created automatically */
-    /* unique resId index is created automatically */
-    CREATE INDEX idx1$table ON $table ($expire, $amount);
+    /* resId index is created automatically because it's UNIQUE */
+    CREATE INDEX IF NOT EXISTS idx1$table ON $table ($expire, $amount);
     COMMIT
     """
 }
@@ -70,14 +81,13 @@ object RouteTable extends Table {
   val killSql = s"DELETE FROM $table WHERE $targetNode = ?"
 
   val createSql = s"""
-    CREATE TABLE $table (
+    CREATE TABLE IF NOT EXISTS $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $path STRING NOT NULL,
       $targetNode STRING NOT NULL UNIQUE, $expire INTEGER NOT NULL
     );
 
-    /* id index is created automatically */
-    /* unique targetNode index is created automatically */
-    CREATE INDEX idx1$table ON $table ($targetNode, $expire);
+    /* targetNode index is created automatically because it's UNIQUE */
+    CREATE INDEX IF NOT EXISTS idx1$table ON $table ($targetNode, $expire);
     COMMIT
     """
 }
@@ -102,22 +112,19 @@ object PaymentTable extends Table {
   val updFailWaitingAndFrozenSql = s"UPDATE $table SET $status = $FAILURE WHERE $status IN ($WAITING, $FROZEN)"
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
 
-  val createVSql = s"""
-    CREATE VIRTUAL TABLE $fts$table
-    USING $fts($search, $hash)
-    """
+  // Once incoming or outgoing payment is settled we can search it by various metadata
+  val createVSql = s"CREATE VIRTUAL TABLE IF NOT EXISTS $fts$table USING $fts($search, $hash)"
 
   val createSql = s"""
-    CREATE TABLE $table (
+    CREATE TABLE IF NOT EXISTS $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $pr STRING NOT NULL, $preimage STRING NOT NULL, $incoming INTEGER NOT NULL,
       $status INTEGER NOT NULL, $stamp INTEGER NOT NULL, $description STRING NOT NULL, $hash STRING NOT NULL UNIQUE,
       $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL, $chanId STRING NOT NULL
     );
 
-    /* id index is created automatically */
-    /* hash index is created automatically */
-    CREATE INDEX idx1$table ON $table ($status);
-    CREATE INDEX idx2$table ON $table ($chanId);
+    /* hash index is created automatically because it's UNIQUE */
+    CREATE INDEX IF NOT EXISTS idx1$table ON $table ($status);
+    CREATE INDEX IF NOT EXISTS idx2$table ON $table ($chanId);
     COMMIT
     """
 }
@@ -130,14 +137,14 @@ object RevokedInfoTable extends Table {
   val selectTxIdSql = s"SELECT * FROM $table WHERE $txId = ?"
 
   val createSql = s"""
-    CREATE TABLE $table (
+    CREATE TABLE IF NOT EXISTS $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $txId STRING NOT NULL,
       $chanId STRING NOT NULL, $myBalance INTEGER NOT NULL,
       $info STRING NOT NULL, $uploaded INTEGER NOT NULL
     );
 
-    CREATE INDEX idx2$table ON $table ($chanId, $myBalance, $uploaded);
-    CREATE INDEX idx1$table ON $table ($txId);
+    CREATE INDEX IF NOT EXISTS idx2$table ON $table ($chanId, $myBalance, $uploaded);
+    CREATE INDEX IF NOT EXISTS idx1$table ON $table ($txId);
     COMMIT
     """
 }
@@ -150,7 +157,6 @@ extends SQLiteOpenHelper(context, name, null, 2) {
   // Note: BinaryData and PublicKey should always yield raw strings for this to work
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
-  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = dbs execSQL RevokedInfoTable.createSql
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.walletapp/table/$tbl"
 
   def txWrap(run: => Unit) = try {
@@ -164,8 +170,10 @@ extends SQLiteOpenHelper(context, name, null, 2) {
     dbs execSQL PaymentTable.createVSql
     dbs execSQL PaymentTable.createSql
     dbs execSQL ChannelTable.createSql
-    dbs execSQL OlympusTable.createSql
     dbs execSQL RouteTable.createSql
+
+    dbs execSQL OlympusLogTable.createSql
+    dbs execSQL OlympusTable.createSql
 
     // Randomize an order of two available default servers
     val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
@@ -174,5 +182,11 @@ extends SQLiteOpenHelper(context, name, null, 2) {
     val dev2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9103", emptyData, "0", ord2, "1")
     dbs.execSQL(OlympusTable.newSql, dev1)
     dbs.execSQL(OlympusTable.newSql, dev2)
+  }
+
+  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
+    // Should work for large version gap because CREATE IF EXISTS
+    dbs execSQL RevokedInfoTable.createSql
+    dbs execSQL OlympusLogTable.createSql
   }
 }
