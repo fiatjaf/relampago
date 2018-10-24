@@ -275,7 +275,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   case class ShowDelayedWrap(stat: ShowDelayed) extends ItemWrap {
     val getDate = new java.util.Date(System.currentTimeMillis + stat.delay)
-    val humanSum = sumIn.format(denom formatted stat.amount)
+    def humanSum = sumIn.format(denom formatted stat.amount)
 
     def humanWhen = {
       val now = System.currentTimeMillis
