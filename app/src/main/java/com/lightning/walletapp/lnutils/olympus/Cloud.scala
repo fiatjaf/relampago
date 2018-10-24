@@ -62,9 +62,6 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
           wrap(me BECOME data1)(action.onDone)
 
         case _ =>
-          val acts1 = data.acts diff Vector(action)
-          val data1 = data.copy(acts = acts1, tokens = ts)
-          wrap(me BECOME data1)(action.onDone)
       }
 
     // We do not have any acts or tokens but have a memo
