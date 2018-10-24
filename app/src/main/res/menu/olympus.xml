@@ -1,0 +1,15 @@
+<menu
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        app:showAsAction="never"
+        android:id="@+id/actionAddEntity"
+        android:title="@string/olympus_add"/>
+
+    <item
+        app:showAsAction="never"
+        android:id="@+id/actionTokenLog"
+        android:title="@string/olympus_log"/>
+
+</menu>

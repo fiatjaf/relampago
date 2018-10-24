@@ -29,7 +29,7 @@ object OlympusTable extends Table {
 object OlympusLogTable extends Table {
   val (table, tokensUsed, explanation, stamp) = ("olympuslog", "tokensused", "explanation", "stamp")
   val newSql = s"INSERT INTO $table ($tokensUsed, $explanation, $stamp) VALUES (?, ?, ?)"
-  val selectAllSql = s"SELECT * FROM $table LIMIT 48"
+  val selectAllSql = s"SELECT * FROM $table ORDER BY $stamp DESC LIMIT 6"
 
   val createSql = s"""
     CREATE TABLE IF NOT EXISTS $table (

@@ -9,22 +9,26 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.lnutils.olympus._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+import android.widget.{ArrayAdapter, CheckBox, EditText, TextView}
+import android.view.{Menu, MenuItem, ViewGroup}
+
 import android.support.v7.widget.helper.ItemTouchHelper
+import com.lightning.walletapp.lnutils.OlympusLogTable
+import com.lightning.walletapp.helper.RichCursor
 import com.lightning.walletapp.ln.LNParams
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Utils.HEX
 import android.app.AlertDialog
 import android.os.Bundle
 import android.net.Uri
-
-import android.widget.{CheckBox, EditText, TextView}
-import android.view.{Menu, MenuItem, ViewGroup}
+import java.util.Date
 
 
-class OlympusActivity extends TimerActivity { me =>
-  lazy val toolbar = findViewById(R.id.toolbar).asInstanceOf[Toolbar]
+class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val serverList = findViewById(R.id.serverList).asInstanceOf[RecyclerView]
   lazy val tokensLeft = getResources getStringArray R.array.olympus_tokens_left
+  lazy val toolbar = findViewById(R.id.toolbar).asInstanceOf[Toolbar]
+  lazy val host = me
 
   val adapter = new GestureAdapter[Cloud, GestureViewHolder] {
     override def onCreateViewHolder(parent: ViewGroup, viewType: Int) = {
@@ -77,7 +81,7 @@ class OlympusActivity extends TimerActivity { me =>
   }
 
   def onUpdate = LNParams.db txWrap {
-    val updated = adapter.getData.asScala.toVector
+    val updated: Vector[Cloud] = adapter.getData.asScala.toVector
     for (removed <- clouds diff updated) remove(removed.identifier)
     for (cloud \ order <- updated.zipWithIndex) addServer(cloud, order)
     for (cloud \ order <- updated.zipWithIndex) updMeta(cloud, order)
@@ -102,11 +106,12 @@ class OlympusActivity extends TimerActivity { me =>
 
   override def onOptionsItemSelected(m: MenuItem) = {
     if (m.getItemId == R.id.actionAddEntity) new FormManager(addNewCloud, olympus_add)
+    else if (m.getItemId == R.id.actionTokenLog) viewTokenUsageLog
     true
   }
 
   override def onCreateOptionsMenu(menu: Menu) = {
-    getMenuInflater.inflate(R.menu.add_entity, menu)
+    getMenuInflater.inflate(R.menu.olympus, menu)
     true
   }
 
@@ -124,5 +129,15 @@ class OlympusActivity extends TimerActivity { me =>
       next(uriChecker.toString, if (serverBackup.isChecked) 1 else 0)
       alert.dismiss
     }
+  }
+
+  def viewTokenUsageLog = {
+    val events = RichCursor(LNParams.db select OlympusLogTable.selectAllSql) vec { rc =>
+      val stamp = when(thenDate = new Date(rc long OlympusLogTable.stamp), now = System.currentTimeMillis)
+      s"<font color=#999999><strong>$stamp</strong></font> ${rc string OlympusLogTable.explanation}".html
+    }
+
+    val adapter = new ArrayAdapter(me, android.R.layout.simple_list_item_1, events.toArray)
+    new AlertDialog.Builder(me).setCustomTitle(me getString olympus_log).setAdapter(adapter, null).create.show
   }
 }

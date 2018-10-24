@@ -58,10 +58,11 @@
     ]]></string>
 
     <!-- Olympus server -->
+    <string name="olympus_log">Лог действий</string>
+    <string name="olympus_add">Добавить сервер</string>
+    <string name="olympus_edit">Изменить сервер</string>
     <string name="olympus_actions">Добавить, убрать, переместить</string>
     <string name="olympus_backup">Бэкап-сервер</string>
-    <string name="olympus_edit">Изменить сервер</string>
-    <string name="olympus_add">Добавить сервер</string>
     <string name="olympus_hint">хост:порт</string>
 
     <array name="olympus_tokens_left">
@@ -289,7 +290,7 @@
     <string name="ln_url_resolving">Resolving request</string>
 
     <!-- Olympus log messages -->
-    <string name="olympus_log_channel_backup">Сохранен зашифрованный бекап для канала «%1$s»</string>
+    <string name="olympus_log_channel_backup">Сохранен зашифрованный бекап для канала с «%1$s»</string>
     <string name="olympus_log_watch_payments">Начато наблюдение за %1$s старыми состояниями</string>
     <string name="olympus_log_refunding_tx">Сохранена отложенная возвратная транзакция</string>
 </resources>

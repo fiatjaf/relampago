@@ -38,7 +38,7 @@ case class CerberusAct(data: BinaryData, plus: Seq[HttpParam], path: String, txi
   // This is an act for uploading a pack of RevocationInfo objects, affected records should be marked once uploaded
 
   def onDone = db txWrap {
-    val text = app.getString(olympus_log_refunding_tx).format(txids.size)
+    val text = app.getString(olympus_log_watch_payments).format(txids.size)
     for (oldTxid <- txids) db.change(RevokedInfoTable.setUploadedSql, oldTxid)
     db.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
   }

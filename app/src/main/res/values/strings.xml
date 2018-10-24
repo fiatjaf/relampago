@@ -62,10 +62,11 @@
     ]]></string>
 
     <!-- Olympus server -->
+    <string name="olympus_log">Token usage log</string>
+    <string name="olympus_add">Add Olympus server</string>
+    <string name="olympus_edit">Edit Olympus server</string>
     <string name="olympus_actions">Add, remove or reorder</string>
     <string name="olympus_backup">Watchtower and backups</string>
-    <string name="olympus_edit">Edit Olympus server</string>
-    <string name="olympus_add">Add Olympus server</string>
     <string name="olympus_hint">Server host:port</string>
 
     <array name="olympus_tokens_left">
@@ -287,7 +288,7 @@
     <string name="ln_url_resolving">Resolving request</string>
 
     <!-- Olympus log messages -->
-    <string name="olympus_log_channel_backup">Saved an encrypted backup for a channel %1$s</string>
+    <string name="olympus_log_channel_backup">Saved an encrypted backup for a channel with «%1$s»</string>
     <string name="olympus_log_watch_payments">Started watching %1$s old channel states</string>
     <string name="olympus_log_refunding_tx">Scheduled a delayed refunding transaction</string>
 </resources>

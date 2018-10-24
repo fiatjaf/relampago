@@ -9,10 +9,10 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
+import android.view.{View, ViewGroup}
 import fr.acinq.bitcoin.{BinaryData, Satoshi}
-import android.view.{Menu, MenuItem, View, ViewGroup}
+import com.lightning.walletapp.ln.Tools.{none, wrap}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
-import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
@@ -231,15 +231,6 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   override def onDestroy = wrap(super.onDestroy) {
     app.kit.peerGroup removeBlocksDownloadedEventListener blocksListener
     for (chan <- localChanCache) chan.listeners -= becomeListener
-  }
-
-  override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
-    if (m.getItemId == R.id.actionAddEntity) me exitTo classOf[LNStartActivity]
-  }
-
-  override def onCreateOptionsMenu(menu: Menu) = {
-    getMenuInflater.inflate(R.menu.add_entity, menu)
-    true
   }
 
   def INIT(state: Bundle) = if (app.isAlive) {

@@ -47,7 +47,7 @@ class LNStartActivity extends ScanActivity { me =>
   override def onResume = wrap(super.onResume)(me returnToBase null)
   override def onCreateOptionsMenu(menu: Menu) = runAnd(true) {
     // Called after FragLNStart sets its toolbar as actionbar
-    getMenuInflater.inflate(R.menu.ln_start, menu)
+    getMenuInflater.inflate(R.menu.lnstart, menu)
     FragLNStart.fragment.setupSearch(menu)
   }
 
