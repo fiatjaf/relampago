@@ -190,11 +190,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       app.kit.wallet.removeWatchedScripts(Collections singletonList fundingScript)
       db.change(ChannelTable.killSql, wbr.commitments.channelId)
 
-    case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
+    case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated => db txWrap {
       val fundingScript: BinaryData = close.commitments.commitInput.txOut.publicKeyScript
       app.kit.wallet.removeWatchedScripts(Collections singletonList fundingScript)
       app.kit.wallet.removeWatchedScripts(app.kit closingPubKeyScripts close)
+      db.change(RevokedInfoTable.killSql, close.commitments.channelId)
       db.change(ChannelTable.killSql, close.commitments.channelId)
+    }
   }
 
   override def onBecome = {

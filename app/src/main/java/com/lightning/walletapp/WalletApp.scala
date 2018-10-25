@@ -430,9 +430,8 @@ object ChannelManager extends Broadcaster {
 
     for {
       routes <- paymentRoutesObs
-      cheapest = routes.sortBy(route => route.map(hop => hop.feeEstimate).sum)
       busyMap = all.map(chan => chan.data.announce.nodeId -> inFlightHtlcs(chan).size).toMap
-      unloadest = cheapest.sortBy(route => if (route.nonEmpty) busyMap(route.head.nodeId) else 0)
+      unloadest = routes.sortBy(route => if (route.nonEmpty) busyMap(route.head.nodeId) else 0)
     } yield useFirstRoute(unloadest, rd)
   }
 

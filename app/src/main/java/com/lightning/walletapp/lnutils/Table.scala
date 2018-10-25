@@ -135,6 +135,7 @@ object RevokedInfoTable extends Table {
   val newSql = s"INSERT INTO $table ($txId, $chanId, $myBalance, $info, $uploaded) VALUES (?, ?, ?, ?, 0)"
   val setUploadedSql = s"UPDATE $table SET $uploaded = 1 WHERE $txId = ?"
   val selectTxIdSql = s"SELECT * FROM $table WHERE $txId = ?"
+  val killSql = s"DELETE FROM $table WHERE $chanId = ?"
 
   val createSql = s"""
     CREATE TABLE IF NOT EXISTS $table (
