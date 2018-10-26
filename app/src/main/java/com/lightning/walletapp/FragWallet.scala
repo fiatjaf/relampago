@@ -549,11 +549,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         val runnableOpt = onChainRunnable(pr)
         val description = getDescription(pr.description)
-        val maxLocalCanSend = operationalChannels.map(estimateCanSend).max
-        val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalCanSend)
+        val maxLocalSend = operationalChannels.map(estimateCanSend).max
+        val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend)
         val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
-        val rateManager = new RateManager(baseContent) hint app.getString(amount_hint_can_send).format(denom withSign maxCappedSend)
-        val bld = baseBuilder(title = app.getString(ln_send_title).format(description).html, baseContent)
+        val bld = baseBuilder(app.getString(ln_send_title).format(description).html, baseContent)
+        val baseHint = app.getString(amount_hint_can_send).format(denom withSign maxCappedSend)
+        val rateManager = new RateManager(baseContent) hint baseHint
 
         val relayLink = new RelayNode(pr.nodeId) {
           def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
@@ -563,13 +564,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
           override def onDataUpdated = canDeliver match {
             case Some(relayable) if canShowGuaranteedDeliveryHint(relayable) =>
-              val deliverable = if (relayable > maxCappedSend) maxCappedSend else relayable
+              val deliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
               rateManager hint app.getString(amount_hint_can_deliver).format(denom withSign deliverable)
 
             case _ =>
-              val canSendHuman = denom withSign maxCappedSend
-              val template = app.getString(amount_hint_can_send)
-              rateManager hint template.format(canSendHuman)
+              // Set a base hint back again
+              rateManager hint baseHint
           }
         }
 

@@ -5,13 +5,15 @@ import com.neovisionaries.ws.client._
 import com.lightning.walletapp.lnutils.RelayNode._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 
 import rx.lang.scala.{Observable => Obs}
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
-import com.lightning.walletapp.ln.wire.NodeAnnouncement
+import com.lightning.walletapp.ln.wire.{Hop, NodeAnnouncement}
 import com.lightning.walletapp.ChannelManager
+import com.lightning.walletapp.ln.LNParams
 import fr.acinq.bitcoin.Crypto.PublicKey
+import fr.acinq.bitcoin.MilliSatoshi
 
 
 object RelayNode {
@@ -21,12 +23,12 @@ object RelayNode {
   def hasRelayPeerOnly = ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == relayNodeKey)
 }
 
-abstract class RelayNode(payeeNodeId: PublicKey) { me =>
+abstract class RelayNode(payeeNodeId: PublicKey) {
   var canDeliver: Option[MilliSatoshi] = None
   var wsOpt: Option[WebSocket] = None
 
   def start(ann: NodeAnnouncement) = {
-    type RelayChannelInfos = Seq[RelayChannelInfo]
+    type ChannelBalanceInfos = Seq[ChannelBalanceInfo]
     val endPoint = s"ws://${ann.workingAddress.getHostString}:$relaySockPort/ws"
     val ws = (new WebSocketFactory).createSocket(endPoint, 7500)
     ws.connectAsynchronously
@@ -37,21 +39,25 @@ abstract class RelayNode(payeeNodeId: PublicKey) { me =>
         Obs.just(null).delay(2.seconds).doOnTerminate(ws.recreate.connectAsynchronously).foreach(none)
 
       override def onTextMessage(ws: WebSocket, raw: String) = {
-        val balances = to[RelayChannelInfos](raw).filter(_.peerNodeId == payeeNodeId).map(_.balances)
-        val fromMe2Relay = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse 0L
-        // 10 sat for routing + 4000000 sat max amount / 0.01% = 400 so in total we have to reserve 410 sat
-        val fromRelay2Payee = balances.map(_.canSendMsat - 410000L).reduceOption(_ max _) getOrElse 0L
-        val deliverableThroughRelay = MilliSatoshi(fromMe2Relay min fromRelay2Payee max 0L)
-        canDeliver = if (balances.isEmpty) None else Some(deliverableThroughRelay)
+        val fromRelay2PayeeBalances = to[ChannelBalanceInfos](raw).filter(_.peerNodeId == payeeNodeId)
+        val fromRelay2PayeeMaxSendable = fromRelay2PayeeBalances.map(_.withoutMaxFee).reduceOption(_ max _) getOrElse 0L
+        val fromMe2RelayMaxSendable = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse 0L
+        val deliverableThroughRelay = MilliSatoshi(fromMe2RelayMaxSendable min fromRelay2PayeeMaxSendable max 0L)
+        canDeliver = if (deliverableThroughRelay.amount <= 2000L) None else Some(deliverableThroughRelay)
         onDataUpdated
       }
     }
   }
 
   def onDataUpdated: Unit
-  def disconnect = for (ws: WebSocket <- wsOpt)
+  def disconnect = for (ws <- wsOpt)
     runAnd(ws.clearListeners)(ws.disconnect)
 }
 
-case class RelayChannelState(canSendMsat: Long, canReceiveMsat: Long)
-case class RelayChannelInfo(balances: RelayChannelState, channelId: BinaryData, peerNodeId: PublicKey)
+case class ChannelBalance(canSendMsat: Long, canReceiveMsat: Long)
+case class ChannelBalanceInfo(balance: ChannelBalance, peerNodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
+                              htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) {
+
+  val hop = Hop(peerNodeId, shortChannelId, cltvExpiryDelta, htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
+  val withoutMaxFee = balance.canSendMsat - feeBaseMsat - LNParams.maxHtlcValueMsat * feeProportionalMillionths / 1000000L
+}
