@@ -292,11 +292,14 @@ object LightningMessageCodecs { me =>
     (binarydata(32) withContext "chainHash") ::
       (int64 withContext "shortChannelId") ::
       (uint32 withContext "timestamp") ::
-      (binarydata(2) withContext "flags") ::
-      (uint16 withContext "cltvExpiryDelta") ::
-      (uint64 withContext "htlcMinimumMsat") ::
-      (uint32 withContext "feeBaseMsat") ::
-      (uint32 withContext "feeProportionalMillionths")
+      (byte withContext "messageFlags").flatPrepend { messageFlags =>
+        (byte withContext "channelFlags" ) ::
+          (uint16 withContext "cltvExpiryDelta") ::
+          (uint64 withContext "htlcMinimumMsat") ::
+          (uint32 withContext "feeBaseMsat") ::
+          (uint32 withContext "feeProportionalMillionths" ) ::
+          (conditional(included = (messageFlags & 1) != 0, uint64) withContext "htlcMaximumMsat")
+      }
 
   private val hop =
     (publicKey withContext "nodeId") ::
@@ -313,10 +316,8 @@ object LightningMessageCodecs { me =>
       (uint32 withContext "outgoingCltv") ::
       (ignore(8 * 12) withContext "unusedWithV0VersionOnHeader")
 
-  private val channelUpdate = (signature withContext "signature") :: channelUpdateWitness
-  private val nodeAnnouncement = (signature withContext "signature") :: nodeAnnouncementWitness
-  val nodeAnnouncementCodec: Codec[NodeAnnouncement] = nodeAnnouncement.as[NodeAnnouncement]
-  val channelUpdateCodec: Codec[ChannelUpdate] = channelUpdate.as[ChannelUpdate]
+  val nodeAnnouncementCodec: Codec[NodeAnnouncement] = (signature.withContext("signature") :: nodeAnnouncementWitness).as[NodeAnnouncement]
+  val channelUpdateCodec: Codec[ChannelUpdate] = (signature.withContext("signature") :: channelUpdateWitness).as[ChannelUpdate]
   val perHopPayloadCodec: Codec[PerHopPayload] = perHopPayload.as[PerHopPayload]
   val hopCodec: Codec[Hop] = hop.as[Hop]
 

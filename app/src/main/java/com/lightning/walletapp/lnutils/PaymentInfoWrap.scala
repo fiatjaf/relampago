@@ -110,11 +110,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     def newRoutes(rd: RoutingData) =
       ChannelManager checkIfSendable rd match {
         case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
-          // First attempt may have been made through a Proxy node, remove this constraint for next try
-          me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, throughPeers = Set.empty, useCache = false)
+          // We can still make a call to fetch more payment route candidates
+          me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
 
         case _ =>
-          // UI will be updated upstream
+          // Nope, UI will be updated upstream
           updStatus(FAILURE, rd.pr.paymentHash)
       }
 
@@ -264,13 +264,12 @@ object BadEntityWrap {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
     val cursor = db.select(BadEntityTable.selectSql, params = System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
-    val fromAsString = for (peerPubKey: PublicKey <- from.toSet) yield peerPubKey.toString
-    val badChansAsLong = for (shortChanId: String <- badChans) yield shortChanId.toLong
 
+    val fromAsString = from.map(_.toString).toSet
     // One of blacklisted nodes may become our peer or final payee
     val filteredBadNodes = badNodes - targetId.toString -- fromAsString
     OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, filteredBadNodes,
-      badChansAsLong, fromAsString, targetId.toString)
+      badChans.map(_.toLong), fromAsString, targetId.toString)
   }
 }
 
@@ -284,10 +283,8 @@ object GossipCatcher extends ChannelListener {
     } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
 
     case (chan, norm: NormalData, upd: ChannelUpdate)
-      // GUARD: we already have an old or empty Hop, replace it with a new one
-      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId)
-        && Announcements.checkSig(upd, chan.data.announce.nodeId) =>
-
+      // GUARD: we have an old or empty Hop, replace it with (peer -> localPhone) hop
+      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
       chan.process(upd toHop chan.data.announce.nodeId)
       chan.listeners -= GossipCatcher
   }

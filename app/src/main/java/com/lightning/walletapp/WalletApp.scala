@@ -26,7 +26,6 @@ import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import android.content.{ClipData, ClipboardManager, Context}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
-
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
@@ -407,10 +406,8 @@ object ChannelManager extends Broadcaster {
   }
 
   def fetchRoutes(rd: RoutingData) = {
-    // First we collect chans which in principle can handle a given payment sum right now
-    // after we get the results we first prioritize cheapest routes and then routes which belong to currently less busy chans
+    // First we collect chans which in principle can handle a given payment sum right now, then prioritize less busy chans
     val from = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
-    val from1 = if (rd.throughPeers.nonEmpty) from.filter(rd.throughPeers.contains) else from
 
     def withHints = for {
       tag <- Obs from rd.pr.routingInfo
@@ -418,15 +415,20 @@ object ChannelManager extends Broadcaster {
       completeRoutes = partialRoutes.map(_ ++ tag.route)
     } yield Obs just completeRoutes
 
-    def getRoutes(targetId: PublicKey) = from1 contains targetId match {
-      case false if rd.useCache => RouteWrap.findRoutes(from1, targetId, rd)
-      case false => BadEntityWrap.findRoutes(from1, targetId, rd)
+    def getRoutes(targetId: PublicKey) = from contains targetId match {
+      // Non empty routes at this point means (localPhone -> Joint -> payee) so don't search
+      case false if rd.routes.isEmpty && rd.useCache => RouteWrap.findRoutes(from, targetId, rd)
+      case false if rd.routes.isEmpty => BadEntityWrap.findRoutes(from, targetId, rd)
       case true => Obs just Vector(Vector.empty)
+      case _ => Obs just Vector.empty
     }
 
     val paymentRoutesObs =
-      if (from1.isEmpty) Obs error new LightningException(app getString ln_no_open_chans)
-      else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
+      if (from.isEmpty) Obs error new LightningException(app getString ln_no_open_chans)
+      // Normally supplied rd does not have any routes because it has just been created or all of routes have failed already
+      // but there is a special case where we relay through a Joint node and have (localPhone -> Joint -> payee) route at start
+      // in this case we also need to check if (localPhone -> payee) and (localPhone -> hint -> payee) exist without remote search
+      else Obs.zip(getRoutes(rd.pr.nodeId) +: Obs.just(rd.routes) +: withHints).map(_.flatten.toVector)
 
     for {
       routes <- paymentRoutesObs

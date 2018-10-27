@@ -330,8 +330,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def generatePopup = {
       val inFiat = msatInFiatHuman(info.firstSum)
-      val noRetry = if (info.pr.isFresh) dialog_retry else -1
-      val rd = emptyRD(info.pr, info.firstMsat, Set.empty, useCache = false)
+      val retry = if (info.pr.isFresh) dialog_retry else -1
+      val rd = emptyRD(info.pr, info.firstMsat, useCache = false)
       val humanStatus = s"<strong>${paymentStates apply info.actualStatus}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
@@ -386,13 +386,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           def useOnchain(alert: AlertDialog) = rm(alert)(runnable.run)
           // Offer a fallback onchain address if payment was not successfull
           if (info.actualStatus != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckFormNeutral(alert => rm(alert)(none), doSend(rd), useOnchain, bld, dialog_ok, noRetry, dialog_pay_onchain)
+          else mkCheckFormNeutral(alert => rm(alert)(none), doSend(rd), useOnchain, bld, dialog_ok, retry, dialog_pay_onchain)
 
         case 0 \ None =>
           val bld = baseBuilder(outgoingTitle.html, detailsWrapper)
           // Only allow user to retry this payment while using excluded nodes and channels but not an onchain option
           if (info.actualStatus != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckForm(alert => rm(alert)(none), doSend(rd), bld, dialog_ok, noRetry)
+          else mkCheckForm(alert => rm(alert)(none), doSend(rd), bld, dialog_ok, retry)
 
         case 1 \ _ =>
           // This is an incoming payment
@@ -503,11 +503,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val rateManager = new RateManager(content) hint baseHint
 
     def makeRequest(sum: MilliSatoshi, preimg: BinaryData) = {
-      val onChainFallback = Some(app.kit.currentAddress.toString)
       val info = content.findViewById(R.id.inputDescription).asInstanceOf[EditText].getText.toString.trim
-      val routes = chansWithRoutes.filterKeys(chan => estimateCanReceiveCapped(chan) >= sum.amount).values.toVector
-      val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimg, nodePrivateKey, info, onChainFallback, routes)
-      val rd = emptyRD(pr, sum.amount, Set.empty, useCache = true)
+      val routes = chansWithRoutes.filterKeys(channel => estimateCanReceiveCapped(channel) >= sum.amount).values.toVector
+      val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimg, nodePrivateKey, info, Some(app.kit.currentAddress.toString), routes)
+      val rd = emptyRD(pr, sum.amount, useCache = true)
 
       db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.pr.paymentHash)
       db.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
@@ -562,8 +561,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
               pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
               RelayNode.hasRelayPeerOnly // We only have a relay node as peer
 
-          override def onDataUpdated = canDeliver match {
-            case Some(relayable) if canShowGuaranteedDeliveryHint(relayable) =>
+          override def onDataUpdated = best match {
+            case Some(relayable \ _) if canShowGuaranteedDeliveryHint(relayable) =>
               val deliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
               rateManager hint app.getString(amount_hint_can_deliver).format(denom withSign deliverable)
 
@@ -573,18 +572,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           }
         }
 
-        def sendAttempt(alert: AlertDialog) = Tuple2(rateManager.result, relayLink.canDeliver) match {
-          case Success(ms) \ Some(relay) if relay < ms && RelayNode.hasRelayPeerOnly => app toast dialog_sum_big
+        def sendAttempt(alert: AlertDialog) = (rateManager.result, relayLink.best) match {
+          case Success(ms) \ Some(relayable \ _) if relayable < ms && RelayNode.hasRelayPeerOnly => app toast dialog_sum_big
           case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
           case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
           case Failure(emptyAmount) \ _ => app toast dialog_sum_empty
 
+          case Success(ms) \ Some(relayable \ hop) if ms <= relayable => rm(alert) {
+            // We have obtained a (Joint -> payee) route out of band and can use it right away
+            val rd = emptyRD(pr, ms.amount, useCache = true) plusOutOfBandRoute Vector(hop)
+            me doSend rd
+          }
+
           case Success(ms) \ _ => rm(alert) {
-            val peers = Set(RelayNode.relayNodeKey, pr.nodeId)
-            val canGuaranteeDelivery = relayLink.canDeliver.exists(relayable => ms <= relayable)
-            if (canGuaranteeDelivery) me doSend emptyRD(pr, ms.amount, peers, useCache = true)
-            else me doSend emptyRD(pr, ms.amount, Set.empty, useCache = true)
-            // Inform that channels are offline and some wait will happen
+            me doSend emptyRD(pr, ms.amount, useCache = true)
+            // Inform if channels are offline and some wait will happen
             val isOnline = operationalChannels.exists(_.state == OPEN)
             if (!isOnline) app toast ln_chan_offline
           }

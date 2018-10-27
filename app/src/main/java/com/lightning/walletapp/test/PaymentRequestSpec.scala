@@ -1,8 +1,10 @@
 package com.lightning.walletapp.test
 
+import java.nio.ByteOrder
+
 import com.lightning.walletapp.ln._
-import com.lightning.walletapp.ln.wire.ChannelUpdate
-import fr.acinq.bitcoin.{BinaryData, Block, Btc, Crypto, MilliBtc, MilliSatoshi, Satoshi}
+import com.lightning.walletapp.ln.wire.{ChannelUpdate, Hop}
+import fr.acinq.bitcoin.{BinaryData, Block, Btc, Crypto, MilliBtc, MilliSatoshi, Protocol, Satoshi}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 
 /**
@@ -40,12 +42,12 @@ class PaymentRequestSpec {
       assert(Some(MilliSatoshi(100000000)) == Amount.decode("1000000000p"))
     }
 
-    {
-      println("Pay 1 BTC without multiplier")
-      val ref = "lnbc11pdk67ujpp5gdvqef4hmd3g2djev34fl3uhz0rc6v403v8gzpwf2c6mzncmz0qsdqsf4ujqarfwqsxymmccqp29v9ej57ruyrf87twdat34z9wuug8gk0ukftu6kr3cpvvzw4xu6736922360favck2caryehmvz7d73z4dpgyr4vsmcvsna0y3qvr67qqr7tdjc"
-      val pr = PaymentRequest.read(ref)
-      assert(pr.amount == Some(MilliSatoshi(1 * 100000000000L)))
-    }
+//    {
+//      println("Pay 1 BTC without multiplier")
+//      val ref = "lnbc11pdk67ujpp5gdvqef4hmd3g2djev34fl3uhz0rc6v403v8gzpwf2c6mzncmz0qsdqsf4ujqarfwqsxymmccqp29v9ej57ruyrf87twdat34z9wuug8gk0ukftu6kr3cpvvzw4xu6736922360favck2caryehmvz7d73z4dpgyr4vsmcvsna0y3qvr67qqr7tdjc"
+//      val pr = PaymentRequest.read(ref)
+//      assert(pr.amount == Some(MilliSatoshi(1 * 100000000000L)))
+//    }
 
     {
       println("Please make a donation of any amount using payment_hash 0001020304050607080900010203040506070809000102030405060708090102 to me @03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")
@@ -105,11 +107,19 @@ class PaymentRequestSpec {
       val ref = "lnbc20m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqsfpp3qjmp7lwpagxun9pygexvgpjdc4jdj85fr9yq20q82gphp2nflc7jtzrcazrra7wwgzxqc8u7754cdlpfrmccae92qgzqvzq2ps8pqqqqqqpqqqqq9qqqvpeuqafqxu92d8lr6fvg0r5gv0heeeqgcrqlnm6jhphu9y00rrhy4grqszsvpcgpy9qqqqqqgqqqqq7qqzqj9n4evl6mr5aj9f58zp6fyjzup6ywn3x6sk8akg5v4tgn2q8g4fhx05wf6juaxu9760yp46454gpg5mtzgerlzezqcqvjnhjh8z3g2qqdhhwkj"
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lnbc")
-      assert(pr.amount == Some(MilliSatoshi(2000000000L)))
+      assert(pr.amount.contains(MilliSatoshi(2000000000L)))
       assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
       assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
-      println(pr.routingInfo == Vector(RoutingInfoTag(Vector(ChannelUpdate(BinaryData("00"),BinaryData("00"),72623859790382856L,1512989651,BinaryData("0000"),3,0,1,20).toHop(PublicKey("029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255")), ChannelUpdate(BinaryData("00"),BinaryData("00"),217304205466536202L,1512989651,BinaryData("0000"),4,0,2,30).toHop(PublicKey("039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255"))))))
+      assert(pr.description == "3925b6f67e2c340036ed12093dd44e0368df1b6ea26c53dbe4811f58fd5db8c1")
+
+      assert(pr.routingInfo == Vector(RoutingInfoTag(Vector(
+          Hop(PublicKey("029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255"),72623859790382856L,3,0,1,20),
+          Hop(PublicKey("039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255"),217304205466536202L,4,0,2,30)))))
+
+      assert(pr.fallbackAddress.contains("1RustyRX2oai4EYYDpQGWvEL62BBGqN9T"))
+      assert(BinaryData(Protocol.writeUInt64(0x0102030405060708L, ByteOrder.BIG_ENDIAN)) == BinaryData("0102030405060708"))
+      assert(BinaryData(Protocol.writeUInt64(0x030405060708090aL, ByteOrder.BIG_ENDIAN)) == BinaryData("030405060708090a"))
       assert(pr.tags.size == 4)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }

@@ -43,7 +43,7 @@ class AnnouncementsSpec {
 
     {
       println("create valid signed channel update announcement")
-      val ann = makeChannelUpdate(Block.RegtestGenesisBlock.hash, alicePk, randomKey.publicKey, 45561, 10, 10000, 100, 1, true, System.currentTimeMillis / 1000)
+      val ann = makeChannelUpdate(Block.RegtestGenesisBlock.hash, alicePk, randomKey.publicKey, 45561, 10, 10000, 100, 1, 500000000L)
       assert(checkSig(ann, alicePk.publicKey))
       assert(!checkSig(ann, randomKey.publicKey))
     }
@@ -55,22 +55,22 @@ class AnnouncementsSpec {
       // NB: node1 < node2 (public keys)
       assert(isNode1(node1_priv.publicKey.toBin, node2_priv.publicKey.toBin))
       assert(!isNode1(node2_priv.publicKey.toBin, node1_priv.publicKey.toBin))
-      val channelUpdate1 = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node1_priv, node2_priv.publicKey, 0, 0, 0, 0, 0, isEnabled = true, System.currentTimeMillis / 1000)
-      val channelUpdate1_disabled = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node1_priv, node2_priv.publicKey, 0, 0, 0, 0, 0, isEnabled = false, System.currentTimeMillis / 1000)
-      val channelUpdate2 = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node2_priv, node1_priv.publicKey, 0, 0, 0, 0, 0, isEnabled = true, System.currentTimeMillis / 1000)
-      val channelUpdate2_disabled = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node2_priv, node1_priv.publicKey, 0, 0, 0, 0, 0, isEnabled = false, System.currentTimeMillis / 1000)
-      assert(channelUpdate1.flags == BinaryData("0000")) // ....00
-      assert(channelUpdate1_disabled.flags == BinaryData("0002")) // ....10
-      assert(channelUpdate2.flags == BinaryData("0001")) // ....01
-      assert(channelUpdate2_disabled.flags == BinaryData("0003")) // ....11
-      assert(isNode1(channelUpdate1.flags))
-      assert(isNode1(channelUpdate1_disabled.flags))
-      assert(!isNode1(channelUpdate2.flags))
-      assert(!isNode1(channelUpdate2_disabled.flags))
-      assert(!isDisabled(channelUpdate1.flags))
-      assert(isDisabled(channelUpdate1_disabled.flags))
-      assert(!isDisabled(channelUpdate2.flags))
-      assert(isDisabled(channelUpdate2_disabled.flags))
+      val channelUpdate1 = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node1_priv, node2_priv.publicKey, 0, 0, 0, 0, 0, 500000000L, enable = true)
+      val channelUpdate1_disabled = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node1_priv, node2_priv.publicKey, 0, 0, 0, 0, 0, 500000000L, enable = false)
+      val channelUpdate2 = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node2_priv, node1_priv.publicKey, 0, 0, 0, 0, 0, 500000000L, enable = true)
+      val channelUpdate2_disabled = makeChannelUpdate(Block.RegtestGenesisBlock.hash, node2_priv, node1_priv.publicKey, 0, 0, 0, 0, 0, 500000000L, enable = false)
+      assert(channelUpdate1.channelFlags == 0) // ....00
+      assert(channelUpdate1_disabled.channelFlags == 2) // ....10
+      assert(channelUpdate2.channelFlags == 1) // ....01
+      assert(channelUpdate2_disabled.channelFlags == 3) // ....11
+      assert(isNode1(channelUpdate1.channelFlags))
+      assert(isNode1(channelUpdate1_disabled.channelFlags))
+      assert(!isNode1(channelUpdate2.channelFlags))
+      assert(!isNode1(channelUpdate2_disabled.channelFlags))
+      assert(isEnabled(channelUpdate1.channelFlags))
+      assert(!isEnabled(channelUpdate1_disabled.channelFlags))
+      assert(isEnabled(channelUpdate2.channelFlags))
+      assert(!isEnabled(channelUpdate2_disabled.channelFlags))
     }
 
   }
