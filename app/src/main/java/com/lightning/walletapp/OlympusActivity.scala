@@ -27,7 +27,6 @@ import java.util.Date
 class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val serverList = findViewById(R.id.serverList).asInstanceOf[RecyclerView]
   lazy val tokensLeft = getResources getStringArray R.array.olympus_tokens_left
-  lazy val toolbar = findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   lazy val host = me
 
   val adapter = new GestureAdapter[Cloud, GestureViewHolder] {
@@ -59,9 +58,11 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def INIT(savedInstanceState: Bundle) = {
-    wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_olympus)
-    wrap(getSupportActionBar setTitle sets_manage_olympus)(getSupportActionBar setSubtitle olympus_actions)
+    me setContentView R.layout.activity_olympus
+    me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     Utils clickableTextField findViewById(R.id.serverWhat)
+    getSupportActionBar setTitle sets_manage_olympus
+    getSupportActionBar setSubtitle olympus_actions
 
     adapter setData clouds.asJava
     adapter setDataChangeListener new GestureAdapter.OnDataChangeListener[Cloud] {

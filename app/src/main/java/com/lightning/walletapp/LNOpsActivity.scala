@@ -30,7 +30,6 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
   lazy val presentChans = app.getResources getStringArray R.array.ln_chan_present
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
-  lazy val toolbar = findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   lazy val otherState = getString(ln_info_status_other)
   lazy val fundingInfo = getString(ln_info_funding)
   lazy val host = me
@@ -233,10 +232,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     for (chan <- localChanCache) chan.listeners -= becomeListener
   }
 
-  def INIT(state: Bundle) = if (app.isAlive) {
-    wrap(me setSupportActionBar toolbar)(me setContentView R.layout.activity_ln_ops)
-    wrap(gridView setAdapter adapter)(getSupportActionBar setTitle action_ln_details)
+  def INIT(s: Bundle) = if (app.isAlive) {
+    me setContentView R.layout.activity_ln_ops
+    me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     getSupportActionBar setSubtitle app.plurOrZero(presentChans, localChanCache.size)
+    wrap(gridView setAdapter adapter)(getSupportActionBar setTitle action_ln_details)
     app.kit.peerGroup addBlocksDownloadedEventListener blocksListener
     for (chan <- localChanCache) chan.listeners += becomeListener
     gridView setNumColumns math.round(scrWidth / 2.4).toInt

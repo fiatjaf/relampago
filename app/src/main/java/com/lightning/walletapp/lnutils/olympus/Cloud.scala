@@ -85,9 +85,10 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         case other => Tools log other
       }
 
-    case (_, act: CloudAct) if isAuthEnabled || data.tokens.nonEmpty =>
-      // Keep processing until we fully run out of tokens in any case
-      me BECOME data.copy(acts = data.acts :+ act take 50)
+    case (_, act: CloudAct) =>
+      // Always accept acts and just store them if tokens are disabled
+      // by doing this we can catch channel backups and upload them later
+      me BECOME data.copy(acts = data.acts :+ act take 25)
       me doProcess CMDStart
 
     case _ =>

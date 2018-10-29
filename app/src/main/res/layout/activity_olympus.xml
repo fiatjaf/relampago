@@ -15,8 +15,8 @@
         android:id="@+id/toolbar"
 
         app:contentInsetLeft="@dimen/app_padding"
+        app:contentInsetStartWithNavigation="0dp"
         app:contentInsetStart="@dimen/app_padding"
-        app:contentInsetRight="@dimen/app_padding"
         app:contentInsetEnd="@dimen/app_padding"/>
 
     <TextView

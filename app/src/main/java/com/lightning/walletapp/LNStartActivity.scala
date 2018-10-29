@@ -139,9 +139,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     val batchPresentInfo = view.findViewById(R.id.batchPresentInfo).asInstanceOf[TextView]
     val batchPresentCancel = view.findViewById(R.id.batchPresentCancel).asInstanceOf[Button]
     val batchPresentWrap = view.findViewById(R.id.batchPresentWrap).asInstanceOf[LinearLayout]
-
     val lnStartNodesList = view.findViewById(R.id.lnStartNodesList).asInstanceOf[ListView]
-    val toolbar = view.findViewById(R.id.toolbar).asInstanceOf[android.support.v7.widget.Toolbar]
 
     def funderInfo(wrk: WSWrap, color: Int, text: Int) = host UITask {
       val humanAmountSum = denom withSign wrk.params.start.fundingAmount
@@ -212,9 +210,8 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
 
     // Init
     FragLNStart.fragment = me
-    host.setSupportActionBar(toolbar)
-    host.getSupportActionBar.setTitle(action_ln_open)
-    host.getSupportActionBar.setSubtitle(ln_status_peer)
+    me initToolbar view.findViewById(R.id.toolbar).asInstanceOf[android.support.v7.widget.Toolbar]
+    wrap(host.getSupportActionBar setTitle action_ln_open)(host.getSupportActionBar setSubtitle ln_status_peer)
     lnStartNodesList.setAdapter(adapter)
     host.checkTransData
     react(new String)

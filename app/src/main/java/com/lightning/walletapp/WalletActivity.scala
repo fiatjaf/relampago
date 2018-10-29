@@ -81,6 +81,16 @@ trait HumanTimeDisplay {
     if (now - ago < 129600000) getRelativeTimeSpanString(ago, now, 0).toString
     else time(thenDate)
   }
+
+  def initToolbar(toolbar: android.support.v7.widget.Toolbar) = {
+    // Show back arrow button to allow users to get back to wallet
+    // just kill current activity once a back button is tapped
+
+    host.setSupportActionBar(toolbar)
+    host.getSupportActionBar.setDisplayHomeAsUpEnabled(true)
+    host.getSupportActionBar.setDisplayShowHomeEnabled(true)
+    toolbar.setNavigationOnClickListener(host onButtonTap host.finish)
+  }
 }
 
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
