@@ -593,8 +593,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
 
         for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
-        for (rep <- RelayNode.relayPeerReports.headOption) relayLink start rep.chan.data.announce
-        bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = relayLink.disconnect }
+        val killWS = for (rep <- RelayNode.relayPeerReports.headOption) yield relayLink start rep.chan.data.announce
+        bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = for (off <- killWS) off.run }
         mkCheckFormNeutral(sendAttempt, none, alert => rm(alert) { for (onChain <- runnableOpt) onChain.run }, bld, dialog_pay, dialog_cancel,
           if (pr.amount.exists(askedSum => maxCappedSend >= askedSum) || runnableOpt.isEmpty) -1 else dialog_pay_onchain)
       }
