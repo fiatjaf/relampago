@@ -712,7 +712,7 @@ object Channel {
 
   def channelAndHop(chan: Channel) = for {
     Some(maybeDummyExtraHop) <- chan(_.extraHop)
-    if maybeDummyExtraHop.htlcMinimumMsat > 0L
+    if maybeDummyExtraHop.cltvExpiryDelta > 0
   } yield chan -> Vector(maybeDummyExtraHop)
 }
 

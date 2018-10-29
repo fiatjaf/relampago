@@ -13,13 +13,15 @@ import language.postfixOps
 import java.math.BigInteger
 import java.net.ProtocolException
 import com.lightning.walletapp.Utils.app
+import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.ln.PaymentRequest
 import com.lightning.walletapp.helper.RichCursor
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
+
 import com.lightning.walletapp.lnutils.{OlympusLogTable, OlympusTable, RevokedInfoTable}
-import com.lightning.walletapp.ln.wire.{NodeAnnouncement, OutRequest}
+import com.lightning.walletapp.ln.wire.{ChannelUpdate, NodeAnnouncement, OutRequest}
 import fr.acinq.bitcoin.{BinaryData, Transaction}
 import rx.lang.scala.{Observable => Obs}
 
@@ -95,11 +97,13 @@ class OlympusWrap extends OlympusProvider {
   def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, tryLater, clouds)
   def getShortId(txid: BinaryData) = failOver(_.connector getShortId txid, Obs.empty, clouds)
   def getChildTxs(ids: BinaryDataSeq) = failOver(_.connector getChildTxs ids, tryLater, clouds)
+  def findUpdate(nodeKey: PublicKey) = failOver(_.connector findUpdate nodeKey, Obs.empty, clouds)
   private[this] val tryLater = Obs error new ProtocolException("Try again later")
 }
 
 trait OlympusProvider {
   def findRoutes(out: OutRequest): Obs[PaymentRouteVec]
+  def findUpdate(nodeKey: PublicKey): Obs[ChannelUpdate]
   def findNodes(query: String): Obs[AnnounceChansNumVec]
   def getShortId(txid: BinaryData): Obs[BlockHeightAndTxIdx]
   def getChildTxs(txIds: BinaryDataSeq): Obs[TxSeq]
@@ -120,6 +124,7 @@ class Connector(val url: String) extends OlympusProvider {
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getShortId(txid: BinaryData) = ask[BlockHeightAndTxIdx]("shortid/get", "txid" -> txid.toString)
   def getChildTxs(txIds: BinaryDataSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
+  def findUpdate(nodeKey: PublicKey) = ask[ChannelUpdate]("router/update", "nodekey" -> nodeKey.toString)
   def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.hex)
   def http(requestPath: String) = post(s"$url/$requestPath", true).trustAllCerts.trustAllHosts.connectTimeout(15000)
 }

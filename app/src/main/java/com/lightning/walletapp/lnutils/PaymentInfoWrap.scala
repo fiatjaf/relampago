@@ -277,13 +277,27 @@ object GossipCatcher extends ChannelListener {
   // Catch ChannelUpdate to enable funds receiving
 
   override def onProcessSuccess = {
-    case (chan, norm: NormalData, _: CMDBestHeight) if norm.commitments.extraHop.isEmpty => for {
-      blockHeight \ txIndex <- app.olympus.getShortId(txid = Commitments fundingTxid norm.commitments)
-      shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
-    } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
+    case (chan, norm: NormalData, _: CMDBestHeight) if norm.commitments.extraHop.isEmpty =>
+      // Stage 1: we don't have any hop at all so at this point we need to obtain a shortChannelId
+
+      for {
+        blockHeight \ txIndex <- app.olympus.getShortId(Commitments fundingTxid norm.commitments)
+        shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, outputIndex = norm.commitments.commitInput.outPoint.index)
+        hop = Hop(chan.data.announce.nodeId, shortChannelId, cltvExpiryDelta = 0, 0L, 0L, feeProportionalMillionths = 0L)
+      } chan process hop
+
+    case (chan, norm: NormalData, _: CMDBestHeight)
+      // Stage 2: we have a dummy hop with real shortChannelId, obtain parameters
+      if norm.commitments.extraHop.nonEmpty && channelAndHop(chan).isEmpty =>
+
+      for {
+        dummyExtraHop <- norm.commitments.extraHop
+        ChannelUpdate(_, _, _, _, _, _, cltv, min, base, prop, _) <- app.olympus.findUpdate(chan.data.announce.nodeId)
+        hop = dummyExtraHop.copy(cltvExpiryDelta = cltv, htlcMinimumMsat = min, feeBaseMsat = base, feeProportionalMillionths = prop)
+      } chan process hop
 
     case (chan, norm: NormalData, upd: ChannelUpdate)
-      // GUARD: we have an old or empty Hop, replace it with (peer -> localPhone) hop
+      // Stage 3: we have an old or empty Hop, replace it with (peer -> localPhone) hop
       if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
       chan.process(upd toHop chan.data.announce.nodeId)
       chan.listeners -= GossipCatcher
