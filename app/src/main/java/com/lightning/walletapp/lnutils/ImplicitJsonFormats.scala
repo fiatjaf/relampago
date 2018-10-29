@@ -399,8 +399,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   // Relay node
 
-  implicit val channelBalanceFmt = jsonFormat[Long, Long,
-    ChannelBalance](ChannelBalance.apply, "canSendMsat", "canReceiveMsat")
+  implicit val channelBalanceFmt = jsonFormat[Long, Long, String, String,
+    ChannelBalance](ChannelBalance.apply, "canSendMsat", "canReceiveMsat", "url", "title")
 
   implicit val channelBalanceInfoFmt = jsonFormat[ChannelBalance, PublicKey, Long, Int, Long, Long, Long,
     ChannelBalanceInfo](ChannelBalanceInfo.apply, "balance", "peerNodeId", "shortChannelId", "cltvExpiryDelta",

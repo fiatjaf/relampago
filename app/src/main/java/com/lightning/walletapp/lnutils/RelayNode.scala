@@ -12,11 +12,13 @@ import com.lightning.walletapp.ChannelManager
 import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.ln.LNParams
 import fr.acinq.bitcoin.Crypto.PublicKey
+import com.lightning.walletapp.Utils.app
 import fr.acinq.bitcoin.MilliSatoshi
 
 
 object RelayNode {
   final val relayNodeKey = PublicKey("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd")
+  final val defaultRelayAnn = app.mkNodeAnnouncement(nodeId = relayNodeKey, host = "5.9.138.164", port = 8089)
   def relayPeerReports = ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == relayNodeKey)
   def hasRelayPeerOnly = ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == relayNodeKey)
 
@@ -55,7 +57,7 @@ abstract class RelayNode(payeeNodeId: PublicKey) {
   }
 }
 
-case class ChannelBalance(canSendMsat: Long, canReceiveMsat: Long)
+case class ChannelBalance(canSendMsat: Long, canReceiveMsat: Long, url: String, title: String)
 case class ChannelBalanceInfo(balance: ChannelBalance, peerNodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
                               htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
