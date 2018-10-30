@@ -551,20 +551,25 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val maxLocalSend = operationalChannels.map(estimateCanSend).max
         val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend)
         val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
-        val bld = baseBuilder(app.getString(ln_send_title).format(description).html, baseContent)
+        val baseTitle = str2View(app.getString(ln_send_title).format(app getString ln_send_title_default, description).html)
         val baseHint = app.getString(amount_hint_can_send).format(denom withSign maxCappedSend)
         val rateManager = new RateManager(baseContent) hint baseHint
+        val bld = baseBuilder(baseTitle, baseContent)
 
         val relayLink = new RelayNode(pr.nodeId) {
+          override def onDataUpdated = UITask(changeText).run
           def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
             (pr.amount.isEmpty && relayable >= maxCappedSend) || // No sum asked and we can deliver max amount
               pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
               RelayNode.hasRelayPeerOnly // We only have a relay node as peer
 
-          override def onDataUpdated = best match {
-            case Some(relayable \ _) if canShowGuaranteedDeliveryHint(relayable) =>
-              val deliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
-              rateManager hint app.getString(amount_hint_can_deliver).format(denom withSign deliverable)
+          def changeText = best match {
+            case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
+              val finalDeliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
+              val newTitle = app.getString(ln_send_title).format(chanBalInfo.balance.title, description).html
+              rateManager hint app.getString(amount_hint_can_deliver).format(denom withSign finalDeliverable)
+              baseTitle.findViewById(R.id.titleTip).asInstanceOf[TextView] setText newTitle
+              baseTitle setBackgroundColor 0x220099FE
 
             case _ =>
               // Set a base hint back again
@@ -578,9 +583,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
           case Failure(emptyAmount) \ _ => app toast dialog_sum_empty
 
-          case Success(ms) \ Some(relayable \ hop) if ms <= relayable => rm(alert) {
-            // We have obtained a (Joint -> payee) route out of band and can use it right away
-            val rd = emptyRD(pr, ms.amount, useCache = true) plusOutOfBandRoute Vector(hop)
+          case Success(ms) \ Some(relayable \ chanBalInfo) if ms <= relayable => rm(alert) {
+            // We have obtained a (Joint -> payee) route out of band so we can use it right away
+            val rd = emptyRD(pr, ms.amount, useCache = true) plusOutOfBandRoute Vector(chanBalInfo.hop)
             me doSend rd
           }
 

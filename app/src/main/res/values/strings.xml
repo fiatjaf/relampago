@@ -85,7 +85,6 @@
 
     <string name="action_coins_send">Send funds</string>
     <string name="action_coins_receive">Receive funds</string>
-    <string name="action_guaranteed">Guaranteed delivery</string>
     <string name="action_ln_details">View channel details</string>
     <string name="action_ln_open">Open new channel</string>
 
@@ -94,8 +93,6 @@
     <string name="amount_hint_sat"><![CDATA[Amount in Satoshi%1$s]]></string>
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
 
-    <string name="guaranteed_delivery_open">Open a channel with Joint node to enable guaranteed delivery</string>
-    <string name="guaranteed_delivery_hint">This is what can definitely be sent off-chain right now to the following destinations via Joint node</string>
     <string name="amount_hint_can_deliver"><![CDATA[<br><small><font color=#0099FE>can <strong>deliver</strong> %1$s</font></small>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>balance %3$s</small>]]></string>
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
@@ -151,9 +148,11 @@
     </array>
 
     <string name="send_scan_qr">Scan a QR code</string>
+    <string name="ln_send_title_default">Send Lightning payment</string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>%1$s</strong></font><small><br><br>%2$s</small>]]></string>
     <string name="send_paste_payment_request"><![CDATA[Paste a Bitcoin address<br><font color=#999999><small>or Lightning Payment Request</small></font>]]></string>
-    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning payment</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin transaction</strong></string></font>]]></string>
+
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><small><br><br>%1$s</small>]]></string>

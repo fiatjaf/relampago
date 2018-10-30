@@ -44,15 +44,15 @@ object RelayNode {
 
 abstract class RelayNode(payeeNodeId: PublicKey) {
   type ChannelBalanceInfos = Seq[ChannelBalanceInfo]
-  type BestDeliverableAndHop = (MilliSatoshi, Hop)
-  var best: Option[BestDeliverableAndHop] = None
+  type BestRelayInfo = (MilliSatoshi, ChannelBalanceInfo)
+  var best: Option[BestRelayInfo] = None
 
   def onDataUpdated: Unit
   def start(ann: NodeAnnouncement) = makeWebSocket(ann) { raw =>
     val me2JointMaxSendable = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse 0L
     val joint2PayeeMaxSendable = to[ChannelBalanceInfos](raw).filter(_.peerNodeId == payeeNodeId).sortBy(- _.withoutMaxFee).headOption
     val deliverableThroughJoint = MilliSatoshi(joint2PayeeMaxSendable.map(_.withoutMaxFee) getOrElse 0L min me2JointMaxSendable)
-    best = if (deliverableThroughJoint.amount <= 10000L) None else joint2PayeeMaxSendable.map(deliverableThroughJoint -> _.hop)
+    best = if (deliverableThroughJoint.amount <= 10000L) None else joint2PayeeMaxSendable.map(deliverableThroughJoint -> _)
     onDataUpdated
   }
 }
