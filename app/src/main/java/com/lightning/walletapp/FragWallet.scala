@@ -4,6 +4,7 @@ import spray.json._
 import android.view._
 import android.widget._
 import org.bitcoinj.core._
+
 import collection.JavaConverters._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
@@ -17,8 +18,8 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import android.os.{Bundle, Handler}
+
 import scala.util.{Failure, Success, Try}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import android.content.{DialogInterface, Intent}
@@ -36,7 +37,7 @@ import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import fr.acinq.bitcoin.Crypto.PublicKey
-import android.support.v4.content.Loader
+import android.support.v4.content.{ContextCompat, Loader}
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
@@ -569,6 +570,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
               val guaranteedDeliveryTitle = app.getString(ln_send_title_guaranteed).format(description).html
               rateManager hint app.getString(amount_hint_can_deliver).format(denom withSign finalDeliverable)
               baseTitle.findViewById(R.id.titleTip).asInstanceOf[TextView] setText guaranteedDeliveryTitle
+              baseTitle setBackgroundColor ContextCompat.getColor(host, R.color.ln)
 
             case _ =>
               // Set a base hint back again
