@@ -551,8 +551,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val maxLocalSend = operationalChannels.map(estimateCanSend).max
         val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend)
         val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
-        val baseTitle = str2View(app.getString(ln_send_title).format(app getString ln_send_title_default, description).html)
         val baseHint = app.getString(amount_hint_can_send).format(denom withSign maxCappedSend)
+        val baseTitle = str2View(app.getString(ln_send_title).format(description).html)
         val rateManager = new RateManager(baseContent) hint baseHint
         val bld = baseBuilder(baseTitle, baseContent)
 
@@ -566,10 +566,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           def changeText = best match {
             case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
               val finalDeliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
-              val newTitle = app.getString(ln_send_title).format(chanBalInfo.balance.title, description).html
+              val guaranteedDeliveryTitle = app.getString(ln_send_title_guaranteed).format(description).html
               rateManager hint app.getString(amount_hint_can_deliver).format(denom withSign finalDeliverable)
-              baseTitle.findViewById(R.id.titleTip).asInstanceOf[TextView] setText newTitle
-              baseTitle setBackgroundColor 0x220099FE
+              baseTitle.findViewById(R.id.titleTip).asInstanceOf[TextView] setText guaranteedDeliveryTitle
 
             case _ =>
               // Set a base hint back again
