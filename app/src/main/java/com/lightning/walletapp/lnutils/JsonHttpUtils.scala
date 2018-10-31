@@ -9,7 +9,6 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import rx.lang.scala.{Observable => Obs}
 
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.Fiat2Btc
-import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import org.bitcoinj.core.Transaction.DEFAULT_TX_FEE
 import com.lightning.walletapp.ChannelManager
 import rx.lang.scala.schedulers.IOScheduler
@@ -40,7 +39,7 @@ object JsonHttpUtils {
 }
 
 object RatesSaver {
-  def safe = retry(OlympusWrap.getRates, pickInc, 3 to 4)
+  def safe = retry(app.olympus.getRates, pickInc, 3 to 4)
   def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
     val sensibleSix = for (notZero <- newFee("6") +: rates.feesSix if notZero > 0) yield notZero
     val sensibleThree = for (notZero <- newFee("3") +: rates.feesThree if notZero > 0) yield notZero

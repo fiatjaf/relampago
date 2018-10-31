@@ -19,7 +19,6 @@ import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started, WalletZygote}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
-import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -248,7 +247,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   val tokensPrice = MilliSatoshi(1000000L)
   def goLNStart: Unit = me goTo classOf[LNStartActivity]
   def goOps(top: View): Unit = me goTo classOf[LNOpsActivity]
-  def goAddChannel(top: View) = if (OlympusWrap.backupExhausted) {
+  def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
     val humanPrice = s"${coloredIn apply tokensPrice} <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
     val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
     mkCheckForm(alert => rm(alert)(goLNStart), none, warn, dialog_ok, dialog_cancel)
@@ -296,7 +295,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     recoverFunds.setEnabled(ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
 
     recoverFunds setOnClickListener onButtonTap {
-      def recover = OlympusWrap getBackup cloudId foreach { backups =>
+      def recover = app.olympus getBackup cloudId foreach { backups =>
         // Decrypt channel recovery data and put it to channels list if it is not present already
         // then try to get new NodeAnnouncement for refunding channels, otherwise use an old one
 
@@ -311,7 +310,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           // Try to connect right away and maybe use new address later
           _ = ConnectionManager.connectTo(chan.data.announce, notify = false)
           // Can call findNodes without `retry` wrapper because it gives `Obs.empty` on error
-          Vector(ann1 \ _, _*) <- OlympusWrap findNodes chan.data.announce.nodeId.toString
+          Vector(ann1 \ _, _*) <- app.olympus findNodes chan.data.announce.nodeId.toString
         } chan process ann1
       }
 

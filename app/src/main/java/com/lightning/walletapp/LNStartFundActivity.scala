@@ -16,7 +16,6 @@ import android.widget.{ImageButton, TextView}
 import scala.util.{Success, Try}
 
 import com.lightning.walletapp.lnutils.olympus.ChannelUploadAct
-import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.ln.Scripts.pubKeyScript
 import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
@@ -113,7 +112,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       app.kit.wallet.addWatchedScripts(Collections singletonList some.commitments.commitInput.txOut.publicKeyScript)
       val encrypted = AES.encReadable2Hex(RefundingData(some.announce, None, some.commitments).toJson.toString, LNParams.cloudSecret)
       val channelUploadAct = ChannelUploadAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put", some.announce.alias)
-      OlympusWrap tellClouds channelUploadAct
+      app.olympus tellClouds channelUploadAct
     }
 
     def localWalletListener = new LocalOpenListener {

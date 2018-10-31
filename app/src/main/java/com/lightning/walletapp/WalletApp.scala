@@ -26,6 +26,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import android.content.{ClipData, ClipboardManager, Context}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
+
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
@@ -55,7 +56,7 @@ class WalletApp extends Application { me =>
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
   lazy val chainFile = new File(getFilesDir, chainFileName)
-  final val olympusWrapRef = OlympusWrap
+  var olympus: OlympusWrap = _
   var kit: WalletKit = _
 
   lazy val plur = getString(lang) match {
@@ -76,11 +77,14 @@ class WalletApp extends Application { me =>
   def toast(code: Int): Unit = toast(me getString code)
   def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
-  def isAlive = if (null == kit) false else kit.state match { case STARTING | RUNNING => null != db case _ => false }
-  def plurOrZero(opts: Array[String], number: Long) = if (number > 0) plur(opts, number) format number else opts(0)
+  def plurOrZero(opts: Array[String], num: Long) = if (num > 0) plur(opts, num) format num else opts(0)
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
   def toAddress(rawText: String) = Address.fromString(app.params, rawText)
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
+
+  def isAlive =
+    if (null == kit || null == olympus || null == db || null == extendedNodeKey) false
+    else kit.state match { case STARTING | RUNNING => true case _ => false }
 
   Utils.appReference = me
   override def onCreate = wrap(super.onCreate) {
@@ -151,11 +155,12 @@ class WalletApp extends Application { me =>
     }
 
     def setupAndStartDownload = {
+      app.olympus = new OlympusWrap
       wallet.setCoinSelector(new MinDepthReachedCoinSelector)
       wallet.autosaveToFile(walletFile, 1000, MILLISECONDS, null)
 
       Future {
-        val host = Uri.parse(olympusWrapRef.clouds.head.connector.url).getHost
+        val host = Uri.parse(app.olympus.clouds.head.connector.url).getHost
         val peer = new PeerAddress(app.params, InetAddress getByName host, 8333)
         peerGroup addAddress peer
       }
@@ -175,13 +180,13 @@ class WalletApp extends Application { me =>
         _ <- obsOnIO delay 20.seconds
         chan <- ChannelManager.notClosing if chan.state == SLEEPING
         // Can call findNodes without `retry` wrapper because it gives `Obs.empty` on error
-        Vector(ann1 \ _, _*) <- olympusWrapRef findNodes chan.data.announce.nodeId.toString
+        Vector(ann1 \ _, _*) <- app.olympus findNodes chan.data.announce.nodeId.toString
       } chan process ann1
 
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
       // Try to clear act leftovers if no channels are left
-      olympusWrapRef tellClouds olympusWrapRef.CMDStart
+      app.olympus tellClouds OlympusWrap.CMDStart
       PaymentInfoWrap.markFailedAndFrozen
       ChannelManager.initConnect
       RatesSaver.initialize
@@ -350,15 +355,15 @@ object ChannelManager extends Broadcaster {
     def CLOSEANDWATCHREVHTLC(cd: ClosingData) = {
       // After publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
       // our job here is to watch every output of every revoked commit tx and re-spend it before their CSV delay runs out
-      repeat(OlympusWrap getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ map CMDSpent foreach process, none)
+      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ map CMDSpent foreach process, none)
       app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
       BECOME(STORE(cd), CLOSING)
     }
 
     def CLOSEANDWATCH(cd: ClosingData) = {
       val tier12txs = for (state <- cd.tier12States) yield state.txn
-      if (tier12txs.nonEmpty) OlympusWrap tellClouds TxUploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
-      repeat(OlympusWrap getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
+      if (tier12txs.nonEmpty) app.olympus tellClouds TxUploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
+      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
       // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
       app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
       BECOME(STORE(cd), CLOSING)
@@ -366,7 +371,7 @@ object ChannelManager extends Broadcaster {
 
     def ASKREFUNDTX(ref: RefundingData) = {
       // Failsafe check in case if we are still in REFUNDING state after app is restarted
-      val txsObs = OlympusWrap getChildTxs Seq(ref.commitments.commitInput.outPoint.txid)
+      val txsObs = app.olympus getChildTxs Seq(ref.commitments.commitInput.outPoint.txid)
       txsObs.foreach(_ map CMDSpent foreach process, none)
     }
 

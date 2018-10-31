@@ -7,7 +7,6 @@ import scala.collection.JavaConverters._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.lnutils.olympus._
-import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import android.widget.{ArrayAdapter, CheckBox, EditText, TextView}
 import android.view.{Menu, MenuItem, ViewGroup}
@@ -64,7 +63,7 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
     getSupportActionBar setTitle sets_manage_olympus
     getSupportActionBar setSubtitle olympus_actions
 
-    adapter setData clouds.asJava
+    adapter setData app.olympus.clouds.asJava
     adapter setDataChangeListener new GestureAdapter.OnDataChangeListener[Cloud] {
       override def onItemReorder(item: Cloud, fromPos: Int, targetPos: Int) = onUpdate
       override def onItemRemoved(item: Cloud, position: Int) = onUpdate
@@ -83,11 +82,11 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def onUpdate = LNParams.db txWrap {
     val updated: Vector[Cloud] = adapter.getData.asScala.toVector
-    for (removed <- clouds diff updated) remove(removed.identifier)
-    for (cloud \ order <- updated.zipWithIndex) addServer(cloud, order)
-    for (cloud \ order <- updated.zipWithIndex) updMeta(cloud, order)
+    for (removed <- app.olympus.clouds diff updated) app.olympus.remove(removed.identifier)
+    for (cloud \ order <- updated.zipWithIndex) app.olympus.addServer(cloud, order)
+    for (cloud \ order <- updated.zipWithIndex) app.olympus.updMeta(cloud, order)
     adapter.notifyDataSetChanged
-    clouds = updated
+    app.olympus.clouds = updated
   }
 
   def addNewCloud(url: String, auth: Int) = {

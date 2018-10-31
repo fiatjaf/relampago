@@ -145,14 +145,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (cs.localCommit.spec.fulfilled.nonEmpty) {
       // Let the clouds know since they may be waiting
       // also vibrate to let a user know it's fulfilled
-      OlympusWrap tellClouds OlympusWrap.CMDStart
+      app.olympus tellClouds OlympusWrap.CMDStart
       com.lightning.walletapp.Vibrator.vibrate
     }
 
     if (fulfilledIncoming.nonEmpty) {
       // Collect vulnerable infos from all channels on finalized off-chain payments
       val infos = ChannelManager.notClosingOrRefunding.flatMap(getVulnerableRevInfos)
-      getCerberusActs(infos.toMap) foreach OlympusWrap.tellClouds
+      getCerberusActs(infos.toMap) foreach app.olympus.tellClouds
     }
   }
 
@@ -166,7 +166,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   type TxIdAndRevInfoMap = Map[String, String]
   def getCerberusActs(infos: TxIdAndRevInfoMap) = {
     // Remove currently pending infos and limit max number of uploads
-    val notPendingInfos = infos -- OlympusWrap.pendingWatchTxIds take 100
+    val notPendingInfos = infos -- app.olympus.pendingWatchTxIds take 100
 
     val encrypted = for {
       txid \ revInfo <- notPendingInfos
@@ -201,7 +201,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onBecome = {
     case (_, _, SLEEPING, OPEN) => resolvePending
-    case (_, _, WAIT_FUNDING_DONE, OPEN) => OlympusWrap tellClouds OlympusWrap.CMDStart
+    case (_, _, WAIT_FUNDING_DONE, OPEN) => app.olympus tellClouds OlympusWrap.CMDStart
     case (_, _, from, CLOSING) if from != CLOSING => runAnd(markFailedAndFrozen)(uiNotify)
   }
 }
@@ -268,7 +268,7 @@ object BadEntityWrap {
     val fromAsString = from.map(_.toString).toSet
     // One of blacklisted nodes may become our peer or final payee
     val filteredBadNodes = badNodes - targetId.toString -- fromAsString
-    OlympusWrap findRoutes OutRequest(rd.firstMsat / 1000L, filteredBadNodes,
+    app.olympus findRoutes OutRequest(rd.firstMsat / 1000L, filteredBadNodes,
       badChans.map(_.toLong), fromAsString, targetId.toString)
   }
 }
@@ -278,7 +278,7 @@ object GossipCatcher extends ChannelListener {
 
   override def onProcessSuccess = {
     case (chan, norm: NormalData, _: CMDBestHeight) if norm.commitments.extraHop.isEmpty => for {
-      blockHeight \ txIndex <- OlympusWrap.getShortId(txid = Commitments fundingTxid norm.commitments)
+      blockHeight \ txIndex <- app.olympus.getShortId(txid = Commitments fundingTxid norm.commitments)
       shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
     } chan process Hop(Tools.randomPrivKey.publicKey, shortChannelId, 0, 0L, 0L, 0L)
 

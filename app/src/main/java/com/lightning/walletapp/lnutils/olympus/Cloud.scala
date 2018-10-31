@@ -24,7 +24,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def isAuthEnabled = auth == 1
   def BECOME(cloudData: CloudData) = {
     // Just save updated data to database on every change
-    OlympusWrap.updData(cloudData.toJson.toString, identifier)
+    app.olympus.updData(cloudData.toJson.toString, identifier)
     become(cloudData, state)
   }
 

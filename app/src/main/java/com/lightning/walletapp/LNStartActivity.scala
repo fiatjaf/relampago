@@ -21,7 +21,6 @@ import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Address
-import rx.lang.scala.Observable
 import org.bitcoinj.core.Batch
 import fr.acinq.bitcoin.Bech32
 import android.os.Bundle
@@ -102,7 +101,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
 
   new ThrottledWork[String, AnnounceChansNumVec] {
     def error(error: Throwable) = Tools errlog error
-    def work(userQuery: String) = findNodes(userQuery)
+    def work(userQuery: String) = app.olympus findNodes userQuery
     def process(userQuery: String, results: AnnounceChansNumVec) = {
       val remoteNodeViewWraps = for (result <- results) yield RemoteNodeView(result)
       nodes = if (userQuery.isEmpty) acinq +: remoteNodeViewWraps else remoteNodeViewWraps
