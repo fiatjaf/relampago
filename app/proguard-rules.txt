@@ -12,9 +12,10 @@
 -dontwarn com.google.common.cache.**
 -dontwarn com.google.common.primitives.**
 
--keep class net.sqlcipher.** { *; }
 -keep class android.support.v7.widget.SearchView { *; }
 -keep class scala.collection.SeqLike { public protected *; }
+-keep class com.lightning.walletapp.lnutils.olympus.** { *; }
+-keep interface com.lightning.walletapp.lnutils.olympus.** { *; }
 
 -keep public enum * {
 	public static **[] values();
