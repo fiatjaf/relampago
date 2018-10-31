@@ -255,39 +255,26 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   } else goLNStart
 
   def showDenomChooser = {
+    val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
+    val stateContent = title.findViewById(R.id.stateContent).asInstanceOf[TextView]
     val lnTotalMsat = ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
     val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
     val rate = msatInFiatHuman apply MilliSatoshi(100000000000L)
+    val inFiat = msatInFiatHuman(walletTotalSum)
 
-    val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
-    val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
-    val stateContent = title.findViewById(R.id.stateContent).asInstanceOf[TextView]
-    val denomChoiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
-    val allDenominations = getResources.getStringArray(R.array.denoms).map(_.html)
+    stateContent setText s"${denom withSign walletTotalSum}<br><small>$inFiat</small>".html
     title.findViewById(R.id.stateExchange).asInstanceOf[TextView] setText rate
-
-    def updateDenomination = {
-      // Update denom first so UI update can react to changes, also persist user choice in local data
-      app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, denomChoiceList.getCheckedItemPosition).commit
-      denom = denoms(denomChoiceList.getCheckedItemPosition)
-      FragWallet.worker.adapter.notifyDataSetChanged
-      FragWallet.worker.updTitle.run
-    }
-
-    denomChoiceList.getCheckedItemPosition
-    denomChoiceList setAdapter new ArrayAdapter(me, singleChoice, allDenominations)
-    denomChoiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    stateContent setText s"${denom withSign walletTotalSum}<br><small>${msatInFiatHuman apply walletTotalSum}</small>".html
-    mkCheckForm(alert => rm(alert)(updateDenomination), none, negBuilder(dialog_ok, title, form), dialog_ok, dialog_cancel)
+    showForm(negBuilder(dialog_ok, title, null).create)
   }
 
   // SETTINGS FORM
 
   def makeSettingsForm = {
-    val title = getString(read_settings).html
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
-    val menu = showForm(negBuilder(dialog_ok, title, form).create)
+    val allDenoms = getResources.getStringArray(R.array.denoms).map(_.html)
+    val menu = showForm(baseBuilder(getString(read_settings).html, form).create)
 
+    val choiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
@@ -380,5 +367,19 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         me startActivity Intent.createChooser(share, "Choose an app")
       }
     }
+
+    def updateDenomination(pos: Int) = {
+      // Update denom so UI update can react to changes
+      // then persist user choice in local data storage
+
+      denom = denoms(pos)
+      app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
+      FragWallet.worker.adapter.notifyDataSetChanged
+      FragWallet.worker.updTitle.run
+    }
+
+    choiceList setAdapter new ArrayAdapter(me, singleChoice, allDenoms)
+    choiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
+    choiceList setOnItemClickListener onTap(updateDenomination)
   }
 }

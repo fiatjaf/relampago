@@ -30,13 +30,13 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   val adapter = new GestureAdapter[Cloud, GestureViewHolder] {
     override def onCreateViewHolder(parent: ViewGroup, viewType: Int) = {
-      val view = getLayoutInflater.inflate(R.layout.frag_olympus_line, parent, false)
+      val view = getLayoutInflater.inflate(R.layout.frag_line_double, parent, false)
       new GestureViewHolder(view)
     }
 
     override def onBindViewHolder(holder: GestureViewHolder, pos: Int) = {
-      val olympusAddress = holder.itemView.findViewById(R.id.olympusAddress).asInstanceOf[TextView]
-      val olympusTokens = holder.itemView.findViewById(R.id.olympusTokens).asInstanceOf[TextView]
+      val olympusAddress = holder.itemView.findViewById(R.id.leftSideLine).asInstanceOf[TextView]
+      val olympusTokens = holder.itemView.findViewById(R.id.rightSideLine).asInstanceOf[TextView]
 
       val cloud = getItem(pos)
       val serverAddress = Uri.parse(cloud.connector.url)

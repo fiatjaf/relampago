@@ -46,5 +46,5 @@
 
     </LinearLayout>
 
-    <View style="@style/GrayDivider"/>
+    <include layout="@layout/frag_input_choose_fee"/>
 </LinearLayout>

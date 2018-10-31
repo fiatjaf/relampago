@@ -8,13 +8,13 @@
         style="@style/BaseText"
         android:layout_weight="3"
         android:layout_width="0dp"
-        android:id="@+id/olympusAddress"/>
+        android:id="@+id/leftSideLine"/>
 
     <TextView
         android:maxLines="1"
         android:gravity="end"
         style="@style/BaseText"
-        android:id="@+id/olympusTokens"
+        android:id="@+id/rightSideLine"
         android:layout_width="wrap_content"/>
 
 </LinearLayout>
