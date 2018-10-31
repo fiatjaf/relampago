@@ -58,7 +58,7 @@ object Utils {
   lazy val sumOut = app getString txs_sum_out
   lazy val sumChan = app getString txs_sum_chan
   lazy val noDesc = app getString ln_no_description
-  lazy val denoms = List(SatDenomination, FinDenomination, BtcDenomination)
+  lazy val denoms = List(SatDenomination, BtcDenomination)
   val coloredChan: MilliSatoshi => String = amt => sumChan.format(denom withSign amt)
   val coloredOut: MilliSatoshi => String = amt => sumOut.format(denom withSign amt)
   val coloredIn: MilliSatoshi => String = amt => sumIn.format(denom withSign amt)

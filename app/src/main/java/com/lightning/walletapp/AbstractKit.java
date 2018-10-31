@@ -15,8 +15,8 @@ import javax.annotation.Nullable;
 
 public abstract class AbstractKit extends AbstractIdleService {
     public static final String ERROR_REPORT = "errorReport";
+    public static final String DENOM_TYPE = "denomType1";
     public static final String RATES_DATA = "ratesData";
-    public static final String DENOM_TYPE = "denomType";
     public static final String FIAT_TYPE = "fiatType";
 
     // Bitcoin wallet core pieces

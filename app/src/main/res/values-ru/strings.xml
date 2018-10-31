@@ -17,8 +17,7 @@
 
     <array name="denoms">
         <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 btc</small></font>]]></item>
-        <item><![CDATA[Finney <font color=#999999><small>= 0.0001 btc</small></font>]]></item>
-        <item><![CDATA[Bitcoin <font color=#999999><small>= 1 btc</small></font>]]></item>
+        <item><![CDATA[Bitcoin <font color=#999999><small>= 100 000 000 sat</small></font>]]></item>
     </array>
 
     <array name="restore_options">

@@ -62,27 +62,6 @@ object SatDenomination extends Denomination {
   }
 }
 
-object FinDenomination extends Denomination {
-  val fmt = new DecimalFormat("###,##0.0000###")
-  val amountInTxt = app getString amount_hint_fin
-  val factor = 10000000L
-
-  fmt setDecimalFormatSymbols symbols
-  def withSign(msat: MilliSatoshi) =
-    formatted(msat) + "\u00A0fin"
-
-  def formatted(msat: MilliSatoshi) = {
-    val basicFormattedSum = asString(msat)
-    val dotIndex = basicFormattedSum indexOf "."
-    val whole \ decimal = basicFormattedSum splitAt dotIndex
-    val satDecimalPart \ milliSatDecimalPart = decimal splitAt 5
-
-    if (decimal == basicFormattedSum) basicFormattedSum
-    else if (decimal == milliSatDecimalPart) s"$whole<small>$decimal</small>"
-    else s"$whole$satDecimalPart<small>$milliSatDecimalPart</small>"
-  }
-}
-
 object BtcDenomination extends Denomination {
   val fmt = new DecimalFormat("##0.000########")
   val amountInTxt = app getString amount_hint_btc

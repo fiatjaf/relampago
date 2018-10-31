@@ -42,22 +42,22 @@ object RelayNode {
   }
 }
 
-abstract class RelayNode(payeeNodeId: PublicKey) {
-  type ChannelBalanceInfos = Seq[ChannelBalanceInfo]
+abstract class RelayNode(payee: PublicKey) {
   type BestRelayInfo = (MilliSatoshi, ChannelBalanceInfo)
   var best: Option[BestRelayInfo] = None
 
   def onDataUpdated: Unit
   def start(ann: NodeAnnouncement) = makeWebSocket(ann) { raw =>
     val me2JointMaxSendable = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse 0L
-    val joint2PayeeMaxSendable = to[ChannelBalanceInfos](raw).filter(_.peerNodeId == payeeNodeId).sortBy(- _.withoutMaxFee).headOption
+    val joint2PayeeMaxSendable = to[ChannelBalances](raw).localBalances.filter(_.peerNodeId == payee).sortBy(- _.withoutMaxFee).headOption
     val deliverableThroughJoint = MilliSatoshi(joint2PayeeMaxSendable.map(_.withoutMaxFee) getOrElse 0L min me2JointMaxSendable)
-    best = if (deliverableThroughJoint.amount <= 10000L) None else joint2PayeeMaxSendable.map(deliverableThroughJoint -> _)
+    best = if (deliverableThroughJoint.amount <= 5000L) None else joint2PayeeMaxSendable.map(deliverableThroughJoint -> _)
     onDataUpdated
   }
 }
 
-case class ChannelBalance(canSendMsat: Long, canReceiveMsat: Long, url: String, title: String)
+case class ChannelBalance(canSendMsat: Long, canReceiveMsat: Long)
+case class ChannelBalances(localBalances: List[ChannelBalanceInfo], tag: String = "ChannelBalances")
 case class ChannelBalanceInfo(balance: ChannelBalance, peerNodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
                               htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
