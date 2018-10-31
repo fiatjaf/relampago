@@ -55,6 +55,7 @@ class WalletApp extends Application { me =>
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
   lazy val chainFile = new File(getFilesDir, chainFileName)
+  final val olympusWrapRef = OlympusWrap
   var kit: WalletKit = _
 
   lazy val plur = getString(lang) match {
@@ -154,7 +155,7 @@ class WalletApp extends Application { me =>
       wallet.autosaveToFile(walletFile, 1000, MILLISECONDS, null)
 
       Future {
-        val host = Uri.parse(OlympusWrap.clouds.head.connector.url).getHost
+        val host = Uri.parse(olympusWrapRef.clouds.head.connector.url).getHost
         val peer = new PeerAddress(app.params, InetAddress getByName host, 8333)
         peerGroup addAddress peer
       }
@@ -174,13 +175,13 @@ class WalletApp extends Application { me =>
         _ <- obsOnIO delay 20.seconds
         chan <- ChannelManager.notClosing if chan.state == SLEEPING
         // Can call findNodes without `retry` wrapper because it gives `Obs.empty` on error
-        Vector(ann1 \ _, _*) <- OlympusWrap findNodes chan.data.announce.nodeId.toString
+        Vector(ann1 \ _, _*) <- olympusWrapRef findNodes chan.data.announce.nodeId.toString
       } chan process ann1
 
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
-      // Try to clear act leftovers if no channels left
-      OlympusWrap tellClouds OlympusWrap.CMDStart
+      // Try to clear act leftovers if no channels are left
+      olympusWrapRef tellClouds olympusWrapRef.CMDStart
       PaymentInfoWrap.markFailedAndFrozen
       ChannelManager.initConnect
       RatesSaver.initialize
