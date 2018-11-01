@@ -1,0 +1,52 @@
+<LinearLayout
+    style="@style/StandardLinearLayoutPage"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <android.support.v7.widget.Toolbar
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+        app:subtitleTextAppearance="@style/ToolbarSubtitleAppearance"
+        app:titleTextAppearance="@style/ToolbarTitleAppearance"
+        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+        android:background="@android:color/black"
+        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:id="@+id/toolbar"
+
+        app:contentInsetLeft="@dimen/app_padding"
+        app:contentInsetStartWithNavigation="0dp"
+        app:contentInsetStart="@dimen/app_padding"
+        app:contentInsetEnd="@dimen/app_padding"/>
+
+    <ListView
+        android:layout_weight="1"
+        android:visibility="gone"
+        android:id="@+id/itemsList"
+        style="@style/GrayDividerListView"/>
+
+    <LinearLayout
+        android:layout_weight="1"
+        android:gravity="top|center"
+        android:visibility="invisible"
+        android:orientation="vertical"
+        android:id="@+id/jointNodeInfo"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content">
+
+        <Button
+            style="@style/MarginInfo"
+            android:layout_width="wrap_content"
+            android:text="@string/action_ln_open"
+            android:onClick="openChannel"/>
+
+        <View style="@style/GrayDivider"/>
+
+        <TextView
+            style="@style/MarginInfo"
+            android:id="@+id/jointNodeHint"
+            android:text="@string/ln_joint_open_hint"
+            android:layout_width="wrap_content"/>
+
+    </LinearLayout>
+</LinearLayout>

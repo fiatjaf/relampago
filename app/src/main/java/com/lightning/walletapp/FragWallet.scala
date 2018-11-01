@@ -59,7 +59,7 @@ class FragWallet extends Fragment {
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
   import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail}
-  import host.{TxProcessor, getSupportLoaderManager, mkCheckForm, rm, mkCheckFormNeutral, <, showDenomChooser}
+  import host.{TxProcessor, getSupportLoaderManager, mkCheckForm, rm, <, mkCheckFormNeutral}
 
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
   val customTitle = frag.findViewById(R.id.customTitle).asInstanceOf[TextView]
@@ -691,14 +691,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   host setSupportActionBar toolbar
+  toolbar setOnClickListener onButtonTap {
+    // View current balance status and guranteed deliveries
+    if (!isSearching) host goTo classOf[WalletStatusActivity]
+  }
+
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
-  toolbar setOnClickListener onButtonTap { if (!isSearching) showDenomChooser }
   // Only update a minimized payments list to eliminate possible performance slowdowns
   host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
   itemsList setOnItemClickListener onTap { position => adapter.getItem(position).generatePopup }
   itemsList setFooterDividersEnabled false
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter
+
+  println(s"-- itemsList.getDividerHeight: ${itemsList.getDividerHeight}")
+  itemsList setDividerHeight 0
 
   ConnectionManager.listeners += connectionListener
   for (c <- ChannelManager.all) c.listeners += chanListener

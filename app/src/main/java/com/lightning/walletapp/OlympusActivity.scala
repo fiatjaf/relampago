@@ -56,7 +56,7 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
   }
 
-  def INIT(savedInstanceState: Bundle) = {
+  def INIT(s: Bundle) = {
     me setContentView R.layout.activity_olympus
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     Utils clickableTextField findViewById(R.id.serverWhat)

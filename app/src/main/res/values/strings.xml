@@ -9,8 +9,6 @@
     <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Confirmation may take hours</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Faster confirmation times</font></small></small>]]></string>
-    <string name="wallet_state"><small>Total balance\n<font color='#999999'>On-chain and LN</font></small></string>
-    <string name="exchange_rate"><small>Exchange rate\n<font color='#999999'>Per 1 bitcoin</font></small></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_restore">Restore Wallet</string>
     <string name="wallet_create">New Wallet</string>
@@ -88,7 +86,6 @@
     <string name="action_ln_open">Open new channel</string>
 
     <!-- dialogs -->
-    <string name="amount_hint_fin"><![CDATA[Amount in Finney%1$s]]></string>
     <string name="amount_hint_sat"><![CDATA[Amount in Satoshi%1$s]]></string>
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
 
@@ -279,7 +276,9 @@
         <item><![CDATA[<i>Public channels unknown</i>]]></item>
     </array>
 
-    <string name="ln_ops_start_fund_incoming_title"><![CDATA[Remote peer wants to open a channel with you, all the opening costs are on them<br><br>Your share: %1$s<br>Capacity: %2$s]]></string>
+    <string name="joint_title">Guaranteed delivery</string>
+    <string name="ln_joint_open_hint">Open a channel with a <a href='http://lightning-wallet.com/'>Joint node</a> to see real time info about guaranteed deposits and withdrawals</string>
+    <string name="ln_ops_start_fund_incoming_title"><![CDATA[Remote peer wants to open a channel to you, all the opening costs are on them<br><br>Your balance: %1$s<br>Capacity: %2$s]]></string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from external source</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from local wallet</strong>]]></string>
     <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>opening a channel</i></font><br><small>%2$s</small><br><br><font color=#999999>Peer node ID</font><br><small>%3$s</small>]]></string>

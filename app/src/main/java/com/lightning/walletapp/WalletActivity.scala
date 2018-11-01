@@ -14,7 +14,6 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import org.bitcoinj.core.{Address, TxWrap}
-import fr.acinq.bitcoin.{MilliSatoshi, Satoshi}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started, WalletZygote}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
@@ -29,6 +28,7 @@ import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.store.SPVBlockStore
 import android.text.format.DateFormat
+import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
 import com.google.common.io.Files
@@ -253,19 +253,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
     mkCheckForm(alert => rm(alert)(goLNStart), none, warn, dialog_ok, dialog_cancel)
   } else goLNStart
-
-  def showDenomChooser = {
-    val title = getLayoutInflater.inflate(R.layout.frag_wallet_state, null)
-    val stateContent = title.findViewById(R.id.stateContent).asInstanceOf[TextView]
-    val lnTotalMsat = ChannelManager.notClosingOrRefunding.map(estimateCanSend).sum
-    val walletTotalSum = Satoshi(app.kit.conf0Balance.value + lnTotalMsat / 1000L)
-    val rate = msatInFiatHuman apply MilliSatoshi(100000000000L)
-    val inFiat = msatInFiatHuman(walletTotalSum)
-
-    stateContent setText s"${denom withSign walletTotalSum}<br><small>$inFiat</small>".html
-    title.findViewById(R.id.stateExchange).asInstanceOf[TextView] setText rate
-    showForm(negBuilder(dialog_ok, title, null).create)
-  }
 
   // SETTINGS FORM
 
