@@ -3,7 +3,6 @@ package com.lightning.walletapp
 import android.support.v7.widget._
 import com.lightning.walletapp.ln._
 import com.thesurix.gesturerecycler._
-
 import scala.collection.JavaConverters._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
@@ -11,6 +10,7 @@ import com.lightning.walletapp.lnutils.olympus._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import android.widget.{ArrayAdapter, CheckBox, EditText, TextView}
 import android.view.{Menu, MenuItem, ViewGroup}
+
 import android.support.v7.widget.helper.ItemTouchHelper
 import com.lightning.walletapp.lnutils.OlympusLogTable
 import com.lightning.walletapp.helper.RichCursor
@@ -18,11 +18,10 @@ import com.lightning.walletapp.ln.LNParams
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.core.Utils.HEX
 import android.app.AlertDialog
+import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
-
-import android.content.Intent
 
 
 class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>

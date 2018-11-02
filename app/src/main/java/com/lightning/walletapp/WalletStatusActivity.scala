@@ -7,6 +7,7 @@ import com.lightning.walletapp.lnutils.RelayNode._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import android.widget.{BaseAdapter, LinearLayout, ListView, TextView}
 import com.lightning.walletapp.WalletStatusActivity.allItems
