@@ -12,11 +12,12 @@ import android.view.{View, ViewGroup}
 import android.widget.{BaseAdapter, LinearLayout, ListView, TextView}
 import com.lightning.walletapp.WalletStatusActivity.allItems
 import com.lightning.walletapp.lnutils.ChannelBalances
-import com.lightning.walletapp.ln.Tools.runAnd
 import android.support.v7.widget.Toolbar
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.MilliSatoshi
+import android.content.Intent
 import android.os.Bundle
+import android.net.Uri
 
 
 object WalletStatusActivity { me =>
@@ -26,9 +27,8 @@ object WalletStatusActivity { me =>
 
     val updatedMap = for {
       jointPeersNodeKey \ title <- mapping
-      cbiOpt = perPeerMaxSendable get jointPeersNodeKey
-      max = cbiOpt.map(_.withoutMaxFee) getOrElse 0L
-      min = math.min(me2JointMaxSendable, max)
+      cbi <- perPeerMaxSendable get jointPeersNodeKey
+      min = math.min(me2JointMaxSendable, cbi.withoutMaxFee)
     } yield title -> MilliSatoshi(min)
     allItems = updatedMap.toList
   }
@@ -39,8 +39,8 @@ object WalletStatusActivity { me =>
     PublicKey("03c856d2dbec7454c48f311031f06bb99e3ca1ab15a9b9b35de14e139aa663b463") -> "htlc.me"
   )
 
-  val nothing = MilliSatoshi(amount = 0L)
-  var allItems = mapping.values.toList.map(_ -> nothing)
+  type TitleAndSendable = (String, MilliSatoshi)
+  var allItems = List.empty[TitleAndSendable]
 }
 
 class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
@@ -78,16 +78,26 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
     super.onDestroy
   }
 
+  def openChannel(top: View) =
+    me exitTo classOf[LNStartActivity]
+
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_wallet_status
+    itemsList setVisibility viewMap(relayPeerReports.nonEmpty)
+    jointNodeInfo setVisibility viewMap(relayPeerReports.isEmpty)
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     getSupportActionBar setTitle joint_title
 
-    itemsList setVisibility viewMap(relayPeerReports.nonEmpty)
-    jointNodeInfo setVisibility viewMap(relayPeerReports.isEmpty)
-    runAnd(itemsList setAdapter adapter)(adapter.notifyDataSetChanged)
-  } else me exitTo classOf[MainActivity]
+    itemsList setOnItemClickListener onTap { position =>
+      val selectedDestinationTitle \ _ = allItems(position)
+      val uri = Uri parse s"https://$selectedDestinationTitle"
+      me startActivity new Intent(Intent.ACTION_VIEW, uri)
+      println(position)
+    }
 
-  def openChannel(top: View) =
-    me exitTo classOf[LNStartActivity]
+    itemsList setAdapter adapter
+    adapter.notifyDataSetChanged
+
+    // Or back if resources are freed
+  } else me exitTo classOf[MainActivity]
 }

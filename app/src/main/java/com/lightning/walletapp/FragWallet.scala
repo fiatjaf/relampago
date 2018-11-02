@@ -4,7 +4,6 @@ import spray.json._
 import android.view._
 import android.widget._
 import org.bitcoinj.core._
-
 import collection.JavaConverters._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
@@ -18,12 +17,13 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-import android.os.{Bundle, Handler}
 
+import android.os.{Bundle, Handler}
 import scala.util.{Failure, Success, Try}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import android.content.{DialogInterface, Intent}
 import android.database.{ContentObserver, Cursor}
+import android.support.v4.content.{ContextCompat, Loader}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
@@ -37,7 +37,6 @@ import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import fr.acinq.bitcoin.Crypto.PublicKey
-import android.support.v4.content.{ContextCompat, Loader}
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
@@ -46,6 +45,7 @@ import android.net.Uri
 
 
 object FragWallet {
+  var dividerHeight = 0
   var worker: FragWalletWorker = _
   val REDIRECT = "goToLnOpsActivity"
 }
@@ -233,6 +233,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var allItems = Vector.empty[ItemWrap]
 
   def updPaymentList = {
+    val divHeight = if (!isTablet && isSearching) 0 else dividerHeight
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
@@ -241,6 +242,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
       mnemonicWarn setVisibility viewMap(allItems.isEmpty)
       itemsList setVisibility viewMap(allItems.nonEmpty)
+      itemsList setDividerHeight divHeight
       adapter.notifyDataSetChanged
       updTitle
     }
@@ -704,8 +706,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter
 
-  println(s"-- itemsList.getDividerHeight: ${itemsList.getDividerHeight}")
-  itemsList setDividerHeight 0
+  // Store real divider height for later reuse
+  dividerHeight = itemsList.getDividerHeight
 
   ConnectionManager.listeners += connectionListener
   for (c <- ChannelManager.all) c.listeners += chanListener
