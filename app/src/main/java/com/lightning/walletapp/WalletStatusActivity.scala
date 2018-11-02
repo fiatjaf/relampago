@@ -7,8 +7,7 @@ import com.lightning.walletapp.lnutils.RelayNode._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-
-import android.view.{View, ViewGroup}
+import android.view.{Menu, MenuItem, View, ViewGroup}
 import android.widget.{BaseAdapter, LinearLayout, ListView, TextView}
 import com.lightning.walletapp.WalletStatusActivity.allItems
 import com.lightning.walletapp.lnutils.ChannelBalances
@@ -57,8 +56,15 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
       val view = host.getLayoutInflater.inflate(R.layout.frag_line_double, null)
       val maxSendField = view.findViewById(R.id.rightSideLine).asInstanceOf[TextView]
       val nameField = view.findViewById(R.id.leftSideLine).asInstanceOf[TextView]
-
       val nameString \ maxSendMsat = getItem(itemPosition)
+
+      view setOnClickListener onButtonTap {
+        val uri = Uri parse s"https://$nameString"
+        val intent = new Intent(Intent.ACTION_VIEW, uri)
+        startActivity(intent)
+      }
+
+      // Set listener on per-item basis because XML properties
       maxSendField setText denom.withSign(maxSendMsat).html
       nameField setText nameString
       view
@@ -78,23 +84,27 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
     super.onDestroy
   }
 
+  override def onCreateOptionsMenu(menu: Menu) = {
+    getMenuInflater.inflate(R.menu.status, menu)
+    true
+  }
+
+  override def onOptionsItemSelected(m: MenuItem) = {
+    val url = "http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do"
+    if (m.getItemId == R.id.actionReadMore) me startActivity new Intent(Intent.ACTION_VIEW, Uri parse url)
+    true
+  }
+
   def openChannel(top: View) =
     me exitTo classOf[LNStartActivity]
 
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_wallet_status
-    itemsList setVisibility viewMap(relayPeerReports.nonEmpty)
-    jointNodeInfo setVisibility viewMap(relayPeerReports.isEmpty)
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     getSupportActionBar setTitle joint_title
 
-    itemsList setOnItemClickListener onTap { position =>
-      val selectedDestinationTitle \ _ = allItems(position)
-      val uri = Uri parse s"https://$selectedDestinationTitle"
-      me startActivity new Intent(Intent.ACTION_VIEW, uri)
-      println(position)
-    }
-
+    jointNodeInfo setVisibility viewMap(relayPeerReports.isEmpty)
+    itemsList setVisibility viewMap(relayPeerReports.nonEmpty)
     itemsList setAdapter adapter
     adapter.notifyDataSetChanged
 

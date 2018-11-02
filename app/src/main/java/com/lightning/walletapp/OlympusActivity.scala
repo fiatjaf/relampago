@@ -3,6 +3,7 @@ package com.lightning.walletapp
 import android.support.v7.widget._
 import com.lightning.walletapp.ln._
 import com.thesurix.gesturerecycler._
+
 import scala.collection.JavaConverters._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
@@ -10,7 +11,6 @@ import com.lightning.walletapp.lnutils.olympus._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import android.widget.{ArrayAdapter, CheckBox, EditText, TextView}
 import android.view.{Menu, MenuItem, ViewGroup}
-
 import android.support.v7.widget.helper.ItemTouchHelper
 import com.lightning.walletapp.lnutils.OlympusLogTable
 import com.lightning.walletapp.helper.RichCursor
@@ -21,6 +21,8 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
+
+import android.content.Intent
 
 
 class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
@@ -59,7 +61,6 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   def INIT(s: Bundle) = {
     me setContentView R.layout.activity_olympus
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-    Utils clickableTextField findViewById(R.id.serverWhat)
     getSupportActionBar setTitle sets_manage_olympus
     getSupportActionBar setSubtitle olympus_actions
 
@@ -105,7 +106,9 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   override def onOptionsItemSelected(m: MenuItem) = {
-    if (m.getItemId == R.id.actionAddEntity) new FormManager(addNewCloud, olympus_add)
+    val url = "http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do"
+    if (m.getItemId == R.id.actionReadMore) me startActivity new Intent(Intent.ACTION_VIEW, Uri parse url)
+    else if (m.getItemId == R.id.actionAddEntity) new FormManager(addNewCloud, olympus_add)
     else if (m.getItemId == R.id.actionTokenLog) viewTokenUsageLog
     true
   }

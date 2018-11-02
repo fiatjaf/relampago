@@ -19,14 +19,6 @@
         app:contentInsetStart="@dimen/app_padding"
         app:contentInsetEnd="@dimen/app_padding"/>
 
-    <TextView
-        style="@style/MarginInfo"
-        android:id="@+id/serverWhat"
-        android:text="@string/olympus_what"
-        android:layout_width="wrap_content"/>
-
-    <View style="@style/GrayDivider"/>
-
     <android.support.v7.widget.RecyclerView
         android:layout_height="match_parent"
         android:layout_width="match_parent"

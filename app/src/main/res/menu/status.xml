@@ -3,16 +3,6 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
-        app:showAsAction="never"
-        android:id="@+id/actionAddEntity"
-        android:title="@string/olympus_add"/>
-
-    <item
-        app:showAsAction="never"
-        android:id="@+id/actionTokenLog"
-        android:title="@string/olympus_log"/>
-
-    <item
         android:title="Read more"
         app:showAsAction="always|collapseActionView"
         android:icon="@drawable/baseline_help_outline_white_24"

@@ -31,7 +31,6 @@
 
     <!-- headers with links -->
     <string name="mnemonic_info"><font color="#E31300">Mnemonic phrase is important</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Read about it</a> and save it now</string>
-    <string name="olympus_what"><a href='http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do'>What does Olympus server do</a>\n<small>don\'t change these settings unless\nyou know what you are doing</small></string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
     <string name="read_settings"><![CDATA[<small>Bitcoin Lightning Wallet<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.2&#8211;81</small>]]></string>
 
@@ -276,7 +275,7 @@
         <item><![CDATA[<i>Public channels unknown</i>]]></item>
     </array>
 
-    <string name="joint_title">Guaranteed delivery</string>
+    <string name="joint_title">Guaranteed Delivery</string>
     <string name="ln_joint_open_hint">Open a channel with a <a href='http://lightning-wallet.com/'>Joint node</a> to see real time info about guaranteed deposits and withdrawals</string>
     <string name="ln_ops_start_fund_incoming_title"><![CDATA[Remote peer wants to open a channel to you, all the opening costs are on them<br><br>Your balance: %1$s<br>Capacity: %2$s]]></string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from external source</strong>]]></string>
