@@ -23,8 +23,8 @@ object RelayNode {
   def hasRelayPeerOnly = ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == relayNodeKey)
 
   def makeWebSocket(ann: NodeAnnouncement)(fun: String => Unit) = {
-    val endPoint = s"ws://${ann.workingAddress.getHostString}:8089/ws"
-    val webSocket = (new WebSocketFactory).createSocket(endPoint, 7500)
+    val webSockEndPoint = s"ws://${ann.workingAddress.getHostString}:8090"
+    val webSocket = (new WebSocketFactory).createSocket(webSockEndPoint, 7500)
     webSocket.connectAsynchronously
 
     webSocket addListener new WebSocketAdapter {
