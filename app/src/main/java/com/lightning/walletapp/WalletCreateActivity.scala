@@ -25,7 +25,7 @@ trait FirstActivity { me: TimerActivity =>
     kit.wallet.saveToFile(app.walletFile)
 
     kit.setupAndStartDownload
-    me exitTo classOf[WalletActivity]
+    me exitTo MainActivity.wallet
   }
 }
 

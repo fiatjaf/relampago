@@ -96,7 +96,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           // Tell wallet activity to redirect to ops
           LNParams.broadcaster nullOnBecome freshChan
           app.TransData.value = FragWallet.REDIRECT
-          me exitTo classOf[WalletActivity]
+          me exitTo MainActivity.wallet
       }
 
       // Provide manual or batched amount
@@ -206,7 +206,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           freshChan.listeners = ChannelManager.operationalListeners
           ExternalFunder.eliminateWSWrap(wsw, inform = false)
           app.TransData.value = FragWallet.REDIRECT
-          me exitTo classOf[WalletActivity]
+          me exitTo MainActivity.wallet
       }
 
       private def askExternalFundingConfirm(started: Started) = UITask {
@@ -240,7 +240,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
           // Tell wallet activity to redirect to ops
           app.TransData.value = FragWallet.REDIRECT
-          me exitTo classOf[WalletActivity]
+          me exitTo MainActivity.wallet
       }
     }
 

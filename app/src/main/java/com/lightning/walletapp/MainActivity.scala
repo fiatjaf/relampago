@@ -21,18 +21,24 @@ import android.view.View
 
 
 object MainActivity {
-  var proceed: Runnable = _
+  var proceedOnSuccess: Runnable = _
+  var actOnError: PartialFunction[Throwable, Unit] = _
+  val wallet = classOf[WalletActivity]
 
   lazy val prepareKit = {
     val stream = new FileInputStream(app.walletFile)
     val proto = WalletProtobufSerializer parseToProto stream
 
     app.kit = new app.WalletKit {
-      def startUp = runAnd(setupAndStartDownload)(proceed.run)
       wallet = (new WalletProtobufSerializer).readWallet(app.params, null, proto)
       store = new org.bitcoinj.store.SPVBlockStore(app.params, app.chainFile)
       blockChain = new BlockChain(app.params, wallet, store)
       peerGroup = new PeerGroup(app.params, blockChain)
+
+      def startUp = try {
+        setupAndStartDownload
+        proceedOnSuccess.run
+      } catch actOnError
     }
   }
 }
@@ -43,12 +49,9 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def INIT(state: Bundle) = {
     runAnd(me setContentView R.layout.activity_main)(me initNfc state)
+    MainActivity.proceedOnSuccess = UITask(me exitTo MainActivity.wallet)
+    MainActivity.actOnError = { case error => UITask(throw error).run }
     Utils clickableTextField findViewById(R.id.mainGreetings)
-
-    MainActivity.proceed = UITask {
-      // Unconditionally go to wallet
-      me exitTo classOf[WalletActivity]
-    }
   }
 
   // NFC AND SHARE
@@ -74,7 +77,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   def next: Unit = (app.walletFile.exists, app.isAlive) match {
     // What exactly should be done depends on wallet app file existence and runtime objects presence
     case (false, _) => findViewById(R.id.mainChoice).asInstanceOf[View] setVisibility View.VISIBLE
-    case (true, true) => MainActivity.proceed.run
+    case (true, true) => MainActivity.proceedOnSuccess.run
 
     case (true, false) =>
       MainActivity.prepareKit

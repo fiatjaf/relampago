@@ -63,9 +63,9 @@ class LNStartActivity extends ScanActivity { me =>
     }
 
     app.TransData checkAndMaybeErase {
-      case _: Address => me exitTo classOf[WalletActivity]
-      case _: BitcoinURI => me exitTo classOf[WalletActivity]
-      case _: PaymentRequest => me exitTo classOf[WalletActivity]
+      case _: Address => me exitTo MainActivity.wallet
+      case _: BitcoinURI => me exitTo MainActivity.wallet
+      case _: PaymentRequest => me exitTo MainActivity.wallet
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
       case started: Started => FragLNStart.fragment.setExternalFunder(started)
       case batch: Batch => FragLNStart.fragment.setBatchMode(batch)
