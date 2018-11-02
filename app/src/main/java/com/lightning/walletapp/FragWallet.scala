@@ -45,7 +45,6 @@ import android.net.Uri
 
 
 object FragWallet {
-  var dividerHeight = 0
   var worker: FragWalletWorker = _
   val REDIRECT = "goToLnOpsActivity"
 }
@@ -233,7 +232,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var allItems = Vector.empty[ItemWrap]
 
   def updPaymentList = {
-    val divHeight = if (!isTablet && isSearching) 0 else dividerHeight
+    val divHeight = if (!isTablet && isSearching) 0 else IconGetter.dp2px
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
@@ -705,9 +704,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   itemsList setFooterDividersEnabled false
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter
-
-  // Store real divider height for later reuse
-  dividerHeight = itemsList.getDividerHeight
 
   ConnectionManager.listeners += connectionListener
   for (c <- ChannelManager.all) c.listeners += chanListener

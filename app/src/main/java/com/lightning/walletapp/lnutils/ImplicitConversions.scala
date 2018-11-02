@@ -1,5 +1,6 @@
 package com.lightning.walletapp.lnutils
 
+import android.util.TypedValue._
 import com.lightning.walletapp.Utils.app
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
@@ -20,6 +21,7 @@ object ImplicitConversions {
 
 object IconGetter extends Html.ImageGetter {
   private val metrics = app.getResources.getDisplayMetrics
+  val dp2px = math round applyDimension(COMPLEX_UNIT_DIP, 1, metrics)
   val scrWidth = metrics.widthPixels.toDouble / metrics.densityDpi
   val maxDialog = metrics.densityDpi * 2.1
   val isTablet = scrWidth > 3.5
