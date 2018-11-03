@@ -70,6 +70,7 @@
     </array>
 
     <!-- menu and fab -->
+    <string name="sets_choose_unit">Выбрать Биткоин-юнит</string>
     <string name="sets_manage_olympus">Настроить бэкап-сервера</string>
     <string name="sets_chan_recover">Восстановитель каналов</string>
     <string name="sets_migrator">Сохранить снимок кошелька</string>
