@@ -1,7 +1,11 @@
 <LinearLayout
     style="@style/StandardLinearLayout"
     xmlns:android="http://schemas.android.com/apk/res/android">
-    <include layout="@layout/frag_input_choose_fee"/>
+
+    <Button
+        style="@style/TransButton"
+        android:id="@+id/chooseBitcoinUnit"
+        android:text="@string/sets_choose_unit"/>
 
     <Button
         style="@style/TransButton"

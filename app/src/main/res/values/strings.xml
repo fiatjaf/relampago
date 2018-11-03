@@ -73,6 +73,7 @@
     </array>
 
     <!-- menu and fab -->
+    <string name="sets_choose_unit">Choose Bitcoin unit</string>
     <string name="sets_manage_olympus">Manage Olympus servers</string>
     <string name="sets_chan_recover">Use channel recovery tool</string>
     <string name="sets_migrator">Use wallet migration tool</string>

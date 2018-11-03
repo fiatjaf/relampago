@@ -153,10 +153,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     app.TransData checkAndMaybeErase {
       case FragWallet.REDIRECT => goOps(null)
-      case _: Started => me goTo classOf[LNStartActivity]
-      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
       case lnLink: LNUrl => lnLink.resolve.foreach(initConnection, none)
       case address: Address => FragWallet.worker.sendBtcPopup(address)(none)
+      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+      case _: Started => goLNStart
 
       case uri: BitcoinURI =>
         // Bitcoin URI may possibly have an amount which we then fill in
@@ -170,8 +170,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case pr: PaymentRequest =>
         // TransData should be set to batch or null to erase previous
         app.TransData.value = TxWrap findBestBatch pr getOrElse null
-        me goTo classOf[LNStartActivity]
-        app toast ln_empty
+        runAnd(app toast ln_empty)(goLNStart)
 
       case _ =>
     }
@@ -258,15 +257,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def makeSettingsForm = {
     val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
-    val allDenoms = getResources.getStringArray(R.array.denoms).map(_.html)
-    val menu = showForm(baseBuilder(getString(read_settings).html, form).create)
-
-    val choiceList = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
     val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
+    val chooseBitcoinUnit = form.findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
     val exportWalletSnapshot = form.findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
+    val menu = showForm(negBuilder(dialog_ok, getString(read_settings).html, form).create)
     recoverFunds.setEnabled(ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
 
     recoverFunds setOnClickListener onButtonTap {
@@ -293,6 +290,30 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         def go = runAnd(app toast dialog_recovering)(recover)
         val bld = baseTextBuilder(me getString channel_recovery_info)
         mkCheckForm(alert => rm(alert)(go), none, bld, dialog_next, dialog_cancel)
+      }
+    }
+
+    chooseBitcoinUnit setOnClickListener onButtonTap {
+      val currentDenom = app.prefs.getInt(AbstractKit.DENOM_TYPE, 0)
+      val allDenoms = getResources.getStringArray(R.array.denoms).map(_.html)
+      val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
+      val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
+
+      def updateDenomination(pos: Int) = {
+        // Update denom so UI update can react to changes
+        // then persist user choice in local data storage
+
+        denom = denoms(pos)
+        app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
+        FragWallet.worker.adapter.notifyDataSetChanged
+        FragWallet.worker.updTitle.run
+      }
+
+      rm(menu) {
+        lst setOnItemClickListener onTap(updateDenomination)
+        lst setAdapter new ArrayAdapter(me, singleChoice, allDenoms)
+        showForm(negBuilder(dialog_ok, me getString sets_choose_unit, form).create)
+        lst.setItemChecked(currentDenom, true)
       }
     }
 
@@ -354,19 +375,5 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         me startActivity Intent.createChooser(share, "Choose an app")
       }
     }
-
-    def updateDenomination(pos: Int) = {
-      // Update denom so UI update can react to changes
-      // then persist user choice in local data storage
-
-      denom = denoms(pos)
-      app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
-      FragWallet.worker.adapter.notifyDataSetChanged
-      FragWallet.worker.updTitle.run
-    }
-
-    choiceList setAdapter new ArrayAdapter(me, singleChoice, allDenoms)
-    choiceList.setItemChecked(app.prefs.getInt(AbstractKit.DENOM_TYPE, 0), true)
-    choiceList setOnItemClickListener onTap(updateDenomination)
   }
 }

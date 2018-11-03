@@ -18,7 +18,6 @@ import android.widget.AdapterView.OnItemClickListener
 import info.hoang8f.android.segmented.SegmentedGroup
 import concurrent.ExecutionContext.Implicits.global
 import com.lightning.walletapp.ln.LNParams.minDepth
-import android.view.inputmethod.InputMethodManager
 import com.lightning.walletapp.lnutils.RatesSaver
 import android.support.v7.app.AppCompatActivity
 import ViewGroup.LayoutParams.WRAP_CONTENT
@@ -28,6 +27,7 @@ import fr.acinq.bitcoin.MilliSatoshi
 import language.implicitConversions
 import org.bitcoinj.script.Script
 import scala.concurrent.Future
+import android.content.Intent
 import android.os.Bundle
 
 import android.content.DialogInterface.{BUTTON_NEUTRAL, BUTTON_POSITIVE, BUTTON_NEGATIVE}
@@ -38,7 +38,6 @@ import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
-import android.content.{Context, Intent}
 import java.util.{Timer, TimerTask}
 
 
