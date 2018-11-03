@@ -226,7 +226,10 @@ object StartNodeView {
   lazy val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
 }
 
-sealed trait StartNodeView { def asString(base: String, separator: String): String }
+sealed trait StartNodeView {
+  def asString(base: String, separator: String): String
+}
+
 case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNodeView {
   // App suggests a bunch of hardcoded and separately fetched nodes with a good liquidity
 
@@ -251,10 +254,14 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 
 sealed trait LNUrlData
 case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
-case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long) extends LNUrlData {
-  def requestChannel = get(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&public=0", true).trustAllCerts.trustAllHosts.body
-  def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), host, port.toInt)
+case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long,
+                                  cltvExpiryDelta: Int, htlcMinimumMsat: Long, feeBaseMsat: Long,
+                                  feeProportionalMillionths: Long) extends LNUrlData {
+
   val nodeLink(key, host, port) = uri
+  val request = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&public=0"
+  def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), host, port.toInt)
+  def requestChannel = get(request, true).trustAllCerts.trustAllHosts.body
 }
 
 // LNURL HANDLER

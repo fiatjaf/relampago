@@ -281,7 +281,7 @@
         <item><![CDATA[<i>Нет данных о каналах</i>]]></item>
     </array>
 
-    <string name="ln_ops_start_fund_incoming_title"><![CDATA[Удаленный узел хочет открыть канал<br><br>Ваш баланс: %1$s<br>Емкость: %2$s]]></string>
+    <string name="ln_ops_start_fund_incoming_title"><![CDATA[Удаленный узел хочет открыть канал<br><br>Вы получите: %1$s<br>Емкость: %2$s]]></string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про Молнию</a></small><br><br>открытие нового канала<br><strong>из внешнего источника</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про Молнию</a></small><br><br>открытие нового канала<br><strong>из этого кошелька</strong>]]></string>
     <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>открытие канала</i></font><br><small>%2$s</small><br><br><font color=#999999>публичный ключ пира</font><br><small>%3$s</small>]]></string>

@@ -185,6 +185,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
       override def onOperational(nodeId: PublicKey) = {
         // Immediately remove listener and make a request
+        // their OpenChannel message should arrive shortly
         ConnectionManager.listeners -= self
         icr.requestChannel
       }
