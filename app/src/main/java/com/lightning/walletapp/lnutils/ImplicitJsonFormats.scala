@@ -127,7 +127,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case Some(s: JsString) if s.value == "ChannelUploadAct" => serialized.convertTo[ChannelUploadAct]
       case Some(s: JsString) if s.value == "TxUploadAct" => serialized.convertTo[TxUploadAct]
       case Some(s: JsString) if s.value == "CerberusAct" => serialized.convertTo[CerberusAct]
-      case None => serialized.convertTo[LegacyAct] // TODO: remove later
+      case _ => serialized.convertTo[LegacyAct] // TODO: remove later
     }
   }
 
