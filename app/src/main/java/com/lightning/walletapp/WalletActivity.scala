@@ -153,10 +153,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     app.TransData checkAndMaybeErase {
       case FragWallet.REDIRECT => goOps(null)
+      case _: Started => me goTo classOf[LNStartActivity]
+      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
       case lnLink: LNUrl => lnLink.resolve.foreach(initConnection, none)
       case address: Address => FragWallet.worker.sendBtcPopup(address)(none)
-      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-      case _: Started => goLNStart
 
       case uri: BitcoinURI =>
         // Bitcoin URI may possibly have an amount which we then fill in
@@ -170,7 +170,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case pr: PaymentRequest =>
         // TransData should be set to batch or null to erase previous
         app.TransData.value = TxWrap findBestBatch pr getOrElse null
-        runAnd(app toast ln_empty)(goLNStart)
+        me goTo classOf[LNStartActivity]
+        app toast ln_empty
 
       case _ =>
     }
@@ -245,13 +246,12 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   val tokensPrice = MilliSatoshi(1000000L)
-  def goLNStart: Unit = me goTo classOf[LNStartActivity]
   def goOps(top: View): Unit = me goTo classOf[LNOpsActivity]
   def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
     val humanPrice = s"${coloredIn apply tokensPrice} <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
     val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
-    mkCheckForm(alert => rm(alert)(goLNStart), none, warn, dialog_ok, dialog_cancel)
-  } else goLNStart
+    mkCheckForm(alert => rm(alert) { me goTo classOf[LNStartActivity] /* proceed */ }, none, warn, dialog_ok, dialog_cancel)
+  } else me goTo classOf[LNStartActivity]
 
   // SETTINGS FORM
 
