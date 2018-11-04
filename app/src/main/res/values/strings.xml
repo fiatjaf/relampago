@@ -279,8 +279,6 @@
         <item><![CDATA[<i>Public channels unknown</i>]]></item>
     </array>
 
-    <string name="joint_title">Guaranteed Delivery</string>
-    <string name="ln_joint_open_hint">Open a channel with a <a href='http://lightning-wallet.com/'>Joint node</a> to see real time info about guaranteed deposits and withdrawals</string>
     <string name="ln_ops_start_fund_incoming_title"><![CDATA[Remote peer wants to open a channel with you, all the opening costs are on them<br><br>Your share: %1$s<br>Capacity: %2$s]]></string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from external source</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from local wallet</strong>]]></string>
