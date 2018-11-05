@@ -142,40 +142,45 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData = {
-    app.TransData.value match {
-      case _: LNUrl => me returnToBase null
-      case _: Address => me returnToBase null
-      case _: BitcoinURI => me returnToBase null
-      case _: PaymentRequest => me returnToBase null
-      case _ => // Switching activity
-    }
-
+  def checkTransData =
     app.TransData checkAndMaybeErase {
-      case FragWallet.REDIRECT => goOps(null)
       case _: Started => me goTo classOf[LNStartActivity]
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-      case lnLink: LNUrl => lnLink.resolve.foreach(initConnection, none)
-      case address: Address => FragWallet.worker.sendBtcPopup(address)(none)
+
+      case FragWallet.REDIRECT =>
+        // TransData value will be erased here
+        me goTo classOf[LNOpsActivity]
+        null
+
+      case lnLink: LNUrl =>
+        // TransData value will be erased here
+        lnLink.resolve.foreach(initConnection, none)
+        me returnToBase null
+
+      case address: Address =>
+        // TransData value will be erased here
+        FragWallet.worker.sendBtcPopup(address)(none)
+        me returnToBase null
 
       case uri: BitcoinURI =>
-        // Bitcoin URI may possibly have an amount which we then fill in
+        // TransData value will be erased here
         val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
         manager setSum scala.util.Try(uri.getAmount)
+        me returnToBase null
 
       case pr: PaymentRequest if ChannelManager.notClosingOrRefunding.nonEmpty =>
         // We have open or at least opening channels so show a form or message to user
+        // TransData value will be erased here
         FragWallet.worker sendPayment pr
+        me returnToBase null
 
       case pr: PaymentRequest =>
         // TransData should be set to batch or null to erase previous
         app.TransData.value = TxWrap findBestBatch pr getOrElse null
         me goTo classOf[LNStartActivity]
-        app toast ln_empty
 
       case _ =>
     }
-  }
 
   def initConnection(icr: IncomingChannelRequest) =
     ConnectionManager.listeners += new ConnectionListener { self =>
@@ -246,7 +251,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   val tokensPrice = MilliSatoshi(1000000L)
-  def goOps(top: View): Unit = me goTo classOf[LNOpsActivity]
   def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
     val humanPrice = s"${coloredIn apply tokensPrice} <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
     val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
