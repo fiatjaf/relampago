@@ -231,13 +231,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def goSendPayment(top: View) = {
-    val options = Array(getString(send_scan_qr).html, getString(send_paste_payment_request).html)
-    val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-    val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, lst).create)
-    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
-    lst setOnItemClickListener onTap { case 0 => scanQR case 1 => pasteRequest }
-    lst setDividerHeight 0
-    lst setDivider null
+    val fragCenterList = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+    val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, fragCenterList).create)
+    val options = Array(send_scan_qr, send_paste_payment_request, send_hivemind_deposit).map(res => getString(res).html)
+    fragCenterList setOnItemClickListener onTap { case 0 => scanQR case 1 => pasteRequest case 2 => depositHivemind }
+    fragCenterList setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
+    fragCenterList setDividerHeight 0
+    fragCenterList setDivider null
 
     def pasteRequest = rm(alert) {
       val resultTry = app.getBufferTry map app.TransData.recordValue
@@ -247,6 +247,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     def scanQR = rm(alert) {
       // Just jump to QR scanner section
       walletPager.setCurrentItem(1, true)
+    }
+
+    def depositHivemind = rm(alert) {
+
     }
   }
 

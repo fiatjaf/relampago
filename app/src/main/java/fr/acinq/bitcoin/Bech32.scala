@@ -125,10 +125,9 @@ object Bech32 {
     *         is the witness version and program the decoded witness program.
     *         If version is 0, it will be either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
     */
-  def decodeWitnessAddress(address: String): (String, Byte, BinaryData) = {
+  private def decodeWitnessAddress(address: String): (String, Byte, BinaryData) = {
     if (address.indexWhere(_.isLower) != -1 && address.indexWhere(_.isUpper) != -1) throw new IllegalArgumentException("input mixes lowercase and uppercase characters")
     val (hrp, data) = decode(address)
-    require(hrp == "bc" || hrp == "tb" || hrp == "bcrt", s"invalid HRP $hrp")
     val version = data(0)
     require(version >= 0 && version <= 16, "invalid segwit version")
     val bin = five2eight(data.drop(1))
@@ -137,4 +136,15 @@ object Bech32 {
     (hrp, version, bin)
   }
 
+  def decodeWitnessAddressMainChain(address: String): (String, Byte, BinaryData) = {
+    val (hrp, version, bin) = decodeWitnessAddress(address)
+    require(hrp == "bc" || hrp == "tb" || hrp == "bcrt", s"invalid main chain HRP $hrp")
+    (hrp, version, bin)
+  }
+
+  def decodeWitnessAddressHivemind(address: String): (String, Byte, BinaryData) = {
+    val (hrp, version, bin) = decodeWitnessAddress(address)
+    require(hrp == "hmbc" || hrp == "hmtb" || hrp == "hmbcrt", s"invalid hivemind HRP $hrp")
+    (hrp, version, bin)
+  }
 }
