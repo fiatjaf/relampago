@@ -55,23 +55,28 @@ class LNStartActivity extends ScanActivity { me =>
     walletPager setAdapter slidingFragmentAdapter
   } else me exitTo classOf[MainActivity]
 
-  def checkTransData = {
-    app.TransData.value match {
-      case _: Batch => me returnToBase null
-      case _: Started => me returnToBase null
-      case _ => // Normal mode or switching
-    }
-
+  def checkTransData =
     app.TransData checkAndMaybeErase {
       case _: Address => me exitTo MainActivity.wallet
       case _: BitcoinURI => me exitTo MainActivity.wallet
       case _: PaymentRequest => me exitTo MainActivity.wallet
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-      case started: Started => FragLNStart.fragment.setExternalFunder(started)
-      case batch: Batch => FragLNStart.fragment.setBatchMode(batch)
-      case _ => FragLNStart.fragment.setNormalMode(null)
+
+      case started: Started =>
+        // TransData value will be erased here
+        FragLNStart.fragment.setExternalFunder(started)
+        me returnToBase null
+
+      case batch: Batch =>
+        // TransData value will be erased here
+        FragLNStart.fragment.setBatchMode(batch)
+        me returnToBase null
+
+      case _ =>
+        // TransData value will be erased here
+        FragLNStart.fragment.setNormalMode.run
+        me returnToBase null
     }
-  }
 }
 
 object FragLNStart {
@@ -90,8 +95,8 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   }
 
   var setBatchMode: Batch => Unit = none
-  var setNormalMode: FragLNStart => Unit = none
   var setExternalFunder: Started => Unit = none
+  var setNormalMode = new Runnable { def run = none }
   private[this] var nodes = Vector.empty[StartNodeView]
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
 
@@ -186,10 +191,10 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
       // Try to connect a Funder and remove any Batch info if it was present before
       funderInfo(freshWSWrap, R.color.material_blue_grey_800, ex_fund_connecting).run
       ExternalFunder setWSWrap freshWSWrap
-      setNormalMode(me)
+      setNormalMode.run
     }
 
-    setNormalMode = _ => {
+    setNormalMode = host UITask {
       // Hide a batch funding notification
       batchPresentWrap setVisibility View.GONE
       FragLNStart.batchOpt = None
@@ -203,7 +208,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     }
 
     // Wire up all tappable elements
-    batchPresentCancel setOnClickListener host.onButtonTap(setNormalMode apply me)
+    batchPresentCancel setOnClickListener host.onButtonTap(setNormalMode.run)
     externalFundCancel setOnClickListener host.onButtonTap(rmCurrentRemoteFunder)
     lnStartNodesList setOnItemClickListener host.onTap(onNodeSelected)
 
