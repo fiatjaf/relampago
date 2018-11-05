@@ -4,9 +4,11 @@ import fr.acinq.bitcoin._
 import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
+
 import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
+import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import com.lightning.walletapp.ChannelManager
 import fr.acinq.eclair.UInt64
 
@@ -55,11 +57,13 @@ object LNParams { me =>
     mismatch < -0.25 || mismatch > 0.25
   }
 
-  def makeLocalParams(theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {
-    val Seq(fund, revoke, pay, delay, htlc, sha) = for (n <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: n :: Nil)
-    LocalParams(maxHtlcValueInFlightMsat = UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay = 1440, maxAcceptedHtlcs = 25,
-      fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey,
-      dustLimit = dust, shaSeed = sha256(sha.privateKey.toBin), isFunder)
+  def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {
+    val Seq(fund, revoke, pay, delay, htlc, sha) = for (ord <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: ord :: Nil)
+    val toSelfDelay = if (ann.nodeId == JointNode.jointNodeKey) 2880 else 1440
+
+    LocalParams(maxHtlcValueInFlightMsat = UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay,
+      maxAcceptedHtlcs = 25, fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey,
+      htlc.privateKey, finalScriptPubKey, dust, shaSeed = sha256(sha.privateKey.toBin), isFunder)
   }
 }
 

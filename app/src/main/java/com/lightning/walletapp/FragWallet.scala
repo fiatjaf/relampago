@@ -558,12 +558,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val rateManager = new RateManager(baseContent) hint baseHint
         val bld = baseBuilder(baseTitle, baseContent)
 
-        val relayLink = new RelayNode(pr.nodeId) {
+        val relayLink = new JointNode(pr.nodeId) {
           override def onDataUpdated = UITask(changeText).run
           def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
             (pr.amount.isEmpty && relayable >= maxCappedSend) || // No sum asked and we can deliver max amount
               pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
-              RelayNode.hasRelayPeerOnly // We only have a relay node as peer
+              JointNode.hasRelayPeerOnly // We only have a relay node as peer
 
           def changeText = best match {
             case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
@@ -580,7 +580,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
 
         def sendAttempt(alert: AlertDialog) = (rateManager.result, relayLink.best) match {
-          case Success(ms) \ Some(relayable \ _) if relayable < ms && RelayNode.hasRelayPeerOnly => app toast dialog_sum_big
+          case Success(ms) \ Some(relayable \ _) if relayable < ms && JointNode.hasRelayPeerOnly => app toast dialog_sum_big
           case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
           case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
           case Failure(emptyAmount) \ _ => app toast dialog_sum_empty
@@ -600,7 +600,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
 
         for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
-        val killOpt = for (rep <- RelayNode.relayPeerReports.headOption) yield relayLink start rep.chan.data.announce
+        val killOpt = for (rep <- JointNode.relayPeerReports.headOption) yield relayLink start rep.chan.data.announce
         bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = for (off <- killOpt) off.run }
         mkCheckFormNeutral(sendAttempt, none, alert => rm(alert) { for (onChain <- runnableOpt) onChain.run }, bld, dialog_pay, dialog_cancel,
           if (pr.amount.exists(askedSum => maxCappedSend >= askedSum) || runnableOpt.isEmpty) -1 else dialog_pay_onchain)

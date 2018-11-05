@@ -2,7 +2,7 @@ package com.lightning.walletapp.lnutils
 
 import scala.concurrent.duration._
 import com.neovisionaries.ws.client._
-import com.lightning.walletapp.lnutils.RelayNode._
+import com.lightning.walletapp.lnutils.JointNode._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.{Hop, NodeAnnouncement}
@@ -16,11 +16,11 @@ import com.lightning.walletapp.Utils.app
 import fr.acinq.bitcoin.MilliSatoshi
 
 
-object RelayNode {
-  final val relayNodeKey = PublicKey("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd")
-  final val defaultRelayAnn = app.mkNodeAnnouncement(nodeId = relayNodeKey, host = "5.9.138.164", port = 8089)
-  def relayPeerReports = ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == relayNodeKey)
-  def hasRelayPeerOnly = ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == relayNodeKey)
+object JointNode {
+  final val jointNodeKey = PublicKey("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd")
+  final val defaultJointAnn = app.mkNodeAnnouncement(nodeId = jointNodeKey, host = "5.9.138.164", port = 8089)
+  def relayPeerReports = ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == jointNodeKey)
+  def hasRelayPeerOnly = ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == jointNodeKey)
 
   def makeWebSocket(ann: NodeAnnouncement)(fun: String => Unit) = {
     val webSockEndPoint = s"ws://${ann.workingAddress.getHostString}:8090"
@@ -42,7 +42,7 @@ object RelayNode {
   }
 }
 
-abstract class RelayNode(payee: PublicKey) {
+abstract class JointNode(payee: PublicKey) {
   type BestRelayInfo = (MilliSatoshi, ChannelBalanceInfo)
   var best: Option[BestRelayInfo] = None
 
@@ -62,6 +62,6 @@ case class ChannelBalanceInfo(balance: ChannelBalance, peerNodeId: PublicKey, sh
                               htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
   // We get balance info from our peer so its node key should be contained in Hop
-  val hop = Hop(relayNodeKey, shortChannelId, cltvExpiryDelta, htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
+  val hop = Hop(jointNodeKey, shortChannelId, cltvExpiryDelta, htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
   val withoutMaxFee = balance.canSendMsat - feeBaseMsat - LNParams.maxHtlcValueMsat * feeProportionalMillionths / 1000000L
 }

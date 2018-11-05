@@ -3,7 +3,7 @@ package com.lightning.walletapp
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
-import com.lightning.walletapp.lnutils.RelayNode._
+import com.lightning.walletapp.lnutils.JointNode._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._

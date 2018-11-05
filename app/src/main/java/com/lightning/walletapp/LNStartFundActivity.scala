@@ -133,9 +133,9 @@ class LNStartFundActivity extends TimerActivity { me =>
           def futureProcess(unsigned: SendRequest) = {
             val fee = LNParams.broadcaster.perKwThreeSat
             val batch = Batch(unsigned, dummyScript, null)
+            val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
             val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
-            val theirUnspendableReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
-            val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
+            val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
             freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat, pushMsat = 0L)
           }
 
@@ -167,9 +167,9 @@ class LNStartFundActivity extends TimerActivity { me =>
 
         mkCheckForm(alert => rm(alert) {
           val fee = LNParams.broadcaster.perKwThreeSat
+          val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
-          val theirUnspendableReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
-          val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
+          val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
           freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat, pushMsat = 0L)
         }, none, baseBuilder(title, text), dialog_next, dialog_cancel)
       }
@@ -217,8 +217,8 @@ class LNStartFundActivity extends TimerActivity { me =>
           val fee = LNParams.broadcaster.perKwThreeSat
           val remoteFundSat = started.start.fundingAmount.amount
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
-          val theirUnspendableReserveSat = wsw.params.start.fundingAmount.amount / LNParams.channelReserveToFundingRatio
-          val localParams = LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
+          val theirReserveSat = wsw.params.start.fundingAmount.amount / LNParams.channelReserveToFundingRatio
+          val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
           freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch = null, remoteFundSat, pushMsat = 0L)
         }, none, baseBuilder(getString(ln_ops_start_fund_external_title).html, content.html), dialog_next, dialog_cancel)
       }
@@ -226,10 +226,8 @@ class LNStartFundActivity extends TimerActivity { me =>
 
     def remoteOpenFundeeListener(open: OpenChannel) = new OpenListener {
       // In this special case we already have their OpenChannel and connection is active
-      val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
-      val theirUnspendableReserveSat = open.fundingSatoshis / LNParams.channelReserveToFundingRatio
-      freshChan process Tuple2(LNParams.makeLocalParams(theirUnspendableReserveSat, finalPubKeyScript,
-        System.currentTimeMillis, isFunder = false), open)
+      freshChan process Tuple2(LNParams.makeLocalParams(ann, open.fundingSatoshis / LNParams.channelReserveToFundingRatio,
+        ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram, System.currentTimeMillis, isFunder = false), open)
 
       override def onBecome = {
         case (_, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>
