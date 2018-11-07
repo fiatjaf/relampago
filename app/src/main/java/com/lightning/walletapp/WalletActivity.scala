@@ -148,9 +148,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
 
       case FragWallet.REDIRECT =>
-        // TransData value will be erased here
-        me goTo classOf[LNOpsActivity]
-        null
+        // TransData value should be erased here
+        // so `goOps` return type is forced to Unit
+        goOps(null)
 
       case lnLink: LNUrl =>
         // TransData value will be erased here
@@ -255,6 +255,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   val tokensPrice = MilliSatoshi(1000000L)
+  def goOps(top: View): Unit = me goTo classOf[LNOpsActivity]
   def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
     val humanPrice = s"${coloredIn apply tokensPrice} <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
     val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
