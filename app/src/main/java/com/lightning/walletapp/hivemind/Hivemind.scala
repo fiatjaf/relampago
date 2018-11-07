@@ -29,6 +29,7 @@ object Hivemind {
     val opReturnScript = Script.write(OP_0 :: OP_PUSHDATA(hiveMindHash) :: Nil)
     rq.tx.addOutput(Coin.ZERO, ScriptBuilder createOpReturnScript opReturnScript)
 
+    // Include previous tx to make input connected, see `addLocalInputsToTx`
     val outPoint = new TransactionOutPoint(app.params, prevDepositIndex, prevTx)
     // Add an input (without signature for now) which spends from previous hivemind deposit tx
     val input = new TransactionInput(app.params, prevTx, Array.emptyByteArray, outPoint, prevDepositAmount)
