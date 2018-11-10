@@ -53,6 +53,13 @@
         того же кошелька на нескольких телефонах!<br><br>Файл-снапшот <string>НЕ ЗАШИФРОВАН</string>, поэтому не храните его в надежных местах.
     ]]></string>
 
+    <string name="hivemind_details"><![CDATA[
+        <strong>Hivemind deposits are disabled</strong><br><br>
+        It will be possible to deposit funds to Hivemind if <a href="http://www.drivechain.info/">Drivechain</a> soft-fork gets activated.<br><br>
+        <a href="http://bitcoinhivemind.com/">Hivemind</a> is a Peer-to-Peer Oracle Protocol which absorbs accurate data into a blockchain so that Bitcoin-users can speculate in Prediction Markets.<br><br>
+        These markets have the <a href=http://bitcoinhivemind.com/papers/3_PM_Applications.pdf>potential</a> to revolutionize the emergence and diffusion of knowledge in society.
+    ]]></string>
+
     <!-- Olympus server -->
     <string name="olympus_log">Лог действий</string>
     <string name="olympus_add">Добавить сервер</string>

@@ -250,7 +250,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def depositHivemind = rm(alert) {
-
+      // Show a warning for now since hivemind sidechain is not enabled yet
+      val alert = showForm(negTextBuilder(dialog_ok, getString(hivemind_details).html).create)
+      try Utils clickableTextField alert.findViewById(android.R.id.message) catch none
     }
   }
 
