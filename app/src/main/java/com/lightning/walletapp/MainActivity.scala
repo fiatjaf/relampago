@@ -3,7 +3,6 @@ package com.lightning.walletapp
 import R.string._
 import android.widget._
 import com.lightning.walletapp.Utils._
-
 import java.io.{File, FileInputStream}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
 import com.google.common.io.{ByteStreams, Files}
@@ -49,7 +48,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   def INIT(state: Bundle) = {
     runAnd(me setContentView R.layout.activity_main)(me initNfc state)
-    MainActivity.proceedOnSuccess = UITask(me exitTo MainActivity.wallet)
+    MainActivity.proceedOnSuccess = UITask { me exitTo MainActivity.wallet }
     MainActivity.actOnError = { case error => UITask(throw error).run }
     Utils clickableTextField findViewById(R.id.mainGreetings)
   }

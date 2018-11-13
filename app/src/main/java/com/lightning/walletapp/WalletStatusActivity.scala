@@ -72,12 +72,12 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
   }
 
-  val killOpt =
-    for (rep <- relayPeerReports.headOption)
-      yield makeWebSocket(rep.chan.data.announce) { raw =>
-        WalletStatusActivity updateItems to[ChannelBalances](raw)
-        UITask(adapter.notifyDataSetChanged).run
-      }
+  val killOpt = for {
+    rep <- relayPeerReports.headOption
+  } yield makeWebSocket(rep.chan.data.announce) { raw =>
+    WalletStatusActivity updateItems to[ChannelBalances](raw)
+    UITask(adapter.notifyDataSetChanged).run
+  }
 
   override def onDestroy = {
     // Disconnect socket on exiting
@@ -101,6 +101,7 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_wallet_status
+    Utils clickableTextField findViewById(R.id.jointNodeHint)
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     getSupportActionBar setTitle joint_title
 
