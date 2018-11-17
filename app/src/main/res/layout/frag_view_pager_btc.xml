@@ -31,6 +31,28 @@
 
         </android.support.v7.widget.Toolbar>
 
+        <LinearLayout
+            style="@style/LineLinearLayout"
+            android:orientation="horizontal"
+            android:layout_width="fill_parent"
+            android:background="#33999999">
+
+            <TextView
+                style="@style/BaseText"
+                android:layout_weight="14"
+                android:layout_width="0dp"
+                android:id="@+id/fiatBalance"/>
+
+            <TextView
+                style="@style/BaseText"
+                android:layout_weight="10"
+                android:layout_width="0dp"
+                android:id="@+id/fiatRate"
+                android:textColor="#888888"
+                android:gravity="end"/>
+
+        </LinearLayout>
+
         <ListView
             android:layout_weight="1"
             android:visibility="gone"

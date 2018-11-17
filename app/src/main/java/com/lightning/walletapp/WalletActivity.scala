@@ -271,6 +271,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
     val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
     val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
+    val setFiatCurrency = form.findViewById(R.id.setFiatCurrency).asInstanceOf[Button]
     val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
     val chooseBitcoinUnit = form.findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
     val exportWalletSnapshot = form.findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
@@ -301,6 +302,27 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         def go = runAnd(app toast dialog_recovering)(recover)
         val bld = baseTextBuilder(me getString channel_recovery_info)
         mkCheckForm(alert => rm(alert)(go), none, bld, dialog_next, dialog_cancel)
+      }
+    }
+
+    setFiatCurrency setOnClickListener onButtonTap {
+      val fiatCodes \ fiatHumanNames = fiatNames.toSeq.reverse.unzip
+      val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
+      val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
+
+      def updateFiatType(pos: Int) = {
+        fiatCode = fiatCodes.toList(pos)
+        // Update fiatCode so UI update can react to changes
+        app.prefs.edit.putString(AbstractKit.FIAT_TYPE, fiatCode).commit
+        // then persist user choice in local data storage
+        FragWallet.worker.updTitle.run
+      }
+
+      rm(menu) {
+        lst setOnItemClickListener onTap(updateFiatType)
+        lst setAdapter new ArrayAdapter(me, singleChoice, fiatHumanNames.toArray)
+        showForm(negBuilder(dialog_ok, me getString sets_set_fiat, form).create)
+        lst.setItemChecked(fiatCodes.toList indexOf fiatCode, true)
       }
     }
 

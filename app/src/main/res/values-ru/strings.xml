@@ -77,6 +77,7 @@
     </array>
 
     <!-- menu and fab -->
+    <string name="sets_set_fiat">Выбрать валюту</string>
     <string name="sets_choose_unit">Выбрать Биткоин-юнит</string>
     <string name="sets_manage_olympus">Настроить бэкап-сервера</string>
     <string name="sets_chan_recover">Восстановитель каналов</string>

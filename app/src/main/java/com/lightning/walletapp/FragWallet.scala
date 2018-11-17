@@ -60,14 +60,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail}
   import host.{TxProcessor, getSupportLoaderManager, mkCheckForm, rm, <, mkCheckFormNeutral}
 
-  val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
+  val fiatRate = frag.findViewById(R.id.fiatRate).asInstanceOf[TextView]
+  val fiatBalance = frag.findViewById(R.id.fiatBalance).asInstanceOf[TextView]
   val customTitle = frag.findViewById(R.id.customTitle).asInstanceOf[TextView]
+  val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
 
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
   val imageMap = Array(await, await, conf1, dead, frozen)
+  val oneBtc = MilliSatoshi(100000000000L)
+  val updTitleTask = UITask(updTitle)
 
   val paymentStates = app.getResources getStringArray R.array.ln_payment_states
   val expiryLeft = app.getResources getStringArray R.array.ln_status_expiry
@@ -86,12 +90,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val blocksTitleListener = new BlocksListener {
     def onBlocksDownloaded(peer: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) =
-      if (left < 1) updPaymentList.run else if (left % broadcaster.blocksPerDay == 0) UITask(updTitle).run
+      if (left < 1) updPaymentList.run else if (left % broadcaster.blocksPerDay == 0) updTitleTask.run
   }
 
   val peersListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
-    def onPeerDisconnected(connectedPeer: Peer, currentPeerCount: Int) = UITask(updTitle).run
-    def onPeerConnected(connectedPeer: Peer, currentPeerCount: Int) = UITask(updTitle).run
+    def onPeerDisconnected(connectedPeer: Peer, currentPeerCount: Int) = updTitleTask.run
+    def onPeerConnected(connectedPeer: Peer, currentPeerCount: Int) = updTitleTask.run
   }
 
   val txsListener = new TxTracker {
@@ -196,10 +200,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       commit <- chan(Commitments.latestRemoteCommit)
     } yield commit.spec.toRemoteMsat
 
-    val btcTotalSum = app.kit.conf0Balance
     val lnTotalSum = MilliSatoshi(lnTotal.sum)
+    val btcTotalSum = app.kit.conf0Balance: MilliSatoshi
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom withSign lnTotalSum
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
+    msatInFiat(oneBtc).foreach(hs => fiatRate setText s"$hs<small> / btc</small>".html)
+    fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
 
     val subtitleText =
       if (app.kit.peerGroup.numConnectedPeers < 1) statusConnecting
@@ -495,6 +501,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     app.kit.peerGroup removeConnectedEventListener peersListener
     app.kit.wallet removeCoinsReceivedEventListener txsListener
     app.kit.wallet removeCoinsSentEventListener txsListener
+    RatesSaver.onUpdated -= updTitleTask
   }
 
   // LN SEND / RECEIVE
@@ -713,6 +720,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   app.kit.peerGroup addConnectedEventListener peersListener
   app.kit.wallet addCoinsReceivedEventListener txsListener
   app.kit.wallet addCoinsSentEventListener txsListener
+  RatesSaver.onUpdated += updTitleTask
   react(new String)
   updBtcItems
 }

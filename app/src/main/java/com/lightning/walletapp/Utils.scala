@@ -83,7 +83,7 @@ object Utils {
 
   val msatInFiatHuman: MilliSatoshi => String = ms => msatInFiat(ms) match {
     case Success(amount) => s"≈ ${formatFiat format amount} $fiatCode"
-    case _ => new String
+    case _ => s"≈ ? $fiatCode"
   }
 }
 

@@ -43,19 +43,15 @@ object RatesSaver {
   var rates = Try(raw) map to[Rates] getOrElse Rates(Nil, Nil, Map.empty, 0)
   var onUpdated = Set.empty[Runnable]
 
-  onUpdated += new Runnable {
-    override def run: Unit = {
-      // Channels may become open sooner then we get updated fees so inform channels once we get updated fees
-      for (c <- ChannelManager.notClosingOrRefunding) c process CMDFeerate(LNParams.broadcaster.perKwThreeSat)
-      app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
-    }
-  }
-
   private[this] def safe = retry(app.olympus.getRates, pickInc, 3 to 4)
   def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
     val sensibleThree = for (notZero <- newFee("3") +: rates.feesThree if notZero > 0) yield notZero
     val sensibleSix = for (notZero <- newFee("6") +: rates.feesSix if notZero > 0) yield notZero
+
+    // Channels may become open sooner then we get updated fees so inform channels once we get updated fees
+    for (c <- ChannelManager.notClosingOrRefunding) c process CMDFeerate(LNParams.broadcaster.perKwThreeSat)
     rates = Rates(sensibleSix take 2, sensibleThree take 2, newFiat, System.currentTimeMillis)
+    app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
     for (runner <- onUpdated) runner.run
   }
 }

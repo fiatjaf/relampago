@@ -4,6 +4,11 @@
 
     <Button
         style="@style/TransButton"
+        android:id="@+id/setFiatCurrency"
+        android:text="@string/sets_set_fiat"/>
+
+    <Button
+        style="@style/TransButton"
         android:id="@+id/chooseBitcoinUnit"
         android:text="@string/sets_choose_unit"/>
 
