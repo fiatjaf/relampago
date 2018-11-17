@@ -90,7 +90,7 @@ class WalletApp extends Application { me =>
   override def onCreate = wrap(super.onCreate) {
     // These cannot be lazy vals because values may change
     Utils.denom = Utils denoms prefs.getInt(AbstractKit.DENOM_TYPE, 0)
-    Utils.fiatName = prefs.getString(AbstractKit.FIAT_TYPE, Utils.strDollar)
+    Utils.fiatCode = prefs.getString(AbstractKit.FIAT_TYPE, "usd")
   }
 
   def setBuffer(text: String) = {

@@ -13,9 +13,7 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.wallet.Wallet.ExceededMaxTransactionSize
 import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
-import android.widget.RadioGroup.OnCheckedChangeListener
 import android.widget.AdapterView.OnItemClickListener
-import info.hoang8f.android.segmented.SegmentedGroup
 import concurrent.ExecutionContext.Implicits.global
 import com.lightning.walletapp.ln.LNParams.minDepth
 import com.lightning.walletapp.lnutils.RatesSaver
@@ -34,7 +32,6 @@ import android.content.DialogInterface.{BUTTON_NEUTRAL, BUTTON_POSITIVE, BUTTON_
 import com.lightning.walletapp.lnutils.IconGetter.{scrWidth, maxDialog}
 import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
-import R.id.{typeCNY, typeEUR, typeJPY, typeUSD}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
@@ -45,7 +42,7 @@ object Utils {
   type TryMSat = Try[MilliSatoshi]
   var appReference: WalletApp = _
   var denom: Denomination = _
-  var fiatName: String = _
+  var fiatCode: String = _
 
   val fileName = "SegwitMainnet"
   val dbFileName = s"$fileName.db"
@@ -65,9 +62,10 @@ object Utils {
 
   // Mappings
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
-  val Seq(strDollar, strEuro, strYen, strYuan) = Seq("dollar", "euro", "yen", "yuan")
-  val fiatMap = Map(typeUSD -> strDollar, typeEUR -> strEuro, typeJPY -> strYen, typeCNY -> strYuan)
-  val revFiatMap = Map(strDollar -> typeUSD, strEuro -> typeEUR, strYen -> typeJPY, strYuan -> typeCNY)
+  val fiatNames = Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan",
+    "inr" -> "Indian Rupee", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль", "brl" -> "Real Brasileiro",
+    "czk" -> "Česká Koruna")
+
   def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
   def getDescription(rawText: String) = if (rawText.isEmpty) s"<i>$noDesc</i>" else rawText take 140
   def humanSix(adr: String) = adr grouped 6 mkString "\u0020"
@@ -78,16 +76,13 @@ object Utils {
     field
   }
 
-  def currentRate = Try(RatesSaver.rates exchange fiatName)
+  def currentRate = Try(RatesSaver.rates exchange fiatCode)
   def msatInFiat(milliSatoshi: MilliSatoshi) = currentRate map {
     perBtc => milliSatoshi.amount * perBtc / BtcDenomination.factor
   }
 
-  val msatInFiatHuman = (ms: MilliSatoshi) => msatInFiat(ms) match {
-    case Success(amt) if fiatName == strYuan => s"≈ ${formatFiat format amt} cny"
-    case Success(amt) if fiatName == strEuro => s"≈ ${formatFiat format amt} eur"
-    case Success(amt) if fiatName == strYen => s"≈ ${formatFiat format amt} jpy"
-    case Success(amt) => s"≈ ${formatFiat format amt} usd"
+  val msatInFiatHuman: MilliSatoshi => String = ms => msatInFiat(ms) match {
+    case Success(amount) => s"≈ ${formatFiat format amount} $fiatCode"
     case _ => new String
   }
 }
@@ -259,9 +254,10 @@ trait TimerActivity extends AppCompatActivity { me =>
 
 class RateManager(val content: View) { me =>
   val satInput = content.findViewById(R.id.inputAmount).asInstanceOf[EditText]
-  val hintDenom = Utils clickableTextField content.findViewById(R.id.hintDenom)
-  val fiatType = content.findViewById(R.id.fiatType).asInstanceOf[SegmentedGroup]
   val fiatInput = content.findViewById(R.id.fiatInputAmount).asInstanceOf[EditText]
+  val hintFiatDenom = Utils clickableTextField content.findViewById(R.id.hintFiatDenom)
+  val hintDenom = Utils clickableTextField content.findViewById(R.id.hintDenom)
+
   def result: TryMSat = Try(denom rawString2MSat satInput.getText.toString.noSpaces)
   def setSum(res: TryMSat) = satInput.setText(res map denom.asString getOrElse null)
   def hint(ex: String) = runAnd(me)(hintDenom setText denom.amountInTxt.format(ex).html)
@@ -277,20 +273,9 @@ class RateManager(val content: View) { me =>
     def onTextChanged(s: CharSequence, start: Int, b: Int, c: Int) = if (satInput.hasFocus) upd
   }
 
-  fiatType setOnCheckedChangeListener new OnCheckedChangeListener {
-    def onCheckedChanged(radioGroupView: RadioGroup, newFiatName: Int) = {
-      // We update both runtime variable and saved value for future launches
-
-      fiatName = fiatMap apply newFiatName
-      app.prefs.edit.putString(AbstractKit.FIAT_TYPE, fiatName).commit
-      if (fiatInput.hasFocus) fiatListener.upd else bitListener.upd
-      fiatInput setHint fiatName
-    }
-  }
-
   satInput addTextChangedListener bitListener
   fiatInput addTextChangedListener fiatListener
-  fiatType check revFiatMap(fiatName)
+  hintFiatDenom setText fiatNames(fiatCode)
   satInput.requestFocus
 }
 
