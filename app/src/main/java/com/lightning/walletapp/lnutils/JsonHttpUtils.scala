@@ -39,20 +39,24 @@ object JsonHttpUtils {
 }
 
 object RatesSaver {
-  def safe = retry(app.olympus.getRates, pickInc, 3 to 4)
-  def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
-    val sensibleSix = for (notZero <- newFee("6") +: rates.feesSix if notZero > 0) yield notZero
-    val sensibleThree = for (notZero <- newFee("3") +: rates.feesThree if notZero > 0) yield notZero
+  private[this] val raw = app.prefs.getString(AbstractKit.RATES_DATA, new String)
+  var rates = Try(raw) map to[Rates] getOrElse Rates(Nil, Nil, Map.empty, 0)
+  var onUpdated = Set.empty[Runnable]
 
-    rates = Rates(sensibleSix take 2, sensibleThree take 2, newFiat, System.currentTimeMillis)
-    // Channels may become open sooner then we get updated fees so inform channels once we get updated fees
-    for (c <- ChannelManager.notClosingOrRefunding) c process CMDFeerate(LNParams.broadcaster.perKwThreeSat)
-    app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
+  onUpdated += new Runnable {
+    override def run: Unit = {
+      // Channels may become open sooner then we get updated fees so inform channels once we get updated fees
+      for (c <- ChannelManager.notClosingOrRefunding) c process CMDFeerate(LNParams.broadcaster.perKwThreeSat)
+      app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
+    }
   }
 
-  var rates = {
-    val raw = app.prefs.getString(AbstractKit.RATES_DATA, new String)
-    Try(raw) map to[Rates] getOrElse Rates(Nil, Nil, Map.empty, 0)
+  private[this] def safe = retry(app.olympus.getRates, pickInc, 3 to 4)
+  def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
+    val sensibleThree = for (notZero <- newFee("3") +: rates.feesThree if notZero > 0) yield notZero
+    val sensibleSix = for (notZero <- newFee("6") +: rates.feesSix if notZero > 0) yield notZero
+    rates = Rates(sensibleSix take 2, sensibleThree take 2, newFiat, System.currentTimeMillis)
+    for (runner <- onUpdated) runner.run
   }
 }
 

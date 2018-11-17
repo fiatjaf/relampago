@@ -264,7 +264,7 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String, cap
                                   feeProportionalMillionths: Long) extends LNUrlData {
 
   val nodeLink(key, host, port) = uri
-  val request = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&public=0"
+  val request = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1"
   def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), host, port.toInt)
   def requestChannel = get(request, true).trustAllCerts.trustAllHosts.body
 }
