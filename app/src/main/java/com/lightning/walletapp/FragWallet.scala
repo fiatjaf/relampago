@@ -62,6 +62,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val fiatRate = frag.findViewById(R.id.fiatRate).asInstanceOf[TextView]
   val fiatBalance = frag.findViewById(R.id.fiatBalance).asInstanceOf[TextView]
+  val fiatDetails = frag.findViewById(R.id.fiatDetails).asInstanceOf[LinearLayout]
+
   val customTitle = frag.findViewById(R.id.customTitle).asInstanceOf[TextView]
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
@@ -165,24 +167,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  new LoaderCallbacks[Cursor] { self =>
-    private[this] var lastQuery = new String
-    private[this] val observer = new ContentObserver(new Handler) {
-      override def onChange(fromMe: Boolean) = if (!fromMe) react(lastQuery)
-    }
-
+  val loaderCallbacks: LoaderCallbacks[Cursor] = new LoaderCallbacks[Cursor] {
     def onCreateLoader(id: Int, bn: Bundle) = new ReactLoader[PaymentInfo](host) {
       val consume = (vec: InfoVec) => runAnd(lnItems = vec map LNWrap)(updPaymentList.run)
-      def getCursor = if (lastQuery.isEmpty) bag.byRecent else bag.byQuery(lastQuery)
-      def createItem(richCursor: RichCursor) = bag toPaymentInfo richCursor
+      def getCursor = if (lastQuery.isEmpty) bag.byRecent else bag byQuery lastQuery
+      def createItem(rc: RichCursor) = bag toPaymentInfo rc
     }
 
     type LoaderCursor = Loader[Cursor]
     type InfoVec = Vector[PaymentInfo]
-    def onLoaderReset(loader: LoaderCursor) = none
-    def onLoadFinished(loader: LoaderCursor, c: Cursor) = none
-    me.react = vs => runAnd(lastQuery = vs)(getSupportLoaderManager.restartLoader(1, null, self).forceLoad)
-    host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
+    def onLoaderReset(loaderCursor: LoaderCursor) = none
+    def onLoadFinished(loaderCursor: LoaderCursor, c: Cursor) = none
+  }
+
+  val observer = new ContentObserver(new Handler) {
+    override def onChange(self: Boolean) = if (!self) react
   }
 
   toggler setOnClickListener onButtonTap {
@@ -201,10 +200,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     } yield commit.spec.toRemoteMsat
 
     val lnTotalSum = MilliSatoshi(lnTotal.sum)
-    val btcTotalSum = app.kit.conf0Balance: MilliSatoshi
+    val btcTotalSum = coin2MSat(app.kit.conf0Balance)
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom withSign lnTotalSum
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
-    msatInFiat(oneBtc).foreach(hs => fiatRate setText s"$hs<small> / btc</small>".html)
+    fiatRate setText s"${msatInFiat(oneBtc) getOrElse 0L}<small> / btc</small>".html
     fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
 
     val subtitleText =
@@ -218,17 +217,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       $subtitleText<img src="none"/>""".html
   }
 
-  override def setupSearch(menu: Menu) = {
-    // Expand payment list if search is active
-    // hide payment description if it's not
-
-    super.setupSearch(menu)
-    searchView addOnAttachStateChangeListener new View.OnAttachStateChangeListener {
-      def onViewDetachedFromWindow(searchViewLenseItem: View): Unit = updPaymentList.run
-      def onViewAttachedToWindow(searchViewLenseItem: View): Unit = none
-    }
-  }
-
   // DISPLAYING ITEMS LIST
 
   val minLinesNum = 5
@@ -237,20 +225,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var btcItems = Vector.empty[BTCWrap]
   var allItems = Vector.empty[ItemWrap]
 
-  def updPaymentList = {
-    val divHeight = if (!isTablet && isSearching) 0 else IconGetter.dp2px
+  def updPaymentList = UITask {
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
-
-    UITask {
-      allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
-      mnemonicWarn setVisibility viewMap(allItems.isEmpty)
-      itemsList setVisibility viewMap(allItems.nonEmpty)
-      itemsList setDividerHeight divHeight
-      adapter.notifyDataSetChanged
-      updTitle
-    }
+    allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
+    mnemonicWarn setVisibility viewMap(allItems.isEmpty)
+    itemsList setVisibility viewMap(allItems.nonEmpty)
+    fiatDetails setVisibility viewMap(!isSearching)
+    adapter.notifyDataSetChanged
+    updTitle
   }
 
   val adapter = new BaseAdapter {
@@ -698,6 +682,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     updPaymentList.run
   }
 
+  def react = getSupportLoaderManager.restartLoader(1, null, loaderCallbacks).forceLoad
+  host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
+
   host setSupportActionBar toolbar
 //  toolbar setOnClickListener onButtonTap {
 //    // View current balance status and guranteed deliveries
@@ -721,6 +708,5 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   app.kit.wallet addCoinsReceivedEventListener txsListener
   app.kit.wallet addCoinsSentEventListener txsListener
   RatesSaver.onUpdated += updTitleTask
-  react(new String)
-  updBtcItems
+  runAnd(react)(updBtcItems)
 }

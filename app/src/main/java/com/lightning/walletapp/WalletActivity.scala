@@ -40,19 +40,28 @@ import java.io.File
 
 
 trait SearchBar { me =>
-  var react: String => Unit = _
+  var isSearching = false
+  var lastQuery = new String
   var searchView: SearchView = _
 
-  // This may be queried before search menu is created so null check
-  def isSearching = searchView != null && !searchView.isIconified
-
-  def setupSearch(menu: Menu) = {
-    val item = menu findItem R.id.action_search
-    searchView = item.getActionView.asInstanceOf[SearchView]
-    searchView setOnQueryTextListener new SearchView.OnQueryTextListener {
-      def onQueryTextChange(queryText: String) = runAnd(true)(me react queryText)
-      def onQueryTextSubmit(queryText: String) = true
+  def setupSearch(m: Menu) = {
+    searchView = m.findItem(R.id.action_search).getActionView.asInstanceOf[SearchView]
+    searchView addOnAttachStateChangeListener new View.OnAttachStateChangeListener {
+      def onViewDetachedFromWindow(lens: View) = runAnd(isSearching = false)(react)
+      def onViewAttachedToWindow(lens: View) = runAnd(isSearching = true)(react)
     }
+
+    searchView setOnQueryTextListener new SearchView.OnQueryTextListener {
+      def onQueryTextChange(txt: String) = runAnd(true)(me search txt)
+      def onQueryTextSubmit(txt: String) = true
+    }
+  }
+
+  def react: Unit
+  def search(txt: String) = {
+    // Update and do the search
+    lastQuery = txt
+    react
   }
 }
 

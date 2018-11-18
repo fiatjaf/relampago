@@ -104,17 +104,14 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   val acinqAnnouncement = app.mkNodeAnnouncement(nodeId = acinqKey, host = "34.239.230.56", 9735)
   val acinq = HardcodedNodeView(acinqAnnouncement, "<strong>Recommended ACINQ node</strong>")
 
-  new ThrottledWork[String, AnnounceChansNumVec] {
-    def error(error: Throwable) = Tools errlog error
+  val worker = new ThrottledWork[String, AnnounceChansNumVec] {
+    def error(searchError: Throwable) = Tools errlog searchError
     def work(userQuery: String) = app.olympus findNodes userQuery
     def process(userQuery: String, results: AnnounceChansNumVec) = {
       val remoteNodeViewWraps = for (result <- results) yield RemoteNodeView(result)
       nodes = if (userQuery.isEmpty) acinq +: remoteNodeViewWraps else remoteNodeViewWraps
       host.UITask(adapter.notifyDataSetChanged).run
     }
-
-    // Connect to search
-    me.react = addWork
   }
 
   val adapter = new BaseAdapter {
@@ -130,6 +127,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     def getCount = nodes.size
   }
 
+  def react = worker addWork lastQuery
   def onNodeSelected(pos: Int): Unit = {
     app.TransData.value = adapter getItem pos
     host goTo classOf[LNStartFundActivity]
@@ -217,8 +215,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     me initToolbar view.findViewById(R.id.toolbar).asInstanceOf[android.support.v7.widget.Toolbar]
     wrap(host.getSupportActionBar setTitle action_ln_open)(host.getSupportActionBar setSubtitle ln_status_peer)
     lnStartNodesList.setAdapter(adapter)
-    host.checkTransData
-    react(new String)
+    runAnd(host.checkTransData)(react)
   }
 }
 
