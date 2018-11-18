@@ -203,8 +203,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom withSign lnTotalSum
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
-    fiatRate setText s"${msatInFiat(oneBtc) getOrElse 0L}<small> / btc</small>".html
-    fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
+
+    val balanceFiat = msatInFiatHuman(lnTotalSum + btcTotalSum)
+    val perBtcRate = formatFiat format msatInFiat(oneBtc).getOrElse(0L)
+    fiatRate setText s"<i>$perBtcRate<small> / btc</small></i>".html
+    fiatBalance setText s"<i>$balanceFiat</i>".html
 
     val subtitleText =
       if (app.kit.peerGroup.numConnectedPeers < 1) statusConnecting
