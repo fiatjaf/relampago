@@ -699,8 +699,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // Only update a minimized payments list to eliminate possible performance slowdowns
   host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
   itemsList setOnItemClickListener onTap { position => adapter.getItem(position).generatePopup }
-  itemsList addHeaderView app.getString(recent_transactions)
-  itemsList setHeaderDividersEnabled false
   itemsList setFooterDividersEnabled false
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter
