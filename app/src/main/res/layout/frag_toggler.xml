@@ -1,6 +1,6 @@
 <LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:visibility="gone" style="@style/StandardLinearLayout">
+    style="@style/StandardLinearLayout" android:visibility="gone"
+    xmlns:android="http://schemas.android.com/apk/res/android">
     <View style="@style/GrayDivider"/>
 
     <ImageButton

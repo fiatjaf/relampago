@@ -16,13 +16,13 @@ import fr.acinq.bitcoin.BinaryData
 import org.bitcoinj.core.Address
 import android.content.Intent
 import android.view.View
+import android.os.Bundle
 
 import android.widget.{ImageButton, ImageView, LinearLayout}
 import com.google.zxing.{BarcodeFormat, EncodeHintType}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
 import android.text.{StaticLayout, TextPaint}
 import java.io.{File, FileOutputStream}
-import android.os.{Build, Bundle}
 
 
 object QRGen {
@@ -89,9 +89,7 @@ class RequestActivity extends TimerActivity { me =>
   } else me exitTo classOf[MainActivity]
 
   def showPaid = UITask {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT)
-      TransitionManager beginDelayedTransition reqContainer
-
+    TransitionManager beginDelayedTransition reqContainer
     reqFulfilled setVisibility View.VISIBLE
     reqOptions setVisibility View.GONE
   }

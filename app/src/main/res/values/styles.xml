@@ -3,13 +3,14 @@
     <!-- page layouts -->
 
     <style name="StandardLinearLayout">
-        <item name="android:layout_height">fill_parent</item>
+        <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_width">fill_parent</item>
         <item name="android:orientation">vertical</item>
         <item name="android:gravity">center</item>
     </style>
 
     <style name="StandardLinearLayoutPage" parent="StandardLinearLayout">
+        <item name="android:layout_height">fill_parent</item>
         <item name="android:background">#F5F5F5</item>
     </style>
 

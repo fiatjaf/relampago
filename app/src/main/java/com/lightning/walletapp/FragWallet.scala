@@ -36,6 +36,7 @@ import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
+import android.transition.TransitionManager
 import fr.acinq.bitcoin.Crypto.PublicKey
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
@@ -64,13 +65,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val fiatBalance = frag.findViewById(R.id.fiatBalance).asInstanceOf[TextView]
   val fiatDetails = frag.findViewById(R.id.fiatDetails).asInstanceOf[LinearLayout]
 
+  val mainWrap = frag.findViewById(R.id.mainWrap).asInstanceOf[LinearLayout]
   val customTitle = frag.findViewById(R.id.customTitle).asInstanceOf[TextView]
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
 
+  val recentTxs = str2View(app getString recent_txs)
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
+  val recentTitle = recentTxs.findViewById(R.id.titleTip).asInstanceOf[TextView]
   val imageMap = Array(await, await, conf1, dead, frozen)
   val oneBtc = MilliSatoshi(100000000000L)
   val updTitleTask = UITask(updTitle)
@@ -226,19 +230,19 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var btcItems = Vector.empty[BTCWrap]
   var allItems = Vector.empty[ItemWrap]
 
-  def updPaymentList = {
+  def updPaymentList = UITask {
+    TransitionManager beginDelayedTransition mainWrap
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
+    adapter.notifyDataSetChanged
+    updTitle
 
-    UITask {
-      allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
-      mnemonicWarn setVisibility viewMap(allItems.isEmpty)
-      itemsList setVisibility viewMap(allItems.nonEmpty)
-      fiatDetails setVisibility viewMap(!isSearching)
-      adapter.notifyDataSetChanged
-      updTitle
-    }
+    allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
+    mnemonicWarn setVisibility viewMap(allItems.isEmpty)
+    itemsList setVisibility viewMap(allItems.nonEmpty)
+    recentTitle setVisibility viewMap(!isSearching)
+    fiatDetails setVisibility viewMap(!isSearching)
   }
 
   val adapter = new BaseAdapter {
@@ -250,7 +254,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val resource = if (isTablet) R.layout.frag_tx_line_tablet else R.layout.frag_tx_line
       val view = if (null == savedView) host.getLayoutInflater.inflate(resource, null) else savedView
       val holder = if (null == view.getTag) new ViewHolder(view) else view.getTag.asInstanceOf[ViewHolder]
-      allItems(position) fillView holder
+      getItem(position) fillView holder
       view
     }
   }
@@ -698,9 +702,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
   // Only update a minimized payments list to eliminate possible performance slowdowns
   host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
-  itemsList setOnItemClickListener onTap { position => adapter.getItem(position).generatePopup }
+  itemsList setOnItemClickListener onTap { pos => adapter.getItem(pos - 1).generatePopup }
   itemsList setFooterDividersEnabled false
+  itemsList setHeaderDividersEnabled false
   itemsList addFooterView allTxsWrapper
+  itemsList addHeaderView recentTxs
   itemsList setAdapter adapter
 
   ConnectionManager.listeners += connectionListener

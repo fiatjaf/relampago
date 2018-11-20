@@ -76,7 +76,7 @@ object ConnectionManager {
           val isOk = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures)
           if (isOk) events.onOperational(ann.nodeId) else events.onIncompatible(ann.nodeId)
 
-        case pg: Ping if pg.pongLength > 0 => handler process Pong("00" * pg.pongLength)
+        case Ping(len, _) if len > 0 && len <= 65532 => handler process Pong("00" * len)
         case internalMessage => events.onMessage(ann.nodeId, internalMessage)
       }
     }

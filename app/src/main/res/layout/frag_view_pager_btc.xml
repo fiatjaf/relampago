@@ -4,6 +4,7 @@
     xmlns:fab="http://schemas.android.com/apk/res-auto">
 
     <LinearLayout
+        android:id="@+id/mainWrap"
         android:baselineAligned="true"
         style="@style/StandardLinearLayout">
 
@@ -61,7 +62,6 @@
 
         <ListView
             android:layout_weight="1"
-            android:visibility="gone"
             android:id="@+id/itemsList"
             style="@style/GrayDividerListView"/>
 
