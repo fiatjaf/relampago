@@ -33,6 +33,7 @@
     <string name="mnemonic_info"><font color="#E31300">Mnemonic phrase is important</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Read about it</a> and save it now</string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
     <string name="read_settings"><![CDATA[<small>Bitcoin Lightning Wallet<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.2&#8211;83</small>]]></string>
+    <string name="recent_transactions">Recent transactions</string>
 
     <string name="channel_recovery_info">
         Recovery tool retrieves available channel backups and uses them to reimburse locked funds back into your on-chain wallet.\n\nYou

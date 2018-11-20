@@ -203,11 +203,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom withSign lnTotalSum
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
-
-    val balanceFiat = msatInFiatHuman(lnTotalSum + btcTotalSum)
     val perBtcRate = formatFiat format msatInFiat(oneBtc).getOrElse(0L)
-    fiatRate setText s"<i>$perBtcRate<small> / btc</small></i>".html
-    fiatBalance setText s"<i>$balanceFiat</i>".html
+    fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
+    fiatRate setText s"$perBtcRate<small> / btc</small>".html
 
     val subtitleText =
       if (app.kit.peerGroup.numConnectedPeers < 1) statusConnecting
@@ -222,22 +220,25 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // DISPLAYING ITEMS LIST
 
-  val minLinesNum = 5
+  val minLinesNum = 4
   var currentCut = minLinesNum
   var lnItems = Vector.empty[LNWrap]
   var btcItems = Vector.empty[BTCWrap]
   var allItems = Vector.empty[ItemWrap]
 
-  def updPaymentList = UITask {
+  def updPaymentList = {
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
-    allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
-    mnemonicWarn setVisibility viewMap(allItems.isEmpty)
-    itemsList setVisibility viewMap(allItems.nonEmpty)
-    fiatDetails setVisibility viewMap(!isSearching)
-    adapter.notifyDataSetChanged
-    updTitle
+
+    UITask {
+      allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
+      mnemonicWarn setVisibility viewMap(allItems.isEmpty)
+      itemsList setVisibility viewMap(allItems.nonEmpty)
+      fiatDetails setVisibility viewMap(!isSearching)
+      adapter.notifyDataSetChanged
+      updTitle
+    }
   }
 
   val adapter = new BaseAdapter {
@@ -698,6 +699,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // Only update a minimized payments list to eliminate possible performance slowdowns
   host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
   itemsList setOnItemClickListener onTap { position => adapter.getItem(position).generatePopup }
+  itemsList addHeaderView app.getString(recent_transactions)
+  itemsList setHeaderDividersEnabled false
   itemsList setFooterDividersEnabled false
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter
