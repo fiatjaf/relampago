@@ -83,8 +83,8 @@ object ConnectionManager {
   }
 
   for {
-    _ <- Obs interval 60.seconds
-    outdated = System.currentTimeMillis - 1000L * 120
+    _ <- Obs interval 30.seconds
+    outdated = System.currentTimeMillis - 1000L * 60
     _ \ work <- connections if work.lastMsg < outdated
   } work.disconnect
 }

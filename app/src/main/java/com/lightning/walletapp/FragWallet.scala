@@ -209,7 +209,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom withSign btcTotalSum
     val perBtcRate = formatFiat format msatInFiat(oneBtc).getOrElse(0L)
     fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
-    fiatRate setText s"$perBtcRate<small> / btc</small>".html
+    fiatRate setText s"<small>$perBtcRate</small>".html
 
     val subtitleText =
       if (app.kit.peerGroup.numConnectedPeers < 1) statusConnecting
@@ -616,11 +616,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def onChainRunnable(pr: PaymentRequest) =
     for (adr <- pr.fallbackAddress) yield UITask {
+      // This code does not get executed right away
+      // but only when user taps a button to pay on-chain
       val fallback = Address.fromString(app.params, adr)
       val tryMSat = Try(pr.amount.get)
 
       sendBtcPopup(fallback) { txj =>
-        // Hide offchain payment once onchain is sent
+        // Hide off-chain payment once on-chain is sent
+        // so user does not see the same on/off-chain record
         PaymentInfoWrap.updStatus(HIDDEN, pr.paymentHash)
         PaymentInfoWrap.uiNotify
       } setSum tryMSat
