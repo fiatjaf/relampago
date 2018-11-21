@@ -189,7 +189,8 @@ class WalletApp extends Application { me =>
       app.olympus tellClouds OlympusWrap.CMDStart
       PaymentInfoWrap.markFailedAndFrozen
       ChannelManager.initConnect
-      RatesSaver.initialize
+      // Initialize subscription
+      RatesSaver.subscription
     }
   }
 }

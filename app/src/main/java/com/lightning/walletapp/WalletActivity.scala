@@ -12,7 +12,6 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import org.bitcoinj.core.{Address, TxWrap}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started, WalletZygote}
@@ -31,12 +30,15 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+
 import com.google.common.io.Files
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
 import java.io.File
+
+import com.lightning.walletapp.lnutils.RatesSaver
 
 
 trait SearchBar { me =>
@@ -400,6 +402,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       }
 
       def createZygote = {
+        // Prevent channel state updates
+        RatesSaver.subscription.unsubscribe
         val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
         val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
         val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray

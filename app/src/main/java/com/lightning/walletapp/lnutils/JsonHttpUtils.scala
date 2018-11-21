@@ -6,9 +6,9 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import rx.lang.scala.{Observable => Obs}
 
-import com.lightning.walletapp.lnutils.olympus.OlympusWrap.Fiat2Btc
+import rx.lang.scala.{Observable => Obs}
+import com.lightning.walletapp.lnutils.olympus.OlympusWrap.{Fiat2Btc, Result}
 import org.bitcoinj.core.Transaction.DEFAULT_TX_FEE
 import com.lightning.walletapp.ChannelManager
 import rx.lang.scala.schedulers.IOScheduler
@@ -43,8 +43,7 @@ object RatesSaver {
   var rates = Try(raw) map to[Rates] getOrElse Rates(Nil, Nil, Map.empty, 0)
   var onUpdated = Set.empty[Runnable]
 
-  private[this] def safe = retry(app.olympus.getRates, pickInc, 3 to 4)
-  def initialize = initDelay(safe, rates.stamp, 1800000) foreach { case newFee \ newFiat =>
+  private[this] val process: PartialFunction[Result, Unit] = { case newFee \ newFiat =>
     val sensibleThree = for (notZero <- newFee("3") +: rates.feesThree if notZero > 0) yield notZero
     val sensibleSix = for (notZero <- newFee("6") +: rates.feesSix if notZero > 0) yield notZero
 
@@ -54,6 +53,11 @@ object RatesSaver {
     app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
     for (runner <- onUpdated) runner.run
   }
+
+  lazy val subscription =
+    // Can later be cancelled if don't want updates anymore
+    initDelay(retry(app.olympus.getRates, pickInc, 3 to 4),
+      rates.stamp, 1800000).subscribe(process)
 }
 
 // 2 items of memory to help eliminate possible fee spikes
