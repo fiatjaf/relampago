@@ -208,6 +208,7 @@
 
     <string name="ln_status_peer">Выберите пира</string>
     <string name="ln_share_pr">Платежный запрос</string>
+    <string name="ln_share_node_id">Мой LN Node Id</string>
     <string name="ln_share_debug">Отладочная информация</string>
     <string name="ln_share_proof">Доказательство платежа</string>
     <string name="ln_description_hint">добавьте описание</string>

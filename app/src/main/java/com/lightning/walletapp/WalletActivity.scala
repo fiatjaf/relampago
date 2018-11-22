@@ -12,6 +12,7 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+
 import org.bitcoinj.core.{Address, TxWrap}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started, WalletZygote}
@@ -20,6 +21,7 @@ import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
+import com.lightning.walletapp.lnutils.RatesSaver
 import android.support.v4.content.FileProvider
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
@@ -30,15 +32,12 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-
 import com.google.common.io.Files
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
 import java.io.File
-
-import com.lightning.walletapp.lnutils.RatesSaver
 
 
 trait SearchBar { me =>
