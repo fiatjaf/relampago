@@ -20,6 +20,7 @@ import com.lightning.walletapp.Utils.app.TransData.nodeLink
 import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
+import java.net.InetSocketAddress
 import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
 import fr.acinq.bitcoin.Bech32
@@ -101,7 +102,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
 
   val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
-  val acinqAnnouncement = app.mkNodeAnnouncement(nodeId = acinqKey, host = "34.239.230.56", 9735)
+  val acinqAnnouncement = app.mkNodeAnnouncement(acinqKey, new InetSocketAddress("34.239.230.56", 9735), "ACINQ")
   val acinq = HardcodedNodeView(acinqAnnouncement, "<strong>Recommended ACINQ node</strong>")
 
   val worker = new ThrottledWork[String, AnnounceChansNumVec] {
@@ -262,7 +263,7 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String, cap
 
   val nodeLink(key, host, port) = uri
   val request = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1"
-  def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), host, port.toInt)
+  def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
   def requestChannel = get(request, true).trustAllCerts.trustAllHosts.body
 }
 

@@ -14,11 +14,12 @@ import com.lightning.walletapp.ln.LNParams
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import fr.acinq.bitcoin.MilliSatoshi
+import java.net.InetSocketAddress
 
 
 object JointNode {
   final val jointNodeKey = PublicKey("03144fcc73cea41a002b2865f98190ab90e4ff58a2ce24d3870f5079081e42922d")
-  final val defaultJointAnn = app.mkNodeAnnouncement(nodeId = jointNodeKey, host = "5.9.83.143", port = 9735)
+  final val defaultJointAnn = app.mkNodeAnnouncement(jointNodeKey, new InetSocketAddress("5.9.83.143", 9735), "Joint")
   def relayPeerReports = ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == jointNodeKey)
   def hasRelayPeerOnly = ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == jointNodeKey)
 

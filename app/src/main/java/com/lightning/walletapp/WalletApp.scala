@@ -26,9 +26,7 @@ import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import android.content.{ClipData, ClipboardManager, Context}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
-
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.RGB
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.TxUploadAct
@@ -99,11 +97,9 @@ class WalletApp extends Application { me =>
     clipboardManager setPrimaryClip content
   }
 
-  def mkNodeAnnouncement(nodeId: PublicKey, host: String, port: Int) = {
-    val nodeAddress: InetSocketAddress = new InetSocketAddress(host, port)
-    val nodeColors: RGB = Tuple3(Byte.MinValue, Byte.MinValue, Byte.MinValue)
+  def mkNodeAnnouncement(id: PublicKey, isa: InetSocketAddress, alias: String) = {
     val sig = Crypto encodeSignature Crypto.sign(random getBytes 32, LNParams.nodePrivateKey)
-    NodeAnnouncement(sig, "", 0L, nodeId, nodeColors, host, NodeAddress(nodeAddress) :: Nil)
+    NodeAnnouncement(sig, "", 0L, id, (Byte.MinValue, Byte.MinValue, Byte.MinValue), alias, NodeAddress(isa) :: Nil)
   }
 
   object TransData { self =>
@@ -122,9 +118,9 @@ class WalletApp extends Application { me =>
     }
 
     def recordValue(rawText: String) = value = rawText take 2880 match {
-      case _ if rawText startsWith "bitcoin" => new BitcoinURI(params, rawText)
-      case _ if rawText startsWith "BITCOIN" => new BitcoinURI(params, rawText.toLowerCase)
-      case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), host, port.toInt)
+      case bitcoinLink if bitcoinLink startsWith "bitcoin" => new BitcoinURI(params, bitcoinLink)
+      case bitcoinLink if bitcoinLink startsWith "BITCOIN" => new BitcoinURI(params, bitcoinLink.toLowerCase)
+      case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
       case lnPayReq(prefix, req) => PaymentRequest.read(s"$prefix$req".toLowerCase)
       case lnUrl(prefix, data) => LNUrl(s"$prefix$data".toLowerCase)
       case _ => toAddress(rawText)
