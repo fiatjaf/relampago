@@ -19,16 +19,9 @@
         app:contentInsetStart="@dimen/app_padding"
         app:contentInsetEnd="@dimen/app_padding"/>
 
-    <ListView
-        android:layout_weight="1"
-        android:visibility="gone"
-        android:id="@+id/itemsList"
-        style="@style/GrayDividerListView"/>
-
     <LinearLayout
-        android:layout_weight="1"
+        android:visibility="gone"
         android:gravity="top|center"
-        android:visibility="invisible"
         android:orientation="vertical"
         android:id="@+id/jointNodeInfo"
         android:layout_width="fill_parent"
@@ -38,7 +31,7 @@
             style="@style/MarginInfo"
             android:layout_width="wrap_content"
             android:text="@string/action_ln_open"
-            android:onClick="openChannel"/>
+            android:onClick="openJointChannel"/>
 
         <View style="@style/GrayDivider"/>
 
@@ -48,5 +41,12 @@
             android:text="@string/ln_joint_open_hint"
             android:layout_width="wrap_content"/>
 
+        <View style="@style/GrayDivider"/>
+
     </LinearLayout>
+
+    <ListView
+        android:id="@+id/itemsList"
+        style="@style/GrayDividerListView"/>
+
 </LinearLayout>

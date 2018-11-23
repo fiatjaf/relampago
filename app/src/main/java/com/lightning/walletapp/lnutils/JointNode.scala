@@ -17,13 +17,13 @@ import fr.acinq.bitcoin.MilliSatoshi
 
 
 object JointNode {
-  final val jointNodeKey = PublicKey("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd")
-  final val defaultJointAnn = app.mkNodeAnnouncement(nodeId = jointNodeKey, host = "5.9.138.164", port = 8089)
+  final val jointNodeKey = PublicKey("03144fcc73cea41a002b2865f98190ab90e4ff58a2ce24d3870f5079081e42922d")
+  final val defaultJointAnn = app.mkNodeAnnouncement(nodeId = jointNodeKey, host = "5.9.83.143", port = 9735)
   def relayPeerReports = ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == jointNodeKey)
   def hasRelayPeerOnly = ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == jointNodeKey)
 
   def makeWebSocket(ann: NodeAnnouncement)(fun: String => Unit) = {
-    val webSockEndPoint = s"ws://${ann.workingAddress.getHostString}:8090"
+    val webSockEndPoint = s"ws://${ann.workingAddress.getHostString}:8081"
     val webSocket = (new WebSocketFactory).createSocket(webSockEndPoint, 7500)
     webSocket.connectAsynchronously
 

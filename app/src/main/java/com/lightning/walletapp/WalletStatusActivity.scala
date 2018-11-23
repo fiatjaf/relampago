@@ -12,6 +12,7 @@ import android.view.{Menu, MenuItem, View, ViewGroup}
 import android.widget.{BaseAdapter, LinearLayout, ListView, TextView}
 import com.lightning.walletapp.WalletStatusActivity.allItems
 import com.lightning.walletapp.lnutils.ChannelBalances
+import com.lightning.walletapp.ln.Tools.wrap
 import android.support.v7.widget.Toolbar
 import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.MilliSatoshi
@@ -22,7 +23,8 @@ import android.net.Uri
 
 object WalletStatusActivity { me =>
   def updateItems(cbs: ChannelBalances): Unit = {
-    val me2JointMaxSendable = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse 0L
+    // Only show what can be sent via Joint -> payee if do not have a phone -> Joint channel because `math.min` below
+    val me2JointMaxSendable = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse Long.MaxValue
     val perPeerMaxSendable = cbs.localBalances.sortBy(- _.withoutMaxFee).groupBy(_.peerNodeId).mapValues(_.head)
 
     val updatedMap = for {
@@ -34,9 +36,8 @@ object WalletStatusActivity { me =>
   }
 
   val mapping = Map (
-    PublicKey("03933884aaf1d6b108397e5efe5c86bcf2d8ca8d2f700eda99db9214fc2712b134") -> "starblocks.acinq.co",
-    PublicKey("02a68237add204623021d09b0334c4992c132eb3c9dcfcb8f3cf8a57386775538e") -> "testnet.yalls.org",
-    PublicKey("03c856d2dbec7454c48f311031f06bb99e3ca1ab15a9b9b35de14e139aa663b463") -> "htlc.me"
+    PublicKey("0282734a2ca9bdca61859c71efdc43234ea664ecba9a785f780c6eec8c80243b45") -> "buda.com",
+    PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f") -> "strike.acinq.co"
   )
 
   type TitleAndSendable = (String, MilliSatoshi)
@@ -72,18 +73,12 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
   }
 
-  val killOpt = for {
-    rep <- relayPeerReports.headOption
-  } yield makeWebSocket(rep.chan.data.announce) { raw =>
+  val killWS = makeWebSocket(defaultJointAnn) { raw =>
     WalletStatusActivity updateItems to[ChannelBalances](raw)
     UITask(adapter.notifyDataSetChanged).run
   }
 
-  override def onDestroy = {
-    // Disconnect socket on exiting
-    for (off <- killOpt) off.run
-    super.onDestroy
-  }
+  override def onDestroy = wrap(super.onDestroy)(killWS.run)
 
   override def onCreateOptionsMenu(menu: Menu) = {
     getMenuInflater.inflate(R.menu.status, menu)
@@ -91,22 +86,23 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   override def onOptionsItemSelected(m: MenuItem) = {
-    val url = "http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do"
-    if (m.getItemId == R.id.actionReadMore) me startActivity new Intent(Intent.ACTION_VIEW, Uri parse url)
+    val url = Uri parse "http://lightning-wallet.com/joint/arbitrage-api"
+    if (m.getItemId == R.id.actionReadMore) me startActivity new Intent(Intent.ACTION_VIEW, url)
     true
   }
 
-  def openChannel(top: View) =
-    me exitTo classOf[LNStartActivity]
+  def openJointChannel(top: View) = {
+    app.TransData.value = defaultJointAnn
+    me exitTo classOf[LNStartFundActivity]
+  }
 
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_wallet_status
     Utils clickableTextField findViewById(R.id.jointNodeHint)
+    jointNodeInfo setVisibility viewMap(relayPeerReports.isEmpty)
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     getSupportActionBar setTitle joint_title
-
-    jointNodeInfo setVisibility viewMap(relayPeerReports.isEmpty)
-    itemsList setVisibility viewMap(relayPeerReports.nonEmpty)
+    // Update because items may be cached
     itemsList setAdapter adapter
     adapter.notifyDataSetChanged
 

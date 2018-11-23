@@ -697,10 +697,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
 
   host setSupportActionBar toolbar
-//  toolbar setOnClickListener onButtonTap {
-//    // View current balance status and guranteed deliveries
-//    if (!isSearching) host goTo classOf[WalletStatusActivity]
-//  }
+  toolbar setOnClickListener onButtonTap {
+    // View current balance status and guranteed deliveries
+    if (!isSearching) host goTo classOf[WalletStatusActivity]
+  }
 
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
   // Only update a minimized payments list to eliminate possible performance slowdowns
