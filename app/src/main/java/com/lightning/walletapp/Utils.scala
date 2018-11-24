@@ -63,8 +63,8 @@ object Utils {
   // Mappings
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
   val fiatNames = Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan",
-    "inr" -> "Indian Rupee", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль", "brl" -> "Real Brasileiro",
-    "czk" -> "Česká Koruna")
+    "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel ", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
+    "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna")
 
   def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
   def getDescription(rawText: String) = if (rawText.isEmpty) s"<i>$noDesc</i>" else rawText take 140

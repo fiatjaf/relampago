@@ -289,7 +289,7 @@
     </array>
 
     <string name="joint_title">Guaranteed Delivery</string>
-    <string name="ln_joint_open_hint">Open a channel with a <a href='http://lightning-wallet.com/'>Joint node</a> to enable guaranteed payments to the destinations listed below\n\nJoint node charges a fee of 50 SAT + 0.025% of payment sum for each guaranteed payment</string>
+    <string name="ln_joint_open_hint">Open a channel with a <a href='http://lightning-wallet.com/joint/'>Joint node</a> to enable guaranteed payments to the destinations listed below\n\nJoint node payment fee is 50 SAT + 0.025% of sum. It has an extended to-self-delay of 2880 blocks</string>
 
     <string name="ln_ops_start_fund_incoming_title"><![CDATA[Remote peer wants to open a channel to you, all the opening costs are on them<br><br>Your share: %1$s<br>Capacity: %2$s]]></string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from external source</strong>]]></string>
