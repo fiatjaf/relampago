@@ -313,13 +313,9 @@ trait BlocksListener extends PeerDataEventListener {
   def onPreMessageReceived(peer: Peer, message: Message) = message
 }
 
-trait TxTracker
-extends WalletCoinsSentEventListener
-with WalletCoinsReceivedEventListener
-with TransactionConfidenceEventListener {
+trait TxTracker extends WalletCoinsSentEventListener with WalletCoinsReceivedEventListener with TransactionConfidenceEventListener {
+  def onTransactionConfidenceChanged(w: Wallet, txj: Transaction) = if (txj.getConfidence.getDepthInBlocks == minDepth) txConfirmed(txj)
   def txConfirmed(txj: Transaction): Unit = none
-  def onTransactionConfidenceChanged(w: Wallet, txj: Transaction) =
-    if (txj.getConfidence.getDepthInBlocks == minDepth) txConfirmed(txj)
 }
 
 class MinDepthReachedCoinSelector
