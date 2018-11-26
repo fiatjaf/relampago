@@ -37,7 +37,8 @@ object WalletStatusActivity { me =>
 
   val mapping = Map (
     PublicKey("0282734a2ca9bdca61859c71efdc43234ea664ecba9a785f780c6eec8c80243b45") -> "buda.com",
-    PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f") -> "strike.acinq.co"
+    PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f") -> "strike.acinq.co",
+    PublicKey("0260fab633066ed7b1d9b9b8a0fac87e1579d1709e874d28a0d171a1f5c43bb877") -> "southxchange.com"
   )
 
   type TitleAndSendable = (String, MilliSatoshi)
