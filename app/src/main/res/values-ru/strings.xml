@@ -201,19 +201,19 @@
     <string name="ex_fund_connected"><![CDATA[<small>connected to <i>%1$s</i></small><br>expires at <strong>%2$s</strong><br>funding amount %3$s<br>funding fee %4$s]]></string>
     <string name="ex_fund_accept"><![CDATA[<small><i>%1$s</i></small><br>capacity %2$s<br>funding fee %3$s]]></string>
 
-    <string name="ln_open_batch_inform"><![CDATA[Your payment request is going to be fulfilled along with a payment channel opening in a single Bitcoin transaction]]></string>
-    <string name="ln_open_batch_confirm"><![CDATA[Would you like to fulfill a payment request and use a remaining change to open a payment channel?<br><br><small>%1$s</small><br><br>request %2$s<br>channel %3$s<br>fee %4$s]]></string>
+    <string name="ln_open_batch_inform"><![CDATA[Платежный запрос будет оплачен вместе с открытием нового канала в одной Биткоин-транзакции, с целью экономии на комиссиях]]></string>
+    <string name="ln_open_batch_confirm"><![CDATA[Хотите оплатить запрос и использовать сдачу для открытия нового платежного канала?<br><br><small>%1$s</small><br><br>запрос %2$s<br>канал %3$s<br>комса %4$s]]></string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
     <string name="ln_status_peer">Выберите пира</string>
     <string name="ln_share_pr">Платежный запрос</string>
-    <string name="ln_share_node_id">Мой LN Node Id</string>
+    <string name="ln_share_node_id">Id моего LN-узла</string>
     <string name="ln_share_debug">Отладочная информация</string>
     <string name="ln_share_proof">Доказательство платежа</string>
     <string name="ln_description_hint">добавьте описание</string>
     <string name="ln_no_description">Описание отсутствует</string>
-    <string name="ln_proof">Подписанный платежный запрос: %1$s\n\nPreimage платежа: %2$s</string>
+    <string name="ln_proof">Подписанный платежный запрос: %1$s\n\nПрообраз платежа: %2$s</string>
     <string name="ln_qr_disposable"><![CDATA[Платеж валиден 2 дня<br>Не используйте его повторно]]></string>
 
     <!-- see PaymentInfo.scala -->
@@ -290,16 +290,16 @@
         <item><![CDATA[<i>Нет данных о каналах</i>]]></item>
     </array>
 
-    <string name="joint_title">Guaranteed Delivery</string>
-    <string name="ln_joint_open_hint">Open a channel with a <a href='http://lightning-wallet.com/joint/'>Joint node</a> to enable guaranteed payments to the destinations listed below\n\nJoint node payment fee is 50 SAT + 0.025% of sum. It has an extended to-self-delay of 2880 blocks</string>
+    <string name="joint_title">Гарантия доставки</string>
+    <string name="ln_joint_open_hint">Откройте канал с <a href='http://lightning-wallet.com/joint/'>Joint-узлом</a>, чтобы отправлять гарантированные платжи получателям, перечисленным ниже\n\nJoint-узел берет комиссию в размере 50 SAT + 0.025% суммы, параметр to-self-delay установлен на 2880 блоков</string>
 
-    <string name="ln_ops_start_fund_incoming_title"><![CDATA[Remote peer wants to open a channel to you, all the opening costs are on them<br><br>Your share: %1$s<br>Capacity: %2$s]]></string>
-    <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from external source</strong>]]></string>
-    <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from local wallet</strong>]]></string>
-    <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>opening a channel</i></font><br><small>%2$s</small><br><br><font color=#999999>Peer node ID</font><br><small>%3$s</small>]]></string>
+    <string name="ln_ops_start_fund_incoming_title"><![CDATA[Удаленный узел хочет открыть канал с вашим кошельком<br><br>Ваша доля: %1$s<br>Емкость: %2$s]]></string>
+    <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про молнию</a></small><br><br>открытие нового канала<br><strong>из внешнего источника</strong>]]></string>
+    <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про молнию</a></small><br><br>открытие нового канала<br><strong>платит ваш кошелек</strong>]]></string>
+    <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>открытие канала</i></font><br><small>%2$s</small><br><br><font color=#999999>ID пира</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
     <string name="ln_ops_start_fund_incoming_channel">входящий канал</string>
-    <string name="ln_url_resolving">Resolving request</string>
+    <string name="ln_url_resolving">Обработка запроса</string>
 
     <!-- Olympus log messages -->
     <string name="olympus_log_channel_backup">Сохранен зашифрованный бекап для канала с «%1$s»</string>
