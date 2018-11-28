@@ -344,14 +344,13 @@ object Commitments {
         rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet.serialize)
 
       val c1 = addLocalProposal(c, add).modify(_.localNextHtlcId).using(_ + 1)
-      // We have an updated Commitments in c1 and thus c1.reducedRemoteState gets updated too
-      val maxAllowedHtlcs = math.min(c.localParams.maxAcceptedHtlcs, c.remoteParams.maxAcceptedHtlcs)
-      val totalInFlightMsat = UInt64(c1.reducedRemoteState.htlcs.map(_.add.amountMsat).sum)
-      val incoming \ outgoing = c1.reducedRemoteState.htlcs.partition(_.incoming)
+      // This is their point of view so our outgoing HTLCs are their incoming
+      val outgoingHtlcs = c1.reducedRemoteState.htlcs.filter(_.incoming)
+      val inFlight = outgoingHtlcs.map(_.add.amountMsat).sum
 
       // We should both check if we can send another HTLC and if PEER can accept another HTLC
-      if (totalInFlightMsat > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
-      if (outgoing.size > maxAllowedHtlcs || incoming.size > maxAllowedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
+      if (UInt64(inFlight) > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
+      if (outgoingHtlcs.size > c.remoteParams.maxAcceptedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
       if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
       c1 -> add
     }
@@ -364,10 +363,14 @@ object Commitments {
 
       // We should both check if WE can accept another HTLC and if PEER can send another HTLC
       // let's compute the current commitment *as seen by us* with this change taken into account
-      val c1 \ reduced = Commitments ifSenderCanAffordFees addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(_ + 1)
-      if (UInt64(reduced.htlcs.map(_.add.amountMsat).sum) > c.localParams.maxHtlcValueInFlightMsat) throw new LightningException
-      if (reduced.htlcs.count(_.incoming) > c.localParams.maxAcceptedHtlcs) throw new LightningException
-      c1
+      val c1 = addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(_ + 1)
+      val c2 \ reduced = Commitments ifSenderCanAffordFees c1
+
+      val incomingHtlcs = reduced.htlcs.filter(_.incoming)
+      val inFlight = incomingHtlcs.map(_.add.amountMsat).sum
+      if (UInt64(inFlight) > c.localParams.maxHtlcValueInFlightMsat) throw new LightningException
+      if (incomingHtlcs.size > c.localParams.maxAcceptedHtlcs) throw new LightningException
+      c2
     }
 
   def receiveFulfill(c: Commitments, fulfill: UpdateFulfillHtlc) =

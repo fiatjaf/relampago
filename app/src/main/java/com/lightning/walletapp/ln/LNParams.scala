@@ -27,7 +27,7 @@ object LNParams { me =>
   val minCapacitySat = 300000L
   final val dust = Satoshi(2730L)
   final val minFeeratePerKw = 253
-  final val maxHtlcValueMsat = 4000000000L
+  final val maxHtlcValueMsat = 10000000000L
   final val maxCapacity = Satoshi(16777215L)
   final val minHtlcValue = MilliSatoshi(1000L)
 
