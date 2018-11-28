@@ -8,36 +8,25 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
-import com.lightning.walletapp.ln.LNParams._
-import com.lightning.walletapp.lnutils.JsonHttpUtils._
-import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
-import org.bitcoinj.core.{Address, TxWrap}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
-import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started, WalletZygote}
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.walletZygoteCodec
+import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
+import org.bitcoinj.core.{Address, TxWrap}
+
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
-import com.lightning.walletapp.lnutils.RatesSaver
-import android.support.v4.content.FileProvider
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
-import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
-import org.bitcoinj.store.SPVBlockStore
 import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-import com.google.common.io.Files
-import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
-import java.io.File
 
 
 trait SearchBar { me =>
@@ -111,8 +100,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   override def onDestroy = wrap(super.onDestroy)(stopDetecting)
   override def onResume = wrap(super.onResume)(me returnToBase null)
+
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
-    if (m.getItemId == R.id.actionSettings) makeSettingsForm
+    if (m.getItemId == R.id.actionSettings) me goTo classOf[SettingsActivity]
   }
 
   override def onBackPressed = {
@@ -273,152 +263,4 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
     mkCheckForm(alert => rm(alert) { me goTo classOf[LNStartActivity] /* proceed */ }, none, warn, dialog_ok, dialog_cancel)
   } else me goTo classOf[LNStartActivity]
-
-  // SETTINGS FORM
-
-  def makeSettingsForm = {
-    val form = getLayoutInflater.inflate(R.layout.frag_settings, null)
-    val rescanWallet = form.findViewById(R.id.rescanWallet).asInstanceOf[Button]
-    val viewMnemonic = form.findViewById(R.id.viewMnemonic).asInstanceOf[Button]
-    val manageOlympus = form.findViewById(R.id.manageOlympus).asInstanceOf[Button]
-    val setFiatCurrency = form.findViewById(R.id.setFiatCurrency).asInstanceOf[Button]
-    val recoverFunds = form.findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
-    val chooseBitcoinUnit = form.findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
-    val exportWalletSnapshot = form.findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
-    val menu = showForm(negBuilder(dialog_ok, getString(read_settings).html, form).create)
-    recoverFunds.setEnabled(ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
-
-    recoverFunds setOnClickListener onButtonTap {
-      def recover = app.olympus getBackup cloudId foreach { backups =>
-        // Decrypt channel recovery data and put it to channels list if it is not present already
-        // then try to get new NodeAnnouncement for refunding channels, otherwise use an old one
-
-        for {
-          encryptedBackup <- backups
-          ref <- AES.decHex2Readable(encryptedBackup, cloudSecret) map to[RefundingData]
-          if !ChannelManager.all.flatMap(_ apply identity).exists(_.channelId == ref.commitments.channelId)
-        } ChannelManager.all +:= ChannelManager.createChannel(ChannelManager.operationalListeners, ref)
-
-        for {
-          chan <- ChannelManager.all if chan.state == REFUNDING
-          // Try to connect right away and maybe use new address later
-          _ = ConnectionManager.connectTo(chan.data.announce, notify = false)
-          // Can call findNodes without `retry` wrapper because it gives `Obs.empty` on error
-          Vector(ann1 \ _, _*) <- app.olympus findNodes chan.data.announce.nodeId.toString
-        } chan process ann1
-      }
-
-      rm(menu) {
-        def go = runAnd(app toast dialog_recovering)(recover)
-        val bld = baseTextBuilder(me getString channel_recovery_info)
-        mkCheckForm(alert => rm(alert)(go), none, bld, dialog_next, dialog_cancel)
-      }
-    }
-
-    setFiatCurrency setOnClickListener onButtonTap {
-      val fiatCodes \ fiatHumanNames = fiatNames.toSeq.reverse.unzip
-      val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
-      val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
-
-      def updateFiatType(pos: Int) = {
-        fiatCode = fiatCodes.toList(pos)
-        // Update fiatCode so UI update can react to changes
-        app.prefs.edit.putString(AbstractKit.FIAT_TYPE, fiatCode).commit
-        // then persist user choice in local data storage
-        FragWallet.worker.updTitle.run
-      }
-
-      rm(menu) {
-        lst setOnItemClickListener onTap(updateFiatType)
-        lst setAdapter new ArrayAdapter(me, singleChoice, fiatHumanNames.toArray)
-        showForm(negBuilder(dialog_ok, me getString sets_set_fiat, form).create)
-        lst.setItemChecked(fiatCodes.toList indexOf fiatCode, true)
-      }
-    }
-
-    chooseBitcoinUnit setOnClickListener onButtonTap {
-      val currentDenom = app.prefs.getInt(AbstractKit.DENOM_TYPE, 0)
-      val allDenoms = getResources.getStringArray(R.array.denoms).map(_.html)
-      val form = getLayoutInflater.inflate(R.layout.frag_input_choose_fee, null)
-      val lst = form.findViewById(R.id.choiceList).asInstanceOf[ListView]
-
-      def updateDenomination(pos: Int) = {
-        // Update denom so UI update can react to changes
-        // then persist user choice in local data storage
-
-        denom = denoms(pos)
-        app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
-        FragWallet.worker.adapter.notifyDataSetChanged
-        FragWallet.worker.updTitle.run
-      }
-
-      rm(menu) {
-        lst setOnItemClickListener onTap(updateDenomination)
-        lst setAdapter new ArrayAdapter(me, singleChoice, allDenoms)
-        showForm(negBuilder(dialog_ok, me getString sets_choose_unit, form).create)
-        lst.setItemChecked(currentDenom, true)
-      }
-    }
-
-    manageOlympus setOnClickListener onButtonTap {
-      // Just show a list of available Olympus servers
-      def proceed = me goTo classOf[OlympusActivity]
-      rm(menu)(proceed)
-    }
-
-    rescanWallet setOnClickListener onButtonTap {
-      // May be needed in case of blockchain glitches
-      // warn user as this is a time consuming operation
-
-      rm(menu) {
-        val bld = baseTextBuilder(me getString sets_rescan_ok)
-        mkCheckForm(alert => rm(alert)(go), none, bld, dialog_ok, dialog_cancel)
-      }
-
-      def go = try {
-        app.chainFile.delete
-        app.kit.wallet.reset
-        app.kit.store = new SPVBlockStore(app.params, app.chainFile)
-        app.kit useCheckPoints app.kit.wallet.getEarliestKeyCreationTime
-        app.kit.wallet saveToFile app.walletFile
-      } catch none finally System exit 0
-    }
-
-    viewMnemonic setOnClickListener onButtonTap {
-      // Can be accessed here and from page button
-      rm(menu)(me viewMnemonic null)
-    }
-
-    exportWalletSnapshot setOnClickListener onButtonTap {
-      // Users may export a whole wallet snapshot and restore later
-      // but warn them about all the risks involved before proceeding
-      rm(menu)(openForm)
-
-      def openForm = {
-        def proceed = <(createZygote, onFail)(none)
-        val bld = me baseTextBuilder getString(migrator_usage_warning).html
-        mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
-      }
-
-      def createZygote = {
-        // Prevent channel state updates
-        RatesSaver.subscription.unsubscribe
-        val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
-        val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
-        val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
-        val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
-
-        val name = s"Bitcoin Wallet Snapshot ${new Date}.txt"
-        val walletSnapshotFilePath = new File(getCacheDir, "images")
-        if (!walletSnapshotFilePath.isFile) walletSnapshotFilePath.mkdirs
-        val savedFile = new File(walletSnapshotFilePath, name)
-        Files.write(encoded.require.toByteArray, savedFile)
-
-        val fileURI = FileProvider.getUriForFile(me, "com.lightning.walletapp", savedFile)
-        val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
-        share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
-        me startActivity Intent.createChooser(share, "Choose an app")
-      }
-    }
-  }
 }

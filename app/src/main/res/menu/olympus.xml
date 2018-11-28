@@ -13,9 +13,9 @@
         android:title="@string/olympus_log"/>
 
     <item
-        android:title="Read more"
+        android:title="Information"
         app:showAsAction="always|collapseActionView"
         android:icon="@drawable/baseline_help_outline_white_24"
-        android:id="@+id/actionReadMore"/>
+        android:id="@+id/actionQuestionMark"/>
 
 </menu>

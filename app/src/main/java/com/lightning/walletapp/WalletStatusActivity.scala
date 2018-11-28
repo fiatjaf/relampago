@@ -87,8 +87,8 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   override def onOptionsItemSelected(m: MenuItem) = {
-    val url = Uri parse "http://lightning-wallet.com/joint/arbitrage-api"
-    if (m.getItemId == R.id.actionReadMore) me startActivity new Intent(Intent.ACTION_VIEW, url)
+    val arbitrageApi = Uri parse "http://lightning-wallet.com/joint/arbitrage-api"
+    me startActivity new Intent(Intent.ACTION_VIEW, arbitrageApi)
     true
   }
 

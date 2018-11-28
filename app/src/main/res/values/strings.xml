@@ -10,6 +10,7 @@
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Confirmation may take hours</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Faster confirmation times</font></small></small>]]></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
+    <string name="wallet_settings">Wallet settings</string>
     <string name="wallet_restore">Restore Wallet</string>
     <string name="wallet_create">New Wallet</string>
 
@@ -32,7 +33,6 @@
     <!-- headers with links -->
     <string name="mnemonic_info"><font color="#E31300">Mnemonic phrase is important</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Read about it</a> and save it now</string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current sum %1$s<br>after raise %2$s<br>]]></string>
-    <string name="read_settings"><![CDATA[<small>Bitcoin Lightning Wallet<br><a href=http://lightning-wallet.com>Read a short app manual</a><br>v0.2&#8211;88</small>]]></string>
     <string name="recent_txs">Recent transactions</string>
 
     <string name="channel_recovery_info">
