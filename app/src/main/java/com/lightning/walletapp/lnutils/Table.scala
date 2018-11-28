@@ -10,6 +10,21 @@ import android.content.Context
 import android.net.Uri
 
 
+object ChannelTable extends Table {
+  val Tuple3(table, identifier, data) = Tuple3("channel", "identifier", "data")
+  val newSql = s"INSERT OR IGNORE INTO $table ($identifier, $data) VALUES (?, ?)"
+  val updSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
+  val selectAllSql = s"SELECT * FROM $table ORDER BY $id DESC"
+  val killSql = s"DELETE FROM $table WHERE $identifier = ?"
+
+  val createSql = s"""
+    CREATE TABLE IF NOT EXISTS $table (
+      $id INTEGER PRIMARY KEY AUTOINCREMENT,
+      $identifier TEXT NOT NULL UNIQUE,
+      $data STRING NOT NULL
+    )"""
+}
+
 object OlympusTable extends Table {
   val (table, identifier, url, data, auth, order, removable) = ("olympus", "identifier", "url", "data", "auth", "ord", "removable")
   val newSql = s"INSERT OR IGNORE INTO $table ($identifier, $url, $data, $auth, $order, $removable) VALUES (?, ?, ?, ?, ?, ?)"
@@ -35,21 +50,6 @@ object OlympusLogTable extends Table {
     CREATE TABLE IF NOT EXISTS $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $tokensUsed INTEGER NOT NULL,
       $explanation STRING NOT NULL, $stamp INTEGER NOT NULL
-    )"""
-}
-
-object ChannelTable extends Table {
-  val Tuple3(table, identifier, data) = Tuple3("channel", "identifier", "data")
-  val newSql = s"INSERT OR IGNORE INTO $table ($identifier, $data) VALUES (?, ?)"
-  val updSql = s"UPDATE $table SET $data = ? WHERE $identifier = ?"
-  val selectAllSql = s"SELECT * FROM $table ORDER BY $id DESC"
-  val killSql = s"DELETE FROM $table WHERE $identifier = ?"
-
-  val createSql = s"""
-    CREATE TABLE IF NOT EXISTS $table (
-      $id INTEGER PRIMARY KEY AUTOINCREMENT,
-      $identifier TEXT NOT NULL UNIQUE,
-      $data STRING NOT NULL
     )"""
 }
 
@@ -151,11 +151,10 @@ object RevokedInfoTable extends Table {
 }
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
-class LNOpenHelper(context: Context, name: String)
-extends SQLiteOpenHelper(context, name, null, 3) {
-
+abstract class TableHelper(ctxt: Context, name: String, v: Int) extends SQLiteOpenHelper(ctxt, name, null, v) {
+  // BinaryData and PublicKey should always yield raw strings for change method to work because of SQLite conversions
   val base = getWritableDatabase
-  // Note: BinaryData and PublicKey should always yield raw strings for this to work
+
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.walletapp/table/$tbl"
@@ -164,25 +163,41 @@ extends SQLiteOpenHelper(context, name, null, 3) {
     runAnd(base.beginTransaction)(run)
     base.setTransactionSuccessful
   } finally base.endTransaction
+}
+
+class LNCoreHelper(context: Context, name: String) extends TableHelper(context, name, 3) {
+  // Tables in this database contain critical information which has to be small and transferrable
 
   def onCreate(dbs: SQLiteDatabase) = {
-    dbs execSQL RevokedInfoTable.createSql
-    dbs execSQL BadEntityTable.createSql
-    dbs execSQL PaymentTable.createVSql
-    dbs execSQL PaymentTable.createSql
+    // First create channel and olympus tables
+    // then prefill olympus with default servers
     dbs execSQL ChannelTable.createSql
-    dbs execSQL RouteTable.createSql
-
-    dbs execSQL OlympusLogTable.createSql
     dbs execSQL OlympusTable.createSql
 
-    // Randomize an order of two available default servers
     val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
     val dev1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9103", emptyData, "1", ord1, "0")
     val dev2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9103", emptyData, "0", ord2, "1")
     dbs.execSQL(OlympusTable.newSql, dev1)
     dbs.execSQL(OlympusTable.newSql, dev2)
+  }
+
+  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
+    // Should work even for updates across many version ranges
+    // because each table and index has CREATE IF EXISTS prefix
+  }
+}
+
+class LNExtHelper(context: Context, name: String) extends TableHelper(context, name, 1) {
+  // Tables in this database contain disposable data which may be dropped in case of phone loss
+
+  def onCreate(dbs: SQLiteDatabase) = {
+    dbs execSQL OlympusLogTable.createSql
+    dbs execSQL RevokedInfoTable.createSql
+    dbs execSQL BadEntityTable.createSql
+    dbs execSQL PaymentTable.createVSql
+    dbs execSQL PaymentTable.createSql
+    dbs execSQL RouteTable.createSql
   }
 
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {

@@ -4,8 +4,7 @@ import fr.acinq.bitcoin._
 import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
-
-import com.lightning.walletapp.Utils.{app, dbFileName}
+import com.lightning.walletapp.Utils.{app, dbCoreFile, dbExtFile}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import com.lightning.walletapp.ln.wire.NodeAnnouncement
@@ -31,7 +30,8 @@ object LNParams { me =>
   final val maxCapacity = Satoshi(16777215L)
   final val minHtlcValue = MilliSatoshi(1000L)
 
-  var db: LNOpenHelper = _
+  var db: LNCoreHelper = _
+  var dbExt: LNExtHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
   var extendedCloudKey: ExtendedPrivateKey = _
 
@@ -45,7 +45,8 @@ object LNParams { me =>
   def setup(seed: BinaryData) = generate(seed) match { case m =>
     extendedNodeKey = derivePrivateKey(m, hardened(46) :: hardened(0) :: Nil)
     extendedCloudKey = derivePrivateKey(m, hardened(92) :: hardened(0) :: Nil)
-    db = new LNOpenHelper(app, dbFileName)
+    dbExt = new LNExtHelper(app, dbExtFile)
+    db = new LNCoreHelper(app, dbCoreFile)
   }
 
   def isFeeNotOk(msat: Long, fee: Long, hops: Int) =

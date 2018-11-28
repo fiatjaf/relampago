@@ -156,7 +156,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
       def createZygote = {
         // Prevent channel state updates
         RatesSaver.subscription.unsubscribe
-        val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
+        val dbFile = new File(app.getDatabasePath(dbCoreFile).getPath)
         val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
         val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
         val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)

@@ -15,7 +15,6 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.wire.FundMsg._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
-import com.google.common.util.concurrent.Service.State._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
@@ -30,6 +29,7 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCode
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.TxUploadAct
+import com.google.common.util.concurrent.Service.State
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import com.lightning.walletapp.helper.RichCursor
@@ -81,8 +81,8 @@ class WalletApp extends Application { me =>
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
 
   def isAlive =
-    if (null == kit || null == olympus || null == db || null == extendedNodeKey) false
-    else kit.state match { case STARTING | RUNNING => true case _ => false }
+    if (null == kit || null == olympus || null == db || null == dbExt || null == extendedNodeKey) false
+    else kit.state match { case State.STARTING | State.RUNNING => true case _ => false }
 
   Utils.appReference = me
   override def onCreate = wrap(super.onCreate) {

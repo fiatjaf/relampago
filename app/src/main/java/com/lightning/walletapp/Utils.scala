@@ -45,7 +45,8 @@ object Utils {
   var fiatCode: String = _
 
   val fileName = "SegwitMainnet"
-  val dbFileName = s"$fileName.db"
+  val dbCoreFile = s"$fileName.db"
+  val dbExtFile = s"Ext$fileName.db"
   val walletFileName = s"$fileName.wallet"
   val chainFileName = s"$fileName.spvchain"
 
