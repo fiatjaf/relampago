@@ -250,11 +250,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   // UTILS
 
-  def stateStatusColor(c: Channel): String = c.state match {
-    case OPEN if isOperational(c) => me getString ln_info_status_open
-    case WAIT_FUNDING_DONE => me getString ln_info_status_opening
-    case NEGOTIATIONS => me getString ln_info_status_negotiations
-    case OPEN => me getString ln_info_status_shutdown
+  def stateStatusColor(c: Channel) = (c.data, c.state) match {
+    case (_: NormalData, OPEN) if isOperational(c) => me getString ln_info_status_open
+    case (_: NormalData, _) if !isOperational(c) => me getString ln_info_status_shutdown
+    case _ \ WAIT_FUNDING_DONE => me getString ln_info_status_opening
+    case _ \ NEGOTIATIONS => me getString ln_info_status_negotiations
     case _ => otherState format c.state
   }
 
