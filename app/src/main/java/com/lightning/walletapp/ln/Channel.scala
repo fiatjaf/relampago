@@ -165,13 +165,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // Funder was not able to broadcast a funding tx, record their fail locally
-      case (wait: WaitBroadcastRemoteData, fail: Fail, SLEEPING | WAIT_FUNDING_DONE) =>
+      case (wait: WaitBroadcastRemoteData, fail: Fail, WAIT_FUNDING_DONE | SLEEPING) =>
         val d1 = me STORE wait.copy(fail = Some apply fail)
         me UPDATA d1
 
 
       // We have asked an external funder to broadcast a funding tx and got an onchain event
-      case (wait: WaitBroadcastRemoteData, CMDSpent(fundTx), SLEEPING | WAIT_FUNDING_DONE) if wait.txHash == fundTx.hash =>
+      case (wait: WaitBroadcastRemoteData, CMDSpent(fundTx), WAIT_FUNDING_DONE | SLEEPING) if wait.txHash == fundTx.hash =>
         val d1 = me STORE WaitFundingDoneData(wait.announce, our = None, their = None, fundTx, wait.commitments)
         me UPDATA d1
 
@@ -326,8 +326,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SHUTDOWN in WAIT_FUNDING_DONE
 
 
-      case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), WAIT_FUNDING_DONE) =>
-        // We have decided to cooperatively close our channel before it has reached a min depth
+      case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), WAIT_FUNDING_DONE | SLEEPING) =>
+        // We have decided to cooperatively close this channel before it has reached a minmum depth
         val finalKey = scriptPubKey getOrElse wait.commitments.localParams.defaultFinalScriptPubKey
         startShutdown(NormalData(wait.announce, wait.commitments), finalKey)
 
@@ -345,7 +345,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SHUTDOWN in OPEN
 
 
-      case (norm @ NormalData(_, commitments, our, their), CMDShutdown(scriptPubKey), OPEN) =>
+      case (norm @ NormalData(_, commitments, our, their), CMDShutdown(scriptPubKey), OPEN | SLEEPING) =>
         // We may have unsigned outgoing HTLCs or already have tried to close this channel cooperatively
         val nope = our.isDefined | their.isDefined | Commitments.localHasUnsignedOutgoing(commitments)
         val finalKey = scriptPubKey getOrElse commitments.localParams.defaultFinalScriptPubKey
@@ -537,6 +537,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         }
 
 
+      case (negs: NegotiationsData, _: CMDShutdown, NEGOTIATIONS | SLEEPING) =>
+        // Disregard custom scriptPubKey and always refund to local wallet
+        startLocalClose(negs)
+
+
       // HANDLE FUNDING SPENT
 
 
@@ -590,17 +595,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (null, wait: WaitBroadcastRemoteData, null) => super.become(wait, SLEEPING)
       case (null, negs: NegotiationsData, null) => super.become(negs, SLEEPING)
       case (null, norm: NormalData, null) => super.become(norm, SLEEPING)
-
-
-      // ENDING A CHANNEL
-
-
-      case (some: HasCommitments, _: CMDShutdown, NEGOTIATIONS | SLEEPING) =>
-        // Disregard custom scriptPubKey and always refund to local wallet
-        // CMDShutdown in WAIT_FUNDING_DONE and OPEN may be cooperative
-        startLocalClose(some)
-
-
       case _ =>
     }
 

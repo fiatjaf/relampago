@@ -44,11 +44,11 @@ object Utils {
   var denom: Denomination = _
   var fiatCode: String = _
 
-  val fileName = "SegwitMainnet"
-  val dbCoreFile = s"$fileName.db"
-  val dbExtFile = s"Ext$fileName.db"
-  val walletFileName = s"$fileName.wallet"
-  val chainFileName = s"$fileName.spvchain"
+  final val fileName = "SegwitMainnet"
+  final val dbCoreFile = s"$fileName.db"
+  final val dbExtFile = s"Ext$fileName.db"
+  final val walletFileName = s"$fileName.wallet"
+  final val chainFileName = s"$fileName.spvchain"
 
   lazy val app = appReference
   lazy val sumIn = app getString txs_sum_in
