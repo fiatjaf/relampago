@@ -165,7 +165,25 @@ abstract class TableHelper(ctxt: Context, name: String, v: Int) extends SQLiteOp
   } finally base.endTransaction
 }
 
-class LNCoreHelper(context: Context, name: String) extends TableHelper(context, name, 3) {
+class LNExtHelper(context: Context, name: String) extends TableHelper(context, name, 1) {
+  // Tables in this database contain disposable data which may be dropped in case of phone loss
+
+  def onCreate(dbs: SQLiteDatabase) = {
+    dbs execSQL OlympusLogTable.createSql
+    dbs execSQL RevokedInfoTable.createSql
+    dbs execSQL BadEntityTable.createSql
+    dbs execSQL PaymentTable.createVSql
+    dbs execSQL PaymentTable.createSql
+    dbs execSQL RouteTable.createSql
+  }
+
+  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
+    // Should work even for updates across many version ranges
+    // because each table and index has CREATE IF EXISTS prefix
+  }
+}
+
+class LNCoreHelper(context: Context, name: String) extends TableHelper(context, name, 4) {
   // Tables in this database contain critical information which has to be small and transferrable
 
   def onCreate(dbs: SQLiteDatabase) = {
@@ -182,26 +200,10 @@ class LNCoreHelper(context: Context, name: String) extends TableHelper(context, 
     dbs.execSQL(OlympusTable.newSql, dev2)
   }
 
-  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
-    // Should work even for updates across many version ranges
-    // because each table and index has CREATE IF EXISTS prefix
-  }
-}
-
-class LNExtHelper(context: Context, name: String) extends TableHelper(context, name, 1) {
-  // Tables in this database contain disposable data which may be dropped in case of phone loss
-
-  def onCreate(dbs: SQLiteDatabase) = {
-    dbs execSQL OlympusLogTable.createSql
-    dbs execSQL RevokedInfoTable.createSql
-    dbs execSQL BadEntityTable.createSql
-    dbs execSQL PaymentTable.createVSql
-    dbs execSQL PaymentTable.createSql
-    dbs execSQL RouteTable.createSql
-  }
-
-  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
-    // Should work even for updates across many version ranges
-    // because each table and index has CREATE IF EXISTS prefix
+  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = if (v0 <= 3 && v1 == 4) {
+    dbs.execSQL(s"ATTACH DATABASE '${context.getDatabasePath(com.lightning.walletapp.Utils.dbExtFile).getPath}' AS ext")
+    dbs.execSQL(s"INSERT INTO ext.${RevokedInfoTable.table} SELECT * FROM ${RevokedInfoTable.table}")
+    dbs.execSQL(s"INSERT INTO ext.${PaymentTable.table} SELECT * FROM ${PaymentTable.table}")
+    dbs.execSQL("DETACH ext")
   }
 }
