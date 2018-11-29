@@ -134,12 +134,13 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def viewTokenUsageLog = {
-    val events = RichCursor(LNParams.db select OlympusLogTable.selectAllSql) vec { rc =>
+    val events = RichCursor(LNParams.dbExt select OlympusLogTable.selectAllSql) vec { rc =>
       val stamp = when(thenDate = new Date(rc long OlympusLogTable.stamp), now = System.currentTimeMillis)
       s"<font color=#999999><strong>$stamp</strong></font> ${rc string OlympusLogTable.explanation}".html
     }
 
     val adapter = new ArrayAdapter(me, android.R.layout.simple_list_item_1, events.toArray)
-    new AlertDialog.Builder(me).setCustomTitle(me getString olympus_log).setAdapter(adapter, null).create.show
+    val bld = new AlertDialog.Builder(me).setCustomTitle(me getString olympus_log)
+    bld.setAdapter(adapter, null).create.show
   }
 }

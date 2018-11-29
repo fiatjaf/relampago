@@ -2,7 +2,6 @@ package com.lightning.walletapp.lnutils.olympus
 
 import spray.json._
 import com.lightning.walletapp.R.string._
-import com.lightning.walletapp.ln.LNParams._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
@@ -15,13 +14,12 @@ import java.net.ProtocolException
 import com.lightning.walletapp.Utils.app
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.ln.Tools.none
-import com.lightning.walletapp.ln.PaymentRequest
 import com.lightning.walletapp.helper.RichCursor
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
-
 import com.lightning.walletapp.lnutils.{OlympusLogTable, OlympusTable, RevokedInfoTable}
 import com.lightning.walletapp.ln.wire.{ChannelUpdate, NodeAnnouncement, OutRequest}
+import com.lightning.walletapp.ln.{LNParams, PaymentRequest}
 import fr.acinq.bitcoin.{BinaryData, Transaction}
 import rx.lang.scala.{Observable => Obs}
 
@@ -57,17 +55,17 @@ class OlympusWrap extends OlympusProvider {
   // All available clouds for RPC queries and backups
   // backup upload requests are also sent to all the clounds
   // and final filtering is done inside of each available cloud
-  var clouds = RichCursor(db select OlympusTable.selectAllSql) vec toCloud
+  var clouds = RichCursor(LNParams.db select OlympusTable.selectAllSql) vec toCloud
   def tellClouds(candidateData: Any) = for (cloud <- clouds) cloud doProcess candidateData
   def backupExhausted = clouds.exists(cloud => cloud.isAuthEnabled && cloud.data.tokens.size <= 5)
   def pendingWatchTxIds = clouds.flatMap(_.data.acts) collect { case ca: CerberusAct => ca.txids } flatten
 
   // SQL interface
 
-  def remove(identifier: String) = db.change(OlympusTable.killSql, identifier)
-  def updData(data: String, identifier: String) = db.change(OlympusTable.updDataSql, data, identifier)
-  def updMeta(cd: Cloud, order: Int) = db.change(OlympusTable.updMetaSql, cd.connector.url, cd.auth, order, cd.identifier)
-  def addServer(cloud: Cloud, order: Int) = db.change(OlympusTable.newSql, cloud.identifier, cloud.connector.url,
+  def remove(identifier: String) = LNParams.db.change(OlympusTable.killSql, identifier)
+  def updData(data: String, identifier: String) = LNParams.db.change(OlympusTable.updDataSql, data, identifier)
+  def updMeta(cd: Cloud, order: Int) = LNParams.db.change(OlympusTable.updMetaSql, cd.connector.url, cd.auth, order, cd.identifier)
+  def addServer(cloud: Cloud, order: Int) = LNParams.db.change(OlympusTable.newSql, cloud.identifier, cloud.connector.url,
     cloud.data.toJson.toString, cloud.auth, order, cloud.removable)
 
   def toCloud(rc: RichCursor) = {
@@ -144,21 +142,21 @@ case class LegacyAct(data: BinaryData, plus: Seq[HttpParam], path: String) exten
 case class CerberusAct(data: BinaryData, plus: Seq[HttpParam], path: String, txids: StringVec) extends CloudAct {
   // This is an act for uploading a pack of RevocationInfo objects, affected records should be marked once uploaded
 
-  def onDone = db txWrap {
+  def onDone = LNParams.dbExt txWrap {
     val text = app.getString(olympus_log_watch_payments).format(txids.size)
-    for (oldTxid <- txids) db.change(RevokedInfoTable.setUploadedSql, oldTxid)
-    db.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
+    for (txid <- txids) LNParams.dbExt.change(RevokedInfoTable.setUploadedSql, txid)
+    LNParams.dbExt.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
   }
 }
 
 case class TxUploadAct(data: BinaryData, plus: Seq[HttpParam], path: String) extends CloudAct {
   // This is an act for uploading refunding transactions when channel gets closed uncooperatively
-  def onDone = db.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
+  def onDone = LNParams.dbExt.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
   def text = app.getString(olympus_log_refunding_tx)
 }
 
 case class ChannelUploadAct(data: BinaryData, plus: Seq[HttpParam], path: String, alias: String) extends CloudAct {
   // This is an act for uploading a channel encrypted backup once a transaction for a new channel gets broadcasted
-  def onDone = db.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
+  def onDone = LNParams.dbExt.change(OlympusLogTable.newSql, params = 1, text, System.currentTimeMillis)
   def text = app.getString(olympus_log_channel_backup).format(alias)
 }

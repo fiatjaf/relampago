@@ -11,7 +11,6 @@ import com.lightning.walletapp.ln.wire._
 import scala.collection.JavaConverters._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
-import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.wire.FundMsg._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
@@ -29,17 +28,18 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCode
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.TxUploadAct
-import com.google.common.util.concurrent.Service.State
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import com.lightning.walletapp.helper.RichCursor
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
+import com.lightning.walletapp.ln.LNParams
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
 import scala.concurrent.Future
 import android.app.Application
+import com.google.common.util
 import java.util.Collections
 import scodec.bits.BitVector
 import android.widget.Toast
@@ -81,8 +81,8 @@ class WalletApp extends Application { me =>
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
 
   def isAlive =
-    if (null == kit || null == olympus || null == db || null == dbExt || null == extendedNodeKey) false
-    else kit.state match { case State.STARTING | State.RUNNING => true case _ => false }
+    if (null == kit || null == olympus || null == LNParams.db || null == LNParams.dbExt || null == LNParams.extendedNodeKey) false
+    else kit.state match { case util.concurrent.Service.State.STARTING | util.concurrent.Service.State.RUNNING => true case _ => false }
 
   Utils.appReference = me
   override def onCreate = wrap(super.onCreate) {
@@ -193,7 +193,7 @@ class WalletApp extends Application { me =>
 
 object ChannelManager extends Broadcaster {
   val CMDLocalShutdown: Command = CMDShutdown(None)
-  val operationalListeners: Set[ChannelListener] = Set(ChannelManager, bag, GossipCatcher)
+  val operationalListeners: Set[ChannelListener] = Set(ChannelManager, LNParams.bag, GossipCatcher)
   private[this] var initialChainHeight: Long = app.kit.wallet.getLastBlockSeenHeight
   var currentBlocksLeft: Int = Int.MaxValue
 
@@ -255,8 +255,8 @@ object ChannelManager extends Broadcaster {
 
     def onChainTx(txj: Transaction) = {
       val cmdOnChainSpent = CMDSpent(txj)
-      for (c <- all) c process cmdOnChainSpent
-      bag.extractPreimage(cmdOnChainSpent.tx)
+      for (channel <- all) channel process cmdOnChainSpent
+      LNParams.bag.extractPreimage(cmdOnChainSpent.tx)
     }
   }
 
@@ -343,11 +343,11 @@ object ChannelManager extends Broadcaster {
       myBalance = cs.localCommit.spec.toLocalMsat
       revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret)
       serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
-    } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
+    } LNParams.dbExt.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
 
     def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
       // Extract RevocationInfo for a given breach transaction
-      val cursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
+      val cursor = LNParams.dbExt.select(RevokedInfoTable.selectTxIdSql, tx.txid)
       val rc = RichCursor(cursor).headTry(_ string RevokedInfoTable.info)
 
       for {
@@ -368,7 +368,7 @@ object ChannelManager extends Broadcaster {
     def CLOSEANDWATCH(cd: ClosingData) = {
       val tier12txs = for (state <- cd.tier12States) yield state.txn
       if (tier12txs.nonEmpty) app.olympus tellClouds TxUploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
-      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
+      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach LNParams.bag.extractPreimage, none)
       // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
       app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
       BECOME(STORE(cd), CLOSING)
@@ -397,7 +397,7 @@ object ChannelManager extends Broadcaster {
 
   def checkIfSendable(rd: RoutingData) = {
     val bestRepOpt = chanReports.sortBy(rep => -rep.estimateFinalCanSend).headOption
-    val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
+    val isPaid = LNParams.bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
     if (frozenInFlightHashes contains rd.pr.paymentHash) Left(app getString err_ln_frozen)
     else if (isPaid.isSuccess) Left(app getString err_ln_fulfilled)
     else bestRepOpt match {

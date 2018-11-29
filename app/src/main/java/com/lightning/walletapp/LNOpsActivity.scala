@@ -288,7 +288,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def getStat(chanId: BinaryData, direction: Int) = {
     // Direction = 0 = untgoing = lastMast, = 1 = incoming = firstMsat
-    val cursor = LNParams.db.select(PaymentTable.selectStatSql, chanId, direction)
+    val cursor = LNParams.dbExt.select(PaymentTable.selectStatSql, chanId, direction)
     RichCursor(cursor) headTry { case RichCursor(с1) => с1 getLong direction } getOrElse 0L
   }
 }

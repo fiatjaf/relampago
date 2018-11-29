@@ -203,7 +203,5 @@ class LNExtHelper(context: Context, name: String) extends TableHelper(context, n
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
     // Should work even for updates across many version ranges
     // because each table and index has CREATE IF EXISTS prefix
-    dbs execSQL RevokedInfoTable.createSql
-    dbs execSQL OlympusLogTable.createSql
   }
 }

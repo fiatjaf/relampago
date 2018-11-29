@@ -509,8 +509,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimg, nodePrivateKey, info, Some(app.kit.currentAddress.toString), routes)
       val rd = emptyRD(pr, sum.amount, useCache = true)
 
-      db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.pr.paymentHash)
-      db.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
+      dbExt.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.pr.paymentHash)
+      dbExt.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
         pr.description, rd.pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
 
       app.TransData.value = pr
@@ -694,7 +694,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def react = getSupportLoaderManager.restartLoader(1, null, loaderCallbacks).forceLoad
-  host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
+  host.getContentResolver.registerContentObserver(dbExt sqlPath PaymentTable.table, true, observer)
 
   host setSupportActionBar toolbar
   toolbar setOnClickListener onButtonTap {
