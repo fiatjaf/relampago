@@ -46,7 +46,7 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       olympusAddress setText serverAddress.getHost
       olympusTokens setText finalTokensLeft.html
-      holder.swipable = cloud.removable == 1
+      holder.swipable = 1 == cloud.removable
     }
   }
 

@@ -85,9 +85,9 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         case other => Tools log other
       }
 
-    case (_, act: CloudAct) =>
-      // Always accept acts and just store them if tokens are disabled
-      // by doing this we can catch channel backups and upload them later
+    case (_, act: CloudAct) if 0 == removable || (isAuthEnabled || data.tokens.nonEmpty) =>
+      // Accept acts and just store them if this cloud is not removable OR auth is on OR tokens left
+      // by doing this we can catch channel backups and upload them later if user re-enables tokens
       me BECOME data.copy(acts = data.acts :+ act take 25)
       me doProcess CMDStart
 
