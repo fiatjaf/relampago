@@ -45,7 +45,6 @@ object LNParams { me =>
   def setup(seed: BinaryData) = generate(seed) match { case m =>
     extendedNodeKey = derivePrivateKey(m, hardened(46) :: hardened(0) :: Nil)
     extendedCloudKey = derivePrivateKey(m, hardened(92) :: hardened(0) :: Nil)
-    // Extended db should be create first so later we can fill it on update
     dbExt = new LNExtHelper(app, dbExtFile)
     db = new LNCoreHelper(app, dbCoreFile)
   }

@@ -183,7 +183,7 @@ class LNExtHelper(context: Context, name: String) extends TableHelper(context, n
   }
 }
 
-class LNCoreHelper(context: Context, name: String) extends TableHelper(context, name, 4) {
+class LNCoreHelper(context: Context, name: String) extends TableHelper(context, name, 7) {
   // Tables in this database contain critical information which has to be small and transferrable
 
   def onCreate(dbs: SQLiteDatabase) = {
@@ -201,9 +201,23 @@ class LNCoreHelper(context: Context, name: String) extends TableHelper(context, 
   }
 
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = if (v0 <= 3 && v1 == 4) {
-    dbs.execSQL(s"ATTACH DATABASE '${context.getDatabasePath(com.lightning.walletapp.Utils.dbExtFile).getPath}' AS ext")
+    // We have tables in core db which have to be copied into identical tables of extended db
+    val extFilePath = context.getDatabasePath(com.lightning.walletapp.Utils.dbExtFile).getPath
+    dbs.setTransactionSuccessful
+    dbs.endTransaction
+
+    // Attach fresh extended db while not in transaction
+    dbs.execSQL(s"ATTACH DATABASE '$extFilePath' AS ext")
+    dbs.beginTransaction
+
+    // At this point we copy filled tables from this db info fresh extended db
     dbs.execSQL(s"INSERT INTO ext.${RevokedInfoTable.table} SELECT * FROM ${RevokedInfoTable.table}")
     dbs.execSQL(s"INSERT INTO ext.${PaymentTable.table} SELECT * FROM ${PaymentTable.table}")
+    dbs.setTransactionSuccessful
+    dbs.endTransaction
+
+    // Detach while not in transaction
     dbs.execSQL("DETACH ext")
+    dbs.beginTransaction
   }
 }
