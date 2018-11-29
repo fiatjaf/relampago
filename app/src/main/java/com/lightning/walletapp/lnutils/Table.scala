@@ -200,24 +200,34 @@ class LNCoreHelper(context: Context, name: String) extends TableHelper(context, 
     dbs.execSQL(OlympusTable.newSql, dev2)
   }
 
-  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = if (v0 <= 3 && v1 == 4) {
-    // We have tables in core db which have to be copied into identical tables of extended db
-    val extFilePath = context.getDatabasePath(com.lightning.walletapp.Utils.dbExtFile).getPath
-    dbs.setTransactionSuccessful
-    dbs.endTransaction
+  def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
+    // Since we need to support even the oldest installations
+    // we walk through every historical database upgrade
 
-    // Attach fresh extended db while not in transaction
-    dbs.execSQL(s"ATTACH DATABASE '$extFilePath' AS ext")
-    dbs.beginTransaction
+    if (v0 < 3) {
+      // Create this table if it's not in core db
+      dbs execSQL RevokedInfoTable.createSql
+    }
 
-    // At this point we copy filled tables from this db info fresh extended db
-    dbs.execSQL(s"INSERT INTO ext.${RevokedInfoTable.table} SELECT * FROM ${RevokedInfoTable.table}")
-    dbs.execSQL(s"INSERT INTO ext.${PaymentTable.table} SELECT * FROM ${PaymentTable.table}")
-    dbs.setTransactionSuccessful
-    dbs.endTransaction
+    if (v0 < 4) {
+      // We have tables in core db which have to be copied into identical tables of extended db
+      val extFilePath = context.getDatabasePath(com.lightning.walletapp.Utils.dbExtFile).getPath
+      dbs.setTransactionSuccessful
+      dbs.endTransaction
 
-    // Detach while not in transaction
-    dbs.execSQL("DETACH ext")
-    dbs.beginTransaction
+      // Attach fresh extended db while not in transaction
+      dbs.execSQL(s"ATTACH DATABASE '$extFilePath' AS ext")
+      dbs.beginTransaction
+
+      // While in a middle of transaction we copy filled tables from this db info fresh extended db
+      dbs.execSQL(s"INSERT INTO ext.${RevokedInfoTable.table} SELECT * FROM ${RevokedInfoTable.table}")
+      dbs.execSQL(s"INSERT INTO ext.${PaymentTable.table} SELECT * FROM ${PaymentTable.table}")
+      dbs.setTransactionSuccessful
+      dbs.endTransaction
+
+      // Detach while not in transaction
+      dbs.execSQL("DETACH ext")
+      dbs.beginTransaction
+    }
   }
 }
