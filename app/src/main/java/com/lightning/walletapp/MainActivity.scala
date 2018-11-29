@@ -111,14 +111,16 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   def restoreFromZygote(intent: Intent) = {
-    val databaseFile = new File(app.getDatabasePath(dbCoreFile).getPath)
+    val dbExtShell = new File(app.getDatabasePath(dbExtFile).getPath)
+    val dbCoreShell = new File(app.getDatabasePath(dbCoreFile).getPath)
     val inputStream = getContentResolver.openInputStream(intent.getData)
     val bitVector = BitVector(ByteStreams toByteArray inputStream)
     val zygote = walletZygoteCodec.decode(bitVector).require.value
-    if (!databaseFile.exists) databaseFile.getParentFile.mkdirs
+    if (!dbCoreShell.exists) dbCoreShell.getParentFile.mkdirs
     Files.write(zygote.wallet, app.walletFile)
     Files.write(zygote.chain, app.chainFile)
-    Files.write(zygote.db, databaseFile)
+    Files.write(zygote.dbCore, dbCoreShell)
+    Files.write(zygote.dbExt, dbExtShell)
     next
   }
 
