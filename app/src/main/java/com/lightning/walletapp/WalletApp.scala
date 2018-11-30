@@ -28,7 +28,6 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCode
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.TxUploadAct
-import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import com.lightning.walletapp.helper.RichCursor
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
@@ -37,14 +36,12 @@ import org.bitcoinj.wallet.Wallet.BalanceType
 import com.lightning.walletapp.ln.LNParams
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
-import scala.concurrent.Future
 import android.app.Application
 import com.google.common.util
 import java.util.Collections
 import scodec.bits.BitVector
 import android.widget.Toast
 import scodec.DecodeResult
-import android.net.Uri
 import scala.util.Try
 import java.io.File
 
@@ -154,13 +151,6 @@ class WalletApp extends Application { me =>
       app.olympus = new OlympusWrap
       wallet.setCoinSelector(new MinDepthReachedCoinSelector)
       wallet.autosaveToFile(walletFile, 1000, MILLISECONDS, null)
-
-      Future {
-        val host = Uri.parse(app.olympus.clouds.head.connector.url).getHost
-        val peer = new PeerAddress(app.params, InetAddress getByName host, 8333)
-        peerGroup addAddress peer
-      }
-
       wallet.addCoinsSentEventListener(ChannelManager.chainEventsListener)
       wallet.addCoinsReceivedEventListener(ChannelManager.chainEventsListener)
       wallet.addTransactionConfidenceEventListener(ChannelManager.chainEventsListener)
