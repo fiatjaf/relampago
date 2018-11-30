@@ -183,7 +183,7 @@ class LNExtHelper(context: Context, name: String) extends TableHelper(context, n
   }
 }
 
-class LNCoreHelper(context: Context, name: String) extends TableHelper(context, name, 7) {
+class LNCoreHelper(context: Context, name: String) extends TableHelper(context, name, 4) {
   // Tables in this database contain critical information which has to be small and transferrable
 
   def onCreate(dbs: SQLiteDatabase) = {

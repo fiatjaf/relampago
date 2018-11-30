@@ -48,11 +48,10 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     true
   }
 
-  def INIT(s: Bundle) = {
+  def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_settings
-    recoverFunds.setEnabled(ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-    getSupportActionBar setSubtitle "Version 0.2-88"
+    getSupportActionBar setSubtitle "App version 0.2-88"
     getSupportActionBar setTitle wallet_settings
 
     recoverFunds setOnClickListener onButtonTap {
@@ -174,5 +173,8 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         me startActivity Intent.createChooser(share, "Choose an app")
       }
     }
-  }
+
+    // Wallet may not see incoming txs immediately if channel is broken while not synched
+    recoverFunds.setEnabled(ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
+  } else me exitTo classOf[MainActivity]
 }
