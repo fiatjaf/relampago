@@ -222,6 +222,12 @@ class LNCoreHelper(context: Context, name: String) extends TableHelper(context, 
       // While in a middle of transaction we copy filled tables from this db info fresh extended db
       dbs.execSQL(s"INSERT INTO ext.${RevokedInfoTable.table} SELECT * FROM ${RevokedInfoTable.table}")
       dbs.execSQL(s"INSERT INTO ext.${PaymentTable.table} SELECT * FROM ${PaymentTable.table}")
+      dbs.execSQL(s"DROP TABLE IF EXISTS ${PaymentTable.fts}${PaymentTable.table}")
+      dbs.execSQL(s"DROP TABLE IF EXISTS ${RevokedInfoTable.table}")
+      dbs.execSQL(s"DROP TABLE IF EXISTS ${OlympusLogTable.table}")
+      dbs.execSQL(s"DROP TABLE IF EXISTS ${BadEntityTable.table}")
+      dbs.execSQL(s"DROP TABLE IF EXISTS ${PaymentTable.table}")
+      dbs.execSQL(s"DROP TABLE IF EXISTS ${RouteTable.table}")
       dbs.setTransactionSuccessful
       dbs.endTransaction
 
