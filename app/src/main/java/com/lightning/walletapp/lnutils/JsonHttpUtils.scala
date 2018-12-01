@@ -6,9 +6,9 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 
 import rx.lang.scala.{Observable => Obs}
-import com.lightning.walletapp.lnutils.olympus.OlympusWrap.{Fiat2Btc, Result}
 import org.bitcoinj.core.Transaction.DEFAULT_TX_FEE
 import com.lightning.walletapp.ChannelManager
 import rx.lang.scala.schedulers.IOScheduler

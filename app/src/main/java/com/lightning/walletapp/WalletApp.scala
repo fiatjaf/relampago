@@ -20,7 +20,6 @@ import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
 
 import rx.lang.scala.{Observable => Obs}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
-import java.net.{InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import android.content.{ClipData, ClipboardManager, Context}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
@@ -36,6 +35,7 @@ import org.bitcoinj.wallet.Wallet.BalanceType
 import com.lightning.walletapp.ln.LNParams
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
+import java.net.InetSocketAddress
 import android.app.Application
 import com.google.common.util
 import java.util.Collections
@@ -185,6 +185,7 @@ object ChannelManager extends Broadcaster {
   val CMDLocalShutdown: Command = CMDShutdown(None)
   val operationalListeners: Set[ChannelListener] = Set(ChannelManager, LNParams.bag, GossipCatcher)
   private[this] var initialChainHeight: Long = app.kit.wallet.getLastBlockSeenHeight
+  // Blocks download has not started yet and we don't know how many is left
   var currentBlocksLeft: Int = Int.MaxValue
 
   val socketEventsListener = new ConnectionListener {
@@ -254,8 +255,11 @@ object ChannelManager extends Broadcaster {
 
   def perKwSixSat = RatesSaver.rates.feeSix.value / 4
   def perKwThreeSat = RatesSaver.rates.feeThree.value / 4
-  // We may still be syncing but anyway a final chain height is known here
-  def currentHeight = app.kit.wallet.getLastBlockSeenHeight + currentBlocksLeft
+
+  def currentHeight =
+    // We may still be syncing but anyway a final chain height is known here
+    if (currentBlocksLeft == Int.MaxValue) app.kit.wallet.getLastBlockSeenHeight
+    else app.kit.wallet.getLastBlockSeenHeight + currentBlocksLeft
 
   def getTx(txid: BinaryData) = {
     val wrapped = Sha256Hash wrap txid.toArray
