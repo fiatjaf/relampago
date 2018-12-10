@@ -239,8 +239,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     else if (lastStamp == -1L) gDriveBackupState setText gdrive_failed
     else if (lastStamp == 0L) gDriveBackupState setText gdrive_not_present
     else gDriveBackupState setText getString(gdrive_last_saved).format(state).html
-
-    gDriveBackups setEnabled !gDriveMissing
-    gDriveBackups setChecked isUserEnabled
+    gDriveBackups.setChecked(!gDriveMissing && isUserEnabled)
+    gDriveBackups.setEnabled(!gDriveMissing)
   }
 }
