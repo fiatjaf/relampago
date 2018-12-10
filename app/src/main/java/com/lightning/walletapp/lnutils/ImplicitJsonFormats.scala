@@ -104,49 +104,6 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val milliSatoshiFmt = jsonFormat[Long, MilliSatoshi](MilliSatoshi.apply, "amount")
   implicit val satoshiFmt = jsonFormat[Long, Satoshi](Satoshi.apply, "amount")
 
-  // Payment request and tags
-
-  implicit object TagFmt extends JsonFormat[Tag] {
-    def read(json: JsValue): Tag = PaymentRequest.Tag parse json.convertTo[Bytes]
-    def write(internal: Tag): JsValue = internal.toInt5s.toJson
-  }
-
-  implicit val paymentRequestFmt =
-    jsonFormat[String, Option[MilliSatoshi], Long, PublicKey, Vector[Tag], BinaryData,
-      PaymentRequest](PaymentRequest.apply, "prefix", "amount", "timestamp", "nodeId", "tags", "signature")
-
-  implicit object CloudActFmt extends JsonFormat[CloudAct] {
-    def write(unserialized: CloudAct): JsValue = unserialized match {
-      case unserialiedMessage: ChannelUploadAct => unserialiedMessage.toJson
-      case unserialiedMessage: TxUploadAct => unserialiedMessage.toJson
-      case unserialiedMessage: CerberusAct => unserialiedMessage.toJson
-      case unserialiedMessage: LegacyAct => unserialiedMessage.toJson
-    }
-
-    def read(serialized: JsValue): CloudAct = serialized.asJsObject.fields get "tag" match {
-      case Some(s: JsString) if s.value == "ChannelUploadAct" => serialized.convertTo[ChannelUploadAct]
-      case Some(s: JsString) if s.value == "TxUploadAct" => serialized.convertTo[TxUploadAct]
-      case Some(s: JsString) if s.value == "CerberusAct" => serialized.convertTo[CerberusAct]
-      case _ => serialized.convertTo[LegacyAct] // TODO: remove later
-    }
-  }
-
-  implicit val legacyActFmt =
-    jsonFormat[BinaryData, Seq[HttpParam], String,
-      LegacyAct](LegacyAct.apply, "data", "plus", "path")
-
-  implicit val cerberusActFmt = taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String, StringVec,
-    CerberusAct](CerberusAct.apply, "data", "plus", "path", "txids"), tag = "CerberusAct")
-
-  implicit val txUploadActFmt = taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String,
-    TxUploadAct](TxUploadAct.apply, "data", "plus", "path"), tag = "TxUploadAct")
-
-  implicit val channelUploadActFmt = taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String, String,
-    ChannelUploadAct](ChannelUploadAct.apply, "data", "plus", "path", "alias"), tag = "ChannelUploadAct")
-
-  implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
-  implicit val ratesFmt = jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
-
   // LNURL
 
   implicit object LNUrlDataFmt extends JsonFormat[LNUrlData] {
@@ -374,8 +331,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       NegotiationsData](NegotiationsData.apply, "announce", "commitments", "localShutdown", "remoteShutdown",
       "localProposals", "lastSignedTx"), tag = "NegotiationsData")
 
-  implicit val normalDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Option[Shutdown], Option[Shutdown],
-    NormalData](NormalData.apply, "announce", "commitments", "localShutdown", "remoteShutdown"), tag = "NormalData")
+  implicit val normalDataFmt =
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Option[Shutdown], Option[Shutdown], Option[Transaction],
+      NormalData](NormalData.apply, "announce", "commitments", "localShutdown", "remoteShutdown", "unknownSpend"), tag = "NormalData")
 
   implicit val waitFundingDoneDataFmt =
     taggedJsonFmt(jsonFormat[NodeAnnouncement,
@@ -396,6 +354,53 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val outRequestFmt = jsonFormat[Long, Set[String], Set[Long], Set[String], String,
       OutRequest](OutRequest.apply, "sat", "badNodes", "badChans", "from", "to")
+
+  // Payment request, tags, upload acts, backups
+
+  implicit object TagFmt extends JsonFormat[Tag] {
+    def read(json: JsValue): Tag = PaymentRequest.Tag parse json.convertTo[Bytes]
+    def write(internal: Tag): JsValue = internal.toInt5s.toJson
+  }
+
+  implicit val paymentRequestFmt =
+    jsonFormat[String, Option[MilliSatoshi], Long, PublicKey, Vector[Tag], BinaryData,
+      PaymentRequest](PaymentRequest.apply, "prefix", "amount", "timestamp", "nodeId", "tags", "signature")
+
+  implicit object CloudActFmt extends JsonFormat[CloudAct] {
+    def write(unserialized: CloudAct): JsValue = unserialized match {
+      case unserialiedMessage: ChannelUploadAct => unserialiedMessage.toJson
+      case unserialiedMessage: TxUploadAct => unserialiedMessage.toJson
+      case unserialiedMessage: CerberusAct => unserialiedMessage.toJson
+      case unserialiedMessage: LegacyAct => unserialiedMessage.toJson
+    }
+
+    def read(serialized: JsValue): CloudAct = serialized.asJsObject.fields get "tag" match {
+      case Some(s: JsString) if s.value == "ChannelUploadAct" => serialized.convertTo[ChannelUploadAct]
+      case Some(s: JsString) if s.value == "TxUploadAct" => serialized.convertTo[TxUploadAct]
+      case Some(s: JsString) if s.value == "CerberusAct" => serialized.convertTo[CerberusAct]
+      case _ => serialized.convertTo[LegacyAct] // TODO: remove later
+    }
+  }
+
+  implicit val legacyActFmt =
+    jsonFormat[BinaryData, Seq[HttpParam], String,
+      LegacyAct](LegacyAct.apply, "data", "plus", "path")
+
+  implicit val cerberusActFmt = taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String, StringVec,
+    CerberusAct](CerberusAct.apply, "data", "plus", "path", "txids"), tag = "CerberusAct")
+
+  implicit val txUploadActFmt = taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String,
+    TxUploadAct](TxUploadAct.apply, "data", "plus", "path"), tag = "TxUploadAct")
+
+  implicit val channelUploadActFmt = taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String, String,
+    ChannelUploadAct](ChannelUploadAct.apply, "data", "plus", "path", "alias"), tag = "ChannelUploadAct")
+
+  implicit val cloudSnapshot = jsonFormat[Vector[ClearToken], String, CloudSnapshot](CloudSnapshot.apply, "tokens", "url")
+  implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
+  implicit val ratesFmt = jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
+
+  implicit val gDriveBackup = taggedJsonFmt(jsonFormat[Vector[HasCommitments], Vector[CloudSnapshot], Int,
+    GDriveBackup](GDriveBackup.apply, "chans", "clouds", "v"), tag = "GDriveBackup")
 
   // Relay node
 

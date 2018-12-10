@@ -9,7 +9,7 @@
         <clip>
             <shape>
                 <corners android:radius="2dp"/>
-                <solid android:color="@color/shpbr_secondary_progress"/>
+                <solid android:color="@color/btc"/>
             </shape>
         </clip>
     </item>
@@ -17,7 +17,7 @@
         <clip>
             <shape>
                 <corners android:radius="2dp"/>
-                <solid android:color="@color/shpbr_primary_progress"/>
+                <solid android:color="@color/ln"/>
             </shape>
         </clip>
     </item>

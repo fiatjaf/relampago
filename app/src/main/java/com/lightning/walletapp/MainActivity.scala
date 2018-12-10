@@ -95,7 +95,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
     val restoreOptions = getResources getStringArray R.array.restore_options
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, restoreOptions)
-    val alert = showForm(negBuilder(dialog_cancel, null, lst).create)
+    val alert = showForm(negBuilder(dialog_cancel, me getString wallet_restore, lst).create)
     lst setDividerHeight 0
     lst setDivider null
 
@@ -111,16 +111,14 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   }
 
   def restoreFromZygote(intent: Intent) = {
-    val dbExtShell = new File(app.getDatabasePath(dbExtFile).getPath)
-    val dbCoreShell = new File(app.getDatabasePath(dbCoreFile).getPath)
+    val databaseFile = new File(app.getDatabasePath(dbFileName).getPath)
     val inputStream = getContentResolver.openInputStream(intent.getData)
     val bitVector = BitVector(ByteStreams toByteArray inputStream)
     val zygote = walletZygoteCodec.decode(bitVector).require.value
-    if (!dbCoreShell.exists) dbCoreShell.getParentFile.mkdirs
+    if (!databaseFile.exists) databaseFile.getParentFile.mkdirs
     Files.write(zygote.wallet, app.walletFile)
     Files.write(zygote.chain, app.chainFile)
-    Files.write(zygote.dbCore, dbCoreShell)
-    Files.write(zygote.dbExt, dbExtShell)
+    Files.write(zygote.db, databaseFile)
     next
   }
 

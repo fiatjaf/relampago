@@ -3,7 +3,6 @@ package com.lightning.walletapp.lnutils.olympus
 import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.lnutils._
-import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
@@ -18,10 +17,9 @@ import org.bitcoinj.core.ECKey
 
 // Uses special paid tokens to store data on server, is constructed directly from a database
 class Cloud(val identifier: String, var connector: Connector, var auth: Int, val removable: Int,
-            val maxPriceMsat: Long = 5000000L) extends StateMachine[CloudData] { me =>
+            val maxMsat: Long = 5000000L) extends StateMachine[CloudData] { me =>
 
   private var isFree = true
-  def isAuthEnabled = auth == 1
   def BECOME(cloudData: CloudData) = {
     // Just save updated data to database on every change
     app.olympus.updData(cloudData.toJson.toString, identifier)
@@ -31,7 +29,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
       (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
-      ChannelManager.notClosing.exists(isOperational) &&
+      ChannelManager.chanReports.exists(_.estimateFinalCanSend >= maxMsat) &&
       isAuthEnabled =>
 
       // Also executes if we have no actions to upload and a few tokens left
@@ -40,7 +38,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
       for {
         pr \ memo <- send1
-        if data.info.isEmpty && pr.unsafeMsat < maxPriceMsat && memo.clears.size > 20
+        if data.info.isEmpty && pr.unsafeMsat < maxMsat && memo.clears.size > 20
         memoSaved = me BECOME CloudData(Some(pr, memo), clearTokens, actions)
       } retryFreshRequest(pr)
 
@@ -85,18 +83,22 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         case other => Tools log other
       }
 
-    case (_, act: CloudAct) if 0 == removable || (isAuthEnabled || data.tokens.nonEmpty) =>
+    case (_, act: CloudAct) if 0 == removable || isAuthEnabled || data.tokens.nonEmpty =>
       // Accept acts and just store them if this cloud is not removable OR auth is on OR tokens left
       // by doing this we can catch channel backups and upload them later if user re-enables tokens
       me BECOME data.copy(acts = data.acts :+ act take 25)
       me doProcess CMDStart
+
+    case (_, cs: CloudSnapshot) if cs.url == connector.url =>
+      // We may get new tokens off-band after restoring from GDrive
+      me BECOME data.copy(tokens = (data.tokens ++ cs.tokens).distinct)
 
     case _ =>
   }
 
   // TALKING TO SERVER
 
-  private def getPaymentRequestBlindMemo =
+  def getPaymentRequestBlindMemo =
     connector.ask[TokensInfo]("blindtokens/info") flatMap {
       case (signerMasterPubKey, signerSessionPubKey, quantity) =>
         val pubKeyQ = ECKey.fromPublicOnly(HEX decode signerMasterPubKey)
@@ -109,9 +111,11 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
           "lang" -> lang, "seskey" -> memo.key).map(PaymentRequest.read).map(pr => pr -> memo)
     }
 
-  def retryFreshRequest(pr: PaymentRequest): Unit = {
-    val rd = emptyRD(pr, pr.unsafeMsat, useCache = true)
-    val ok = ChannelManager.notClosing.exists(isOperational)
-    if (ok) PaymentInfoWrap addPendingPayment rd
+  def isAuthEnabled = 1 == auth
+  def snapshot = CloudSnapshot(data.tokens, connector.url)
+  def retryFreshRequest(failedPayReq: PaymentRequest): Unit = {
+    val rd = emptyRD(failedPayReq, firstMsat = failedPayReq.unsafeMsat, useCache = true)
+    val isOk = ChannelManager.chanReports.exists(_.estimateFinalCanSend >= failedPayReq.unsafeMsat)
+    if (isOk) PaymentInfoWrap addPendingPayment rd
   }
 }

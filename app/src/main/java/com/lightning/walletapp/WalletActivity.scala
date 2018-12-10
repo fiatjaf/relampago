@@ -14,17 +14,21 @@ import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import org.bitcoinj.core.{Address, TxWrap}
 
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
+import com.lightning.walletapp.lnutils.JsonHttpUtils.obsOnIO
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.github.clans.fab.FloatingActionMenu
+import com.lightning.walletapp.lnutils.GDrive
 import android.support.v7.widget.SearchView
 import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+import android.content.Intent
 import org.ndeftools.Message
+import android.app.Activity
 import android.os.Bundle
 import java.util.Date
 
@@ -125,7 +129,17 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrap(me setDetecting true)(me initNfc state)
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
+
+    val shouldCheck = app.prefs.getLong(AbstractKit.GDRIVE_LAST_SAVE, 0L) <= 0L // Unknown or failed
+    val needsCheck = !GDrive.isMissing(app) && app.prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true) && shouldCheck
+    if (needsCheck) obsOnIO.map(_ => GDrive signInAccount me).foreach(accountOpt => if (accountOpt.isEmpty) askGDriveSignIn)
   } else me exitTo classOf[MainActivity]
+
+  override def onActivityResult(reqCode: Int, resultCode: Int, results: Intent) = {
+    val isGDriveSignInSuccessful = reqCode == 102 && resultCode == Activity.RESULT_OK
+    app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, isGDriveSignInSuccessful).commit
+    if (!isGDriveSignInSuccessful) app toast gdrive_disabled
+  }
 
   // NFC
 
@@ -155,6 +169,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case lnLink: LNUrl =>
         // TransData value will be erased here
         lnLink.resolve.foreach(initConnection, none)
+        app toast ln_url_resolving
         me returnToBase null
 
       case address: Address =>
@@ -186,7 +201,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     ConnectionManager.listeners += new ConnectionListener { self =>
       // This is done to make sure we definitely have an LN connection
       ConnectionManager.connectTo(icr.getAnnounce, notify = true)
-      app toast ln_url_resolving
 
       override def onOperational(nodeId: PublicKey) = {
         // Immediately remove listener and make a request

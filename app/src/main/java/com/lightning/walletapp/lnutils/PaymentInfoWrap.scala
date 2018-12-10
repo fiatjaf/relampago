@@ -5,6 +5,7 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
+import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
@@ -19,7 +20,6 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.ChannelManager
-import com.lightning.walletapp.ln.LNParams
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
 import java.util.Collections
@@ -52,27 +52,27 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (fulfills.nonEmpty) uiNotify
   }
 
-  def fetchAndSend(rd: RoutingData) = ChannelManager.fetchRoutes(rd).foreach(ChannelManager.sendEither(_, failOnUI), remoteRouteException => me failOnUI rd)
-  def updOkIncoming(m: UpdateAddHtlc) = LNParams.dbExt.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
-  def updOkOutgoing(m: UpdateFulfillHtlc) = LNParams.dbExt.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
-  def getPaymentInfo(hash: BinaryData) = RichCursor apply LNParams.dbExt.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
-  def updStatus(status: Int, hash: BinaryData) = LNParams.dbExt.change(PaymentTable.updStatusSql, status, hash)
-  def uiNotify = app.getContentResolver.notifyChange(LNParams.dbExt sqlPath PaymentTable.table, null)
-  def byQuery(query: String) = LNParams.dbExt.select(PaymentTable.searchSql, s"$query*")
-  def byRecent = LNParams.dbExt select PaymentTable.selectRecentSql
+  def fetchAndSend(rd: RoutingData) = ChannelManager.fetchRoutes(rd).foreach(ChannelManager.sendEither(_, failOnUI), olympusErr => me failOnUI rd)
+  def updOkIncoming(m: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
+  def updOkOutgoing(m: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
+  def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
+  def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
+  def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
+  def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
+  def byRecent = db select PaymentTable.selectRecentSql
 
   def toPaymentInfo(rc: RichCursor) = PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage,
     rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
     rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
-  def insertOrUpdateOutgoingPayment(rd: RoutingData) = LNParams.dbExt txWrap {
-    LNParams.dbExt.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
-    LNParams.dbExt.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis,
-      rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
+  def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
+    db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
+    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis, rd.pr.description,
+      rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
-  def markFailedAndFrozen = LNParams.dbExt txWrap {
-    LNParams.dbExt change PaymentTable.updFailWaitingAndFrozenSql
+  def markFailedAndFrozen = db txWrap {
+    db change PaymentTable.updFailWaitingAndFrozenSql
     for (hash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, hash)
     for (hash <- ChannelManager.frozenInFlightHashes) updStatus(FROZEN, hash)
   }
@@ -92,13 +92,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     me insertOrUpdateOutgoingPayment rd
   }
 
-  override def fulfillReceived(ok: UpdateFulfillHtlc) = LNParams.dbExt txWrap {
-    // Save preimage right away since once we have a preimage it's already fulfilled
+  override def fulfillReceived(ok: UpdateFulfillHtlc) = db txWrap {
+    // Save preimage right away, don't wait for their next commitSig
     me updOkOutgoing ok
 
     inFlightPayments get ok.paymentHash foreach { rd =>
-      // Make payment searchable and use optimization: record sub-routes in database
-      LNParams.dbExt.change(PaymentTable.newVirtualSql, rd.queryText, rd.pr.paymentHash)
+      // Make payment searchable + optimization: record sub-routes in database
+      db.change(PaymentTable.newVirtualSql, rd.queryText, rd.pr.paymentHash)
       if (rd.usedRoute.nonEmpty) RouteWrap cacheSubRoutes rd
     }
   }
@@ -118,7 +118,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
           updStatus(FAILURE, rd.pr.paymentHash)
       }
 
-    LNParams.dbExt txWrap {
+    db txWrap {
       fulfilledIncoming foreach updOkIncoming
       // Malformed payments are returned by our direct peer and should never be retried again
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
@@ -159,7 +159,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def getVulnerableRevInfos(chan: Channel) = chan(identity) map { cs =>
     // Find previous channel states which peer might be tempted to spend but omit too small deltas
     def toTxidAndInfo(shiftedRc: RichCursor) = (shiftedRc string RevokedInfoTable.txId, shiftedRc string RevokedInfoTable.info)
-    val cursor = LNParams.dbExt.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat - 5460000L)
+    val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat - dust.amount * 4 * 1000L)
     RichCursor(cursor) vec toTxidAndInfo
   } getOrElse Vector.empty
 
@@ -186,18 +186,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onProcessSuccess = {
     case (_, wbr: WaitBroadcastRemoteData, _: CMDBestHeight) if wbr.isFailed =>
-      val fundingScript: BinaryData = wbr.commitments.commitInput.txOut.publicKeyScript
-      app.kit.wallet.removeWatchedScripts(Collections singletonList fundingScript)
-      LNParams.db.change(ChannelTable.killSql, wbr.commitments.channelId)
+      app.kit.wallet.removeWatchedScripts(app.kit fundingPubScript wbr)
+      db.change(ChannelTable.killSql, wbr.commitments.channelId)
 
     case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
-      val fundingScript: BinaryData = close.commitments.commitInput.txOut.publicKeyScript
-      app.kit.wallet.removeWatchedScripts(Collections singletonList fundingScript)
       app.kit.wallet.removeWatchedScripts(app.kit closingPubKeyScripts close)
-
-      // We may have now useless revoked history for this chan so just delete it
-      LNParams.dbExt.change(RevokedInfoTable.killSql, close.commitments.channelId)
-      LNParams.db.change(ChannelTable.killSql, close.commitments.channelId)
+      app.kit.wallet.removeWatchedScripts(app.kit fundingPubScript close)
+      db.change(RevokedInfoTable.killSql, close.commitments.channelId)
+      db.change(ChannelTable.killSql, close.commitments.channelId)
   }
 
   override def onBecome = {
@@ -208,10 +204,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 }
 
 object ChannelWrap {
-  def doPut(chanId: BinaryData, data: String) = LNParams.db txWrap {
-    // Insert and then update because of INSERT IGNORE sqlite effects
-    LNParams.db.change(ChannelTable.newSql, chanId, data)
-    LNParams.db.change(ChannelTable.updSql, data, chanId)
+  def doPut(chanId: BinaryData, data: String) = db txWrap {
+    // Insert and then update because of INSERT IGNORE effects
+    db.change(ChannelTable.newSql, chanId, data)
+    db.change(ChannelTable.updSql, data, chanId)
   }
 
   def put(data: HasCommitments) = {
@@ -219,8 +215,8 @@ object ChannelWrap {
     doPut(data.commitments.channelId, raw)
   }
 
-  def get = {
-    val rc = RichCursor(LNParams.db select ChannelTable.selectAllSql)
+  def doGet(db1: LNOpenHelper) = {
+    val rc = RichCursor(db1 select ChannelTable.selectAllSql)
     rc.vec(_ string ChannelTable.data substring 1) map to[HasCommitments]
   }
 }
@@ -234,18 +230,18 @@ object RouteWrap {
     for (_ \ node \ path <- rd.onion.sharedSecrets drop 1 zip subs) {
       val expiration = System.currentTimeMillis + 1000L * 3600 * 24 * 14
       val subPathJson \ subNodeString = path.toJson.toString -> node.toString
-      LNParams.dbExt.change(RouteTable.newSql, subPathJson, subNodeString, expiration)
-      LNParams.dbExt.change(RouteTable.updSql, subPathJson, expiration, subNodeString)
+      db.change(RouteTable.newSql, subPathJson, subNodeString, expiration)
+      db.change(RouteTable.updSql, subPathJson, expiration, subNodeString)
     }
   }
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
-    val cursor = LNParams.dbExt.select(RouteTable.selectSql, targetId, System.currentTimeMillis)
-    val cachedRouteTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRoute]
+    val cursor = db.select(RouteTable.selectSql, targetId, System.currentTimeMillis)
+    val routeTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRoute]
     // Channels could be closed or excluded so make sure we still have a matching channel for cached route
-    val validRouteTry = for (rt <- cachedRouteTry if from contains rt.head.nodeId) yield Obs just Vector(rt)
+    val validRouteTry = for (rt <- routeTry if from contains rt.head.nodeId) yield Obs just Vector(rt)
 
-    LNParams.dbExt.change(RouteTable.killSql, targetId)
+    db.change(RouteTable.killSql, targetId)
     // Remove cached route in case if it starts hanging our payments
     // this route will be put back again if payment was a successful one
     validRouteTry getOrElse BadEntityWrap.findRoutes(from, targetId, rd)
@@ -254,13 +250,13 @@ object RouteWrap {
 
 object BadEntityWrap {
   val putEntity = (entity: String, span: Long, msat: Long) => {
-    LNParams.dbExt.change(BadEntityTable.newSql, entity, System.currentTimeMillis + span, msat)
-    LNParams.dbExt.change(BadEntityTable.updSql, System.currentTimeMillis + span, msat, entity)
+    db.change(BadEntityTable.newSql, entity, System.currentTimeMillis + span, msat)
+    db.change(BadEntityTable.updSql, System.currentTimeMillis + span, msat, entity)
   }
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
     // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
-    val cursor = LNParams.dbExt.select(BadEntityTable.selectSql, System.currentTimeMillis, rd.firstMsat)
+    val cursor = db.select(BadEntityTable.selectSql, params = System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
 
     val fromAsString = from.map(_.toString).toSet

@@ -1,9 +1,5 @@
 <resources>
     <item name="bg" type="color">#282B30</item>
-    <item name="btc" type="color">#FF9900</item>
+    <item name="btc" type="color">#E68A00</item>
     <item name="ln" type="color">#0099FE</item>
-
-    <color name="shpbr_background">#282B30</color>
-    <color name="shpbr_primary_progress">#0099FE</color>
-    <color name="shpbr_secondary_progress">#E68A00</color>
 </resources>

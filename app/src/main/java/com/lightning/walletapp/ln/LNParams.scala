@@ -4,8 +4,9 @@ import fr.acinq.bitcoin._
 import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
-import com.lightning.walletapp.Utils.{app, dbCoreFile, dbExtFile}
+import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
+import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import com.lightning.walletapp.ChannelManager
@@ -20,9 +21,8 @@ object LNParams { me =>
   val globalFeatures = ""
   val minDepth = 1
 
+  val maxToSelfDelay = 2016
   val maxCltvDelta = 7 * 144L
-  val maxToSelfDelay = 2000L
-
   val minCapacitySat = 300000L
   final val dust = Satoshi(2730L)
   final val minFeeratePerKw = 253
@@ -30,8 +30,7 @@ object LNParams { me =>
   final val maxCapacity = Satoshi(16777215L)
   final val minHtlcValue = MilliSatoshi(1000L)
 
-  var db: LNCoreHelper = _
-  var dbExt: LNExtHelper = _
+  var db: LNOpenHelper = _
   var extendedNodeKey: ExtendedPrivateKey = _
   var extendedCloudKey: ExtendedPrivateKey = _
 
@@ -45,8 +44,8 @@ object LNParams { me =>
   def setup(seed: BinaryData) = generate(seed) match { case m =>
     extendedNodeKey = derivePrivateKey(m, hardened(46) :: hardened(0) :: Nil)
     extendedCloudKey = derivePrivateKey(m, hardened(92) :: hardened(0) :: Nil)
-    dbExt = new LNExtHelper(app, dbExtFile)
-    db = new LNCoreHelper(app, dbCoreFile)
+    db = new LNOpenHelper(app, dbFileName)
+    app.olympus = new OlympusWrap
   }
 
   def isFeeNotOk(msat: Long, fee: Long, hops: Int) =
@@ -58,13 +57,12 @@ object LNParams { me =>
     mismatch < -0.25 || mismatch > 0.25
   }
 
+  def backupFileName = s"blw${chainHash.toString}-${cloudId.toString}.bkup"
   def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (ord <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: ord :: Nil)
-    val toSelfDelay = if (ann.nodeId == JointNode.jointNodeKey) 2880 else 1440
-
-    LocalParams(maxHtlcValueInFlightMsat = UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay,
-      maxAcceptedHtlcs = 25, fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey,
-      htlc.privateKey, finalScriptPubKey, dust, shaSeed = sha256(sha.privateKey.toBin), isFunder)
+    LocalParams(UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay = if (ann.nodeId == JointNode.jointNodeKey) 2880 else 1440,
+      maxAcceptedHtlcs = 25, fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey, htlc.privateKey,
+      finalScriptPubKey, dust, shaSeed = sha256(sha.privateKey.toBin), isFunder)
   }
 }
 

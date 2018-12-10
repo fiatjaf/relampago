@@ -3,24 +3,32 @@ package com.lightning.walletapp
 import android.widget._
 import android.widget.DatePicker._
 import com.lightning.walletapp.R.string._
+import com.lightning.walletapp.ln.LNParams._
 import com.hootsuite.nachos.terminator.ChipTerminatorHandler._
+import com.lightning.walletapp.ln._
+import com.lightning.walletapp.lnutils.{ChannelWrap, GDrive, TaskWrap}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.wallet.{DeterministicSeed, Wallet}
 import android.view.{View, ViewGroup}
-
-import android.R.layout.simple_list_item_1
+import com.lightning.walletapp.ln.wire.GDriveBackup
+import com.google.android.gms.drive.DriveContents
 import com.hootsuite.nachos.NachoTextView
 import com.lightning.walletapp.Utils.app
 import org.bitcoinj.crypto.MnemonicCode
-import java.util.Calendar
+import android.content.Intent
+import android.app.Activity
+
+import scala.util.Success
+import java.util.{Calendar, Collections}
+
 import android.os.Bundle
+import fr.acinq.bitcoin.BinaryData
 
 
-class WhenPicker(host: TimerActivity, start: Long)
-  extends DatePicker(host) with OnDateChangedListener { me =>
-  def refresh = runAnd(me)(try getParent.asInstanceOf[ViewGroup] removeView me catch none)
+class WhenPicker(host: TimerActivity, start: Long) extends DatePicker(host) with OnDateChangedListener { me =>
   def humanTime = java.text.DateFormat getDateInstance java.text.DateFormat.MEDIUM format cal.getTime
-  def onDateChanged(view: DatePicker, year: Int, mon: Int, dt: Int) = cal.set(year, mon, dt)
+  def onDateChanged(view: DatePicker, year: Int, mon: Int, date: Int) = cal.set(year, mon, date)
+  def refresh = runAnd(me)(try getParent.asInstanceOf[ViewGroup] removeView me catch none)
   init(cal get Calendar.YEAR, cal get Calendar.MONTH, cal get Calendar.DATE, me)
 
   lazy val cal = {
@@ -42,11 +50,11 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_restore)
     restoreCode addTextChangedListener new TextChangedWatcher {
-      override def onTextChanged(cs: CharSequence, x: Int, y: Int, z: Int) = {
-        val mnemonicPhraseIsCorrect: Boolean = getMnemo.split("\\s+").length > 11
-        if (mnemonicPhraseIsCorrect) restoreWallet setText wallet_restore
-        else restoreWallet setText restore_mnemonic_wrong
-        restoreWallet setEnabled mnemonicPhraseIsCorrect
+      def isMnemonicCorrect = getMnemonic.split("\\s+").length > 11
+      override def onTextChanged(c: CharSequence, x: Int, y: Int, z: Int) = {
+        val txt = if (isMnemonicCorrect) wallet_restore else restore_mnemonic_wrong
+        restoreWallet setEnabled isMnemonicCorrect
+        restoreWallet setText txt
       }
     }
 
@@ -55,26 +63,96 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
     restoreCode.addChipTerminator(',', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode.addChipTerminator('\n', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode setDropDownBackgroundResource R.color.button_material_dark
-    restoreCode setAdapter new ArrayAdapter(me, simple_list_item_1,
+    restoreCode setAdapter new ArrayAdapter(me, android.R.layout.simple_list_item_1,
       MnemonicCode.INSTANCE.getWordList)
+
+    // Sign in before wallet restoring
+    val noGDrive = GDrive isMissing me
+    if (!noGDrive) askGDriveSignIn
   }
 
   override def onBackPressed = wrap(super.onBackPressed)(app.kit.stopAsync)
-  def getMnemo = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")
+  override def onActivityResult(reqCode: Int, resultCode: Int, result: Intent) =
+    if (reqCode == 102 && resultCode != Activity.RESULT_OK) warnNoBackups(none).run
+
+  def warnNoBackups(go: => Unit) = UITask {
+    val bld = baseTextBuilder(me getString err_gdrive_sign_in_failed)
+    mkCheckForm(alert => rm(alert)(go), finish, bld, dialog_ok, dialog_cancel)
+  }
+
+  def getMnemonic = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")
   def setWhen(button: View) = mkCheckForm(alert => rm(alert)(restoreWhen setText dp.humanTime),
     none, baseBuilder(null, dp.refresh), dialog_ok, dialog_cancel)
 
   def recWallet(top: View) =
     app.kit = new app.WalletKit {
-      restoreInfo setVisibility View.GONE
       restoreProgress setVisibility View.VISIBLE
+      restoreInfo setVisibility View.GONE
       startAsync
 
       def startUp = {
         // Make a seed from user provided mnemonic code and restore a wallet using it
-        val seed = new DeterministicSeed(getMnemo, null, "", dp.cal.getTimeInMillis / 1000)
+        val seed = new DeterministicSeed(getMnemonic, null, "", dp.cal.getTimeInMillis / 1000)
         wallet = Wallet.fromSeed(app.params, seed)
-        prepareFreshWallet(this)
+        LNParams setup seed.getSeedBytes
+
+        // Proceed to wallet or try to use gdrive backups
+        // user should have been logged in gdrive at this point
+        if (GDrive isMissing app) me prepareFreshWallet app.kit
+        else GDrive signInAccount app match {
+
+          case Some(signInAcc) =>
+            val syncTask = GDrive.syncClientTask(app)(signInAcc)
+            val driveResClient = GDrive.driveResClient(app)(signInAcc)
+
+            val onError = TaskWrap.onFailure { exc =>
+              // This may be normal if user has no backup at all
+              warnNoBackups(me prepareFreshWallet app.kit).run
+            }
+
+            val onBackup = TaskWrap.onSuccess[DriveContents] { contents =>
+              GDrive.decrypt(contents, secret = LNParams.cloudSecret) match {
+                case Success(gDriveBackupData) => useGDriveBackup(gDriveBackupData)
+                case _ => onError onFailure new Exception("Decryption has failed")
+              }
+            }
+
+            new TaskWrap[Void, DriveContents] sContinueWithTask syncTask apply { _ =>
+              val metaTask = GDrive.getMetaTask(driveResClient.getAppFolder, driveResClient, backupFileName)
+              GDrive.getFileTask(metaTask, driveResClient).addOnSuccessListener(onBackup).addOnFailureListener(onError)
+            }
+
+          case None =>
+            me prepareFreshWallet app.kit
+            UITask(app toast gdrive_disabled).run
+        }
+      }
+
+      def restoreAnyChannel(some: HasCommitments) = {
+        val chan = ChannelManager.createChannel(ChannelManager.operationalListeners, some)
+        // Restored channels have no local history and we can't guarantee watchtower has it
+        if (Channel isOperational chan) chan process ChannelManager.CMDLocalShutdown
+        app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
+        ChannelWrap put some
+        chan
+      }
+
+      def restoreClosedChannel(cd: ClosingData) = {
+        // Closing channels may have in-flight 2nd level HTLCs present
+        app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
+        restoreAnyChannel(cd)
+      }
+
+      def restoreChannel(some: HasCommitments) = some match {
+        case closing: ClosingData => restoreClosedChannel(closing)
+        case _ => restoreAnyChannel(some)
+      }
+
+      def useGDriveBackup(googleDriveBackup: GDriveBackup) = {
+        for (snapshot <- googleDriveBackup.clouds) app.olympus tellClouds snapshot
+        ChannelManager.all = for (data <- googleDriveBackup.chans) yield restoreChannel(data)
+        GDrive.updatePreferences(app, isEnabled = true, lastSave = System.currentTimeMillis)
+        me prepareFreshWallet app.kit
       }
     }
 }

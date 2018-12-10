@@ -36,15 +36,15 @@
     <string name="recent_txs">Recent transactions</string>
 
     <string name="channel_recovery_info">
-        Recovery tool retrieves available channel backups and uses them to reimburse locked funds back into your on-chain wallet.\n\nYou
-        should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds,
-        otherwise nothing will happen.\n\nUsing this tool does not affect open channels currently present on this device.
+        Olympus recovery tool downloads available channel backups and uses them to reimburse locked funds back into your on-chain wallet.\n\nYou should
+        expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds, otherwise nothing will
+        happen.\n\nUsing this tool does not affect open channels currently present on this device
     </string>
 
     <string name="tokens_warn"><![CDATA[
         Please note: this wallet uses paid <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>storage tokens</a> to store your encrypted channel backups and
         <a href=https://medium.com/@akumaigorodski/watchtower-support-is-coming-to-bitcoin-lightning-wallet-8f969ac206b2>secure off-chain balance</a> while your device is offline.
-        <br><br>An automatic Lightning payment of <i>%1$s</i> will acquire 50 storage tokens once your first channel becomes open.
+        <br><br>An automatic Lightning payment of <i>%1$s</i> will acquire 50 storage tokens once your first channel becomes open
     ]]></string>
 
     <string name="migrator_usage_warning"><![CDATA[
@@ -80,11 +80,18 @@
         <item><![CDATA[<small><i>backup disabled</i></small>]]></item>
     </array>
 
+    <!-- GDrive backups -->
+    <string name="gdrive_last_saved">Last save %1$s</string>
+    <string name="gdrive_failed">Backup saving has failed</string>
+    <string name="gdrive_disabled">GDrive backups are disabled</string>
+    <string name="gdrive_not_present">No backup is present yet</string>
+    <string name="sets_gdrive">Backup channels to GDrive</string>
+
     <!-- menu and fab -->
     <string name="sets_set_fiat">Set Fiat currency</string>
     <string name="sets_choose_unit">Choose Bitcoin unit</string>
     <string name="sets_manage_olympus">Manage Olympus servers</string>
-    <string name="sets_chan_recover">Use channel recovery tool</string>
+    <string name="sets_chan_recover">Olympus channel recovery</string>
     <string name="sets_migrator">Use wallet migration tool</string>
     <string name="sets_mnemonic">View mnemonic phrase</string>
     <string name="sets_rescan">Rescan blockchain</string>
@@ -104,9 +111,8 @@
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
 
     <string name="dialog_pr_making">Making payment request&#8230;</string>
+    <string name="olympus_recovering">Getting Olympus backups&#8230;</string>
     <string name="dialog_pr_expired">Expired payment request</string>
-    <string name="dialog_recovering">Recovering funds&#8230;</string>
-    <string name="dialog_sum_empty">Please provide an amount</string>
     <string name="dialog_sum_small">Amount is too small</string>
     <string name="dialog_sum_big">Amount is too large</string>
     <string name="dialog_pay_onchain">Pay on-chain</string>
@@ -121,20 +127,20 @@
     <!-- notifications -->
     <array name="info_progress">
         <item>Sync is complete</item>
-        <item><![CDATA[<font color=#FF9900>Sync: %1$d day behind</font>]]></item>
-        <item><![CDATA[<font color=#FF9900>Sync: %1$d days behind</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Sync: %1$d day behind</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Sync: %1$d days behind</font>]]></item>
     </array>
 
     <string name="btc_empty">No on-chain funds</string>
     <string name="ln_empty">No off-chain funds</string>
     <string name="btc_status_operational">Wallet is operational</string>
-    <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Connecting to peers&#8230;</font>]]></string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Connecting to peers&#8230;</font>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
 
-    <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
-    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
     <string name="btc_pending_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br><small>delayed channel refunding</small><br>%1$s<br><br>pending %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
     <string name="btc_refunding">Refunding transaction</string>
@@ -158,7 +164,7 @@
 
     <string name="ln_send_title_guaranteed"><![CDATA[<font color=#FFFFFF><strong>Guaranteed Delivery</strong><small><br><br>%1$s</small></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning Payment</strong></font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Send Bitcoin Transaction</strong></font>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Send Bitcoin Transaction</strong></font>]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><small><br><br>%1$s</small>]]></string>
@@ -170,7 +176,6 @@
     <string name="ln_no_open_chans">No open channels found</string>
 
     <string name="err_ln_peer_offline">Could not connect to remote peer at %1$s</string>
-    <string name="err_ln_no_data_loss_protect">Data loss protection is not provided by this peer</string>
     <string name="err_ln_remote_amount_high">Failed because payment amount is too high for your peer to accept</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum</string>
@@ -183,6 +188,7 @@
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
     <string name="err_ln_expired"><![CDATA[Expired payment detected<br><br>You may force close a related channel but a better approach would be to contact a faulty peer and let them sort this out<br><br><strong>Expired payment hash</strong><br>%1$s]]></string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
+    <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
     <string name="err_self_payment">Failed because payments to yourself are not allowed</string>
     <string name="err_general">Failed because an error has occurred</string>
@@ -240,6 +246,7 @@
 
     <string name="ln_info_funding">%1$s of %2$s</string>
     <string name="ln_info_close_coop">Closed cooperatively</string>
+    <string name="ln_info_unknown_spend">Unknown spend detected</string>
     <string name="ln_info_close_local">Force-closed by your wallet</string>
     <string name="ln_info_close_remote">Force-closed by remote peer</string>
     <string name="ln_info_no_receive">Receiving not yet enabled by peer</string>
@@ -249,12 +256,12 @@
     <string name="ln_info_nothing"><![CDATA[<i>nothing</i>]]></string>
 
     <string name="ln_info_status_open"><![CDATA[<font color=#6AAB38>OPEN</font>]]></string>
-    <string name="ln_info_status_opening"><![CDATA[<font color=#FF9900>OPENING</font>]]></string>
-    <string name="ln_info_status_shutdown"><![CDATA[<font color=#FF9900>SHUTDOWN</font>]]></string>
-    <string name="ln_info_status_negotiations"><![CDATA[<font color=#FF9900>NEGOTIATION</font>]]></string>
+    <string name="ln_info_status_opening"><![CDATA[<font color=#E68A00>OPENING</font>]]></string>
+    <string name="ln_info_status_shutdown"><![CDATA[<font color=#E68A00>SHUTDOWN</font>]]></string>
+    <string name="ln_info_status_negotiations"><![CDATA[<font color=#E68A00>NEGOTIATION</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
-    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved<br><br>It it not recommended to close a channel right now and let those stuck payments to eventually become failed or fulfilled, would you still like to proceed?]]></string>
+    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved<br><br>It it not recommended to close a channel right now and let those stuck payments to eventually become failed or fulfilled, would you still like to proceed?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; Note that closing right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closure</a> which requires additional fees and time, would you still like to proceed?]]></string>
     <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close this channel and send a refunding transaction to the following address?<br><br><strong>%1$s</strong><br><br>Please make sure that address is the right one as this action can not be undone]]></string>
     <string name="ln_chan_close_confirm_local">Do you want to close this channel and send a refunding transaction back to this wallet?</string>

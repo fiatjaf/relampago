@@ -1,5 +1,6 @@
 package com.lightning.walletapp.test
 
+import com.lightning.walletapp.ChannelManager
 import com.lightning.walletapp.helper.AES
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln._
@@ -8,7 +9,7 @@ import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.lnutils.{PaymentInfoWrap, RevokedInfoTable}
 import fr.acinq.bitcoin.{BinaryData, Transaction}
-import fr.acinq.bitcoin.Crypto.Point
+import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import scodec.DecodeResult
 import scodec.bits.BitVector
 
@@ -32,11 +33,11 @@ class RevokedInfoSpec {
   def allTests = {
     val serialized1 = LightningMessageCodecs.serialize(revocationInfoCodec encode ri)
     // Sent 3 outgoing payments in chan1
-    dbExt.change(RevokedInfoTable.newSql, txid1, chanId1, 1000000000L, serialized1)
-    dbExt.change(RevokedInfoTable.newSql, txid2, chanId1, 800000000L, serialized1)
-    dbExt.change(RevokedInfoTable.newSql, txid3, chanId1, 600000000L, serialized1)
+    db.change(RevokedInfoTable.newSql, txid1, chanId1, 1000000000L, serialized1)
+    db.change(RevokedInfoTable.newSql, txid2, chanId1, 800000000L, serialized1)
+    db.change(RevokedInfoTable.newSql, txid3, chanId1, 600000000L, serialized1)
     // Then got back an incoming payment in chan1
-    dbExt.change(RevokedInfoTable.newSql, txid4, chanId1, 900000000L, serialized1)
+    db.change(RevokedInfoTable.newSql, txid4, chanId1, 900000000L, serialized1)
 
 
     val c1 = Commitments(
@@ -66,13 +67,13 @@ class RevokedInfoSpec {
     }
 
 
-    dbExt.change(RevokedInfoTable.newSql, txid5, chanId2, 1000000000L, serialized1)
+    db.change(RevokedInfoTable.newSql, txid5, chanId2, 1000000000L, serialized1)
     // Attempted to send an outgoing payment in chan2
-    dbExt.change(RevokedInfoTable.newSql, txid6, chanId2, 500000000L, serialized1)
+    db.change(RevokedInfoTable.newSql, txid6, chanId2, 500000000L, serialized1)
     // But payment got rejected and refunded so we got our full balance back
     // We also sent another small payment which has also been rejected
-    dbExt.change(RevokedInfoTable.newSql, txid7, chanId2, 999999990L, serialized1)
-    dbExt.change(RevokedInfoTable.newSql, txid8, chanId2, 1000000000L, serialized1)
+    db.change(RevokedInfoTable.newSql, txid7, chanId2, 999999990L, serialized1)
+    db.change(RevokedInfoTable.newSql, txid8, chanId2, 1000000000L, serialized1)
 
 
     val c2 = Commitments(localParams = null,

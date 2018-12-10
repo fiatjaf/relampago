@@ -117,18 +117,25 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         val started = me time new Date(cs.startedAt)
         val breakFee = Satoshi(cs.reducedRemoteState.myFeeSat)
         val txDepth \ _ = LNParams.broadcaster.getStatus(fundTxId)
-        val canSendMsat \ canReceiveMsat = estimateCanSend(chan) -> estimateCanReceive(chan)
+        val canReceiveMsat = estimateCanReceive(chan)
+        val canSendMsat = estimateCanSend(chan)
+
+        val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
         val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amount.amount).sum / 1000L)
         val refundable = Satoshi(Commitments.latestRemoteCommit(cs).spec.toRemoteMsat / 1000L)
-        val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
         val valueReceived = Satoshi(getStat(cs.channelId, 1) / 1000L)
         val valueSent = Satoshi(getStat(cs.channelId, 0) / 1000L)
 
         val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
-        val reserveAndFee = cs.reducedRemoteState.myFeeSat + cs.remoteParams.channelReserveSatoshis
-        baseBar setSecondaryProgress (barCanSend + canReceiveMsat / capacity.amount).toInt
-        overBar setProgress (reserveAndFee * 1000L / capacity.amount).toInt
+        val barCanReceive = barCanSend + canReceiveMsat / capacity.amount
+
+        // For incoming chans reserveAndFee is reserve only since fee is zero
+        val reserveAndFee = breakFee.amount + cs.remoteParams.channelReserveSatoshis
+        val barLocalReserve = math.min(barCanSend, reserveAndFee * 1000L / capacity.amount)
+
         baseBar setProgress barCanSend.toInt
+        baseBar setSecondaryProgress barCanReceive.toInt
+        overBar setProgress barLocalReserve.toInt
 
         startedAtText setText started.html
         fundingDepthText setText fundingInfo.format(txDepth, threshold)
@@ -152,9 +159,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             visibleExcept(R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive, R.id.closedAt,
               R.id.paymentsSent, R.id.paymentsReceived, R.id.paymentsInFlight)
 
-          case _: NormalData if isOperational(chan) =>
-            val canNotReceive = txDepth > 6 && channelAndHop(chan).isEmpty
-            if (canNotReceive) setExtraInfo(resource = ln_info_no_receive)
+          case norm: NormalData if isOperational(chan) =>
+            if (txDepth > 6 && channelAndHop(chan).isEmpty) setExtraInfo(resource = ln_info_no_receive)
+            if (norm.unknownSpend.isDefined) setExtraInfo(resource = ln_info_unknown_spend)
             visibleExcept(R.id.fundingDepth, R.id.closedAt)
 
           case _: NormalData | _: NegotiationsData =>
@@ -211,7 +218,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
           def viewFunding =
             host startActivity new Intent(Intent.ACTION_VIEW,
-              Uri parse s"https://smartbit.com.au/tx/$fundTxId")
+              Uri parse s"https://testnet.smartbit.com.au/tx/$fundTxId")
 
           lst setOnItemClickListener onTap {
             case 3 => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
@@ -288,7 +295,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def getStat(chanId: BinaryData, direction: Int) = {
     // Direction = 0 = untgoing = lastMast, = 1 = incoming = firstMsat
-    val cursor = LNParams.dbExt.select(PaymentTable.selectStatSql, chanId, direction)
+    val cursor = LNParams.db.select(PaymentTable.selectStatSql, chanId, direction)
     RichCursor(cursor) headTry { case RichCursor(с1) => с1 getLong direction } getOrElse 0L
   }
 }

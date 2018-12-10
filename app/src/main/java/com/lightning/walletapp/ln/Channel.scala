@@ -26,7 +26,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     override def onProcessSuccess = { case ps => for (lst <- listeners if lst.onProcessSuccess isDefinedAt ps) lst onProcessSuccess ps }
     override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
-
     override def fulfillReceived(updateFulfill: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived updateFulfill
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
     override def settled(cs: Commitments) = for (lst <- listeners) lst settled cs
@@ -81,12 +80,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           throw new LightningException("Their proposed channel reserve is too high relative to capacity")
 
         val firstPerCommitPoint = Generators.perCommitPoint(localParams.shaSeed, 0L)
-        val accept = AcceptChannel(open.temporaryChannelId, localParams.dustLimit.amount,
-          localParams.maxHtlcValueInFlightMsat, localParams.channelReserveSat, LNParams.minDepth,
-          LNParams.minHtlcValue.amount, localParams.toSelfDelay, localParams.maxAcceptedHtlcs,
-          localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint,
-          localParams.paymentBasepoint, localParams.delayedPaymentBasepoint,
-          localParams.htlcBasepoint, firstPerCommitPoint)
+        val accept = AcceptChannel(temporaryChannelId = open.temporaryChannelId, dustLimitSatoshis = localParams.dustLimit.amount,
+          maxHtlcValueInFlightMsat = localParams.maxHtlcValueInFlightMsat, channelReserveSatoshis = localParams.channelReserveSat,
+          htlcMinimumMsat = LNParams.minHtlcValue.amount, minimumDepth = LNParams.minDepth, toSelfDelay = localParams.toSelfDelay,
+          maxAcceptedHtlcs = localParams.maxAcceptedHtlcs, localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint,
+          localParams.paymentBasepoint, localParams.delayedPaymentBasepoint, localParams.htlcBasepoint, firstPerCommitPoint)
 
         BECOME(WaitFundingCreatedRemote(announce, localParams, remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis,
           open.maxHtlcValueInFlightMsat, open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = 6, open.toSelfDelay, open.maxAcceptedHtlcs,
@@ -326,43 +324,48 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SHUTDOWN in WAIT_FUNDING_DONE
 
 
-      case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), WAIT_FUNDING_DONE | SLEEPING) =>
-        // We have decided to cooperatively close this channel before it has reached a minmum depth
-        val finalKey = scriptPubKey getOrElse wait.commitments.localParams.defaultFinalScriptPubKey
-        startShutdown(NormalData(wait.announce, wait.commitments), finalKey)
+      case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), WAIT_FUNDING_DONE) =>
+        val finalScriptPubKey = scriptPubKey getOrElse wait.commitments.localParams.defaultFinalScriptPubKey
+        val localShutdown = Shutdown(wait.commitments.channelId, scriptPubKey = finalScriptPubKey)
+        val norm = NormalData(wait.announce, wait.commitments, Some(localShutdown), None)
+        BECOME(me STORE norm, OPEN) SEND localShutdown
+
+
+      case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), SLEEPING) =>
+        val finalScriptPubKey = scriptPubKey getOrElse wait.commitments.localParams.defaultFinalScriptPubKey
+        val localShutdown = Shutdown(wait.commitments.channelId, scriptPubKey = finalScriptPubKey)
+        val norm = NormalData(wait.announce, wait.commitments, Some(localShutdown), None)
+        BECOME(me STORE norm, SLEEPING) SEND localShutdown
 
 
       case (wait: WaitFundingDoneData, remote: Shutdown, WAIT_FUNDING_DONE) =>
-        // They have decided to close our channel before it reached a min depth
-
-        val norm = NormalData(wait.announce, wait.commitments)
-        val norm1 = norm.modify(_.remoteShutdown) setTo Some(remote)
-        // We just got their Shutdown so we add ours and start negotiations
-        startShutdown(norm1, wait.commitments.localParams.defaultFinalScriptPubKey)
+        val localShutdown = Shutdown(wait.commitments.channelId, wait.commitments.localParams.defaultFinalScriptPubKey)
+        val norm = NormalData(wait.announce, wait.commitments, Some(localShutdown), Some(remote), None)
+        BECOME(me STORE norm, OPEN) SEND localShutdown
         doProcess(CMDProceed)
 
 
       // SHUTDOWN in OPEN
 
 
-      case (norm @ NormalData(_, commitments, our, their), CMDShutdown(scriptPubKey), OPEN | SLEEPING) =>
-        // We may have unsigned outgoing HTLCs or already have tried to close this channel cooperatively
-        val nope = our.isDefined | their.isDefined | Commitments.localHasUnsignedOutgoing(commitments)
-        val finalKey = scriptPubKey getOrElse commitments.localParams.defaultFinalScriptPubKey
-        if (nope) startLocalClose(norm) else startShutdown(norm, finalKey)
+      case (norm @ NormalData(announce, commitments, our, their, txOpt), CMDShutdown(scriptPubKey), OPEN | SLEEPING) =>
+        if (Commitments.localHasUnsignedOutgoing(commitments) | our.isDefined | their.isDefined) startLocalClose(norm) else {
+          val localShutdown = Shutdown(commitments.channelId, scriptPubKey getOrElse commitments.localParams.defaultFinalScriptPubKey)
+          val norm1 = me STORE NormalData(announce, commitments, Some(localShutdown), their, txOpt)
+          me UPDATA norm1 SEND localShutdown
+        }
 
 
       // Either they initiate a shutdown or respond to the one we have sent
-      // should sign our unsigned outgoing HTLCs if present and then start shutdown
-      case (norm @ NormalData(_, commitments, _, None), remote: Shutdown, OPEN) =>
-
-        val d1 = norm.modify(_.remoteShutdown) setTo Some(remote)
-        val canNotShutdown = Commitments.remoteHasUnsignedOutgoing(commitments)
-        if (canNotShutdown) startLocalClose(norm) else me UPDATA d1 doProcess CMDProceed
+      // should sign our unsigned outgoing HTLCs if present and then proceed with shutdown
+      case (norm @ NormalData(announce, commitments, our, None, txOpt), remote: Shutdown, OPEN) =>
+        val norm = NormalData(announce, commitments, our, remoteShutdown = Some(remote), txOpt)
+        if (Commitments remoteHasUnsignedOutgoing commitments) startLocalClose(norm)
+        else me UPDATA norm doProcess CMDProceed
 
 
       // We have nothing to sign so check if maybe we are in valid shutdown state
-      case (norm @ NormalData(announce, commitments, our, their), CMDProceed, OPEN)
+      case (norm @ NormalData(announce, commitments, our, their, txOpt), CMDProceed, OPEN)
         // GUARD: only consider this if we have nothing in-flight
         if inFlightHtlcs(me).isEmpty =>
 
@@ -378,10 +381,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
             val neg = NegotiationsData(announce, commitments, ourSig, theirSig, Nil)
             BECOME(me STORE neg, NEGOTIATIONS)
 
-          case None \ theirSigOpt if theirSigOpt.isDefined =>
+          case None \ Some(theirSig) =>
             // We have previously received their Shutdown so can respond
             // send CMDProceed once to make sure we still have nothing to sign
-            startShutdown(norm, commitments.localParams.defaultFinalScriptPubKey)
+            val localShutdown = Shutdown(norm.commitments.channelId, commitments.localParams.defaultFinalScriptPubKey)
+            val norm1 = me STORE NormalData(announce, commitments, Some(localShutdown), Some(theirSig), txOpt)
+            me UPDATA norm1 SEND localShutdown
             doProcess(CMDProceed)
 
           // Not ready
@@ -578,7 +583,15 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case (Some(claim), _, _) => me CLOSEANDWATCHREVHTLC ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil)
           case (_, Left(nextRemote), _) if nextRemote.txid == tx.txid => startRemoteNextClose(some, nextRemote)
           case _ if some.commitments.remoteCommit.txid == tx.txid => startRemoteCurrentClose(some)
-          case _ => startLocalClose(some)
+
+          case (_, _, norm: NormalData) =>
+            // May happen when old snapshot is used two times in a row
+            val d1 = me STORE norm.copy(unknownSpend = Some apply tx)
+            me UPDATA d1
+
+          case _ =>
+            // Nothing left to do here so at least inform user
+            throw new LightningException("Unknown spend detected")
         }
 
 
@@ -638,12 +651,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     BECOME(me STORE NormalData(wait.announce, c1), OPEN)
   }
 
-  private def startShutdown(norm: NormalData, finalScriptPubKey: BinaryData) = {
-    val localShutdownMessage = Shutdown(norm.commitments.channelId, finalScriptPubKey)
-    val norm1 = norm.modify(_.localShutdown) setTo Some(localShutdownMessage)
-    BECOME(me STORE norm1, OPEN) SEND localShutdownMessage
-  }
-
   private def startMutualClose(some: HasCommitments, tx: Transaction) = some match {
     case closingData: ClosingData => BECOME(me STORE closingData.copy(mutualClose = tx +: closingData.mutualClose), CLOSING)
     case neg: NegotiationsData => BECOME(me STORE ClosingData(neg.announce, neg.commitments, neg.localProposals, tx :: Nil), CLOSING)
@@ -700,7 +707,7 @@ object Channel {
   }
 
   def isOperational(chan: Channel) = chan.data match {
-    case NormalData(_, _, None, None) => true
+    case NormalData(_, _, None, None, _) => true
     case _ => false
   }
 
@@ -711,8 +718,8 @@ object Channel {
 }
 
 case class ChanReport(chan: Channel, cs: Commitments) {
-  def estimateFinalCanSend: Long = estimateCanSend(chan) - softReserve.amount * 1000L
-  val softReserve = if (cs.localParams.isFunder) cs.commitInput.txOut.amount / 50L else Satoshi(0L)
+  def estimateFinalCanSend = estimateCanSend(chan) - softReserve.amount * 1000L
+  val softReserve = if (cs.localParams.isFunder) cs.commitInput.txOut.amount / 100L else Satoshi(0L)
 }
 
 trait ChannelListener {

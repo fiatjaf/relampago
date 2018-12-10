@@ -13,9 +13,6 @@ trait FirstActivity { me: TimerActivity =>
   def prepareFreshWallet(kit: app.WalletKit) = {
     kit.store = new SPVBlockStore(app.params, app.chainFile)
     kit.useCheckPoints(kit.wallet.getEarliestKeyCreationTime)
-    LNParams.setup(kit.wallet.getKeyChainSeed.getSeedBytes)
-
-    // Complete initialization
     kit.blockChain = new BlockChain(app.params, kit.wallet, kit.store)
     kit.peerGroup = new PeerGroup(app.params, kit.blockChain)
 
@@ -23,9 +20,8 @@ trait FirstActivity { me: TimerActivity =>
     kit.wallet.currentAddress(org.bitcoinj.wallet.KeyChain.KeyPurpose.RECEIVE_FUNDS)
     kit.wallet.currentAddress(org.bitcoinj.wallet.KeyChain.KeyPurpose.CHANGE)
     kit.wallet.saveToFile(app.walletFile)
-
-    kit.setupAndStartDownload
     me exitTo MainActivity.wallet
+    kit.setupAndStartDownload
   }
 }
 
@@ -36,6 +32,8 @@ class WalletCreateActivity extends TimerActivity with FirstActivity {
     app.kit = new app.WalletKit {
       override def startUp: Unit = {
         wallet = new Wallet(app.params)
+        val freshSeed = wallet.getKeyChainSeed
+        LNParams setup freshSeed.getSeedBytes
         prepareFreshWallet(this)
       }
     }

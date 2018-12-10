@@ -20,6 +20,24 @@
         app:contentInsetStart="@dimen/app_padding"
         app:contentInsetEnd="@dimen/app_padding"/>
 
+    <CheckBox
+        style="@style/Info"
+        android:layout_marginTop="25dp"
+        android:layout_gravity="center"
+        android:id="@+id/gDriveBackups"
+        android:layout_width="wrap_content"
+        android:text="@string/sets_gdrive"
+        android:onClick="onGDrive"/>
+
+    <TextView
+        style="@style/Info"
+        android:layout_gravity="center"
+        android:layout_marginBottom="25dp"
+        android:id="@+id/gDriveBackupState"
+        android:layout_width="wrap_content"/>
+
+    <View style="@style/GrayDivider"/>
+
     <Button
         style="@style/TransButton"
         android:id="@+id/setFiatCurrency"

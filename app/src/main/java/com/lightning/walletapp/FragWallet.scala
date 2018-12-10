@@ -113,12 +113,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // To fight spamming
   private[this] var errorLimit = 5
-  private[this] var openMessageLimit = 5
+  private[this] var lastOpenMsecStamp = 0L
 
   val connectionListener = new ConnectionListener {
-    override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-      case open: OpenChannel if openMessageLimit > 0 && open.channelFlags == 0.toByte =>
-        def proceed: Unit = ConnectionManager.connections get nodeId foreach { worker =>
+    override def onMessage(nodeId: PublicKey, incomingMessage: LightningMessage) = incomingMessage match {
+      case open: OpenChannel if System.currentTimeMillis > lastOpenMsecStamp + 15000L && open.channelFlags == 0.toByte =>
+        // We only consider incoming channels if they are private and last message arrived more than 15 seconds ago
+
+        def proceed = ConnectionManager.connections get nodeId foreach { worker =>
           val nodeView = HardcodedNodeView(worker.ann, StartNodeView.incomingChannel)
           app.TransData.value = IncomingChannelParams(nodeView, open)
           host goTo classOf[LNStartFundActivity]
@@ -129,7 +131,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           val capacity = denom withSign MilliSatoshi(open.fundingSatoshis * 1000L)
           val title = app.getString(ln_ops_start_fund_incoming_title).format(yourBalance, capacity).html
           mkCheckForm(alert => rm(alert)(proceed), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
-          openMessageLimit -= 1
+          lastOpenMsecStamp = System.currentTimeMillis
         }.run
 
       case _ =>
@@ -304,7 +306,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       viewTxOutside setOnClickListener onButtonTap {
         val parentCommitTxid = stat.commitTx.txid.toString
-        val uri = s"https://smartbit.com.au/tx/$parentCommitTxid"
+        val uri = s"https://testnet.smartbit.com.au/tx/$parentCommitTxid"
         host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
       }
 
@@ -426,31 +428,25 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
       val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
-      val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
 
       val color = if (wrap.visibleValue.isPositive) coloredIn else coloredOut
-      val humanOutputs = wrap directedScriptPubKeysWithValueTry wrap.visibleValue.isPositive collect {
+      val humanOutputs = wrap.directedScriptPubKeysWithValueTry(wrap.visibleValue.isPositive) collect {
         case Success(chanFunding \ value) if chanFunding.isSentToP2WSH => P2WSHData(value, chanFunding).destination(coloredChan).html
         case Success(pks \ value) if !ScriptPattern.isOpReturn(pks) => AddrData(value, pks getToAddress app.params).destination(color).html
       }
 
-      val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip,
-        humanOutputs.toArray) { override def isEnabled(pos: Int) = false }
+      viewTxOutside setOnClickListener onButtonTap {
+        val uri = s"https://testnet.smartbit.com.au/tx/" + wrap.tx.getHashAsString
+        host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
+      }
 
+      viewShareBody setOnClickListener onButtonTap { host share BinaryData(wrap.tx.unsafeBitcoinSerialize).toString }
+      val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, humanOutputs.toArray) { override def isEnabled(pos: Int) = false }
+      val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
       lst setHeaderDividersEnabled false
       lst addHeaderView detailsWrapper
       lst setAdapter views
       lst setDivider null
-
-      viewTxOutside setOnClickListener onButtonTap {
-        val uri = s"https://smartbit.com.au/tx/" + wrap.tx.getHashAsString
-        host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
-      }
-
-      viewShareBody setOnClickListener onButtonTap {
-        val rawTransaction = wrap.tx.unsafeBitcoinSerialize
-        host share BinaryData(rawTransaction).toString
-      }
 
       val header = wrap.fee match {
         case _ if wrap.visibleValue.isPositive =>
@@ -509,8 +505,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimg, nodePrivateKey, info, Some(app.kit.currentAddress.toString), routes)
       val rd = emptyRD(pr, sum.amount, useCache = true)
 
-      dbExt.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.pr.paymentHash)
-      dbExt.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
+      db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.pr.paymentHash)
+      db.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
         pr.description, rd.pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
 
       app.TransData.value = pr
@@ -520,7 +516,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def recAttempt(alert: AlertDialog) = rateManager.result match {
       case Success(ms) if maxCanReceive < ms => app toast dialog_sum_big
       case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
-      case Failure(reason) => app toast dialog_sum_empty
+      case Failure(reason) => app toast dialog_sum_small
 
       case Success(ms) => rm(alert) {
         // Requests without amount are not allowed for now
@@ -582,7 +578,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           case Success(ms) \ Some(relayable \ _) if relayable < ms && JointNode.hasRelayPeerOnly => app toast dialog_sum_big
           case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
           case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
-          case Failure(emptyAmount) \ _ => app toast dialog_sum_empty
+          case Failure(emptyAmount) \ _ => app toast dialog_sum_small
 
           case Success(ms) \ Some(relayable \ chanBalInfo) if ms <= relayable => rm(alert) {
             // We have obtained a (Joint -> payee) route out of band so we can use it right away
@@ -651,7 +647,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def sendAttempt(alert: AlertDialog): Unit = rateManager.result match {
       case Success(ms) if MIN isGreaterThan ms => app toast dialog_sum_small
-      case Failure(probablyEmptySum) => app toast dialog_sum_empty
+      case Failure(probablyEmptySum) => app toast dialog_sum_small
       case Success(ms) => rm(alert)(next(ms).start)
     }
 
@@ -694,7 +690,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def react = getSupportLoaderManager.restartLoader(1, null, loaderCallbacks).forceLoad
-  host.getContentResolver.registerContentObserver(dbExt sqlPath PaymentTable.table, true, observer)
+  host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
 
   host setSupportActionBar toolbar
   toolbar setOnClickListener onButtonTap {

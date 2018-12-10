@@ -361,15 +361,11 @@ object LightningMessageCodecs { me =>
       (publicKey withContext "remoteRevocationPubkey") ::
       (publicKey withContext "remoteDelayedPaymentKey")
 
-  val revocationInfoCodec = revocationInfo.as[RevocationInfo]
-
   private val walletZygote =
-    (varsizebinarydataLong withContext "dbCore") ::
-      (varsizebinarydataLong withContext "dbExt") ::
+    (uint16 withContext "v") ::
+      (varsizebinarydataLong withContext "db") ::
       (varsizebinarydataLong withContext "wallet") ::
       (varsizebinarydataLong withContext "chain")
-
-  val walletZygoteCodec = walletZygote.as[WalletZygote]
 
   private val aesZygote =
     (uint16 withContext "v") ::
@@ -382,5 +378,7 @@ object LightningMessageCodecs { me =>
     (vectorOfN(uint16, aesZygoteCodec) withContext "payloads") ::
       (vectorOfN(uint16, zeropaddedstring) withContext "halfTxIds")
 
+  val walletZygoteCodec = walletZygote.as[WalletZygote]
+  val revocationInfoCodec = revocationInfo.as[RevocationInfo]
   val cerberusPayloadCodec = cerberusPayload.as[CerberusPayload]
 }

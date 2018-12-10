@@ -54,9 +54,8 @@ class LNStartFundActivity extends TimerActivity { me =>
     lnStartFundDetails setText asString.html
 
     class OpenListener extends ConnectionListener with ChannelListener {
-      val noLossProtect = new LightningException(me getString err_ln_no_data_loss_protect)
       val peerOffline = new LightningException(me getString err_ln_peer_offline format ann.addresses.head.toString)
-      override def onIncompatible(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> noLossProtect)
+      override def onIncompatible(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
       override def onTerminalError(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
 
@@ -108,11 +107,11 @@ class LNStartFundActivity extends TimerActivity { me =>
       // error here will halt all further progress
       freshChan STORE some
 
+      app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
       // Start watching a channel funding script and save a channel, order an encrypted backup upload
-      app.kit.wallet.addWatchedScripts(Collections singletonList some.commitments.commitInput.txOut.publicKeyScript)
-      val encrypted = AES.encReadable2Hex(RefundingData(some.announce, None, some.commitments).toJson.toString, LNParams.cloudSecret)
-      val channelUploadAct = ChannelUploadAct(encrypted, Seq("key" -> LNParams.cloudId.toString), "data/put", some.announce.alias)
-      app.olympus tellClouds channelUploadAct
+      val encrypted = AES.encReadable(RefundingData(some.announce, None, some.commitments).toJson.toString, LNParams.cloudSecret)
+      val chanUpload = ChannelUploadAct(encrypted.toHex, Seq("key" -> LNParams.cloudId.toString), "data/put", some.announce.alias)
+      app.olympus.tellClouds(chanUpload)
     }
 
     def localWalletListener = new LocalOpenListener {
@@ -149,7 +148,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           case Success(ms) if ms < minCap => app toast dialog_sum_small
           case Success(ms) if ms > maxCap => app toast dialog_sum_big
           case Success(ms) => rm(alert)(next(ms).start)
-          case _ => app toast dialog_sum_empty
+          case _ => app toast dialog_sum_small
         }
 
         def useMax(alert: AlertDialog) = rateManager setSum Try(maxCap)

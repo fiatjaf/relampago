@@ -16,7 +16,6 @@ import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
 import android.widget.AdapterView.OnItemClickListener
 import concurrent.ExecutionContext.Implicits.global
 import com.lightning.walletapp.ln.LNParams.minDepth
-import com.lightning.walletapp.lnutils.RatesSaver
 import android.support.v7.app.AppCompatActivity
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.View.OnClickListener
@@ -28,9 +27,10 @@ import scala.concurrent.Future
 import android.content.Intent
 import android.os.Bundle
 
-import android.content.DialogInterface.{BUTTON_NEUTRAL, BUTTON_POSITIVE, BUTTON_NEGATIVE}
-import com.lightning.walletapp.lnutils.IconGetter.{scrWidth, maxDialog}
-import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
+import android.content.DialogInterface.{BUTTON_NEGATIVE, BUTTON_NEUTRAL, BUTTON_POSITIVE}
+import com.lightning.walletapp.lnutils.IconGetter.{maxDialog, scrWidth}
+import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
+import com.lightning.walletapp.lnutils.{GDrive, RatesSaver}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
@@ -45,8 +45,7 @@ object Utils {
   var fiatCode: String = _
 
   final val fileName = "SegwitMainnet"
-  final val dbCoreFile = s"$fileName.db"
-  final val dbExtFile = s"Ext$fileName.db"
+  final val dbFileName = s"$fileName.db"
   final val walletFileName = s"$fileName.wallet"
   final val chainFileName = s"$fileName.spvchain"
 
@@ -105,6 +104,11 @@ trait TimerActivity extends AppCompatActivity { me =>
   val exitTo: Class[_] => Any = target => {
     me startActivity new Intent(this, target)
     runAnd(app.TransData.DoNotEraseValue)(finish)
+  }
+
+  def askGDriveSignIn = {
+    val signInClient = GDrive signInAttemptClient me
+    startActivityForResult(signInClient.getSignInIntent, 102)
   }
 
   def finishMe(top: View) = finish

@@ -36,7 +36,7 @@
     <string name="recent_txs">Недавние транзакции</string>
 
     <string name="channel_recovery_info">
-        Восстановитель каналов скачивает резервные копии ваших потерянных каналов с бэкап-серверов и использует
+        Восстановитель скачивает резервные копии ваших потерянных каналов с бэкап-серверов и использует
         их для возмещения средств обратно в ваш ончейн кошелек.\n\nОжидайте возвратной транзакции вскоре после 
         запуска восстановителя если у вас есть потерянные каналы с деньгами
     </string>
@@ -48,8 +48,7 @@
     ]]></string>
 
     <string name="migrator_usage_warning"><![CDATA[
-        Мигратор создает файл-снапшот, который потом можно будет использовать для полного восстановления кошелька.<br><br>
-        Мигратор следует использовать если вы хотите перенести кошелек с одного телефона на другой или удалить кошелек чтобы вскоре его восстановить.
+        Файл-снапшот можно создать если вы хотите перенести кошелек с одного телефона на другой или удалить кошелек чтобы вскоре его восстановить.
         <br><br>Файл-снапшот <strong>НЕ НУЖНО</strong> использовать для долговременного хранения или для создания множественных копий одного и
         того же кошелька на нескольких телефонах!<br><br>Файл-снапшот <string>НЕ ЗАШИФРОВАН</string>, поэтому не храните его в публичных местах.
     ]]></string>
@@ -77,12 +76,19 @@
         <item><![CDATA[<small><i>бэкап отключен</i></small>]]></item>
     </array>
 
+    <!-- GDrive backups -->
+    <string name="gdrive_disabled">Бекапы в GDrive отключены</string>
+    <string name="gdrive_not_present">Бекап пока отсутствует</string>
+    <string name="gdrive_last_saved">Последнее сохранение %1$s</string>
+    <string name="gdrive_failed">Не получилось сохранить бекап</string>
+    <string name="sets_gdrive">Бекапы каналов в GDrive</string>
+
     <!-- menu and fab -->
     <string name="sets_set_fiat">Выбрать валюту</string>
     <string name="sets_choose_unit">Выбрать Биткоин-юнит</string>
-    <string name="sets_manage_olympus">Настроить бэкап-сервера</string>
+    <string name="sets_manage_olympus">Настроить бекап-сервера</string>
     <string name="sets_chan_recover">Восстановитель каналов</string>
-    <string name="sets_migrator">Сохранить снимок кошелька</string>
+    <string name="sets_migrator">Сохранить файл-снапшот</string>
     <string name="sets_mnemonic">Мнемонический код</string>
     <string name="sets_rescan">Рескан блокчейна</string>
 
@@ -101,9 +107,8 @@
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
 
     <string name="dialog_pr_making">Создаю платежный запрос&#8230;</string>
+    <string name="olympus_recovering">Getting Olympus backups&#8230;</string>
     <string name="dialog_pr_expired">Этот платежный запрос устарел</string>
-    <string name="dialog_recovering">Восстанавливаю деньги&#8230;</string>
-    <string name="dialog_sum_empty">Укажите сумму платежа</string>
     <string name="dialog_sum_small">Сумма слишком мала</string>
     <string name="dialog_sum_big">Сумма слишком велика</string>
     <string name="dialog_pay_onchain">На цепи</string>
@@ -118,23 +123,23 @@
     <!-- notifications -->
     <array name="info_progress">
         <item>Синхронизация завершена</item>
-        <item><![CDATA[<font color=#FF9900>Синхронизация %1$d день</font>]]></item>
-        <item><![CDATA[<font color=#FF9900>Синхронизация %1$d дня</font>]]></item>
-        <item><![CDATA[<font color=#FF9900>Синхронизация %1$d дней</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Синхронизация %1$d день</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Синхронизация %1$d дня</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Синхронизация %1$d дней</font>]]></item>
     </array>
 
     <string name="btc_empty">Нет монет на цепи</string>
     <string name="ln_empty">Нет монет в каналах</string>
     <string name="btc_status_operational">Кошелек онлайн</string>
-    <string name="btc_status_connecting"><![CDATA[<font color=#FF9900>Поиск узлов&#8230;</font>]]></string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Поиск узлов&#8230;</font>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
 
-    <string name="btc_incoming_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
-    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
-    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
-    <string name="btc_pending_title"><![CDATA[<font color=#FF9900><strong>Возврат денег из канала</strong></font><br>%1$s<br><br>сумма %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
+    <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
+    <string name="btc_pending_title"><![CDATA[<font color=#E68A00><strong>Возврат денег из канала</strong></font><br>%1$s<br><br>сумма %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
     <string name="btc_refunding">Отложенная транзакция</string>
 
     <string name="txs_sum_chan"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
@@ -157,11 +162,11 @@
 
     <string name="ln_send_title_guaranteed"><![CDATA[<font color=#FFFFFF><strong>Гарантированная доставка</strong><small><br><br>%1$s</small></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_send_title"><![CDATA[<font color=#FF9900><strong>Послать Биткоин-транзакцию</strong></font>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послать Биткоин-транзакцию</strong></font>]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запрос-Молния</font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Биткоин-транзакция</font><small><br><br>создать QR-код с обычным адресом для получения ончейн Биткоин-транзакций</small>]]></string>
+    <string name="btc_receive_option"><![CDATA[<font color=#E68A00>Биткоин-транзакция</font><small><br><br>создать QR-код с обычным адресом для получения ончейн Биткоин-транзакций</small>]]></string>
     <string name="ln_receive_6conf"><![CDATA[&#9888; Входящие платежи-Молнии пока невозможны потому что ваш пир еще не готов. Как правило пиры становятся готовы как только наполняющая канал Биткоин-транзакция получает 6 подтверждений]]></string>
     <string name="ln_receive_reserve"><![CDATA[&#9888; Входящие платежи-Молнии пока невозможны потому что для начала вам нужно потратить хотя-бы %1$s чтобы освободить место для получения денег]]></string>
     <string name="ln_receive_ok">Cоздать QR-код с одноразовым запросом для получения быстрых оффчейн-платежей</string>
@@ -169,7 +174,6 @@
     <string name="ln_no_open_chans">Нет открытых каналов</string>
 
     <string name="err_ln_peer_offline">Не удалось подключиться к узлу %1$s</string>
-    <string name="err_ln_no_data_loss_protect">Узел не защищает от утери данных</string>
     <string name="err_ln_remote_amount_high">Не получилось потому что сумма платежа слишком высока для вашего пира</string>
     <string name="err_ln_remote_amount_low">Не получилось потому что сумма платежа слишком низка для вашего пира</string>
     <string name="err_ln_amount_overflow">Не получилось потому что сумма платежа превышет допустимый предел</string>
@@ -181,8 +185,9 @@
     <string name="err_ln_second_reserve"><![CDATA[Не получилось потому что баланс слишком низкий с учетом софт-резерва<br><br>%1$s<br><br>хард-резерв %2$s<br>софт-резерв %3$s<br><br>емоксть %4$s<br>лимит %5$s<br>sending %6$s]]></string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Недостаточно средств</strong><br><br>доступно %1$s<br>отправлено %2$s<br>не хватает %3$s<br>в ожидании %4$s<br><br>Учтите что входящие Биткоин-транзакции можно тратить только после того как они получат хотя-бы одно подтверждение]]></string>
     <string name="err_ln_expired"><![CDATA[Есть застрявший платеж<br><br>Вы можете принудительно закрыть канал или связаться с пиром, чтобы он исправил проблему<br><br>Хэш платежа<br>%1$s]]></string>
-    <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой. Попробуйте разбить ее на несколько более мелких транзакций</string>
     <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии. Вы можете добавить денег в кошелек и попробовать еше раз</string>
+    <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой. Попробуйте разбить ее на несколько более мелких транзакций</string>
+    <string name="err_gdrive_sign_in_failed">Не получилось залогиниться в GDrive, хотите продолжить без восстановления каналов из бекапов GDrive?</string>
     <string name="err_self_payment">Не получилось потому что вы пытаетесь отправить платеж самому себе</string>
     <string name="err_general">Не получилось потому что произошла непредвиденная ошибка</string>
     <string name="err_no_data">Ничего не найдено</string>
@@ -241,19 +246,20 @@
     <string name="ln_info_close_coop">Закрыт кооперативно</string>
     <string name="ln_info_close_remote">Закрыт удаленным узлом</string>
     <string name="ln_info_close_local">Закрыт вашим кошельком</string>
-    <string name="ln_info_no_receive">Receiving is not enabled by peer</string>
     <string name="ln_info_coop_attempt">Канал закрывается&#8230;</string>
+    <string name="ln_info_unknown_spend">Обнарежена неизвестная трата</string>
+    <string name="ln_info_no_receive">Receiving is not enabled by peer</string>
     <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>отключен</small></font>]]></string>
     <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>онлайн</small></font>]]></string>
     <string name="ln_info_nothing"><![CDATA[<i>ничего</i>]]></string>
 
     <string name="ln_info_status_open"><![CDATA[<font color=#6AAB38>ОТКРЫТ</font>]]></string>
-    <string name="ln_info_status_opening"><![CDATA[<font color=#FF9900>ОТКРЫВАЕТСЯ</font>]]></string>
-    <string name="ln_info_status_shutdown"><![CDATA[<font color=#FF9900>ЗАКРЫВАЕТСЯ</font>]]></string>
-    <string name="ln_info_status_negotiations"><![CDATA[<font color=#FF9900>ПЕРЕГОВОРЫ</font>]]></string>
+    <string name="ln_info_status_opening"><![CDATA[<font color=#E68A00>ОТКРЫВАЕТСЯ</font>]]></string>
+    <string name="ln_info_status_shutdown"><![CDATA[<font color=#E68A00>ЗАКРЫВАЕТСЯ</font>]]></string>
+    <string name="ln_info_status_negotiations"><![CDATA[<font color=#E68A00>ПЕРЕГОВОРЫ</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
-    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#FF9900>В канале есть зависшие платежи</font> поэтому кооперативное закрытие будет отложено пока они не исчезнут<br><br>Рекомендуется не закрывать канал прямо сейчас, а вместо этого дать зависшим платежам некоторое время, все еще хотите продолжить?]]></string>
+    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В канале есть зависшие платежи</font> поэтому кооперативное закрытие будет отложено пока они не исчезнут<br><br>Рекомендуется не закрывать канал прямо сейчас, а вместо этого дать зависшим платежам некоторое время, все еще хотите продолжить?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; Учтите, что попытка закрытия канала прямо сейчас приведет к <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсированному закрытию</a>, на которое уйдет большая сумма комиссии и больше времени, все еще хотите продолжить?]]></string>
     <string name="ln_chan_close_confirm_address"><![CDATA[Хотите закрыть канал и отправить возвратную Биткоин-транзакцию на следующий адрес?<br><br><strong>%1$s</strong><br><br>Убедитесь, что адрес верный, потому что позже закрытие канала нельзя будет отменить]]></string>
     <string name="ln_chan_close_confirm_local">Хотите закрыть канал и отправить возвратную Биткоин-транзакцию обратно в этот кошелек?</string>

@@ -65,7 +65,7 @@
 
             <TextView
                 style="@style/CardBaseText"
-                android:textColor="@color/shpbr_background"
+                android:textColor="@color/bg"
                 android:id="@+id/totalCapacityText"
                 android:gravity="end"/>
 
@@ -76,7 +76,7 @@
 
             <TextView
                 style="@style/CardBaseText"
-                android:textColor="@color/shpbr_primary_progress"
+                android:textColor="@color/ln"
                 android:id="@+id/canSendText"
                 android:gravity="end"/>
 
@@ -87,7 +87,7 @@
 
             <TextView
                 style="@style/CardBaseText"
-                android:textColor="@color/shpbr_secondary_progress"
+                android:textColor="@color/btc"
                 android:id="@+id/canReceiveText"
                 android:gravity="end"/>
 

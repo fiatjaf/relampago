@@ -86,9 +86,8 @@ case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLo
                                their: Option[FundingLocked], fundingTx: Transaction,
                                commitments: Commitments) extends HasCommitments
 
-case class NormalData(announce: NodeAnnouncement,
-                      commitments: Commitments, localShutdown: Option[Shutdown] = None,
-                      remoteShutdown: Option[Shutdown] = None) extends HasCommitments
+case class NormalData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Option[Shutdown] = None,
+                      remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends HasCommitments
 
 case class ClosingTxProposed(unsignedTx: ClosingTx, localClosingSigned: ClosingSigned)
 case class NegotiationsData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Shutdown, remoteShutdown: Shutdown,
@@ -127,7 +126,7 @@ case class ClosingData(announce: NodeAnnouncement,
       case info => info.getState.map(state => state.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
     }
 
-    val hardDelay = closedAt + 1000L * 3600 * 24 * 28
+    val hardDelay = closedAt + 1000L * 3600 * 24 * 21
     allConfirmedOrDead || hardDelay < System.currentTimeMillis
   }
 }
