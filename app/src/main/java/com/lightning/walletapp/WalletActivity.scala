@@ -12,12 +12,14 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import org.bitcoinj.core.{Address, TxWrap}
+import java.util.{Date, TimerTask}
 
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.lnutils.JsonHttpUtils.obsOnIO
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
+import com.lightning.walletapp.helper.AwaitService
 import com.github.clans.fab.FloatingActionMenu
 import com.lightning.walletapp.lnutils.GDrive
 import android.support.v7.widget.SearchView
@@ -30,7 +32,6 @@ import android.content.Intent
 import org.ndeftools.Message
 import android.app.Activity
 import android.os.Bundle
-import java.util.Date
 
 
 trait SearchBar { me =>
@@ -96,16 +97,25 @@ trait HumanTimeDisplay {
 }
 
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
-  lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
   lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
     def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
     def getCount = 2
   }
 
-  override def onDestroy = wrap(super.onDestroy)(stopDetecting)
-  override def onResume = wrap(super.onResume)(me returnToBase null)
+  lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
+  lazy val awaitStopTask = new TimerTask { def run = me stopService awaitServiceIntent }
+  lazy val awaitServiceIntent = new Intent(me, AwaitService.reference)
 
-  override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
+  override def onDestroy = {
+    // Clean up used resources
+
+    super.onDestroy
+    awaitStopTask.run
+    stopDetecting
+  }
+
+  override def onResume = wrap(super.onResume)(me returnToBase null)
+  override def onOptionsItemSelected(m: MenuItem): Boolean = runAnd(true) {
     if (m.getItemId == R.id.actionSettings) me goTo classOf[SettingsActivity]
   }
 

@@ -310,4 +310,8 @@
     <string name="olympus_log_channel_backup">Сохранен зашифрованный бекап для канала с «%1$s»</string>
     <string name="olympus_log_watch_payments">Начато наблюдение за %1$s старыми состояниями</string>
     <string name="olympus_log_refunding_tx">Сохранена отложенная возвратная транзакция</string>
+
+    <!-- Notification -->
+    <string name="notify_title">Ожидается платеж-молния</string>
+    <string name="notify_body">Приложение остается открытым, чтобы получить %1$s</string>
 </resources>

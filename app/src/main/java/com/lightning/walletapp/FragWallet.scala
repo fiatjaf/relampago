@@ -25,10 +25,11 @@ import android.content.{DialogInterface, Intent}
 import android.database.{ContentObserver, Cursor}
 import android.support.v4.content.{ContextCompat, Loader}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
-import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.walletapp.ln.wire.{LightningMessage, OpenChannel}
+import com.lightning.walletapp.helper.{AwaitService, ReactLoader, RichCursor}
+
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
@@ -139,8 +140,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   val chanListener = new ChannelListener {
-    // should be removed once frag is destroyed
-    // prevent remote error spamming by using trigger
+    override def settled(cs: Commitments) =
+      if (cs.localCommit.spec.fulfilled.nonEmpty)
+        host.awaitStopTask.run
 
     override def onProcessSuccess = {
       case (chan, data: HasCommitments, remoteError: wire.Error) if errorLimit > 0 => UITask {
@@ -511,6 +513,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       app.TransData.value = pr
       host goTo classOf[RequestActivity]
+      // Prevent application from closing for some time
+      host.awaitServiceIntent.putExtra(AwaitService.AWAITED_AMOUNT, denom withSign sum)
+      ContextCompat.startForegroundService(host, host.awaitServiceIntent)
+      host.timer.schedule(host.awaitStopTask, 1000L * 60 * 10)
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {

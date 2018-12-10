@@ -24,14 +24,15 @@ import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import androidx.work.{ExistingWorkPolicy, WorkManager}
 import android.content.{ClipData, ClipboardManager, Context}
+import com.lightning.walletapp.helper.{AwaitService, RichCursor}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
+import android.app.{Application, NotificationChannel, NotificationManager}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, pickInc, repeat}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.TxUploadAct
 import java.util.concurrent.TimeUnit.MILLISECONDS
-import com.lightning.walletapp.helper.RichCursor
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
@@ -39,10 +40,10 @@ import java.util.Collections.singletonList
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
-import android.app.Application
 import scodec.bits.BitVector
 import android.widget.Toast
 import scodec.DecodeResult
+import android.os.Build
 import scala.util.Try
 import java.io.File
 
@@ -85,8 +86,13 @@ class WalletApp extends Application { me =>
   Utils.appReference = me
   override def onCreate = wrap(super.onCreate) {
     // These cannot be lazy vals because values may change
-    Utils.denom = Utils denoms prefs.getInt(AbstractKit.DENOM_TYPE, 0)
     Utils.fiatCode = prefs.getString(AbstractKit.FIAT_TYPE, "usd")
+    Utils.denom = Utils denoms prefs.getInt(AbstractKit.DENOM_TYPE, 0)
+
+    if (Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1) {
+      val srvChan = new NotificationChannel(AwaitService.CHANNEL_ID, "NC", NotificationManager.IMPORTANCE_DEFAULT)
+      me getSystemService classOf[NotificationManager] createNotificationChannel srvChan
+    }
   }
 
   def setBuffer(text: String) = {

@@ -309,4 +309,8 @@
     <string name="olympus_log_channel_backup">Saved an encrypted backup for a channel with «%1$s»</string>
     <string name="olympus_log_watch_payments">Started watching %1$s old channel states</string>
     <string name="olympus_log_refunding_tx">Scheduled a delayed refunding transaction</string>
+
+    <!-- Notification -->
+    <string name="notify_title">Waiting for incoming payment</string>
+    <string name="notify_body">Keeping an app open to receive %1$s</string>
 </resources>
