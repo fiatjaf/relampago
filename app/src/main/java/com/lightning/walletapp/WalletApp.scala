@@ -90,7 +90,8 @@ class WalletApp extends Application { me =>
     Utils.denom = Utils denoms prefs.getInt(AbstractKit.DENOM_TYPE, 0)
 
     if (Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1) {
-      val srvChan = new NotificationChannel(AwaitService.CHANNEL_ID, "NC", NotificationManager.IMPORTANCE_DEFAULT)
+      val importanceLevel = NotificationManager.IMPORTANCE_DEFAULT
+      val srvChan = new NotificationChannel(AwaitService.CHANNEL_ID, "NC", importanceLevel)
       me getSystemService classOf[NotificationManager] createNotificationChannel srvChan
     }
   }
@@ -449,9 +450,9 @@ object ChannelManager extends Broadcaster {
       else Obs.zip(getRoutes(rd.pr.nodeId) +: Obs.just(rd.routes) +: withHints).map(_.flatten.toVector)
 
     for {
-      routes <- paymentRoutesObs
+      routeVec <- paymentRoutesObs
       busyMap = all.map(chan => chan.data.announce.nodeId -> inFlightHtlcs(chan).size).toMap
-      unloadest = routes.sortBy(route => if (route.nonEmpty) busyMap(route.head.nodeId) else 0)
+      unloadest = routeVec.sortBy(route => if (route.nonEmpty) busyMap(route.head.nodeId) else 0)
     } yield useFirstRoute(unloadest, rd)
   }
 

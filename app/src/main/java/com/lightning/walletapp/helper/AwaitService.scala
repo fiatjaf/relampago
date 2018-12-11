@@ -26,7 +26,7 @@ class AwaitService extends Service { me =>
       startForeground(1, new NotificationCompat.Builder(me, AwaitService.CHANNEL_ID)
         .addAction(android.R.drawable.ic_menu_close_clear_cancel, getResources getString R.string.dialog_cancel, pendingCancelIntent)
         .setSmallIcon(R.drawable.ic_info_outline_white_18dp).setContentTitle(getResources getString R.string.notify_title)
-        .setContentText(getResources getString R.string.notify_title format awaitedPaymentSum)
+        .setContentText(getResources getString R.string.notify_body format awaitedPaymentSum)
         .setContentIntent(pendingActivity).build)
     }
 

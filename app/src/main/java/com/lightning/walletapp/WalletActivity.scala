@@ -12,7 +12,6 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import org.bitcoinj.core.{Address, TxWrap}
-import java.util.{Date, TimerTask}
 
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.lnutils.JsonHttpUtils.obsOnIO
@@ -32,6 +31,7 @@ import android.content.Intent
 import org.ndeftools.Message
 import android.app.Activity
 import android.os.Bundle
+import java.util.Date
 
 
 trait SearchBar { me =>
@@ -97,20 +97,16 @@ trait HumanTimeDisplay {
 }
 
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
+  lazy val awaitServiceIntent: Intent = new Intent(me, AwaitService.reference)
+  lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
   lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
     def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
     def getCount = 2
   }
 
-  lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
-  lazy val awaitStopTask = new TimerTask { def run = me stopService awaitServiceIntent }
-  lazy val awaitServiceIntent = new Intent(me, AwaitService.reference)
-
-  override def onDestroy = {
-    // Clean up used resources
-
-    super.onDestroy
-    awaitStopTask.run
+  override def onDestroy = wrap(super.onDestroy) {
+    // Clean up foreground service and NFC detector
+    me stopService awaitServiceIntent
     stopDetecting
   }
 

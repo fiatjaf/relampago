@@ -142,7 +142,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val chanListener = new ChannelListener {
     override def settled(cs: Commitments) =
       if (cs.localCommit.spec.fulfilled.nonEmpty)
-        host.awaitStopTask.run
+        host stopService host.awaitServiceIntent
 
     override def onProcessSuccess = {
       case (chan, data: HasCommitments, remoteError: wire.Error) if errorLimit > 0 => UITask {
@@ -513,10 +513,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       app.TransData.value = pr
       host goTo classOf[RequestActivity]
-      // Prevent application from closing for some time
+      // Prevent application from closing for indefinite time, but user cancellable
       host.awaitServiceIntent.putExtra(AwaitService.AWAITED_AMOUNT, denom withSign sum)
       ContextCompat.startForegroundService(host, host.awaitServiceIntent)
-      host.timer.schedule(host.awaitStopTask, 1000L * 60 * 10)
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {

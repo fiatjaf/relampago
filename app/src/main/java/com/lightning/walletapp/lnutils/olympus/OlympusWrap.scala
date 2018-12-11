@@ -92,13 +92,12 @@ class OlympusWrap extends OlympusProvider {
     Obs.from(clouds).flatMap(_.connector getBackup key onErrorReturn empty)
   }
 
-  def getRates = failOver(_.connector.getRates, tryLater, clouds)
   def findNodes(query: String) = failOver(_.connector findNodes query, Obs.empty, clouds)
-  def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, tryLater, clouds)
   def getShortId(txid: BinaryData) = failOver(_.connector getShortId txid, Obs.empty, clouds)
-  def getChildTxs(ids: BinaryDataSeq) = failOver(_.connector getChildTxs ids, tryLater, clouds)
   def findUpdate(nodeKey: PublicKey) = failOver(_.connector findUpdate nodeKey, Obs.empty, clouds)
-  private[this] val tryLater = Obs error new ProtocolException("Try again later")
+  def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, Obs just Vector.empty, clouds)
+  def getRates = failOver(_.connector.getRates, Obs error new ProtocolException("Could not obtain feerates and fiat prices"), clouds)
+  def getChildTxs(ids: BinaryDataSeq) = failOver(_.connector getChildTxs ids, Obs error new ProtocolException("Try again later"), clouds)
 }
 
 trait OlympusProvider {
