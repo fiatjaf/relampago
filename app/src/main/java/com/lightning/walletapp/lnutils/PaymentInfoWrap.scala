@@ -150,18 +150,18 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     if (fulfilledIncoming.nonEmpty) {
-      // Collect vulnerable infos from all channels on finalized off-chain payments
-      val infos = ChannelManager.notClosingOrRefunding.flatMap(getVulnerableRevInfos)
+      // Collect vulnerable infos from ALL channels on incoming payment
+      val infos = ChannelManager.chanReports.flatMap(getVulnerableRevInfos)
       getCerberusActs(infos.toMap) foreach app.olympus.tellClouds
     }
   }
 
-  def getVulnerableRevInfos(chan: Channel) = chan(identity) map { cs =>
-    // Find previous channel states which peer might be tempted to spend but omit too small deltas
-    def toTxidAndInfo(shiftedRc: RichCursor) = (shiftedRc string RevokedInfoTable.txId, shiftedRc string RevokedInfoTable.info)
-    val cursor = db.select(RevokedInfoTable.selectLocalSql, cs.channelId, cs.localCommit.spec.toLocalMsat - dust.amount * 4 * 1000L)
-    RichCursor(cursor) vec toTxidAndInfo
-  } getOrElse Vector.empty
+  def getVulnerableRevInfos(rep: ChanReport) = {
+    // Find previous channel states which peer might be tempted to spend
+    val threshold = rep.cs.localCommit.spec.toLocalMsat - dust.amount * 4 * 1000L
+    def toTxidAndInfo(rc: RichCursor) = (rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
+    RichCursor apply db.select(RevokedInfoTable.selectLocalSql, rep.cs.channelId, threshold) vec toTxidAndInfo
+  }
 
   type TxIdAndRevInfoMap = Map[String, String]
   def getCerberusActs(infos: TxIdAndRevInfoMap) = {

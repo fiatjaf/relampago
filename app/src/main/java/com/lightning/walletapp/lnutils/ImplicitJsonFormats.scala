@@ -399,8 +399,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
   implicit val ratesFmt = jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
 
-  implicit val gDriveBackup = taggedJsonFmt(jsonFormat[Vector[HasCommitments], Vector[CloudSnapshot], Int,
-    GDriveBackup](GDriveBackup.apply, "chans", "clouds", "v"), tag = "GDriveBackup")
+  implicit val gDriveBackup =
+    taggedJsonFmt(jsonFormat[Vector[HasCommitments], Vector[CloudSnapshot], Int,
+      GDriveBackup](GDriveBackup.apply, "chans", "clouds", "v"), tag = "GDriveBackup")
 
   // Relay node
 

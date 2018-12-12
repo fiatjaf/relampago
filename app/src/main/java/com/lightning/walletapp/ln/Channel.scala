@@ -535,10 +535,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
               me UPDATA d1 SEND nextProposed.localClosingSigned
             }
 
-          case Failure(why) =>
+          case _ =>
+            // Sig check has failed
             startLocalClose(neg)
-            // This will show error details to user
-            throw new LightningException(why.getMessage)
         }
 
 

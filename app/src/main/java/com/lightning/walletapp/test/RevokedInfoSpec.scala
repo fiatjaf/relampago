@@ -3,12 +3,13 @@ package com.lightning.walletapp.test
 import com.lightning.walletapp.ChannelManager
 import com.lightning.walletapp.helper.AES
 import com.lightning.walletapp.ln.LNParams._
+import com.lightning.walletapp.ln.Scripts.InputInfo
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.lnutils.{PaymentInfoWrap, RevokedInfoTable}
-import fr.acinq.bitcoin.{BinaryData, Transaction}
+import fr.acinq.bitcoin.{BinaryData, OutPoint, Satoshi, Transaction, TxOut}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import scodec.DecodeResult
 import scodec.bits.BitVector
@@ -41,7 +42,7 @@ class RevokedInfoSpec {
 
 
     val c1 = Commitments(
-      localParams = null,
+      localParams = LocalParams(null, 0, 0, 0, null, null, null, null, null, null, null, null, isFunder = true),
       remoteParams = null,
       LocalCommit(index = 0L, spec = CommitmentSpec(0L, toLocalMsat = 900000000L, toRemoteMsat = 0L), null, null),
       remoteCommit = null,
@@ -50,7 +51,7 @@ class RevokedInfoSpec {
       localNextHtlcId = 0L,
       remoteNextHtlcId = 0L,
       remoteNextCommitInfo = null,
-      commitInput = null,
+      commitInput = InputInfo(null, TxOut(Satoshi(100000L), Seq.empty), null),
       remotePerCommitmentSecrets = null,
       channelId = chanId1)
 
@@ -76,7 +77,8 @@ class RevokedInfoSpec {
     db.change(RevokedInfoTable.newSql, txid8, chanId2, 1000000000L, serialized1)
 
 
-    val c2 = Commitments(localParams = null,
+    val c2 = Commitments(
+      localParams = LocalParams(null, 0, 0, 0, null, null, null, null, null, null, null, null, isFunder = false),
       remoteParams = null,
       LocalCommit(index = 0L, spec = CommitmentSpec(0L, toLocalMsat = 1000000000L, toRemoteMsat = 0L), null, null),
       remoteCommit = null,
@@ -85,7 +87,7 @@ class RevokedInfoSpec {
       localNextHtlcId = 0L,
       remoteNextHtlcId = 0L,
       remoteNextCommitInfo = null,
-      commitInput = null,
+      commitInput = InputInfo(null, TxOut(Satoshi(100000L), Seq.empty), null),
       remotePerCommitmentSecrets = null,
       channelId = chanId2)
 
@@ -101,7 +103,8 @@ class RevokedInfoSpec {
       data = NormalData(announce = null, commitments = c2)
     }
 
-    val cerberusAct = PaymentInfoWrap.getCerberusActs(Vector(chan1, chan2).flatMap(PaymentInfoWrap.getVulnerableRevInfos).toMap).next
+    val reports = Vector(ChanReport(chan1, c1), ChanReport(chan2, c2))
+    val cerberusAct = PaymentInfoWrap.getCerberusActs(reports.flatMap(PaymentInfoWrap.getVulnerableRevInfos).toMap).next
     val cerberusPayloadHex = cerberusAct.data.toString
 
     // Taken from Olympus
@@ -113,7 +116,7 @@ class RevokedInfoSpec {
     assert(Set(txid2.toString take 16, txid3.toString take 16, txid6.toString take 16) == halfTxIds.toSet)
 
     for {
-    // Taken from Olympus
+      // Taken from Olympus
       halfTxId \ aesz <- halfTxIds zip aesZygotes
       fullTxidBin <- halfTxIds.zip(Vector(txid2, txid3)).toMap get halfTxId
       revBitVec <- AES.decZygote(aesz, fullTxidBin) map BitVector.apply
@@ -121,6 +124,6 @@ class RevokedInfoSpec {
     } assert(ri1 == ri)
 
     cerberusAct.onDone
-    assert(Vector(chan1, chan2).flatMap(PaymentInfoWrap.getVulnerableRevInfos).isEmpty)
+    assert(reports.flatMap(PaymentInfoWrap.getVulnerableRevInfos).isEmpty)
   }
 }
