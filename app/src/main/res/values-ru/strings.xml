@@ -7,11 +7,14 @@
     <string name="step_fees"><![CDATA[<font color=#999999>Выберите комиссию</font><br><br>%1$s]]></string>
     <string name="greetings">Bitcoin Кошелек-Молния\nПрочитайте <a href='http://lightning-wallet.com'>инструкцию</a></string>
     <string name="sets_rescan_ok">Сейчас кошелек закроется, рескан блокчейна начнется автоматически при следующем открытии</string>
+    <string name="boost_details"><![CDATA[Хотите поднять комиссию для этой транзакции и подтвердить ее быстрее?<br><br>сейчас %1$s<br>после CPFP %2$s<br>]]></string>
+    <string name="mnemonic_info"><font color="#E31300">Мнемонический код важен!</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> зачем он нужен и сохраните его прямо сейчас\n\n\n<small>Подсказка: свайпните влево\nчтобы открыть QR сканер</small></string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Может занять несколько часов</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Более быстрое подтверждение</font></small></small>]]></string>
     <string name="copied_to_clipboard">Скопировано «%1$s»</string>
     <string name="wallet_restore">Восстановить кошелек</string>
     <string name="wallet_settings">Настройки кошелька</string>
+    <string name="recent_txs">Недавние транзакции</string>
     <string name="wallet_create">Новый кошелек</string>
 
     <array name="denoms">
@@ -29,11 +32,6 @@
     <string name="restore_wallet_restoring">Кошелек восстанавливается\nЭто может занять пару минут</string>
     <string name="restore_mnemonic_wrong">Нужно ровно 12 слов</string>
     <string name="restore_hint">Ваш мнемонический код</string>
-
-    <!-- headers with links -->
-    <string name="mnemonic_info"><font color="#E31300">Мнемонический код важен!</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> зачем он нужен и сохраните его прямо сейчас</string>
-    <string name="boost_details"><![CDATA[Хотите поднять комиссию для этой транзакции и подтвердить ее быстрее?<br><br>сейчас %1$s<br>после CPFP %2$s<br>]]></string>
-    <string name="recent_txs">Недавние транзакции</string>
 
     <string name="channel_recovery_info">
         Восстановитель скачивает резервные копии ваших потерянных каналов с бэкап-серверов и использует

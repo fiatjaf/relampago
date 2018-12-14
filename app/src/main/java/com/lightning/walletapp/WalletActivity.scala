@@ -164,13 +164,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def checkTransData =
     app.TransData checkAndMaybeErase {
-      case _: Started => me goTo classOf[LNStartActivity]
+      // TransData value should be retained in both of these cases
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+      case _: Started => goStart
 
       case FragWallet.REDIRECT =>
         // TransData value should be erased here
-        // so `goOps` return type is forced to Unit
-        goOps(null)
+        // so goOps return type is forced to Unit
+        goOps(null): Unit
 
       case lnLink: LNUrl =>
         // TransData value will be erased here
@@ -198,7 +199,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case pr: PaymentRequest =>
         // TransData should be set to batch or null to erase previous
         app.TransData.value = TxWrap findBestBatch pr getOrElse null
-        me goTo classOf[LNStartActivity]
+        // Do not erase a previously set data
+        goStart
 
       case _ =>
     }
@@ -277,10 +279,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   val tokensPrice = MilliSatoshi(1000000L)
-  def goOps(top: View): Unit = me goTo classOf[LNOpsActivity]
+  def goStart = me goTo classOf[LNStartActivity]
+  def goOps(top: View) = me goTo classOf[LNOpsActivity]
   def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
     val humanPrice = s"${coloredIn apply tokensPrice} <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
     val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
-    mkCheckForm(alert => rm(alert) { me goTo classOf[LNStartActivity] /* proceed */ }, none, warn, dialog_ok, dialog_cancel)
-  } else me goTo classOf[LNStartActivity]
+    mkCheckForm(alert => rm(alert)(goStart), none, warn, dialog_ok, dialog_cancel)
+  } else goStart
 }
