@@ -200,12 +200,14 @@ object Helpers {
                            perCommitSecret: Scalar): RevocationInfo = {
 
       val remotePerCommitmentPoint = perCommitSecret.toPoint
+      val scorchedEarthFee = LNParams.broadcaster.perKwThreeSat * 2
       val localPrivkey = derivePrivKey(commitments.localParams.paymentKey, remotePerCommitmentPoint)
       val remoteRevocationPrivkey = revocationPrivKey(commitments.localParams.revocationSecret, perCommitSecret)
       val remoteDelayedPaymentKey = derivePubKey(commitments.remoteParams.delayedPaymentBasepoint, remotePerCommitmentPoint)
-      val ri = RevocationInfo(redeemScriptsToSigs = Nil, claimMainTxSig = None, claimPenaltyTxSig = None, LNParams.broadcaster.perKwThreeSat,
-        commitments.localParams.dustLimit.amount, commitments.localParams.defaultFinalScriptPubKey, commitments.localParams.toSelfDelay,
-        localPrivkey.publicKey, remoteRevocationPrivkey.publicKey, remoteDelayedPaymentKey)
+
+      val ri = RevocationInfo(redeemScriptsToSigs = Nil, claimMainTxSig = None, claimPenaltyTxSig = None,
+        scorchedEarthFee, commitments.localParams.dustLimit.amount, commitments.localParams.defaultFinalScriptPubKey,
+        commitments.localParams.toSelfDelay, localPrivkey.publicKey, remoteRevocationPrivkey.publicKey, remoteDelayedPaymentKey)
 
       val claimMainSig = ri.makeClaimP2WPKHOutput(tx) map Scripts.sign(localPrivkey)
       val claimPenaltySig = ri.makeMainPenalty(tx) map Scripts.sign(remoteRevocationPrivkey)
