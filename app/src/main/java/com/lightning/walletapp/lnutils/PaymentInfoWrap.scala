@@ -293,7 +293,10 @@ object GossipCatcher extends ChannelListener {
     case (chan, norm: NormalData, upd: ChannelUpdate)
       // Stage 3: we have an old or empty Hop, replace it with (peer -> localPhone) hop
       if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
-      chan.process(upd toHop chan.data.announce.nodeId)
+
+      val newHop = upd toHop chan.data.announce.nodeId
+      val isCopy = norm.commitments.extraHop contains newHop
+      if (!isCopy) chan process newHop
       chan.listeners -= GossipCatcher
   }
 }

@@ -12,9 +12,9 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-
-import android.view.{Menu, MenuItem, View}
 import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
+import android.view.{Menu, MenuItem, View}
+
 import com.lightning.walletapp.ln.wire.WalletZygote
 import com.google.android.gms.drive.MetadataBuffer
 import android.support.v4.content.FileProvider
