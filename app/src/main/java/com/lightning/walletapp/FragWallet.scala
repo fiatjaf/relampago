@@ -514,7 +514,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       app.TransData.value = pr
       host goTo classOf[RequestActivity]
       // Prevent application from closing for indefinite time, but user cancellable
-      host.awaitServiceIntent.putExtra(AwaitService.AWAITED_AMOUNT, denom withSign sum)
+      host.awaitServiceIntent.putExtra(AwaitService.AWAITED_AMOUNT, denom asString sum)
       ContextCompat.startForegroundService(host, host.awaitServiceIntent)
     }
 
