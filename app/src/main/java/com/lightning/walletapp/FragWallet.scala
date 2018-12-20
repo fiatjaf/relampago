@@ -141,8 +141,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val chanListener = new ChannelListener {
     override def settled(cs: Commitments) =
-      if (cs.localCommit.spec.fulfilled.nonEmpty)
-        host stopService host.awaitServiceIntent
+      if (cs.localCommit.spec.fulfilled.nonEmpty) {
+        host.awaitServiceIntent.setAction(AwaitService.CANCEL)
+        ContextCompat.startForegroundService(host, host.awaitServiceIntent)
+      }
 
     override def onProcessSuccess = {
       case (chan, data: HasCommitments, remoteError: wire.Error) if errorLimit > 0 => UITask {
@@ -186,10 +188,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     type InfoVec = Vector[PaymentInfo]
     def onLoaderReset(loaderCursor: LoaderCursor) = none
     def onLoadFinished(loaderCursor: LoaderCursor, c: Cursor) = none
-  }
-
-  val observer = new ContentObserver(new Handler) {
-    override def onChange(self: Boolean) = if (!self) react
   }
 
   toggler setOnClickListener onButtonTap {
@@ -513,8 +511,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       app.TransData.value = pr
       host goTo classOf[RequestActivity]
-      // Prevent application from closing for indefinite time, but user cancellable
-      host.awaitServiceIntent.putExtra(AwaitService.AWAITED_AMOUNT, denom asString sum)
+      host.awaitServiceIntent.setAction(AwaitService.SHOW_AMOUNT)
+      host.awaitServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString sum)
       ContextCompat.startForegroundService(host, host.awaitServiceIntent)
     }
 
@@ -694,19 +692,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     updPaymentList.run
   }
 
-  def react = getSupportLoaderManager.restartLoader(1, null, loaderCallbacks).forceLoad
+  def react = android.support.v4.app.LoaderManager.getInstance(host).restartLoader(1, null, loaderCallbacks).forceLoad
+  val observer = new ContentObserver(new Handler) { override def onChange(fromSelf: Boolean) = if (!fromSelf) react }
   host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
-
+  host.timer.schedule(adapter.notifyDataSetChanged, 10000, 10000)
   host setSupportActionBar toolbar
+
   toolbar setOnClickListener onButtonTap {
     // View current balance status and guranteed deliveries
     if (!isSearching) host goTo classOf[WalletStatusActivity]
   }
 
-  Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
-  // Only update a minimized payments list to eliminate possible performance slowdowns
-  host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
-  itemsList setOnItemClickListener onTap { pos => adapter.getItem(pos - 1).generatePopup }
+  itemsList setOnItemClickListener onTap {
+    pos => adapter.getItem(pos - 1).generatePopup
+  }
+
   itemsList setFooterDividersEnabled false
   itemsList setHeaderDividersEnabled false
   itemsList addFooterView allTxsWrapper
@@ -715,6 +715,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   ConnectionManager.listeners += connectionListener
   for (c <- ChannelManager.all) c.listeners += chanListener
+  Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
   app.kit.wallet addTransactionConfidenceEventListener txsListener
   app.kit.peerGroup addBlocksDownloadedEventListener blocksTitleListener
   app.kit.peerGroup addDisconnectedEventListener peersListener

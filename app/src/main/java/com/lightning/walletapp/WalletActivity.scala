@@ -104,12 +104,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     def getCount = 2
   }
 
-  override def onDestroy = wrap(super.onDestroy) {
-    // Clean up foreground service and NFC detector
-    me stopService awaitServiceIntent
-    stopDetecting
-  }
-
+  override def onDestroy = wrap(super.onDestroy)(stopDetecting)
   override def onResume = wrap(super.onResume)(me returnToBase null)
   override def onOptionsItemSelected(m: MenuItem): Boolean = runAnd(true) {
     if (m.getItemId == R.id.actionSettings) me goTo classOf[SettingsActivity]
