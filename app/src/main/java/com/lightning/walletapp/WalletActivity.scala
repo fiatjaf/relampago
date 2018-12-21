@@ -97,7 +97,7 @@ trait HumanTimeDisplay {
 }
 
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
-  lazy val awaitServiceIntent: Intent = new Intent(me, AwaitService.reference)
+  lazy val awaitServiceIntent: Intent = new Intent(me, AwaitService.classof)
   lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
   lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
     def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
