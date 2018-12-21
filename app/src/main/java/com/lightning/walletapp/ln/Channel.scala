@@ -318,7 +318,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (norm: NormalData, cmd: CMDBestHeight, OPEN | SLEEPING) =>
         val expiredPayment = Commitments.findExpiredHtlc(norm.commitments, cmd)
-        if (expiredPayment.nonEmpty) throw HTLCExpiryException(norm, expiredPayment.get)
+        if (expiredPayment.nonEmpty) throw HTLCHasExpired(norm, expiredPayment.get)
 
 
       // SHUTDOWN in WAIT_FUNDING_DONE

@@ -143,8 +143,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def informOfferClose(chan: Channel, message: String) = UITask {
       val bld = baseBuilder(chan.data.announce.toString.html, message)
       def close(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
-      mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_force)
-      errorLimit -= 1
+      mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_close)
     }
 
     override def settled(cs: Commitments) =
@@ -155,6 +154,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case (chan, _: HasCommitments, remoteError: wire.Error) if errorLimit > 0 =>
         // Remote peer has sent us an error, display details to user and offer force-close
         informOfferClose(chan, remoteError.exception.getMessage).run
+        errorLimit -= 1
 
       case (chan, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
         // Remote peer was OK but now has incompatible features, display details to user and offer force-close
@@ -169,7 +169,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash
         PaymentInfoWrap failOnUI rd
 
-      case chan \ HTLCExpiryException(_, htlc) =>
+      case chan \ HTLCHasExpired(_, htlc) =>
         val paymentHash = htlc.add.paymentHash.toString
         val bld = negTextBuilder(dialog_ok, app.getString(err_ln_expired).format(paymentHash).html)
         UITask(host showForm bld.setCustomTitle(chan.data.announce.toString.html).create).run

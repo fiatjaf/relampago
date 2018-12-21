@@ -50,8 +50,11 @@ object GDrive {
     // Obtain all channels and all storage tokens and encode a backup blob
 
     val db1 = new LNOpenHelper(ctxt, dbFileName)
-    val tokensBackup = RichCursor(db1 select OlympusTable.selectAllSql).vec(cd => toCloud(cd).snapshot)
-    val backup = GDriveBackup(chans = ChannelWrap doGet db1, tokensBackup, v = 1).toJson.toString
+    val olympusCursor = db1 select OlympusTable.selectAllSql
+    val channels = ChannelWrap doGet db1
+
+    val tokensBackup = RichCursor(olympusCursor).vec(cd => toCloud(cd).snapshot)
+    val backup = GDriveBackup(channels, tokensBackup, v = 1).toJson.toString
     AES.encReadable(backup, secret).toByteArray
   }
 

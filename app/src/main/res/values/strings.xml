@@ -89,7 +89,7 @@
     <string name="sets_set_fiat">Set Fiat currency</string>
     <string name="sets_choose_unit">Choose Bitcoin unit</string>
     <string name="sets_manage_olympus">Manage Olympus servers</string>
-    <string name="sets_chan_recover">Olympus channel recovery</string>
+    <string name="sets_chan_recover">Use Olympus recovery tool</string>
     <string name="sets_migrator">Use wallet migration tool</string>
     <string name="sets_mnemonic">View mnemonic phrase</string>
     <string name="sets_rescan">Rescan blockchain</string>
@@ -264,7 +264,7 @@
     <string name="ln_chan_force_details"><![CDATA[&#9888; Note that closing right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closure</a> which requires additional fees and time, would you still like to proceed?]]></string>
     <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close this channel and send a refunding transaction to the following address?<br><br><strong>%1$s</strong><br><br>Please make sure that address is the right one as this action can not be undone]]></string>
     <string name="ln_chan_close_confirm_local">Do you want to close this channel and send a refunding transaction back to this wallet?</string>
-    <string name="ln_chan_force">Force close</string>
+    <string name="ln_chan_close">Close channel</string>
 
     <array name="ln_chan_actions_list">
         <item>View funding transaction</item>
