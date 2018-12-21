@@ -49,13 +49,13 @@ class LNStartFundActivity extends TimerActivity { me =>
   } else me exitTo classOf[MainActivity]
 
   def proceed(icrOpt: Option[IncomingChannelParams], asString: String, ann: NodeAnnouncement) = {
+    val peerOffline = new LightningException(me getString err_ln_peer_offline format ann.workingAddress.toString)
+    val peerIncompatible = new LightningException(me getString err_ln_peer_incompatible format ann.workingAddress.toString)
     val freshChan = ChannelManager.createChannel(bootstrap = InitData(ann), initialListeners = Set.empty)
     lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
     lnStartFundDetails setText asString.html
 
     class OpenListener extends ConnectionListener with ChannelListener {
-      val peerOffline = new LightningException(me getString err_ln_peer_offline format ann.addresses.head.toString)
-      override def onIncompatible(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
       override def onTerminalError(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
 
@@ -74,9 +74,10 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     abstract class LocalOpenListener extends OpenListener {
-      override def onOperational(remotePeerCandidateNodeId: PublicKey) =
-        // Remote peer has sent their Init so we ask user to provide an amount
-        if (remotePeerCandidateNodeId == ann.nodeId) askLocalFundingConfirm.run
+      override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (nodeId == ann.nodeId) {
+        // Peer has sent us their Init so we ask user to provide a funding amount if peer is compatible
+        if (isCompat) askLocalFundingConfirm.run else onException(freshChan -> peerIncompatible)
+      }
 
       override def onBecome = {
         case (_, WaitFundingData(_, cmd, accept), WAIT_FOR_ACCEPT, WAIT_FOR_FUNDING) =>
@@ -175,9 +176,10 @@ class LNStartFundActivity extends TimerActivity { me =>
     }
 
     def remoteOpenListener(wsw: WSWrap) = new OpenListener {
-      override def onOperational(remotePeerCandidateNodeId: PublicKey) =
-        // #1 peer has provided an Init so we reassure that Funder is there
-        if (remotePeerCandidateNodeId == ann.nodeId) wsw send wsw.params.start
+      override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (nodeId == ann.nodeId) {
+        // #1 peer has provided an Init so we reassure that remote Funder can still broadcast a funding
+        if (isCompat) wsw send wsw.params.start else onException(freshChan -> peerIncompatible)
+      }
 
       override def onProcessSuccess = {
         case (_, _: InitData, started: Started) if started.start == wsw.params.start =>

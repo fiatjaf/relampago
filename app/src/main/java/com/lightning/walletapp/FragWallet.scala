@@ -27,8 +27,8 @@ import android.support.v4.content.{ContextCompat, Loader}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
-import com.lightning.walletapp.ln.wire.{LightningMessage, OpenChannel}
 import com.lightning.walletapp.helper.{AwaitService, ReactLoader, RichCursor}
+import com.lightning.walletapp.ln.wire.{ChannelReestablish, LightningMessage, OpenChannel}
 
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
@@ -60,7 +60,7 @@ class FragWallet extends Fragment {
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
   import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail}
-  import host.{TxProcessor, getSupportLoaderManager, mkCheckForm, rm, <, mkCheckFormNeutral}
+  import host.{TxProcessor, mkCheckForm, rm, <, mkCheckFormNeutral}
 
   val fiatRate = frag.findViewById(R.id.fiatRate).asInstanceOf[TextView]
   val fiatBalance = frag.findViewById(R.id.fiatBalance).asInstanceOf[TextView]
@@ -140,6 +140,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   val chanListener = new ChannelListener {
+    def informOfferClose(chan: Channel, message: String) = UITask {
+      val bld = baseBuilder(chan.data.announce.toString.html, message)
+      def close(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
+      mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_force)
+      errorLimit -= 1
+    }
+
     override def settled(cs: Commitments) =
       if (cs.localCommit.spec.fulfilled.nonEmpty) {
         host.awaitServiceIntent.setAction(AwaitService.CANCEL)
@@ -147,30 +154,29 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
     override def onProcessSuccess = {
-      case (chan, data: HasCommitments, remoteError: wire.Error) if errorLimit > 0 => UITask {
-        def close(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
-        val bld = baseBuilder(chan.data.announce.toString.html, remoteError.exception.getMessage)
-        mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_force)
-        errorLimit -= 1
-      }.run
+      case (chan, _: HasCommitments, remoteError: wire.Error) if errorLimit > 0 =>
+        // Remote peer has sent us an error, display details to user and offer force-close
+        informOfferClose(chan, remoteError.exception.getMessage).run
+
+      case (chan, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
+        // Remote peer was OK but now has incompatible features, display details to user and offer force-close
+        val msg = host getString err_ln_peer_incompatible format chan.data.announce.workingAddress.toString
+        informOfferClose(chan, msg).run
     }
 
     override def onException = {
       case _ \ CMDAddImpossible(rd, code) =>
-        // Remove this payment from unsent when failed
+        // Remove this payment from unsent since it was not accepted by channel
+        UITask(host showForm negTextBuilder(dialog_ok, app getString code).create).run
         PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash
-        val bld = negTextBuilder(dialog_ok, app getString code)
-        UITask(host showForm bld.create).run
         PaymentInfoWrap failOnUI rd
 
       case chan \ HTLCExpiryException(_, htlc) =>
         val paymentHash = htlc.add.paymentHash.toString
-        // Inform user about situation instead of force-closing automatically
         val bld = negTextBuilder(dialog_ok, app.getString(err_ln_expired).format(paymentHash).html)
         UITask(host showForm bld.setCustomTitle(chan.data.announce.toString.html).create).run
 
       case _ \ internal =>
-        // Internal error has happened, show stack trace
         val stackTrace = UncaughtHandler toText internal
         val bld = negTextBuilder(dialog_ok, stackTrace)
         UITask(host showForm bld.create).run

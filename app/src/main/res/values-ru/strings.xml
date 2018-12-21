@@ -172,7 +172,8 @@
     <string name="ln_no_open_chans">Нет открытых каналов</string>
 
     <string name="err_ln_peer_offline">Не удалось подключиться к узлу %1$s</string>
-    <string name="err_ln_remote_amount_high">Не получилось потому что сумма платежа слишком высока для вашего пира</string>
+    <string name="err_ln_peer_incompatible">Узел %1$s не поддерживает защиту от потери данных</string>
+    <string name="err_ln_remote_amount_high">Не получилось потому что общая сумма платежей в пути будет слишком высока для вашего пира</string>
     <string name="err_ln_remote_amount_low">Не получилось потому что сумма платежа слишком низка для вашего пира</string>
     <string name="err_ln_amount_overflow">Не получилось потому что сумма платежа превышет допустимый предел</string>
     <string name="err_ln_fulfilled">Не получилось потому что этот платежный запрос уже оплачен</string>

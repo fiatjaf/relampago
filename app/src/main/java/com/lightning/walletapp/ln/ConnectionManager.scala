@@ -23,16 +23,14 @@ object ConnectionManager {
 
   protected[this] val events = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = for (lst <- listeners) lst.onMessage(nodeId, msg)
+    override def onOperational(nodeId: PublicKey, isCompat: Boolean) = for (lst <- listeners) lst.onOperational(nodeId, isCompat)
     override def onTerminalError(nodeId: PublicKey) = for (lst <- listeners) lst.onTerminalError(nodeId)
-    override def onIncompatible(nodeId: PublicKey) = for (lst <- listeners) lst.onIncompatible(nodeId)
-    override def onOperational(nodeId: PublicKey) = for (lst <- listeners) lst.onOperational(nodeId)
     override def onDisconnect(nodeId: PublicKey) = for (lst <- listeners) lst.onDisconnect(nodeId)
   }
 
   def connectTo(ann: NodeAnnouncement, notify: Boolean) = connections get ann.nodeId match {
-    // Worker may already be present so in this case we immediately notify listeners if needed
+    case Some(workerIsPresent) => if (notify) events.onOperational(ann.nodeId, isCompat = true)
     case None => connections += ann.nodeId -> new Worker(ann)
-    case _ => if (notify) events onOperational ann.nodeId
   }
 
   class Worker(val ann: NodeAnnouncement) {
@@ -73,8 +71,9 @@ object ConnectionManager {
 
       message match {
         case their: Init =>
-          val isOk = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures)
-          if (isOk) events.onOperational(ann.nodeId) else events.onIncompatible(ann.nodeId)
+          val dlp = dataLossProtect(their.localFeatures)
+          val baseCompat = areSupported(their.localFeatures)
+          events.onOperational(ann.nodeId, dlp && baseCompat)
 
         case Ping(len, _) if len > 0 && len <= 65532 => handler process Pong("00" * len)
         case internalMessage => events.onMessage(ann.nodeId, internalMessage)
@@ -91,8 +90,7 @@ object ConnectionManager {
 
 class ConnectionListener {
   def onMessage(nodeId: PublicKey, msg: LightningMessage): Unit = none
+  def onOperational(nodeId: PublicKey, isCompat: Boolean): Unit = none
   def onTerminalError(nodeId: PublicKey): Unit = none
-  def onIncompatible(nodeId: PublicKey): Unit = none
-  def onOperational(nodeId: PublicKey): Unit = none
   def onDisconnect(nodeId: PublicKey): Unit = none
 }

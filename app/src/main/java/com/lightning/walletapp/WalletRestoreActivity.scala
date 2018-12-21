@@ -130,17 +130,16 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
 
       def restoreAnyChannel(some: HasCommitments) = {
         val chan = ChannelManager.createChannel(ChannelManager.operationalListeners, some)
-        // Restored channels have no local history and we can't guarantee watchtower has it
-        if (Channel isOperational chan) chan process ChannelManager.CMDLocalShutdown
         app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
+        // Do not use STORE because it invokes a backup upload
         ChannelWrap put some
         chan
       }
 
-      def restoreClosedChannel(cd: ClosingData) = {
+      def restoreClosedChannel(closing: ClosingData) = {
         // Closing channels may have in-flight 2nd level HTLCs present
-        app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
-        restoreAnyChannel(cd)
+        app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts closing)
+        restoreAnyChannel(closing)
       }
 
       def restoreChannel(some: HasCommitments) = some match {

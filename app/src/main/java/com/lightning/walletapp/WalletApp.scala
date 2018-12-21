@@ -196,16 +196,15 @@ object ChannelManager extends Broadcaster {
   var currentBlocksLeft: Int = Int.MaxValue
 
   val socketEventsListener = new ConnectionListener {
+    override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDLocalShutdown)
+    override def onOperational(nodeId: PublicKey, isCompat: Boolean) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
+
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
       case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
       case errAll: Error if errAll.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process errAll)
       case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
       case _ =>
     }
-
-    override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDLocalShutdown)
-    override def onOperational(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
-    override def onIncompatible(nodeId: PublicKey) = onTerminalError(nodeId)
 
     override def onDisconnect(nodeId: PublicKey) = for {
       affectedChans <- Obs just fromNode(notClosing, nodeId) if affectedChans.nonEmpty

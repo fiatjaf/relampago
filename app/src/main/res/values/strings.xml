@@ -174,7 +174,8 @@
     <string name="ln_no_open_chans">No open channels found</string>
 
     <string name="err_ln_peer_offline">Could not connect to remote peer at %1$s</string>
-    <string name="err_ln_remote_amount_high">Failed because payment amount is too high for your peer to accept</string>
+    <string name="err_ln_peer_incompatible">Peer %1$s does not support data loss protection</string>
+    <string name="err_ln_remote_amount_high">Failed because total in-flight amount would be too high for your peer to accept</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum</string>
     <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already</string>

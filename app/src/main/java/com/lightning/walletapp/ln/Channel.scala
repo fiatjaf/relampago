@@ -401,7 +401,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         cr.myCurrentPerCommitmentPoint -> ref.remoteLatestPoint match {
           case _ \ Some(ourSavedPoint) => ASKREFUNDPEER(ref, ourSavedPoint)
           case Some(theirPoint) \ _ => ASKREFUNDPEER(ref, theirPoint)
-          case _ =>
+          case _ => // They don't support data-loss-protect
         }
 
       case (norm: NormalData, cr: ChannelReestablish, SLEEPING)
