@@ -13,7 +13,6 @@
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Faster confirmation times</font></small></small>]]></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
     <string name="wallet_settings">Wallet settings</string>
-    <string name="recent_txs">Recent transactions</string>
     <string name="wallet_restore">Restore Wallet</string>
     <string name="wallet_create">New Wallet</string>
 

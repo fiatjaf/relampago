@@ -14,7 +14,6 @@
     <string name="copied_to_clipboard">Скопировано «%1$s»</string>
     <string name="wallet_restore">Восстановить кошелек</string>
     <string name="wallet_settings">Настройки кошелька</string>
-    <string name="recent_txs">Недавние транзакции</string>
     <string name="wallet_create">Новый кошелек</string>
 
     <array name="denoms">

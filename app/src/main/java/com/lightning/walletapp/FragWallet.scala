@@ -72,10 +72,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
   val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
 
-  val recentTxs = str2View(app getString recent_txs)
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
-  val recentTitle = recentTxs.findViewById(R.id.titleTip).asInstanceOf[TextView]
   val imageMap = Array(await, await, conf1, dead, frozen)
   val oneBtc = MilliSatoshi(100000000000L)
   val updTitleTask = UITask(updTitle)
@@ -230,7 +228,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // DISPLAYING ITEMS LIST
 
-  val minLinesNum = 4
+  val minLinesNum = 5
   var currentCut = minLinesNum
   var lnItems = Vector.empty[LNWrap]
   var btcItems = Vector.empty[BTCWrap]
@@ -247,7 +245,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
     mnemonicWarn setVisibility viewMap(allItems.isEmpty)
     itemsList setVisibility viewMap(allItems.nonEmpty)
-    recentTitle setVisibility viewMap(!isSearching)
     fiatDetails setVisibility viewMap(!isSearching)
   }
 
@@ -711,9 +708,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   itemsList setFooterDividersEnabled false
-  itemsList setHeaderDividersEnabled false
   itemsList addFooterView allTxsWrapper
-  itemsList addHeaderView recentTxs
   itemsList setAdapter adapter
 
   ConnectionManager.listeners += connectionListener
