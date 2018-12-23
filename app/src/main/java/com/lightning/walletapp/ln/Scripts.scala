@@ -278,14 +278,10 @@ object Scripts { me =>
     val toRemote = Satoshi(spec.toRemoteMsat / 1000L)
     val toLocal = Satoshi(spec.toLocalMsat / 1000L)
 
-    val localSat \ remoteSat = localIsFunder match {
-      case true => Tuple2(toLocal - commitFee, toRemote)
-      case false => Tuple2(toLocal, toRemote - commitFee)
-    }
-
     val redeem = toLocalDelayed(localRevocationPubkey, toLocalDelay, localDelayedPaymentPubkey)
-    val toLocalDelayedOutput = if (localSat < localDustLimit) Nil else TxOut(localSat, Script pay2wsh redeem) :: Nil
+    val localSat \ remoteSat = if (localIsFunder) Tuple2(toLocal - commitFee, toRemote) else Tuple2(toLocal, toRemote - commitFee)
     val toRemoteOutput = if (remoteSat < localDustLimit) Nil else TxOut(remoteSat, Script pay2wpkh remotePaymentPubkey) :: Nil
+    val toLocalDelayedOutput = if (localSat < localDustLimit) Nil else TxOut(localSat, Script pay2wsh redeem) :: Nil
 
     val htlcOfferedOutputs = trimOfferedHtlcs(dustLimit = localDustLimit, spec) map { add =>
       val offered = htlcOffered(localHtlcPubkey, remoteHtlcPubkey, localRevocationPubkey, add.hash160)
@@ -297,9 +293,9 @@ object Scripts { me =>
       TxOut(add.amount, Script pay2wsh received)
     }
 
-    // Make an obscured tx number as defined in BOLT #3 (a 48 bits integer) which we can use in case of contract breach
-    val txNumber = obscuredCommitTxNumber(commitTxNumber, localIsFunder, localPaymentBasePoint, remotePaymentBasePoint)
-    val (sequence, locktime) = encodeTxNumber(txNumber)
+    val sequence \ locktime =
+      me encodeTxNumber obscuredCommitTxNumber(commitTxNumber,
+        localIsFunder, localPaymentBasePoint, remotePaymentBasePoint)
 
     val outs = toLocalDelayedOutput ++ toRemoteOutput ++ htlcOfferedOutputs ++ htlcReceivedOutputs
     val in = TxIn(commitTxInput.outPoint, Array.emptyByteArray, sequence = sequence) :: Nil
