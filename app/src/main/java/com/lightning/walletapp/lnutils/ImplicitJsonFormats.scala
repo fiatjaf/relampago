@@ -413,4 +413,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val channelBalancesFmt = jsonFormat[List[ChannelBalanceInfo], String,
     ChannelBalances](ChannelBalances.apply, "localBalances", "tag")
+
+  // Top nodes
+
+  implicit val topNodesFmt = jsonFormat[StringVec, Long, TopNodes](TopNodes.apply, "nodes", "stamp")
 }

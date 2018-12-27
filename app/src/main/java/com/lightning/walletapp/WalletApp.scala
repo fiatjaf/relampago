@@ -32,6 +32,7 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCode
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.TxUploadAct
+import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
@@ -40,6 +41,7 @@ import java.util.Collections.singletonList
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
+import scala.concurrent.Future
 import scodec.bits.BitVector
 import android.widget.Toast
 import scodec.DecodeResult
@@ -163,6 +165,9 @@ class WalletApp extends Application { me =>
       wallet.addCoinsReceivedEventListener(ChannelManager.chainEventsListener)
       wallet.addTransactionConfidenceEventListener(ChannelManager.chainEventsListener)
       peerGroup.addDisconnectedEventListener(ChannelManager.chainEventsListener)
+
+      // Speed up initial connection by using a random top node
+      Future(peerGroup addAddress TopNodes.randomPeerAddress)
       peerGroup addPeerDiscovery new DnsDiscovery(params)
       peerGroup.setMinRequiredProtocolVersion(70015)
       peerGroup.setDownloadTxDependencies(0)

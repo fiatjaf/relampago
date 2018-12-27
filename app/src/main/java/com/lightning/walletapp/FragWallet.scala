@@ -495,7 +495,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     app.kit.peerGroup removeConnectedEventListener peersListener
     app.kit.wallet removeCoinsReceivedEventListener txsListener
     app.kit.wallet removeCoinsSentEventListener txsListener
-    RatesSaver.onUpdated -= updTitleTask
   }
 
   // LN SEND / RECEIVE
@@ -728,6 +727,5 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   app.kit.peerGroup addConnectedEventListener peersListener
   app.kit.wallet addCoinsReceivedEventListener txsListener
   app.kit.wallet addCoinsSentEventListener txsListener
-  RatesSaver.onUpdated += updTitleTask
   runAnd(react)(updBtcItems)
 }
