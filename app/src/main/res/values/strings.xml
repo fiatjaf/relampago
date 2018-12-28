@@ -143,12 +143,12 @@
     <string name="btc_pending_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br><small>delayed channel refunding</small><br>%1$s<br><br>pending %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
     <string name="btc_refunding">Refunding transaction</string>
 
-    <string name="txs_sum_chan"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
+    <string name="txs_sum_p2wsh"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
     <string name="txs_sum_out"><![CDATA[<font color=#E31300><tt>-</tt>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><tt>+</tt>%1$s</font>]]></string>
     <string name="txs_view_outside">View on SmartBit site</string>
     <string name="txs_share_body">Share raw transaction</string>
-    <string name="txs_p2wsh">Channel funding</string>
+    <string name="txs_p2wsh">Sent to contract</string>
 
     <array name="txs_confs">
         <item><![CDATA[<strong>awaiting&#160;confirmation</strong>]]></item>
@@ -294,7 +294,12 @@
     </array>
 
     <string name="joint_title">Guaranteed Delivery</string>
-    <string name="ln_joint_open_hint">Open a channel with a <a href='http://lightning-wallet.com/joint/'>Joint node</a> to enable guaranteed payments to the destinations listed below\n\nJoint node payment fee is 50 SAT + 0.025% of sum. It has an extended to-self-delay of 2880 blocks</string>
+
+    <string name="ln_joint_open_hint"><![CDATA[
+        Open a channel with a <a href=http://lightning-wallet.com/joint/>Joint node</a> to enable guaranteed
+        payments to the destinations listed below\n\nJoint node payment fee is 50 SAT + 0.025% of sum.
+        It has an extended to-self-delay of 2880 blocks
+    ]]></string>
 
     <string name="ln_ops_start_fund_incoming_title"><![CDATA[Remote peer wants to open a channel to you, all the opening costs are on them<br><br>Your share: %1$s<br>Capacity: %2$s]]></string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from external source</strong>]]></string>

@@ -38,7 +38,7 @@ case class Batch(unsigned: SendRequest, dummyScript: BinaryData, pr: PaymentRequ
     val info = getDescription(pr.description)
     val onchainSum = coloredOut apply pr.amount.get
     val onchainFee = coloredOut apply unsigned.tx.getFee
-    val channelSum = coloredChan apply Satoshi(fundingAmountSat)
+    val channelSum = coloredP2WSH apply Satoshi(fundingAmountSat)
     base.format(info, onchainSum, channelSum, onchainFee).html
   }
 }

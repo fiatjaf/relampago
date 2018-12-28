@@ -140,12 +140,12 @@
     <string name="btc_pending_title"><![CDATA[<font color=#E68A00><strong>Возврат денег из канала</strong></font><br>%1$s<br><br>сумма %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
     <string name="btc_refunding">Отложенная транзакция</string>
 
-    <string name="txs_sum_chan"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
+    <string name="txs_sum_p2wsh"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
     <string name="txs_sum_out"><![CDATA[<font color=#E31300><tt>-</tt>%1$s</font>]]></string>
     <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><tt>+</tt>%1$s</font>]]></string>
     <string name="txs_view_outside">Посмотреть на SmartBit</string>
     <string name="txs_share_body">Исходный код транзакции</string>
-    <string name="txs_p2wsh">Пополнение канала</string>
+    <string name="txs_p2wsh">Отправлено в контракт</string>
 
     <array name="txs_confs">
         <item><![CDATA[<strong>ожидает&#160;подтверждения</strong>]]></item>
@@ -295,7 +295,11 @@
     </array>
 
     <string name="joint_title">Гарантия доставки</string>
-    <string name="ln_joint_open_hint">Откройте канал с <a href='http://lightning-wallet.com/joint/'>Joint-узлом</a>, чтобы отправлять гарантированные платжи получателям, перечисленным ниже\n\nJoint-узел берет комиссию в размере 50 SAT + 0.025% суммы, параметр to-self-delay установлен на 2880 блоков</string>
+
+    <string name="ln_joint_open_hint"><![CDATA[
+        Откройте канал с <a href=http://lightning-wallet.com/joint/>Joint-узлом</a>, чтобы отправлять гарантированные платжи получателям,
+        перечисленным ниже\n\nJoint-узел берет комиссию в размере 50 SAT + 0.025% суммы, параметр to-self-delay установлен на 2880 блоков
+    ]]></string>
 
     <string name="ln_ops_start_fund_incoming_title"><![CDATA[Удаленный узел хочет открыть канал с вашим кошельком<br><br>Ваша доля: %1$s<br>Емкость: %2$s]]></string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про молнию</a></small><br><br>открытие нового канала<br><strong>из внешнего источника</strong>]]></string>

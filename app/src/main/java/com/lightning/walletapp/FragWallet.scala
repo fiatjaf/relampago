@@ -437,7 +437,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val color = if (wrap.visibleValue.isPositive) coloredIn else coloredOut
       val humanOutputs = wrap.directedScriptPubKeysWithValueTry(wrap.visibleValue.isPositive) collect {
-        case Success(chanFunding \ value) if chanFunding.isSentToP2WSH => P2WSHData(value, chanFunding).destination(coloredChan).html
+        case Success(chanFunding \ value) if chanFunding.isSentToP2WSH => P2WSHData(value, chanFunding).destination(coloredP2WSH).html
         case Success(pks \ value) if !ScriptPattern.isOpReturn(pks) => AddrData(value, pks getToAddress app.params).destination(color).html
       }
 
