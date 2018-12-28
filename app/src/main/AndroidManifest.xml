@@ -35,7 +35,9 @@
 
         </provider>
 
-        <service android:name="com.lightning.walletapp.helper.AwaitService"/>
+        <service
+            android:stopWithTask="true"
+            android:name="com.lightning.walletapp.helper.AwaitService"/>
 
         <activity
             android:name="com.lightning.walletapp.MainActivity"

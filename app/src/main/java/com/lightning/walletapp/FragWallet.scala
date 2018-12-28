@@ -148,10 +148,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     override def settled(cs: Commitments) =
-      if (cs.localCommit.spec.fulfilled.nonEmpty) {
-        host.awaitServiceIntent.setAction(AwaitService.CANCEL)
-        ContextCompat.startForegroundService(host, host.awaitServiceIntent)
-      }
+      if (cs.localCommit.spec.fulfilled.nonEmpty)
+        host stopService host.awaitServiceIntent
 
     override def onProcessSuccess = {
       case (chan, _: HasCommitments, remoteError: wire.Error) if errorLimit > 0 =>

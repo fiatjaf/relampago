@@ -29,13 +29,13 @@ object JsonHttpUtils {
     Obs.just(null).delay(delayLeft.millis).flatMap(_ => next)
   }
 
-  def obsOnIO = Obs just null subscribeOn IOScheduler.apply
   def repeat[T](obs: Obs[T], pick: (Unit, Int) => Duration, times: Range) =
     obs.repeatWhen(_.zipWith(Obs from times)(pick) flatMap Obs.timer)
 
   def retry[T](obs: Obs[T], pick: (Throwable, Int) => Duration, times: Range) =
     obs.retryWhen(_.zipWith(Obs from times)(pick) flatMap Obs.timer)
 
+  def obsOnIO = Obs just null subscribeOn IOScheduler.apply
   def to[T : JsonFormat](raw: String): T = raw.parseJson.convertTo[T]
   def pickInc(errorOrUnit: Any, next: Int) = next.seconds
 }
