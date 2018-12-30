@@ -59,14 +59,6 @@ object BtcDenomination extends Denomination {
   val factor = 100000000000L
 
   fmt setDecimalFormatSymbols symbols
-  def withSign(msat: MilliSatoshi) =
-    formatted(msat) + "\u00A0btc"
-
-  def formatted(msat: MilliSatoshi) = {
-    val basicFormattedSum = asString(msat)
-    val dotIndex = basicFormattedSum indexOf "."
-    val whole \ decimal = basicFormattedSum splitAt dotIndex
-    if (decimal == basicFormattedSum) basicFormattedSum
-    else s"$whole${decimal take 9}"
-  }
+  def withSign(msat: MilliSatoshi) = formatted(msat) + "\u00A0btc"
+  def formatted(msat: MilliSatoshi) = asString(msat) take 10
 }
