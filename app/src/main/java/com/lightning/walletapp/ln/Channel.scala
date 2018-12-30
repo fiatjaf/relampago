@@ -6,6 +6,7 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
 import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
+import scala.util.Success
 
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -13,7 +14,6 @@ import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
 import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import fr.acinq.bitcoin.Crypto.{Point, Scalar}
-import scala.util.{Failure, Success}
 
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
