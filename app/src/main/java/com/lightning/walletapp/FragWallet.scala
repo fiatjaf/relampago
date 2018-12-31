@@ -94,8 +94,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // LISTENERS
 
   val blocksTitleListener = new BlocksListener {
-    def onBlocksDownloaded(peer: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) =
-      if (left < 1) updPaymentList.run else if (left % broadcaster.blocksPerDay == 0) updTitleTask.run
+    def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) =
+      if (left % broadcaster.blocksPerDay == 0) updTitleTask.run
   }
 
   val peersListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {

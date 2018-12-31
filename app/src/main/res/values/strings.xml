@@ -5,10 +5,10 @@
 
     <!-- app wide -->
     <string name="step_fees"><![CDATA[<font color=#999999>Final step: miner fee</font><br><br>%1$s]]></string>
+    <string name="sets_rescan_ok">Do you want to rescan a blockchain right now? It will take some time</string>
     <string name="greetings">Bitcoin Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
-    <string name="mnemonic_info"><font color="#E31300">Mnemonic phrase is important</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Read about it</a> and save it now\n\n\n<small>swipe screen to the left\nto open a QR scanner</small></string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current %1$s<br>raised %2$s<br>]]></string>
-    <string name="sets_rescan_ok">Application is about to be closed now and blockchain rescanning will be automatically triggered on next launch</string>
+    <string name="mnemonic_info"><font color="#E31300">Mnemonic phrase is important</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Read about it</a> and save it now\n\n\n<small>swipe screen to the left\nto open a QR scanner</small></string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Confirmation may take hours</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Faster confirmation times</font></small></small>]]></string>
     <string name="copied_to_clipboard">Copied «%1$s»</string>
@@ -214,7 +214,7 @@
     <string name="ln_status_peer">Select peer</string>
     <string name="ln_share_debug">Share debug info</string>
     <string name="ln_share_pr">Share Payment Request</string>
-    <string name="ln_share_node_id">Share my LN Node Id</string>
+    <string name="ln_share_node_id">Share my LN Node ID</string>
     <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_description_hint">add some description</string>
     <string name="ln_no_description">No description provided</string>
@@ -261,7 +261,7 @@
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved<br><br>It it not recommended to close a channel right now and let those stuck payments to eventually become failed or fulfilled, would you still like to proceed?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; Note that closing right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closure</a> which requires additional fees and time, would you still like to proceed?]]></string>
-    <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close this channel and send a refunding transaction to the following address?<br><br><strong>%1$s</strong><br><br>Please make sure that address is the right one as this action can not be undone]]></string>
+    <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close this channel and send a refunding transaction to the following address?<br><br><strong>%1$s</strong><br><br>Please make sure that address is the right one as this action can not be undone!]]></string>
     <string name="ln_chan_close_confirm_local">Do you want to close this channel and send a refunding transaction back to this wallet?</string>
     <string name="ln_chan_close">Close channel</string>
 

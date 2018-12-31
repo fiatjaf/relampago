@@ -1,0 +1,317 @@
+<resources>
+    <string name="lang">ukr</string>
+    <string name="emerge_report">Показати звіт</string>
+    <string name="emerge_mode">Аварійний режим</string>
+
+    <!-- app wide -->
+    <string name="step_fees"><![CDATA[<font color=#999999>Оберіть комісію</font><br><br>%1$s]]></string>
+    <string name="sets_rescan_ok">Хочете пересканувати блокчейн прямо зараз? Це займе деякий час</string>
+    <string name="greetings">Bitcoin Гаманець-Блискавка\nОзнайомтесь з <a href='http://lightning-wallet.com'>інструкцією</a></string>
+    <string name="boost_details"><![CDATA[Хочете підняти комісію для цієї транзакції щоб підтвердити її швидше?<br><br>зараз %1$s<br>після %2$s]]></string>
+    <string name="mnemonic_info"><font color="#E31300">Мнемонічна фраза важлива!</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> навіщо він потрібен і збережіть його прямо зараз\n\n\n<small>Підказка: свайпніть вліво\nщоб відкрити QR сканер</small></string>
+    <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Може зайняти кілька годин</font></small></small>]]></string>
+    <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Більш швидке підтвердження</font></small></small>]]></string>
+    <string name="copied_to_clipboard">Скопійовано «%1$s»</string>
+    <string name="wallet_restore">Відновити гаманець</string>
+    <string name="wallet_settings">Налаштування гаманця</string>
+    <string name="wallet_create">Новий гаманець</string>
+
+    <array name="denoms">
+        <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 btc</small></font>]]></item>
+        <item><![CDATA[Bitcoin <font color=#999999><small>= 100 000 000 sat</small></font>]]></item>
+    </array>
+
+    <array name="restore_options">
+        <item>Мнемонічна фраза</item>
+        <item>Файл-снапшот гаманця</item>
+    </array>
+
+    <string name="restore_when">Коли ви створили гаманець? \n не змінюйте дату якщо не впевнені</string>
+    <string name="create_wallet_creating">Створюється новий гаманець \nЦе може зайняти декілька хвилин</string>
+    <string name="restore_wallet_restoring">Гаманець відновлюється \nЦе може зайняти декілька хвилин</string>
+    <string name="restore_mnemonic_wrong">Потрібно рівно 12 слів</string>
+    <string name="restore_hint">Ваш мнемонічний код</string>
+
+    <string name="channel_recovery_info">
+        Відновлювач скачує резервні копії ваших втрачених каналів з бекап-серверів і використовує
+        їх для відшкодування коштів назад в ваш он-чейн гаманець.\n\nОчікуйте зворотної транзакції незабаром
+        після запуску відновлювача якщо у вас є втрачені канали з грошима
+    </string>
+
+    <string name="tokens_warn"><![CDATA[
+        Будь ласка, майте на увазі: цей гаманець використовує <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>платні талони</a>
+        для зберігання зашифрованих резервних копій ваших каналів.<br><br>Автоматичний платіж-Блискавка сумою <i>%1$s</i> придбає 50 талонів
+        як тільки ви відкриєте перший канал.<br><br>Ці талони захистять вас від випадкової втрати грошей в каналах
+    ]]></string>
+
+    <string name="migrator_usage_warning"><![CDATA[
+        Файл-снапшот можна створити якщо ви хочете перенести гаманець з одного телефону на інший або видалити гаманець щоб незабаром його відновити.
+        <br><br>Файл-снапшот <strong>НЕ ПОТРІБНО</strong> використовувати для довготривалого зберігання або для створення багатьох копій одного і
+        того ж гаманця на різних телефонах!<br><br>Файл-снапшот <string>НЕ Є ЗАШИФРОВАНИМ</string>, тому не зберігайте його в публічних місцях.
+    ]]></string>
+
+    <string name="hivemind_details"><![CDATA[
+        <Strong>Hivemind deposits are disabled</strong><br><br>
+        It will be possible to deposit funds to Hivemind if <a href="http://www.drivechain.info/">Drivechain</a> soft-fork gets activated.<br><br>
+        <a href="http://bitcoinhivemind.com/">Hivemind</a> is a Peer-to-Peer Oracle Protocol which absorbs accurate data into a blockchain so that Bitcoin-users can speculate in Prediction Markets.<br><br>
+        These markets have the <a href=http://bitcoinhivemind.com/papers/3_PM_Applications.pdf>potential</a> to revolutionize the emergence and diffusion of knowledge in society.
+    ]]></string>
+
+    <!-- Olympus server -->
+    <string name="olympus_log">Лог дій</string>
+    <string name="olympus_add">Додати сервер</string>
+    <string name="olympus_edit">Змінити сервер</string>
+    <string name="olympus_actions">Додати, прибрати, перемістити</string>
+    <string name="olympus_backup">Бекап-сервер</string>
+    <string name="olympus_hint">хост: порт</string>
+
+    <array name="olympus_tokens_left">
+        <item><![CDATA[<small><i>талонів немає</i></small>]]></item>
+        <item><![CDATA[<small><i>%1$d талон</i></small>]]></item>
+        <item><![CDATA[<small><i>%1$d талона</i></small>]]></item>
+        <item><![CDATA[<small><i>%1$d талонів</i></small>]]></item>
+        <item><![CDATA[<small><i>бекап вимкнено</i></small>]]></item>
+    </array>
+
+    <!-- GDrive backups -->
+    <string name="gdrive_disabled">Бекап в GDrive вимкнений</string>
+    <string name="gdrive_not_present">Бекап поки відсутній</string>
+    <string name="gdrive_last_saved">Останнє збереження %1$s</string>
+    <string name="gdrive_failed">Не вийшло зберегти бекап</string>
+    <string name="sets_gdrive">Бекап каналів в GDrive</string>
+
+    <!-- menu and fab -->
+    <string name="sets_set_fiat">Обрати валюту</string>
+    <string name="sets_choose_unit">Обрати Біткоїн-юніт</string>
+    <string name="sets_manage_olympus">Налаштувати бекап-сервера</string>
+    <string name="sets_chan_recover">Відновлювач каналів</string>
+    <string name="sets_migrator">Зберегти файл-снапшот</string>
+    <string name="sets_mnemonic">Мнемонічний код</string>
+    <string name="sets_rescan">Рескан блокчейна</string>
+
+    <string name="action_coins_send">Послати гроші</string>
+    <string name="action_coins_receive">Отримати гроші</string>
+    <string name="action_ln_details">Стан каналів</string>
+    <string name="action_ln_open">Відчинити канал</string>
+
+    <!-- dialogs -->
+    <string name="amount_hint_sat"><![CDATA[Сума в Satoshi %1$s]]></string>
+    <string name="amount_hint_btc"><![CDATA[Сума в Bitcoin %1$s]]></string>
+    <string name="amount_hint_can_deliver"><![CDATA[<br><small><font color=#0099FE>can <strong>deliver</strong>%1$s</font></small>]]></string>
+    <string name="amount_hint_newchan"><![CDATA[<br><small>мінімум %1$s<br>максимум %2$s<br>баланс %3$s</small>]]></string>
+    <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
+    <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
+
+    <string name="dialog_pr_making">Створюю платіжний запит&#8230;</string>
+    <string name="olympus_recovering">Getting Olympus backups&#8230;</string>
+    <string name="dialog_pr_expired">Цей платіжний запит застарів</string>
+    <string name="dialog_sum_small">Сума занадто мала</string>
+    <string name="dialog_sum_big">Сума занадто велика</string>
+    <string name="dialog_pay_onchain">На ланцюзі</string>
+    <string name="dialog_cancel">Скасувати</string>
+    <string name="dialog_retry">Ще раз</string>
+    <string name="dialog_boost">CPFP</string>
+    <string name="dialog_next">Далі</string>
+    <string name="dialog_pay">Pay</string>
+    <string name="dialog_max">Max</string>
+    <string name="dialog_ok">OK</string>
+
+    <!-- notifications -->
+    <array name="info_progress">
+        <item>Синхронізацію завершено</item>
+        <item><![CDATA[<font color=#E68A00>Синхронізація %1$d день</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Синхронізація %1$d дня</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Синхронізація %1$d днів</font>]]></item>
+    </array>
+
+    <string name="btc_empty">Немає монет он-чейн</string>
+    <string name="ln_empty">Немає монет в каналах</string>
+    <string name="btc_status_operational">Гаманець онлайн</string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Пошук вузлів&#8230;</font>]]></string>
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>отримано %2$s<br><small>%3$s за поточним курсом</small>]]></string>
+    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small>]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
+
+    <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>отримано %2$s<br><small>%3$s за поточним курсом</small>]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small>]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
+    <string name="btc_pending_title"><![CDATA[<font color=#E68A00><strong>Повернення грошей з каналу</strong></font><br>%1$s<br><br>сума %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
+    <string name="btc_refunding">Відкладена транзакція</string>
+
+    <string name="txs_sum_p2wsh"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
+    <string name="txs_sum_out"><![CDATA[<font color=#E31300><tt>-</tt>%1$s</font>]]></string>
+    <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><tt>+</tt>%1$s</font>]]></string>
+    <string name="txs_view_outside">Подивитися на SmartBit</string>
+    <string name="txs_share_body">Вихідний код транзакції</string>
+    <string name="txs_p2wsh">Відправлено в контракт</string>
+
+    <array name="txs_confs">
+        <item><![CDATA[<strong>очікує підтвердження</strong>]]></item>
+        <item><![CDATA[<strong>%1$s подтврежденіе</strong>]]></item>
+        <item><![CDATA[<strong>%1$s підтвердження</strong>]]></item>
+        <item><![CDATA[<strong>%1$s підтверджень</strong>]]></item>
+    </array>
+
+    <string name="send_scan_qr">Сканувати QR-код</string>
+    <string name="send_paste_payment_request"><![CDATA[Вставити Біткоїн-адресу<br><font color=#999999><small>або платіжний запит-Блискавку</small></font>]]></string>
+    <string name="send_hivemind_deposit"><![CDATA[Відіслати в Hivemind<br><font color=#999999><small>сайдчейн для ринку передбачень</small></font>]]></string>
+    <string name="ln_send_title_guaranteed"><![CDATA[<font color=#FFFFFF><strong>Гарантована доставка</strong><small><br><br>%1$s</small></font>]]></string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послати платіж-Блискавку</strong></font><small><br><br>%1$s</small>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послати Біткоїн-транзакцію</strong></font>]]></string>
+
+    <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Створити запит-Блискавку</strong></font>]]></string>
+    <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запит-Блискавка</font><small><br><br>%1$s</small>]]></string>
+    <string name="btc_receive_option"><![CDATA[<font color=#E68A00>Біткоїн-транзакція</font><small><br><br>Створити QR-код зі звичайною адресою для отримання ончейн Біткоїн-транзакцій</small>]]></string>
+    <string name="ln_receive_6conf"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що ваш пір ще не готовий. Як правило це стається як тільки наповнююча канал Біткоїн-транзакція отримує 6 підтверджень]]></string>
+    <string name="ln_receive_reserve"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що для початку вам потрібно витратити хоча б %1$s щоб звільнити місце для отримання грошей]]></string>
+    <string name="ln_receive_ok">Створити QR-код з одноразовим запитом для отримання швидких оффчейн-платежів</string>
+    <string name="ln_chan_offline">Канал в офлайні, чекаємо&#8230;</string>
+    <string name="ln_no_open_chans">Немає відкритих каналів</string>
+
+    <string name="err_ln_peer_offline">Помилка з\'єднання з вузлом %1$s</string>
+    <string name="err_ln_peer_incompatible">Вузол %1$s не підтримує захист від втрати даних</string>
+    <string name="err_ln_remote_amount_high">Не вийшло тому що загальна сума платежів у шляху буде занадто висока для вашого бенкету</string>
+    <string name="err_ln_remote_amount_low">Не вийшло тому що сума платежу занадто низька для вашого бенкету</string>
+    <string name="err_ln_amount_overflow">Не вийшло тому що сума платежу превишет допустиму межу</string>
+    <string name="err_ln_fulfilled">Не вийшло тому що цей платіжний запит вже був оплачений</string>
+    <string name="err_ln_too_many">Не вийшло тому що занадто багато платежів уже в дорозі</string>
+    <string name="err_ln_frozen">Не вийшло тому що цей платіж заморожений</string>
+
+    <string name="err_ln_still_opening">Не вийшло тому що платіжний канал ще не відкритий\n\nНаповнююча канал Біткоїн-транзакція повинна отримати більше підтверджень перед тим як його можна буде використовувати для відправки платежів</string>
+    <string name="err_ln_second_reserve"><![CDATA[Не вийшло тому що баланс занадто низький з урахуванням софт-резерву<br><br>%1$s<br><br>хард-резерв %2$s<br>софт-резерв %3$s<br><br>ємність %4$s<br>ліміт %5$s<br>sending %6$s]]></string>
+    <string name="err_not_enough_funds"><![CDATA[<strong>Недостатньо коштів</strong><br><br>є %1$s<br>відправлено %2$s<br>не вистачає %3$s<br>очікується %4$s<br><br>Майте на увазі що очікувані Біткоїн-транзакції можна витрачати тільки після того як вони отримають хоча б одне підтверждення]]></string>
+    <string name="err_ln_expired"><![CDATA[Платіж застряг<br><br>Ви можете примусово закрити канал або зв\'язатися з піром, щоб він виправив проблему<br><br>Хеш платежу<br>%1$s]]></string>
+    <string name="err_empty_shrunk">Не вийшло тому що не вдалося підібрати потрібну суму комісії. Ви можете додати грошей в гаманець та спробувати еше раз</string>
+    <string name="err_tx_too_large">Не вийшло тому що розмір транзакції занадто великий. Спробуйте розбити її на кілька дрібніших транзакцій</string>
+    <string name="err_gdrive_sign_in_failed">Не вийшло залогінитися в GDrive, хочете продовжити без відновлення каналів з бекапів GDrive?</string>
+    <string name="err_self_payment">Не вийшло тому що ви намагаєтеся відправити платіж самому собі</string>
+    <string name="err_general">Не вийшло тому що сталася неочікувана помилка</string>
+    <string name="err_no_data">Нічого не знайдено</string>
+
+    <string name="err_fund_verify_error">Can not proceed with external funding because remote verification failed</string>
+    <string name="err_fund_not_verified_yet">Can not proceed with external funding because verification is not finished yet</string>
+    <string name="err_fund_reserve_failed">Can not proceed with external funding because a requested amount could not be reserved</string>
+    <string name="err_fund_reserve_expired">Can not proceed with external funding because your reserved amount hit an expiry deadline</string>
+    <string name="err_fund_funding_pending">Can not proceed with external funding because your reserved amount is still being allocated</string>
+    <string name="err_fund_funding_exists">Can not proceed with external funding because another reserved amount of yours exists already</string>
+    <string name="err_publish_error">Can not proceed with external funding because a funding transaction failed to broadcast</string>
+    <string name="err_fund_internal_error">Can not proceed with external funding because a remote internal error occurred</string>
+    <string name="err_fund_disconnect">Disconnected from external funder</string>
+
+    <string name="ex_fund_connecting"><![CDATA[<small>connecting to <i>%1$s</i></small><br>expires at <strong>%2$s</strong><br>funding amount %3$s<br>funding fee %4$s]]></string>
+    <string name="ex_fund_connected"><![CDATA[<small>connected to <i>%1$s</i></small><br>expires at <strong>%2$s</strong><br>funding amount %3$s<br>funding fee %4$s]]></string>
+    <string name="ex_fund_accept"><![CDATA[<small><i>%1$s</i></small><br>capacity %2$s<br>funding fee %3$s]]></string>
+
+    <string name="ln_open_batch_inform"><![CDATA[Платіжний запит буде оплачений разом з відкриттям нового каналу в єдиній Біткойн-транзакції з метою економії на комісії]]></string>
+    <string name="ln_open_batch_confirm"><![CDATA[Хочете оплатити запит і використати здачу для відкриття нового платіжного каналу?<br><br><small>%1$s</small><br><br>запит %2$s<br>канал %3$s<br>комса %4$s]]></string>
+
+    <!-- SPECIFIC TO LIGHTNING NETWORK -->
+
+    <string name="ln_status_peer">Оберіть піра</string>
+    <string name="ln_share_pr">Платіжний запит</string>
+    <string name="ln_share_node_id">ID мого LN-вузла</string>
+    <string name="ln_share_debug">Отладочна інформація</string>
+    <string name="ln_share_proof">Доказ платежу</string>
+    <string name="ln_description_hint">додайте опис</string>
+    <string name="ln_no_description">Опис відсутній</string>
+    <string name="ln_proof">Підписаний платіжний запит: %1$s\n\nПрообраз платежу: %2$s</string>
+    <string name="ln_qr_disposable"><![CDATA[Валідний протягом 2 днів<br>Не використовуйте цей QR повторно]]></string>
+
+    <!-- see PaymentInfo.scala -->
+    <array name="ln_payment_states">
+        <item>очікує отримання</item>
+        <item>знаходиться в дорозі</item>
+        <item>успішно оплачений</item>
+        <item>повернутий назад</item>
+        <item>заморожений</item>
+    </array>
+
+    <string name="ln_info_sent">value sent</string>
+    <string name="ln_info_received">value received</string>
+    <string name="ln_info_in_flight">value in-flight</string>
+    <string name="ln_info_can_receive">can receive</string>
+    <string name="ln_info_refundable">refundable</string>
+    <string name="ln_info_depth">funding depth</string>
+    <string name="ln_info_capacity">ємність</string>
+    <string name="ln_info_can_send">can send</string>
+    <string name="ln_info_fee">breaking fee</string>
+    <string name="ln_info_started">відкритий</string>
+    <string name="ln_info_closed">зачинений</string>
+
+    <string name="ln_info_funding">%1$s з %2$s</string>
+    <string name="ln_info_close_coop">Зачинений кооперативно</string>
+    <string name="ln_info_close_remote">Зачинений вашим піром</string>
+    <string name="ln_info_close_local">Зачинений вашим гаманцем</string>
+    <string name="ln_info_coop_attempt">Канал зачиняється&#8230;</string>
+    <string name="ln_info_unknown_spend">Виявлено невідома трата</string>
+    <string name="ln_info_no_receive">Receiving is not enabled by peer</string>
+    <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>вимкнений</small></font>]]></string>
+    <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>онлайн</small></font>]]></string>
+    <string name="ln_info_nothing"><![CDATA[<i>нічого</i>]]></string>
+
+    <string name="ln_info_status_open"><![CDATA[<font color=#6AAB38>ВІДЧИНЕНИЙ</font>]]></string>
+    <string name="ln_info_status_opening"><![CDATA[<font color=#E68A00>ВІДЧИНЯЄТЬСЯ</font>]]></string>
+    <string name="ln_info_status_shutdown"><![CDATA[<font color=#E68A00>ЗАЧИНЯЄТЬСЯ</font>]]></string>
+    <string name="ln_info_status_negotiations"><![CDATA[<font color=#E68A00>ПЕРЕГОВОРИ</font>]]></string>
+    <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
+
+    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В каналі є завислі платежі</font> тому кооперативне закриття буде відкладено поки вони не зникнуть<br><br>Рекомендується не закривати канал прямо зараз, а замість цього дати завислим платежам деякий час, все ще хочете продовжити?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[&#9888; Майте на увазі, що спроба закриття каналу прямо зараз призведе до <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсованого закриття</a>, на яке піде велика сума комісії і більше часу, все ще хочете продовжити?]]></string>
+    <string name="ln_chan_close_confirm_address"><![CDATA[Хочете закрити канал і відправити зворотню Біткоїн-транзакцію на наступну адресу?<br><br><strong>%1$s</strong><br><br>Переконайтеся, що адреса вірна, тому що пізніше закриття каналу не можна буде скасувати!]]></string>
+    <string name="ln_chan_close_confirm_local">Хочете закрити канал і відправити зворотню Біткоїн-транзакцію назад в цей гаманець?</string>
+    <string name="ln_chan_close">Зачинити канал</string>
+
+    <array name="ln_chan_actions_list">
+        <item>View funding transaction</item>
+        <item><![CDATA[Зберегти снапшот каналу<br><font color=#999999><small>містить приватні дані</small></font>]]></item>
+        <item><![CDATA[Зачинити на адресу<br><font color=#999999><small>спочатку скопіюйте адресу</small></font>]]></item>
+        <item>Закрити в цей гаманець</item>
+    </array>
+
+    <array name="ln_chan_present">
+        <item><![CDATA[Каналів немає]]></item>
+        <item><![CDATA[Усього %1$s канал]]></item>
+        <item><![CDATA[Усього %1$s канала]]></item>
+        <item><![CDATA[Усього %1$s каналів]]></item>
+    </array>
+
+    <array name="ln_status_expiry">
+        <item><![CDATA[застряглий платіж]]></item>
+        <item><![CDATA[залишився %1$s блок]]></item>
+        <item><![CDATA[залишилось %1$s блока]]></item>
+        <item><![CDATA[залишилось %1$s блоків]]></item>
+    </array>
+
+    <!-- opening a new channel -->
+    <array name="ln_ops_start_node_channels">
+        <item><![CDATA[<strong>Немає відчинених каналів</strong>]]></item>
+        <item><![CDATA[<strong>%1$s</strong> відчинений канал]]></item>
+        <item><![CDATA[<strong>%1$s</strong> відчинених канала]]></item>
+        <item><![CDATA[<strong>%1$s</strong> відчинених каналов]]></item>
+        <item><![CDATA[<i>Немає даних про канали</i>]]></item>
+    </array>
+
+    <string name="joint_title">Гарантія доставки</string>
+
+    <string name="ln_joint_open_hint">
+        Відчиніть канал з <a href='http://lightning-wallet.com/joint/'>Joint-вузлом</a>, щоб відправляти гарантовані платжі одержувачам,
+        перерахованим нижче\n\nJoint-вузол бере комісію в розмірі 50 SAT + 0.025% суми, параметр to-self-delay встановлений на 2880 блоків
+    </string>
+
+    <string name="ln_ops_start_fund_incoming_title"><![CDATA[Віддалений вузол хоче відкрити канал з вашим гаманцем<br><br>Ваша доля: %1$s<br>Ємність: %2$s]]></string>
+    <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Є питання?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про блискавку</a></small><br><br>відчиняється новий канал<br><strong>із зовнішнього джерела</strong>]]></string>
+    <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про блискавку</a></small><br><br>відчиняється новий канал<br><strong>платить ваш гаманець</strong>]]></string>
+    <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>відчинення каналу</i></font><br><small>%2$s</small><br><br><font color=#999999>ID піра</font><br><small>%3$s</small>]]></string>
+    <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
+    <string name="ln_ops_start_fund_incoming_channel">вхідний канал</string>
+    <string name="ln_url_resolving">опрацювання запиту</string>
+
+    <!-- Olympus log messages -->
+    <string name="olympus_log_channel_backup">Збережений зашифрований бекап каналу з «%1$s»</string>
+    <string name="olympus_log_watch_payments">Почато стеження за %1$s старими станами</string>
+    <string name="olympus_log_refunding_tx">Збережена відкладена зворотня транзакція</string>
+
+    <!-- Notification -->
+    <string name="notify_title">Очікується платіж-Блискавка</string>
+    <string name="notify_body">Додаток залишається відкритим, щоб отримати %1$s</string>
+</resources>
