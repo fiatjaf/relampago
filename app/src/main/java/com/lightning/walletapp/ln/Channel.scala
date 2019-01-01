@@ -404,11 +404,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case _ => // They don't support data-loss-protect
         }
 
-      case (norm: NormalData, cr: ChannelReestablish, SLEEPING)
-        // GUARD: we have started in NORMAL state but their nextRemoteRevocationNumber is too far away
-        if norm.commitments.localCommit.index < cr.nextRemoteRevocationNumber && cr.myCurrentPerCommitmentPoint.isDefined =>
-        val secret = Generators.perCommitSecret(norm.commitments.localParams.shaSeed, cr.nextRemoteRevocationNumber - 1)
-        if (cr.yourLastPerCommitmentSecret contains secret) ASKREFUNDPEER(norm, cr.myCurrentPerCommitmentPoint.get)
+
+      case (some: HasCommitments, cr: ChannelReestablish, SLEEPING)
+        // GUARD: their nextRemoteRevocationNumber is unexpectedly too far away
+        if some.commitments.localCommit.index < cr.nextRemoteRevocationNumber && cr.myCurrentPerCommitmentPoint.isDefined =>
+        val secret = Generators.perCommitSecret(some.commitments.localParams.shaSeed, cr.nextRemoteRevocationNumber - 1)
+        if (cr.yourLastPerCommitmentSecret contains secret) ASKREFUNDPEER(some, cr.myCurrentPerCommitmentPoint.get)
         else throw new LightningException
 
 
