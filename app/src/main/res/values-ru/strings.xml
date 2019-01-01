@@ -5,8 +5,8 @@
 
     <!-- app wide -->
     <string name="step_fees"><![CDATA[<font color=#999999>Выберите комиссию</font><br><br>%1$s]]></string>
-    <string name="sets_rescan_ok">Хотите пересканировать блокчейн прямо сейчас? Это займет некоторое время</string>
     <string name="greetings">Bitcoin Кошелек-Молния\nПрочитайте <a href='http://lightning-wallet.com'>инструкцию</a></string>
+    <string name="sets_rescan_ok">Хотите пересканировать блокчейн прямо сейчас? Процесс начнется автоматически при следующем запуске приложения</string>
     <string name="boost_details"><![CDATA[Хотите поднять комиссию для этой транзакции и подтвердить ее быстрее?<br><br>сейчас %1$s<br>после %2$s<br>]]></string>
     <string name="mnemonic_info"><font color="#E31300">Мнемонический код важен!</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> зачем он нужен и сохраните его прямо сейчас\n\n\n<small>Подсказка: свайпните влево\nчтобы открыть QR сканер</small></string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Может занять несколько часов</font></small></small>]]></string>
