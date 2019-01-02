@@ -4,7 +4,7 @@
     <string name="emerge_mode">Emergency mode</string>
 
     <!-- app wide -->
-    <string name="step_fees"><![CDATA[<font color=#999999>Final step: miner fee</font><br><br>%1$s]]></string>
+    <string name="step_fees"><![CDATA[<font color=#999999>Choose miner fee</font><br><br>%1$s]]></string>
     <string name="sets_rescan_ok">Wallet will be closed now and blockchain rescan is going to be started automatically on next launch</string>
     <string name="greetings">Bitcoin Lightning Wallet\nPlease read a short yet important\n<a href='http://lightning-wallet.com'>wallet manual</a> before proceeding</string>
     <string name="boost_details"><![CDATA[Would you like to raise a fee for this transaction and thus get it confirmed faster?<br><br>current %1$s<br>raised %2$s<br>]]></string>
@@ -147,7 +147,7 @@
     <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><tt>+</tt>%1$s</font>]]></string>
     <string name="txs_view_outside">View on SmartBit site</string>
     <string name="txs_share_body">Share raw transaction</string>
-    <string name="txs_p2wsh">Sent to contract</string>
+    <string name="txs_p2wsh">Contract funding</string>
 
     <array name="txs_confs">
         <item><![CDATA[<strong>awaiting&#160;confirmation</strong>]]></item>
@@ -183,10 +183,10 @@
 
     <string name="err_ln_still_opening">Failed because a payment channel is not open yet\n\nFunding transaction needs to get enough confirmations before a channel can be used to send payments</string>
     <string name="err_ln_second_reserve"><![CDATA[Failed because a channel balance is too low when soft reserve is taken into account<br><br>%1$s<br><br>hard reserve %2$s<br>soft reserve %3$s<br><br>capacity %4$s<br>can send %5$s<br>sending %6$s]]></string>
-    <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s<br>pending %4$s<br><br>Please note that pending Bitcoin transactions need to get at least one confirmation to become spendable]]></string>
     <string name="err_ln_expired"><![CDATA[Expired payment detected<br><br>You may force close a related channel but a better approach would be to contact a faulty peer and let them sort this out<br><br><strong>Expired payment hash</strong><br>%1$s]]></string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
     <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>
+    <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s]]></string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
     <string name="err_self_payment">Failed because payments to yourself are not allowed</string>
     <string name="err_general">Failed because an error has occurred</string>
@@ -308,12 +308,10 @@
     <string name="ln_ops_start_fund_incoming_channel">incoming channel</string>
     <string name="ln_url_resolving">Resolving request</string>
 
-    <!-- Olympus log messages -->
+    <!-- Olympus log messages and notification -->
     <string name="olympus_log_channel_backup">Saved an encrypted backup for a channel with «%1$s»</string>
     <string name="olympus_log_watch_payments">Started watching %1$s old channel states</string>
     <string name="olympus_log_refunding_tx">Scheduled a delayed refunding transaction</string>
-
-    <!-- Notification -->
-    <string name="notify_title">Waiting for incoming payment</string>
     <string name="notify_body">Keeping an app open to receive %1$s</string>
+    <string name="notify_title">Waiting for incoming payment</string>
 </resources>

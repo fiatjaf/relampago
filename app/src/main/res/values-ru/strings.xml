@@ -34,7 +34,7 @@
 
     <string name="channel_recovery_info">
         Восстановитель скачивает резервные копии ваших потерянных каналов с бэкап-серверов и использует
-        их для возмещения средств обратно в ваш ончейн кошелек.\n\nОжидайте возвратной транзакции вскоре после 
+        их для возмещения средств обратно в ваш он-чейн кошелек.\n\nОжидайте возвратной транзакции вскоре после
         запуска восстановителя если у вас есть потерянные каналы с деньгами
     </string>
 
@@ -67,9 +67,9 @@
 
     <array name="olympus_tokens_left">
         <item><![CDATA[<small><i>талонов нет</i></small>]]></item>
-        <item><![CDATA[<small><i>есть %1$d талон</i></small>]]></item>
-        <item><![CDATA[<small><i>есть %1$d талона</i></small>]]></item>
-        <item><![CDATA[<small><i>есть %1$d талонов</i></small>]]></item>
+        <item><![CDATA[<small><i>%1$d талон</i></small>]]></item>
+        <item><![CDATA[<small><i>%1$d талона</i></small>]]></item>
+        <item><![CDATA[<small><i>%1$d талонов</i></small>]]></item>
         <item><![CDATA[<small><i>бэкап отключен</i></small>]]></item>
     </array>
 
@@ -97,7 +97,6 @@
     <!-- dialogs -->
     <string name="amount_hint_sat"><![CDATA[Сумма в Satoshi%1$s]]></string>
     <string name="amount_hint_btc"><![CDATA[Сумма в Bitcoin%1$s]]></string>
-
     <string name="amount_hint_can_deliver"><![CDATA[<br><small><font color=#0099FE>can <strong>deliver</strong> %1$s</font></small>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>минимум %1$s<br>максимум %2$s<br>баланс %3$s</small>]]></string>
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
@@ -108,9 +107,9 @@
     <string name="dialog_pr_expired">Этот платежный запрос устарел</string>
     <string name="dialog_sum_small">Сумма слишком мала</string>
     <string name="dialog_sum_big">Сумма слишком велика</string>
-    <string name="dialog_pay_onchain">На цепи</string>
+    <string name="dialog_pay_onchain">Он-чейн</string>
     <string name="dialog_cancel">Отмена</string>
-    <string name="dialog_retry">Retry</string>
+    <string name="dialog_retry">Еще раз</string>
     <string name="dialog_boost">CPFP</string>
     <string name="dialog_next">Далее</string>
     <string name="dialog_pay">Pay</string>
@@ -144,7 +143,7 @@
     <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><tt>+</tt>%1$s</font>]]></string>
     <string name="txs_view_outside">Посмотреть на SmartBit</string>
     <string name="txs_share_body">Исходный код транзакции</string>
-    <string name="txs_p2wsh">Отправлено в контракт</string>
+    <string name="txs_p2wsh">Наполнение контракта</string>
 
     <array name="txs_confs">
         <item><![CDATA[<strong>ожидает&#160;подтверждения</strong>]]></item>
@@ -156,7 +155,6 @@
     <string name="send_scan_qr">Сканировать QR-код</string>
     <string name="send_paste_payment_request"><![CDATA[Вставить Биткоин-адрес<br><font color=#999999><small>или платежный запрос-Молнию</small></font>]]></string>
     <string name="send_hivemind_deposit"><![CDATA[Послать в Hivemind<br><font color=#999999><small>сайдчейн для рынка предсказаний</small></font>]]></string>
-
     <string name="ln_send_title_guaranteed"><![CDATA[<font color=#FFFFFF><strong>Гарантированная доставка</strong><small><br><br>%1$s</small></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послать Биткоин-транзакцию</strong></font>]]></string>
@@ -181,10 +179,10 @@
 
     <string name="err_ln_still_opening">Не получилось потому что платежный канал еще не открыт\n\nПополняющая канал Биткоин-транзакция должна получить больше подтверждений перед тем как его можно будет использовать для отправки платежей</string>
     <string name="err_ln_second_reserve"><![CDATA[Не получилось потому что баланс слишком низкий с учетом софт-резерва<br><br>%1$s<br><br>хард-резерв %2$s<br>софт-резерв %3$s<br><br>емоксть %4$s<br>лимит %5$s<br>sending %6$s]]></string>
-    <string name="err_not_enough_funds"><![CDATA[<strong>Недостаточно средств</strong><br><br>доступно %1$s<br>отправлено %2$s<br>не хватает %3$s<br>в ожидании %4$s<br><br>Учтите что входящие Биткоин-транзакции можно тратить только после того как они получат хотя-бы одно подтверждение]]></string>
     <string name="err_ln_expired"><![CDATA[Есть застрявший платеж<br><br>Вы можете принудительно закрыть канал или связаться с пиром, чтобы он исправил проблему<br><br>Хэш платежа<br>%1$s]]></string>
     <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии. Вы можете добавить денег в кошелек и попробовать еше раз</string>
     <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой. Попробуйте разбить ее на несколько более мелких транзакций</string>
+    <string name="err_not_enough_funds"><![CDATA[<strong>Недостаточно средств</strong><br><br>доступно %1$s<br>отправлено %2$s<br>не хватает %3$s]]></string>
     <string name="err_gdrive_sign_in_failed">Не получилось залогиниться в GDrive, хотите продолжить без восстановления каналов из бекапов GDrive?</string>
     <string name="err_self_payment">Не получилось потому что вы пытаетесь отправить платеж самому себе</string>
     <string name="err_general">Не получилось потому что произошла непредвиденная ошибка</string>
@@ -234,13 +232,13 @@
     <string name="ln_info_can_receive">can receive</string>
     <string name="ln_info_refundable">refundable</string>
     <string name="ln_info_depth">funding depth</string>
-    <string name="ln_info_capacity">емкость</string>
+    <string name="ln_info_fee">force-close fee</string>
+    <string name="ln_info_capacity">capacity</string>
     <string name="ln_info_can_send">can send</string>
-    <string name="ln_info_fee">breaking fee</string>
-    <string name="ln_info_started">открыт</string>
-    <string name="ln_info_closed">закрыт</string>
+    <string name="ln_info_started">started</string>
+    <string name="ln_info_closed">closed</string>
 
-    <string name="ln_info_funding">%1$s of %2$s</string>
+    <string name="ln_info_funding">%1$s из %2$s</string>
     <string name="ln_info_close_coop">Закрыт кооперативно</string>
     <string name="ln_info_close_remote">Закрыт удаленным узлом</string>
     <string name="ln_info_close_local">Закрыт вашим кошельком</string>
@@ -308,12 +306,10 @@
     <string name="ln_ops_start_fund_incoming_channel">входящий канал</string>
     <string name="ln_url_resolving">Обработка запроса</string>
 
-    <!-- Olympus log messages -->
+    <!-- Olympus log messages and notification -->
     <string name="olympus_log_channel_backup">Сохранен зашифрованный бекап для канала с «%1$s»</string>
     <string name="olympus_log_watch_payments">Начато наблюдение за %1$s старыми состояниями</string>
     <string name="olympus_log_refunding_tx">Сохранена отложенная возвратная транзакция</string>
-
-    <!-- Notification -->
-    <string name="notify_title">Ожидается платеж-молния</string>
     <string name="notify_body">Приложение остается открытым, чтобы получить %1$s</string>
+    <string name="notify_title">Ожидается платеж-молния</string>
 </resources>

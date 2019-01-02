@@ -145,7 +145,6 @@ class WalletApp extends Application { me =>
   abstract class WalletKit extends AbstractKit {
     def currentAddress = wallet currentAddress KeyPurpose.RECEIVE_FUNDS
     def conf0Balance = wallet getBalance BalanceType.ESTIMATED_SPENDABLE // Returns all utxos
-    def conf1Balance = wallet getBalance BalanceType.AVAILABLE_SPENDABLE // Uses coin selector
     def blockSend(txj: Transaction) = peerGroup.broadcastTransaction(txj, 1).broadcast.get
     def shutDown = none
 
@@ -161,7 +160,7 @@ class WalletApp extends Application { me =>
     }
 
     def setupAndStartDownload = {
-      wallet.setCoinSelector(new MinDepthReachedCoinSelector)
+      wallet.allowSpendingUnconfirmedTransactions
       wallet.autosaveToFile(walletFile, 1000, MILLISECONDS, null)
       wallet.addCoinsSentEventListener(ChannelManager.chainEventsListener)
       wallet.addCoinsReceivedEventListener(ChannelManager.chainEventsListener)

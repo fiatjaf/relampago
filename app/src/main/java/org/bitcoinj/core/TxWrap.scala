@@ -53,12 +53,11 @@ object TxWrap {
     val addrScript = ScriptBuilder.createOutputScript(where).getProgram
     val emptyThreshold = Coin.valueOf(LNParams.minCapacitySat * 2)
     val suggestedChanSum = Coin.valueOf(5000000L)
-    val totalBalance = app.kit.conf1Balance
 
     val candidates = for (idx <- 0 to 10) yield Try {
       // Try out a number of amounts to determine the largest change
       val increase = sum add Coin.valueOf(LNParams.minCapacitySat * idx)
-      val shouldEmpty = totalBalance minus increase isLessThan emptyThreshold
+      val shouldEmpty = app.kit.conf0Balance minus increase isLessThan emptyThreshold
       val req = if (shouldEmpty) emptyWallet(where) else to(where, increase)
 
       req.feePerKb = RatesSaver.rates.feeSix

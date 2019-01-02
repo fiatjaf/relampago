@@ -630,28 +630,24 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def sendBtcPopup(addr: Address)(and: Transaction => Unit): RateManager = {
     val form = host.getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
-    val baseHint = app.getString(amount_hint_can_send).format(denom withSign app.kit.conf1Balance)
+    val baseHint = app.getString(amount_hint_can_send).format(denom withSign app.kit.conf0Balance)
     val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
     val rateManager = new RateManager(form) hint baseHint
-
-    def next(ms: MilliSatoshi) = new TxProcessor {
-      def futureProcess(unsignedRequest: SendRequest) = {
-        val signedSpendTx = app.kit.sign(unsignedRequest).tx
-        and(app.kit blockSend signedSpendTx)
-      }
-
-      val pay = AddrData(ms, addr)
-      def retry = sendBtcPopup(addr)(and)
-      def onTxFail(sendingError: Throwable) = {
-        val bld = baseBuilder(title = messageWhenMakingTx(sendingError), null)
-        mkCheckForm(alert => rm(alert)(retry), none, bld, dialog_retry, dialog_cancel)
-      }
-    }
 
     def sendAttempt(alert: AlertDialog): Unit = rateManager.result match {
       case Success(ms) if MIN isGreaterThan ms => app toast dialog_sum_small
       case Failure(probablyEmptySum) => app toast dialog_sum_small
-      case Success(ms) => rm(alert)(next(ms).start)
+
+      case Success(ms) =>
+        val txProcessor = new TxProcessor {
+          def retry = sendBtcPopup(addr)(and)
+          def futureProcess(unsignedRequest: SendRequest) = and(app.kit blockSend app.kit.sign(unsignedRequest).tx)
+          def onTxFail(err: Throwable) = mkCheckForm(alert => rm(alert)(retry), none, baseBuilder(txMakeError(err), null), dialog_retry, dialog_cancel)
+          val pay = AddrData(ms, addr)
+        }
+
+        val coloredAmount = txProcessor.pay destination coloredOut
+        rm(alert)(txProcessor start coloredAmount)
     }
 
     val bld = baseBuilder(app.getString(btc_send_title).html, form)

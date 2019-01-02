@@ -125,31 +125,35 @@ class LNStartFundActivity extends TimerActivity { me =>
         val rateManager = new RateManager(content) hint getString(amount_hint_newchan).format(denom withSign minCap,
           denom withSign LNParams.maxCapacity, denom withSign app.kit.conf0Balance)
 
-        def next(msat: MilliSatoshi) = new TxProcessor {
-          val dummyKey: PublicKey = randomPrivKey.publicKey
-          val dummyScript = pubKeyScript(dummyKey, dummyKey)
-          val pay = P2WSHData(msat, dummyScript)
-
-          def futureProcess(unsigned: SendRequest) = {
-            val fee = LNParams.broadcaster.perKwThreeSat
-            val batch = Batch(unsigned, dummyScript, null)
-            val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
-            val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
-            val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
-            freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat, pushMsat = 0L)
-          }
-
-          def onTxFail(fundingError: Throwable) = {
-            val bld = baseBuilder(title = messageWhenMakingTx(fundingError), null)
-            mkCheckForm(alert => rm(alert)(finish), none, bld, dialog_ok, -1)
-          }
-        }
-
         def askAttempt(alert: AlertDialog) = rateManager.result match {
           case Success(ms) if ms < minCap => app toast dialog_sum_small
           case Success(ms) if ms > maxCap => app toast dialog_sum_big
-          case Success(ms) => rm(alert)(next(ms).start)
-          case _ => app toast dialog_sum_small
+
+          case Success(ms) =>
+            val txProcessor = new TxProcessor {
+              val dummyKey = randomPrivKey.publicKey
+              val dummyScript = pubKeyScript(dummyKey, dummyKey)
+              val pay = P2WSHData(ms, pay2wsh = dummyScript)
+
+              def futureProcess(unsigned: SendRequest) = {
+                val fee = LNParams.broadcaster.perKwThreeSat
+                val batch = Batch(unsigned, dummyScript, null)
+                val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
+                val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
+                val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
+                freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat, pushMsat = 0L)
+              }
+
+              def onTxFail(err: Throwable) =
+                mkCheckForm(alert => rm(alert)(finish), none,
+                  baseBuilder(txMakeError(err), null), dialog_ok, -1)
+            }
+
+            val coloredAmount = txProcessor.pay destination coloredP2WSH
+            rm(alert)(txProcessor start coloredAmount)
+
+          case _ =>
+            app toast dialog_sum_small
         }
 
         def useMax(alert: AlertDialog) = rateManager setSum Try(maxCap)

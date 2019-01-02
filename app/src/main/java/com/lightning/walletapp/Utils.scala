@@ -199,10 +199,8 @@ trait TimerActivity extends AppCompatActivity { me =>
     def onTxFail(exc: Throwable)
     val pay: PayData
 
-    // Estimate a real fee this tx will have in order to be confirmed within next 6 blocks
-    def start = <(app.kit sign plainRequest(RatesSaver.rates.feeSix), onTxFail)(chooseFee)
-
-    def chooseFee(estimate: SendRequest): Unit = {
+    def start(coloredAmount: String) = <(app.kit sign plainRequest(RatesSaver.rates.feeSix), onTxFail) { estimate =>
+      // Estimate a real fee this tx will have in order to be confirmed within next 6 blocks, then propose chaper one
       val livePerTxFee: MilliSatoshi = estimate.tx.getFee
       val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
 
@@ -223,7 +221,7 @@ trait TimerActivity extends AppCompatActivity { me =>
         case 1 => self futureProcess plainRequest(RatesSaver.rates.feeSix)
       }, onTxFail)(none)
 
-      val bld = baseBuilder(getString(step_fees).format(pay destination coloredOut).html, form)
+      val bld = baseBuilder(getString(step_fees).format(coloredAmount).html, form)
       mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_pay, dialog_cancel)
       lst setAdapter new ArrayAdapter(me, singleChoice, feesOptions)
       lst.setItemChecked(0, true)
@@ -236,19 +234,16 @@ trait TimerActivity extends AppCompatActivity { me =>
       unsignedRequestWithFee
     }
 
-    def messageWhenMakingTx: PartialFunction[Throwable, CharSequence] = {
+    def txMakeError: PartialFunction[Throwable, CharSequence] = {
       case _: ExceededMaxTransactionSize => app getString err_tx_too_large
       case _: CouldNotAdjustDownwards => app getString err_empty_shrunk
       case notEnough: InsufficientMoneyException =>
 
-        val canSend = sumIn.format(denom withSign app.kit.conf1Balance)
-        val sending = sumOut.format(denom withSign pay.cn)
-
-        val txt = getString(err_not_enough_funds)
-        val zeroConfs = app.kit.conf0Balance minus app.kit.conf1Balance
+        val canSend = sumIn.format(denom withSign app.kit.conf0Balance)
         val missing = sumOut.format(denom withSign notEnough.missing)
-        val pending = sumIn format denom.withSign(zeroConfs)
-        txt.format(canSend, sending, missing, pending).html
+        val sending = sumOut.format(denom withSign pay.cn)
+        val txt = me getString err_not_enough_funds
+        txt.format(canSend, sending, missing).html
 
       case _: Throwable =>
         app getString err_general
@@ -284,26 +279,19 @@ class RateManager(val content: View) { me =>
 }
 
 trait PayData {
-  // Emptying a wallet needs special handling
   def destination(mark: MilliSatoshi => String): String
-  def isAll = app.kit.conf1Balance equals cn
   def getRequest: SendRequest
   def cn: Coin
-
-  def transform(mark: MilliSatoshi => String) = {
-    val formattedAmount = mark apply coin2MSat(cn)
-    s"<small>$formattedAmount</small><br>"
-  }
 }
 
 case class AddrData(cn: Coin, address: Address) extends PayData {
-  def getRequest: SendRequest = if (isAll) emptyWallet(address) else to(address, cn)
-  def destination(mark: MilliSatoshi => String) = transform(mark) + humanSix(address.toString)
+  def getRequest: SendRequest = if (app.kit.conf0Balance equals cn) emptyWallet(address) else to(address, cn)
+  def destination(marker: MilliSatoshi => String) = s"<small>${marker apply cn}</small><br>" + humanSix(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
-  def getRequest = if (isAll) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
-  def destination(mark: MilliSatoshi => String) = transform(mark) + app.getString(txs_p2wsh)
+  def getRequest = if (app.kit.conf0Balance equals cn) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
+  def destination(marker: MilliSatoshi => String) = s"<small>${marker apply cn}</small><br>" + app.getString(txs_p2wsh)
 }
 
 abstract class TextChangedWatcher extends TextWatcher {
@@ -320,11 +308,4 @@ trait BlocksListener extends PeerDataEventListener {
 trait TxTracker extends WalletCoinsSentEventListener with WalletCoinsReceivedEventListener with TransactionConfidenceEventListener {
   def onTransactionConfidenceChanged(w: Wallet, txj: Transaction) = if (txj.getConfidence.getDepthInBlocks == minDepth) txConfirmed(txj)
   def txConfirmed(txj: Transaction): Unit = none
-}
-
-class MinDepthReachedCoinSelector
-extends org.bitcoinj.wallet.DefaultCoinSelector {
-  override def shouldSelect(txj: Transaction): Boolean =
-    if (null != txj) txj.getConfidence.getDepthInBlocks >= minDepth
-    else true
 }
