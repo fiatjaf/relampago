@@ -171,7 +171,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case lnLink: LNUrl =>
         // TransData value will be erased here
         lnLink.resolve.foreach(initConnection, none)
-        app toast ln_url_resolving
+        app toast ln_url_requesting
         me returnToBase null
 
       case address: Address =>

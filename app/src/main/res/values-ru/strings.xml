@@ -295,13 +295,12 @@
         перечисленным ниже\n\nJoint-узел берет комиссию в размере 50 SAT + 0.025% суммы, параметр to-self-delay установлен на 2880 блоков
     </string>
 
-    <string name="ln_ops_start_fund_incoming_title"><![CDATA[Удаленный узел хочет открыть канал с вашим кошельком<br><br>Ваша доля: %1$s<br>Емкость: %2$s]]></string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про молнию</a></small><br><br>открытие нового канала<br><strong>из внешнего источника</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про молнию</a></small><br><br>открытие нового канала<br><strong>платит ваш кошелек</strong>]]></string>
     <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>открытие канала</i></font><br><small>%2$s</small><br><br><font color=#999999>ID пира</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
     <string name="ln_ops_start_fund_incoming_channel">входящий канал</string>
-    <string name="ln_url_resolving">Обработка запроса</string>
+    <string name="ln_url_requesting">Запрос на новый канал&#8230;</string>
 
     <!-- Olympus log messages and notification -->
     <string name="olympus_log_channel_backup">Сохранен зашифрованный бекап для канала с «%1$s»</string>

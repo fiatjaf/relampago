@@ -116,22 +116,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val connectionListener = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, incomingMessage: LightningMessage) = incomingMessage match {
-      case open: OpenChannel if System.currentTimeMillis > lastOpenMsecStamp + 15000L && open.channelFlags == 0.toByte =>
-        // We only consider incoming channels if they are private and last message arrived more than 15 seconds ago
+      case open: OpenChannel if System.currentTimeMillis > lastOpenMsecStamp + 10000L && open.channelFlags == 0.toByte =>
+        // We only consider incoming channels if they are private and last message arrived more than 10 seconds ago
 
-        def proceed = ConnectionManager.connections get nodeId foreach { worker =>
-          val nodeView = HardcodedNodeView(worker.ann, StartNodeView.incomingChannel)
-          app.TransData.value = IncomingChannelParams(nodeView, open)
+        lastOpenMsecStamp = System.currentTimeMillis
+        ConnectionManager.connections get nodeId foreach { worker =>
+          val hnv = HardcodedNodeView(worker.ann, StartNodeView.incomingChannel)
+          app.TransData.value = IncomingChannelParams(hnv, open)
           host goTo classOf[LNStartFundActivity]
         }
-
-        UITask {
-          val yourBalance = denom.coloredIn(MilliSatoshi(open.pushMsat), denom.sign)
-          val capacity = denom.coloredP2WSH(MilliSatoshi(open.fundingSatoshis * 1000L), denom.sign)
-          val title = app.getString(ln_ops_start_fund_incoming_title).format(yourBalance, capacity).html
-          mkCheckForm(alert => rm(alert)(proceed), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
-          lastOpenMsecStamp = System.currentTimeMillis
-        }.run
 
       case _ =>
     }
