@@ -101,7 +101,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_settings
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-    getSupportActionBar setSubtitle "App version 0.3-93"
+    getSupportActionBar setSubtitle "App version 0.3-94"
     getSupportActionBar setTitle wallet_settings
     updateBackupView
 
