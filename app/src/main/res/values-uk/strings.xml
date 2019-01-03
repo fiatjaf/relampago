@@ -136,11 +136,8 @@
     <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small>]]></string>
     <string name="btc_outgoing_title"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
     <string name="btc_pending_title"><![CDATA[<font color=#E68A00><strong>Повернення грошей з каналу</strong></font><br>%1$s<br><br>сума %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
-    <string name="btc_refunding">Відкладена транзакція</string>
 
-    <string name="txs_sum_p2wsh"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
-    <string name="txs_sum_out"><![CDATA[<font color=#E31300><tt>-</tt>%1$s</font>]]></string>
-    <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><tt>+</tt>%1$s</font>]]></string>
+    <string name="btc_refunding">Відкладена транзакція</string>
     <string name="txs_view_outside">Подивитися на SmartBit</string>
     <string name="txs_share_body">Вихідний код транзакції</string>
     <string name="txs_p2wsh">Наповнення контракту</string>
@@ -182,7 +179,7 @@
     <string name="err_ln_expired"><![CDATA[Платіж застряг<br><br>Ви можете примусово закрити канал або зв\'язатися з піром, щоб він виправив проблему<br><br>Хеш платежу<br>%1$s]]></string>
     <string name="err_empty_shrunk">Не вийшло тому що не вдалося підібрати потрібну суму комісії. Ви можете додати грошей в гаманець та спробувати еше раз</string>
     <string name="err_tx_too_large">Не вийшло тому що розмір транзакції занадто великий. Спробуйте розбити її на кілька дрібніших транзакцій</string>
-    <string name="err_not_enough_funds"><![CDATA[<strong>Недостатньо коштів</strong><br><br>є %1$s<br>відправлено %2$s<br>не вистачає %3$s]]></string>
+    <string name="err_not_enough_funds"><![CDATA[<strong>Недостатньо коштів</strong><br><br>доступно %1$s<br>відправлено %2$s<br>не вистачає %3$s]]></string>
     <string name="err_gdrive_sign_in_failed">Не вийшло залогінитися в GDrive, хочете продовжити без відновлення каналів з бекапів GDrive?</string>
     <string name="err_self_payment">Не вийшло тому що ви намагаєтесь відправити платіж самому собі</string>
     <string name="err_general">Не вийшло тому що сталася неочікувана помилка</string>

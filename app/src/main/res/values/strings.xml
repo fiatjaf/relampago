@@ -140,11 +140,8 @@
     <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
     <string name="btc_pending_title"><![CDATA[<font color=#FF9900><strong>Bitcoin transaction</strong></font><br><small>delayed channel refunding</small><br>%1$s<br><br>pending %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
-    <string name="btc_refunding">Refunding transaction</string>
 
-    <string name="txs_sum_p2wsh"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
-    <string name="txs_sum_out"><![CDATA[<font color=#E31300><tt>-</tt>%1$s</font>]]></string>
-    <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><tt>+</tt>%1$s</font>]]></string>
+    <string name="btc_refunding">Refunding transaction</string>
     <string name="txs_view_outside">View on SmartBit site</string>
     <string name="txs_share_body">Share raw transaction</string>
     <string name="txs_p2wsh">Contract funding</string>

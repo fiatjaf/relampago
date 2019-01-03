@@ -122,8 +122,8 @@ class LNStartFundActivity extends TimerActivity { me =>
         val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
         val maxCap = MilliSatoshi(math.min(app.kit.conf0Balance.value, LNParams.maxCapacity.amount) * 1000L)
         val minCap = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat * 3, LNParams.minCapacitySat) * 1000L)
-        val rateManager = new RateManager(content) hint getString(amount_hint_newchan).format(denom withSign minCap,
-          denom withSign LNParams.maxCapacity, denom withSign app.kit.conf0Balance)
+        val rateManager = new RateManager(content) hint getString(amount_hint_newchan).format(denom formattedWithSign minCap,
+          denom formattedWithSign LNParams.maxCapacity, denom formattedWithSign app.kit.conf0Balance)
 
         def askAttempt(alert: AlertDialog) = rateManager.result match {
           case Success(ms) if ms < minCap => app toast dialog_sum_small
@@ -149,8 +149,9 @@ class LNStartFundActivity extends TimerActivity { me =>
                   baseBuilder(txMakeError(err), null), dialog_ok, -1)
             }
 
-            val coloredAmount = txProcessor.pay destination coloredP2WSH
-            rm(alert)(txProcessor start coloredAmount)
+            val coloredAmount = denom.coloredP2WSH(txProcessor.pay.cn, denom.sign)
+            val coloredExplanation = txProcessor.pay destination coloredAmount
+            rm(alert)(txProcessor start coloredExplanation)
 
           case _ =>
             app toast dialog_sum_small
@@ -215,7 +216,8 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       private def askExternalFundingConfirm(started: Started) = UITask {
-        val capacity \ fundingFee = coloredIn(started.start.fundingAmount) -> coloredOut(started.fee)
+        val fundingFee = denom.coloredOut(msat = started.fee, denom.sign)
+        val capacity = denom.coloredIn(msat = started.start.fundingAmount, denom.sign)
         val content = getString(ex_fund_accept).format(started.start.host, capacity, fundingFee)
 
         mkCheckForm(alert => rm(alert) {

@@ -219,7 +219,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val maxCanReceiveMsat = operationalChannelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L
     val maxCanReceive = MilliSatoshi(maxCanReceiveMsat)
 
-    val reserveUnspent = getString(ln_receive_reserve) format coloredOut(-maxCanReceive) // Negate to cancel out a minus
+    val reserveUnspent = getString(ln_receive_reserve) format denom.coloredOut(-maxCanReceive, denom.sign)
     val lnReceiveText = if (operationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_no_open_chans)
       else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_option).format(me getString ln_receive_6conf)
       else if (maxCanReceiveMsat < 0L) getString(ln_receive_option).format(reserveUnspent)
@@ -228,11 +228,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val options = Array(lnReceiveText.html, getString(btc_receive_option).html)
     val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_receive, lst).create)
-
-    lst setDivider null
-    lst setDividerHeight 0
-    lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
     lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
+    lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
+    lst setDividerHeight 0
+    lst setDivider null
 
     def onChain = rm(alert) {
       app.TransData.value = app.kit.currentAddress
@@ -275,8 +274,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def goStart = me goTo classOf[LNStartActivity]
   def goOps(top: View) = me goTo classOf[LNOpsActivity]
   def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
-    val humanPrice = s"${coloredIn apply tokensPrice} <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
-    val warn = baseTextBuilder(getString(tokens_warn).format(humanPrice).html).setCustomTitle(me getString action_ln_open)
-    mkCheckForm(alert => rm(alert)(goStart), none, warn, dialog_ok, dialog_cancel)
+    val coloredAmount = denom.coloredIn(msat = tokensPrice, denom.sign)
+    val warn = getString(tokens_warn) format s"$coloredAmount <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
+    mkCheckForm(alert => rm(alert)(goStart), none, baseTextBuilder(warn.html).setCustomTitle(me getString action_ln_open), dialog_ok, dialog_cancel)
   } else goStart
 }

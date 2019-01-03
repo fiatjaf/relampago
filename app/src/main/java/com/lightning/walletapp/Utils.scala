@@ -50,13 +50,8 @@ object Utils {
   final val chainFileName = s"$fileName.spvchain"
 
   lazy val app = appReference
-  lazy val sumIn = app getString txs_sum_in
-  lazy val sumOut = app getString txs_sum_out
   lazy val noDesc = app getString ln_no_description
   lazy val denoms = List(SatDenomination, BtcDenomination)
-  val coloredP2WSH: MilliSatoshi => String = amt => app.getString(txs_sum_p2wsh).format(denom withSign amt)
-  val coloredOut: MilliSatoshi => String = amt => sumOut.format(denom withSign amt)
-  val coloredIn: MilliSatoshi => String = amt => sumIn.format(denom withSign amt)
   val singleChoice = android.R.layout.select_dialog_singlechoice
 
   // Mappings
@@ -206,8 +201,8 @@ trait TimerActivity extends AppCompatActivity { me =>
 
       val inFiatLive = msatInFiatHuman(livePerTxFee)
       val inFiatRisky = msatInFiatHuman(riskyPerTxFee)
-      val markedLivePerTxFee = coloredOut(livePerTxFee)
-      val markedRiskyPerTxFee = coloredOut(riskyPerTxFee)
+      val markedLivePerTxFee = denom.coloredOut(livePerTxFee, denom.sign)
+      val markedRiskyPerTxFee = denom.coloredOut(riskyPerTxFee, denom.sign)
 
       val txtFeeLive = getString(fee_live).format(markedLivePerTxFee, inFiatLive)
       val txtFeeRisky = getString(fee_risky).format(markedRiskyPerTxFee, inFiatRisky)
@@ -239,11 +234,10 @@ trait TimerActivity extends AppCompatActivity { me =>
       case _: CouldNotAdjustDownwards => app getString err_empty_shrunk
       case notEnough: InsufficientMoneyException =>
 
-        val canSend = sumIn.format(denom withSign app.kit.conf0Balance)
-        val missing = sumOut.format(denom withSign notEnough.missing)
-        val sending = sumOut.format(denom withSign pay.cn)
-        val txt = me getString err_not_enough_funds
-        txt.format(canSend, sending, missing).html
+        val sending = denom.coloredOut(pay.cn, denom.sign)
+        val missing = denom.coloredOut(notEnough.missing, denom.sign)
+        val canSend = denom.coloredIn(app.kit.conf0Balance, denom.sign)
+        getString(err_not_enough_funds).format(canSend, sending, missing).html
 
       case _: Throwable =>
         app getString err_general
@@ -279,19 +273,19 @@ class RateManager(val content: View) { me =>
 }
 
 trait PayData {
-  def destination(mark: MilliSatoshi => String): String
+  def destination(colored: String): String
   def getRequest: SendRequest
   def cn: Coin
 }
 
 case class AddrData(cn: Coin, address: Address) extends PayData {
   def getRequest: SendRequest = if (app.kit.conf0Balance equals cn) emptyWallet(address) else to(address, cn)
-  def destination(marker: MilliSatoshi => String) = s"<small>${marker apply cn}</small><br>" + humanSix(address.toString)
+  def destination(colored: String) = s"<small>$colored</small><br>" + humanSix(address.toString)
 }
 
 case class P2WSHData(cn: Coin, pay2wsh: Script) extends PayData {
   def getRequest = if (app.kit.conf0Balance equals cn) emptyWallet(app.params, pay2wsh) else to(app.params, pay2wsh, cn)
-  def destination(marker: MilliSatoshi => String) = s"<small>${marker apply cn}</small><br>" + app.getString(txs_p2wsh)
+  def destination(colored: String) = s"<small>$colored</small><br>" + app.getString(txs_p2wsh)
 }
 
 abstract class TextChangedWatcher extends TextWatcher {

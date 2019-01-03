@@ -417,11 +417,11 @@ object ChannelManager extends Broadcaster {
 
       // We should explain to user what exactly is going on here
       case Some(rep) if rep.estimateFinalCanSend < rd.firstMsat =>
-        val sendingNow = coloredOut apply MilliSatoshi(rd.firstMsat)
-        val finalCanSend = coloredIn apply MilliSatoshi(rep.estimateFinalCanSend)
-        val capacity = coloredIn apply MilliSatoshi(Commitments.latestRemoteCommit(rep.cs).spec.toRemoteMsat)
-        val hardReserve = coloredOut apply Satoshi(rep.cs.reducedRemoteState.myFeeSat + rep.cs.remoteParams.channelReserveSatoshis)
-        Left(app.getString(err_ln_second_reserve).format(rep.chan.data.announce.alias, hardReserve, coloredOut(rep.softReserve),
+        val sendingNow = denom.coloredOut(MilliSatoshi(rd.firstMsat), denom.sign)
+        val finalCanSend = denom.coloredIn(MilliSatoshi(rep.estimateFinalCanSend), denom.sign)
+        val capacity = denom.coloredIn(MilliSatoshi(Commitments.latestRemoteCommit(rep.cs).spec.toRemoteMsat), denom.sign)
+        val hardReserve = denom.coloredOut(Satoshi(rep.cs.reducedRemoteState.myFeeSat + rep.cs.remoteParams.channelReserveSatoshis), denom.sign)
+        Left(app.getString(err_ln_second_reserve).format(rep.chan.data.announce.alias, hardReserve, denom.coloredOut(rep.softReserve, denom.sign),
           capacity, finalCanSend, sendingNow).html)
 
       case None => Left(app getString ln_no_open_chans)

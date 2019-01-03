@@ -136,11 +136,8 @@
     <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
     <string name="btc_outgoing_title"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
     <string name="btc_pending_title"><![CDATA[<font color=#E68A00><strong>Возврат денег из канала</strong></font><br>%1$s<br><br>сумма %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
-    <string name="btc_refunding">Отложенная транзакция</string>
 
-    <string name="txs_sum_p2wsh"><![CDATA[<font color=#0099FE><tt>+</tt>%1$s</font>]]></string>
-    <string name="txs_sum_out"><![CDATA[<font color=#E31300><tt>-</tt>%1$s</font>]]></string>
-    <string name="txs_sum_in"><![CDATA[<font color=#6AAB38><tt>+</tt>%1$s</font>]]></string>
+    <string name="btc_refunding">Отложенная транзакция</string>
     <string name="txs_view_outside">Посмотреть на SmartBit</string>
     <string name="txs_share_body">Исходный код транзакции</string>
     <string name="txs_p2wsh">Наполнение контракта</string>
