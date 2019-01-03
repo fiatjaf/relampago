@@ -259,8 +259,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val localCommitFmt = jsonFormat[Long, CommitmentSpec, Seq[HtlcTxAndSigs], CommitTx,
     LocalCommit](LocalCommit.apply, "index", "spec", "htlcTxsAndSigs", "commitTx")
 
-  implicit val remoteCommitFmt = jsonFormat[Long, CommitmentSpec, BinaryData, Option[Transaction], Point,
-    RemoteCommit](RemoteCommit.apply, "index", "spec", "txid", "txOpt", "remotePerCommitmentPoint")
+  implicit val remoteCommitFmt = jsonFormat[Long, CommitmentSpec, Option[Transaction], Point,
+    RemoteCommit](RemoteCommit.apply, "index", "spec", "txOpt", "remotePerCommitmentPoint")
 
   implicit val waitingForRevocationFmt = jsonFormat[RemoteCommit, CommitSig, Long,
     WaitingForRevocation](WaitingForRevocation.apply, "nextRemoteCommit", "sent",

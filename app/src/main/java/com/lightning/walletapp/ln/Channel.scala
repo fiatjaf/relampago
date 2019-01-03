@@ -117,7 +117,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         if (Scripts.checkValid(signedLocalCommitTx).isSuccess) {
           val channelId = Tools.toLongId(fundingHash = txHash, outIndex)
-          val rc = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, Some(remoteCommitTx.tx), open.firstPerCommitmentPoint)
+          val rc = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), open.firstPerCommitmentPoint)
           val wfcs = WaitFundingSignedCore(localParams, channelId, accept, localSpec, signedLocalCommitTx, rc)
           val wait = WaitBroadcastRemoteData(announce, wfcs, txHash, wfcs makeCommitments signedLocalCommitTx)
           val localSigOfRemoteTx = Scripts.sign(localParams.fundingPrivKey)(remoteCommitTx)
@@ -581,8 +581,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case (_, _, negs: NegotiationsData) if negs.localProposals.exists(_.unsignedTx.tx.txid == tx.txid) => startMutualClose(negs, tx)
           case (Some(claim), _, closingData: ClosingData) => me CLOSEANDWATCHREVHTLC closingData.modify(_.revokedCommit).using(claim +: _)
           case (Some(claim), _, _) => me CLOSEANDWATCHREVHTLC ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil)
-          case (_, Left(nextRemote), _) if nextRemote.txid == tx.txid => startRemoteNextClose(some, nextRemote)
-          case _ if some.commitments.remoteCommit.txid == tx.txid => startRemoteCurrentClose(some)
+          case (_, Left(nextRemote), _) if nextRemote.txOpt.exists(_.txid == tx.txid) => startRemoteNextClose(some, nextRemote)
+          case _ if some.commitments.remoteCommit.txOpt.exists(_.txid == tx.txid) => startRemoteCurrentClose(some)
 
           case (_, _, norm: NormalData) =>
             // May happen when old snapshot is used two times in a row
@@ -629,7 +629,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
     val longId = Tools.toLongId(txHash, outIndex)
     val localSigOfRemoteTx = Scripts.sign(cmd.localParams.fundingPrivKey)(remoteCommitTx)
-    val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, remoteCommitTx.tx.txid, Some(remoteCommitTx.tx), accept.firstPerCommitmentPoint)
+    val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), accept.firstPerCommitmentPoint)
     val wfsc = WaitFundingSignedCore(cmd.localParams, longId, accept, localSpec, localCommitTx, firstRemoteCommit)
     wfsc -> FundingCreated(cmd.tempChanId, txHash, outIndex, localSigOfRemoteTx)
   }
