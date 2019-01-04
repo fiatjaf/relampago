@@ -68,7 +68,7 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
       }
 
       // Set listener on per-item basis because XML properties
-      maxSendField setText denom.formattedWithSign(maxSendMsat).html
+      maxSendField setText denom.parsedWithSign(maxSendMsat).html
       nameField setText nameString
       view
     }

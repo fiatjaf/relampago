@@ -28,12 +28,12 @@ object Denomination {
 trait Denomination {
   def rawString2MSat(raw: String) = MilliSatoshi(BigDecimal(raw) * factor toLong)
   def asString(msat: MilliSatoshi) = fmt format BigDecimal(msat.amount) / factor
-  def formattedWithSign(msat: MilliSatoshi) = formatted(msat) + sign
-  def formatted(msat: MilliSatoshi): String
+  def parsedWithSign(msat: MilliSatoshi) = parsed(msat) + sign
+  protected def parsed(msat: MilliSatoshi): String
 
-  def coloredP2WSH(msat: MilliSatoshi, suffix: String) = s"<font color=#0099FE><tt>+</tt>${this formatted msat}</font>$suffix"
-  def coloredOut(msat: MilliSatoshi, suffix: String) = s"<font color=#E31300><tt>-</tt>${this formatted msat}</font>$suffix"
-  def coloredIn(msat: MilliSatoshi, suffix: String) = s"<font color=#6AAB38><tt>+</tt>${this formatted msat}</font>$suffix"
+  def coloredP2WSH(msat: MilliSatoshi, suffix: String) = s"<font color=#0099FE><tt>+</tt>${this parsed msat}</font>$suffix"
+  def coloredOut(msat: MilliSatoshi, suffix: String) = s"<font color=#E31300><tt>-</tt>${this parsed msat}</font>$suffix"
+  def coloredIn(msat: MilliSatoshi, suffix: String) = s"<font color=#6AAB38><tt>+</tt>${this parsed msat}</font>$suffix"
 
   val amountInTxt: String
   val fmt: DecimalFormat
@@ -48,7 +48,7 @@ object SatDenomination extends Denomination {
   val factor = 1000L
 
   fmt setDecimalFormatSymbols symbols
-  def formatted(msat: MilliSatoshi) = {
+  def parsed(msat: MilliSatoshi) = {
     val basicFormattedSum = asString(msat)
     val dotIndex = basicFormattedSum indexOf "."
     val whole \ decimal = basicFormattedSum splitAt dotIndex
@@ -64,6 +64,6 @@ object BtcDenomination extends Denomination {
   val sign = "\u00A0btc"
 
   fmt setDecimalFormatSymbols symbols
-  def formatted(msat: MilliSatoshi) =
+  def parsed(msat: MilliSatoshi) =
     asString(msat) take 10
 }

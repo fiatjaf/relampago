@@ -139,10 +139,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
         startedAtText setText started.html
         fundingDepthText setText fundingInfo.format(txDepth, threshold)
-        canReceiveText setText denom.formattedWithSign(Satoshi(canReceiveMsat) / 1000L).html
-        canSendText setText denom.formattedWithSign(Satoshi(canSendMsat) / 1000L).html
-        refundableAmountText setText denom.formattedWithSign(refundable).html
-        totalCapacityText setText denom.formattedWithSign(capacity).html
+        canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
+        canSendText setText denom.parsedWithSign(Satoshi(canSendMsat) / 1000L).html
+        refundableAmountText setText denom.parsedWithSign(refundable).html
+        totalCapacityText setText denom.parsedWithSign(capacity).html
 
         paymentsInFlightText setText sumOrNothing(valueInFlight).html
         paymentsReceivedText setText sumOrNothing(valueReceived).html
@@ -290,7 +290,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def sumOrNothing(sats: Satoshi) = sats match {
     case Satoshi(0L) => me getString ln_info_nothing
-    case _ => denom formattedWithSign sats
+    case _ => denom parsedWithSign sats
   }
 
   def getStat(chanId: BinaryData, direction: Int) = {
