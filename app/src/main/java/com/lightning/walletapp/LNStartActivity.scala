@@ -12,8 +12,6 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.StartNodeView._
 import com.lightning.walletapp.ln.wire.FundMsg._
 import com.github.kevinsawicki.http.HttpRequest._
-import com.lightning.walletapp.lnutils.JsonHttpUtils._
-import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
@@ -25,7 +23,9 @@ import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
 import fr.acinq.bitcoin.Bech32
 import android.os.Bundle
+import android.net.Uri
 import java.util.Date
+import scala.util.Try
 
 
 class LNStartActivity extends ScanActivity { me =>
@@ -231,6 +231,7 @@ sealed trait StartNodeView {
   def asString(base: String, separator: String): String
 }
 
+case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
 case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNodeView {
   // App suggests a bunch of hardcoded and separately fetched nodes with a good liquidity
 
@@ -253,22 +254,21 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 
 // GETTING INCOMING CHANNEL
 
-sealed trait LNUrlData
-case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
-case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long,
-                                  cltvExpiryDelta: Int, htlcMinimumMsat: Long, feeBaseMsat: Long,
-                                  feeProportionalMillionths: Long) extends LNUrlData {
+case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long,
+                                  push: Long, cltvExpiryDelta: Int, htlcMinimumMsat: Long,
+                                  feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
   val nodeLink(key, host, port) = uri
+  private[this] val chanUrl = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1"
   def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
-  def requestChannel = get(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1", true).trustAllCerts.trustAllHosts.body
+  def requestChannel = get(chanUrl, true).trustAllCerts.trustAllHosts.body
 }
 
 // LNURL HANDLER
 
 case class LNUrl(bech32url: String) {
-  private[this] val _ \ decoded = Bech32 decode bech32url
-  private[this] val finalDecoded = Bech32 five2eight decoded
-  private def fetch = get(bin2readable(finalDecoded.toArray), true).trustAllCerts.trustAllHosts
-  def resolve = obsOnIO.map(_ => fetch.connectTimeout(7500).body) map to[IncomingChannelRequest]
+  def resolve(ask: String) = get(ask, true).trustAllCerts.trustAllHosts.connectTimeout(7500).body
+  val uri = Uri parse bin2readable(Bech32.five2eight(input = Bech32.decode(bech32url)._2).toArray)
+  val action = Try(uri getQueryParameter "action")
+  require(uri.toString contains "https://")
 }

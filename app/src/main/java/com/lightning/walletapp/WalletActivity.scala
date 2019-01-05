@@ -8,13 +8,14 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
+import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
 import org.bitcoinj.core.{Address, TxWrap}
 
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
-import com.lightning.walletapp.lnutils.JsonHttpUtils.obsOnIO
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -30,6 +31,7 @@ import java.text.SimpleDateFormat
 import android.content.Intent
 import org.ndeftools.Message
 import android.app.Activity
+import scala.util.Success
 import android.os.Bundle
 import java.util.Date
 
@@ -168,10 +170,19 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         // so goOps return type is forced to Unit
         goOps(null): Unit
 
-      case lnLink: LNUrl =>
+      case lnUrl: LNUrl =>
+        lnUrl.action match {
+          case Success("proofOfPayer") =>
+
+          case _ =>
+            // This lnURL has no known action, historically this means it's a chan open request
+            // we must fetch chan parameters and make sure node is connected before asking for new channel
+            val ask = obsOnIO.map(_ => lnUrl resolve lnUrl.uri.toString) map to[IncomingChannelRequest]
+            ask.foreach(onNext = initConnection, onError = Tools.errlog)
+            app toast ln_url_requesting_new_channel
+        }
+
         // TransData value will be erased here
-        lnLink.resolve.foreach(initConnection, none)
-        app toast ln_url_requesting
         me returnToBase null
 
       case address: Address =>
