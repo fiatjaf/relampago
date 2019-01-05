@@ -259,10 +259,11 @@
     <string name="ln_chan_close">Закрыть канал</string>
 
     <array name="ln_chan_actions_list">
-        <item>View funding transaction</item>
+        <item>Открывающая транзакция</item>
         <item><![CDATA[Сохранить снапшот канала<br><font color=#999999><small>содержит приватные данные</small></font>]]></item>
         <item><![CDATA[Закрыть на адрес<br><font color=#999999><small>c начала скопируйте адрес</small></font>]]></item>
         <item>Закрыть в этот кошелек</item>
+        <item>Возвратная транзакция</item>
     </array>
 
     <array name="ln_chan_present">

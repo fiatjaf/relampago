@@ -262,7 +262,7 @@
         <item>View funding transaction</item>
         <item><![CDATA[Зберегти снапшот каналу<br><font color=#999999><small>містить приватні дані</small></font>]]></item>
         <item><![CDATA[Зачинити на адресу<br><font color=#999999><small>спочатку скопіюйте адресу</small></font>]]></item>
-        <item>Закрити в цей гаманець</item>
+        <item>Зворотня транзакція</item>
     </array>
 
     <array name="ln_chan_present">

@@ -216,15 +216,17 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
               dialog_ok, dialog_cancel)
           }
 
-          def viewFunding =
-            host startActivity new Intent(Intent.ACTION_VIEW,
-              Uri parse s"https://smartbit.com.au/tx/$fundTxId")
+          def viewClosing = chan.data match {
+            case cd: ClosingData => urlIntent(cd.bestClosing.commitTx.txid.toString)
+            case _ => Tools log "Attempting to view a closing tx of not yet closed channel"
+          }
 
           lst setOnItemClickListener onTap {
-            case 3 => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
-            case 2 => proceedCoopCloseOrWarn(informAndClose = closeToAddress)
+            case 0 => urlIntent(fundTxId.toString)
             case 1 => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
-            case 0 => viewFunding
+            case 2 => proceedCoopCloseOrWarn(informAndClose = closeToAddress)
+            case 3 => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
+            case 4 => viewClosing
           }
         }
       }
@@ -283,9 +285,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def menu(chanData: ChannelData) = chanData match {
-    case wbr: WaitBroadcastRemoteData if wbr.fail.isDefined => chanActions take 2
-    case _: RefundingData | _: ClosingData => chanActions take 2
-    case _ => chanActions
+    case _: ClosingData => chanActions.patch(2, Nil, 2)
+    case _: RefundingData => chanActions take 2
+    case _ => chanActions take 4
   }
 
   def sumOrNothing(sats: Satoshi) = sats match {
@@ -298,4 +300,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     val cursor = LNParams.db.select(PaymentTable.selectStatSql, chanId, direction)
     RichCursor(cursor) headTry { case RichCursor(с1) => с1 getLong direction } getOrElse 0L
   }
+
+  def urlIntent(txid: String) =
+    host startActivity new Intent(Intent.ACTION_VIEW,
+      Uri parse s"https://smartbit.com.au/tx/$txid")
 }

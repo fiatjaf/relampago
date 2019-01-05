@@ -267,6 +267,7 @@
         <item><![CDATA[Export channel snapshot<br><font color=#999999><small>contains private key material</small></font>]]></item>
         <item><![CDATA[Close to specified address<br><font color=#999999><small>copy an address before proceeding</small></font>]]></item>
         <item>Close to this wallet</item>
+        <item>View refunding transaction</item>
     </array>
 
     <array name="ln_chan_present">
