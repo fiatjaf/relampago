@@ -30,8 +30,22 @@ case class DescriptionTag(description: String) extends Tag {
   def toInt5s = encode(Bech32 eight2five description.getBytes, 'd')
 }
 
-case class LNUrlTag(contents: String) extends Tag {
-  def toInt5s = encode(Bech32 eight2five contents.getBytes, 'l')
+case class LNUrlTag(contents: LNUrl) extends Tag {
+  def toInt5s = encode(Bech32 eight2five contents.uri.toString.getBytes, 'l')
+}
+
+object LNUrl {
+  def fromBech32(bech32url: String) = {
+    val _ \ data = Bech32.decode(bech32url)
+    val request = Bech32.five2eight(data).toArray
+    LNUrl(Tools bin2readable request)
+  }
+}
+
+case class LNUrl(request: String) {
+  val uri = android.net.Uri parse request
+  val action = Try(uri getQueryParameter "action")
+  require(uri.toString contains "https://")
 }
 
 case class DescriptionHashTag(hash: BinaryData) extends Tag {
@@ -161,7 +175,7 @@ object PaymentRequest {
 
   def apply(chain: BinaryData, amount: Option[MilliSatoshi], paymentHash: BinaryData,
             privateKey: PrivateKey, description: String, fallbackAddress: Option[String],
-            routes: PaymentRouteVec, lnUrl: Option[String] = None): PaymentRequest = {
+            routes: PaymentRouteVec, lnUrl: Option[LNUrl] = None): PaymentRequest = {
 
     val paymentHashTag = PaymentHashTag(paymentHash)
     val lnUrlTag = lnUrl.map(LNUrlTag.apply).toVector
@@ -259,7 +273,8 @@ object PaymentRequest {
 
         case lTag if lTag == Bech32.map('l') =>
           val contents = Bech32 five2eight input.slice(3, len + 3)
-          LNUrlTag(Tools bin2readable contents.toArray)
+          val lnUrl = LNUrl(Tools bin2readable contents.toArray)
+          LNUrlTag(lnUrl)
 
         case _ =>
           val unknown = input.slice(3, len + 3)

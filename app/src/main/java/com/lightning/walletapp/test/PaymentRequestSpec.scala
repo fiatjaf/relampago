@@ -186,8 +186,7 @@ class PaymentRequestSpec {
       assert(pr.prefix == "lnbc")
       assert(pr.amount.contains(MilliSatoshi(100500L)))
       assert(pr.description == "On mainnet, with lnurl")
-      println(pr.minFinalCltvExpiry)
-      assert(pr.lnUrlOpt.contains("https://api.bitrefill.com/v1/thor?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df"))
+      assert(pr.lnUrlOpt.map(_.uri.toString).contains("https://api.bitrefill.com/v1/thor?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df"))
       assert(PaymentRequest.write(pr.sign(PrivateKey("64d8af56f86ed1acc4bf79c7e5d0c64532e41ec990f75bf41c021dbcb88199f101"))) == ref)
     }
   }

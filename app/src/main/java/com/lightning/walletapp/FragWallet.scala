@@ -639,7 +639,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case Success(ms) =>
         val txProcessor = new TxProcessor {
-          def futureProcess(unsignedRequest: SendRequest) = and(app.kit blockSend app.kit.sign(unsignedRequest).tx)
+          def futureProcess(unsignedSendRequest: SendRequest) = and(app.kit blockSend app.kit.sign(unsignedSendRequest).tx)
           def onTxFail(err: Throwable) = mkCheckForm(alert => rm(alert)(retry), none, baseBuilder(txMakeError(err), null), dialog_retry, dialog_cancel)
           def retry = sendBtcPopup(addr)(and)
           val pay = AddrData(ms, addr)

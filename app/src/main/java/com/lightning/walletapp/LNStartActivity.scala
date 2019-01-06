@@ -21,11 +21,8 @@ import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
 import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
-import fr.acinq.bitcoin.Bech32
 import android.os.Bundle
-import android.net.Uri
 import java.util.Date
-import scala.util.Try
 
 
 class LNStartActivity extends ScanActivity { me =>
@@ -262,13 +259,4 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String, cap
   private[this] val chanUrl = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1"
   def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
   def requestChannel = get(chanUrl, true).trustAllCerts.trustAllHosts.body
-}
-
-// LNURL HANDLER
-
-case class LNUrl(bech32url: String) {
-  def resolve(ask: String) = get(ask, true).trustAllCerts.trustAllHosts.connectTimeout(7500).body
-  val uri = Uri parse bin2readable(Bech32.five2eight(input = Bech32.decode(bech32url)._2).toArray)
-  val action = Try(uri getQueryParameter "action")
-  require(uri.toString contains "https://")
 }

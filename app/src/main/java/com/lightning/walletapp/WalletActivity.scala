@@ -8,6 +8,7 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
+import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
@@ -159,7 +160,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData =
+  def checkTransData: Unit =
     app.TransData checkAndMaybeErase {
       // TransData value should be retained in both of these cases
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
@@ -170,17 +171,27 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         // so goOps return type is forced to Unit
         goOps(null): Unit
 
-      case lnUrl: LNUrl =>
+      case (lnUrl: LNUrl, isUnbounded: Boolean) =>
+        // LNURL is unbounded when directly scanned i.e. user is aware of what is going on
+        // LNURL is bounded when it is extracted from a payment request since user is unaware
+        // bounded LNURLs require explicit user approval to make HTTP calls
+
         lnUrl.action match {
           case Success("proofOfPayer") =>
 
-          case _ =>
+          case _ if isUnbounded =>
             // TransData value will be erased here
             // This lnURL has no known action, historically this means it's a chan open request
             // we must fetch chan parameters and make sure node is connected before asking for new channel
-            val ask = obsOnIO.map(_ => lnUrl resolve lnUrl.uri.toString) map to[IncomingChannelRequest]
-            ask.foreach(onNext = initConnection, onError = Tools.errlog)
+            val request = get(lnUrl.uri.toString, true).trustAllCerts.trustAllHosts.connectTimeout(7500)
+            val ask = obsOnIO.map(_ => request.body) map to[IncomingChannelRequest]
+            ask.foreach(initConnection, Tools.errlog)
             app toast ln_url_requesting_new_channel
+            me returnToBase null
+
+          case _ =>
+            // Something is wrong, go back home
+            // TransData value will be erased here
             me returnToBase null
         }
 
@@ -196,12 +207,19 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         me returnToBase null
 
       case pr: PaymentRequest =>
-        if (ChannelManager.notClosingOrRefunding.isEmpty) {
+        if (pr.lnUrlOpt.isDefined) {
+          // Presence of correct LNURL overrides pr processing
+          // but can't make automatic HTTP requests in this case
+          app.TransData.value = Tuple2(pr.lnUrlOpt.get, false)
+          checkTransData
+
+        } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
           // No operational channels are present, offer to open a new one
           // TransData should be set to batch or null to erase previous value
           app.TransData.value = TxWrap findBestBatch pr getOrElse null
           // Do not erase a previously set data
           goStart
+
         } else {
           // We have open or at least opening channels
           // TransData value will be erased here
