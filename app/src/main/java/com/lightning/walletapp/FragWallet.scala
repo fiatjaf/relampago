@@ -52,8 +52,8 @@ object FragWallet {
 }
 
 class FragWallet extends Fragment {
-  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_view_pager_btc, vg, false)
-  override def onViewCreated(view: View, state: Bundle) = worker = new FragWalletWorker(getActivity.asInstanceOf[WalletActivity], view)
+  override def onCreateView(inf: LayoutInflater, viewGroup: ViewGroup, bundle: Bundle) = inf.inflate(R.layout.frag_view_pager_btc, viewGroup, false)
+  override def onViewCreated(view: View, state: Bundle) = if (app.isAlive) worker = new FragWalletWorker(getActivity.asInstanceOf[WalletActivity], view)
   override def onDestroy = wrap(super.onDestroy)(worker.onFragmentDestroy)
   override def onResume = wrap(super.onResume)(worker.host.checkTransData)
 }

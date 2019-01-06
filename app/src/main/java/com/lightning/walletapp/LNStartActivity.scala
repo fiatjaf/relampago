@@ -133,8 +133,6 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     host goTo classOf[LNStartFundActivity]
   }
 
-  // App may not be alive but fragment may still be recreated
-  // when app has been brought from background so do additional check here
   override def onViewCreated(view: View, state: Bundle) = if (app.isAlive) {
     val externalFundInfo = view.findViewById(R.id.externalFundInfo).asInstanceOf[TextView]
     val externalFundCancel = view.findViewById(R.id.externalFundCancel).asInstanceOf[Button]
