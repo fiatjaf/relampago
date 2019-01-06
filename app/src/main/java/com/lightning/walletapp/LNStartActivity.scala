@@ -100,13 +100,12 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   var setNormalMode = new Runnable { def run = none }
   private[this] var nodes = Vector.empty[StartNodeView]
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
+  lazy val worker = new ThrottledWork[String, AnnounceChansNumVec] {
+    private[this] val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
+    private[this] val acinqAnnounce = app.mkNodeAnnouncement(acinqKey, new InetSocketAddress("34.239.230.56", 9735), "ACINQ")
+    private[this] val acinq = HardcodedNodeView(acinqAnnounce, "<strong>Recommended ACINQ node</strong>")
 
-  val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
-  val acinqAnnouncement = app.mkNodeAnnouncement(acinqKey, new InetSocketAddress("34.239.230.56", 9735), "ACINQ")
-  val acinq = HardcodedNodeView(acinqAnnouncement, "<strong>Recommended ACINQ node</strong>")
-
-  val worker = new ThrottledWork[String, AnnounceChansNumVec] {
-    def error(searchError: Throwable) = Tools errlog searchError
+    def error(err: Throwable) = Tools errlog err
     def work(userQuery: String) = app.olympus findNodes userQuery
     def process(userQuery: String, results: AnnounceChansNumVec) = {
       val remoteNodeViewWraps = for (result <- results) yield RemoteNodeView(result)
@@ -134,7 +133,9 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     host goTo classOf[LNStartFundActivity]
   }
 
-  override def onViewCreated(view: View, state: Bundle) = {
+  // App may not be alive but fragment may still be recreated
+  // when app has been brought from background so do additional check here
+  override def onViewCreated(view: View, state: Bundle) = if (app.isAlive) {
     val externalFundInfo = view.findViewById(R.id.externalFundInfo).asInstanceOf[TextView]
     val externalFundCancel = view.findViewById(R.id.externalFundCancel).asInstanceOf[Button]
     val externalFundWrap = view.findViewById(R.id.externalFundWrap).asInstanceOf[LinearLayout]
@@ -145,6 +146,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     val lnStartNodesList = view.findViewById(R.id.lnStartNodesList).asInstanceOf[ListView]
 
     def funderInfo(wrk: WSWrap, color: Int, text: Int) = host UITask {
+      // Show extended remote funding info here so user knows what's up
 
       externalFundWrap setVisibility View.VISIBLE
       externalFundWrap setBackgroundColor getResources.getColor(color, null)
