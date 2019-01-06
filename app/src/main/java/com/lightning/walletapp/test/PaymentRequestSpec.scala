@@ -178,5 +178,17 @@ class PaymentRequestSpec {
       assert(pr.tags.size == 4)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
+
+    {
+      println("On mainnet, with lnurl")
+      val ref = "lnbc1005n1pwrrhz3fppqtm5e6a00nwcxzxy82fpkgljmwd5shy67l9qdp68gurn8ghj7ctsdyhxy6t5wfjkv6tvdshxxmmd9amrztm5dphhy0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxdpyfahzqmtpd9hxuet59ss8w6t5dqsxcmn4wfkqxqy9gcqpp5k9zgs608azef036c584pzxnf5lr2qzrpgmj20qw5nl5f9nw4q8cqznkjthev8emn0qujmznfq5eje05e4thnfu6wv2xe3d58uejr8dgr7wq3m9p90ry6tnezasp2aun6awfgeu0fcrk2wy0fuxzuq4hwt9qqyc3zu3"
+      val pr = PaymentRequest.read(ref)
+      assert(pr.prefix == "lnbc")
+      assert(pr.amount.contains(MilliSatoshi(100500L)))
+      assert(pr.description == "On mainnet, with lnurl")
+      println(pr.minFinalCltvExpiry)
+      assert(pr.lnUrlOpt.contains("https://api.bitrefill.com/v1/thor?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df"))
+      assert(PaymentRequest.write(pr.sign(PrivateKey("64d8af56f86ed1acc4bf79c7e5d0c64532e41ec990f75bf41c021dbcb88199f101"))) == ref)
+    }
   }
 }

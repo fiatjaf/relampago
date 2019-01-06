@@ -113,8 +113,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // To fight spamming
   private[this] var errorLimit = 5
   private[this] var lastOpenMsecStamp = 0L
-
-  val connectionListener = new ConnectionListener {
+  private[this] val connectionListener = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, incomingMessage: LightningMessage) = incomingMessage match {
       case open: OpenChannel if System.currentTimeMillis > lastOpenMsecStamp + 10000L && open.channelFlags == 0.toByte =>
         // We only consider incoming channels if they are private and last message arrived more than 10 seconds ago

@@ -30,6 +30,10 @@ case class DescriptionTag(description: String) extends Tag {
   def toInt5s = encode(Bech32 eight2five description.getBytes, 'd')
 }
 
+case class LNUrlTag(contents: String) extends Tag {
+  def toInt5s = encode(Bech32 eight2five contents.getBytes, 'l')
+}
+
 case class DescriptionHashTag(hash: BinaryData) extends Tag {
   def toInt5s: Int5Seq = encode(Bech32 eight2five hash, 'h')
 }
@@ -103,7 +107,8 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
   lazy val unsafeMsat = amount.get.amount
   lazy val adjustedMinFinalCltvExpiry = minFinalCltvExpiry.getOrElse(0L) + 10L
   lazy val minFinalCltvExpiry = tags.collectFirst { case m: MinFinalCltvExpiryTag => m.expiryDelta }
-  lazy val paymentHash = tags.collectFirst { case p: PaymentHashTag => p.hash }.get
+  lazy val paymentHash = tags.collectFirst { case payHash: PaymentHashTag => payHash.hash }.get
+  lazy val lnUrlOpt = tags.collectFirst { case lnURL: LNUrlTag => lnURL.contents }
   lazy val routingInfo = tags.collect { case r: RoutingInfoTag => r }
 
   lazy val fallbackAddress = tags.collectFirst {
@@ -156,11 +161,12 @@ object PaymentRequest {
 
   def apply(chain: BinaryData, amount: Option[MilliSatoshi], paymentHash: BinaryData,
             privateKey: PrivateKey, description: String, fallbackAddress: Option[String],
-            routes: PaymentRouteVec): PaymentRequest = {
+            routes: PaymentRouteVec, lnUrl: Option[String] = None): PaymentRequest = {
 
     val paymentHashTag = PaymentHashTag(paymentHash)
+    val lnUrlTag = lnUrl.map(LNUrlTag.apply).toVector
     val fallbackTag = fallbackAddress.map(FallbackAddressTag.apply).toVector
-    val tags = routes.map(RoutingInfoTag.apply) ++ fallbackTag ++ Vector(DescriptionTag(description), ExpiryTag(3600 * 48), paymentHashTag)
+    val tags = routes.map(RoutingInfoTag.apply) ++ fallbackTag ++ lnUrlTag ++ Vector(DescriptionTag(description), ExpiryTag(3600 * 48), paymentHashTag)
     val pr = PaymentRequest(prefixes(chain), amount, System.currentTimeMillis / 1000L, privateKey.publicKey, tags, BinaryData.empty)
     pr sign privateKey
   }
@@ -250,6 +256,10 @@ object PaymentRequest {
           val ints: Int5Seq = input.slice(3, len + 3)
           val expiry = readUnsignedLong(len, ints)
           MinFinalCltvExpiryTag(expiry)
+
+        case lTag if lTag == Bech32.map('l') =>
+          val contents = Bech32 five2eight input.slice(3, len + 3)
+          LNUrlTag(Tools bin2readable contents.toArray)
 
         case _ =>
           val unknown = input.slice(3, len + 3)
