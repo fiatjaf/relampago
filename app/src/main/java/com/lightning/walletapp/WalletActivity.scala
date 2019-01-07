@@ -206,8 +206,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       ConnectionManager.connectTo(ann = incoming.getAnnounce, notify = true)
       override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
         // Remove listener and make a request, their OpenChannel message should arrive shortly
+        incoming.requestChannel.foreach(none, none)
         ConnectionManager.listeners -= self
-        incoming.requestChannel
       }
     }
 

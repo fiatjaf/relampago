@@ -262,8 +262,9 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String, cap
                                   feeProportionalMillionths: Long) extends LNUrlData {
 
   val nodeLink(key, host, port) = uri
+  private[this] val request = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1"
   def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
-  def requestChannel = get(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1", true).trustAllCerts.trustAllHosts.body
+  def requestChannel = obsOnIO.map(_ => get(request, true).trustAllCerts.trustAllHosts.body)
 }
 
 // LNURL HANDLER
