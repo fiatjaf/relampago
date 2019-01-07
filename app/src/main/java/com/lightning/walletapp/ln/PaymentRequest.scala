@@ -44,7 +44,6 @@ object LNUrl {
 
 case class LNUrl(request: String) {
   val uri = android.net.Uri parse request
-  val action = Try(uri getQueryParameter "action")
   require(uri.toString contains "https://")
 }
 

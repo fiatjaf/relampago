@@ -7,19 +7,19 @@ import com.lightning.walletapp.ln.Scripts._
 import com.lightning.walletapp.lnutils.olympus._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
-import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
-import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
-import com.lightning.walletapp.ln.Tools.{Bytes, UserId}
-
 import com.lightning.walletapp.ln.crypto.ShaHashesWithIndex
 import com.lightning.walletapp.ln.crypto.ShaChain.Index
-import com.lightning.walletapp.IncomingChannelRequest
 import fr.acinq.eclair.UInt64
 import scodec.bits.BitVector
 import java.math.BigInteger
 import scodec.Codec
+
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
+import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
+import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData, WithdrawRequest}
+import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
+import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
+import com.lightning.walletapp.ln.Tools.{Bytes, UserId}
 
 
 object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
@@ -106,10 +106,26 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   // LNURL
 
+  implicit object LNUrlDataFmt extends JsonFormat[LNUrlData] {
+    def write(unserialized: LNUrlData): JsValue = unserialized match {
+      case unserialiedMessage: IncomingChannelRequest => unserialiedMessage.toJson
+      case unserialiedMessage: WithdrawRequest => unserialiedMessage.toJson
+    }
+
+    def read(serialized: JsValue): LNUrlData = serialized.asJsObject fields "tag" match {
+      case JsString("channelRequest") => serialized.convertTo[IncomingChannelRequest]
+      case JsString("withdrawRequest") => serialized.convertTo[WithdrawRequest]
+      case _ => throw new RuntimeException
+    }
+  }
+
   implicit val incomingChannelRequestFmt =
-    jsonFormat[String, String, String, Long, Long, Int, Long, Long, Long,
-      IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1", "capacity",
-      "push", "cltvExpiryDelta", "htlcMinimumMsat", "feeBaseMsat", "feeProportionalMillionths")
+    taggedJsonFmt(jsonFormat[String, String, String, Long, Long, Int, Long, Long, Long,
+      IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1", "capacity", "push",
+      "cltvExpiryDelta", "htlcMinimumMsat", "feeBaseMsat", "feeProportionalMillionths"), tag = "channelRequest")
+
+  implicit val withdrawRequest = taggedJsonFmt(jsonFormat[String, String, MilliSatoshi,
+    WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxAmount"), tag = "withdrawRequest")
 
   // FundMsg
 

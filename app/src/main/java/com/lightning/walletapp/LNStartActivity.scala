@@ -19,10 +19,13 @@ import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
+
 import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
 import android.os.Bundle
 import java.util.Date
+
+import fr.acinq.bitcoin.MilliSatoshi
 
 
 class LNStartActivity extends ScanActivity { me =>
@@ -249,14 +252,20 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
   }
 }
 
-// GETTING INCOMING CHANNEL
+// LNURL response types
 
-case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long,
-                                  push: Long, cltvExpiryDelta: Int, htlcMinimumMsat: Long,
-                                  feeBaseMsat: Long, feeProportionalMillionths: Long) {
+sealed trait LNUrlData {
+  def execute(request: String) = get(request, true).trustAllCerts.trustAllHosts.body
+}
+
+case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long, cltvExpiryDelta: Int,
+                                  htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) extends LNUrlData {
 
   val nodeLink(key, host, port) = uri
-  private[this] val chanUrl = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1"
   def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
-  def requestChannel = get(chanUrl, true).trustAllCerts.trustAllHosts.body
+  def requestChannel = execute(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1")
+}
+
+case class WithdrawRequest(callback: String, k1: String, maxAmount: MilliSatoshi) extends LNUrlData {
+  def requestWithdraw(pr: PaymentRequest) = execute(s"$callback?k1=$k1&pr=${PaymentRequest write pr}")
 }

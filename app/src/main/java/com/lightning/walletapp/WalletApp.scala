@@ -135,8 +135,8 @@ class WalletApp extends Application { me =>
       case bitcoinUriLink if bitcoinUriLink startsWith "BITCOIN" => bitcoinUri(bitcoinUriLink.toLowerCase)
       case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
       case shortNodeLink(key, host) => mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, 9735), host)
-      case lnUrl(prefix, data) => Tuple2(LNUrl fromBech32 s"$prefix$data", true)
       case lnPayReq(prefix, data) => PaymentRequest read s"$prefix$data"
+      case lnUrl(prefix, data) => LNUrl fromBech32 s"$prefix$data"
       case _ => toAddress(rawText)
     }
   }

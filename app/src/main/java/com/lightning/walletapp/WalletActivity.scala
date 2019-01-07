@@ -15,7 +15,6 @@ import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
 import org.bitcoinj.core.{Address, TxWrap}
-
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
@@ -29,12 +28,16 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+
 import android.content.Intent
 import org.ndeftools.Message
 import android.app.Activity
+
 import scala.util.Success
 import android.os.Bundle
 import java.util.Date
+
+import com.lightning.walletapp.test.{FailureMessageLightningMessageCodecsSpec, GeneratorsSpec, SphinxSpec, WireSpec}
 
 
 trait SearchBar { me =>
@@ -171,7 +174,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         // so goOps return type is forced to Unit
         goOps(null): Unit
 
-      case (lnUrl: LNUrl, isUnbounded: Boolean) =>
+      case lnUrl: LNUrl =>
         // LNURL is unbounded when directly scanned i.e. user is aware of what is going on
         // LNURL is bounded when it is extracted from a payment request since user is unaware
         // bounded LNURLs require explicit user approval to make HTTP calls
@@ -208,9 +211,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
       case pr: PaymentRequest =>
         if (pr.lnUrlOpt.isDefined) {
-          // Presence of correct LNURL overrides pr processing
-          // but can't make automatic HTTP requests in this case
-          app.TransData.value = Tuple2(pr.lnUrlOpt.get, false)
+          // Presence of LNURL overrides pr processing
+          app.TransData.value = pr.lnUrlOpt.get
           checkTransData
 
         } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
@@ -227,7 +229,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           me returnToBase null
         }
 
-      case _ =>
+      case otherwise =>
     }
 
   def initConnection(incoming: IncomingChannelRequest) =
