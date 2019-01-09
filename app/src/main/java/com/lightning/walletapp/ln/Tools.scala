@@ -19,7 +19,6 @@ object Tools {
   val random = new RandomGenerator
   def runAnd[T](result: T)(action: Any): T = result
   def bin2readable(bin: Bytes) = new String(bin, "UTF-8")
-  def errlog(error: Throwable): Unit = error.printStackTrace
   def log(message: String): Unit = android.util.Log.d("LN", message)
   def randomPrivKey = PrivateKey(random getBytes 32, compressed = true)
   def wrap(run: => Unit)(go: => Unit) = try go catch none finally run

@@ -300,7 +300,7 @@
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Є питання?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про блискавку</a></small><br><br>відчиняється новий канал<br><strong>платить ваш гаманець</strong>]]></string>
     <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>відчинення каналу</i></font><br><small>%2$s</small><br><br><font color=#999999>ID піра</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
-    <string name="ln_url_requesting_new_channel">Запитую новий канал&#8230;</string>
+    <string name="ln_url_resolving">Підключення до сервісу&#8230;</string>
     <string name="ln_ops_start_fund_incoming_channel">вхідний канал</string>
 
     <!-- Olympus log messages and notification -->

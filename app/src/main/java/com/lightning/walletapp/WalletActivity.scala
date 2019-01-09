@@ -15,6 +15,7 @@ import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
 import org.bitcoinj.core.{Address, TxWrap}
+
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
@@ -28,16 +29,11 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-
 import android.content.Intent
 import org.ndeftools.Message
 import android.app.Activity
-
-import scala.util.Success
 import android.os.Bundle
 import java.util.Date
-
-import com.lightning.walletapp.test.{FailureMessageLightningMessageCodecsSpec, GeneratorsSpec, SphinxSpec, WireSpec}
 
 
 trait SearchBar { me =>
@@ -175,28 +171,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         goOps(null): Unit
 
       case lnUrl: LNUrl =>
-        // LNURL is unbounded when directly scanned i.e. user is aware of what is going on
-        // LNURL is bounded when it is extracted from a payment request since user is unaware
-        // bounded LNURLs require explicit user approval to make HTTP calls
-
-        lnUrl.action match {
-          case Success("proofOfPayer") =>
-
-          case _ if isUnbounded =>
-            // TransData value will be erased here
-            // This lnURL has no known action, historically this means it's a chan open request
-            // we must fetch chan parameters and make sure node is connected before asking for new channel
-            val request = get(lnUrl.uri.toString, true).trustAllCerts.trustAllHosts.connectTimeout(7500)
-            val ask = obsOnIO.map(_ => request.body) map to[IncomingChannelRequest]
-            ask.foreach(initConnection, Tools.errlog)
-            app toast ln_url_requesting_new_channel
-            me returnToBase null
-
-          case _ =>
-            // Something is wrong, go back home
-            // TransData value will be erased here
-            me returnToBase null
-        }
+        // TransData value will be erased here
+        val initialRequest = get(lnUrl.uri.toString, true).trustAllCerts.trustAllHosts
+        val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
+        ask.doOnSubscribe(app toast ln_url_resolving).foreach(resolveLNUrl, onFail)
+        me returnToBase null
 
       case address: Address =>
         // TransData value will be erased here
@@ -232,16 +211,26 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case otherwise =>
     }
 
+  def resolveLNUrl(data: LNUrlData) = data match {
+    case icr: IncomingChannelRequest => initConnection(icr)
+    case wr: WithdrawRequest => showWithdrawalForm(wr)
+    case _ =>
+  }
+
   def initConnection(incoming: IncomingChannelRequest) =
     ConnectionManager.listeners += new ConnectionListener { self =>
       // This is done to make sure we definitely have an LN connection
       ConnectionManager.connectTo(ann = incoming.getAnnounce, notify = true)
       override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
         // Remove listener and make a request, their OpenChannel message should arrive shortly
-        incoming.requestChannel.foreach(none, none)
+        obsOnIO.map(_ => incoming.requestChannel).foreach(none, onFail)
         ConnectionManager.listeners -= self
       }
     }
+
+  def showWithdrawalForm(wr: WithdrawRequest) = {
+
+  }
 
   // BUTTONS REACTIONS
 

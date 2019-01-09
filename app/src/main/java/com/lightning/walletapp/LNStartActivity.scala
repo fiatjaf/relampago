@@ -17,15 +17,13 @@ import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
 import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
+import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
-
 import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
 import android.os.Bundle
 import java.util.Date
-
-import fr.acinq.bitcoin.MilliSatoshi
 
 
 class LNStartActivity extends ScanActivity { me =>
@@ -99,13 +97,14 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   var setExternalFunder: Started => Unit = none
   var setNormalMode = new Runnable { def run = none }
   private[this] var nodes = Vector.empty[StartNodeView]
+
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
   lazy val worker = new ThrottledWork[String, AnnounceChansNumVec] {
     private[this] val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
     private[this] val acinqAnnounce = app.mkNodeAnnouncement(acinqKey, new InetSocketAddress("34.239.230.56", 9735), "ACINQ")
     private[this] val acinq = HardcodedNodeView(acinqAnnounce, "<strong>Recommended ACINQ node</strong>")
 
-    def error(err: Throwable) = Tools errlog err
+    def error(err: Throwable) = host onFail err
     def work(userQuery: String) = app.olympus findNodes userQuery
     def process(userQuery: String, results: AnnounceChansNumVec) = {
       val remoteNodeViewWraps = for (result <- results) yield RemoteNodeView(result)
@@ -227,11 +226,8 @@ object StartNodeView {
   lazy val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
 }
 
-sealed trait StartNodeView {
-  def asString(base: String, separator: String): String
-}
-
 case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
+sealed trait StartNodeView { def asString(base: String, separator: String): String }
 case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNodeView {
   // App suggests a bunch of hardcoded and separately fetched nodes with a good liquidity
 
@@ -254,18 +250,17 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 
 // LNURL response types
 
-sealed trait LNUrlData {
-  def execute(request: String) = get(request, true).trustAllCerts.trustAllHosts.body
-}
-
+sealed trait LNUrlData { def unsafe(request: String) = get(request, true).trustAllCerts.trustAllHosts.body }
 case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long, cltvExpiryDelta: Int,
                                   htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) extends LNUrlData {
 
   val nodeLink(key, host, port) = uri
   def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
-  def requestChannel = execute(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1")
+  def requestChannel = unsafe(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1")
+  require(callback contains "https://")
 }
 
 case class WithdrawRequest(callback: String, k1: String, maxAmount: MilliSatoshi) extends LNUrlData {
-  def requestWithdraw(pr: PaymentRequest) = execute(s"$callback?k1=$k1&pr=${PaymentRequest write pr}")
+  def requestWithdraw(pr: PaymentRequest) = unsafe(s"$callback?k1=$k1&pr=${PaymentRequest write pr}")
+  require(callback contains "https://")
 }
