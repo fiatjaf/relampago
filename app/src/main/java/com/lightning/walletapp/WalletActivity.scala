@@ -159,62 +159,59 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData: Unit =
-    app.TransData checkAndMaybeErase {
-      // TransData value should be retained in both of these cases
-      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-      case _: Started => goStart
+  def checkTransData = app.TransData checkAndMaybeErase {
+    // TransData value should be retained in both of these cases
+    case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+    case _: Started => goStart
 
-      case FragWallet.REDIRECT =>
-        // TransData value should be erased here
-        // so goOps return type is forced to Unit
-        goOps(null): Unit
+    case FragWallet.REDIRECT =>
+      // TransData value should be erased here
+      // so goOps return type is forced to Unit
+      goOps(null): Unit
 
-      case lnUrl: LNUrl =>
-        // TransData value will be erased here
-        val initialRequest = get(lnUrl.uri.toString, true).trustAllCerts.trustAllHosts
+    case address: Address =>
+      // TransData value will be erased here
+      FragWallet.worker.sendBtcPopup(address)(none)
+      me returnToBase null
+
+    case uri: BitcoinURI =>
+      // TransData value will be erased here
+      val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
+      manager setSum scala.util.Try(uri.getAmount)
+      me returnToBase null
+
+    case pr: PaymentRequest =>
+      if (pr.lnUrlOpt.isDefined) {
+        // Presence of LNUrl overrides payment request processing
+        // with any LNUrl we first have to retrieve Json response and then decide how to proceed
+        val initialRequest = get(pr.lnUrlOpt.get.uri.toString, true).trustAllCerts.trustAllHosts
         val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
-        ask.doOnSubscribe(app toast ln_url_resolving).foreach(resolveLNUrl, onFail)
-        me returnToBase null
 
-      case address: Address =>
+        ask.foreach(_ match {
+          case icr: IncomingChannelRequest => initConnection(icr)
+          case wr: WithdrawRequest => showWithdrawalForm(Some(pr), wr)
+          case _ => log("Unrecognized lnurl type")
+        }, onFail)
+
         // TransData value will be erased here
-        FragWallet.worker.sendBtcPopup(address)(none)
+        app toast ln_url_resolving
         me returnToBase null
 
-      case uri: BitcoinURI =>
+      } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
+        // No operational channels are present, offer to open a new one
+        // TransData should be set to batch or null to erase previous value
+        app.TransData.value = TxWrap findBestBatch pr getOrElse null
+        // Do not erase a previously set data
+        goStart
+
+      } else {
+        // We have open or at least opening channels
         // TransData value will be erased here
-        val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
-        manager setSum scala.util.Try(uri.getAmount)
+        FragWallet.worker sendPayment pr
         me returnToBase null
+      }
 
-      case pr: PaymentRequest =>
-        if (pr.lnUrlOpt.isDefined) {
-          // Presence of LNURL overrides pr processing
-          app.TransData.value = pr.lnUrlOpt.get
-          checkTransData
-
-        } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
-          // No operational channels are present, offer to open a new one
-          // TransData should be set to batch or null to erase previous value
-          app.TransData.value = TxWrap findBestBatch pr getOrElse null
-          // Do not erase a previously set data
-          goStart
-
-        } else {
-          // We have open or at least opening channels
-          // TransData value will be erased here
-          FragWallet.worker sendPayment pr
-          me returnToBase null
-        }
-
-      case otherwise =>
-    }
-
-  def resolveLNUrl(data: LNUrlData) = data match {
-    case icr: IncomingChannelRequest => initConnection(icr)
-    case wr: WithdrawRequest => showWithdrawalForm(wr)
-    case _ =>
+    case otherwise =>
   }
 
   def initConnection(incoming: IncomingChannelRequest) =
@@ -228,7 +225,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       }
     }
 
-  def showWithdrawalForm(wr: WithdrawRequest) = {
+  def showWithdrawalForm(prOpt: Option[PaymentRequest], wr: WithdrawRequest) = {
 
   }
 

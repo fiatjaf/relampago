@@ -172,6 +172,11 @@ object PaymentRequest {
       Block.TestnetGenesisBlock.hash -> "lntb",
       Block.LivenetGenesisBlock.hash -> "lnbc")
 
+  def lnUrlDummy(lNUrl: LNUrl) =
+    // Used as convinience method to pass LNUrls
+    PaymentRequest(prefix = new String, amount = None, timestamp = 0L,
+      nodeId = null, tags = Vector apply LNUrlTag(lNUrl), BinaryData.empty)
+
   def apply(chain: BinaryData, amount: Option[MilliSatoshi], paymentHash: BinaryData,
             privateKey: PrivateKey, description: String, fallbackAddress: Option[String],
             routes: PaymentRouteVec, lnUrl: Option[LNUrl] = None): PaymentRequest = {
