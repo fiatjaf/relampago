@@ -31,19 +31,22 @@ object LNParams { me =>
   final val minHtlcValue = MilliSatoshi(1000L)
 
   var db: LNOpenHelper = _
-  var extendedNodeKey: ExtendedPrivateKey = _
-  var extendedCloudKey: ExtendedPrivateKey = _
+  private[this] var master: ExtendedPrivateKey = _
+  lazy val extendedNodeKey = derivePrivateKey(master, hardened(46) :: hardened(0) :: Nil)
+  lazy val extendedCloudKey = derivePrivateKey(master, hardened(92) :: hardened(0) :: Nil)
+  // Linking key is used for creating domain-specific identifiers when using "linkable payment" LNUrl
+  lazy val linkingKey = derivePrivateKey(master, hardened(138) :: hardened(0) :: Nil).privateKey.toBin.data
+  // Cloud secret is used to encrypt Olympus and GDrive data, cloud ID is used as identifier
+  lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin.data)
+  lazy val cloudId = sha256(cloudSecret.data)
 
   lazy val bag = PaymentInfoWrap
   lazy val broadcaster: Broadcaster = ChannelManager
   lazy val nodePublicKey: PublicKey = nodePrivateKey.publicKey
   lazy val nodePrivateKey: PrivateKey = extendedNodeKey.privateKey
-  lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin.data)
-  lazy val cloudId = sha256(cloudSecret.data)
 
-  def setup(seed: BinaryData) = generate(seed) match { case m =>
-    extendedNodeKey = derivePrivateKey(m, hardened(46) :: hardened(0) :: Nil)
-    extendedCloudKey = derivePrivateKey(m, hardened(92) :: hardened(0) :: Nil)
+  def setup(walletSeed: BinaryData) = {
+    master = generate(seed = walletSeed)
     db = new LNOpenHelper(app, dbFileName)
     app.olympus = new OlympusWrap
   }
