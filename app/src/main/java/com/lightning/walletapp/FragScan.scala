@@ -29,7 +29,7 @@ class FragScan extends Fragment with BarcodeCallback { me =>
   override def onCreateView(inflator: LayoutInflater, vg: ViewGroup, bn: Bundle) =
     inflator.inflate(R.layout.frag_view_pager_scan, vg, false)
 
-  override def onViewCreated(view: View, savedInstanceState: Bundle) = {
+  override def onViewCreated(view: View, savedInstanceState: Bundle) = if (app.isAlive) {
     val camDenied = ContextCompat.checkSelfPermission(host, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
     if (camDenied) ActivityCompat.requestPermissions(host, Array(android.Manifest.permission.CAMERA), 102)
     barcodeReader = view.findViewById(R.id.reader).asInstanceOf[BarcodeView]

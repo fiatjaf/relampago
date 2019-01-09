@@ -162,12 +162,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         }
 
 
-      // Funder was not able to broadcast a funding tx, record their fail locally
-      case (wait: WaitBroadcastRemoteData, fail: Fail, WAIT_FUNDING_DONE | SLEEPING) =>
-        val d1 = me STORE wait.copy(fail = Some apply fail)
-        me UPDATA d1
-
-
       // We have asked an external funder to broadcast a funding tx and got an onchain event
       case (wait: WaitBroadcastRemoteData, CMDSpent(fundTx), WAIT_FUNDING_DONE | SLEEPING) if wait.txHash == fundTx.hash =>
         val d1 = me STORE WaitFundingDoneData(wait.announce, our = None, their = None, fundTx, wait.commitments)

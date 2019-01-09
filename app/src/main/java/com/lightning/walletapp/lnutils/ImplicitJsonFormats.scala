@@ -11,11 +11,11 @@ import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
-import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData}
 import com.lightning.walletapp.ln.Tools.{Bytes, UserId}
 
 import com.lightning.walletapp.ln.crypto.ShaHashesWithIndex
 import com.lightning.walletapp.ln.crypto.ShaChain.Index
+import com.lightning.walletapp.IncomingChannelRequest
 import fr.acinq.eclair.UInt64
 import scodec.bits.BitVector
 import java.math.BigInteger
@@ -106,21 +106,10 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   // LNURL
 
-  implicit object LNUrlDataFmt extends JsonFormat[LNUrlData] {
-    def write(unserialized: LNUrlData): JsValue = unserialized match {
-      case unserialiedMessage: IncomingChannelRequest => unserialiedMessage.toJson
-    }
-
-    def read(serialized: JsValue): LNUrlData = serialized.asJsObject fields "tag" match {
-      case JsString("channelRequest") => serialized.convertTo[IncomingChannelRequest]
-      case _ => throw new RuntimeException
-    }
-  }
-
   implicit val incomingChannelRequestFmt =
-    taggedJsonFmt(jsonFormat[String, String, String, Long, Long, Int, Long, Long, Long,
-      IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1", "capacity", "push",
-      "cltvExpiryDelta", "htlcMinimumMsat", "feeBaseMsat", "feeProportionalMillionths"), tag = "channelRequest")
+    jsonFormat[String, String, String, Long, Long, Int, Long, Long, Long,
+      IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1", "capacity",
+      "push", "cltvExpiryDelta", "htlcMinimumMsat", "feeBaseMsat", "feeProportionalMillionths")
 
   // FundMsg
 

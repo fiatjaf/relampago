@@ -52,8 +52,8 @@ object FragWallet {
 }
 
 class FragWallet extends Fragment {
-  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_view_pager_btc, vg, false)
-  override def onViewCreated(view: View, state: Bundle) = worker = new FragWalletWorker(getActivity.asInstanceOf[WalletActivity], view)
+  override def onCreateView(inf: LayoutInflater, viewGroup: ViewGroup, bundle: Bundle) = inf.inflate(R.layout.frag_view_pager_btc, viewGroup, false)
+  override def onViewCreated(view: View, state: Bundle) = if (app.isAlive) worker = new FragWalletWorker(getActivity.asInstanceOf[WalletActivity], view)
   override def onDestroy = wrap(super.onDestroy)(worker.onFragmentDestroy)
   override def onResume = wrap(super.onResume)(worker.host.checkTransData)
 }
@@ -113,8 +113,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // To fight spamming
   private[this] var errorLimit = 5
   private[this] var lastOpenMsecStamp = 0L
-
-  val connectionListener = new ConnectionListener {
+  private[this] val connectionListener = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, incomingMessage: LightningMessage) = incomingMessage match {
       case open: OpenChannel if System.currentTimeMillis > lastOpenMsecStamp + 10000L && open.channelFlags == 0.toByte =>
         // We only consider incoming channels if they are private and last message arrived more than 10 seconds ago
@@ -202,8 +201,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     val lnTotalSum = MilliSatoshi(lnTotal.sum)
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
-    val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom formattedWithSign lnTotalSum
-    val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom formattedWithSign btcTotalSum
+    val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
+    val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom parsedWithSign btcTotalSum
     val perBtcRate = formatFiat format msatInFiat(oneBtc).getOrElse(0L)
     fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
     fiatRate setText s"<small>$perBtcRate</small>".html
@@ -495,7 +494,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // LN SEND / RECEIVE
 
   def receive(chansWithRoutes: Map[Channel, PaymentRoute], maxCanReceive: MilliSatoshi) = {
-    val baseHint = app.getString(amount_hint_can_receive).format(denom formattedWithSign maxCanReceive)
+    val baseHint = app.getString(amount_hint_can_receive).format(denom parsedWithSign maxCanReceive)
     val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
     val rateManager = new RateManager(content) hint baseHint
 
@@ -551,7 +550,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val maxLocalSend = operationalChannels.map(estimateCanSend).max
         val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend)
         val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
-        val baseHint = app.getString(amount_hint_can_send).format(denom formattedWithSign maxCappedSend)
+        val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
         val baseTitle = str2View(app.getString(ln_send_title).format(description).html)
         val rateManager = new RateManager(baseContent) hint baseHint
         val bld = baseBuilder(baseTitle, baseContent)
@@ -567,7 +566,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
             case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
               val finalDeliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
               val guaranteedDeliveryTitle = app.getString(ln_send_title_guaranteed).format(description).html
-              rateManager hint app.getString(amount_hint_can_deliver).format(denom formattedWithSign finalDeliverable)
+              rateManager hint app.getString(amount_hint_can_deliver).format(denom parsedWithSign finalDeliverable)
               baseTitle.findViewById(R.id.titleTip).asInstanceOf[TextView] setText guaranteedDeliveryTitle
               baseTitle setBackgroundColor ContextCompat.getColor(host, R.color.ln)
 
@@ -629,7 +628,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
   def sendBtcPopup(addr: Address)(and: Transaction => Unit): RateManager = {
-    val baseHint = app.getString(amount_hint_can_send).format(denom formattedWithSign app.kit.conf0Balance)
+    val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign app.kit.conf0Balance)
     val form = host.getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
     val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
     val rateManager = new RateManager(form) hint baseHint
@@ -640,7 +639,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case Success(ms) =>
         val txProcessor = new TxProcessor {
-          def futureProcess(unsignedRequest: SendRequest) = and(app.kit blockSend app.kit.sign(unsignedRequest).tx)
+          def futureProcess(unsignedSendRequest: SendRequest) = and(app.kit blockSend app.kit.sign(unsignedSendRequest).tx)
           def onTxFail(err: Throwable) = mkCheckForm(alert => rm(alert)(retry), none, baseBuilder(txMakeError(err), null), dialog_retry, dialog_cancel)
           def retry = sendBtcPopup(addr)(and)
           val pay = AddrData(ms, addr)

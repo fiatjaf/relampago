@@ -122,8 +122,8 @@ class LNStartFundActivity extends TimerActivity { me =>
         val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
         val maxCap = MilliSatoshi(math.min(app.kit.conf0Balance.value, LNParams.maxCapacity.amount) * 1000L)
         val minCap = MilliSatoshi(math.max(LNParams.broadcaster.perKwThreeSat * 3, LNParams.minCapacitySat) * 1000L)
-        val rateManager = new RateManager(content) hint getString(amount_hint_newchan).format(denom formattedWithSign minCap,
-          denom formattedWithSign LNParams.maxCapacity, denom formattedWithSign app.kit.conf0Balance)
+        val rateManager = new RateManager(content) hint getString(amount_hint_newchan).format(denom parsedWithSign minCap,
+          denom parsedWithSign LNParams.maxCapacity, denom parsedWithSign app.kit.conf0Balance)
 
         def askAttempt(alert: AlertDialog) = rateManager.result match {
           case Success(ms) if ms < minCap => app toast dialog_sum_small

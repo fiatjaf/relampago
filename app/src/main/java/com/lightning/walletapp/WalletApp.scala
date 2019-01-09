@@ -13,7 +13,6 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
-import com.lightning.walletapp.ln.wire.FundMsg._
 import com.google.common.util.concurrent.Service.State._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
@@ -105,8 +104,8 @@ class WalletApp extends Application { me =>
   }
 
   def mkNodeAnnouncement(id: PublicKey, isa: InetSocketAddress, alias: String) = {
-    val sig = Crypto encodeSignature Crypto.sign(random getBytes 32, LNParams.nodePrivateKey)
-    NodeAnnouncement(sig, "", 0L, id, (-128, -128, -128), alias, NodeAddress(isa) :: Nil)
+    val dummySig = Crypto encodeSignature Crypto.sign(random getBytes 32, randomPrivKey)
+    NodeAnnouncement(dummySig, "", 0L, id, (-128, -128, -128), alias, NodeAddress(isa) :: Nil)
   }
 
   object TransData { self =>
@@ -136,8 +135,8 @@ class WalletApp extends Application { me =>
       case bitcoinUriLink if bitcoinUriLink startsWith "BITCOIN" => bitcoinUri(bitcoinUriLink.toLowerCase)
       case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
       case shortNodeLink(key, host) => mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, 9735), host)
-      case lnPayReq(prefix, req) => PaymentRequest.read(s"$prefix$req".toLowerCase)
-      case lnUrl(prefix, data) => LNUrl(s"$prefix$data".toLowerCase)
+      case lnUrl(prefix, data) => Tuple2(LNUrl fromBech32 s"$prefix$data", true)
+      case lnPayReq(prefix, data) => PaymentRequest read s"$prefix$data"
       case _ => toAddress(rawText)
     }
   }
@@ -289,10 +288,6 @@ object ChannelManager extends Broadcaster {
       val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockSend tx catch none
-
-    case (chan, wbr: WaitBroadcastRemoteData, _: ChannelReestablish) if wbr.isOutdated && wbr.fail.isEmpty =>
-      // External funder may never publish our funding tx so we should mark it as failure once enough time passes
-      chan process Fail(FAIL_PUBLISH_ERROR, "Funding has expired")
 
     case (chan, wait: WaitFundingDoneData, _: ChannelReestablish) if wait.our.isEmpty =>
       // CMDConfirmed may be sent to an offline channel and there will be no reaction

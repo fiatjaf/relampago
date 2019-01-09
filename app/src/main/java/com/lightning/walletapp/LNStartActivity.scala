@@ -12,8 +12,6 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.StartNodeView._
 import com.lightning.walletapp.ln.wire.FundMsg._
 import com.github.kevinsawicki.http.HttpRequest._
-import com.lightning.walletapp.lnutils.JsonHttpUtils._
-import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
@@ -23,7 +21,6 @@ import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
 import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
-import fr.acinq.bitcoin.Bech32
 import android.os.Bundle
 import java.util.Date
 
@@ -100,13 +97,12 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   var setNormalMode = new Runnable { def run = none }
   private[this] var nodes = Vector.empty[StartNodeView]
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
+  lazy val worker = new ThrottledWork[String, AnnounceChansNumVec] {
+    private[this] val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
+    private[this] val acinqAnnounce = app.mkNodeAnnouncement(acinqKey, new InetSocketAddress("34.239.230.56", 9735), "ACINQ")
+    private[this] val acinq = HardcodedNodeView(acinqAnnounce, "<strong>Recommended ACINQ node</strong>")
 
-  val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
-  val acinqAnnouncement = app.mkNodeAnnouncement(acinqKey, new InetSocketAddress("34.239.230.56", 9735), "ACINQ")
-  val acinq = HardcodedNodeView(acinqAnnouncement, "<strong>Recommended ACINQ node</strong>")
-
-  val worker = new ThrottledWork[String, AnnounceChansNumVec] {
-    def error(searchError: Throwable) = Tools errlog searchError
+    def error(err: Throwable) = Tools errlog err
     def work(userQuery: String) = app.olympus findNodes userQuery
     def process(userQuery: String, results: AnnounceChansNumVec) = {
       val remoteNodeViewWraps = for (result <- results) yield RemoteNodeView(result)
@@ -134,7 +130,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     host goTo classOf[LNStartFundActivity]
   }
 
-  override def onViewCreated(view: View, state: Bundle) = {
+  override def onViewCreated(view: View, state: Bundle) = if (app.isAlive) {
     val externalFundInfo = view.findViewById(R.id.externalFundInfo).asInstanceOf[TextView]
     val externalFundCancel = view.findViewById(R.id.externalFundCancel).asInstanceOf[Button]
     val externalFundWrap = view.findViewById(R.id.externalFundWrap).asInstanceOf[LinearLayout]
@@ -145,14 +141,13 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     val lnStartNodesList = view.findViewById(R.id.lnStartNodesList).asInstanceOf[ListView]
 
     def funderInfo(wrk: WSWrap, color: Int, text: Int) = host UITask {
-      val humanAmountSum = denom formattedWithSign wrk.params.start.fundingAmount
-      val humanFeeSum = denom formattedWithSign wrk.params.fee
-      val humanExpiry = me time new Date(wrk.params.expiry)
+      // Show extended remote funding info here so user knows what's up
 
       externalFundWrap setVisibility View.VISIBLE
       externalFundWrap setBackgroundColor getResources.getColor(color, null)
       externalFundInfo setText host.getString(text).format(wrk.params.start.host,
-        humanExpiry, humanAmountSum, humanFeeSum).html
+        me time new Date(wrk.params.expiry), denom parsedWithSign wrk.params.fee,
+        denom parsedWithSign wrk.params.start.fundingAmount).html
     }
 
     setExternalFunder = started => {
@@ -233,6 +228,7 @@ sealed trait StartNodeView {
   def asString(base: String, separator: String): String
 }
 
+case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
 case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNodeView {
   // App suggests a bunch of hardcoded and separately fetched nodes with a good liquidity
 
@@ -255,23 +251,12 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 
 // GETTING INCOMING CHANNEL
 
-sealed trait LNUrlData
-case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
-case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long,
-                                  cltvExpiryDelta: Int, htlcMinimumMsat: Long, feeBaseMsat: Long,
-                                  feeProportionalMillionths: Long) extends LNUrlData {
+case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long,
+                                  push: Long, cltvExpiryDelta: Int, htlcMinimumMsat: Long,
+                                  feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
   val nodeLink(key, host, port) = uri
-  private[this] val request = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1"
+  private[this] val chanUrl = s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1"
   def getAnnounce = app.mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
-  def requestChannel = obsOnIO.map(_ => get(request, true).trustAllCerts.trustAllHosts.body)
-}
-
-// LNURL HANDLER
-
-case class LNUrl(bech32url: String) {
-  private[this] val _ \ decoded = Bech32 decode bech32url
-  private[this] val finalDecoded = Bech32 five2eight decoded
-  private def fetch = get(bin2readable(finalDecoded.toArray), true).trustAllCerts.trustAllHosts
-  def resolve = obsOnIO.map(_ => fetch.connectTimeout(7500).body) map to[IncomingChannelRequest]
+  def requestChannel = get(chanUrl, true).trustAllCerts.trustAllHosts.body
 }

@@ -14,8 +14,7 @@ import ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
 
 
 object Scripts { me =>
-  type ScriptEltSeq = Seq[ScriptElt]
-  def multiSig2of2(pubkey1: PublicKey, pubkey2: PublicKey): ScriptEltSeq =
+  def multiSig2of2(pubkey1: PublicKey, pubkey2: PublicKey) =
     LexicographicalOrdering.isLessThan(pubkey1.toBin, pubkey2.toBin) match {
       case false => Script.createMultiSigMofN(m = 2, pubkey2 :: pubkey1 :: Nil)
       case true => Script.createMultiSigMofN(m = 2, pubkey1 :: pubkey2 :: Nil)
@@ -56,7 +55,7 @@ object Scripts { me =>
   // LN SCRIPTS
 
   def toLocalDelayed(revocationPubkey: PublicKey, toSelfDelay: Int,
-                     localDelayedPaymentPubkey: PublicKey): ScriptEltSeq =
+                     localDelayedPaymentPubkey: PublicKey) =
 
     OP_IF ::
       OP_PUSHDATA(revocationPubkey) ::
@@ -95,8 +94,7 @@ object Scripts { me =>
     OP_ENDIF :: Nil
 
   def htlcReceived(localHtlcPubkey: PublicKey, remoteHtlcPubkey: PublicKey,
-                   revocationPubKey: PublicKey, payHash160: BinaryData,
-                   lockTime: Long): ScriptEltSeq =
+                   revocationPubKey: PublicKey, payHash160: BinaryData, lockTime: Long) =
 
     OP_DUP :: OP_HASH160 ::
     OP_PUSHDATA(revocationPubKey.hash160) ::
@@ -310,7 +308,7 @@ object Scripts { me =>
                   remoteHtlcPubkey: PublicKey, spec: CommitmentSpec) = {
 
     val finder = new PubKeyScriptIndexFinder(commitTx)
-    def makeHtlcTx(redeem: ScriptEltSeq, pubKeyScript: ScriptEltSeq, amount: Satoshi, fee: Satoshi, expiry: Long) = {
+    def makeHtlcTx(redeem: Seq[ScriptElt], pubKeyScript: Seq[ScriptElt], amount: Satoshi, fee: Satoshi, expiry: Long) = {
       val index = finder.findPubKeyScriptIndex(pubkeyScript = Script.write(Script pay2wsh redeem), Option apply amount)
       val inputInfo = InputInfo(OutPoint(commitTx, index), commitTx.txOut(index), Script write redeem)
       val txIn = TxIn(inputInfo.outPoint, BinaryData.empty, 0x00000000L) :: Nil
