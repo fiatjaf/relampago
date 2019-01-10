@@ -122,7 +122,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
         val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
         val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amount.amount).sum / 1000L)
-        val refundable = Satoshi(Commitments.latestRemoteCommit(cs).spec.toRemoteMsat / 1000L)
+        val refundable = Satoshi(cs.localCommit.spec.toLocalMsat / 1000L)
         val valueReceived = Satoshi(getStat(cs.channelId, 1) / 1000L)
         val valueSent = Satoshi(getStat(cs.channelId, 0) / 1000L)
 

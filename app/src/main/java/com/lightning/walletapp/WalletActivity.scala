@@ -15,7 +15,6 @@ import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
 import org.bitcoinj.core.{Address, TxWrap}
-
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
@@ -29,11 +28,14 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+
 import android.content.Intent
 import org.ndeftools.Message
 import android.app.Activity
 import android.os.Bundle
 import java.util.Date
+
+import com.lightning.walletapp.test.{FailureMessageLightningMessageCodecsSpec, SphinxSpec}
 
 
 trait SearchBar { me =>
@@ -180,19 +182,17 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       manager setSum scala.util.Try(uri.getAmount)
       me returnToBase null
 
+    case lnUrl: LNUrl =>
+      resolveUrl(None, lnUrl)
+      // Got an explicit lnurl, should resolve
+      // TransData value will be erased here
+      app toast ln_url_resolving
+      me returnToBase null
+
     case pr: PaymentRequest =>
       if (pr.lnUrlOpt.isDefined) {
-        // Presence of LNUrl overrides payment request processing
-        // with any LNUrl we first have to retrieve Json response and then decide how to proceed
-        val initialRequest = get(pr.lnUrlOpt.get.uri.toString, true).trustAllCerts.trustAllHosts
-        val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
-
-        ask.foreach(_ match {
-          case icr: IncomingChannelRequest => initConnection(icr)
-          case wr: WithdrawRequest => showWithdrawalForm(Some(pr), wr)
-          case _ => log("Unrecognized lnurl type")
-        }, onFail)
-
+        resolveUrl(Some(pr), pr.lnUrlOpt.get)
+        // Should resolve an embedded lnurl frist
         // TransData value will be erased here
         app toast ln_url_resolving
         me returnToBase null
@@ -211,22 +211,34 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         me returnToBase null
       }
 
-    case otherwise =>
+    case _ =>
   }
 
-  def initConnection(incoming: IncomingChannelRequest) =
-    ConnectionManager.listeners += new ConnectionListener { self =>
-      // This is done to make sure we definitely have an LN connection
-      ConnectionManager.connectTo(ann = incoming.getAnnounce, notify = true)
-      override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
-        // Remove listener and make a request, their OpenChannel message should arrive shortly
-        obsOnIO.map(_ => incoming.requestChannel).foreach(none, onFail)
-        ConnectionManager.listeners -= self
-      }
+  def resolveUrl(prOpt: Option[PaymentRequest], lNUrl: LNUrl) = {
+    val initialRequest = get(lNUrl.uri.toString, true).trustAllCerts.trustAllHosts
+    val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
+    ask.map(decideOnData).foreach(none, onFail) // Resolving methods must run on IO thread
+
+    def decideOnData(data: LNUrlData) = data match {
+      case icr: IncomingChannelRequest => initConnection(icr)
+      case wr: WithdrawRequest => showWithdrawalForm(wr)
+      case _ => log("Unrecognized lnurl type")
     }
 
-  def showWithdrawalForm(prOpt: Option[PaymentRequest], wr: WithdrawRequest) = {
+    def initConnection(incoming: IncomingChannelRequest) =
+      ConnectionManager.listeners += new ConnectionListener { self =>
+        // This is done to make sure we definitely have an LN connection
+        ConnectionManager.connectTo(ann = incoming.getAnnounce, notify = true)
+        override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
+          // Remove listener and make a request, their OpenChannel message should arrive shortly
+          ConnectionManager.listeners -= self
+          incoming.requestChannel
+        }
+      }
 
+    def showWithdrawalForm(wr: WithdrawRequest) = {
+
+    }
   }
 
   // BUTTONS REACTIONS

@@ -713,7 +713,7 @@ object Channel {
 
 case class ChanReport(chan: Channel, cs: Commitments) {
   def estimateFinalCanSend = estimateCanSend(chan) - softReserve.amount * 1000L
-  val softReserve = if (cs.localParams.isFunder) cs.commitInput.txOut.amount / 100L else Satoshi(0L)
+  val softReserve = if (cs.localParams.isFunder) cs.commitInput.txOut.amount / 200L else Satoshi(0L)
 }
 
 trait ChannelListener {

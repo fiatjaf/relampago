@@ -56,6 +56,7 @@ class LNStartActivity extends ScanActivity { me =>
 
   def checkTransData =
     app.TransData checkAndMaybeErase {
+      case _: LNUrl => me exitTo MainActivity.wallet
       case _: Address => me exitTo MainActivity.wallet
       case _: BitcoinURI => me exitTo MainActivity.wallet
       case _: PaymentRequest => me exitTo MainActivity.wallet
