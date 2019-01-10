@@ -15,6 +15,7 @@ import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
 import org.bitcoinj.core.{Address, TxWrap}
+
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
@@ -28,14 +29,11 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-
 import android.content.Intent
 import org.ndeftools.Message
 import android.app.Activity
 import android.os.Bundle
 import java.util.Date
-
-import com.lightning.walletapp.test.{FailureMessageLightningMessageCodecsSpec, SphinxSpec}
 
 
 trait SearchBar { me =>
