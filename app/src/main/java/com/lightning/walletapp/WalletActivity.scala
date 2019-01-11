@@ -223,16 +223,19 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case _ => log("Unrecognized lnurl type")
     }
 
-    def initConnection(incoming: IncomingChannelRequest) =
+    def initConnection(incoming: IncomingChannelRequest) = {
       ConnectionManager.listeners += new ConnectionListener { self =>
-        // This is done to make sure we definitely have an LN connection
-        ConnectionManager.connectTo(ann = incoming.getAnnounce, notify = true)
         override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
           // Remove listener and make a request, their OpenChannel message should arrive shortly
           ConnectionManager.listeners -= self
           incoming.requestChannel
         }
       }
+
+      // Make sure we definitely have an LN connection before asking
+      ConnectionManager.connectTo(incoming.getAnnounce, notify = true)
+    }
+
 
     def showWithdrawalForm(wr: WithdrawRequest) = {
 
