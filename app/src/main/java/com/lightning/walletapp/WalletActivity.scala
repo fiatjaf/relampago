@@ -181,14 +181,21 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case lnUrl: LNUrl =>
-      resolveStandardUrl(None, lnUrl)
+      resolveUrl(None, lnUrl)
       // Got an explicit lnurl, should resolve
       // TransData value will be erased here
       app toast ln_url_resolving
       me returnToBase null
 
     case pr: PaymentRequest =>
-      if (ChannelManager.notClosingOrRefunding.isEmpty) {
+      if (pr.lnUrlOpt.isDefined) {
+        resolveUrl(Some(pr), pr.lnUrlOpt.get)
+        // Should resolve an embedded lnurl first
+        // TransData value will be erased here
+        app toast ln_url_resolving
+        me returnToBase null
+
+      } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
         // No operational channels are present, offer to open a new one
         // TransData should be set to batch or null to erase previous value
         app.TransData.value = TxWrap findBestBatch pr getOrElse null
@@ -207,7 +214,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // LNURL
 
-  def resolveStandardUrl(prOpt: Option[PaymentRequest], lNUrl: LNUrl) = {
+  def resolveUrl(prOpt: Option[PaymentRequest], lnUrl: LNUrl) =
+    scala.util.Try(lnUrl.uri getQueryParameter "tag") -> prOpt match {
+      case scala.util.Success("link") \ Some(pr) => showLinkSendForm(lnUrl, pr)
+      case scala.util.Success("login") \ _ => showLoginForm(lnUrl)
+      case _ => resolveStandardUrl(lnUrl)
+    }
+
+  def resolveStandardUrl(lNUrl: LNUrl) = {
     val initialRequest = get(lNUrl.uri.toString, true).trustAllCerts.trustAllHosts
     val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
     // Resolving methods must run on IO thread to avoid "network on main thread" exceptions
@@ -239,6 +253,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def showLoginForm(lnUrl: LNUrl) = {
+
+  }
+
+  def showLinkSendForm(lnUrl: LNUrl, pr: PaymentRequest) = {
 
   }
 

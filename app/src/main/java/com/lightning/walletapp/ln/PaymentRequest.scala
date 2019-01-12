@@ -44,8 +44,7 @@ object LNUrl {
 
 case class LNUrl(request: String) {
   val uri = android.net.Uri parse request
-  val specialMeaning = Try(uri getQueryParameter "tag")
-  require(uri.toString contains "https://", "Not an HTTPS lnurl")
+  require(uri.toString contains "https://")
 }
 
 case class DescriptionHashTag(hash: BinaryData) extends Tag {
