@@ -181,21 +181,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case lnUrl: LNUrl =>
-      resolveUrl(None, lnUrl)
+      resolveStandardUrl(None, lnUrl)
       // Got an explicit lnurl, should resolve
       // TransData value will be erased here
       app toast ln_url_resolving
       me returnToBase null
 
     case pr: PaymentRequest =>
-      if (pr.lnUrlOpt.isDefined) {
-        resolveUrl(Some(pr), pr.lnUrlOpt.get)
-        // Should resolve an embedded lnurl frist
-        // TransData value will be erased here
-        app toast ln_url_resolving
-        me returnToBase null
-
-      } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
+      if (ChannelManager.notClosingOrRefunding.isEmpty) {
         // No operational channels are present, offer to open a new one
         // TransData should be set to batch or null to erase previous value
         app.TransData.value = TxWrap findBestBatch pr getOrElse null
@@ -212,34 +205,40 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     case _ =>
   }
 
-  def resolveUrl(prOpt: Option[PaymentRequest], lNUrl: LNUrl) = {
+  // LNURL
+
+  def resolveStandardUrl(prOpt: Option[PaymentRequest], lNUrl: LNUrl) = {
     val initialRequest = get(lNUrl.uri.toString, true).trustAllCerts.trustAllHosts
     val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
-    ask.map(decideOnData).foreach(none, onFail) // Resolving methods must run on IO thread
+    // Resolving methods must run on IO thread to avoid "network on main thread" exceptions
 
-    def decideOnData(data: LNUrlData) = data match {
+    ask.map {
       case icr: IncomingChannelRequest => initConnection(icr)
       case wr: WithdrawRequest => showWithdrawalForm(wr)
       case _ => log("Unrecognized lnurl type")
-    }
+    }.foreach(none, onFail)
+  }
 
-    def initConnection(incoming: IncomingChannelRequest) = {
-      ConnectionManager.listeners += new ConnectionListener { self =>
-        override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
-          // Remove listener and make a request, their OpenChannel message should arrive shortly
-          ConnectionManager.listeners -= self
-          incoming.requestChannel
-        }
+  def initConnection(incoming: IncomingChannelRequest) = {
+    ConnectionManager.listeners += new ConnectionListener { self =>
+      override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
+        // Remove listener and make a request, OpenChannel message should arrive shortly
+        // must make sure request is not happening on a main thread when called here
+        ConnectionManager.listeners -= self
+        incoming.requestChannel
       }
-
-      // Make sure we definitely have an LN connection before asking
-      ConnectionManager.connectTo(incoming.getAnnounce, notify = true)
     }
 
+    // Make sure we definitely have an LN connection before asking
+    ConnectionManager.connectTo(incoming.getAnnounce, notify = true)
+  }
 
-    def showWithdrawalForm(wr: WithdrawRequest) = {
+  def showWithdrawalForm(wr: WithdrawRequest) = {
 
-    }
+  }
+
+  def showLoginForm(lnUrl: LNUrl) = {
+
   }
 
   // BUTTONS REACTIONS

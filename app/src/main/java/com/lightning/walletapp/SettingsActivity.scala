@@ -160,8 +160,8 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         app.kit.store = new SPVBlockStore(app.params, app.chainFile)
         app.kit useCheckPoints app.kit.wallet.getEarliestKeyCreationTime
         app.kit.wallet saveToFile app.walletFile
-        val pid = android.os.Process.myPid
-        android.os.Process killProcess pid
+        finishAffinity
+        System exit 0
       } catch none
     }
 
