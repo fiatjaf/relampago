@@ -605,9 +605,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
   def doSend(rd: RoutingData) =
-    ChannelManager checkIfSendable rd match {
-      case Right(rd1) => PaymentInfoWrap addPendingPayment rd1
-      case Left(sanityCheckErrorMsg) => onFail(sanityCheckErrorMsg)
+    ChannelManager.checkIfSendable(rd) match {
+      case Left(sanityCheckErr) => onFail(sanityCheckErr)
+      case _ => PaymentInfoWrap addPendingPayment rd
     }
 
   // BTC SEND / BOOST

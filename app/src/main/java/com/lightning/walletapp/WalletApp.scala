@@ -462,11 +462,14 @@ object ChannelManager extends Broadcaster {
     case Left(emptyRD) => noRoutes(emptyRD)
 
     case Right(rd) =>
-      // Empty used route means we're sending to our peer and its nodeId is our target
-      val targetId = if (rd.usedRoute.nonEmpty) rd.usedRoute.head.nodeId else rd.pr.nodeId
-      val chans = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan }
-      val res = chans collectFirst { case chan if chan.data.announce.nodeId == targetId => chan process rd }
-      res getOrElse sendEither(useRoutesLeft(rd), noRoutes)
+      val targetId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
+      // Empty used route means we're sending to peer and its nodeId is our target, make sure chosen chan has enough funds
+      val opt = chanReports.find(r => r.estimateFinalCanSend >= rd.firstMsat && r.chan.data.announce.nodeId == targetId)
+
+      opt match {
+        case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)
+        case Some(targetChanRep) => targetChanRep.chan process rd
+      }
   }
 }
 

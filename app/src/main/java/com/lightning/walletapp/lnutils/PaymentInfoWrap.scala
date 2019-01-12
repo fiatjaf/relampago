@@ -22,7 +22,6 @@ import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.ChannelManager
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
-import java.util.Collections
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
@@ -107,16 +106,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     // Update affected record states in a database, then retry failed payments where possible
     val fulfilledIncoming = for (Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled) yield add
 
-    def newRoutes(rd: RoutingData) =
-      ChannelManager checkIfSendable rd match {
-        case Right(stillCanSendRD) if stillCanSendRD.callsLeft > 0 =>
-          // We can still make a call to fetch more payment route candidates
-          me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-
-        case _ =>
-          // Nope, UI will be updated upstream
-          updStatus(FAILURE, rd.pr.paymentHash)
-      }
+    def newRoutes(rd: RoutingData) = {
+      // UI will be updated upstream if we can't re-send any more
+      val stillCanReSend = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
+      if (stillCanReSend) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
+      else updStatus(FAILURE, rd.pr.paymentHash)
+    }
 
     db txWrap {
       fulfilledIncoming foreach updOkIncoming
@@ -129,9 +124,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
           // Try to use the routes left or fetch new ones if empty
           // but account for possibility of rd not being in place
 
-          case Some(Some(prunedRD) \ excludes) =>
+          case Some(Some(rd1) \ excludes) =>
             for (entity <- excludes) BadEntityWrap.putEntity tupled entity
-            ChannelManager.sendEither(useRoutesLeft(prunedRD), newRoutes)
+            ChannelManager.sendEither(useFirstRoute(rd1.routes, rd1), newRoutes)
 
           case _ =>
             // May happen after app restart

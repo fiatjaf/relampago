@@ -47,7 +47,6 @@ object PaymentInfo {
     makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
   }
 
-  def useRoutesLeft(rd: RoutingData) = useFirstRoute(rd.routes, rd)
   def useFirstRoute(rest: PaymentRouteVec, rd: RoutingData) = rest match {
     case firstRoute +: restOfRoutes => useRoute(firstRoute, restOfRoutes, rd)
     case _ => Left(rd)
