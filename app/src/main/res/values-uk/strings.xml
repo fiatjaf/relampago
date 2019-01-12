@@ -57,6 +57,12 @@
         These markets have the <a href=http://bitcoinhivemind.com/papers/3_PM_Applications.pdf>potential</a> to revolutionize the emergence and diffusion of knowledge in society.
     ]]></string>
 
+    <string name="offchain_receive_howto"><![CDATA[
+        Для отримання платежів-Блискавок потрібно мати як мінімум один <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платіжний канал</a>. Відкрити канал можна двома способами:<br><br>
+        1. Відкрийте <i>вихідний канал</i> з обраним вами пiром та спочатку зробіть кілька платежів-Блискавок щоб <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>звільнити місце</a> для вхідних коштів.<br><br>
+        2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Замовте</a> <i>вхідний канал</i>, який одразу дозволить вам отримувати платежі-Блискавки.
+    ]]></string>
+
     <!-- Olympus server -->
     <string name="olympus_log">Лог дій</string>
     <string name="olympus_add">Додати сервер</string>
@@ -161,6 +167,7 @@
     <string name="btc_receive_option"><![CDATA[<font color=#E68A00>Біткоїн-транзакція</font><small><br><br>Створити QR-код зі звичайною адресою для отримання ончейн Біткоїн-транзакцій</small>]]></string>
     <string name="ln_receive_6conf"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що ваш пір ще не готовий. Як правило це стається як тільки наповнююча канал Біткоїн-транзакція отримує 6 підтверджень]]></string>
     <string name="ln_receive_reserve"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що для початку вам потрібно витратити хоча б %1$s щоб звільнити місце для отримання грошей]]></string>
+    <string name="ln_receive_suggestion"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що немає каналів.<br><br>Натисніть, щоб дізнатися більше!]]></string>
     <string name="ln_receive_ok">Створити QR-код з одноразовим запитом для отримання швидких оффчейн-платежів</string>
     <string name="ln_chan_offline">Канал в офлайні, чекаємо&#8230;</string>
     <string name="ln_no_open_chans">Немає відкритих каналів</string>
@@ -184,6 +191,8 @@
     <string name="err_self_payment">Не вийшло тому що ви намагаєтесь відправити платіж самому собі</string>
     <string name="err_general">Не вийшло тому що сталася неочікувана помилка</string>
     <string name="err_no_data">Нічого не знайдено</string>
+
+    <!-- SPECIAL CHANNEL OPEN MODES -->
 
     <string name="err_fund_verify_error">Can not proceed with external funding because remote verification failed</string>
     <string name="err_fund_not_verified_yet">Can not proceed with external funding because verification is not finished yet</string>

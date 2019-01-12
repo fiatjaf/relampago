@@ -65,7 +65,7 @@
     <string name="offchain_receive_howto"><![CDATA[
         Receiving off-chain Lightning funds requires you to have at least one <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channel</a>. There are two ways to accomplish this:<br><br>
         1. Open an <i>outgoing channel</i> with a peer of your choice and spend some Lightning funds first to <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>make room</a> for incoming payments.<br><br>
-        2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Order</a> an <i>incoming channel</i> where all the funds are initially on peer\'s side so you can receive Lightning payments right away.
+        2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Order</a> an <i>incoming channel</i> which would allow you to receive Lightning payments right away.
     ]]></string>
 
     <!-- Olympus server -->
