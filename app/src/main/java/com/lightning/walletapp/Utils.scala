@@ -124,7 +124,6 @@ trait TimerActivity extends AppCompatActivity { me =>
     val alert = showForm(bld.create)
     val posAct = me onButtonTap ok(alert)
     val negAct = me onButtonTap rm(alert)(no)
-    try clickableTextField(alert findViewById android.R.id.message) catch none
     if (-1 != noResource) alert getButton BUTTON_NEGATIVE setOnClickListener negAct
     if (-1 != okResource) alert getButton BUTTON_POSITIVE setOnClickListener posAct
     alert
@@ -147,11 +146,9 @@ trait TimerActivity extends AppCompatActivity { me =>
     alertDialog.getWindow.getAttributes.windowAnimations = R.style.SlidingDialog
     alertDialog setCanceledOnTouchOutside false
 
-    try alertDialog.show catch none finally if (scrWidth > 2.3) {
-      // Could be run on large tablets so constrain max window size
-      alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
-    }
-
+    // First, attempt to make dialog links clickable, then make sure it does not blow up if called on destroyed activity
+    try alertDialog.show catch none finally if (scrWidth > 2.3) alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
+    try clickableTextField(alertDialog findViewById android.R.id.message) catch none
     alertDialog
   }
 

@@ -62,6 +62,12 @@
         These markets have the <a href=http://bitcoinhivemind.com/papers/3_PM_Applications.pdf>potential</a> to revolutionize the emergence and diffusion of knowledge in society.
     ]]></string>
 
+    <string name="offchain_receive_howto"><![CDATA[
+        Receiving off-chain Lightning funds requires you to have at least one <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channel</a>. There are two ways to accomplish this:<br><br>
+        1. Open an <i>outgoing channel</i> with a peer of your choice and spend some Lightning funds first to <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>make room</a> for incoming payments.<br><br>
+        2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Order</a> an <i>incoming channel</i> where all the funds are initially on peer\'s side so you can receive Lightning payments right away.
+    ]]></string>
+
     <!-- Olympus server -->
     <string name="olympus_log">Token usage log</string>
     <string name="olympus_add">Add Olympus server</string>
@@ -162,10 +168,11 @@
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><small><br><br>Make a QR-code with on-chain wallet address, can be used to receive regular Bitcoin transactions</small>]]></string>
-    <string name="ln_receive_6conf"><![CDATA[&#9888; Can\'t ask for Lightning payments because your peer has not allowed receiving yet, this typically happens once a funding Bitcoin transaction gets 6 confirmations]]></string>
-    <string name="ln_receive_reserve"><![CDATA[&#9888; Can\'t ask for Lightning payments yet because first you need to spend at least %1$s in order to make some space for receiving]]></string>
-    <string name="ln_receive_ok">Make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments</string>
+    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><small><br><br>Make a QR-code with on-chain wallet address, can be used to receive regular Bitcoin transactions.</small>]]></string>
+    <string name="ln_receive_6conf"><![CDATA[&#9888; Can\'t ask for Lightning payments because your peer has not allowed receiving yet, this typically happens once a funding Bitcoin transaction gets 6 confirmations.]]></string>
+    <string name="ln_receive_reserve"><![CDATA[&#9888; Can\'t ask for Lightning payments yet because first you need to spend at least %1$s in order to make some space for receiving.]]></string>
+    <string name="ln_receive_suggestion"><![CDATA[&#9888; Can\'t ask for Lightning payments because no channels are present.<br><br>Tap to find out more!]]></string>
+    <string name="ln_receive_ok">Make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments.</string>
     <string name="ln_chan_offline">Channel is offline, waiting&#8230;</string>
     <string name="ln_no_open_chans">No open channels found</string>
 
@@ -188,6 +195,8 @@
     <string name="err_self_payment">Failed because payments to yourself are not allowed</string>
     <string name="err_general">Failed because an error has occurred</string>
     <string name="err_no_data">No useful data found</string>
+
+    <!-- SPECIAL CHANNEL OPEN MODES -->
 
     <string name="err_fund_verify_error">Can not proceed with external funding because remote verification failed</string>
     <string name="err_fund_not_verified_yet">Can not proceed with external funding because verification is not finished yet</string>

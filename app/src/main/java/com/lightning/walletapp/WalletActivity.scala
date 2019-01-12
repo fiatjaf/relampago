@@ -230,6 +230,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     // Make sure we definitely have an LN connection before asking
+    // if connection is already there we'll be notified in this thread
     ConnectionManager.connectTo(incoming.getAnnounce, notify = true)
   }
 
@@ -244,13 +245,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   // BUTTONS REACTIONS
 
   def goReceivePayment(top: View) = {
-    val operationalChannels = ChannelManager.notClosingOrRefunding.filter(isOperational)
-    val operationalChannelsWithRoutes: Map[Channel, PaymentRoute] = operationalChannels.flatMap(channelAndHop).toMap
+    val openingOrOpenChannels = ChannelManager.notClosingOrRefunding.filter(isOperational)
+    val operationalChannelsWithRoutes: Map[Channel, PaymentRoute] = openingOrOpenChannels.flatMap(channelAndHop).toMap
     val maxCanReceiveMsat = operationalChannelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L
     val maxCanReceive = MilliSatoshi(maxCanReceiveMsat)
 
     val reserveUnspent = getString(ln_receive_reserve) format denom.coloredOut(-maxCanReceive, denom.sign)
-    val lnReceiveText = if (operationalChannels.isEmpty) getString(ln_receive_option).format(me getString ln_no_open_chans)
+    val lnReceiveText = if (openingOrOpenChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_suggestion)
       else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_option).format(me getString ln_receive_6conf)
       else if (maxCanReceiveMsat < 0L) getString(ln_receive_option).format(reserveUnspent)
       else getString(ln_receive_option).format(me getString ln_receive_ok)
@@ -269,8 +270,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def offChain = rm(alert) {
-      // Provide filtered channels with real hops and real receivable amount
-      FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive)
+      if (openingOrOpenChannels.nonEmpty) FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive)
+      else showForm(negTextBuilder(dialog_ok, app.getString(offchain_receive_howto).html).create)
     }
   }
 
