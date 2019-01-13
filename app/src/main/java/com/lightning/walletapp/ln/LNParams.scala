@@ -32,10 +32,10 @@ object LNParams { me =>
 
   var db: LNOpenHelper = _
   private[this] var master: ExtendedPrivateKey = _
-  lazy val extendedNodeKey = derivePrivateKey(master, hardened(46) :: hardened(0) :: Nil)
-  lazy val extendedCloudKey = derivePrivateKey(master, hardened(92) :: hardened(0) :: Nil)
-  // Linking key is used for creating domain-specific identifiers when using "linkable payment" LNUrl
-  lazy val linkingKey = derivePrivateKey(master, hardened(138) :: hardened(0) :: Nil).privateKey.toBin.data
+  lazy val extendedNodeKey = derivePrivateKey(master, hardened(46L) :: hardened(0L) :: Nil)
+  lazy val extendedCloudKey = derivePrivateKey(master, hardened(92L) :: hardened(0L) :: Nil)
+  // HashingKey is used for creating domain-specific identifiers when using "linkable payment" LNUrl
+  lazy val hashingKey = derivePrivateKey(master, hardened(138L) :: 0L :: Nil).privateKey.toBin.data
   // Cloud secret is used to encrypt Olympus and GDrive data, cloud ID is used as identifier
   lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin.data)
   lazy val cloudId = sha256(cloudSecret.data)
@@ -54,10 +54,14 @@ object LNParams { me =>
   def isFeeNotOk(msat: Long, fee: Long, hops: Int) =
     fee > 25000 * (hops + 1) + msat / 50
 
-  // On-chain fee calculations
   def shouldUpdateFee(network: Long, commit: Long) = {
     val mismatch = 2.0 * (network - commit) / (commit + network)
     mismatch < -0.25 || mismatch > 0.25
+  }
+
+  def getLinkingKey(domainName: String) = {
+    val prefix = crypto.Digests.hmacSha256(hashingKey.toArray, domainName getBytes "UTF-8") take 8
+    derivePrivateKey(master, hardened(138L) :: 0L :: BigInt(prefix).toLong :: Nil).privateKey
   }
 
   def backupFileName = s"blw${chainHash.toString}-${cloudId.toString}.bkup"

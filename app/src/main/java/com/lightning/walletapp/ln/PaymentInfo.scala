@@ -167,7 +167,7 @@ object PaymentInfo {
       // Payment request may not have a zero final sum which means it's a donation and should not be checked for overflow
       case Success(info) if info.pr.amount.exists(add.amountMsat > _.amount * 2) => failHtlc(ss, IncorrectPaymentAmount, add)
       case Success(info) if info.pr.amount.exists(add.amountMsat < _.amount) => failHtlc(ss, IncorrectPaymentAmount, add)
-      case Success(info) if info.incoming == 1 && info.actualStatus != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
+      case Success(info) if info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
       case _ => failHtlc(ss, UnknownPaymentHash, add)
     }
 
@@ -190,23 +190,13 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long, lastExpiry: Long,
                        callsLeft: Int, useCache: Boolean) {
 
-  // Allow users to search by payment description OR recipient nodeId OR payment hash
+  lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
   lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toString}"
-  def plusOutOfBandRoute(route: PaymentRoute) = copy(routes = route +: routes)
+  def plusOutOfBandRoute(newRoute: PaymentRoute) = copy(routes = newRoute +: routes)
 }
 
-case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int,
-                       stamp: Long, description: String, hash: String, firstMsat: Long,
-                       lastMsat: Long, lastExpiry: Long) {
-
-  def actualStatus = incoming match {
-    // Once we have a preimage it is a SUCCESS
-    // but only if this is an outgoing payment
-    case 0 if preimage != NOIMAGE => SUCCESS
-    // Incoming payment always has preimage
-    // so we should always look at status
-    case _ => status
-  }
+case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int, stamp: Long,
+                       description: String, hash: String, firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
 
   // Keep serialized for performance
   lazy val firstSum = MilliSatoshi(firstMsat)

@@ -404,8 +404,8 @@ object ChannelManager extends Broadcaster {
   // SENDING PAYMENTS
 
   def checkIfSendable(rd: RoutingData) = {
+    val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS)
     val bestRepOpt = chanReports.sortBy(rep => -rep.estimateFinalCanSend).headOption
-    val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.actualStatus == SUCCESS)
     if (frozenInFlightHashes contains rd.pr.paymentHash) Left(app getString err_ln_frozen)
     else if (isPaid.isSuccess) Left(app getString err_ln_fulfilled)
     else bestRepOpt match {

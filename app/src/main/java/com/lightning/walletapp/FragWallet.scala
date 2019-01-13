@@ -319,7 +319,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case false => denom.coloredOut(info.firstSum, new String)
       }
 
-      holder.transactCircle setImageResource imageMap(info.actualStatus)
+      holder.transactCircle setImageResource imageMap(info.status)
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
       holder.transactWhat setText getDescription(info.description).html
@@ -330,7 +330,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val inFiat = msatInFiatHuman(info.firstSum)
       val retry = if (info.pr.isFresh) dialog_retry else -1
       val rd = emptyRD(info.pr, info.firstMsat, useCache = false)
-      val humanStatus = s"<strong>${paymentStates apply info.actualStatus}</strong>"
+      val humanStatus = s"<strong>${paymentStates apply info.status}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
       val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
@@ -341,7 +341,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       paymentRequest setOnClickListener onButtonTap(host share serializedPR)
       paymentDetails setText getDescription(info.description).html
 
-      if (info.actualStatus == SUCCESS) {
+      if (info.status == SUCCESS) {
         paymentRequest setVisibility View.GONE
         paymentProof setVisibility View.VISIBLE
         paymentProof setOnClickListener onButtonTap {
@@ -368,11 +368,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         val title = lnTitleOut.format(humanStatus, amountSentHuman, inFiat, feeHuman, paidFeePercent)
         val expiryBlocksLeftPart = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
-        if (info.actualStatus == WAITING) s"$expiryBlocksLeftPart<br>$title" else title
+        if (info.status == WAITING) s"$expiryBlocksLeftPart<br>$title" else title
       }
 
       info.incoming -> onChainRunnable(rd.pr) match {
-        case 0 \ Some(runnable) if info.lastMsat == 0 && info.lastExpiry == 0 && info.actualStatus == FAILURE =>
+        case 0 \ Some(runnable) if info.lastMsat == 0 && info.lastExpiry == 0 && info.status == FAILURE =>
           // Payment was failed without even trying because wallet is offline or no suitable payment routes were found
           val bld = baseBuilder(lnTitleOutNoFee.format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper)
           mkCheckFormNeutral(alert => rm(alert)(none), none, alert => rm(alert)(runnable.run), bld, dialog_ok, -1, dialog_pay_onchain)
@@ -387,13 +387,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           val bld = baseBuilder(outgoingTitle.html, detailsWrapper)
           def useOnchain(alert: AlertDialog) = rm(alert)(runnable.run)
           // Offer a fallback onchain address if payment was not successfull
-          if (info.actualStatus != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
+          if (info.status != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
           else mkCheckFormNeutral(alert => rm(alert)(none), doSend(rd), useOnchain, bld, dialog_ok, retry, dialog_pay_onchain)
 
         case 0 \ None =>
           val bld = baseBuilder(outgoingTitle.html, detailsWrapper)
           // Only allow user to retry this payment while using excluded nodes and channels but not an onchain option
-          if (info.actualStatus != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
+          if (info.status != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
           else mkCheckForm(alert => rm(alert)(none), doSend(rd), bld, dialog_ok, retry)
 
         case 1 \ _ =>
