@@ -435,7 +435,7 @@ object ChannelManager extends Broadcaster {
     } yield Obs just completeRoutes
 
     def getRoutes(target: PublicKey) =
-      if (rd.isReflexive) from diff Vector(target) match {
+      if (rd.isReflexive) from.filter(_ != target) match {
         case restFrom if restFrom.isEmpty => Obs just Vector(Vector.empty)
         case restFrom if rd.useCache => RouteWrap.findRoutes(restFrom, target, rd)
         case restFrom => BadEntityWrap.findRoutes(restFrom, target, rd)
