@@ -434,19 +434,22 @@ object ChannelManager extends Broadcaster {
       completeRoutes = partialRoutes.map(_ ++ tag.route)
     } yield Obs just completeRoutes
 
-    def getRoutes(targetId: PublicKey) = from contains targetId match {
-      // Non empty routes at this point means (localPhone -> Joint -> payee) so don't search
-      case false if rd.routes.isEmpty && rd.useCache => RouteWrap.findRoutes(from, targetId, rd)
-      case false if rd.routes.isEmpty => BadEntityWrap.findRoutes(from, targetId, rd)
-      case true => Obs just Vector(Vector.empty)
-      case _ => Obs just Vector.empty
-    }
+    def getRoutes(target: PublicKey) =
+      if (rd.isReflexive) from diff Vector(target) match {
+        case restFrom if restFrom.isEmpty => Obs just Vector(Vector.empty)
+        case restFrom if rd.useCache => RouteWrap.findRoutes(restFrom, target, rd)
+        case restFrom => BadEntityWrap.findRoutes(restFrom, target, rd)
+      } else from contains target match {
+        case true => Obs just Vector(Vector.empty)
+        case false if rd.routes.nonEmpty => Obs just Vector.empty
+        case false if rd.useCache => RouteWrap.findRoutes(from, target, rd)
+        case false => BadEntityWrap.findRoutes(from, target, rd)
+      }
 
     val paymentRoutesObs =
-      if (from.isEmpty) Obs error new LightningException(app getString ln_no_open_chans)
-      // Normally supplied rd does not have any routes because it has just been created or all of routes have failed already
-      // but there is a special case where we relay through a Joint node and have (localPhone -> Joint -> payee) route at start
-      // in this case we also need to check if (localPhone -> payee) and (localPhone -> hint -> payee) exist without remote search
+      if (from.isEmpty) Obs error new LightningException
+      else if (rd.isReflexive) Obs.zip(observables = withHints).map(_.flatten.toVector)
+      // Normally rd does not conain routes at this point but it may have a (phone -> Joint -> payee) one
       else Obs.zip(getRoutes(rd.pr.nodeId) +: Obs.just(rd.routes) +: withHints).map(_.flatten.toVector)
 
     for {
@@ -462,11 +465,16 @@ object ChannelManager extends Broadcaster {
     case Left(emptyRD) => noRoutes(emptyRD)
 
     case Right(rd) =>
+      // Empty used route means we're sending to peer and its nodeId is our target
       val targetId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
-      // Empty used route means we're sending to peer and its nodeId is our target, make sure chosen chan has enough funds
-      val opt = chanReports.find(r => r.estimateFinalCanSend >= rd.firstMsat && r.chan.data.announce.nodeId == targetId)
+      val notViaShortChanId = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
 
-      opt match {
+      chanReports find { rep =>
+        val notLoop = !rep.cs.extraHop.exists(_.shortChannelId == notViaShortChanId)
+        val isLocatedAtRouteStart = rep.chan.data.announce.nodeId == targetId
+        val hasEnoughFunds = rep.estimateFinalCanSend >= rd.firstMsat
+        notLoop && isLocatedAtRouteStart && hasEnoughFunds
+      } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)
         case Some(targetChanRep) => targetChanRep.chan process rd
       }

@@ -2,7 +2,6 @@ package com.lightning.walletapp.ln
 
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.crypto._
-import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.crypto.Sphinx._
 import com.lightning.walletapp.ln.RoutingInfoTag._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._

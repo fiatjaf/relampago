@@ -188,7 +188,6 @@
     <string name="err_tx_too_large">Не вийшло тому що розмір транзакції занадто великий. Спробуйте розбити її на кілька дрібніших транзакцій</string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Недостатньо коштів</strong><br><br>доступно %1$s<br>відправлено %2$s<br>не вистачає %3$s]]></string>
     <string name="err_gdrive_sign_in_failed">Не вийшло залогінитися в GDrive, хочете продовжити без відновлення каналів з бекапів GDrive?</string>
-    <string name="err_self_payment">Не вийшло тому що ви намагаєтесь відправити платіж самому собі</string>
     <string name="err_general">Не вийшло тому що сталася неочікувана помилка</string>
     <string name="err_no_data">Нічого не знайдено</string>
 

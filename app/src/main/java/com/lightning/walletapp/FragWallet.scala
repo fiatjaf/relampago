@@ -505,8 +505,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val rd = emptyRD(pr, sum.amount, useCache = true)
 
       db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.pr.paymentHash)
-      db.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
-        pr.description, rd.pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
+      db.change(PaymentTable.newSql, pr.toJson, preimg, 1, if (rd.isReflexive) WAITING else HIDDEN,
+        System.currentTimeMillis, pr.description, rd.pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
 
       app.TransData.value = pr
       host goTo classOf[RequestActivity]
@@ -534,7 +534,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def sendPayment(pr: PaymentRequest) =
     if (PaymentRequest.prefixes(chainHash) != pr.prefix) app toast err_general
-    else if (pr.nodeId == nodePublicKey) app toast err_self_payment
     else if (!pr.isFresh) app toast dialog_pr_expired
     else {
 

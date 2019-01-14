@@ -31,7 +31,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def addPendingPayment(rd: RoutingData) = {
     // Add payment to unsentPayments and try to resolve it later
     unsentPayments = unsentPayments.updated(rd.pr.paymentHash, rd)
-    me insertOrUpdateOutgoingPayment rd
+    if (!rd.isReflexive) me insertOrUpdateOutgoingPayment rd
     resolvePending
     uiNotify
   }
@@ -60,9 +60,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
 
-  def toPaymentInfo(rc: RichCursor) = PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage,
-    rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
-    rc string PaymentTable.hash, rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
+  def toPaymentInfo(rc: RichCursor) =
+    PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage, rc int PaymentTable.incoming, rc int PaymentTable.status,
+      rc long PaymentTable.stamp, rc string PaymentTable.description, rc string PaymentTable.hash, rc long PaymentTable.firstMsat,
+      rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
@@ -85,10 +86,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {
-    // Payment has been accepted by channel so start local tracking
+    if (!rd.isReflexive) me insertOrUpdateOutgoingPayment rd
     inFlightPayments = inFlightPayments.updated(rd.pr.paymentHash, rd)
     unsentPayments = unsentPayments - rd.pr.paymentHash
-    me insertOrUpdateOutgoingPayment rd
   }
 
   override def fulfillReceived(ok: UpdateFulfillHtlc) = db txWrap {

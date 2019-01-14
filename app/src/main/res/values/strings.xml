@@ -191,7 +191,6 @@
     <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s]]></string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
-    <string name="err_self_payment">Failed because payments to yourself are not allowed</string>
     <string name="err_general">Failed because an error has occurred</string>
     <string name="err_no_data">No useful data found</string>
 
