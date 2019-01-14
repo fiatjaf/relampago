@@ -185,7 +185,6 @@
     <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 
     <string name="err_ln_still_opening">Failed because a payment channel is not open yet\n\nFunding transaction needs to get enough confirmations before a channel can be used to send payments</string>
-    <string name="err_ln_second_reserve"><![CDATA[Failed because a channel balance is too low when soft reserve is taken into account<br><br>%1$s<br><br>hard reserve %2$s<br>soft reserve %3$s<br><br>capacity %4$s<br>can send %5$s<br>sending %6$s]]></string>
     <string name="err_ln_expired"><![CDATA[Expired payment detected<br><br>You may force close a related channel but a better approach would be to contact a faulty peer and let them sort this out<br><br><strong>Expired payment hash</strong><br>%1$s]]></string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
     <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>

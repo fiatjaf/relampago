@@ -111,8 +111,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         val started = me time new Date(cs.startedAt)
         val breakFee = Satoshi(cs.reducedRemoteState.myFeeSat)
         val txDepth \ _ = LNParams.broadcaster.getStatus(fundTxId)
+        val canSendMsat = ChanReport(chan, cs).softReserveCanSend
         val canReceiveMsat = estimateCanReceive(chan)
-        val canSendMsat = estimateCanSend(chan)
 
         val refundable = Satoshi(cs.localCommit.spec.toLocalMsat / 1000L)
         val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amount.amount).sum / 1000L)

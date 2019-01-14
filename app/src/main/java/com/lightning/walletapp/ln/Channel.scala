@@ -690,20 +690,10 @@ object Channel {
   val CLOSING = "CLOSING"
 
   def inFlightHtlcs(chan: Channel) = chan(_.reducedRemoteState.htlcs) getOrElse Set.empty
-  def estimateCanReceiveCapped(chan: Channel) = math.min(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
   def estimateCanReceive(chan: Channel) = chan(_.reducedRemoteState.canReceiveMsat) getOrElse 0L
-  def estimateCanSend(chan: Channel) = chan(_.reducedRemoteState.canSendMsat) getOrElse 0L
-
-  def isOpening(chan: Channel): Boolean = chan.data match {
-    case remote: WaitBroadcastRemoteData => remote.fail.isEmpty
-    case _: WaitFundingDoneData => true
-    case _ => false
-  }
-
-  def isOperational(chan: Channel) = chan.data match {
-    case NormalData(_, _, None, None, _) => true
-    case _ => false
-  }
+  def estimateCanReceiveCapped(chan: Channel) = math.min(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
+  def isOpening(chan: Channel): Boolean = chan.data match { case _: WaitFundingDoneData => true case _ => false }
+  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }
 
   def channelAndHop(chan: Channel) = for {
     Some(maybeDummyExtraHop) <- chan(_.extraHop)
@@ -712,8 +702,9 @@ object Channel {
 }
 
 case class ChanReport(chan: Channel, cs: Commitments) {
-  def estimateFinalCanSend = estimateCanSend(chan) - softReserve.amount * 1000L
-  val softReserve = if (cs.localParams.isFunder) cs.commitInput.txOut.amount / 200L else Satoshi(0L)
+  // Add some gap in case if on-chain fee rises while we have low balance
+  // also ensure it's slightly large enough so in case if on-chain fees rise we get good output
+  val softReserveCanSend = cs.reducedRemoteState.canSendMsat - cs.reducedRemoteState.myFeeSat * 2
 }
 
 trait ChannelListener {

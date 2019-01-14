@@ -403,30 +403,19 @@ object ChannelManager extends Broadcaster {
 
   // SENDING PAYMENTS
 
-  def checkIfSendable(rd: RoutingData) = {
-    val isPaid = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS)
-    val bestRepOpt = chanReports.sortBy(rep => -rep.estimateFinalCanSend).headOption
+  def checkIfSendable(rd: RoutingData) =
     if (frozenInFlightHashes contains rd.pr.paymentHash) Left(app getString err_ln_frozen)
-    else if (isPaid.isSuccess) Left(app getString err_ln_fulfilled)
-    else bestRepOpt match {
-
-      // We should explain to user what exactly is going on here
-      case Some(rep) if rep.estimateFinalCanSend < rd.firstMsat =>
-        val sendingNow = denom.coloredOut(MilliSatoshi(rd.firstMsat), denom.sign)
-        val finalCanSend = denom.coloredIn(MilliSatoshi(rep.estimateFinalCanSend), denom.sign)
-        val capacity = denom.coloredIn(MilliSatoshi(Commitments.latestRemoteCommit(rep.cs).spec.toRemoteMsat), denom.sign)
-        val hardReserve = denom.coloredOut(Satoshi(rep.cs.reducedRemoteState.myFeeSat + rep.cs.remoteParams.channelReserveSatoshis), denom.sign)
-        Left(app.getString(err_ln_second_reserve).format(rep.chan.data.announce.alias, hardReserve, denom.coloredOut(rep.softReserve, denom.sign),
-          capacity, finalCanSend, sendingNow).html)
-
+    else if (bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS).isSuccess) Left(app getString err_ln_fulfilled)
+    else chanReports.sortBy(theMostUpToDateChannelReport => -theMostUpToDateChannelReport.softReserveCanSend).headOption match {
+      // It may happen such that we had enough funds while were deciding whether to pay but don't have enough now
+      case Some(rep) if rep.softReserveCanSend < rd.firstMsat => Left(app getString dialog_sum_big)
       case None => Left(app getString ln_no_open_chans)
       case _ => Right(rd)
     }
-  }
 
   def fetchRoutes(rd: RoutingData) = {
     // First we collect chans which in principle can handle a given payment sum right now, then prioritize less busy chans
-    val from = chanReports collect { case rep if rep.estimateFinalCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
+    val from = chanReports collect { case rep if rep.softReserveCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
 
     def withHints = for {
       tag <- Obs from rd.pr.routingInfo
@@ -472,7 +461,7 @@ object ChannelManager extends Broadcaster {
       chanReports find { rep =>
         val notLoop = !rep.cs.extraHop.exists(_.shortChannelId == notViaShortChanId)
         val isLocatedAtRouteStart = rep.chan.data.announce.nodeId == targetId
-        val hasEnoughFunds = rep.estimateFinalCanSend >= rd.firstMsat
+        val hasEnoughFunds = rep.softReserveCanSend >= rd.firstMsat
         notLoop && isLocatedAtRouteStart && hasEnoughFunds
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)

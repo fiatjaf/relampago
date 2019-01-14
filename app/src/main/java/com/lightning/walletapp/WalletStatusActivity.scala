@@ -24,7 +24,7 @@ import android.net.Uri
 object WalletStatusActivity { me =>
   def updateItems(cbs: ChannelBalances): Unit = {
     // Only show what can be sent via Joint -> payee if do not have a phone -> Joint channel because `math.min` below
-    val me2JointMaxSendable = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse Long.MaxValue
+    val me2JointMaxSendable = relayPeerReports.map(_.softReserveCanSend).reduceOption(_ max _) getOrElse Long.MaxValue
     val perPeerMaxSendable = cbs.localBalances.sortBy(- _.withoutMaxFee).groupBy(_.peerNodeId).mapValues(_.head)
 
     val updatedMap = for {

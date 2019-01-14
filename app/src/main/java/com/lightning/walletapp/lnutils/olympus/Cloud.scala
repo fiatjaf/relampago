@@ -29,7 +29,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
       (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
-      ChannelManager.chanReports.exists(_.estimateFinalCanSend >= maxMsat) &&
+      ChannelManager.chanReports.exists(_.softReserveCanSend >= maxMsat) &&
       isAuthEnabled =>
 
       // Also executes if we have no actions to upload and a few tokens left
@@ -115,7 +115,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def snapshot = CloudSnapshot(data.tokens, connector.url)
   def retryFreshRequest(failedPayReq: PaymentRequest): Unit = {
     val rd = emptyRD(failedPayReq, firstMsat = failedPayReq.unsafeMsat, useCache = true)
-    val isOk = ChannelManager.chanReports.exists(_.estimateFinalCanSend >= failedPayReq.unsafeMsat)
+    val isOk = ChannelManager.chanReports.exists(_.softReserveCanSend >= failedPayReq.unsafeMsat)
     if (isOk) PaymentInfoWrap addPendingPayment rd
   }
 }

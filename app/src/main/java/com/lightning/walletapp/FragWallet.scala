@@ -537,16 +537,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     else if (!pr.isFresh) app toast dialog_pr_expired
     else {
 
-      // This fetches normal channels which MAY be offline currently
-      val openingChannels = ChannelManager.notClosingOrRefunding.filter(isOpening)
-      val operationalChannels = ChannelManager.notClosingOrRefunding.filter(isOperational)
-      if (operationalChannels.isEmpty && openingChannels.nonEmpty) onFail(app getString err_ln_still_opening)
-      else if (operationalChannels.isEmpty) app toast ln_no_open_chans
+      val noOpenChans = ChannelManager.chanReports.isEmpty
+      val hasOpeningChans = ChannelManager.notClosingOrRefunding.exists(isOpening)
+      if (noOpenChans && hasOpeningChans) onFail(app getString err_ln_still_opening)
+      else if (noOpenChans) app toast ln_no_open_chans
       else {
 
         val runnableOpt = onChainRunnable(pr)
         val description = getDescription(pr.description)
-        val maxLocalSend = operationalChannels.map(estimateCanSend).max
+        val maxLocalSend = ChannelManager.chanReports.map(_.softReserveCanSend).max
         val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend)
         val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
         val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
@@ -588,10 +587,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           }
 
           case Success(ms) \ _ => rm(alert) {
+            // A usual send without out-of-band paths
             me doSend emptyRD(pr, ms.amount, useCache = true)
-            // Inform if channels are offline and some wait will happen
-            val isOnline = operationalChannels.exists(_.state == OPEN)
-            if (!isOnline) app toast ln_chan_offline
           }
         }
 
@@ -603,11 +600,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
     }
 
-  def doSend(rd: RoutingData) =
+  def doSend(rd: RoutingData) = {
+    // Inform if channels are offline and some waiting is about to happen
+    val atLeaseOneIsOnline = ChannelManager.chanReports.exists(_.chan.state == OPEN)
+    if (!atLeaseOneIsOnline) app toast ln_chan_offline
+
     ChannelManager.checkIfSendable(rd) match {
       case Left(sanityCheckErr) => onFail(sanityCheckErr)
       case _ => PaymentInfoWrap addPendingPayment rd
     }
+  }
 
   // BTC SEND / BOOST
 

@@ -49,7 +49,7 @@ abstract class JointNode(payee: PublicKey) {
 
   def onDataUpdated: Unit
   def start(ann: NodeAnnouncement) = makeWebSocket(ann) { raw =>
-    val me2JointMaxSendable = relayPeerReports.map(_.estimateFinalCanSend).reduceOption(_ max _) getOrElse 0L
+    val me2JointMaxSendable = relayPeerReports.map(_.softReserveCanSend).reduceOption(_ max _) getOrElse 0L
     val joint2PayeeMaxSendable = to[ChannelBalances](raw).localBalances.filter(_.peerNodeId == payee).sortBy(- _.withoutMaxFee).headOption
     val deliverableThroughJoint = MilliSatoshi(joint2PayeeMaxSendable.map(_.withoutMaxFee) getOrElse 0L min me2JointMaxSendable)
     best = if (deliverableThroughJoint.amount <= 5000L) None else joint2PayeeMaxSendable.map(deliverableThroughJoint -> _)
