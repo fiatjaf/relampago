@@ -149,26 +149,6 @@
 
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/paymentsSent">
-            <TextView style="@style/CardBaseText" android:text="@string/ln_info_sent"/>
-
-            <TextView
-                style="@style/CardBaseText"
-                android:id="@+id/paymentsSentText"
-                android:gravity="end"/>
-
-        </LinearLayout>
-
-        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/paymentsReceived">
-            <TextView style="@style/CardBaseText" android:text="@string/ln_info_received"/>
-
-            <TextView
-                style="@style/CardBaseText"
-                android:id="@+id/paymentsReceivedText"
-                android:gravity="end"/>
-
-        </LinearLayout>
-
         <LinearLayout style="@style/CardLinearLayout" android:id="@+id/paymentsInFlight">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_in_flight"/>
 

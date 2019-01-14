@@ -101,7 +101,6 @@ object PaymentTable extends Table {
 
   // Selecting
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
-  val selectStatSql = s"SELECT SUM($lastMsat), SUM($firstMsat) FROM $table WHERE $chanId = ? AND $incoming = ?"
   val selectRecentSql = s"SELECT * FROM $table WHERE $status IN ($WAITING, $SUCCESS, $FAILURE, $FROZEN) ORDER BY $id DESC LIMIT 48"
   val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT 24)"
 

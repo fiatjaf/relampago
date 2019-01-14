@@ -231,8 +231,6 @@
         <item>заморожен</item>
     </array>
 
-    <string name="ln_info_sent">value sent</string>
-    <string name="ln_info_received">value received</string>
     <string name="ln_info_in_flight">value in-flight</string>
     <string name="ln_info_can_receive">can receive</string>
     <string name="ln_info_refundable">refundable</string>
