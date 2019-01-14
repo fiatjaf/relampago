@@ -31,7 +31,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def addPendingPayment(rd: RoutingData) = {
     // Add payment to unsentPayments and try to resolve it later
     unsentPayments = unsentPayments.updated(rd.pr.paymentHash, rd)
-    if (!rd.isReflexive) me insertOrUpdateOutgoingPayment rd
+    me insertOrUpdateOutgoingPayment rd
     resolvePending
     uiNotify
   }
@@ -86,7 +86,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {
-    if (!rd.isReflexive) me insertOrUpdateOutgoingPayment rd
+    me insertOrUpdateOutgoingPayment rd
     inFlightPayments = inFlightPayments.updated(rd.pr.paymentHash, rd)
     unsentPayments = unsentPayments - rd.pr.paymentHash
   }

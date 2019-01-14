@@ -156,7 +156,7 @@
     </array>
 
     <string name="send_scan_qr">Сканувати QR-код</string>
-    <string name="send_paste_payment_request"><![CDATA[Вставити Біткоїн-адресу<br><font color=#999999><small>або платіжний запит-Блискавку</small></font>]]></string>
+    <string name="send_paste_payment_request"><![CDATA[Вставити запит-Блискавку<br><font color=#999999><small>або Біткоїн-адресу</small></font>]]></string>
     <string name="send_hivemind_deposit"><![CDATA[Відіслати в Hivemind<br><font color=#999999><small>сайдчейн для ринку передбачень</small></font>]]></string>
     <string name="ln_send_title_guaranteed"><![CDATA[<font color=#FFFFFF><strong>Гарантована доставка</strong><small><br><br>%1$s</small></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послати платіж-Блискавку</strong></font><small><br><br>%1$s</small>]]></string>
