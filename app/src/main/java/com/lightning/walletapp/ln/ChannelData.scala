@@ -290,7 +290,6 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
 }
 
 object Commitments {
-  def fundingTxid(c: Commitments) = BinaryData(c.commitInput.outPoint.hash.reverse)
   def localHasUnsignedOutgoing(c: Commitments) = c.localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def remoteHasUnsignedOutgoing(c: Commitments) = c.remoteChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def latestRemoteCommit(c: Commitments) = c.remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse c.remoteCommit

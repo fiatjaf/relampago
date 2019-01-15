@@ -18,7 +18,8 @@ import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def hasCsOr[T](fun: HasCommitments => T, or: T) = data match { case some: HasCommitments => fun(some) case _ => or }
+  def hasCsOr[T](fun: HasCommitments => T, defaultNoCommits: T) = data match { case some: HasCommitments => fun(some) case _ => defaultNoCommits }
+  def fundTxId = data match { case some: HasCommitments => BinaryData(some.commitments.commitInput.outPoint.hash.reverse) case _ => BinaryData.empty }
   def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onException me -> err }
   var listeners: Set[ChannelListener] = _
 

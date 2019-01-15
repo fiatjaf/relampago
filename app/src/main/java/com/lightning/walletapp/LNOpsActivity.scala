@@ -101,11 +101,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       // Attempt to display relevant details based on state
       // fallback to generic details if state is not known
 
-      val fundTxId = Commitments fundingTxid cs
       val capacity = cs.commitInput.txOut.amount
       val started = me time new Date(cs.startedAt)
       val breakFee = Satoshi(cs.reducedRemoteState.myFeeSat)
-      val txDepth \ _ = LNParams.broadcaster.getStatus(fundTxId)
+      val txDepth \ _ = LNParams.broadcaster.getStatus(chan.fundTxId)
       val canSendMsat = cs.reducedRemoteState.canSendMsat
       val canReceiveMsat = estimateCanReceive(chan)
 
@@ -204,7 +203,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         }
 
         lst setOnItemClickListener onTap {
-          case 0 => urlIntent(fundTxId.toString)
+          case 0 => urlIntent(chan.fundTxId.toString)
           case 1 => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
           case 2 => proceedCoopCloseOrWarn(informAndClose = closeToAddress)
           case 3 => proceedCoopCloseOrWarn(informAndClose = closeToWallet)

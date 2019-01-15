@@ -225,11 +225,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var lnItems = Vector.empty[LNWrap]
   var btcItems = Vector.empty[BTCWrap]
   var allItems = Vector.empty[ItemWrap]
+  var fundTxIds = Map.empty[String, Channel]
 
   def updPaymentList = UITask {
     TransitionManager beginDelayedTransition mainWrap
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
+    fundTxIds = ChannelManager.all.map(chan => chan.fundTxId.toString -> chan).toMap
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
     adapter.notifyDataSetChanged
     updTitle
@@ -405,22 +407,24 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   case class BTCWrap(wrap: TxWrap) extends ItemWrap {
-    val getDate: java.util.Date = wrap.tx.getUpdateTime
     private[this] def txDepth = wrap.tx.getConfidence.getDepthInBlocks
     private[this] def txDead = DEAD == wrap.tx.getConfidence.getConfidenceType
+    private[this] val id = wrap.tx.getHashAsString
+    val getDate = wrap.tx.getUpdateTime
 
     def fillView(holder: ViewHolder) = {
       val humanSum = wrap.visibleValue.isPositive match {
-        case true => denom.coloredIn(wrap.visibleValue, new String)
+        case _ if fundTxIds contains id => denom.coloredP2WSH(-wrap.visibleValue, new String)
         case false => denom.coloredOut(-wrap.visibleValue, new String)
+        case true => denom.coloredIn(wrap.visibleValue, new String)
       }
 
       val status = if (txDead) dead else if (txDepth >= minDepth) conf1 else await
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactSum setText s"<img src='btc'/>$humanSum".html
-      holder.transactWhat setText wrap.tx.getHashAsString
       holder.transactWhat setVisibility viewMap(isTablet)
       holder.transactCircle setImageResource status
+      holder.transactWhat setText id
     }
 
     def generatePopup = {
@@ -439,8 +443,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       viewTxOutside setOnClickListener onButtonTap {
-        val uri = s"https://smartbit.com.au/tx/" + wrap.tx.getHashAsString
-        host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
+        val uri = Uri parse s"https://smartbit.com.au/tx/$id"
+        host startActivity new Intent(Intent.ACTION_VIEW, uri)
       }
 
       viewShareBody setOnClickListener onButtonTap { host share BinaryData(wrap.tx.unsafeBitcoinSerialize).toString }

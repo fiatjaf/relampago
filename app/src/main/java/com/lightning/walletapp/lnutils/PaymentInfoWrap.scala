@@ -270,7 +270,7 @@ object GossipCatcher extends ChannelListener {
       // Stage 1: we don't have any hop at all so at this point we need to obtain a shortChannelId
 
       for {
-        blockHeight \ txIndex <- app.olympus.getShortId(Commitments fundingTxid norm.commitments)
+        blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
         shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, outputIndex = norm.commitments.commitInput.outPoint.index)
         hop = Hop(chan.data.announce.nodeId, shortChannelId, cltvExpiryDelta = 0, 0L, 0L, feeProportionalMillionths = 0L)
       } chan process hop

@@ -24,7 +24,6 @@ import org.bitcoinj.wallet.SendRequest
 import fr.acinq.bitcoin.MilliSatoshi
 import android.app.AlertDialog
 import org.bitcoinj.core.Batch
-import java.util.Collections
 import android.os.Bundle
 
 
