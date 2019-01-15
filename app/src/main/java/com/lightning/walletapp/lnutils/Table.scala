@@ -109,7 +109,8 @@ object PaymentTable extends Table {
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ?, $chanId = ? WHERE $hash = ?"
   val updLastParamsSql = s"UPDATE $table SET $status = $WAITING, $firstMsat = ?, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
   val updFailWaitingAndFrozenSql = s"UPDATE $table SET $status = $FAILURE WHERE $status IN ($WAITING, $FROZEN)"
-  val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ?"
+  // Frozen payment may become fulfilled but then get overridden on restart unless we check for status
+  val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ? AND $status <> $SUCCESS"
 
   // Once incoming or outgoing payment is settled we can search it by various metadata
   val createVSql = s"CREATE VIRTUAL TABLE IF NOT EXISTS $fts$table USING $fts($search, $hash)"
