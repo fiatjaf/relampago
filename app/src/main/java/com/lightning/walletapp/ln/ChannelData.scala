@@ -272,7 +272,7 @@ case class RemoteCommit(index: Long, spec: CommitmentSpec, txOpt: Option[Transac
 case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: BinaryData, remoteSig: BinaryData)
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 
-case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long, theirFeeSat: Long)
+case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long)
 case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit, remoteCommit: RemoteCommit, localChanges: Changes,
                        remoteChanges: Changes, localNextHtlcId: Long, remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point],
                        commitInput: InputInfo, remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, extraHop: Option[Hop] = None,
@@ -285,7 +285,7 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
 
     val canSendMsat = reduced.toRemoteMsat - (myFeeSat + remoteParams.channelReserveSatoshis) * 1000L
     val canReceiveMsat = localCommit.spec.toRemoteMsat - (theirFeeSat + localParams.channelReserveSat) * 1000L
-    ReducedState(reduced.htlcs, canSendMsat, canReceiveMsat, myFeeSat, theirFeeSat)
+    ReducedState(reduced.htlcs, canSendMsat, canReceiveMsat, myFeeSat)
   }
 }
 

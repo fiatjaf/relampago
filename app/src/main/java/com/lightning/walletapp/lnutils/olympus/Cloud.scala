@@ -3,6 +3,7 @@ package com.lightning.walletapp.lnutils.olympus
 import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.lnutils._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
@@ -28,9 +29,8 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
-      (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
-      ChannelManager.chanReports.exists(_.softReserveCanSend >= maxMsat) &&
-      isAuthEnabled =>
+      (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) && isAuthEnabled &&
+      ChannelManager.all.filter(isOperational).exists(chan => estimateCanSend(chan) >= maxMsat) =>
 
       // Also executes if we have no actions to upload and a few tokens left
       val send = retry(getPaymentRequestBlindMemo, pick = pickInc, times = 4 to 5)
@@ -114,8 +114,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def isAuthEnabled = 1 == auth
   def snapshot = CloudSnapshot(data.tokens, connector.url)
   def retryFreshRequest(failedPayReq: PaymentRequest): Unit = {
-    val rd = emptyRD(failedPayReq, firstMsat = failedPayReq.unsafeMsat, useCache = true)
-    val isOk = ChannelManager.chanReports.exists(_.softReserveCanSend >= failedPayReq.unsafeMsat)
-    if (isOk) PaymentInfoWrap addPendingPayment rd
+    val isOk = ChannelManager.all.filter(isOperational).exists(chan => estimateCanSend(chan) >= failedPayReq.unsafeMsat)
+    if (isOk) PaymentInfoWrap addPendingPayment emptyRD(failedPayReq, firstMsat = failedPayReq.unsafeMsat, useCache = true)
   }
 }

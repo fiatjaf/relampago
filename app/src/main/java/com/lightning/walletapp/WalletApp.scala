@@ -207,7 +207,7 @@ object ChannelManager extends Broadcaster {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
       case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
       case errAll: Error if errAll.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process errAll)
-      case m: ChannelMessage => notClosing.find(chan => chan(_.channelId) contains m.channelId).foreach(_ process m)
+      case m: ChannelMessage => notClosing.find(_.hasCsOr(_.commitments.channelId, null) == m.channelId).foreach(_ process m)
       case _ =>
     }
 
@@ -319,11 +319,6 @@ object ChannelManager extends Broadcaster {
     chan <- all if isOpening(chan) || isOperational(chan)
   } yield chan
 
-  def chanReports = for {
-    chan <- all if isOperational(chan)
-    commitments <- chan apply identity
-  } yield ChanReport(chan, commitments)
-
   def delayedPublishes = {
     // Select all ShowDelayed which can't be published yet because cltv/csv delay is not cleared
     val statuses = all.map(_.data).collect { case cd: ClosingData => cd.bestClosing.getState }.flatten
@@ -406,16 +401,16 @@ object ChannelManager extends Broadcaster {
   def checkIfSendable(rd: RoutingData) =
     if (frozenInFlightHashes contains rd.pr.paymentHash) Left(app getString err_ln_frozen)
     else if (bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS).isSuccess) Left(app getString err_ln_fulfilled)
-    else chanReports.sortBy(theMostUpToDateChannelReport => -theMostUpToDateChannelReport.softReserveCanSend).headOption match {
-      // It may happen such that we had enough funds while were deciding whether to pay but don't have enough now
-      case Some(rep) if rep.softReserveCanSend < rd.firstMsat => Left(app getString dialog_sum_big)
+    // It may happen such that we had enough funds while were deciding whether to pay, but do not have enough funds currently
+    else all.filter(isOperational).sortBy(estimateCanSend)(Ordering[Long].reverse).headOption match {
+      case Some(chan) if estimateCanSend(chan) < rd.firstMsat => Left(app getString dialog_sum_big)
       case None => Left(app getString ln_no_open_chans)
       case _ => Right(rd)
     }
 
   def fetchRoutes(rd: RoutingData) = {
     // First we collect chans which in principle can handle a given payment sum right now, then prioritize less busy chans
-    val from = chanReports collect { case rep if rep.softReserveCanSend >= rd.firstMsat => rep.chan.data.announce.nodeId }
+    val from = all filter isOperational collect { case chan if estimateCanSend(chan) >= rd.firstMsat => chan.data.announce.nodeId }
 
     def withHints = for {
       tag <- Obs from rd.pr.routingInfo
@@ -455,17 +450,15 @@ object ChannelManager extends Broadcaster {
 
     case Right(rd) =>
       // Empty used route means we're sending to peer and its nodeId is our target
-      val targetId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
+      val targetNodeId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
       val notViaShortChanId = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
 
-      chanReports find { rep =>
-        val notLoop = !rep.cs.extraHop.exists(_.shortChannelId == notViaShortChanId)
-        val isLocatedAtRouteStart = rep.chan.data.announce.nodeId == targetId
-        val hasEnoughFunds = rep.softReserveCanSend >= rd.firstMsat
-        notLoop && isLocatedAtRouteStart && hasEnoughFunds
+      all filter isOperational find { chan =>
+        val isLoop = chan.hasCsOr(_.commitments.extraHop.exists(_.shortChannelId == notViaShortChanId), false)
+        !isLoop && chan.data.announce.nodeId == targetNodeId && estimateCanSend(chan) >= rd.firstMsat
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)
-        case Some(targetChanRep) => targetChanRep.chan process rd
+        case Some(targetChannel) => targetChannel process rd
       }
   }
 }

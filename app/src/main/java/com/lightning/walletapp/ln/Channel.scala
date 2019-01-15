@@ -18,7 +18,7 @@ import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def apply[T](ex: Commitments => T) = Some(data) collect { case some: HasCommitments => ex apply some.commitments }
+  def hasCsOr[T](fun: HasCommitments => T, or: T) = data match { case some: HasCommitments => fun(some) case _ => or }
   def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onException me -> err }
   var listeners: Set[ChannelListener] = _
 
@@ -689,22 +689,18 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  def inFlightHtlcs(chan: Channel) = chan(_.reducedRemoteState.htlcs) getOrElse Set.empty
-  def estimateCanReceive(chan: Channel) = chan(_.reducedRemoteState.canReceiveMsat) getOrElse 0L
+  def estimateCanSend(chan: Channel) = chan.hasCsOr(_.commitments.reducedRemoteState.canSendMsat, 0L)
+  def estimateCanReceive(chan: Channel) = chan.hasCsOr(_.commitments.reducedRemoteState.canReceiveMsat, 0L)
   def estimateCanReceiveCapped(chan: Channel) = math.min(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
-  def isOpening(chan: Channel): Boolean = chan.data match { case _: WaitFundingDoneData => true case _ => false }
+  def inFlightHtlcs(chan: Channel): Set[Htlc] = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }
+  def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
 
   def channelAndHop(chan: Channel) = for {
-    Some(maybeDummyExtraHop) <- chan(_.extraHop)
-    if maybeDummyExtraHop.cltvExpiryDelta > 0
-  } yield chan -> Vector(maybeDummyExtraHop)
-}
-
-case class ChanReport(chan: Channel, cs: Commitments) {
-  // Add some gap in case if on-chain fee rises while we have low balance
-  // also ensure it's slightly large enough so in case if on-chain fees rise we get good output
-  val softReserveCanSend = cs.reducedRemoteState.canSendMsat - cs.reducedRemoteState.myFeeSat * 2
+    exHop <- chan.hasCsOr(_.commitments.extraHop, None)
+    // Make sure this is not an empty placeholder hop
+    if exHop.cltvExpiryDelta > 0
+  } yield chan -> Vector(exHop)
 }
 
 trait ChannelListener {

@@ -194,10 +194,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // UPDATING TITLE
 
   def updTitle = {
-    val lnTotal = for {
-      chan <- ChannelManager.notClosingOrRefunding
-      commit <- chan(Commitments.latestRemoteCommit)
-    } yield commit.spec.toRemoteMsat
+    val lnTotal = ChannelManager.notClosingOrRefunding map { chan =>
+      // Here we seek a total refundable amount which is not affected by on-chain fee changes
+      chan.hasCsOr(data => Commitments.latestRemoteCommit(data.commitments).spec.toRemoteMsat, 0L)
+    }
 
     val lnTotalSum = MilliSatoshi(lnTotal.sum)
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
@@ -532,77 +532,74 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     mkCheckFormNeutral(recAttempt, none, useMax, bld, dialog_ok, dialog_cancel, dialog_max)
   }
 
-  def sendPayment(pr: PaymentRequest) =
-    if (PaymentRequest.prefixes(chainHash) != pr.prefix) app toast err_general
-    else if (!pr.isFresh) app toast dialog_pr_expired
-    else {
+  def sendPayment(pr: PaymentRequest): Unit = {
+    val hasOpeningChans = ChannelManager.notClosingOrRefunding.exists(isOpening)
+    val hasOpenChans = ChannelManager.notClosingOrRefunding.exists(isOperational)
 
-      val noOpenChans = ChannelManager.chanReports.isEmpty
-      val hasOpeningChans = ChannelManager.notClosingOrRefunding.exists(isOpening)
-      if (noOpenChans && hasOpeningChans) onFail(app getString err_ln_still_opening)
-      else if (noOpenChans) app toast ln_no_open_chans
-      else {
+    if (!pr.isFresh) return app toast dialog_pr_expired
+    if (PaymentRequest.prefixes(chainHash) != pr.prefix) return app toast err_general
+    if (hasOpeningChans && !hasOpenChans) return onFail(app getString err_ln_still_opening)
+    if (!hasOpenChans) return app toast ln_no_open_chans
 
-        val runnableOpt = onChainRunnable(pr)
-        val description = getDescription(pr.description)
-        val maxLocalSend = ChannelManager.chanReports.map(_.softReserveCanSend).max
-        val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend)
-        val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
-        val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
-        val baseTitle = str2View(app.getString(ln_send_title).format(description).html)
-        val rateManager = new RateManager(baseContent) hint baseHint
-        val bld = baseBuilder(baseTitle, baseContent)
+    val runnableOpt = onChainRunnable(pr)
+    val description = getDescription(pr.description)
+    val maxLocalSend = ChannelManager.all.filter(isOperational).map(estimateCanSend).max
+    val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend)
+    val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
+    val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
+    val baseTitle = str2View(app.getString(ln_send_title).format(description).html)
+    val rateManager = new RateManager(baseContent) hint baseHint
+    val bld = baseBuilder(baseTitle, baseContent)
 
-        val relayLink = new JointNode(pr.nodeId) {
-          override def onDataUpdated = UITask(changeText).run
-          def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
-            (pr.amount.isEmpty && relayable >= maxCappedSend) || // No sum asked and we can deliver max amount
-              pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
-              JointNode.hasRelayPeerOnly // We only have a relay node as peer
+    val relayLink = new JointNode(pr.nodeId) {
+      override def onDataUpdated = UITask(changeText).run
+      def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
+        (pr.amount.isEmpty && relayable >= maxCappedSend) || // No sum asked and we can deliver max amount
+          pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
+          JointNode.hasRelayPeerOnly // We only have a relay node as peer
 
-          def changeText = best match {
-            case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
-              val finalDeliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
-              val guaranteedDeliveryTitle = app.getString(ln_send_title_guaranteed).format(description).html
-              rateManager hint app.getString(amount_hint_can_deliver).format(denom parsedWithSign finalDeliverable)
-              baseTitle.findViewById(R.id.titleTip).asInstanceOf[TextView] setText guaranteedDeliveryTitle
-              baseTitle setBackgroundColor ContextCompat.getColor(host, R.color.ln)
+      def changeText = best match {
+        case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
+          val finalDeliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
+          val guaranteedDeliveryTitle = app.getString(ln_send_title_guaranteed).format(description).html
+          rateManager hint app.getString(amount_hint_can_deliver).format(denom parsedWithSign finalDeliverable)
+          baseTitle.findViewById(R.id.titleTip).asInstanceOf[TextView] setText guaranteedDeliveryTitle
+          baseTitle setBackgroundColor ContextCompat.getColor(host, R.color.ln)
 
-            case _ =>
-              // Set a base hint back again
-              rateManager hint baseHint
-          }
-        }
-
-        def sendAttempt(alert: AlertDialog) = (rateManager.result, relayLink.best) match {
-          case Success(ms) \ Some(relayable \ _) if relayable < ms && JointNode.hasRelayPeerOnly => app toast dialog_sum_big
-          case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
-          case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
-          case Failure(emptyAmount) \ _ => app toast dialog_sum_small
-
-          case Success(ms) \ Some(relayable \ chanBalInfo) if ms <= relayable => rm(alert) {
-            // We have obtained a (Joint -> payee) route out of band so we can use it right away
-            val rd = emptyRD(pr, ms.amount, useCache = true) plusOutOfBandRoute Vector(chanBalInfo.hop)
-            me doSend rd
-          }
-
-          case Success(ms) \ _ => rm(alert) {
-            // A usual send without out-of-band paths
-            me doSend emptyRD(pr, ms.amount, useCache = true)
-          }
-        }
-
-        for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
-        val killOpt = for (rep <- JointNode.relayPeerReports.headOption) yield relayLink start rep.chan.data.announce
-        bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = for (off <- killOpt) off.run }
-        mkCheckFormNeutral(sendAttempt, none, alert => rm(alert) { for (onChain <- runnableOpt) onChain.run }, bld, dialog_pay, dialog_cancel,
-          if (pr.amount.exists(askedSum => maxCappedSend >= askedSum) || runnableOpt.isEmpty) -1 else dialog_pay_onchain)
+        case _ =>
+          // Set a base hint back again
+          rateManager hint baseHint
       }
     }
 
+    def sendAttempt(alert: AlertDialog) = (rateManager.result, relayLink.best) match {
+      case Success(ms) \ Some(relayable \ _) if relayable < ms && JointNode.hasRelayPeerOnly => app toast dialog_sum_big
+      case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
+      case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
+      case Failure(emptyAmount) \ _ => app toast dialog_sum_small
+
+      case Success(ms) \ Some(relayable \ chanBalInfo) if ms <= relayable => rm(alert) {
+        // We have obtained a (Joint -> payee) route out of band so we can use it right away
+        val rd = emptyRD(pr, ms.amount, useCache = true) plusOutOfBandRoute Vector(chanBalInfo.hop)
+        me doSend rd
+      }
+
+      case Success(ms) \ _ => rm(alert) {
+        // A usual send without out-of-band paths added
+        me doSend emptyRD(pr, ms.amount, useCache = true)
+      }
+    }
+
+    for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
+    val killOpt = for (chan <- JointNode.relayPeerChans.headOption) yield relayLink start chan.data.announce
+    bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = for (off <- killOpt) off.run }
+    mkCheckFormNeutral(sendAttempt, none, alert => rm(alert) { for (onChain <- runnableOpt) onChain.run }, bld, dialog_pay, dialog_cancel,
+      if (pr.amount.exists(askedSum => maxCappedSend >= askedSum) || runnableOpt.isEmpty) -1 else dialog_pay_onchain)
+  }
+
   def doSend(rd: RoutingData) = {
-    // Inform if channels are offline and some waiting is about to happen
-    val atLeaseOneIsOnline = ChannelManager.chanReports.exists(_.chan.state == OPEN)
+    // Inform if all local channels are offline and some waiting is about to happen
+    val atLeaseOneIsOnline = ChannelManager.notClosingOrRefunding.exists(_.state == OPEN)
     if (!atLeaseOneIsOnline) app toast ln_chan_offline
 
     ChannelManager.checkIfSendable(rd) match {

@@ -2,6 +2,7 @@ package com.lightning.walletapp.lnutils
 
 import scala.concurrent.duration._
 import com.neovisionaries.ws.client._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.JointNode._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
@@ -20,8 +21,8 @@ import java.net.InetSocketAddress
 object JointNode {
   final val jointNodeKey = PublicKey("03144fcc73cea41a002b2865f98190ab90e4ff58a2ce24d3870f5079081e42922d")
   final val defaultJointAnn = app.mkNodeAnnouncement(jointNodeKey, new InetSocketAddress("5.9.83.143", 9735), "Joint")
-  def relayPeerReports = ChannelManager.chanReports.filter(_.chan.data.announce.nodeId == jointNodeKey)
-  def hasRelayPeerOnly = ChannelManager.chanReports.forall(_.chan.data.announce.nodeId == jointNodeKey)
+  def hasRelayPeerOnly = ChannelManager.fromNode(ChannelManager.all, jointNodeKey).forall(isOperational)
+  def relayPeerChans = ChannelManager.fromNode(ChannelManager.all, jointNodeKey).filter(isOperational)
 
   def makeWebSocket(ann: NodeAnnouncement)(fun: String => Unit) = {
     val webSockEndPoint = s"ws://${ann.workingAddress.getHostString}:8081"
@@ -49,7 +50,7 @@ abstract class JointNode(payee: PublicKey) {
 
   def onDataUpdated: Unit
   def start(ann: NodeAnnouncement) = makeWebSocket(ann) { raw =>
-    val me2JointMaxSendable = relayPeerReports.map(_.softReserveCanSend).reduceOption(_ max _) getOrElse 0L
+    val me2JointMaxSendable = relayPeerChans.map(estimateCanSend).reduceOption(_ max _) getOrElse 0L
     val joint2PayeeMaxSendable = to[ChannelBalances](raw).localBalances.filter(_.peerNodeId == payee).sortBy(- _.withoutMaxFee).headOption
     val deliverableThroughJoint = MilliSatoshi(joint2PayeeMaxSendable.map(_.withoutMaxFee) getOrElse 0L min me2JointMaxSendable)
     best = if (deliverableThroughJoint.amount <= 5000L) None else joint2PayeeMaxSendable.map(deliverableThroughJoint -> _)

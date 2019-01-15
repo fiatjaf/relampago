@@ -1,6 +1,5 @@
 package com.lightning.walletapp.test
 
-import com.lightning.walletapp.ChannelManager
 import com.lightning.walletapp.helper.AES
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.Scripts.InputInfo
@@ -9,8 +8,8 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.lnutils.{PaymentInfoWrap, RevokedInfoTable}
-import fr.acinq.bitcoin.{BinaryData, OutPoint, Satoshi, Transaction, TxOut}
-import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
+import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction, TxOut}
+import fr.acinq.bitcoin.Crypto.Point
 import scodec.DecodeResult
 import scodec.bits.BitVector
 
@@ -103,7 +102,7 @@ class RevokedInfoSpec {
       data = NormalData(announce = null, commitments = c2)
     }
 
-    val reports = Vector(ChanReport(chan1, c1), ChanReport(chan2, c2))
+    val reports = Vector(chan1, chan2)
     val cerberusAct = PaymentInfoWrap.getCerberusActs(reports.flatMap(PaymentInfoWrap.getVulnerableRevInfos).toMap).next
     val cerberusPayloadHex = cerberusAct.data.toString
 

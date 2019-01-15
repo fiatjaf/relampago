@@ -3,6 +3,7 @@ package com.lightning.walletapp
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.JointNode._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
@@ -23,8 +24,8 @@ import android.net.Uri
 
 object WalletStatusActivity { me =>
   def updateItems(cbs: ChannelBalances): Unit = {
-    // Only show what can be sent via Joint -> payee if do not have a phone -> Joint channel because `math.min` below
-    val me2JointMaxSendable = relayPeerReports.map(_.softReserveCanSend).reduceOption(_ max _) getOrElse Long.MaxValue
+    // Show what can be sent via Joint -> payee if do not have a phone -> Joint channel because `math.min` will choose a lower value
+    val me2JointMaxSendable = ChannelManager.all.filter(isOperational).map(estimateCanSend).reduceOption(_ max _) getOrElse Long.MaxValue
     val perPeerMaxSendable = cbs.localBalances.sortBy(- _.withoutMaxFee).groupBy(_.peerNodeId).mapValues(_.head)
 
     val updatedMap = for {
@@ -100,7 +101,7 @@ class WalletStatusActivity extends TimerActivity with HumanTimeDisplay { me =>
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_wallet_status
     Utils clickableTextField findViewById(R.id.jointNodeHint)
-    jointNodeInfo setVisibility viewMap(relayPeerReports.isEmpty)
+    jointNodeInfo setVisibility viewMap(relayPeerChans.isEmpty)
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     getSupportActionBar setTitle joint_title
     // Update because items may be cached
