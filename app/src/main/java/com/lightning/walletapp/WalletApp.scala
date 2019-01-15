@@ -19,12 +19,12 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
 
 import rx.lang.scala.{Observable => Obs}
+import fr.acinq.bitcoin.{BinaryData, Crypto}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import androidx.work.{ExistingWorkPolicy, WorkManager}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor}
-import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Satoshi}
 import android.app.{Application, NotificationChannel, NotificationManager}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, pickInc, repeat}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
