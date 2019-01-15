@@ -12,9 +12,10 @@ import com.lightning.walletapp.ln.Channel._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+
 import android.app.{Activity, AlertDialog}
 import org.bitcoinj.core.{Address, TxWrap}
-import fr.acinq.bitcoin.{Bech32, BinaryData, Crypto, MilliSatoshi}
+import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
@@ -31,7 +32,6 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
@@ -135,21 +135,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrap(me setDetecting true)(me initNfc state)
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
-
-    /*
-    * def encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: BinaryData): String = {
-    // prepend witness version: 0
-    val data1 = witnessVersion +: Bech32.eight2five(data)
-    val checksum = Bech32.checksum(hrp, data1)
-    hrp + "1" + new String((data1 ++ checksum).map(i => Bech32.pam(i)).toArray)
-  }
-    * */
-
-//    val data = "https://service.com?tag=login&c=158ea41f653d6447b7f8ca980363985d0a9a5b72d41bb8b7f5119c7c308a372c" getBytes "UTF-8"
-//    val data1 = Bech32.eight2five(data)
-//    val checksum = Bech32.checksum("lnurl", data1)
-//    val res = "lnurl" + 1 + new String((data1 ++ checksum).map(i => Bech32.pam(i)).toArray)
-//    println(s"-- ${res.toUpperCase}")
 
     val shouldCheck = app.prefs.getLong(AbstractKit.GDRIVE_LAST_SAVE, 0L) <= 0L // Unknown or failed
     val needsCheck = !GDrive.isMissing(app) && app.prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true) && shouldCheck
@@ -283,7 +268,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       def login(alert: AlertDialog) = rm(alert) {
         val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
         val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
-        val callback = s"${lnUrl.uri.toString}&key=${linkingPrivKey.publicKey}&sig=${sig.toString}"
+        val callback = s"${lnUrl.uri.toString}&key=${linkingPrivKey.publicKey.toString}&sig=${sig.toString}"
         val callbackRequest = get(callback, true).connectTimeout(5000).trustAllCerts.trustAllHosts
         obsOnIO.map(_ => callbackRequest.body.toJson).foreach(none, onFail)
         app toast ln_url_resolving

@@ -116,8 +116,10 @@
     <string name="dialog_pay_onchain">Он-чейн</string>
     <string name="dialog_cancel">Скасувати</string>
     <string name="dialog_retry">Ще раз</string>
+    <string name="dialog_login">Увiйти</string>
     <string name="dialog_boost">CPFP</string>
     <string name="dialog_next">Далі</string>
+    <string name="dialog_wut">Iнфо</string>
     <string name="dialog_pay">Pay</string>
     <string name="dialog_max">Max</string>
     <string name="dialog_ok">OK</string>
@@ -294,19 +296,18 @@
         <item><![CDATA[<i>Немає даних про канали</i>]]></item>
     </array>
 
-    <string name="joint_title">Гарантія доставки</string>
-
     <string name="ln_joint_open_hint">
         Відчиніть канал з <a href='http://lightning-wallet.com/joint/'>Joint-вузлом</a>, щоб відправляти гарантовані платжі одержувачам,
         перерахованим нижче\n\nJoint-вузол бере комісію в розмірі 50 SAT + 0.025% суми, параметр to-self-delay встановлений на 2880 блоків
     </string>
 
+    <string name="joint_title">Гарантія доставки</string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Є питання?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про блискавку</a></small><br><br>відчиняється новий канал<br><strong>із зовнішнього джерела</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Є питання?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про блискавку</a></small><br><br>відчиняється новий канал<br><strong>платить ваш гаманець</strong>]]></string>
     <string name="ln_ops_start_fund_node_view"><![CDATA[%1$s<br><font color=#999999><i>відчинення каналу</i></font><br><small>%2$s</small><br><br><font color=#999999>ID піра</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
-    <string name="ln_url_resolving">Підключення до сервісу&#8230;</string>
     <string name="ln_ops_start_fund_incoming_channel">вхідний канал</string>
+    <string name="ln_url_resolving">Підключення до сервісу&#8230;</string>
 
     <!-- Olympus log messages and notification -->
     <string name="olympus_log_channel_backup">Збережений зашифрований бекап каналу з «%1$s»</string>
