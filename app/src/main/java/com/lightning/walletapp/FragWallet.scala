@@ -225,14 +225,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var lnItems = Vector.empty[LNWrap]
   var btcItems = Vector.empty[BTCWrap]
   var allItems = Vector.empty[ItemWrap]
-  var fundTxIds = Map.empty[String, Channel]
+  var fundTxIds = Set.empty[String]
 
   def updPaymentList = UITask {
     TransitionManager beginDelayedTransition mainWrap
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
-    fundTxIds = ChannelManager.all.map(chan => chan.fundTxId.toString -> chan).toMap
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
+    fundTxIds = ChannelManager.all.map(_.fundTxId.toString).toSet
     adapter.notifyDataSetChanged
     updTitle
 
