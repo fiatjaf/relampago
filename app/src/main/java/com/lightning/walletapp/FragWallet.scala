@@ -313,7 +313,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   case class LNWrap(info: PaymentInfo) extends ItemWrap {
-    val getDate: java.util.Date = new java.util.Date(info.stamp)
+    val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
       val humanSum = info.incoming == 1 match {

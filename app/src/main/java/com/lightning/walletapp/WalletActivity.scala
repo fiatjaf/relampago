@@ -1,5 +1,6 @@
 package com.lightning.walletapp
 
+import spray.json._
 import android.view._
 import android.widget._
 import com.lightning.walletapp.ln._
@@ -11,28 +12,30 @@ import com.lightning.walletapp.ln.Channel._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
+import android.app.{Activity, AlertDialog}
+import org.bitcoinj.core.{Address, TxWrap}
+import fr.acinq.bitcoin.{Bech32, BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
-import org.bitcoinj.core.{Address, TxWrap}
-
+import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
+import android.support.v4.content.ContextCompat
 import com.github.clans.fab.FloatingActionMenu
 import com.lightning.walletapp.lnutils.GDrive
 import android.support.v7.widget.SearchView
 import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
-import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+
 import android.content.Intent
 import org.ndeftools.Message
-import android.app.Activity
 import android.os.Bundle
+import android.net.Uri
 import java.util.Date
 
 
@@ -133,6 +136,21 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
 
+    /*
+    * def encodeWitnessAddress(hrp: String, witnessVersion: Byte, data: BinaryData): String = {
+    // prepend witness version: 0
+    val data1 = witnessVersion +: Bech32.eight2five(data)
+    val checksum = Bech32.checksum(hrp, data1)
+    hrp + "1" + new String((data1 ++ checksum).map(i => Bech32.pam(i)).toArray)
+  }
+    * */
+
+//    val data = "https://service.com?tag=login&c=158ea41f653d6447b7f8ca980363985d0a9a5b72d41bb8b7f5119c7c308a372c" getBytes "UTF-8"
+//    val data1 = Bech32.eight2five(data)
+//    val checksum = Bech32.checksum("lnurl", data1)
+//    val res = "lnurl" + 1 + new String((data1 ++ checksum).map(i => Bech32.pam(i)).toArray)
+//    println(s"-- ${res.toUpperCase}")
+
     val shouldCheck = app.prefs.getLong(AbstractKit.GDRIVE_LAST_SAVE, 0L) <= 0L // Unknown or failed
     val needsCheck = !GDrive.isMissing(app) && app.prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true) && shouldCheck
     if (needsCheck) obsOnIO.map(_ => GDrive signInAccount me).foreach(accountOpt => if (accountOpt.isEmpty) askGDriveSignIn)
@@ -181,18 +199,16 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case lnUrl: LNUrl =>
-      resolveUrl(None, lnUrl)
       // Got an explicit lnurl, should resolve
       // TransData value will be erased here
-      app toast ln_url_resolving
+      resolveUrl(None, lnUrl)
       me returnToBase null
 
     case pr: PaymentRequest =>
       if (pr.lnUrlOpt.isDefined) {
-        resolveUrl(Some(pr), pr.lnUrlOpt.get)
         // Should resolve an embedded lnurl first
         // TransData value will be erased here
-        app toast ln_url_resolving
+        resolveUrl(Some(pr), pr.lnUrlOpt.get)
         me returnToBase null
 
       } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
@@ -217,7 +233,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def resolveUrl(prOpt: Option[PaymentRequest], lnUrl: LNUrl) =
     scala.util.Try(lnUrl.uri getQueryParameter "tag") -> prOpt match {
       case scala.util.Success("link") \ Some(pr) => showLinkSendForm(lnUrl, pr)
-      case scala.util.Success("login") \ _ => showLoginForm(lnUrl)
+      case scala.util.Success("login") \ None => showLoginForm(lnUrl)
       case _ => resolveStandardUrl(lnUrl)
     }
 
@@ -225,6 +241,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val initialRequest = get(lNUrl.uri.toString, true).trustAllCerts.trustAllHosts
     val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
     // Resolving methods must run on IO thread to avoid "network on main thread" exceptions
+    app toast ln_url_resolving
 
     ask.map {
       case icr: IncomingChannelRequest => initConnection(icr)
@@ -253,7 +270,30 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def showLoginForm(lnUrl: LNUrl) = {
+    scala.util.Try(lnUrl.uri getQueryParameter "c").map(BinaryData.apply) match {
+      case scala.util.Success(loginChallenge) => offerLogin(loginChallenge take 64)
+      case _ => app toast err_no_data
+    }
 
+    def offerLogin(challenge: BinaryData) = {
+      val title = str2View(s"<big><font color=#FFFFFF>${lnUrl.uri.getHost}</font></big>".html)
+      mkCheckFormNeutral(login, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
+      title setBackgroundColor ContextCompat.getColor(me, R.color.ln)
+
+      def login(alert: AlertDialog) = rm(alert) {
+        val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
+        val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
+        val callback = s"${lnUrl.uri.toString}&key=${linkingPrivKey.publicKey}&sig=${sig.toString}"
+        val callbackRequest = get(callback, true).connectTimeout(5000).trustAllCerts.trustAllHosts
+        obsOnIO.map(_ => callbackRequest.body.toJson).foreach(none, onFail)
+        app toast ln_url_resolving
+      }
+
+      def wut(alert: AlertDialog) = rm(alert) {
+        val info = Uri parse s"https://lightning-wallet.com"
+        me startActivity new Intent(Intent.ACTION_VIEW, info)
+      }
+    }
   }
 
   def showLinkSendForm(lnUrl: LNUrl, pr: PaymentRequest) = {
