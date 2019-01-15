@@ -215,11 +215,12 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     def fillView(chan: Channel) = {
       val state = stateStatusColor(chan)
       val connect = connectivityStatusColor(chan)
-      val stateConnect = s"<strong>$state</strong><br>$connect"
-      chan.hasCsOr(sm => showDetails(chan, sm.commitments), null)
-      addressAndKey setText chan.data.announce.toString.html
-      stateAndConnectivity setText stateConnect.html
+
       extraInfo setVisibility View.GONE
+      addressAndKey setText chan.data.announce.toString.html
+      stateAndConnectivity setText s"<strong>$state</strong><br>$connect".html
+      // Details method should be called after extraInfo is set to GONE above
+      chan.hasCsOr(sm => showDetails(chan, sm.commitments), null)
     }
   }
 
