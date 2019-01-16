@@ -31,7 +31,13 @@ trait Denomination {
   def parsedWithSign(msat: MilliSatoshi) = parsed(msat) + sign
   protected def parsed(msat: MilliSatoshi): String
 
-  def coloredP2WSH(msat: MilliSatoshi, suffix: String) = s"<font color=#0099FE><tt>+</tt>${this parsed msat}</font>$suffix"
+  def coloredP2WSH(msat: MilliSatoshi, suffix: String) = {
+    val content = s"<font color=#0099FE>${this parsed msat}</font>$suffix"
+    val start = "<tt><font color=#AAAAAA>[</font></tt>"
+    val end = "<tt><font color=#AAAAAA>]</font></tt>"
+    s"$start$content$end"
+  }
+
   def coloredOut(msat: MilliSatoshi, suffix: String) = s"<font color=#E31300><tt>-</tt>${this parsed msat}</font>$suffix"
   def coloredIn(msat: MilliSatoshi, suffix: String) = s"<font color=#6AAB38><tt>+</tt>${this parsed msat}</font>$suffix"
 
