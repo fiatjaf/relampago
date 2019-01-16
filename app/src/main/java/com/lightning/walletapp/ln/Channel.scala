@@ -702,6 +702,13 @@ object Channel {
     // Make sure this is not an empty placeholder hop
     if exHop.cltvExpiryDelta > 0
   } yield chan -> Vector(exHop)
+
+  def updateHop(chan: Channel, upd: ChannelUpdate) = for {
+    oldExtraHop <- chan.hasCsOr(_.commitments.extraHop, None)
+    if oldExtraHop.shortChannelId == upd.shortChannelId
+    newExtraHop = upd toHop chan.data.announce.nodeId
+    if oldExtraHop != newExtraHop
+  } chan process newExtraHop
 }
 
 trait ChannelListener {

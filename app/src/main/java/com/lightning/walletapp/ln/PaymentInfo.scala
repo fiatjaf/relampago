@@ -80,9 +80,9 @@ object PaymentInfo {
   def failHtlc(sharedSecret: BinaryData, failure: FailureMessage, add: UpdateAddHtlc) =
     CMDFailHtlc(reason = createErrorPacket(sharedSecret, failure), id = add.id)
 
-  def withoutChan(chan: Long, rd: RoutingData, span: Long, msat: Long) = {
-    val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == chan)
-    val blackListedChan = Tuple3(chan.toString, span, msat)
+  def withoutChan(shortId: Long, rd: RoutingData, span: Long, msat: Long) = {
+    val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == shortId)
+    val blackListedChan = Tuple3(shortId.toString, span, msat)
     val rd1 = rd.copy(routes = routesWithoutBadChannels)
     Some(rd1) -> Vector(blackListedChan)
   }
@@ -106,7 +106,10 @@ object PaymentInfo {
 
     // Put reconstructed route back, nothing to blacklist
     val rd1 = rd.copy(routes = withReplacedHop +: rd.routes)
+    // Prevent endless loop by marking this channel
     replacedChans += upd.shortChannelId
+    // Update hop data in related chan
+    LNParams updateExtraHop upd
     Some(rd1) -> Vector.empty
   }
 

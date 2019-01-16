@@ -8,7 +8,7 @@ import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
-import com.lightning.walletapp.ln.wire.NodeAnnouncement
+import com.lightning.walletapp.ln.wire.{ChannelUpdate, NodeAnnouncement}
 import com.lightning.walletapp.ChannelManager
 import fr.acinq.eclair.UInt64
 
@@ -63,6 +63,9 @@ object LNParams { me =>
     val prefix = crypto.Digests.hmacSha256(hashingKey.toArray, domainName getBytes "UTF-8") take 8
     derivePrivateKey(master, hardened(138L) :: 0L :: BigInt(prefix).toLong :: Nil).privateKey
   }
+
+  def updateExtraHop(upd: ChannelUpdate) = for (chan <- ChannelManager.notClosingOrRefunding) Channel.updateHop(chan, upd)
+  def updateFeerate = for (chan <- ChannelManager.notClosingOrRefunding) chan process CMDFeerate(broadcaster.perKwThreeSat)
 
   def backupFileName = s"blw${chainHash.toString}-${cloudId.toString}.bkup"
   def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {

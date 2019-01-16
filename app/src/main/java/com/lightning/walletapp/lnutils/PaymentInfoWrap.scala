@@ -210,8 +210,8 @@ object ChannelWrap {
     doPut(data.commitments.channelId, raw)
   }
 
-  def doGet(db1: LNOpenHelper) = {
-    val rc = RichCursor(db1 select ChannelTable.selectAllSql)
+  def doGet(database: LNOpenHelper) = {
+    val rc = RichCursor(database select ChannelTable.selectAllSql)
     rc.vec(_ string ChannelTable.data substring 1) map to[HasCommitments]
   }
 }
@@ -254,11 +254,11 @@ object BadEntityWrap {
     val cursor = db.select(BadEntityTable.selectSql, params = System.currentTimeMillis, rd.firstMsat)
     val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
 
-    val fromAsString = from.map(_.toString).toSet
-    // One of blacklisted nodes may become our peer or final payee
-    val filteredBadNodes = badNodes - targetId.toString -- fromAsString
-    app.olympus findRoutes OutRequest(rd.firstMsat / 1000L, filteredBadNodes,
-      badChans.map(_.toLong), fromAsString, targetId.toString)
+    val targetStr = targetId.toString
+    // Remove source and sink nodes from badNodes because they may have been blacklisted earlier
+    val fromAsStr = for (oneOfDirectPeerNodeKeys: PublicKey <- from.toSet) yield oneOfDirectPeerNodeKeys.toString
+    val badChanLongs = for (publicChannelDeniedByRoutingNode: String <- badChans) yield publicChannelDeniedByRoutingNode.toLong
+    app.olympus findRoutes OutRequest(rd.firstMsat / 1000L, badNodes - targetStr -- fromAsStr, badChanLongs, fromAsStr, targetStr)
   }
 }
 
@@ -286,12 +286,9 @@ object GossipCatcher extends ChannelListener {
       } chan process hop
 
     case (chan, norm: NormalData, upd: ChannelUpdate)
-      // Stage 3: we have an old or empty Hop, replace it with (peer -> localPhone) hop
+      // Stage 3: we have an old or dummy Hop, replace it with (peer -> localPhone) hop
       if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
-
-      val newHop = upd toHop chan.data.announce.nodeId
-      val isCopy = norm.commitments.extraHop contains newHop
-      if (!isCopy) chan process newHop
       chan.listeners -= GossipCatcher
+      updateHop(chan, upd)
   }
 }

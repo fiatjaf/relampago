@@ -12,7 +12,6 @@ import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import rx.lang.scala.{Observable => Obs}
 import org.bitcoinj.core.{Coin, PeerAddress}
 import org.bitcoinj.core.Transaction.DEFAULT_TX_FEE
-import com.lightning.walletapp.ChannelManager
 import rx.lang.scala.schedulers.IOScheduler
 import com.lightning.walletapp.AbstractKit
 import com.lightning.walletapp.Utils.app
@@ -47,11 +46,11 @@ object RatesSaver {
   private[this] val process: PartialFunction[Result, Unit] = { case newFee \ newFiat =>
     val sensibleThree = for (notZero <- newFee("3") +: rates.feesThree if notZero > 0) yield notZero
     val sensibleSix = for (notZero <- newFee("6") +: rates.feesSix if notZero > 0) yield notZero
-
-    // Channels may become open sooner then we get updated fees so inform channels once we get updated fees
-    for (c <- ChannelManager.notClosingOrRefunding) c process CMDFeerate(LNParams.broadcaster.perKwThreeSat)
     rates = Rates(sensibleSix take 2, sensibleThree take 2, newFiat, System.currentTimeMillis)
     app.prefs.edit.putString(AbstractKit.RATES_DATA, rates.toJson.toString).commit
+    // Channels may become open sooner then we get updated fees
+    // so inform channels again once we get updated fees
+    LNParams.updateFeerate
   }
 
   lazy val subscription =
