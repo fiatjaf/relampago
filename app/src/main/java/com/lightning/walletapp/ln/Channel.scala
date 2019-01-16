@@ -690,8 +690,20 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  def estimateCanSend(chan: Channel) = chan.hasCsOr(_.commitments.reducedRemoteState.canSendMsat, 0L)
-  def estimateCanReceive(chan: Channel) = chan.hasCsOr(_.commitments.reducedRemoteState.canReceiveMsat, 0L)
+  def estimateCanSend(chan: Channel) = chan.hasCsOr(some => {
+    val sendWithReserveAndCommitFeeMsat = some.commitments.reducedRemoteState.canSendMsat
+    val nextHtlcFee = Scripts.weight2fee(some.commitments.localCommit.spec.feeratePerKw, Scripts.safeWeight)
+    if (some.commitments.localParams.isFunder) sendWithReserveAndCommitFeeMsat - nextHtlcFee.amount * 1000L
+    else sendWithReserveAndCommitFeeMsat
+  }, 0L)
+
+  def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => {
+    val receiveWithReserveAndCommitFeeMsat = some.commitments.reducedRemoteState.canReceiveMsat
+    val nextHtlcFee = Scripts.weight2fee(some.commitments.localCommit.spec.feeratePerKw, Scripts.safeWeight)
+    if (!some.commitments.localParams.isFunder) receiveWithReserveAndCommitFeeMsat - nextHtlcFee.amount * 10000L
+    else receiveWithReserveAndCommitFeeMsat
+  }, 0L)
+
   def estimateCanReceiveCapped(chan: Channel) = math.min(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
   def inFlightHtlcs(chan: Channel): Set[Htlc] = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }

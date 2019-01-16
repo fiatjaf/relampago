@@ -281,7 +281,9 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
   lazy val reducedRemoteState = {
     val reduced = CommitmentSpec.reduce(Commitments.latestRemoteCommit(me).spec, remoteChanges.acked, localChanges.proposed)
     val commitFeeSat = Scripts.commitTxFee(dustLimit = remoteParams.dustLimitSat, spec = reduced).amount
-    val myFeeSat \ theirFeeSat = if (localParams.isFunder) commitFeeSat -> 0L else 0L -> commitFeeSat
+
+    val myFeeSat = if (localParams.isFunder) commitFeeSat else 0L
+    val theirFeeSat = if (localParams.isFunder) 0L else commitFeeSat
 
     val canSendMsat = reduced.toRemoteMsat - (myFeeSat + remoteParams.channelReserveSatoshis) * 1000L
     val canReceiveMsat = localCommit.spec.toRemoteMsat - (theirFeeSat + localParams.channelReserveSat) * 1000L

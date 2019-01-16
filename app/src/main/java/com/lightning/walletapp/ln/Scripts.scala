@@ -166,6 +166,8 @@ object Scripts { me =>
   case class ClosingTx(input: InputInfo, tx: Transaction) extends TransactionWithInputInfo
   def weight2fee(perKw: Long, weight: Int) = Satoshi(perKw * weight / 1000L)
 
+  val htlcWeight = 172
+  val safeWeight = 200
   val commitWeight = 724
   val htlcTimeoutWeight = 663
   val htlcSuccessWeight = 703
@@ -186,11 +188,10 @@ object Scripts { me =>
     spec.htlcs.collect { case Htlc(true, add) if add.amount >= htlcSuccessFee => add }.toSeq
   }
 
-  def commitTxFee(dustLimit: Satoshi, spec: CommitmentSpec): Satoshi = {
-    val trimmedOfferedHtlcs = 172 * trimOfferedHtlcs(dustLimit, spec).size
-    val trimmedReceivedHtlcs = 172 * trimReceivedHtlcs(dustLimit, spec).size
-    val weight = commitWeight + trimmedOfferedHtlcs + trimmedReceivedHtlcs
-    weight2fee(spec.feeratePerKw, weight)
+  def commitTxFee(dustLimit: Satoshi, spec: CommitmentSpec) = {
+    val trimmedOfferedHtlcs = htlcWeight * trimOfferedHtlcs(dustLimit, spec).size
+    val trimmedReceivedHtlcs = htlcWeight * trimReceivedHtlcs(dustLimit, spec).size
+    weight2fee(spec.feeratePerKw, commitWeight + trimmedOfferedHtlcs + trimmedReceivedHtlcs)
   }
 
   // Commit tx with obscured tx number
