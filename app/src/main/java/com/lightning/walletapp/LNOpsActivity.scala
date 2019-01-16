@@ -190,25 +190,22 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           warnAndMaybeClose(me getString ln_chan_close_confirm_local)
         }
 
-        def closeToAddress = app.getBufferTry map app.toAddress foreach { address =>
-          val text = me getString ln_chan_close_confirm_address format humanSix(address.toString)
-          val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(address).getProgram)
-          mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html),
-            dialog_ok, dialog_cancel)
+        def closeToAddress = app.getBufferTry map app.toAddress foreach { refundOnChainAddress =>
+          val text = me getString ln_chan_close_confirm_address format humanSix(refundOnChainAddress.toString)
+          val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(refundOnChainAddress).getProgram)
+          mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
         }
 
-        def viewClosing = chan.data match {
-          case cd: ClosingData => urlIntent(cd.bestClosing.commitTx.txid.toString)
-          case _ => Tools log "Attempting to view a closing tx of not yet closed channel"
+        def defineAction(pos: Int) = pos -> chan.data match {
+          case (0, _) => urlIntent(txid = chan.fundTxId.toString)
+          case (1, _) => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
+          case (2, cd: ClosingData) => urlIntent(txid = cd.bestClosing.commitTx.txid.toString)
+          case (2, _) => proceedCoopCloseOrWarn(informAndClose = closeToAddress)
+          case (3, _) => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
         }
 
-        lst setOnItemClickListener onTap {
-          case 0 => urlIntent(chan.fundTxId.toString)
-          case 1 => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
-          case 2 => proceedCoopCloseOrWarn(informAndClose = closeToAddress)
-          case 3 => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
-          case 4 => viewClosing
-        }
+        // Specify what to do once user taps a menu
+        lst setOnItemClickListener onTap(defineAction)
       }
     }
 
