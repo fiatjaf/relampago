@@ -504,7 +504,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def makeRequest(sum: MilliSatoshi, preimg: BinaryData) = {
       val info = content.findViewById(R.id.inputDescription).asInstanceOf[EditText].getText.toString.trim
-      val routes = chansWithRoutes.filterKeys(channel => estimateCanReceiveCapped(channel) >= sum.amount).values.toVector
+      val routes = chansWithRoutes.filterKeys(viableChannel => estimateCanReceiveCapped(viableChannel) >= sum.amount).values.toVector
       val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimg, nodePrivateKey, info, Some(app.kit.currentAddress.toString), routes)
       val rd = emptyRD(pr, sum.amount, useCache = true)
 

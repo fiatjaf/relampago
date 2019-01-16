@@ -109,7 +109,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       val canReceiveMsat = estimateCanReceive(chan)
 
       val refundable = Satoshi(cs.localCommit.spec.toLocalMsat / 1000L)
-      val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amount.amount).sum / 1000L)
+      val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amountMsat).sum / 1000L)
       val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
       val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
       val barCanReceive = barCanSend + canReceiveMsat / capacity.amount
@@ -201,7 +201,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           case (1, _) => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
           case (2, cd: ClosingData) => urlIntent(txid = cd.bestClosing.commitTx.txid.toString)
           case (2, _) => proceedCoopCloseOrWarn(informAndClose = closeToAddress)
-          case (3, _) => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
+          case _ => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
         }
 
         // Specify what to do once user taps a menu
