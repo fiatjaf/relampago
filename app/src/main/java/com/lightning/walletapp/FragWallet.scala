@@ -25,9 +25,9 @@ import android.content.{DialogInterface, Intent}
 import android.database.{ContentObserver, Cursor}
 import android.support.v4.content.{ContextCompat, Loader}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
+import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
-import com.lightning.walletapp.helper.{AwaitService, ReactLoader, RichCursor}
 import com.lightning.walletapp.ln.wire.{ChannelReestablish, LightningMessage, OpenChannel}
 
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
@@ -497,26 +497,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // LN SEND / RECEIVE
 
-  def receive(chansWithRoutes: Map[Channel, PaymentRoute], maxCanReceive: MilliSatoshi) = {
+  def receive(chansWithRoutes: Map[Channel, PaymentRoute], maxCanReceive: MilliSatoshi,
+              title: View, defDescr: String = new String)(onDone: PaymentRequest => Unit) {
+
     val baseHint = app.getString(amount_hint_can_receive).format(denom parsedWithSign maxCanReceive)
     val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
+    val inputDescription = content.findViewById(R.id.inputDescription).asInstanceOf[EditText]
     val rateManager = new RateManager(content) hint baseHint
 
-    def makeRequest(sum: MilliSatoshi, preimg: BinaryData) = {
-      val info = content.findViewById(R.id.inputDescription).asInstanceOf[EditText].getText.toString.trim
-      val routes = chansWithRoutes.filterKeys(viableChannel => estimateCanReceiveCapped(viableChannel) >= sum.amount).values.toVector
-      val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimg, nodePrivateKey, info, Some(app.kit.currentAddress.toString), routes)
-      val rd = emptyRD(pr, sum.amount, useCache = true)
-
-      db.change(PaymentTable.newVirtualSql, params = rd.queryText, rd.pr.paymentHash)
-      db.change(PaymentTable.newSql, pr.toJson, preimg, 1, HIDDEN, System.currentTimeMillis,
-        pr.description, rd.pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
-
-      app.TransData.value = pr
-      host goTo classOf[RequestActivity]
-      host.awaitServiceIntent.setAction(AwaitService.SHOW_AMOUNT)
-      host.awaitServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString sum)
-      ContextCompat.startForegroundService(host, host.awaitServiceIntent)
+    def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
+      val paymentPurpose = inputDescription.getText.toString.trim
+      val chans = chansWithRoutes.filterKeys(capableChannel => estimateCanReceiveCapped(capableChannel) >= sum.amount).values.toVector
+      val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, paymentPurpose, Some(app.kit.currentAddress.toString), chans)
+      db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN, System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
+      db.change(PaymentTable.newVirtualSql, emptyRD(pr, sum.amount, useCache = true).queryText, pr.paymentHash)
+      pr
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
@@ -526,14 +521,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case Success(ms) => rm(alert) {
         // Requests without amount are not allowed for now
-        <(makeRequest(ms, random getBytes 32), onFail)(none)
-        app toast dialog_pr_making
+        <(makeRequest(ms, random getBytes 32), onFail)(onDone)
       }
     }
 
-    def useMax(alert: AlertDialog) = rateManager setSum Try(maxCanReceive)
-    val bld = baseBuilder(title = app.getString(ln_receive_title).html, content)
-    mkCheckFormNeutral(recAttempt, none, useMax, bld, dialog_ok, dialog_cancel, dialog_max)
+    inputDescription setText defDescr
+    mkCheckFormNeutral(recAttempt, none, alert => rateManager setSum Try(maxCanReceive),
+      bld = baseBuilder(title, body = content), dialog_ok, dialog_cancel, dialog_max)
   }
 
   def sendPayment(pr: PaymentRequest): Unit = {
@@ -565,10 +559,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       def changeText = best match {
         case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
           val finalDeliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
-          val guaranteedDeliveryTitle = app.getString(ln_send_title_guaranteed).format(description).html
+          host.updateView2Blue(baseTitle, app getString ln_send_title_guaranteed format description)
           rateManager hint app.getString(amount_hint_can_deliver).format(denom parsedWithSign finalDeliverable)
-          baseTitle.findViewById(R.id.titleTip).asInstanceOf[TextView] setText guaranteedDeliveryTitle
-          baseTitle setBackgroundColor ContextCompat.getColor(host, R.color.ln)
 
         case _ =>
           // Set a base hint back again

@@ -160,8 +160,8 @@
     <string name="send_scan_qr">Сканировать QR-код</string>
     <string name="send_paste_payment_request"><![CDATA[Вставить запрос-Молнию<br><font color=#999999><small>или Биткоин-адрес</small></font>]]></string>
     <string name="send_hivemind_deposit"><![CDATA[Послать в Hivemind<br><font color=#999999><small>сайдчейн для рынка предсказаний</small></font>]]></string>
-    <string name="ln_send_title_guaranteed"><![CDATA[<font color=#FFFFFF><strong>Гарантированная доставка</strong><small><br><br>%1$s</small></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
+    <string name="ln_send_title_guaranteed"><![CDATA[<strong>Гарантированная доставка</strong><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послать Биткоин-транзакцию</strong></font>]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>

@@ -17,6 +17,7 @@ import android.widget.AdapterView.OnItemClickListener
 import concurrent.ExecutionContext.Implicits.global
 import com.lightning.walletapp.ln.LNParams.minDepth
 import android.support.v7.app.AppCompatActivity
+import android.support.v4.content.ContextCompat
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
@@ -158,6 +159,13 @@ trait TimerActivity extends AppCompatActivity { me =>
     Utils clickableTextField view.findViewById(R.id.titleTip) setText textFieldData
     view setBackgroundColor 0x22AAAAAA
     view
+  }
+
+  def updateView2Blue(oldView: View, newText: String) = {
+    val titleTip = oldView.findViewById(R.id.titleTip).asInstanceOf[TextView]
+    oldView setBackgroundColor ContextCompat.getColor(me, R.color.ln)
+    titleTip setText s"<font color=#FFFFFF>$newText</font>".html
+    oldView
   }
 
   implicit def UITask(exec: => Unit): TimerTask = {

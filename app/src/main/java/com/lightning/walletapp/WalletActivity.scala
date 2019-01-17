@@ -225,13 +225,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def resolveStandardUrl(lNUrl: LNUrl) = {
     val initialRequest = get(lNUrl.uri.toString, true).trustAllCerts.trustAllHosts
     val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
-    // Resolving methods must run on IO thread to avoid "network on main thread" exceptions
+    // Resolving methods must run on IO thread to avoid "net on main" and parsing exceptions
     app toast ln_url_resolving
 
     ask.map {
       case icr: IncomingChannelRequest => initConnection(icr)
-      case wr: WithdrawRequest => showWithdrawalForm(wr)
-      case _ => log("Unrecognized lnurl type")
+      case wr: WithdrawRequest => me doReceivePayment Some(wr)
+      case unknown => throw new Exception(s"Unrecognized $unknown")
     }.foreach(none, onFail)
   }
 
@@ -250,10 +250,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     ConnectionManager.connectTo(incoming.getAnnounce, notify = true)
   }
 
-  def showWithdrawalForm(wr: WithdrawRequest) = {
-
-  }
-
   def showLoginForm(lnUrl: LNUrl) = {
     scala.util.Try(lnUrl.uri getQueryParameter "c").map(BinaryData.apply) match {
       case scala.util.Success(loginChallenge) => offerLogin(loginChallenge take 64)
@@ -261,14 +257,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def offerLogin(challenge: BinaryData) = {
-      val title = str2View(s"<big><font color=#FFFFFF>${lnUrl.uri.getHost}</font></big>".html)
+      val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
       mkCheckFormNeutral(login, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
-      title setBackgroundColor ContextCompat.getColor(me, R.color.ln)
 
       def login(alert: AlertDialog) = rm(alert) {
         val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
         val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
-        val callback = s"${lnUrl.uri.toString}&key=${linkingPrivKey.publicKey.toString}&sig=${sig.toString}"
+        val callback = s"${lnUrl.request}&key=${linkingPrivKey.publicKey.toString}&sig=${sig.toString}"
         val callbackRequest = get(callback, true).connectTimeout(5000).trustAllCerts.trustAllHosts
         obsOnIO.map(_ => callbackRequest.body.toJson).foreach(none, onFail)
         app toast ln_url_resolving
@@ -287,34 +282,54 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // BUTTONS REACTIONS
 
-  def goReceivePayment(top: View) = {
-    val openingOrOpenChannels = ChannelManager.notClosingOrRefunding
+  def doReceivePayment(wrOpt: Option[WithdrawRequest] = None) = {
+    val openingOrOpenChannels: Vector[Channel] = ChannelManager.notClosingOrRefunding
     val operationalChannelsWithRoutes: Map[Channel, PaymentRoute] = openingOrOpenChannels.flatMap(channelAndHop).toMap
-    val maxCanReceiveMsat = operationalChannelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L
-    val maxCanReceive = MilliSatoshi(maxCanReceiveMsat)
+    val maxCanReceive = MilliSatoshi(operationalChannelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L)
+    val reserveUnspent = getString(ln_receive_reserve) format denom.coloredP2WSH(maxCanReceive, denom.sign)
 
-    val reserveUnspent = getString(ln_receive_reserve) format denom.coloredOut(-maxCanReceive, denom.sign)
-    val lnReceiveText = if (openingOrOpenChannels.isEmpty) getString(ln_receive_option).format(me getString ln_receive_suggestion)
-      else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_option).format(me getString ln_receive_6conf)
-      else if (maxCanReceiveMsat < 0L) getString(ln_receive_option).format(reserveUnspent)
-      else getString(ln_receive_option).format(me getString ln_receive_ok)
+    wrOpt match {
+      case Some(wr) =>
+        val finalMaxCanReceive = if (wr.maxAmount > maxCanReceive) maxCanReceive else wr.maxAmount
+        val title = updateView2Blue(oldView = str2View(new String), app getString ln_receive_title)
+        if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(offchain_receive_howto).html).create)
+        else if (operationalChannelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
+        else if (maxCanReceive.amount < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
+        else FragWallet.worker.receive(operationalChannelsWithRoutes, finalMaxCanReceive, title, wr.defaultDescription) { netPaymentRequest =>
+          obsOnIO.map(_ => wr.requestWithdraw(netPaymentRequest).toJson.asJsObject fields "status").foreach(none, onFail)
+          app toast dialog_pr_making
+        }
 
-    val options = Array(lnReceiveText.html, getString(btc_receive_option).html)
-    val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-    val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_receive, lst).create)
-    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
-    lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
-    lst setDividerHeight 0
-    lst setDivider null
+      case None =>
+        val alertLNHint =
+          if (openingOrOpenChannels.isEmpty) getString(ln_receive_suggestion)
+          else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_6conf)
+          else if (maxCanReceive.amount < 0L) getString(ln_receive_option).format(reserveUnspent)
+          else getString(ln_receive_ok)
 
-    def onChain = rm(alert) {
-      app.TransData.value = app.kit.currentAddress
-      me goTo classOf[RequestActivity]
-    }
+        val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+        val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_receive, lst).create)
+        val options = Array(getString(ln_receive_option).format(alertLNHint).html, getString(btc_receive_option).html)
 
-    def offChain = rm(alert) {
-      if (openingOrOpenChannels.nonEmpty) FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive)
-      else showForm(negTextBuilder(dialog_ok, app.getString(offchain_receive_howto).html).create)
+        def offChain = rm(alert) {
+          if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(offchain_receive_howto).html).create)
+          else FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive, app.getString(ln_receive_title).html) { qrPaymentRequest =>
+            awaitServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString qrPaymentRequest.amount.get).setAction(AwaitService.SHOW_AMOUNT)
+            ContextCompat.startForegroundService(me, awaitServiceIntent)
+            app.TransData.value = qrPaymentRequest
+            me goTo classOf[RequestActivity]
+          }
+        }
+
+        def onChain = rm(alert) {
+          app.TransData.value = app.kit.currentAddress
+          me goTo classOf[RequestActivity]
+        }
+
+        lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
+        lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
+        lst setDividerHeight 0
+        lst setDivider null
     }
   }
 
@@ -347,9 +362,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   val tokensPrice = MilliSatoshi(1000000L)
   def goStart = me goTo classOf[LNStartActivity]
   def goOps(top: View) = me goTo classOf[LNOpsActivity]
+  def goReceivePayment(top: View) = doReceivePayment(None)
   def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
-    val coloredAmount = denom.coloredIn(msat = tokensPrice, denom.sign)
-    val warn = getString(tokens_warn) format s"$coloredAmount <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
-    mkCheckForm(alert => rm(alert)(goStart), none, baseTextBuilder(warn.html).setCustomTitle(me getString action_ln_open), dialog_ok, dialog_cancel)
+    val withFiatAmount = denom.coloredIn(tokensPrice, denom.sign) + s"<font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
+    val bld = baseTextBuilder(getString(tokens_warn).format(withFiatAmount).html).setCustomTitle(me getString action_ln_open)
+    mkCheckForm(alert => rm(alert)(goStart), none, bld, dialog_ok, dialog_cancel)
   } else goStart
 }
