@@ -170,10 +170,7 @@ object PaymentInfo {
       case Success(info) if !isLoop && info.pr.amount.exists(add.amountMsat > _.amount * 2) => failHtlc(ss, IncorrectPaymentAmount, add)
       case Success(info) if !isLoop && info.pr.amount.exists(add.amountMsat < _.amount) => failHtlc(ss, IncorrectPaymentAmount, add)
       case Success(info) if !isLoop && info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
-      case _ => {
-        println(s"-- isLoop: $isLoop")
-        failHtlc(ss, UnknownPaymentHash, add)
-      }
+      case _ => failHtlc(ss, UnknownPaymentHash, add)
     }
 
     case (Attempt.Successful(_), _, sharedSecret) =>
