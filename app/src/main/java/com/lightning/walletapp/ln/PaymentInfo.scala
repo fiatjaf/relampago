@@ -156,7 +156,7 @@ object PaymentInfo {
   }
 
   // After mutually signed HTLCs are present we need to parse and fail/fulfill them
-  def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag) = Try {
+  def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag, isLoop: Boolean) = Try {
     val packet = parsePacket(privateKey = nodeSecret, associatedData = add.paymentHash, add.onionRoutingPacket)
     Tuple3(perHopPayloadCodec decode BitVector(packet.payload), packet.nextPacket, packet.sharedSecret)
   } map {
@@ -167,10 +167,13 @@ object PaymentInfo {
 
     case (Attempt.Successful(_), nextPacket, ss) if nextPacket.isLast => bag getPaymentInfo add.paymentHash match {
       // Payment request may not have a zero final sum which means it's a donation and should not be checked for overflow
-      case Success(info) if info.pr.amount.exists(add.amountMsat > _.amount * 2) => failHtlc(ss, IncorrectPaymentAmount, add)
-      case Success(info) if info.pr.amount.exists(add.amountMsat < _.amount) => failHtlc(ss, IncorrectPaymentAmount, add)
-      case Success(info) if info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
-      case _ => failHtlc(ss, UnknownPaymentHash, add)
+      case Success(info) if !isLoop && info.pr.amount.exists(add.amountMsat > _.amount * 2) => failHtlc(ss, IncorrectPaymentAmount, add)
+      case Success(info) if !isLoop && info.pr.amount.exists(add.amountMsat < _.amount) => failHtlc(ss, IncorrectPaymentAmount, add)
+      case Success(info) if !isLoop && info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
+      case _ => {
+        println(s"-- isLoop: $isLoop")
+        failHtlc(ss, UnknownPaymentHash, add)
+      }
     }
 
     case (Attempt.Successful(_), _, sharedSecret) =>

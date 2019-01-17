@@ -255,10 +255,15 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         me UPDATA norm.copy(commitments = c1) SEND updateFailMalformedHtlс
 
 
-      // Fail or fulfill incoming HTLCs
       case (norm: NormalData, CMDHTLCProcess, OPEN) =>
-        for (Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs)
-          me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag)
+        // Fail or fulfill incoming HTLCs except looping ones
+
+        for {
+          Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs
+          localCommittedHtlcs = norm.commitments.localCommit.spec.htlcs
+          // We don't want to receive a payment into a channel we have sent it from in attempt to rebalance
+          isLoop = localCommittedHtlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == add.paymentHash)
+        } me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, isLoop)
 
         // And sign once done
         doProcess(CMDProceed)
