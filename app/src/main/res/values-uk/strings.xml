@@ -114,6 +114,8 @@
     <string name="dialog_sum_small">Сума занадто мала</string>
     <string name="dialog_sum_big">Сума занадто велика</string>
     <string name="dialog_pay_onchain">Он-чейн</string>
+    <string name="dialog_share_key">Share key</string>
+    <string name="dialog_opt_out">Opt out</string>
     <string name="dialog_cancel">Скасувати</string>
     <string name="dialog_retry">Ще раз</string>
     <string name="dialog_login">Увiйти</string>
@@ -307,6 +309,11 @@
     <string name="ln_ops_start_node_view"><![CDATA[%1$s<br><small>%2$s<br><font color=#999999>%3$s</font></small>]]></string>
     <string name="ln_ops_start_fund_incoming_channel">вхідний канал</string>
     <string name="ln_url_resolving">Підключення до сервісу&#8230;</string>
+
+    <string name="ln_url_info_linking"><![CDATA[
+        Логiн-ключ для <i>%1$s</i>, згенерований вашим гаманцем:<br><br><strong>%2$s</strong><br><br>
+        Логiн-ключ можно розкрити, але його рекомендується передавати тiльки <i>%3$s</i>
+    ]]></string>
 
     <!-- Olympus log messages and notification -->
     <string name="olympus_log_channel_backup">Збережений зашифрований бекап каналу з «%1$s»</string>

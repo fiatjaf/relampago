@@ -133,7 +133,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def informOfferClose(chan: Channel, message: String) = UITask {
       val bld = baseBuilder(chan.data.announce.asString.html, message)
       def close(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
-      mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_close)
+      mkCheckFormNeutral(_.dismiss, none, close, bld, dialog_ok, -1, ln_chan_close)
     }
 
     override def settled(cs: Commitments) =
@@ -156,7 +156,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case _ \ CMDAddImpossible(rd, code) =>
         // Remove this payment from unsent since it was not accepted by channel
         UITask(host showForm negTextBuilder(dialog_ok, app getString code).create).run
-        PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash
         PaymentInfoWrap failOnUI rd
 
       case chan \ HTLCHasExpired(_, htlc) =>
@@ -375,9 +374,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       info.incoming -> rd.pr.fallbackAddress -> rd.pr.amount match {
         case 0 \ Some(adr) \ Some(amount) if info.lastMsat == 0 && info.lastExpiry == 0 && info.status == FAILURE =>
-          // Payment was failed without even trying because wallet is offline or no suitable payment routes were found
+          // Payment was failed without even trying because wallet is offline or no suitable payment routes were found on Olympus server
           val bld = baseBuilder(lnTitleOutNoFee.format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper)
-          mkCheckFormNeutral(alert => rm(alert)(none), none, onChain(adr, amount, rd.pr.paymentHash), bld, dialog_ok, -1, dialog_pay_onchain)
+          mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount, rd.pr.paymentHash), bld, dialog_ok, -1, dialog_pay_onchain)
 
         case 0 \ _ \ _ if info.lastMsat == 0 && info.lastExpiry == 0 =>
           // Payment has not been tried yet because an wallet is offline
@@ -386,15 +385,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
         case 0 \ Some(adr) \ Some(amount) =>
-          // Offer a fallback on-chain along with off-chain retry if payment was not successfull
+          // Offer a fallback on-chain address along with off-chain retry if payment was not successfull
           if (info.status != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckFormNeutral(alert => rm(alert)(none), doSend(rd), onChain(adr, amount, rd.pr.paymentHash),
+          else mkCheckFormNeutral(_.dismiss, doSendOffChain(rd), onChain(adr, amount, rd.pr.paymentHash),
             baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry, dialog_pay_onchain)
 
         case 0 \ _ \ _ =>
           // Allow off-chain retry only, no on-chain fallback
           if (info.status != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckForm(alert => rm(alert)(none), doSend(rd), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry)
+          else mkCheckForm(_.dismiss, doSendOffChain(rd), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry)
 
         case 1 \ _ \ _ =>
           val amountReceivedHuman = denom.coloredIn(info.firstSum, denom.sign)
@@ -476,7 +475,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       // Check if CPFP can be applied: enough value to handle the fee, not dead yet
       if (wrap.valueDelta.isLessThan(RatesSaver.rates.feeSix) || txDepth > 0) showForm(negBuilder(dialog_ok, header.html, lst).create)
-      else mkCheckForm(alert => rm(alert)(none), boostIncoming(wrap), baseBuilder(header.html, lst), dialog_ok, dialog_boost)
+      else mkCheckForm(_.dismiss, boostIncoming(wrap), baseBuilder(header.html, lst), dialog_ok, dialog_boost)
     }
   }
 
@@ -581,12 +580,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case Success(ms) \ Some(relayable \ chanBalInfo) if ms <= relayable => rm(alert) {
           // We have obtained a (Joint -> payee) route out of band so we can use it right away
           val rd = emptyRD(pr, ms.amount, useCache = true) plusOutOfBandRoute Vector(chanBalInfo.hop)
-          me doSend rd
+          me doSendOffChain rd
         }
 
         case Success(ms) \ _ => rm(alert) {
           // A usual send without out-of-band paths added
-          me doSend emptyRD(pr, ms.amount, useCache = true)
+          val rd = emptyRD(pr, ms.amount, useCache = true)
+          me doSendOffChain rd
         }
       }
 
@@ -613,10 +613,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  def doSend(rd: RoutingData) = {
+  def doSendOffChain(rd: RoutingData) = {
     // Inform if all local channels are offline and some waiting is about to happen
-    val atLeaseOneIsOnline = ChannelManager.notClosingOrRefunding.exists(_.state == OPEN)
-    if (!atLeaseOneIsOnline) app toast ln_chan_offline
+    val atLeastOneIsOnline = ChannelManager.notClosingOrRefunding.exists(_.state == OPEN)
+    if (!atLeastOneIsOnline) app toast ln_chan_offline
 
     ChannelManager.checkIfSendable(rd) match {
       case Left(sanityCheckErr) => onFail(sanityCheckErr)
@@ -672,7 +672,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val boost = denom.coloredIn(wrap.valueDelta minus newFee, denom.sign)
     // Unlike normal transaction this one uses a whole half of current feeSix
     val userWarn = baseBuilder(app.getString(boost_details).format(current, boost).html, null)
-    mkCheckForm(alert => rm(alert)(none), <(replace, onError)(none), userWarn, dialog_cancel, dialog_boost)
+    mkCheckForm(_.dismiss, <(replace, onError)(none), userWarn, dialog_cancel, dialog_boost)
 
     def replace: Unit = {
       if (wrap.tx.getConfidence.getDepthInBlocks > 0) return

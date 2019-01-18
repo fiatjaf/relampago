@@ -12,9 +12,11 @@ import com.lightning.walletapp.ln.Channel._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+
 import android.app.{Activity, AlertDialog}
 import org.bitcoinj.core.{Address, TxWrap}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
+import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
@@ -25,13 +27,11 @@ import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
 import android.support.v4.content.ContextCompat
 import com.github.clans.fab.FloatingActionMenu
-import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import android.support.v7.widget.SearchView
 import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
@@ -211,8 +211,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       }
 
     case _ =>
-      val wr = WithdrawRequest("https://satoshis.games", "k1", MilliSatoshi(45000000L), "satohis.games withdrawal")
-      doReceivePayment(Some(wr))
   }
 
   // LNURL
@@ -259,22 +257,22 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def offerLogin(challenge: BinaryData) = {
-      val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
-      mkCheckFormNeutral(login, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
+      val title = updateView2Blue(str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
+      lazy val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
+      lazy val pk = linkingPrivKey.publicKey.toString
 
       def login(alert: AlertDialog) = rm(alert) {
-        val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
-        val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
-        val callback = s"${lnUrl.request}&key=${linkingPrivKey.publicKey.toString}&sig=${sig.toString}"
-        val callbackRequest = get(callback, true).connectTimeout(5000).trustAllCerts.trustAllHosts
+        val signature = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
+        val callback = get(s"${lnUrl.request}&key=$pk&sig=${signature.toString}", true)
+        val callbackRequest = callback.connectTimeout(5000).trustAllCerts.trustAllHosts
         obsOnIO.map(_ => callbackRequest.body.toJson).foreach(none, onFail)
         app toast ln_url_resolving
       }
 
-      def wut(alert: AlertDialog) = rm(alert) {
-        val info = Uri parse s"https://lightning-wallet.com"
-        me startActivity new Intent(Intent.ACTION_VIEW, info)
-      }
+      mkCheckFormNeutral(login, none, _ => {
+        val bld = baseTextBuilder(getString(ln_url_info_linking).format(lnUrl.uri.getHost, pk, lnUrl.uri.getHost).html)
+        mkCheckFormNeutral(_.dismiss, none, _ => me share pk, bld, dialog_ok, -1, dialog_share_key)
+      }, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
     }
   }
 
