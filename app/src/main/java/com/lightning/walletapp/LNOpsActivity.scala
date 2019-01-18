@@ -173,7 +173,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       view setOnClickListener onButtonTap {
         val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-        val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.toString.html, lst).create)
+        val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.asString.html, lst).create)
         lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, me menu chan.data)
         lst setDividerHeight 0
         lst setDivider null
@@ -214,7 +214,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       val connect = connectivityStatusColor(chan)
 
       extraInfo setVisibility View.GONE
-      addressAndKey setText chan.data.announce.toString.html
+      addressAndKey setText chan.data.announce.asString.html
       stateAndConnectivity setText s"<strong>$state</strong><br>$connect".html
       // Details method should be called after extraInfo is set to GONE above
       chan.hasCsOr(sm => showDetails(chan, sm.commitments), null)

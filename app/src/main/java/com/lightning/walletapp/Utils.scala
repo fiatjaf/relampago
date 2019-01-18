@@ -61,7 +61,6 @@ object Utils {
     "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel ", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
     "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound sterling")
 
-  def humanNode(key: String, sep: String) = key.grouped(24).map(_ grouped 3 mkString "\u0020") mkString sep
   def getDescription(rawText: String) = if (rawText.isEmpty) s"<i>$noDesc</i>" else rawText take 140
   def humanSix(adr: String) = adr grouped 6 mkString "\u0020"
 

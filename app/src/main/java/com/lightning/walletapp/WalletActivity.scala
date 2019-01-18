@@ -229,8 +229,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     app toast ln_url_resolving
 
     ask.map {
-      case icr: IncomingChannelRequest => initConnection(icr)
       case wr: WithdrawRequest => me doReceivePayment Some(wr)
+      case icr: IncomingChannelRequest => me initConnection icr
       case unknown => throw new Exception(s"Unrecognized $unknown")
     }.foreach(none, onFail)
   }

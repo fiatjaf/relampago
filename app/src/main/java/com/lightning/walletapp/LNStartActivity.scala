@@ -118,7 +118,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     def getView(pos: Int, savedView: View, par: ViewGroup) = {
       val slot = host.getLayoutInflater.inflate(R.layout.frag_single_line, null)
       val textLine = slot.findViewById(R.id.textLine).asInstanceOf[TextView]
-      textLine setText getItem(pos).asString(nodeView, "\u0020").html
+      textLine setText getItem(pos).asString(nodeView).html
       slot
     }
 
@@ -227,26 +227,17 @@ object StartNodeView {
   lazy val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
 }
 
+sealed trait StartNodeView { def asString(base: String): String }
 case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
-sealed trait StartNodeView { def asString(base: String, separator: String): String }
 case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNodeView {
   // App suggests a bunch of hardcoded and separately fetched nodes with a good liquidity
-
-  def asString(base: String, separator: String) = {
-    val key = humanNode(ann.nodeId.toString, separator)
-    base.format(ann.alias, tip, key)
-  }
+  def asString(base: String) = base.format(ann.alias, tip, ann.pretty)
 }
 
 case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
-  // User may search for every currently available node on Olympus server
-
-  def asString(base: String, separator: String) = {
-    val channelAnnouncement \ channelConnections = acn
-    val humanConnects = app.plurOrZero(chansNumber, channelConnections)
-    val key = humanNode(channelAnnouncement.nodeId.toString, separator)
-    base.format(channelAnnouncement.alias, humanConnects, key)
-  }
+  // User may search for nodes present in global routing graph, provided by Olympus server
+  def asString(base: String) = base.format(ca.alias, app.plurOrZero(chansNumber, num), ca.pretty)
+  val ca \ num = acn
 }
 
 // LNURL response types

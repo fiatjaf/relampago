@@ -131,7 +131,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val chanListener = new ChannelListener {
     def informOfferClose(chan: Channel, message: String) = UITask {
-      val bld = baseBuilder(chan.data.announce.toString.html, message)
+      val bld = baseBuilder(chan.data.announce.asString.html, message)
       def close(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
       mkCheckFormNeutral(alert => rm(alert)(none), none, close, bld, dialog_ok, -1, ln_chan_close)
     }
@@ -162,7 +162,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case chan \ HTLCHasExpired(_, htlc) =>
         val paymentHash = htlc.add.paymentHash.toString
         val bld = negTextBuilder(dialog_ok, app.getString(err_ln_expired).format(paymentHash).html)
-        UITask(host showForm bld.setCustomTitle(chan.data.announce.toString.html).create).run
+        UITask(host showForm bld.setCustomTitle(chan.data.announce.asString.html).create).run
 
       case _ \ internal =>
         val stackTrace = UncaughtHandler toText internal

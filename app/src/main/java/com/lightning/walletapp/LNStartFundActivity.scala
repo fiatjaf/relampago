@@ -37,10 +37,10 @@ class LNStartFundActivity extends TimerActivity { me =>
     setContentView(R.layout.activity_ln_start_fund)
 
     app.TransData checkAndMaybeErase {
-      case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(nodeFundView, "<br>"), ann)
-      case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(nodeFundView, "<br>"), ann)
-      case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, chansNumber.last).asString(nodeFundView, "<br>"), ann)
-      case icp: IncomingChannelParams => proceed(Some(icp), icp.nodeView.asString(nodeFundView, "<br>"), icp.nodeView.ann)
+      case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(nodeFundView), ann)
+      case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(nodeFundView), ann)
+      case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, chansNumber.last).asString(nodeFundView), ann)
+      case icp: IncomingChannelParams => proceed(Some(icp), icp.nodeView.asString(nodeFundView), icp.nodeView.ann)
       case _ => finish
     }
 

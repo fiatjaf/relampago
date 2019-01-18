@@ -118,16 +118,14 @@ case class NodeAnnouncement(signature: BinaryData,
                             nodeId: PublicKey, rgbColor: RGB, alias: String,
                             addresses: NodeAddressList) extends RoutingMessage {
 
-  lazy val identifier = (alias + nodeId.toString).toLowerCase
   lazy val workingAddress: InetSocketAddress = addresses.collect {
     case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
     case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
   }.head
 
-  override def toString = {
-    val cute = nodeId.toString take 15 grouped 3 mkString "\u0020"
-    s"<strong>${alias take 16}</strong><br><small>$cute</small>"
-  }
+  lazy val identifier = (alias + nodeId.toString).toLowerCase
+  lazy val pretty = nodeId.toString take 15 grouped 3 mkString "\u0020"
+  def asString = s"<strong>${alias take 16}</strong><br><small>$pretty</small>"
 }
 
 sealed trait NodeAddress
