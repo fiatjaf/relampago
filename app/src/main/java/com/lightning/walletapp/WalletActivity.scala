@@ -12,7 +12,6 @@ import com.lightning.walletapp.ln.Channel._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import android.app.{Activity, AlertDialog}
 import org.bitcoinj.core.{Address, TxWrap}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
@@ -26,12 +25,13 @@ import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
 import android.support.v4.content.ContextCompat
 import com.github.clans.fab.FloatingActionMenu
-import com.lightning.walletapp.lnutils.GDrive
+import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import android.support.v7.widget.SearchView
 import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
@@ -211,6 +211,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       }
 
     case _ =>
+      val wr = WithdrawRequest("https://satoshis.games", "k1", MilliSatoshi(45000000L), "satohis.games withdrawal")
+      doReceivePayment(Some(wr))
   }
 
   // LNURL
@@ -295,9 +297,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(offchain_receive_howto).html).create)
         else if (operationalChannelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive.amount < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
-        else FragWallet.worker.receive(operationalChannelsWithRoutes, finalMaxCanReceive, title, wr.defaultDescription) { netPaymentRequest =>
-          obsOnIO.map(_ => wr.requestWithdraw(netPaymentRequest).toJson.asJsObject fields "status").foreach(none, onFail)
-          app toast dialog_pr_making
+        else FragWallet.worker.receive(operationalChannelsWithRoutes, finalMaxCanReceive, title, wr.defaultDescription) { rd =>
+          def onRequestFailed(serverResponseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail serverResponseFail)
+          obsOnIO.map(_ => wr.requestWithdraw(rd.pr).toJson.asJsObject fields "status").foreach(none, onRequestFailed)
+          PaymentInfoWrap.updStatus(PaymentInfo.WAITING, rd.pr.paymentHash)
+          PaymentInfoWrap.uiNotify
         }
 
       case None =>
@@ -313,11 +317,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
         def offChain = rm(alert) {
           if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(offchain_receive_howto).html).create)
-          else FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive, app.getString(ln_receive_title).html) { qrPaymentRequest =>
-            awaitServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString qrPaymentRequest.amount.get).setAction(AwaitService.SHOW_AMOUNT)
+          else FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive, app.getString(ln_receive_title).html) { rd =>
+            awaitServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
             ContextCompat.startForegroundService(me, awaitServiceIntent)
-            app.TransData.value = qrPaymentRequest
             me goTo classOf[RequestActivity]
+            app.TransData.value = rd.pr
           }
         }
 

@@ -496,7 +496,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // LN SEND / RECEIVE
 
   def receive(chansWithRoutes: Map[Channel, PaymentRoute], maxCanReceive: MilliSatoshi,
-              title: View, defDescr: String = new String)(onDone: PaymentRequest => Unit) {
+              title: View, defDescr: String = new String)(onDone: RoutingData => Unit) {
 
     val baseHint = app.getString(amount_hint_can_receive).format(denom parsedWithSign maxCanReceive)
     val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
@@ -504,12 +504,17 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val rateManager = new RateManager(content) hint baseHint
 
     def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
-      val paymentPurpose = inputDescription.getText.toString.trim
-      val chans = chansWithRoutes.filterKeys(capableChannel => estimateCanReceiveCapped(capableChannel) >= sum.amount).values.toVector
-      val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, paymentPurpose, Some(app.kit.currentAddress.toString), chans)
-      db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN, System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
-      db.change(PaymentTable.newVirtualSql, emptyRD(pr, sum.amount, useCache = true).queryText, pr.paymentHash)
-      pr
+      val pr = PaymentRequest(chainHash, amount = Some(sum), paymentHash = Crypto sha256 preimage,
+        nodePrivateKey, inputDescription.getText.toString.trim, Some(app.kit.currentAddress.toString),
+        chansWithRoutes.filterKeys(chan => estimateCanReceiveCapped(chan) >= sum.amount).values.toVector)
+
+      val rd = emptyRD(pr, sum.amount, useCache = true)
+      db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
+      db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN,
+        System.currentTimeMillis, pr.description, pr.paymentHash,
+        sum.amount, 0L, 0L, NOCHANID)
+
+      rd
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
@@ -520,6 +525,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case Success(ms) => rm(alert) {
         // Requests without amount are not allowed for now
         <(makeRequest(ms, random getBytes 32), onFail)(onDone)
+        app toast dialog_pr_making
       }
     }
 
@@ -528,80 +534,82 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       bld = baseBuilder(title, body = content), dialog_ok, dialog_cancel, dialog_max)
   }
 
-  def sendPayment(pr: PaymentRequest): Unit = {
+  def sendPayment(pr: PaymentRequest) = {
     // At this point we know we have some channels, check if they are good
     val hasOpeningChans = ChannelManager.notClosingOrRefunding.exists(isOpening)
     val maxLocalSend = ChannelManager.all.filter(isOperational).map(estimateCanSend)
 
-    if (!pr.isFresh) return app toast dialog_pr_expired
-    if (PaymentRequest.prefixes(chainHash) != pr.prefix) return app toast err_general
-    if (hasOpeningChans && maxLocalSend.isEmpty) return onFail(app getString err_ln_still_opening)
-    if (maxLocalSend.isEmpty) return app toast ln_no_open_chans
+    if (!pr.isFresh) app toast dialog_pr_expired
+    else if (PaymentRequest.prefixes(chainHash) != pr.prefix) app toast err_general
+    else if (hasOpeningChans && maxLocalSend.isEmpty) onFail(app getString err_ln_still_opening)
+    else if (maxLocalSend.isEmpty) app toast ln_no_open_chans
+    else {
 
-    val description = getDescription(pr.description)
-    val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend.max)
-    val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
-    val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
-    val baseTitle = str2View(app.getString(ln_send_title).format(description).html)
-    val rateManager = new RateManager(baseContent) hint baseHint
+      val description = getDescription(pr.description)
+      val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend.max)
+      val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
+      val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
+      val baseTitle = str2View(app.getString(ln_send_title).format(description).html)
+      val rateManager = new RateManager(baseContent) hint baseHint
 
-    val relayLink = new JointNode(pr.nodeId) {
-      override def onDataUpdated = UITask(changeText).run
+      val relayLink = new JointNode(pr.nodeId) {
+        override def onDataUpdated = UITask(changeText).run
 
-      def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
-        (pr.amount.isEmpty && relayable >= maxCappedSend) || // No sum asked and we can deliver max amount
-          pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
-          JointNode.hasRelayPeerOnly // We only have a relay node as peer
+        def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
+          (pr.amount.isEmpty && relayable >= maxCappedSend) || // No sum asked and we can deliver max amount
+            pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
+            JointNode.hasRelayPeerOnly // We only have a relay node as peer
 
-      def changeText = best match {
-        case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
-          val finalDeliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
-          host.updateView2Blue(baseTitle, app getString ln_send_title_guaranteed format description)
-          rateManager hint app.getString(amount_hint_can_deliver).format(denom parsedWithSign finalDeliverable)
+        def changeText = best match {
+          case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
+            val finalDeliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
+            host.updateView2Blue(baseTitle, app getString ln_send_title_guaranteed format description)
+            rateManager hint app.getString(amount_hint_can_deliver).format(denom parsedWithSign finalDeliverable)
+
+          case _ =>
+            // Set a base hint back again
+            rateManager hint baseHint
+        }
+      }
+
+      def sendAttempt(alert: AlertDialog) = rateManager.result -> relayLink.best match {
+        case Success(ms) \ Some(relayable \ _) if relayable < ms && JointNode.hasRelayPeerOnly => app toast dialog_sum_big
+        case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
+        case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
+        case Failure(emptyAmount) \ _ => app toast dialog_sum_small
+
+        case Success(ms) \ Some(relayable \ chanBalInfo) if ms <= relayable => rm(alert) {
+          // We have obtained a (Joint -> payee) route out of band so we can use it right away
+          val rd = emptyRD(pr, ms.amount, useCache = true) plusOutOfBandRoute Vector(chanBalInfo.hop)
+          me doSend rd
+        }
+
+        case Success(ms) \ _ => rm(alert) {
+          // A usual send without out-of-band paths added
+          me doSend emptyRD(pr, ms.amount, useCache = true)
+        }
+      }
+
+      pr.fallbackAddress -> pr.amount match {
+        case Some(adr) \ Some(amount) if amount > maxCappedSend && amount < app.kit.conf0Balance =>
+          // We have channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet
+          val notEnoughFundsMessage = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
+          mkCheckFormNeutral(none, none, onChain(adr, amount, pr.paymentHash), baseBuilder(baseTitle, notEnoughFundsMessage.html),
+            dialog_ok, -1, dialog_pay_onchain)
+
+        case _ \ Some(amount) if amount > maxCappedSend =>
+          // Either request contains no fallback address or we don't have enough funds on-chain
+          val msg = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
+          showForm(negBuilder(dialog_ok, baseTitle, msg.html).create)
 
         case _ =>
-          // Set a base hint back again
-          rateManager hint baseHint
+          // We can afford to pay this off-chain
+          val bld = baseBuilder(baseTitle, baseContent)
+          val killOpt = for (jointChannel <- JointNode.relayPeerChans.headOption) yield relayLink start jointChannel.data.announce
+          bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dlg: DialogInterface) = for (off <- killOpt) off.run }
+          for (amountrequestedByPayee <- pr.amount) rateManager setSum Try(amountrequestedByPayee)
+          mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
       }
-    }
-
-    def sendAttempt(alert: AlertDialog) = (rateManager.result, relayLink.best) match {
-      case Success(ms) \ Some(relayable \ _) if relayable < ms && JointNode.hasRelayPeerOnly => app toast dialog_sum_big
-      case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
-      case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
-      case Failure(emptyAmount) \ _ => app toast dialog_sum_small
-
-      case Success(ms) \ Some(relayable \ chanBalInfo) if ms <= relayable => rm(alert) {
-        // We have obtained a (Joint -> payee) route out of band so we can use it right away
-        val rd = emptyRD(pr, ms.amount, useCache = true) plusOutOfBandRoute Vector(chanBalInfo.hop)
-        me doSend rd
-      }
-
-      case Success(ms) \ _ => rm(alert) {
-        // A usual send without out-of-band paths added
-        me doSend emptyRD(pr, ms.amount, useCache = true)
-      }
-    }
-
-    pr.fallbackAddress -> pr.amount match {
-      case Some(adr) \ Some(amount) if amount > maxCappedSend && amount < app.kit.conf0Balance =>
-        // We have channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet
-        val notEnoughFundsMessage = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
-        mkCheckFormNeutral(none, none, onChain(adr, amount, pr.paymentHash), baseBuilder(baseTitle, notEnoughFundsMessage.html),
-          dialog_ok, -1, dialog_pay_onchain)
-
-      case _ \ Some(amount) if amount > maxCappedSend =>
-        // Either request contains no fallback address or we don't have enough funds on-chain
-        val msg = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
-        showForm(negBuilder(dialog_ok, baseTitle, msg.html).create)
-
-      case _ =>
-        // We can afford to pay this off-chain
-        val bld = baseBuilder(baseTitle, baseContent)
-        val killOpt = for (jointChannel <- JointNode.relayPeerChans.headOption) yield relayLink start jointChannel.data.announce
-        bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dlg: DialogInterface) = for (off <- killOpt) off.run }
-        mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
-        for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
     }
   }
 
@@ -623,7 +631,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     // this code only gets executed when user taps a button to pay on-chain
     val fallback = Address.fromString(app.params, adr)
 
-    sendBtcPopup(fallback) { txj =>
+    sendBtcPopup(fallback) { _ =>
       PaymentInfoWrap.updStatus(HIDDEN, hash)
       PaymentInfoWrap.uiNotify
     } setSum Try(amount)
