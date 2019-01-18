@@ -145,7 +145,6 @@
     <string name="btc_outgoing_title"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
     <string name="btc_pending_title"><![CDATA[<font color=#E68A00><strong>Возврат денег из канала</strong></font><br>%1$s<br><br>сумма %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
 
-    <string name="btc_refunding">Отложенная транзакция</string>
     <string name="txs_view_outside">Посмотреть на SmartBit</string>
     <string name="txs_share_body">Исходный код транзакции</string>
     <string name="txs_p2wsh">Наполнение контракта</string>
@@ -187,8 +186,8 @@
     <string name="err_ln_expired"><![CDATA[Есть застрявший платеж<br><br>Вы можете принудительно закрыть канал или связаться с пиром, чтобы он исправил проблему<br><br>Хэш платежа<br>%1$s]]></string>
     <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии. Вы можете добавить денег в кошелек и попробовать еше раз</string>
     <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой. Попробуйте разбить ее на несколько более мелких транзакций</string>
-    <string name="err_not_enough_funds"><![CDATA[<strong>Недостаточно средств</strong><br><br>доступно %1$s<br>отправлено %2$s<br>не хватает %3$s]]></string>
     <string name="err_gdrive_sign_in_failed">Не получилось залогиниться в GDrive, хотите продолжить без восстановления каналов из бекапов GDrive?</string>
+    <string name="err_ln_not_enough">У вас нет канала, в котором было бы достаточно денег, чтобы отправить %1$s офф-чейн</string>
     <string name="err_general">Не получилось потому что произошла непредвиденная ошибка</string>
     <string name="err_no_data">Ничего не найдено</string>
 

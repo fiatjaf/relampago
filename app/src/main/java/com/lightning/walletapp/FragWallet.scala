@@ -273,6 +273,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   case class ShowDelayedWrap(stat: ShowDelayed) extends ItemWrap {
     val getDate = new java.util.Date(System.currentTimeMillis + stat.delay)
     def humanSum = denom.coloredIn(stat.amount, new String)
+    val id = stat.commitTx.txid.toString
 
     def humanWhen = {
       val now = System.currentTimeMillis
@@ -285,8 +286,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       holder.transactSum setText s"<img src='btc'/>$humanSum".html
       holder.transactWhat setVisibility viewMap(isTablet)
       holder.transactCircle setImageResource await
-      holder.transactWhat setText btc_refunding
       holder.transactWhen setText humanWhen
+      holder.transactWhat setText id
     }
 
     def generatePopup = {
@@ -300,9 +301,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
       viewTxOutside setOnClickListener onButtonTap {
-        val parentCommitTxid = stat.commitTx.txid.toString
-        val uri = s"https://smartbit.com.au/tx/$parentCommitTxid"
-        host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
+        val uri = Uri parse s"https://smartbit.com.au/tx/$id"
+        host startActivity new Intent(Intent.ACTION_VIEW, uri)
       }
 
       viewShareBody setOnClickListener onButtonTap {
@@ -373,32 +373,30 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         if (info.status == WAITING) s"$expiryBlocksLeftPart<br>$title" else title
       }
 
-      info.incoming -> onChainRunnable(rd.pr) match {
-        case 0 \ Some(runnable) if info.lastMsat == 0 && info.lastExpiry == 0 && info.status == FAILURE =>
+      info.incoming -> rd.pr.fallbackAddress -> rd.pr.amount match {
+        case 0 \ Some(adr) \ Some(amount) if info.lastMsat == 0 && info.lastExpiry == 0 && info.status == FAILURE =>
           // Payment was failed without even trying because wallet is offline or no suitable payment routes were found
           val bld = baseBuilder(lnTitleOutNoFee.format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper)
-          mkCheckFormNeutral(alert => rm(alert)(none), none, alert => rm(alert)(runnable.run), bld, dialog_ok, -1, dialog_pay_onchain)
+          mkCheckFormNeutral(alert => rm(alert)(none), none, onChain(adr, amount, rd.pr.paymentHash), bld, dialog_ok, -1, dialog_pay_onchain)
 
-        case 0 \ _ if info.lastMsat == 0 && info.lastExpiry == 0 =>
+        case 0 \ _ \ _ if info.lastMsat == 0 && info.lastExpiry == 0 =>
           // Payment has not been tried yet because an wallet is offline
           val amountSentHuman = denom.coloredOut(info.firstSum, denom.sign)
           val title = lnTitleOutNoFee.format(humanStatus, amountSentHuman, inFiat)
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
-        case 0 \ Some(runnable) =>
-          val bld = baseBuilder(outgoingTitle.html, detailsWrapper)
-          def useOnchain(alert: AlertDialog) = rm(alert)(runnable.run)
-          // Offer a fallback onchain address if payment was not successfull
+        case 0 \ Some(adr) \ Some(amount) =>
+          // Offer a fallback on-chain along with off-chain retry if payment was not successfull
           if (info.status != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckFormNeutral(alert => rm(alert)(none), doSend(rd), useOnchain, bld, dialog_ok, retry, dialog_pay_onchain)
+          else mkCheckFormNeutral(alert => rm(alert)(none), doSend(rd), onChain(adr, amount, rd.pr.paymentHash),
+            baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry, dialog_pay_onchain)
 
-        case 0 \ None =>
-          val bld = baseBuilder(outgoingTitle.html, detailsWrapper)
-          // Only allow user to retry this payment while using excluded nodes and channels but not an onchain option
+        case 0 \ _ \ _ =>
+          // Allow off-chain retry only, no on-chain fallback
           if (info.status != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckForm(alert => rm(alert)(none), doSend(rd), bld, dialog_ok, retry)
+          else mkCheckForm(alert => rm(alert)(none), doSend(rd), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry)
 
-        case 1 \ _ =>
+        case 1 \ _ \ _ =>
           val amountReceivedHuman = denom.coloredIn(info.firstSum, denom.sign)
           val title = lnTitleIn.format(humanStatus, amountReceivedHuman, inFiat)
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
@@ -531,26 +529,25 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def sendPayment(pr: PaymentRequest): Unit = {
+    // At this point we know we have some channels, check if they are good
     val hasOpeningChans = ChannelManager.notClosingOrRefunding.exists(isOpening)
-    val hasOpenChans = ChannelManager.notClosingOrRefunding.exists(isOperational)
+    val maxLocalSend = ChannelManager.all.filter(isOperational).map(estimateCanSend)
 
     if (!pr.isFresh) return app toast dialog_pr_expired
     if (PaymentRequest.prefixes(chainHash) != pr.prefix) return app toast err_general
-    if (hasOpeningChans && !hasOpenChans) return onFail(app getString err_ln_still_opening)
-    if (!hasOpenChans) return app toast ln_no_open_chans
+    if (hasOpeningChans && maxLocalSend.isEmpty) return onFail(app getString err_ln_still_opening)
+    if (maxLocalSend.isEmpty) return app toast ln_no_open_chans
 
-    val runnableOpt = onChainRunnable(pr)
     val description = getDescription(pr.description)
-    val maxLocalSend = ChannelManager.all.filter(isOperational).map(estimateCanSend).max
-    val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend)
+    val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend.max)
     val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
     val baseTitle = str2View(app.getString(ln_send_title).format(description).html)
     val rateManager = new RateManager(baseContent) hint baseHint
-    val bld = baseBuilder(baseTitle, baseContent)
 
     val relayLink = new JointNode(pr.nodeId) {
       override def onDataUpdated = UITask(changeText).run
+
       def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
         (pr.amount.isEmpty && relayable >= maxCappedSend) || // No sum asked and we can deliver max amount
           pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
@@ -586,11 +583,26 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
     }
 
-    for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
-    val killOpt = for (chan <- JointNode.relayPeerChans.headOption) yield relayLink start chan.data.announce
-    bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dialog: DialogInterface) = for (off <- killOpt) off.run }
-    mkCheckFormNeutral(sendAttempt, none, alert => rm(alert) { for (onChain <- runnableOpt) onChain.run }, bld, dialog_pay, dialog_cancel,
-      if (pr.amount.exists(askedSum => maxCappedSend >= askedSum) || runnableOpt.isEmpty) -1 else dialog_pay_onchain)
+    pr.fallbackAddress -> pr.amount match {
+      case Some(adr) \ Some(amount) if amount > maxCappedSend && amount < app.kit.conf0Balance =>
+        // We have channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet
+        val notEnoughFundsMessage = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
+        mkCheckFormNeutral(none, none, onChain(adr, amount, pr.paymentHash), baseBuilder(baseTitle, notEnoughFundsMessage.html),
+          dialog_ok, -1, dialog_pay_onchain)
+
+      case _ \ Some(amount) if amount > maxCappedSend =>
+        // Either request contains no fallback address or we don't have enough funds on-chain
+        val msg = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
+        showForm(negBuilder(dialog_ok, baseTitle, msg.html).create)
+
+      case _ =>
+        // We can afford to pay this off-chain
+        val bld = baseBuilder(baseTitle, baseContent)
+        val killOpt = for (jointChannel <- JointNode.relayPeerChans.headOption) yield relayLink start jointChannel.data.announce
+        bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dlg: DialogInterface) = for (off <- killOpt) off.run }
+        mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
+        for (askedSum <- pr.amount) rateManager setSum Try(askedSum)
+    }
   }
 
   def doSend(rd: RoutingData) = {
@@ -606,20 +618,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // BTC SEND / BOOST
 
-  def onChainRunnable(pr: PaymentRequest) =
-    for (adr <- pr.fallbackAddress) yield UITask {
-      // This code does not get executed right away
-      // but only when user taps a button to pay on-chain
-      val fallback = Address.fromString(app.params, adr)
-      val tryMSat = Try(pr.amount.get)
+  def onChain(adr: String, amount: MilliSatoshi, hash: BinaryData)(alert: AlertDialog) = rm(alert) {
+    // Hide off-chain payment once on-chain is sent so user does not see the same on/off-chain records
+    // this code only gets executed when user taps a button to pay on-chain
+    val fallback = Address.fromString(app.params, adr)
 
-      sendBtcPopup(fallback) { txj =>
-        // Hide off-chain payment once on-chain is sent
-        // so user does not see the same on/off-chain record
-        PaymentInfoWrap.updStatus(HIDDEN, pr.paymentHash)
-        PaymentInfoWrap.uiNotify
-      } setSum tryMSat
-    }
+    sendBtcPopup(fallback) { txj =>
+      PaymentInfoWrap.updStatus(HIDDEN, hash)
+      PaymentInfoWrap.uiNotify
+    } setSum Try(amount)
+  }
 
   def sendBtcPopup(addr: Address)(and: Transaction => Unit): RateManager = {
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign app.kit.conf0Balance)
@@ -633,7 +641,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case Success(ms) =>
         val txProcessor = new TxProcessor {
-          def futureProcess(unsignedSendRequest: SendRequest) = and(app.kit blockSend app.kit.sign(unsignedSendRequest).tx)
+          def futureProcess(unsignedOnChainSendRequest: SendRequest) = and(app.kit blockSend app.kit.sign(unsignedOnChainSendRequest).tx)
           def onTxFail(err: Throwable) = mkCheckForm(alert => rm(alert)(retry), none, baseBuilder(txMakeError(err), null), dialog_retry, dialog_cancel)
           def retry = sendBtcPopup(addr)(and)
           val pay = AddrData(ms, addr)

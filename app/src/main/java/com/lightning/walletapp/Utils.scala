@@ -236,15 +236,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     def txMakeError: PartialFunction[Throwable, CharSequence] = {
       case _: ExceededMaxTransactionSize => app getString err_tx_too_large
       case _: CouldNotAdjustDownwards => app getString err_empty_shrunk
-      case notEnough: InsufficientMoneyException =>
-
-        val sending = denom.coloredOut(pay.cn, denom.sign)
-        val missing = denom.coloredOut(notEnough.missing, denom.sign)
-        val canSend = denom.coloredIn(app.kit.conf0Balance, denom.sign)
-        getString(err_not_enough_funds).format(canSend, sending, missing).html
-
-      case _: Throwable =>
-        app getString err_general
+      case _: Throwable => app getString err_general
     }
   }
 }
