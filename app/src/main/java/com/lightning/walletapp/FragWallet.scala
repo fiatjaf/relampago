@@ -120,8 +120,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         lastOpenMsecStamp = System.currentTimeMillis
         ConnectionManager.connections get nodeId foreach { worker =>
-          val hnv = HardcodedNodeView(worker.ann, StartNodeView.incomingChannel)
-          app.TransData.value = IncomingChannelParams(hnv, open)
+          val incomingChannel = app getString ln_ops_start_fund_incoming_channel
+          val hardcodedNodeView = HardcodedNodeView(worker.ann, incomingChannel)
+          app.TransData.value = IncomingChannelParams(hardcodedNodeView, open)
           host goTo classOf[LNStartFundActivity]
         }
 

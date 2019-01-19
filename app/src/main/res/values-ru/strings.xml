@@ -290,10 +290,10 @@
 
     <!-- opening a new channel -->
     <array name="ln_ops_start_node_channels">
-        <item><![CDATA[<strong>Нет открытых каналов</strong>]]></item>
-        <item><![CDATA[<strong>%1$s</strong> открытый канал]]></item>
-        <item><![CDATA[<strong>%1$s</strong> открытых канала]]></item>
-        <item><![CDATA[<strong>%1$s</strong> открытых каналов]]></item>
+        <item><![CDATA[Нет открытых каналов]]></item>
+        <item><![CDATA[%1$s открытый канал]]></item>
+        <item><![CDATA[%1$s открытых канала]]></item>
+        <item><![CDATA[%1$s открытых каналов]]></item>
         <item><![CDATA[<i>Нет данных о каналах</i>]]></item>
     </array>
 

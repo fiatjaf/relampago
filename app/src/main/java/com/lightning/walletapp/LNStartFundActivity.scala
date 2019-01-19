@@ -9,7 +9,6 @@ import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
-import com.lightning.walletapp.StartNodeView._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import android.widget.{ImageButton, TextView}
@@ -35,12 +34,14 @@ class LNStartFundActivity extends TimerActivity { me =>
 
   def INIT(state: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_ln_start_fund)
+    val fundNodeView = app getString ln_ops_start_fund_node_view
+    val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
 
     app.TransData checkAndMaybeErase {
-      case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(nodeFundView), ann)
-      case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(nodeFundView), ann)
-      case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, chansNumber.last).asString(nodeFundView), ann)
-      case icp: IncomingChannelParams => proceed(Some(icp), icp.nodeView.asString(nodeFundView), icp.nodeView.ann)
+      case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(fundNodeView), ann)
+      case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(fundNodeView), ann)
+      case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, chansNumber.last).asString(fundNodeView), ann)
+      case icp: IncomingChannelParams => proceed(Some(icp), icp.nodeView.asString(fundNodeView), icp.nodeView.ann)
       case _ => finish
     }
 

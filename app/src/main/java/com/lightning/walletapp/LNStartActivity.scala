@@ -9,7 +9,6 @@ import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
-import com.lightning.walletapp.StartNodeView._
 import com.lightning.walletapp.ln.wire.FundMsg._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
@@ -103,7 +102,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   lazy val worker = new ThrottledWork[String, AnnounceChansNumVec] {
     private[this] val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
     private[this] val acinqAnnounce = app.mkNodeAnnouncement(acinqKey, new InetSocketAddress("34.239.230.56", 9735), "ACINQ")
-    private[this] val acinq = HardcodedNodeView(acinqAnnounce, "<strong>Recommended ACINQ node</strong>")
+    private[this] val acinq = HardcodedNodeView(acinqAnnounce, "<strong>Recommended node</strong>")
 
     def error(err: Throwable) = host onFail err
     def work(userQuery: String) = app.olympus findNodes userQuery
@@ -118,7 +117,8 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     def getView(pos: Int, savedView: View, par: ViewGroup) = {
       val slot = host.getLayoutInflater.inflate(R.layout.frag_single_line, null)
       val textLine = slot.findViewById(R.id.textLine).asInstanceOf[TextView]
-      textLine setText getItem(pos).asString(nodeView).html
+      val txt = getItem(pos).asString(app getString ln_ops_start_node_view)
+      textLine setText txt.html
       slot
     }
 
@@ -220,13 +220,6 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
 
 // DISPLAYING NODES ON UI
 
-object StartNodeView {
-  lazy val nodeView = app getString ln_ops_start_node_view
-  lazy val nodeFundView = app getString ln_ops_start_fund_node_view
-  lazy val incomingChannel = app getString ln_ops_start_fund_incoming_channel
-  lazy val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
-}
-
 sealed trait StartNodeView { def asString(base: String): String }
 case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
 case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNodeView {
@@ -235,8 +228,8 @@ case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNo
 }
 
 case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
-  // User may search for nodes present in global routing graph, provided by Olympus server
   def asString(base: String) = base.format(ca.alias, app.plurOrZero(chansNumber, num), ca.pretty)
+  lazy val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
   val ca \ num = acn
 }
 

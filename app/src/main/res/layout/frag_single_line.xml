@@ -5,6 +5,7 @@
     <TextView
         style="@style/BaseText"
         android:id="@+id/textLine"
+        android:lineSpacingExtra="5sp"
         android:layout_width="match_parent"/>
 
 </LinearLayout>
