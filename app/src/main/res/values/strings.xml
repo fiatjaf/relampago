@@ -162,7 +162,6 @@
     </array>
 
     <string name="send_scan_qr">Scan a QR code</string>
-    <string name="send_paste_payment_request"><![CDATA[Paste Lightning Invoice<br><font color=#999999><small>or Bitcoin address</small></font>]]></string>
     <string name="send_hivemind_deposit"><![CDATA[Deposit funds to Hivemind<br><font color=#999999><small>a prediction market sidechain</small></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning Payment</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="ln_send_title_guaranteed"><![CDATA[<strong>Guaranteed Delivery</strong><small><br><br>%1$s</small>]]></string>

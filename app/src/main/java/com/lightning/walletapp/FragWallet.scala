@@ -23,7 +23,6 @@ import scala.util.{Failure, Success, Try}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import android.content.{DialogInterface, Intent}
 import android.database.{ContentObserver, Cursor}
-import android.support.v4.content.{ContextCompat, Loader}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
@@ -38,6 +37,7 @@ import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import android.transition.TransitionManager
+import android.support.v4.content.Loader
 import fr.acinq.bitcoin.Crypto.PublicKey
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern

@@ -162,56 +162,62 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData = app.TransData checkAndMaybeErase {
-    // TransData value should be retained in both of these cases
-    case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-    case _: Started => goStart
+  def checkTransData: Unit =
+    app.TransData checkAndMaybeErase {
+      // TransData value should be retained in both of these cases
+      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+      case _: Started => goStart
 
-    case FragWallet.REDIRECT =>
-      // TransData value should be erased here
-      // so goOps return type is forced to Unit
-      goOps(null): Unit
+      case FragWallet.REDIRECT =>
+        // TransData value should be erased here
+        // so goOps return type is forced to Unit
+        goOps(null): Unit
 
-    case address: Address =>
-      // TransData value will be erased here
-      FragWallet.worker.sendBtcPopup(address)(none)
-      me returnToBase null
-
-    case uri: BitcoinURI =>
-      // TransData value will be erased here
-      val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
-      manager setSum scala.util.Try(uri.getAmount)
-      me returnToBase null
-
-    case lnUrl: LNUrl =>
-      // Got an explicit lnurl, should resolve
-      // TransData value will be erased here
-      resolveUrl(None, lnUrl)
-      me returnToBase null
-
-    case pr: PaymentRequest =>
-      if (pr.lnUrlOpt.isDefined) {
-        // Should resolve an embedded lnurl first
+      case address: Address =>
         // TransData value will be erased here
-        resolveUrl(Some(pr), pr.lnUrlOpt.get)
+        FragWallet.worker.sendBtcPopup(address)(none)
         me returnToBase null
 
-      } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
-        // No operational channels are present, offer to open a new one
-        // TransData should be set to batch or null to erase previous value
-        app.TransData.value = TxWrap findBestBatch pr getOrElse null
-        // Do not erase a previously set data
-        goStart
-
-      } else {
-        // We have open or at least opening channels
+      case uri: BitcoinURI =>
         // TransData value will be erased here
-        FragWallet.worker sendPayment pr
+        val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
+        manager setSum scala.util.Try(uri.getAmount)
         me returnToBase null
-      }
 
-    case _ =>
-  }
+      case lnUrl: LNUrl =>
+        // Got an explicit lnurl, should resolve
+        // TransData value will be erased here
+        resolveUrl(None, lnUrl)
+        me returnToBase null
+
+      case pr: PaymentRequest =>
+        if (pr.lnUrlOpt.isDefined) {
+          // Should resolve an embedded lnurl first
+          // TransData value will be erased here
+          resolveUrl(Some(pr), pr.lnUrlOpt.get)
+          me returnToBase null
+
+        } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
+          // No operational channels are present, offer to open a new one
+          // TransData should be set to batch or null to erase previous value
+          app.TransData.value = TxWrap findBestBatch pr getOrElse null
+          // Do not erase a previously set data
+          goStart
+
+        } else {
+          // We have open or at least opening channels
+          // TransData value will be erased here
+          FragWallet.worker sendPayment pr
+          me returnToBase null
+        }
+
+      case _ =>
+        val useful = app.getBufferTry.filter(_.length > 24)
+        <(useful map app.TransData.recordValue, _ => app.clearBuffer) { parseResult =>
+          // Do automatic processing if app buffer contains data which could be parsed
+          if (parseResult.isSuccess) runAnd(checkTransData)(app.clearBuffer)
+        }
+    }
 
   // LNURL
 
@@ -290,8 +296,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     wrOpt match {
       case Some(wr) =>
+        val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
         val finalMaxCanReceive = if (wr.maxAmount > maxCanReceive) maxCanReceive else wr.maxAmount
-        val title = updateView2Blue(oldView = str2View(new String), app getString ln_receive_title)
         if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(offchain_receive_howto).html).create)
         else if (operationalChannelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive.amount < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
@@ -336,18 +342,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def goSendPayment(top: View) = {
+    val options = Array(send_scan_qr, send_hivemind_deposit).map(res => getString(res).html)
     val fragCenterList = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, fragCenterList).create)
-    val options = Array(send_scan_qr, send_paste_payment_request, send_hivemind_deposit).map(res => getString(res).html)
-    fragCenterList setOnItemClickListener onTap { case 0 => scanQR case 1 => pasteRequest case 2 => depositHivemind }
     fragCenterList setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
+    fragCenterList setOnItemClickListener onTap { case 0 => scanQR case 1 => depositHivemind }
     fragCenterList setDividerHeight 0
     fragCenterList setDivider null
-
-    def pasteRequest = rm(alert) {
-      val resultTry = app.getBufferTry map app.TransData.recordValue
-      if (resultTry.isSuccess) checkTransData else app toast err_no_data
-    }
 
     def scanQR = rm(alert) {
       // Just jump to QR scanner section
