@@ -67,6 +67,7 @@ object LNParams { me =>
   def updateExtraHop(upd: ChannelUpdate) = for (chan <- ChannelManager.notClosingOrRefunding) Channel.updateHop(chan, upd)
   def updateFeerate = for (chan <- ChannelManager.notClosingOrRefunding) chan process CMDFeerate(broadcaster.perKwThreeSat)
 
+  def mnemonicFileName = s"blw${chainHash.toString}-mnemonic.bkup"
   def backupFileName = s"blw${chainHash.toString}-${cloudId.toString}.bkup"
   def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (ord <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: ord :: Nil)

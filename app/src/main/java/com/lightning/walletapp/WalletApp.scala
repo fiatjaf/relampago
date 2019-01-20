@@ -308,8 +308,8 @@ object ChannelManager extends Broadcaster {
 
   // CHANNEL CREATION AND MANAGEMENT
 
+  val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
   // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-  val chanBackupWork = BackupWorker.workRequest(dbFileName, backupFileName, cloudSecret)
   var all = for (chanState <- ChannelWrap doGet db) yield createChannel(operationalListeners, chanState)
   def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
   def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c

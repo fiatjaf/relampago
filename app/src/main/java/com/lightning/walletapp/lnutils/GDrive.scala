@@ -6,18 +6,16 @@ import com.google.android.gms.tasks._
 import com.google.android.gms.drive.query._
 import com.google.android.gms.auth.api.signin._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-
-import com.lightning.walletapp.helper.{AES, RichCursor}
+import com.lightning.walletapp.{AbstractKit, ChannelManager}
+import com.lightning.walletapp.ln.Tools.{Bytes, bin2readable}
 import androidx.work.{Data, OneTimeWorkRequest, Worker, WorkerParameters}
-import com.lightning.walletapp.lnutils.olympus.OlympusWrap.toCloud
 import com.google.android.gms.common.GoogleApiAvailability
 import com.lightning.walletapp.ln.crypto.MultiStreamUtils
-import com.lightning.walletapp.lnutils.JsonHttpUtils.to
 import com.google.android.gms.common.ConnectionResult
-import com.lightning.walletapp.ln.Tools.bin2readable
 import com.lightning.walletapp.ln.wire.GDriveBackup
 import androidx.work.ListenableWorker.Result
-import com.lightning.walletapp.AbstractKit
+import com.lightning.walletapp.helper.AES
+import com.lightning.walletapp.Utils.app
 import com.google.common.collect.Sets
 import java.util.concurrent.TimeUnit
 import fr.acinq.bitcoin.BinaryData
@@ -46,22 +44,10 @@ object GDrive {
     Option(GoogleSignIn getLastSignedInAccount ctxt)
       .filter(_.getGrantedScopes containsAll scopes)
 
-  def encrypt(ctxt: Context, secret: BinaryData, dbFileName: String) = {
-    // Obtain all channels and all storage tokens and encode a backup blob
-
-    val db1 = new LNOpenHelper(ctxt, dbFileName)
-    val olympusCursor = db1 select OlympusTable.selectAllSql
-    val channels = ChannelWrap doGet db1
-
-    val tokensBackup = RichCursor(olympusCursor).vec(cd => toCloud(cd).snapshot)
-    val backup = GDriveBackup(channels, tokensBackup, v = 1).toJson.toString
-    AES.encReadable(backup, secret).toByteArray
-  }
-
   def decrypt(contents: DriveContents, secret: BinaryData) = for {
     encryptedData <- Try(MultiStreamUtils readone contents.getInputStream)
-    backup <- AES.decBytes(encryptedData, secret) map bin2readable map to[GDriveBackup]
-  } yield backup
+    someBackup <- AES.decBytes(encryptedData, secret) map bin2readable
+  } yield someBackup
 
   def getMetaTask(folderTask: Task[DriveFolder], res: DriveResourceClient, fileName: String) =
     new TaskWrap[DriveFolder, MetadataBuffer] sContinueWithTask folderTask apply { folderTaskReady =>
@@ -75,7 +61,7 @@ object GDrive {
       res.openFile(metaTaskReady.getResult.get(0).getDriveId.asDriveFile, DriveFile.MODE_READ_ONLY)
     }
 
-  def createBackupTask(ctxt: Context, res: DriveResourceClient, dbFileName: String,
+  def createBackupTask(res: DriveResourceClient, backupProvider: BinaryData => Bytes,
                        backupFileName: String, secret: BinaryData) = {
 
     val appFolderTask = res.getAppFolder
@@ -83,23 +69,23 @@ object GDrive {
 
     new TaskWrap[Void, DriveFile] sContinueWithTask Tasks.whenAll(appFolderTask, contentsTask) apply { _ =>
       val changeSet = (new MetadataChangeSet.Builder).setTitle(backupFileName).setMimeType("application/octet-stream")
-      MultiStreamUtils.writeone(encrypt(ctxt, secret, dbFileName), contentsTask.getResult.getOutputStream)
+      MultiStreamUtils.writeone(backupProvider(secret), contentsTask.getResult.getOutputStream)
       res.createFile(appFolderTask.getResult, changeSet.build, contentsTask.getResult)
     }
   }
 
-  def updateBackupTask(ctxt: Context, res: DriveResourceClient, dbFileName: String, driveFile: DriveFile, secret: BinaryData) =
+  def updateBackupTask(res: DriveResourceClient, backupProvider: BinaryData => Bytes, driveFile: DriveFile, secret: BinaryData) =
     new TaskWrap[DriveContents, Void] sContinueWithTask res.openFile(driveFile, DriveFile.MODE_WRITE_ONLY) apply { contentsTask =>
-      MultiStreamUtils.writeone(encrypt(ctxt, secret, dbFileName), contentsTask.getResult.getOutputStream)
+      MultiStreamUtils.writeone(backupProvider(secret), contentsTask.getResult.getOutputStream)
       res.commitContents(contentsTask.getResult, null)
     }
 
-  def createOrUpdateBackup(ctxt: Context, dbFileName: String, backupFileName: String,
+  def createOrUpdateBackup(backupProvider: BinaryData => Bytes, backupFileName: String,
                            secret: BinaryData, drc: DriveResourceClient) = Try {
 
     val buffer = Tasks await getMetaTask(drc.getAppFolder, drc, backupFileName)
-    if (0 == buffer.getCount) Tasks await createBackupTask(ctxt, drc, dbFileName, backupFileName, secret)
-    else Tasks await updateBackupTask(ctxt, drc, dbFileName, buffer.get(0).getDriveId.asDriveFile, secret)
+    if (0 == buffer.getCount) Tasks await createBackupTask(drc, backupProvider, backupFileName, secret)
+    else Tasks await updateBackupTask(drc, backupProvider, buffer.get(0).getDriveId.asDriveFile, secret)
   }
 }
 
@@ -117,41 +103,44 @@ class TaskWrap[S, R] {
 
 object BackupWorker {
   val SECRET = "secret"
-  val DB_FILE_NAME = "dbFileName"
   val BACKUP_FILE_NAME = "backupFileName"
   private[this] val bwClass = classOf[BackupWorker]
 
-  def workRequest(dbFileName: String, backupFileName: String, secret: BinaryData) = {
-    val bld = (new Data.Builder).putString(DB_FILE_NAME, dbFileName).putString(BACKUP_FILE_NAME, backupFileName).putString(SECRET, secret.toString)
-    new OneTimeWorkRequest.Builder(bwClass).setInputData(bld.build).setInitialDelay(5, TimeUnit.SECONDS).addTag("ChannelsBackupWork").build
+  def workRequest(backupFileName: String, secret: BinaryData) = {
+    val bld = (new Data.Builder).putString(BACKUP_FILE_NAME, backupFileName).putString(SECRET, secret.toString).build
+    new OneTimeWorkRequest.Builder(bwClass).setInputData(bld).setInitialDelay(5, TimeUnit.SECONDS).addTag("ChannelsBackupWork").build
   }
 }
 
 class BackupWorker(ctxt: Context, params: WorkerParameters) extends Worker(ctxt, params) {
-  // Attempt to save channel state dat aand storage tokens on a gdrive server
+  // Attempt to save channel state data and storage tokens on a gdrive server, update settings
 
-  def doWork: Result = if (GDrive isMissing ctxt) Result.SUCCESS else {
+  def doWork: Result = {
+    if (GDrive isMissing ctxt) return Result.SUCCESS
     val prefs = ctxt.getSharedPreferences("prefs", Context.MODE_PRIVATE)
     val isEnabled = prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true)
     if (!isEnabled) return Result.SUCCESS
 
     val secret = getInputData.getString(BackupWorker.SECRET)
-    val dbFileName = getInputData.getString(BackupWorker.DB_FILE_NAME)
     val backupFileName = getInputData.getString(BackupWorker.BACKUP_FILE_NAME)
-    if (null == secret || null == dbFileName || null == backupFileName) return Result.FAILURE
-    val dcrOpt = GDrive.signInAccount(ctxt) map GDrive.driveResClient(ctxt)
+    if (null == secret || null == backupFileName) return Result.FAILURE
 
-    dcrOpt match {
-      case Some(dcr) =>
-        val res = GDrive.createOrUpdateBackup(ctxt, dbFileName, backupFileName, BinaryData(secret), dcr)
-        GDrive.updatePreferences(ctxt, res.isSuccess, if (res.isSuccess) System.currentTimeMillis else -1L)
-        if (res.isSuccess) Result.SUCCESS else Result.FAILURE
+    val channelsAndTokens: BinaryData => Bytes = secret => {
+      val tokensBackup = for (cloud <- app.olympus.clouds) yield cloud.snapshot
+      val hasCommitmentsBackup = for (channel <- ChannelManager.all) yield channel.hasCsOr(Some.apply, None)
+      val backup = GDriveBackup(hasCommitmentsBackup.flatten, tokensBackup, v = 1).toJson.toString
+      AES.encReadable(backup, secret).toByteArray
+    }
 
-      case None =>
-        // We could not get a resource client so data can't be saved
-        // user should see a login window when app gets opened next time
-        GDrive.updatePreferences(ctxt, isEnabled = true, lastSave = -1L)
-        Result.FAILURE
+    GDrive.signInAccount(ctxt) map GDrive.driveResClient(ctxt) map { drc =>
+      val res = GDrive.createOrUpdateBackup(channelsAndTokens, backupFileName, BinaryData(secret), drc)
+      GDrive.updatePreferences(ctxt, res.isSuccess, lastSave = if (res.isSuccess) System.currentTimeMillis else -1L)
+      if (res.isSuccess) Result.SUCCESS else Result.FAILURE
+    } getOrElse {
+      // We could not get a resource client so data can't be saved
+      // user should see a login window when app gets opened next time
+      GDrive.updatePreferences(ctxt, isEnabled = true, lastSave = -1L)
+      Result.FAILURE
     }
   }
 }

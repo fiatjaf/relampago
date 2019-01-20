@@ -2,14 +2,17 @@ package com.lightning.walletapp
 
 import android.widget._
 import android.widget.DatePicker._
+import com.lightning.walletapp.ln._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.LNParams._
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.hootsuite.nachos.terminator.ChipTerminatorHandler._
-import com.lightning.walletapp.ln._
 import com.lightning.walletapp.lnutils.{ChannelWrap, GDrive, TaskWrap}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.wallet.{DeterministicSeed, Wallet}
 import android.view.{View, ViewGroup}
+
+import com.lightning.walletapp.lnutils.JsonHttpUtils.to
 import com.lightning.walletapp.ln.wire.GDriveBackup
 import com.google.android.gms.drive.DriveContents
 import com.hootsuite.nachos.NachoTextView
@@ -17,12 +20,9 @@ import com.lightning.walletapp.Utils.app
 import org.bitcoinj.crypto.MnemonicCode
 import android.content.Intent
 import android.app.Activity
-
 import scala.util.Success
-import java.util.{Calendar, Collections}
-
+import java.util.Calendar
 import android.os.Bundle
-import fr.acinq.bitcoin.BinaryData
 
 
 class WhenPicker(host: TimerActivity, start: Long) extends DatePicker(host) with OnDateChangedListener { me =>
@@ -99,59 +99,61 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
         // Proceed to wallet or try to use gdrive backups
         // user should have been logged in gdrive at this point
         if (GDrive isMissing app) me prepareFreshWallet app.kit
-        else GDrive signInAccount app match {
+        else attemptToLoadBackup
+      }
+    }
 
-          case Some(signInAcc) =>
-            val syncTask = GDrive.syncClientTask(app)(signInAcc)
-            val driveResClient = GDrive.driveResClient(app)(signInAcc)
+  def restoreAnyChannel(some: HasCommitments) = {
+    val chan = ChannelManager.createChannel(ChannelManager.operationalListeners, some)
+    app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
+    // Do not use STORE because it invokes a backup upload
+    ChannelWrap put some
+    chan
+  }
 
-            val onError = TaskWrap.onFailure { exc =>
-              // This may be normal if user has no backup at all
-              warnNoBackups(me prepareFreshWallet app.kit).run
-            }
+  def restoreClosedChannel(closing: ClosingData) = {
+    // Closing channels may have in-flight 2nd level HTLCs present
+    app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts closing)
+    restoreAnyChannel(closing)
+  }
 
-            val onBackup = TaskWrap.onSuccess[DriveContents] { contents =>
-              GDrive.decrypt(contents, secret = LNParams.cloudSecret) match {
-                case Success(gDriveBackupData) => useGDriveBackup(gDriveBackupData)
-                case _ => onError onFailure new Exception("Decryption has failed")
-              }
-            }
+  def restoreChannel(some: HasCommitments) = some match {
+    case closing: ClosingData => restoreClosedChannel(closing)
+    case _ => restoreAnyChannel(some)
+  }
 
-            new TaskWrap[Void, DriveContents] sContinueWithTask syncTask apply { _ =>
-              val metaTask = GDrive.getMetaTask(driveResClient.getAppFolder, driveResClient, backupFileName)
-              GDrive.getFileTask(metaTask, driveResClient).addOnSuccessListener(onBackup).addOnFailureListener(onError)
-            }
+  def useGDriveBackup(googleDriveBackup: GDriveBackup) = {
+    for (snapshot <- googleDriveBackup.clouds) app.olympus tellClouds snapshot
+    ChannelManager.all = for (data <- googleDriveBackup.chans) yield restoreChannel(data)
+    GDrive.updatePreferences(app, isEnabled = true, lastSave = System.currentTimeMillis)
+    me prepareFreshWallet app.kit
+  }
 
-          case None =>
-            me prepareFreshWallet app.kit
-            UITask(app toast gdrive_disabled).run
+  def attemptToLoadBackup =
+    GDrive signInAccount app match {
+      case Some(googleSignInAccount) =>
+        val syncTask = GDrive.syncClientTask(app)(googleSignInAccount)
+        val driveResClient = GDrive.driveResClient(app)(googleSignInAccount)
+
+        val onError = TaskWrap.onFailure { exc =>
+          // This may be normal if user has no backup at all
+          warnNoBackups(me prepareFreshWallet app.kit).run
         }
-      }
 
-      def restoreAnyChannel(some: HasCommitments) = {
-        val chan = ChannelManager.createChannel(ChannelManager.operationalListeners, some)
-        app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
-        // Do not use STORE because it invokes a backup upload
-        ChannelWrap put some
-        chan
-      }
+        val onBackup = TaskWrap.onSuccess[DriveContents] { contents =>
+          GDrive.decrypt(contents, LNParams.cloudSecret) map to[GDriveBackup] match {
+            case Success(decodedGDriveBackupData) => useGDriveBackup(decodedGDriveBackupData)
+            case _ => onError onFailure new Exception("Decryption has failed")
+          }
+        }
 
-      def restoreClosedChannel(closing: ClosingData) = {
-        // Closing channels may have in-flight 2nd level HTLCs present
-        app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts closing)
-        restoreAnyChannel(closing)
-      }
+        new TaskWrap[Void, DriveContents] sContinueWithTask syncTask apply { _ =>
+          val metaTask = GDrive.getMetaTask(driveResClient.getAppFolder, driveResClient, backupFileName)
+          GDrive.getFileTask(metaTask, driveResClient).addOnSuccessListener(onBackup).addOnFailureListener(onError)
+        }
 
-      def restoreChannel(some: HasCommitments) = some match {
-        case closing: ClosingData => restoreClosedChannel(closing)
-        case _ => restoreAnyChannel(some)
-      }
-
-      def useGDriveBackup(googleDriveBackup: GDriveBackup) = {
-        for (snapshot <- googleDriveBackup.clouds) app.olympus tellClouds snapshot
-        ChannelManager.all = for (data <- googleDriveBackup.chans) yield restoreChannel(data)
-        GDrive.updatePreferences(app, isEnabled = true, lastSave = System.currentTimeMillis)
+      case None =>
         me prepareFreshWallet app.kit
-      }
+        UITask(app toast gdrive_disabled).run
     }
 }
