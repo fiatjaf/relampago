@@ -17,10 +17,10 @@ import android.app.{Activity, AlertDialog}
 import org.bitcoinj.core.{Address, TxWrap}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
-import com.lightning.walletapp.ln.wire.{NodeAnnouncement, Started}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
+import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import android.support.v4.app.FragmentStatePagerAdapter
 import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -34,8 +34,8 @@ import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
 import android.content.Intent
 import org.ndeftools.Message
+import scala.util.Success
 import android.os.Bundle
-import android.net.Uri
 import java.util.Date
 
 
@@ -162,62 +162,55 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // EXTERNAL DATA CHECK
 
-  def checkTransData: Unit =
-    app.TransData checkAndMaybeErase {
-      // TransData value should be retained in both of these cases
-      case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-      case _: Started => goStart
+  def checkTransData = app.TransData checkAndMaybeErase {
+    // TransData value should be retained in both of these cases
+    case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
 
-      case FragWallet.REDIRECT =>
-        // TransData value should be erased here
-        // so goOps return type is forced to Unit
-        goOps(null): Unit
+    case FragWallet.REDIRECT =>
+      // TransData value should be erased here
+      // so goOps return type is forced to Unit
+      goOps(null): Unit
 
-      case address: Address =>
+    case address: Address =>
+      // TransData value will be erased here
+      FragWallet.worker.sendBtcPopup(address)(none)
+      me returnToBase null
+
+    case uri: BitcoinURI =>
+      // TransData value will be erased here
+      val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
+      manager setSum scala.util.Try(uri.getAmount)
+      me returnToBase null
+
+    case lnUrl: LNUrl =>
+      // Got an explicit lnurl, should resolve
+      // TransData value will be erased here
+      resolveUrl(None, lnUrl)
+      me returnToBase null
+
+    case pr: PaymentRequest =>
+      if (pr.lnUrlOpt.isDefined) {
+        // Should resolve an embedded lnurl first
         // TransData value will be erased here
-        FragWallet.worker.sendBtcPopup(address)(none)
+        resolveUrl(Some(pr), pr.lnUrlOpt.get)
         me returnToBase null
 
-      case uri: BitcoinURI =>
+      } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
+        // No operational channels are present, offer to open a new one
+        // TransData should be set to batch or null to erase previous value
+        app.TransData.value = TxWrap findBestBatch pr getOrElse null
+        // Do not erase a previously set data
+        goStart
+
+      } else {
+        // We have open or at least opening channels
         // TransData value will be erased here
-        val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
-        manager setSum scala.util.Try(uri.getAmount)
+        FragWallet.worker sendPayment pr
         me returnToBase null
+      }
 
-      case lnUrl: LNUrl =>
-        // Got an explicit lnurl, should resolve
-        // TransData value will be erased here
-        resolveUrl(None, lnUrl)
-        me returnToBase null
-
-      case pr: PaymentRequest =>
-        if (pr.lnUrlOpt.isDefined) {
-          // Should resolve an embedded lnurl first
-          // TransData value will be erased here
-          resolveUrl(Some(pr), pr.lnUrlOpt.get)
-          me returnToBase null
-
-        } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
-          // No operational channels are present, offer to open a new one
-          // TransData should be set to batch or null to erase previous value
-          app.TransData.value = TxWrap findBestBatch pr getOrElse null
-          // Do not erase a previously set data
-          goStart
-
-        } else {
-          // We have open or at least opening channels
-          // TransData value will be erased here
-          FragWallet.worker sendPayment pr
-          me returnToBase null
-        }
-
-      case _ =>
-        val useful = app.getBufferTry.filter(_.length > 24)
-        <(useful map app.TransData.recordValue, _ => app.clearBuffer) { parseResult =>
-          // Do automatic processing if app buffer contains data which could be parsed
-          if (parseResult.isSuccess) runAnd(checkTransData)(app.clearBuffer)
-        }
-    }
+    case _ =>
+  }
 
   // LNURL
 
@@ -342,17 +335,22 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def goSendPayment(top: View) = {
-    val options = Array(send_scan_qr, send_hivemind_deposit).map(res => getString(res).html)
     val fragCenterList = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, fragCenterList).create)
+    val options = Array(send_scan_qr, send_paste_payment_request, send_hivemind_deposit).map(res => getString(res).html)
+    fragCenterList setOnItemClickListener onTap { case 0 => scanQR case 1 => pasteRequest case 2 => depositHivemind }
     fragCenterList setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
-    fragCenterList setOnItemClickListener onTap { case 0 => scanQR case 1 => depositHivemind }
     fragCenterList setDividerHeight 0
     fragCenterList setDivider null
 
     def scanQR = rm(alert) {
       // Just jump to QR scanner section
       walletPager.setCurrentItem(1, true)
+    }
+
+    def pasteRequest = rm(alert) {
+      val resultTry = app.getBufferTry map app.TransData.recordValue
+      if (resultTry.isSuccess) checkTransData else app toast err_no_data
     }
 
     def depositHivemind = rm(alert) {

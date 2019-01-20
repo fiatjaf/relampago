@@ -132,14 +132,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       refundFeeText setText sumOrNothing(breakFee).html
 
       chan.data match {
-        case _: WaitFundingDoneData =>
+        case _: WaitFundingDoneData | _: WaitBroadcastRemoteData =>
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
             R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight)
-
-        case remoteWait: WaitBroadcastRemoteData =>
-          if (remoteWait.fail.isDefined) setExtraInfo(remoteWait.fail.get.report.html)
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
-            R.id.closedAt, R.id.paymentsInFlight)
 
         case norm: NormalData if isOperational(chan) =>
           if (txDepth > 6 && channelAndHop(chan).isEmpty) setExtraInfo(resource = ln_info_no_receive)

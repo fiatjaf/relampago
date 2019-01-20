@@ -97,7 +97,6 @@ class WalletApp extends Application { me =>
     }
   }
 
-  def clearBuffer = setBuffer(new String, notify = false)
   def setBuffer(bufferText: String, notify: Boolean = true) = {
     val bufferContent = ClipData.newPlainText("wallet", bufferText)
     if (notify) me toast getString(copied_to_clipboard).format(bufferText)

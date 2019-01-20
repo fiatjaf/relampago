@@ -9,6 +9,7 @@ import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.ln.crypto.ShaHashesWithIndex
 import com.lightning.walletapp.ln.crypto.ShaChain.Index
+import com.lightning.walletapp.ln.Tools.Bytes
 import fr.acinq.eclair.UInt64
 import scodec.bits.BitVector
 import java.math.BigInteger
@@ -19,7 +20,6 @@ import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndCl
 import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData, WithdrawRequest}
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
-import com.lightning.walletapp.ln.Tools.{Bytes, UserId}
 
 
 object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
@@ -128,55 +128,6 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     taggedJsonFmt(jsonFormat[String, String, MilliSatoshi, String,
       WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxAmount",
       "defaultDescription"), tag = "withdrawRequest")
-
-  // FundMsg
-
-  implicit object JsonMessageFmt extends JsonFormat[FundMsg] {
-    def write(unserialized: FundMsg): JsValue = unserialized match {
-      case unserialiedMessage: FundingTxReady => unserialiedMessage.toJson
-      case unserialiedMessage: PrepareFundingTx => unserialiedMessage.toJson
-      case unserialiedMessage: BroadcastFundingTx => unserialiedMessage.toJson
-      case unserialiedMessage: FundingTxBroadcasted => unserialiedMessage.toJson
-      case unserialiedMessage: Started => unserialiedMessage.toJson
-      case unserialiedMessage: Start => unserialiedMessage.toJson
-      case unserialiedMessage: Fail => unserialiedMessage.toJson
-    }
-
-    def read(serialized: JsValue): FundMsg =
-      serialized.asJsObject fields "tag" match {
-        case JsString("FundingTxReady") => serialized.convertTo[FundingTxReady]
-        case JsString("PrepareFundingTx") => serialized.convertTo[PrepareFundingTx]
-        case JsString("BroadcastFundingTx") => serialized.convertTo[BroadcastFundingTx]
-        case JsString("FundingTxBroadcasted") => serialized.convertTo[FundingTxBroadcasted]
-        case JsString("Started") => serialized.convertTo[Started]
-        case JsString("Start") => serialized.convertTo[Start]
-        case JsString("Fail") => serialized.convertTo[Fail]
-        case _ => throw new RuntimeException
-      }
-  }
-
-  implicit val failFmt: JsonFormat[Fail] =
-    taggedJsonFmt(jsonFormat[Int, String, String,
-      Fail](Fail.apply, "code", "reason", "userId"), tag = "Fail")
-
-  implicit val startFmt: JsonFormat[Start] =
-    taggedJsonFmt(jsonFormat[UserId, Satoshi, String, Int, Option[String],
-      Start](Start.apply, "userId", "fundingAmount", "host", "port", "extra"), tag = "Start")
-
-  implicit val prepareFundingTxFmt: JsonFormat[PrepareFundingTx] = taggedJsonFmt(jsonFormat[UserId, BinaryData,
-    PrepareFundingTx](PrepareFundingTx.apply, "userId", "pubkeyScript"), tag = "PrepareFundingTx")
-
-  implicit val fundingTxReadyFmt: JsonFormat[FundingTxReady] = taggedJsonFmt(jsonFormat[UserId, BinaryData, Int,
-    FundingTxReady](FundingTxReady.apply, "userId", "txHash", "outIndex"), tag = "FundingTxReady")
-
-  implicit val broadcastFundingTxFmt: JsonFormat[BroadcastFundingTx] = taggedJsonFmt(jsonFormat[UserId, BinaryData,
-    BroadcastFundingTx](BroadcastFundingTx.apply, "userId", "txHash"), tag = "BroadcastFundingTx")
-
-  implicit val fundingTxBroadcastedFmt: JsonFormat[FundingTxBroadcasted] = taggedJsonFmt(jsonFormat[UserId, Transaction,
-    FundingTxBroadcasted](FundingTxBroadcasted.apply, "userId", "tx"), tag = "FundingTxBroadcasted")
-
-  implicit val startedFmt: JsonFormat[Started] = taggedJsonFmt(jsonFormat[Start, Long, Satoshi,
-    Started](Started.apply, "start", "expiry", "fee"), tag = "Started")
 
   // Channel data
 
@@ -354,10 +305,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       "remoteParams", "localSpec", "localCommitTx", "remoteCommit")
 
   implicit val waitBroadcastRemoteDataFmt =
-    taggedJsonFmt(jsonFormat[NodeAnnouncement,
-      WaitFundingSignedCore, BinaryData, Commitments, Option[Fail],
-      WaitBroadcastRemoteData](WaitBroadcastRemoteData.apply, "announce", "core",
-      "txHash", "commitments", "fail"), tag = "WaitBroadcastRemoteData")
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, WaitFundingSignedCore, BinaryData, Commitments,
+      WaitBroadcastRemoteData](WaitBroadcastRemoteData.apply, "announce", "core", "txHash",
+      "commitments"), tag = "WaitBroadcastRemoteData")
 
   implicit val outRequestFmt = jsonFormat[Long, Set[String], Set[Long], Set[String], String,
       OutRequest](OutRequest.apply, "sat", "badNodes", "badChans", "from", "to")

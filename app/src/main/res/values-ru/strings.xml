@@ -159,6 +159,7 @@
     </array>
 
     <string name="send_scan_qr">Сканировать QR-код</string>
+    <string name="send_paste_payment_request"><![CDATA[Вставить запрос-Молнию<br><font color=#999999><small>или Биткоин-адрес</small></font>]]></string>
     <string name="send_hivemind_deposit"><![CDATA[Послать в Hivemind<br><font color=#999999><small>сайдчейн для рынка предсказаний</small></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="ln_send_title_guaranteed"><![CDATA[<strong>Гарантированная доставка</strong><small><br><br>%1$s</small>]]></string>
@@ -192,26 +193,10 @@
     <string name="err_general">Не получилось потому что произошла непредвиденная ошибка</string>
     <string name="err_no_data">Ничего не найдено</string>
 
-    <!-- SPECIAL CHANNEL OPEN MODES -->
-
-    <string name="err_fund_verify_error">Can not proceed with external funding because remote verification failed</string>
-    <string name="err_fund_not_verified_yet">Can not proceed with external funding because verification is not finished yet</string>
-    <string name="err_fund_reserve_failed">Can not proceed with external funding because a requested amount could not be reserved</string>
-    <string name="err_fund_reserve_expired">Can not proceed with external funding because your reserved amount hit an expiry deadline</string>
-    <string name="err_fund_funding_pending">Can not proceed with external funding because your reserved amount is still being allocated</string>
-    <string name="err_fund_funding_exists">Can not proceed with external funding because another reserved amount of yours exists already</string>
-    <string name="err_publish_error">Can not proceed with external funding because a funding transaction failed to broadcast</string>
-    <string name="err_fund_internal_error">Can not proceed with external funding because a remote internal error occurred</string>
-    <string name="err_fund_disconnect">Disconnected from external funder</string>
-
-    <string name="ex_fund_connecting"><![CDATA[<small>connecting to <i>%1$s</i></small><br>expires at <strong>%2$s</strong><br>funding amount %3$s<br>funding fee %4$s]]></string>
-    <string name="ex_fund_connected"><![CDATA[<small>connected to <i>%1$s</i></small><br>expires at <strong>%2$s</strong><br>funding amount %3$s<br>funding fee %4$s]]></string>
-    <string name="ex_fund_accept"><![CDATA[<small><i>%1$s</i></small><br>capacity %2$s<br>funding fee %3$s]]></string>
+    <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
     <string name="ln_open_batch_inform"><![CDATA[Платежный запрос будет оплачен вместе с открытием нового канала в одной Биткоин-транзакции, с целью экономии на комиссиях]]></string>
     <string name="ln_open_batch_confirm"><![CDATA[Хотите оплатить запрос и использовать сдачу для открытия нового платежного канала?<br><br><small>%1$s</small><br><br>запрос %2$s<br>канал %3$s<br>комса %4$s]]></string>
-
-    <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
     <string name="ln_status_peer">Выберите пира</string>
     <string name="ln_share_pr">Платежный запрос</string>

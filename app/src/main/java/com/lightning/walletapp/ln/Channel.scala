@@ -133,8 +133,15 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (WaitFundingData(announce, cmd, accept), CMDFunding(fundTx), WAIT_FOR_FUNDING) =>
         // They have accepted our proposal, let them sign a first commit so we can broadcast a funding later
         if (fundTx.txOut(cmd.batch.fundOutIdx).amount.amount != cmd.batch.fundingAmountSat) throw new LightningException
-        val core \ fundingCreatedMessage = signLocalFunding(cmd, accept, txHash = fundTx.hash, outIndex = cmd.batch.fundOutIdx)
-        BECOME(WaitFundingSignedData(announce, core, fundTx), WAIT_FUNDING_SIGNED) SEND fundingCreatedMessage
+        val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstCommitTxs(cmd.localParams, cmd.fundingSat,
+          cmd.pushMsat, cmd.initialFeeratePerKw, accept, fundTx.hash, cmd.batch.fundOutIdx, accept.firstPerCommitmentPoint)
+
+        val longId = Tools.toLongId(fundTx.hash, cmd.batch.fundOutIdx)
+        val localSigOfRemoteTx = Scripts.sign(cmd.localParams.fundingPrivKey)(remoteCommitTx)
+        val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), accept.firstPerCommitmentPoint)
+        val wfsc = WaitFundingSignedCore(cmd.localParams, longId, accept, localSpec, localCommitTx, firstRemoteCommit)
+        val fundingCreated = FundingCreated(cmd.tempChanId, fundTx.hash, cmd.batch.fundOutIdx, localSigOfRemoteTx)
+        BECOME(WaitFundingSignedData(announce, wfsc, fundTx), WAIT_FUNDING_SIGNED) SEND fundingCreated
 
 
       // They have signed our first commit, we can broadcast a local funding tx
@@ -146,13 +153,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // REMOTE FUNDER/FUNDEE FLOW
-
-
-      // We have asked an external funder to prepare a funding tx and got a positive response
-      case (WaitFundingData(announce, cmd, accept), ready: FundingTxReady, WAIT_FOR_FUNDING) =>
-        val core \ fundingCreatedMessage = signLocalFunding(cmd, accept, ready.txHash, ready.outIndex)
-        val data = WaitFundingSignedRemoteData(announce, core, txHash = ready.txHash)
-        BECOME(data, WAIT_FUNDING_SIGNED) SEND fundingCreatedMessage
 
 
       // We have asked a remote peer to sign our first commit and got a remote signature
@@ -621,17 +621,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
     ChannelReestablish(some.commitments.channelId, nextLocalCommitmentNumber, some.commitments.remoteCommit.index,
       Some apply Scalar(yourLastPerCommitmentSecret), Some apply myCurrentPerCommitmentPoint)
-  }
-
-  private def signLocalFunding(cmd: CMDOpenChannel, accept: AcceptChannel, txHash: BinaryData, outIndex: Int) = {
-    val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstCommitTxs(cmd.localParams, cmd.fundingSat,
-      cmd.pushMsat, cmd.initialFeeratePerKw, accept, txHash, outIndex, accept.firstPerCommitmentPoint)
-
-    val longId = Tools.toLongId(txHash, outIndex)
-    val localSigOfRemoteTx = Scripts.sign(cmd.localParams.fundingPrivKey)(remoteCommitTx)
-    val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), accept.firstPerCommitmentPoint)
-    val wfsc = WaitFundingSignedCore(cmd.localParams, longId, accept, localSpec, localCommitTx, firstRemoteCommit)
-    wfsc -> FundingCreated(cmd.tempChanId, txHash, outIndex, localSigOfRemoteTx)
   }
 
   private def verifyTheirFirstRemoteCommitTxSig(core: WaitFundingSignedCore, remoteSig: BinaryData) = Scripts checkValid {

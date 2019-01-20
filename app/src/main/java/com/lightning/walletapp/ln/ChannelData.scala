@@ -74,8 +74,8 @@ case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSi
 
 // ALL THE DATA BELOW WILL BE STORED
 
-case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore, txHash: BinaryData,
-                                   commitments: Commitments, fail: Option[Fail] = None) extends HasCommitments {
+case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore,
+                                   txHash: BinaryData, commitments: Commitments) extends HasCommitments {
 
   def isFailed = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 1000L
 }

@@ -6,10 +6,8 @@ import android.support.v4.app._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.ln.wire._
-import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
-import com.lightning.walletapp.ln.wire.FundMsg._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
@@ -22,7 +20,6 @@ import java.net.InetSocketAddress
 import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
 import android.os.Bundle
-import java.util.Date
 
 
 class LNStartActivity extends ScanActivity { me =>
@@ -61,11 +58,6 @@ class LNStartActivity extends ScanActivity { me =>
       case _: PaymentRequest => me exitTo MainActivity.wallet
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
 
-      case started: Started =>
-        // TransData value will be erased here
-        FragLNStart.fragment.setExternalFunder(started)
-        me returnToBase null
-
       case batch: Batch =>
         // TransData value will be erased here
         FragLNStart.fragment.setBatchMode(batch)
@@ -84,25 +76,22 @@ object FragLNStart {
 }
 
 class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
-  def rmCurrentRemoteFunder = for (currentWSWrap <- ExternalFunder.worker) ExternalFunder eliminateWSWrap currentWSWrap
-  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_ln_start, vg, false)
+  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) =
+    inf.inflate(R.layout.frag_ln_start, vg, false)
 
   override def onDestroy = {
     FragLNStart.batchOpt = None
-    rmCurrentRemoteFunder
     super.onDestroy
   }
 
   var setBatchMode: Batch => Unit = none
-  var setExternalFunder: Started => Unit = none
   var setNormalMode = new Runnable { def run = none }
   private[this] var nodes = Vector.empty[StartNodeView]
-
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
   lazy val worker = new ThrottledWork[String, AnnounceChansNumVec] {
     private[this] val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
     private[this] val acinqAnnounce = app.mkNodeAnnouncement(acinqKey, new InetSocketAddress("34.239.230.56", 9735), "ACINQ")
-    private[this] val acinq = HardcodedNodeView(acinqAnnounce, "<strong>Recommended node</strong>")
+    private[this] val acinq = HardcodedNodeView(acinqAnnounce, "<i>Recommended node</i>")
 
     def error(err: Throwable) = host onFail err
     def work(userQuery: String) = app.olympus findNodes userQuery
@@ -134,62 +123,10 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   }
 
   override def onViewCreated(view: View, state: Bundle) = if (app.isAlive) {
-    val externalFundInfo = view.findViewById(R.id.externalFundInfo).asInstanceOf[TextView]
-    val externalFundCancel = view.findViewById(R.id.externalFundCancel).asInstanceOf[Button]
-    val externalFundWrap = view.findViewById(R.id.externalFundWrap).asInstanceOf[LinearLayout]
-
     val batchPresentInfo = view.findViewById(R.id.batchPresentInfo).asInstanceOf[TextView]
     val batchPresentCancel = view.findViewById(R.id.batchPresentCancel).asInstanceOf[Button]
     val batchPresentWrap = view.findViewById(R.id.batchPresentWrap).asInstanceOf[LinearLayout]
     val lnStartNodesList = view.findViewById(R.id.lnStartNodesList).asInstanceOf[ListView]
-
-    def funderInfo(wrk: WSWrap, color: Int, text: Int) = host UITask {
-      // Show extended remote funding info here so user knows what's up
-
-      externalFundWrap setVisibility View.VISIBLE
-      externalFundWrap setBackgroundColor getResources.getColor(color, null)
-      externalFundInfo setText host.getString(text).format(wrk.params.start.host,
-        me time new Date(wrk.params.expiry), denom parsedWithSign wrk.params.fee,
-        denom parsedWithSign wrk.params.start.fundingAmount).html
-    }
-
-    setExternalFunder = started => {
-      val freshWSWrap = WSWrap(started)
-
-      val err2String =
-        Map(FAIL_VERIFY_ERROR -> err_fund_verify_error)
-          .updated(FAIL_NOT_VERIFIED_YET, err_fund_not_verified_yet)
-          .updated(FAIL_INTERNAL_ERROR, err_fund_internal_error)
-          .updated(FAIL_RESERVE_FAILED, err_fund_reserve_failed)
-          .updated(FAIL_RESERVE_EXPIRED, err_fund_reserve_expired)
-          .updated(FAIL_FUNDING_IS_TRIED, err_fund_funding_pending)
-          .updated(FAIL_FUNDING_EXISTS, err_fund_funding_exists)
-          .updated(FAIL_PUBLISH_ERROR, err_publish_error)
-
-      freshWSWrap.listeners += new ExternalFunderListener {
-        override def onRejection = host.UITask(externalFundWrap setVisibility View.GONE).run
-        override def onOffline = funderInfo(freshWSWrap, R.color.material_blue_grey_800, ex_fund_connecting).run
-        override def onMsg(message: FundMsg) = funderInfo(freshWSWrap, R.color.ln, ex_fund_connected).run
-      }
-
-      freshWSWrap.listeners += new ExternalFunderListener {
-        override def onMsg(message: FundMsg) = message match {
-          case _: Fail => ExternalFunder eliminateWSWrap freshWSWrap
-          case _ => Tools log s"Websocket got $message"
-        }
-
-        override def onRejection = freshWSWrap.lastMessage match {
-          case Fail(code, _, _) if err2String contains code => host onFail getString(err2String apply code)
-          case _: Fail => host onFail getString(err2String apply FAIL_INTERNAL_ERROR)
-          case _ => host.UITask(app toast err_fund_disconnect).run
-        }
-      }
-
-      // Try to connect a Funder and remove any Batch info if it was present before
-      funderInfo(freshWSWrap, R.color.material_blue_grey_800, ex_fund_connecting).run
-      ExternalFunder setWSWrap freshWSWrap
-      setNormalMode.run
-    }
 
     setNormalMode = host UITask {
       // Hide a batch funding notification
@@ -204,15 +141,12 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
       batchPresentInfo setText info.html
     }
 
-    // Wire up all tappable elements
-    batchPresentCancel setOnClickListener host.onButtonTap(setNormalMode.run)
-    externalFundCancel setOnClickListener host.onButtonTap(rmCurrentRemoteFunder)
-    lnStartNodesList setOnItemClickListener host.onTap(onNodeSelected)
-
     // Init
     FragLNStart.fragment = me
     me initToolbar view.findViewById(R.id.toolbar).asInstanceOf[android.support.v7.widget.Toolbar]
     wrap(host.getSupportActionBar setTitle action_ln_open)(host.getSupportActionBar setSubtitle ln_status_peer)
+    batchPresentCancel setOnClickListener host.onButtonTap(setNormalMode.run)
+    lnStartNodesList setOnItemClickListener host.onTap(onNodeSelected)
     lnStartNodesList.setAdapter(adapter)
     runAnd(host.checkTransData)(react)
   }
