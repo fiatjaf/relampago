@@ -159,6 +159,16 @@
 
         </LinearLayout>
 
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/totalPayments">
+            <TextView style="@style/CardBaseText" android:text="@string/ln_info_total_payments"/>
+
+            <TextView
+                style="@style/CardBaseText"
+                android:id="@+id/totalPaymentsText"
+                android:gravity="end"/>
+
+        </LinearLayout>
+
         <LinearLayout style="@style/CardLinearLayout" android:id="@+id/fundingDepth">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_depth"/>
 

@@ -9,14 +9,16 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
+import fr.acinq.bitcoin.{BinaryData, Satoshi}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import android.view.{Menu, MenuItem, View, ViewGroup}
-import com.lightning.walletapp.ln.Tools.{none, wrap, runAnd}
+import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
+import com.lightning.walletapp.lnutils.PaymentTable
+import com.lightning.walletapp.helper.RichCursor
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
-import fr.acinq.bitcoin.Satoshi
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
@@ -69,6 +71,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     val wrappers =
       view.findViewById(R.id.refundableAmount).asInstanceOf[View] ::
         view.findViewById(R.id.paymentsInFlight).asInstanceOf[View] ::
+        view.findViewById(R.id.totalPayments).asInstanceOf[View] ::
         view.findViewById(R.id.totalCapacity).asInstanceOf[View] ::
         view.findViewById(R.id.fundingDepth).asInstanceOf[View] ::
         view.findViewById(R.id.canReceive).asInstanceOf[View] ::
@@ -78,6 +81,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         view.findViewById(R.id.canSend).asInstanceOf[View] ::
         baseBar :: overBar :: Nil
 
+    val totalPaymentsText = view.findViewById(R.id.totalPaymentsText).asInstanceOf[TextView]
     val refundableAmountText = view.findViewById(R.id.refundableAmountText).asInstanceOf[TextView]
     val paymentsInFlightText = view.findViewById(R.id.paymentsInFlightText).asInstanceOf[TextView]
     val totalCapacityText = view.findViewById(R.id.totalCapacityText).asInstanceOf[TextView]
@@ -123,10 +127,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       overBar setProgress barLocalReserve.toInt
 
       startedAtText setText started.html
-      fundingDepthText setText fundingInfo.format(txDepth, threshold)
+      totalPaymentsText setText getStat(cs.channelId).toString
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(canSendMsat) / 1000L).html
       refundableAmountText setText denom.parsedWithSign(refundable).html
+      fundingDepthText setText fundingInfo.format(txDepth, threshold)
       totalCapacityText setText denom.parsedWithSign(capacity).html
       paymentsInFlightText setText sumOrNothing(valueInFlight).html
       refundFeeText setText sumOrNothing(breakFee).html
@@ -134,7 +139,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       chan.data match {
         case _: WaitFundingDoneData | _: WaitBroadcastRemoteData =>
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
-            R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight)
+            R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
+            R.id.totalPayments)
 
         case norm: NormalData if isOperational(chan) =>
           if (txDepth > 6 && channelAndHop(chan).isEmpty) setExtraInfo(resource = ln_info_no_receive)
@@ -156,8 +162,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             R.id.fundingDepth, R.id.paymentsInFlight)
 
         case _ =>
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
-            R.id.refundFee, R.id.closedAt, R.id.fundingDepth, R.id.paymentsInFlight)
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
+            R.id.canReceive, R.id.refundFee, R.id.closedAt, R.id.fundingDepth,
+            R.id.paymentsInFlight, R.id.totalPayments)
       }
 
       // MENU PART
@@ -276,6 +283,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def sumOrNothing(sats: Satoshi) = sats match {
     case Satoshi(0L) => me getString ln_info_nothing
     case _ => denom parsedWithSign sats
+  }
+
+  def getStat(chanId: BinaryData) = {
+    val cursor = LNParams.db.select(PaymentTable.selectPaymentNumSql, chanId)
+    RichCursor(cursor) headTry { case RichCursor(cursor1) => cursor1 getLong 0 } getOrElse 0L
   }
 
   def urlIntent(txid: String) =

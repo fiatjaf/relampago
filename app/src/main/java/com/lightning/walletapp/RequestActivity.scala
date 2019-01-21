@@ -59,7 +59,6 @@ class RequestActivity extends TimerActivity { me =>
   lazy val bottomSize = getResources getDimensionPixelSize R.dimen.bitmap_bottom_size
   lazy val topSize = getResources getDimensionPixelSize R.dimen.bitmap_top_size
   lazy val qrSize = getResources getDimensionPixelSize R.dimen.bitmap_qr_size
-  lazy val disposable = getString(ln_qr_disposable)
 
   var whenDestroy: Runnable = new Runnable { def run = none }
   override def onDestroy = wrap(super.onDestroy)(whenDestroy.run)
@@ -79,7 +78,7 @@ class RequestActivity extends TimerActivity { me =>
     }
 
     app.TransData checkAndMaybeErase {
-      case pr: PaymentRequest => showInfo(drawAll(denom asString pr.amount.get, disposable.html), PaymentRequest write pr)
+      case pr: PaymentRequest => showInfo(drawAll(denom asString pr.amount.get, getString(ln_qr_disposable).html), PaymentRequest write pr)
       case onChainAddress: Address => showInfo(drawBottom(Utils humanSix onChainAddress.toString), onChainAddress.toString)
       case _ => finish
     }
