@@ -192,9 +192,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           warnAndMaybeClose(me getString ln_chan_close_confirm_local)
         }
 
-        def closeToAddress = app.getBufferTry map app.toAddress foreach { refundOnChainAddress =>
-          val text = me getString ln_chan_close_confirm_address format humanSix(refundOnChainAddress.toString)
-          val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(refundOnChainAddress).getProgram)
+        def closeToAddress = app.getBufferTry map app.TransData.toBitcoinUri foreach { uri =>
+          val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
+          val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
           mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
         }
 

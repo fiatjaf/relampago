@@ -77,7 +77,6 @@ class WalletApp extends Application { me =>
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def plurOrZero(opts: Array[String], num: Long) = if (num > 0) plur(opts, num) format num else opts(0)
   def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
-  def toAddress(rawText: String) = Address.fromString(app.params, rawText)
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
 
   def isAlive =
@@ -130,6 +129,7 @@ class WalletApp extends Application { me =>
       uri
     }
 
+    def toBitcoinUri(addr: String) = bitcoinUri(s"bitcoin:$addr")
     def recordValue(rawText: String) = value = rawText take 2880 match {
       case bitcoinUriLink if bitcoinUriLink startsWith "bitcoin" => bitcoinUri(bitcoinUriLink)
       case bitcoinUriLink if bitcoinUriLink startsWith "BITCOIN" => bitcoinUri(bitcoinUriLink.toLowerCase)
@@ -137,7 +137,7 @@ class WalletApp extends Application { me =>
       case shortNodeLink(key, host) => mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, 9735), host)
       case lnPayReq(prefix, data) => PaymentRequest.read(s"$prefix$data")
       case lnUrl(prefix, data) => LNUrl.fromBech32(s"$prefix$data")
-      case _ => toAddress(rawText)
+      case _ => toBitcoinUri(rawText)
     }
   }
 

@@ -191,6 +191,7 @@
     <string name="err_ln_expired"><![CDATA[Expired payment detected<br><br>You may force close a related channel but a better approach would be to contact a faulty peer and let them sort this out<br><br><strong>Expired payment hash</strong><br>%1$s]]></string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process. Try breaking it into a number of smaller transactions.</string>
     <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>
+    <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s]]></string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
     <string name="err_ln_not_enough">None of your channels contains enough funds to send %1$s off-chain</string>
     <string name="err_general">Failed because an error has occurred</string>

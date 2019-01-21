@@ -34,7 +34,6 @@ import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
 import android.content.Intent
 import org.ndeftools.Message
-import scala.util.Success
 import android.os.Bundle
 import java.util.Date
 
@@ -171,15 +170,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       // so goOps return type is forced to Unit
       goOps(null): Unit
 
-    case address: Address =>
-      // TransData value will be erased here
-      FragWallet.worker.sendBtcPopup(address)(none)
-      me returnToBase null
-
     case uri: BitcoinURI =>
       // TransData value will be erased here
       val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
-      manager setSum scala.util.Try(uri.getAmount)
+      // Prohibit sum editing if uri contains a definite amount
+      manager maybeLockAmount uri
       me returnToBase null
 
     case lnUrl: LNUrl =>

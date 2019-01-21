@@ -14,6 +14,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.wallet.Wallet.ExceededMaxTransactionSize
 import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
 import android.widget.AdapterView.OnItemClickListener
+
 import concurrent.ExecutionContext.Implicits.global
 import com.lightning.walletapp.ln.LNParams.minDepth
 import android.support.v7.app.AppCompatActivity
@@ -22,21 +23,25 @@ import ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
 import fr.acinq.bitcoin.MilliSatoshi
+
 import language.implicitConversions
 import org.bitcoinj.script.Script
+
 import scala.concurrent.Future
 import android.content.Intent
 import android.os.Bundle
-
 import android.content.DialogInterface.{BUTTON_NEGATIVE, BUTTON_NEUTRAL, BUTTON_POSITIVE}
 import com.lightning.walletapp.lnutils.IconGetter.{maxDialog, scrWidth}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import com.lightning.walletapp.lnutils.{GDrive, RatesSaver}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
+
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import java.util.{Timer, TimerTask}
+
+import org.bitcoinj.uri.BitcoinURI
 
 
 object Utils {
@@ -236,7 +241,15 @@ trait TimerActivity extends AppCompatActivity { me =>
     def txMakeError: PartialFunction[Throwable, CharSequence] = {
       case _: ExceededMaxTransactionSize => app getString err_tx_too_large
       case _: CouldNotAdjustDownwards => app getString err_empty_shrunk
-      case _: Throwable => app getString err_general
+
+      case notEnough: InsufficientMoneyException =>
+        val sending = denom.coloredOut(pay.cn, denom.sign)
+        val missing = denom.coloredOut(notEnough.missing, denom.sign)
+        val canSend = denom.coloredIn(app.kit.conf0Balance, denom.sign)
+        getString(err_not_enough_funds).format(canSend, sending, missing).html
+
+      case _: Throwable =>
+        app getString err_general
     }
   }
 }
@@ -247,10 +260,17 @@ class RateManager(val content: View) { me =>
   val hintFiatDenom = Utils clickableTextField content.findViewById(R.id.hintFiatDenom)
   val hintDenom = Utils clickableTextField content.findViewById(R.id.hintDenom)
 
-  def result: TryMSat = Try(denom rawString2MSat satInput.getText.toString.noSpaces)
+  def result = Try(denom rawString2MSat satInput.getText.toString.noSpaces)
   def setSum(res: TryMSat) = satInput.setText(res map denom.asString getOrElse null)
   def hint(ex: String) = runAnd(me)(hintDenom setText denom.amountInTxt.format(ex).html)
   def fiatDecimal = BigDecimal(fiatInput.getText.toString.noSpaces)
+
+  def maybeLockAmount(uri: BitcoinURI) = {
+    val amountTry: TryMSat = Try(uri.getAmount)
+    fiatInput setEnabled amountTry.isFailure
+    satInput setEnabled amountTry.isFailure
+    setSum(amountTry)
+  }
 
   val fiatListener = new TextChangedWatcher {
     def upd = setSum(currentRate.map(perBtc => fiatDecimal / perBtc) map btcBigDecimal2MSat)

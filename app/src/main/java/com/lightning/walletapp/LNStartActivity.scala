@@ -17,7 +17,6 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
-import org.bitcoinj.core.Address
 import org.bitcoinj.core.Batch
 import android.os.Bundle
 
@@ -53,7 +52,6 @@ class LNStartActivity extends ScanActivity { me =>
   def checkTransData =
     app.TransData checkAndMaybeErase {
       case _: LNUrl => me exitTo MainActivity.wallet
-      case _: Address => me exitTo MainActivity.wallet
       case _: BitcoinURI => me exitTo MainActivity.wallet
       case _: PaymentRequest => me exitTo MainActivity.wallet
       case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
