@@ -285,7 +285,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrOpt match {
       case Some(wr) =>
         val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
-        val finalMaxCanReceive = if (wr.maxAmount > maxCanReceive) maxCanReceive else wr.maxAmount
+        val finalMaxCanReceive = if (wr.maxWithdrawable > maxCanReceive) maxCanReceive else wr.maxWithdrawable
         if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(offchain_receive_howto).html).create)
         else if (operationalChannelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive.amount < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)

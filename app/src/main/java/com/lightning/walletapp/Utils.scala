@@ -14,7 +14,6 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.wallet.Wallet.ExceededMaxTransactionSize
 import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
 import android.widget.AdapterView.OnItemClickListener
-
 import concurrent.ExecutionContext.Implicits.global
 import com.lightning.walletapp.ln.LNParams.minDepth
 import android.support.v7.app.AppCompatActivity
@@ -23,25 +22,22 @@ import ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
 import fr.acinq.bitcoin.MilliSatoshi
-
 import language.implicitConversions
+import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.script.Script
-
 import scala.concurrent.Future
 import android.content.Intent
 import android.os.Bundle
+
 import android.content.DialogInterface.{BUTTON_NEGATIVE, BUTTON_NEUTRAL, BUTTON_POSITIVE}
 import com.lightning.walletapp.lnutils.IconGetter.{maxDialog, scrWidth}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import com.lightning.walletapp.lnutils.{GDrive, RatesSaver}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
-
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import java.util.{Timer, TimerTask}
-
-import org.bitcoinj.uri.BitcoinURI
 
 
 object Utils {
@@ -66,8 +62,12 @@ object Utils {
     "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel ", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
     "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound sterling")
 
-  def getDescription(rawText: String) = if (rawText.isEmpty) s"<i>$noDesc</i>" else rawText take 140
-  def humanSix(adr: String) = adr grouped 6 mkString "\u0020"
+  def getDescription(rawText: String) =
+    if (rawText.isEmpty) s"<i>$noDesc</i>"
+    else rawText take 140
+
+  def humanSix(adr: String) =
+    adr grouped 6 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {
     val field: TextView = view.asInstanceOf[TextView]

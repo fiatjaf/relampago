@@ -177,7 +177,7 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String, cap
   require(callback contains "https://", "Not an HTTPS callback")
 }
 
-case class WithdrawRequest(callback: String, k1: String, maxAmount: MilliSatoshi, defaultDescription: String) extends LNUrlData {
+case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: MilliSatoshi, defaultDescription: String) extends LNUrlData {
   def requestWithdraw(paymentRequest: PaymentRequest) = unsafe(s"$callback?k1=$k1&pr=${PaymentRequest write paymentRequest}")
   require(callback contains "https://", "Not an HTTPS callback")
 }
