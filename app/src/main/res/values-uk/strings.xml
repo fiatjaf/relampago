@@ -8,7 +8,7 @@
     <string name="greetings">Bitcoin Гаманець-Блискавка\nОзнайомтесь з <a href='http://lightning-wallet.com'>інструкцією</a></string>
     <string name="sets_rescan_ok">Зараз гаманець закриється, рескан блокчейну розпочнеться автоматично при наступному запуску</string>
     <string name="boost_details"><![CDATA[Хочете підняти комісію для цієї транзакції щоб підтвердити її швидше?<br><br>зараз %1$s<br>після %2$s]]></string>
-    <string name="mnemonic_info"><font color="#E31300">Мнемонічна фраза важлива!</font>\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> навіщо він потрібен і збережіть його прямо зараз\n\n\n<small>Підказка: свайпніть вліво\nщоб відкрити QR сканер</small></string>
+    <string name="mnemonic_info">Мнемонічна фраза важлива!\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> навіщо він потрібен і збережіть його прямо зараз\n\n\n<small>Підказка: свайпніть вліво\nщоб відкрити QR сканер</small></string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Може зайняти кілька годин</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Більш швидке підтвердження</font></small></small>]]></string>
     <string name="copied_to_clipboard">Скопійовано «%1$s»</string>
