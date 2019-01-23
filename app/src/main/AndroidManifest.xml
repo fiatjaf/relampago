@@ -100,9 +100,6 @@
         <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.OlympusActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 
-        <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.WalletStatusActivity"
-            android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
-
         <activity android:launchMode="singleTask" android:name="com.lightning.walletapp.SettingsActivity"
             android:screenOrientation="portrait" android:theme="@style/CustomBar"/>
 

@@ -1,5 +1,6 @@
 package com.lightning.walletapp
 
+import spray.json._
 import android.view._
 import android.widget._
 import android.support.v4.app._
@@ -11,6 +12,7 @@ import com.lightning.walletapp.ln.Tools._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
 import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
@@ -19,6 +21,7 @@ import org.bitcoinj.uri.BitcoinURI
 import java.net.InetSocketAddress
 import org.bitcoinj.core.Batch
 import android.os.Bundle
+import scala.util.Try
 
 
 class LNStartActivity extends ScanActivity { me =>
@@ -166,6 +169,15 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 }
 
 // LNURL response types
+
+object LNUrlData {
+  def guardResponse(raw: String): Unit = {
+    val validJson = Try(raw.toJson.asJsObject.fields)
+    val hasError = validJson.map(_ apply "reason").map(json2String)
+    if (validJson.isFailure) throw new Exception(s"Invalid response $raw")
+    if (hasError.isSuccess) throw new Exception(hasError.get)
+  }
+}
 
 sealed trait LNUrlData { def unsafe(request: String) = get(request, true).trustAllCerts.trustAllHosts.body }
 case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long, cltvExpiryDelta: Int,

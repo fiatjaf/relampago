@@ -13,8 +13,9 @@ import com.lightning.walletapp.ln.Tools.Bytes
 import fr.acinq.eclair.UInt64
 import scodec.bits.BitVector
 import java.math.BigInteger
-import scodec.Codec
 
+import scala.util.{Success, Try}
+import scodec.Codec
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData, WithdrawRequest}
@@ -34,6 +35,13 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     def write(unserialized: T) = JsObject(base.write(unserialized).asJsObject.fields + extension)
     def read(serialized: JsValue) = base read serialized
     private val extension = "tag" -> JsString(tag)
+  }
+
+  def decide(raw: String) = {
+    val validJson = Try(raw.toJson.asJsObject.fields)
+    val hasError = validJson.map(_ apply "reason").map(json2String)
+    if (validJson.isFailure) throw new Exception("Invalid Json response")
+    if (hasError.isSuccess) throw new Exception(hasError.get)
   }
 
   implicit object BigIntegerFmt extends JsonFormat[BigInteger] {

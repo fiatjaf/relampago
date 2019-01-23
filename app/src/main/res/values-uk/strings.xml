@@ -283,11 +283,6 @@
         <item><![CDATA[<i>Немає даних про канали</i>]]></item>
     </array>
 
-    <string name="ln_joint_open_hint">
-        Відчиніть канал з <a href='http://lightning-wallet.com/joint/'>Joint-вузлом</a>, щоб відправляти гарантовані платжі одержувачам,
-        перерахованим нижче\n\nJoint-вузол бере комісію в розмірі 50 SAT + 0.025% суми, параметр to-self-delay встановлений на 2880 блоків
-    </string>
-
     <string name="joint_title">Гарантія доставки</string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Є питання?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про блискавку</a></small><br><br>відчиняється новий канал<br><strong>із зовнішнього джерела</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Є питання?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про блискавку</a></small><br><br>відчиняється новий канал<br><strong>платить ваш гаманець</strong>]]></string>

@@ -14,7 +14,6 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import android.app.{Activity, AlertDialog}
-import org.bitcoinj.core.{Address, TxWrap}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
@@ -22,7 +21,6 @@ import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import android.support.v4.app.FragmentStatePagerAdapter
-import com.lightning.walletapp.Denomination.coin2MSat
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
 import android.support.v4.content.ContextCompat
@@ -32,6 +30,7 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+import org.bitcoinj.core.TxWrap
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
@@ -219,28 +218,25 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def resolveStandardUrl(lNUrl: LNUrl) = {
     val initialRequest = get(lNUrl.uri.toString, true).trustAllCerts.trustAllHosts
     val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
-    // Resolving methods must run on IO thread to avoid "net on main" and parsing exceptions
-    app toast ln_url_resolving
+    ask.doOnSubscribe(app toast ln_url_resolving).foreach(doResolve, onFail)
 
-    ask.map {
-      case wr: WithdrawRequest => me doReceivePayment Some(wr)
-      case icr: IncomingChannelRequest => me initConnection icr
+    def doResolve(data: LNUrlData): Unit = data match {
+      case inChanReq: IncomingChannelRequest => initConnection(inChanReq)
+      case wthdReq: WithdrawRequest => doReceivePayment(wthdReq :: Nil)
       case unknown => throw new Exception(s"Unrecognized $unknown")
-    }.foreach(none, onFail)
+    }
   }
 
   def initConnection(incoming: IncomingChannelRequest) = {
     ConnectionManager.listeners += new ConnectionListener { self =>
       override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
         // Remove listener and make a request, OpenChannel message should arrive shortly
-        // must make sure request is not happening on a main thread when called here
+        obsOnIO.map(_ => incoming.requestChannel).foreach(none, none)
         ConnectionManager.listeners -= self
-        incoming.requestChannel
       }
     }
 
     // Make sure we definitely have an LN connection before asking
-    // if connection is already there we'll be notified in this thread
     ConnectionManager.connectTo(incoming.getAnnounce, notify = true)
   }
 
@@ -252,20 +248,20 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     def offerLogin(challenge: BinaryData) = {
       val title = updateView2Blue(str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
-      lazy val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
-      lazy val pk = linkingPrivKey.publicKey.toString
+      lazy val linkingPrivKey = LNParams.getLinkingKey(domainName = lnUrl.uri.getHost)
+      lazy val pub = linkingPrivKey.publicKey.toString
 
-      def login(alert: AlertDialog) = rm(alert) {
+      def doLogin(alert: AlertDialog) = rm(alert) {
         val signature = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
-        val callback = get(s"${lnUrl.request}&key=$pk&sig=${signature.toString}", true)
-        val callbackRequest = callback.connectTimeout(5000).trustAllCerts.trustAllHosts
-        obsOnIO.map(_ => callbackRequest.body.toJson).foreach(none, onFail)
+        val secondLevelCallback = get(s"${lnUrl.request}&key=$pub&sig=${signature.toString}", true)
+        val secondLevelRequest = secondLevelCallback.connectTimeout(5000).trustAllCerts.trustAllHosts
+        obsOnIO.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
         app toast ln_url_resolving
       }
 
-      mkCheckFormNeutral(login, none, _ => {
-        val bld = baseTextBuilder(getString(ln_url_info_linking).format(lnUrl.uri.getHost, pk, lnUrl.uri.getHost).html)
-        mkCheckFormNeutral(_.dismiss, none, _ => me share pk, bld, dialog_ok, -1, dialog_share_key)
+      mkCheckFormNeutral(doLogin, none, _ => {
+        val bld = baseTextBuilder(getString(ln_url_info_linking).format(lnUrl.uri.getHost, pub, lnUrl.uri.getHost).html)
+        mkCheckFormNeutral(_.dismiss, none, _ => me share pub, bld, dialog_ok, -1, dialog_share_key)
       }, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
     }
   }
@@ -276,14 +272,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // BUTTONS REACTIONS
 
-  def doReceivePayment(wrOpt: Option[WithdrawRequest] = None) = {
+  def doReceivePayment(wrOpt: List[WithdrawRequest] = Nil) = {
     val openingOrOpenChannels: Vector[Channel] = ChannelManager.notClosingOrRefunding
     val operationalChannelsWithRoutes: Map[Channel, PaymentRoute] = openingOrOpenChannels.flatMap(channelAndHop).toMap
     val maxCanReceive = MilliSatoshi(operationalChannelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L)
     val reserveUnspent = getString(ln_receive_reserve) format denom.coloredP2WSH(maxCanReceive, denom.sign)
 
     wrOpt match {
-      case Some(wr) =>
+      case wr :: Nil =>
         val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
         val finalMaxCanReceive = if (wr.maxWithdrawable > maxCanReceive) maxCanReceive else wr.maxWithdrawable
         if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(offchain_receive_howto).html).create)
@@ -291,12 +287,12 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else if (maxCanReceive.amount < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
         else FragWallet.worker.receive(operationalChannelsWithRoutes, finalMaxCanReceive, title, wr.defaultDescription) { rd =>
           def onRequestFailed(serverResponseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail serverResponseFail)
-          obsOnIO.map(_ => wr.requestWithdraw(rd.pr).toJson.asJsObject fields "status").foreach(none, onRequestFailed)
+          obsOnIO.map(_ => wr requestWithdraw rd.pr).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
           PaymentInfoWrap.updStatus(PaymentInfo.WAITING, rd.pr.paymentHash)
           PaymentInfoWrap.uiNotify
         }
 
-      case None =>
+      case Nil =>
         val alertLNHint =
           if (openingOrOpenChannels.isEmpty) getString(ln_receive_suggestion)
           else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_6conf)
@@ -358,7 +354,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   val tokensPrice = MilliSatoshi(1000000L)
   def goStart = me goTo classOf[LNStartActivity]
   def goOps(top: View) = me goTo classOf[LNOpsActivity]
-  def goReceivePayment(top: View) = doReceivePayment(None)
+  def goReceivePayment(top: View) = doReceivePayment(Nil)
   def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
     val withFiatAmount = denom.coloredIn(tokensPrice, denom.sign) + s"<font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
     val bld = baseTextBuilder(getString(tokens_warn).format(withFiatAmount).html).setCustomTitle(me getString action_ln_open)

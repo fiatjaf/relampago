@@ -70,7 +70,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val customTitle = frag.findViewById(R.id.customTitle).asInstanceOf[TextView]
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
-  val toolbar = frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
 
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
@@ -496,7 +495,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // LN SEND / RECEIVE
 
   def receive(chansWithRoutes: Map[Channel, PaymentRoute], maxCanReceive: MilliSatoshi,
-              title: View, defDescr: String = new String)(onDone: RoutingData => Unit) {
+              title: View, defDescr: String = new String)(onDone: RoutingData => Unit) = {
 
     val baseHint = app.getString(amount_hint_can_receive).format(denom parsedWithSign maxCanReceive)
     val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
@@ -530,8 +529,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     inputDescription setText defDescr
-    mkCheckFormNeutral(recAttempt, none, alert => rateManager setSum Try(maxCanReceive),
-      bld = baseBuilder(title, body = content), dialog_ok, dialog_cancel, dialog_max)
+    mkCheckFormNeutral(recAttempt, none, _ => rateManager setSum Try(maxCanReceive),
+      baseBuilder(title, content), dialog_ok, dialog_cancel, dialog_max)
   }
 
   def sendPayment(pr: PaymentRequest) = {
@@ -700,19 +699,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def react = android.support.v4.app.LoaderManager.getInstance(host).restartLoader(1, null, loaderCallbacks).forceLoad
   val observer = new ContentObserver(new Handler) { override def onChange(fromSelf: Boolean) = if (!fromSelf) react }
-  host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
+
   host.timer.schedule(adapter.notifyDataSetChanged, 10000, 10000)
-  host setSupportActionBar toolbar
-
-  toolbar setOnClickListener onButtonTap {
-    // View current balance status and guranteed deliveries
-    if (!isSearching) host goTo classOf[WalletStatusActivity]
-  }
-
-  itemsList setOnItemClickListener onTap {
-    pos => adapter.getItem(pos).generatePopup
-  }
-
+  host setSupportActionBar frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
+  host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
+  itemsList setOnItemClickListener onTap { position => adapter.getItem(position).generatePopup }
   itemsList setFooterDividersEnabled false
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter

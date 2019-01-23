@@ -283,11 +283,6 @@
         <item><![CDATA[<i>Нет данных о каналах</i>]]></item>
     </array>
 
-    <string name="ln_joint_open_hint">
-        Откройте канал с <a href='http://lightning-wallet.com/joint/'>Joint-узлом</a>, чтобы отправлять гарантированные платжи получателям,
-        перечисленным ниже\n\nJoint-узел берет комиссию в размере 50 SAT + 0.025% суммы, параметр to-self-delay установлен на 2880 блоков
-    </string>
-
     <string name="joint_title">Гарантия доставки</string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про молнию</a></small><br><br>открытие нового канала<br><strong>из внешнего источника</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Есть вопросы?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про молнию</a></small><br><br>открытие нового канала<br><strong>платит ваш кошелек</strong>]]></string>
