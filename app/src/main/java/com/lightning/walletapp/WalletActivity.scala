@@ -1,6 +1,5 @@
 package com.lightning.walletapp
 
-import spray.json._
 import android.view._
 import android.widget._
 import com.lightning.walletapp.ln._
@@ -292,7 +291,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           PaymentInfoWrap.uiNotify
         }
 
-      case Nil =>
+      case _ =>
         val alertLNHint =
           if (openingOrOpenChannels.isEmpty) getString(ln_receive_suggestion)
           else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_6conf)
