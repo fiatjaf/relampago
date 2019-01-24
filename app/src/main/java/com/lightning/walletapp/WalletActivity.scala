@@ -182,18 +182,18 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case pr: PaymentRequest =>
-      if (pr.lnUrlOpt.isDefined) {
-        // Should resolve an embedded lnurl first
-        // TransData value will be erased here
-        resolveUrl(Some(pr), pr.lnUrlOpt.get)
-        me returnToBase null
-
-      } else if (ChannelManager.notClosingOrRefunding.isEmpty) {
+      if (ChannelManager.notClosingOrRefunding.isEmpty) {
         // No operational channels are present, offer to open a new one
         // TransData should be set to batch or null to erase previous value
         app.TransData.value = TxWrap findBestBatch pr getOrElse null
         // Do not erase a previously set data
         goStart
+
+      } else if (pr.lnUrlOpt.isDefined) {
+        // Should resolve an embedded lnurl first
+        // TransData value will be erased here
+        resolveUrl(Some(pr), pr.lnUrlOpt.get)
+        me returnToBase null
 
       } else {
         // We have open or at least opening channels
