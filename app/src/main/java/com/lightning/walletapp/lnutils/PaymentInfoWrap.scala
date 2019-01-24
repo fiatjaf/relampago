@@ -86,9 +86,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {
-    me insertOrUpdateOutgoingPayment rd
     inFlightPayments = inFlightPayments.updated(rd.pr.paymentHash, rd)
     unsentPayments = unsentPayments - rd.pr.paymentHash
+    me insertOrUpdateOutgoingPayment rd
   }
 
   override def fulfillReceived(ok: UpdateFulfillHtlc) = db txWrap {

@@ -351,15 +351,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
       }
 
-      for {
-        responses <- PaymentInfo.errors.get(rd.pr.paymentHash)
-        history = responses.reverse.map(_.toString) mkString "\n==\n"
-        rd1 <- PaymentInfoWrap.inFlightPayments.get(rd.pr.paymentHash)
-        routingPath = for (usedPaymentHop <- rd1.usedRoute) yield usedPaymentHop.humanDetails
-        receiver = s"Payee: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
-        fullDebugData = ("Your wallet" +: routingPath :+ receiver mkString "\n-->\n") + s"\n\n$history"
-        _ = paymentDebug setOnClickListener onButtonTap(host share fullDebugData)
-      } paymentDebug setVisibility View.VISIBLE
+      PaymentInfoWrap.inFlightPayments get rd.pr.paymentHash foreach { rd1 =>
+        val routingPath = for (usedHop <- rd1.usedRoute) yield usedHop.humanDetails
+        val errors = PaymentInfo.errors.getOrElse(rd.pr.paymentHash, Vector.empty).reverse.map(_.toString) mkString "\n==\n"
+        val receiverInfo = s"Payee: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
+        val debugInfo = ("Your wallet" +: routingPath :+ receiverInfo mkString "\n-->\n") + s"\n\n$errors"
+        paymentDebug setOnClickListener onButtonTap(host share debugInfo)
+        paymentDebug setVisibility View.VISIBLE
+      }
 
       def outgoingTitle = {
         val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
