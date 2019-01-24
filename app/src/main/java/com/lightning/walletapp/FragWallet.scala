@@ -21,7 +21,6 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import android.os.{Bundle, Handler}
 import scala.util.{Failure, Success, Try}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
-import android.content.{DialogInterface, Intent}
 import android.database.{ContentObserver, Cursor}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
@@ -43,6 +42,7 @@ import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
 import android.app.AlertDialog
+import android.content.Intent
 import android.net.Uri
 
 
@@ -550,39 +550,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val baseTitle = str2View(app.getString(ln_send_title).format(description).html)
       val rateManager = new RateManager(baseContent) hint baseHint
 
-      val relayLink = new JointNode(pr.nodeId) {
-        override def onDataUpdated = UITask(changeText).run
+      def sendAttempt(alert: AlertDialog) = rateManager.result match {
+        case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
+        case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+        case Success(ms) if maxCappedSend < ms => app toast dialog_sum_big
+        case Failure(emptyAmount) => app toast dialog_sum_small
 
-        def canShowGuaranteedDeliveryHint(relayable: MilliSatoshi) =
-          (pr.amount.isEmpty && relayable >= maxCappedSend) || // No sum asked and we can deliver max amount
-            pr.amount.exists(asked => relayable >= asked) || // We definitely can deliver an asked amount
-            JointNode.hasRelayPeerOnly // We only have a relay node as peer
-
-        def changeText = best match {
-          case Some(relayable \ chanBalInfo) if canShowGuaranteedDeliveryHint(relayable) =>
-            val finalDeliverable = if (relayable >= maxCappedSend) maxCappedSend else relayable
-            host.updateView2Blue(baseTitle, app getString ln_send_title_guaranteed format description)
-            rateManager hint app.getString(amount_hint_can_deliver).format(denom parsedWithSign finalDeliverable)
-
-          case _ =>
-            // Set a base hint back again
-            rateManager hint baseHint
-        }
-      }
-
-      def sendAttempt(alert: AlertDialog) = rateManager.result -> relayLink.best match {
-        case Success(ms) \ Some(relayable \ _) if relayable < ms && JointNode.hasRelayPeerOnly => app toast dialog_sum_big
-        case Success(ms) \ _ if minHtlcValue > ms || pr.amount.exists(_ > ms) => app toast dialog_sum_small
-        case Success(ms) \ _ if maxCappedSend < ms => app toast dialog_sum_big
-        case Failure(emptyAmount) \ _ => app toast dialog_sum_small
-
-        case Success(ms) \ Some(relayable \ chanBalInfo) if ms <= relayable => rm(alert) {
-          // We have obtained a (Joint -> payee) route out of band so we can use it right away
-          val rd = emptyRD(pr, ms.amount, useCache = true) plusOutOfBandRoute Vector(chanBalInfo.hop)
-          me doSendOffChain rd
-        }
-
-        case Success(ms) \ _ => rm(alert) {
+        case Success(ms) => rm(alert) {
           // A usual send without out-of-band paths added
           val rd = emptyRD(pr, ms.amount, useCache = true)
           me doSendOffChain rd
@@ -603,11 +577,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         case _ =>
           // We can afford to pay this off-chain
-          val bld = baseBuilder(baseTitle, baseContent)
-          val killOpt = for (jointChannel <- JointNode.relayPeerChans.headOption) yield relayLink start jointChannel.data.announce
-          bld setOnDismissListener new DialogInterface.OnDismissListener { def onDismiss(dlg: DialogInterface) = for (off <- killOpt) off.run }
-          for (amountrequestedByPayee <- pr.amount) rateManager setSum Try(amountrequestedByPayee)
-          mkCheckForm(sendAttempt, none, bld, dialog_pay, dialog_cancel)
+          for (amountRequestedByPayee <- pr.amount) rateManager setSum Try(amountRequestedByPayee)
+          mkCheckForm(sendAttempt, none, baseBuilder(baseTitle, baseContent), dialog_pay, dialog_cancel)
       }
     }
   }

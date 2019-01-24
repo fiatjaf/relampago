@@ -108,7 +108,6 @@
     <string name="amount_hint_sat"><![CDATA[Amount in Satoshi%1$s]]></string>
     <string name="amount_hint_btc"><![CDATA[Amount in Bitcoin%1$s]]></string>
 
-    <string name="amount_hint_can_deliver"><![CDATA[<br><small><font color=#0099FE>can <strong>deliver</strong> %1$s</font></small>]]></string>
     <string name="amount_hint_newchan"><![CDATA[<br><small>min capacity %1$s<br>max capacity %2$s<br>balance %3$s</small>]]></string>
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
@@ -165,7 +164,6 @@
     <string name="send_paste_payment_request"><![CDATA[Paste Lightning Invoice<br><font color=#999999><small>or Bitcoin address</small></font>]]></string>
     <string name="send_hivemind_deposit"><![CDATA[Deposit funds to Hivemind<br><font color=#999999><small>a prediction market sidechain</small></font>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning Payment</strong></font><small><br><br>%1$s</small>]]></string>
-    <string name="ln_send_title_guaranteed"><![CDATA[<strong>Guaranteed Delivery</strong><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Send Bitcoin Transaction</strong></font>]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
@@ -283,7 +281,6 @@
         <item><![CDATA[<i>Public channels unknown</i>]]></item>
     </array>
 
-    <string name="joint_title">Guaranteed Delivery</string>
     <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from external source</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from local wallet</strong>]]></string>
     <string name="ln_ops_start_fund_node_view"><![CDATA[<strong>%1$s</strong><br><font color=#999999><i>opening a channel</i></font><br>%2$s<br><br><font color=#999999>Peer node ID</font><br><small>%3$s</small>]]></string>

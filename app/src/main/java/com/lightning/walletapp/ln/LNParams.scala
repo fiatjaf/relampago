@@ -70,9 +70,8 @@ object LNParams { me =>
   def backupFileName = s"blw${chainHash.toString}-${cloudId.toString}.bkup"
   def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (ord <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: ord :: Nil)
-    LocalParams(UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay = if (ann.nodeId == JointNode.jointNodeKey) 2880 else 1440,
-      maxAcceptedHtlcs = 25, fund.privateKey, revoke.privateKey, pay.privateKey, delay.privateKey, htlc.privateKey,
-      finalScriptPubKey, dust, shaSeed = sha256(sha.privateKey.toBin), isFunder)
+    LocalParams(UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay = 1440, maxAcceptedHtlcs = 25, fund.privateKey, revoke.privateKey,
+      pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey, dust, shaSeed = sha256(sha.privateKey.toBin), isFunder)
   }
 }
 

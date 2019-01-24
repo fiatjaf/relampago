@@ -13,9 +13,9 @@ import com.lightning.walletapp.ln.Tools.Bytes
 import fr.acinq.eclair.UInt64
 import scodec.bits.BitVector
 import java.math.BigInteger
-
-import scala.util.{Success, Try}
+import scala.util.Try
 import scodec.Codec
+
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData, WithdrawRequest}
@@ -363,24 +363,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val cloudSnapshot = jsonFormat[Vector[ClearToken], String, CloudSnapshot](CloudSnapshot.apply, "tokens", "url")
   implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
   implicit val ratesFmt = jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
+  implicit val topNodesFmt = jsonFormat[StringVec, Long, TopNodes](TopNodes.apply, "nodes", "stamp")
 
   implicit val gDriveBackup =
     taggedJsonFmt(jsonFormat[Vector[HasCommitments], Vector[CloudSnapshot], Int,
       GDriveBackup](GDriveBackup.apply, "chans", "clouds", "v"), tag = "GDriveBackup")
-
-  // Relay node
-
-  implicit val channelBalanceFmt = jsonFormat[Long, Long,
-    ChannelBalance](ChannelBalance.apply, "canSendMsat", "canReceiveMsat")
-
-  implicit val channelBalanceInfoFmt = jsonFormat[ChannelBalance, PublicKey, Long, Int, Long, Long, Long,
-    ChannelBalanceInfo](ChannelBalanceInfo.apply, "balance", "peerNodeId", "shortChannelId", "cltvExpiryDelta",
-    "htlcMinimumMsat", "feeBaseMsat", "feeProportionalMillionths")
-
-  implicit val channelBalancesFmt = jsonFormat[List[ChannelBalanceInfo], String,
-    ChannelBalances](ChannelBalances.apply, "localBalances", "tag")
-
-  // Top nodes
-
-  implicit val topNodesFmt = jsonFormat[StringVec, Long, TopNodes](TopNodes.apply, "nodes", "stamp")
 }
