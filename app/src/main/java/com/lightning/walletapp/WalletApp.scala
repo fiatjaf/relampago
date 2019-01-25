@@ -404,7 +404,7 @@ object ChannelManager extends Broadcaster {
     // It may happen such that we had enough funds while were deciding whether to pay, but do not have enough funds currently
     else all.filter(isOperational).sortBy(estimateCanSend)(Ordering[Long].reverse).headOption match {
       case Some(chan) if estimateCanSend(chan) < rd.firstMsat => Left(app getString dialog_sum_big)
-      case None => Left(app getString ln_no_open_chans)
+      case None => Left(app getString err_ln_no_open_chans)
       case _ => Right(rd)
     }
 

@@ -57,7 +57,7 @@
         These markets have the <a href=http://bitcoinhivemind.com/papers/3_PM_Applications.pdf>potential</a> to revolutionize the emergence and diffusion of knowledge in society.
     ]]></string>
 
-    <string name="offchain_receive_howto"><![CDATA[
+    <string name="ln_receive_howto"><![CDATA[
         Для отримання платежів-Блискавок потрібно мати як мінімум один <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платіжний канал</a>. Відкрити канал можна двома способами:<br><br>
         1. Відкрийте <i>вихідний канал</i> з обраним вами пiром та спочатку зробіть кілька платежів-Блискавок щоб <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>звільнити місце</a> для вхідних коштів.<br><br>
         2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Замовте</a> <i>вхідний канал</i>, який одразу дозволить вам отримувати платежі-Блискавки.
@@ -171,8 +171,8 @@
     <string name="ln_receive_reserve"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що для початку вам потрібно витратити хоча б %1$s щоб звільнити місце для отримання грошей]]></string>
     <string name="ln_receive_suggestion"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що немає каналів.<br><br>Натисніть, щоб дізнатися більше!]]></string>
     <string name="ln_receive_ok">Створити QR-код з одноразовим запитом для отримання швидких оффчейн-платежів</string>
-    <string name="ln_chan_offline">Канал в офлайні, чекаємо&#8230;</string>
-    <string name="ln_no_open_chans">Немає відкритих каналів</string>
+    <string name="err_ln_chan_offline">Канал в офлайні, чекаємо&#8230;</string>
+    <string name="err_ln_no_open_chans">Немає відкритих каналів</string>
 
     <string name="err_ln_peer_offline">Помилка з\'єднання з вузлом %1$s</string>
     <string name="err_ln_peer_incompatible">Вузол %1$s не підтримує захист від втрати даних</string>
@@ -183,7 +183,7 @@
     <string name="err_ln_too_many">Не вийшло тому що занадто багато платежів уже в дорозі</string>
     <string name="err_ln_frozen">Не вийшло тому що цей платіж заморожений</string>
 
-    <string name="err_ln_still_opening">Не вийшло тому що платіжний канал ще не відкритий\n\nНаповнююча канал Біткоїн-транзакція повинна отримати більше підтверджень перед тим як його можна буде використовувати для відправки платежів</string>
+    <string name="err_ln_still_opening">Не вийшло тому що платіжний канал ще не відкритий\n\nНаповнююча канал Біткоїн-транзакція повинна отримати до 6 підтверджень перед тим як його можна буде використовувати для платежів</string>
     <string name="err_ln_expired"><![CDATA[Платіж застряг<br><br>Ви можете примусово закрити канал або зв\'язатися з піром, щоб він виправив проблему<br><br>Хеш платежу<br>%1$s]]></string>
     <string name="err_empty_shrunk">Не вийшло тому що не вдалося підібрати потрібну суму комісії. Ви можете додати грошей в гаманець та спробувати еше раз</string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Недостатньо коштів</strong><br><br>є %1$s<br>відправлено %2$s<br>не вистачає %3$s]]></string>

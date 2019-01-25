@@ -8,6 +8,7 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
+import com.lightning.walletapp.Denomination._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
@@ -182,23 +183,53 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case pr: PaymentRequest =>
-      if (ChannelManager.notClosingOrRefunding.isEmpty) {
-        // No operational channels are present, offer to open a new one
-        // TransData should be set to batch or null to erase previous value
-        app.TransData.value = TxWrap findBestBatch pr getOrElse null
-        // Do not erase a previously set data
-        goStart
+      val hasOpeningChans = ChannelManager.notClosingOrRefunding.exists(isOpening)
+      val maxLocalSend = ChannelManager.all.filter(isOperational).map(estimateCanSend)
+
+      if (!pr.isFresh) {
+        // Expired payment request, reject
+        // TransData value will be erased here
+        app toast dialog_pr_expired
+        me returnToBase null
+
+      } else if (PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix) {
+        // Payee has provided a payment request from some other network, reject
+        // TransData value will be erased here
+        app toast err_general
+        me returnToBase null
+
+      } else if (hasOpeningChans && maxLocalSend.isEmpty) {
+        // Only opening channels are present, tell use about it
+        onFail(app getString err_ln_still_opening)
+        // TransData value will be erased here
+        me returnToBase null
+
+      } else if (maxLocalSend.isEmpty) {
+        // No channels are present at all currently, offer to open a new one
+        if (pr.amount.exists(_ > app.kit.conf0Balance) || app.kit.conf0Balance.isZero) {
+          // They have requested too much or there is no amount but on-chain wallet is empty
+          // TransData value will be erased here
+          onFail(app getString ln_send_howto)
+          me returnToBase null
+
+        } else {
+          // TransData is set to batch or null to erase previous value
+          app.TransData.value = TxWrap findBestBatch pr getOrElse null
+          // Do not erase data which we have just updated
+          app toast err_ln_no_open_chans
+          goStart
+        }
 
       } else if (pr.lnUrlOpt.isDefined) {
-        // Should resolve an embedded lnurl first
-        // TransData value will be erased here
+        // Should resolve an embedded lnurl
         resolveUrl(Some(pr), pr.lnUrlOpt.get)
+        // TransData value will be erased here
         me returnToBase null
 
       } else {
-        // We have open or at least opening channels
+        // We have operational channels, pass it further
+        FragWallet.worker.sendPayment(maxLocalSend, pr)
         // TransData value will be erased here
-        FragWallet.worker sendPayment pr
         me returnToBase null
       }
 
@@ -250,6 +281,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       lazy val linkingPrivKey = LNParams.getLinkingKey(domainName = lnUrl.uri.getHost)
       lazy val pub = linkingPrivKey.publicKey.toString
 
+      mkCheckFormNeutral(doLogin, none, _ => {
+        val msg = getString(ln_url_info_linking).format(lnUrl.uri.getHost, pub, lnUrl.uri.getHost).html
+        mkCheckFormNeutral(_.dismiss, none, _ => me share pub, baseTextBuilder(msg), dialog_ok, -1, dialog_share_key)
+      }, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
+
       def doLogin(alert: AlertDialog) = rm(alert) {
         val signature = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
         val secondLevelCallback = get(s"${lnUrl.request}&key=$pub&sig=${signature.toString}", true)
@@ -257,11 +293,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         obsOnIO.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
         app toast ln_url_resolving
       }
-
-      mkCheckFormNeutral(doLogin, none, _ => {
-        val bld = baseTextBuilder(getString(ln_url_info_linking).format(lnUrl.uri.getHost, pub, lnUrl.uri.getHost).html)
-        mkCheckFormNeutral(_.dismiss, none, _ => me share pub, bld, dialog_ok, -1, dialog_share_key)
-      }, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
     }
   }
 
@@ -281,7 +312,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case wr :: Nil =>
         val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
         val finalMaxCanReceive = if (wr.maxWithdrawable > maxCanReceive) maxCanReceive else wr.maxWithdrawable
-        if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(offchain_receive_howto).html).create)
+        if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_howto).html).create)
         else if (operationalChannelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive.amount < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
         else FragWallet.worker.receive(operationalChannelsWithRoutes, finalMaxCanReceive, title, wr.defaultDescription) { rd =>
@@ -303,7 +334,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         val options = Array(getString(ln_receive_option).format(alertLNHint).html, getString(btc_receive_option).html)
 
         def offChain = rm(alert) {
-          if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(offchain_receive_howto).html).create)
+          if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
           else FragWallet.worker.receive(operationalChannelsWithRoutes, maxCanReceive, app.getString(ln_receive_title).html) { rd =>
             awaitServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
             ContextCompat.startForegroundService(me, awaitServiceIntent)
