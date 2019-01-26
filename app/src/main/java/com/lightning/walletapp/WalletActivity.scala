@@ -306,7 +306,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val openingOrOpenChannels: Vector[Channel] = ChannelManager.notClosingOrRefunding
     val operationalChannelsWithRoutes: Map[Channel, PaymentRoute] = openingOrOpenChannels.flatMap(channelAndHop).toMap
     val maxCanReceive = MilliSatoshi(operationalChannelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L)
-    val reserveUnspent = getString(ln_receive_reserve) format denom.coloredP2WSH(maxCanReceive, denom.sign)
+    val reserveUnspent = getString(ln_receive_reserve) format denom.coloredP2WSH(-maxCanReceive, denom.sign)
 
     wrOpt match {
       case wr :: Nil =>
@@ -326,7 +326,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         val alertLNHint =
           if (openingOrOpenChannels.isEmpty) getString(ln_receive_suggestion)
           else if (operationalChannelsWithRoutes.isEmpty) getString(ln_receive_6conf)
-          else if (maxCanReceive.amount < 0L) getString(ln_receive_option).format(reserveUnspent)
+          else if (maxCanReceive.amount < 0L) reserveUnspent
           else getString(ln_receive_ok)
 
         val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
