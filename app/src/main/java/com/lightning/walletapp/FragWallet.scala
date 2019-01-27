@@ -532,7 +532,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       baseBuilder(title, content), dialog_ok, dialog_cancel, dialog_max)
   }
 
-  def sendPayment(maxLocalSend: Vector[Long], pr: PaymentRequest) = {
+  def sendPayment(maxLocalSend: Vector[Long], pr: PaymentRequest)(onSend: RoutingData => Unit) = {
     // At this point we know we have operational channels, check if we have enough off-chain funds, maybe offer on-chain option
     val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend.max)
     val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
@@ -548,8 +548,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case Success(ms) => rm(alert) {
         // A usual send without out-of-band paths added
-        val rd = emptyRD(pr, ms.amount, useCache = true)
-        me doSendOffChain rd
+        // payment requests without amounts are forbidden
+        onSend apply emptyRD(pr, ms.amount, useCache = true)
       }
     }
 

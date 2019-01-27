@@ -228,7 +228,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
       } else {
         // We have operational channels, pass it further
-        FragWallet.worker.sendPayment(maxLocalSend, pr)
+        // this is a ususal payment request so attempt to send a payment right away
+        FragWallet.worker.sendPayment(maxLocalSend, pr)(FragWallet.worker.doSendOffChain)
         // TransData value will be erased here
         me returnToBase null
       }
