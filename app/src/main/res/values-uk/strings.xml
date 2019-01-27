@@ -57,12 +57,6 @@
         These markets have the <a href=http://bitcoinhivemind.com/papers/3_PM_Applications.pdf>potential</a> to revolutionize the emergence and diffusion of knowledge in society.
     ]]></string>
 
-    <string name="ln_receive_howto"><![CDATA[
-        Для отримання платежів-Блискавок потрібно мати як мінімум один <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платіжний канал</a>. Відкрити канал можна двома способами:<br><br>
-        1. Відкрийте <i>вихідний канал</i> з обраним вами пiром та спочатку зробіть кілька платежів-Блискавок щоб <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>звільнити місце</a> для вхідних коштів.<br><br>
-        2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Замовте</a> <i>вхідний канал</i>, який одразу дозволить вам отримувати платежі-Блискавки.
-    ]]></string>
-
     <!-- Olympus server -->
     <string name="olympus_log">Лог дій</string>
     <string name="olympus_add">Додати сервер</string>
@@ -164,16 +158,34 @@
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послати платіж-Блискавку</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послати Біткоїн-транзакцію</strong></font>]]></string>
 
+    <string name="ln_send_howto"><![CDATA[
+        Ви намагаєтеся оплатити запит-Блискавку, але в цьому гаманці зараз немає відкритих
+        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платіжних каналів</a>,
+        також у вашому он-чейн гаманці недостатньо біткоїнiв для відкриття нового каналу.<br><br>Що робити?
+        Спочатку заведіть біткоїни в гаманець, потім використайте їх для відкриття нового каналу.
+    ]]></string>
+
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Створити запит-Блискавку</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запит-Блискавка</font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_receive_option"><![CDATA[<font color=#E68A00>Біткоїн-транзакція</font><small><br><br>Створити QR-код зі звичайною адресою для отримання ончейн Біткоїн-транзакцій</small>]]></string>
+
+    <string name="ln_receive_howto"><![CDATA[
+        Для отримання платежів-Блискавок потрібно мати як мінімум один <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платіжний канал</a>. Відкрити канал можна двома способами:<br><br>
+        1. Відкрийте <i>вихідний канал</i> з обраним вами пiром та спочатку зробіть кілька платежів-Блискавок щоб <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>звільнити місце</a> для вхідних коштів.<br><br>
+        2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Замовте</a> <i>вхідний канал</i>, який одразу дозволить вам отримувати платежі-Блискавки.
+    ]]></string>
+
     <string name="ln_receive_6conf"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що ваш пір ще не готовий. Як правило це стається як тільки наповнююча канал Біткоїн-транзакція отримує 6 підтверджень]]></string>
     <string name="ln_receive_reserve"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що для початку вам потрібно витратити хоча б %1$s щоб звільнити місце для отримання грошей]]></string>
     <string name="ln_receive_suggestion"><![CDATA[&#9888; Вхідні платежі-Блискавки поки неможливі тому що немає каналів.<br><br>Натисніть, щоб дізнатися більше!]]></string>
     <string name="ln_receive_ok">Створити QR-код з одноразовим запитом для отримання швидких оффчейн-платежів</string>
-    <string name="err_ln_chan_offline">Канал в офлайні, чекаємо&#8230;</string>
-    <string name="err_ln_no_open_chans">Немає відкритих каналів</string>
 
+    <string name="btc_receive_option"><![CDATA[
+        <font color=#E68A00>Біткоїн-транзакція</font><small><br><br>Створити QR-код
+        зі звичайною адресою для отримання ончейн Біткоїн-транзакцій</small>
+    ]]></string>
+
+    <string name="err_ln_no_open_chans">Немає відкритих каналів</string>
+    <string name="err_ln_chan_offline">Канал в офлайні, чекаємо&#8230;</string>
     <string name="err_ln_peer_offline">Помилка з\'єднання з вузлом %1$s</string>
     <string name="err_ln_peer_incompatible">Вузол %1$s не підтримує захист від втрати даних</string>
     <string name="err_ln_remote_amount_high">Не вийшло тому що загальна сума платежів у шляху буде занадто висока для вашого пiра</string>

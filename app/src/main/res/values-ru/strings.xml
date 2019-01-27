@@ -57,12 +57,6 @@
         These markets have the <a href=http://bitcoinhivemind.com/papers/3_PM_Applications.pdf>potential</a> to revolutionize the emergence and diffusion of knowledge in society.
     ]]></string>
 
-    <string name="ln_receive_howto"><![CDATA[
-        Для получения платежей-Молний нужно иметь как минимум один <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платежный канал</a>. Открыть канал можно двумя способами:<br><br>
-        1. Откройте <i>исходящий канал</i> с выбранным вами пиром и сначала сделайте несколько платежей-Молний чтобы <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>освободить место</a> для входящих средств.<br><br>
-        2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Закажите</a> <i>входящий канал</i>, который сразу же позволит вам получать платежи-Молнии.
-    ]]></string>
-
     <!-- Olympus server -->
     <string name="olympus_log">Лог действий</string>
     <string name="olympus_add">Добавить сервер</string>
@@ -164,16 +158,34 @@
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послать Биткоин-транзакцию</strong></font>]]></string>
 
+    <string name="ln_send_howto"><![CDATA[
+        Вы пытаетесь оплатить запрос-Молнию, но в кошельке сейчас нет открытых
+        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платежных каналов</a>,
+        к тому же в вашем он-чейн кошельке недостаточно биткоинов для открытия нового канала.<br><br>Что делать?
+        Сначала заведите биткоины в кошелек, потом используйте их для открытия нового канала.
+    ]]></string>
+
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запрос-Молния</font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_receive_option"><![CDATA[<font color=#E68A00>Биткоин-транзакция</font><small><br><br>создать QR-код с обычным адресом для получения ончейн Биткоин-транзакций</small>]]></string>
+
+    <string name="ln_receive_howto"><![CDATA[
+        Для получения платежей-Молний нужно иметь как минимум один <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платежный канал</a>. Открыть канал можно двумя способами:<br><br>
+        1. Откройте <i>исходящий канал</i> с выбранным вами пиром и сначала сделайте несколько платежей-Молний чтобы <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>освободить место</a> для входящих средств.<br><br>
+        2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Закажите</a> <i>входящий канал</i>, который сразу же позволит вам получать платежи-Молнии.
+    ]]></string>
+
     <string name="ln_receive_6conf"><![CDATA[&#9888; Входящие платежи-Молнии пока невозможны потому что ваш пир еще не готов. Как правило пиры становятся готовы как только наполняющая канал Биткоин-транзакция получает 6 подтверждений]]></string>
     <string name="ln_receive_reserve"><![CDATA[&#9888; Входящие платежи-Молнии пока невозможны потому что для начала вам нужно потратить хотя-бы %1$s чтобы освободить место для получения денег]]></string>
     <string name="ln_receive_suggestion"><![CDATA[&#9888; Входящие платежи-Молнии пока невозможны потому что нет каналов.<br><br>Нажмите, чтобы узнать больше!]]></string>
     <string name="ln_receive_ok">Cоздать QR-код с одноразовым запросом для получения быстрых оффчейн-платежей</string>
-    <string name="err_ln_chan_offline">Канал в оффлайне, ждем&#8230;</string>
-    <string name="err_ln_no_open_chans">Нет открытых каналов</string>
 
+    <string name="btc_receive_option"><![CDATA[
+        <font color=#E68A00>Биткоин-транзакция</font><small><br><br>создать QR-код
+        с обычным адресом для получения ончейн Биткоин-транзакций</small>
+    ]]></string>
+
+    <string name="err_ln_no_open_chans">Нет открытых каналов</string>
+    <string name="err_ln_chan_offline">Канал в оффлайне, ждем&#8230;</string>
     <string name="err_ln_peer_offline">Не удалось подключиться к узлу %1$s</string>
     <string name="err_ln_peer_incompatible">Узел %1$s не поддерживает защиту от потери данных</string>
     <string name="err_ln_remote_amount_high">Не получилось потому что общая сумма платежей в пути будет слишком высока для вашего пира</string>
