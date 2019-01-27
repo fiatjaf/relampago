@@ -154,9 +154,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def onNfcStateDisabled = none
   def onNfcStateEnabled = none
 
-  def readNdefMessage(m: Message) =
-    <(app.TransData recordValue ndefMessageString(m),
-      _ => app toast err_no_data)(_ => checkTransData)
+  private[this] def readFail(readingError: Throwable) = app toast err_no_data
+  def readNdefMessage(nfc: Message) = <(app.TransData recordNdefValue nfc, readFail)(_ => checkTransData)
 
   // EXTERNAL DATA CHECK
 
@@ -382,13 +381,17 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
   }
 
-  val tokensPrice = MilliSatoshi(1000000L)
   def goStart = me goTo classOf[LNStartActivity]
   def goOps(top: View) = me goTo classOf[LNOpsActivity]
-  def goReceivePayment(top: View) = doReceivePayment(Nil)
-  def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
-    val withFiatAmount = denom.coloredIn(tokensPrice, denom.sign) + s" <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
-    val bld = baseTextBuilder(getString(tokens_warn).format(withFiatAmount).html).setCustomTitle(me getString action_ln_open)
+  def goReceivePayment(top: View) = doReceivePayment(wrOpt = Nil)
+  def goAddChannel(top: View) = if (app.olympus.backupExhausted) warnAboutTokens else goStart
+
+  def warnAboutTokens = {
+    val tokensPrice = MilliSatoshi(1000000L)
+    val fiatAmount = msatInFiatHuman(tokensPrice)
+    val amount = denom.coloredIn(tokensPrice, denom.sign)
+    val body = getString(tokens_warn).format(s"$amount <font color=#999999>$fiatAmount</font>")
+    val bld = baseTextBuilder(body.html).setCustomTitle(me getString action_ln_open)
     mkCheckForm(alert => rm(alert)(goStart), none, bld, dialog_ok, dialog_cancel)
-  } else goStart
+  }
 }

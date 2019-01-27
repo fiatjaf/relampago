@@ -547,9 +547,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case Failure(emptyAmount) => app toast dialog_sum_small
 
       case Success(ms) => rm(alert) {
-        // A usual send without out-of-band paths added
-        // payment requests without amounts are forbidden
-        onSend apply emptyRD(pr, ms.amount, useCache = true)
+        // Payment requests without amounts are forbidden
+        val rd = emptyRD(pr, ms.amount, useCache = true)
+        onSend(rd)
       }
     }
 
@@ -565,8 +565,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val msg = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
         showForm(negBuilder(dialog_ok, baseTitle, msg.html).create)
 
+      case _ \ Some(amount) if pr.straightForward =>
+        // We can skip confirmation window and pay right away
+        val rd = emptyRD(pr, amount.amount, useCache = true)
+        onSend(rd)
+
       case _ =>
-        // We can afford to pay this off-chain
+        // We can fulfill this off-chain payment, but need to show a confirmation window
         for (amountRequestedByPayee <- pr.amount) rateManager setSum Try(amountRequestedByPayee)
         mkCheckForm(sendAttempt, none, baseBuilder(baseTitle, baseContent), dialog_pay, dialog_cancel)
     }
