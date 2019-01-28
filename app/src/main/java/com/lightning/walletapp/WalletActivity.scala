@@ -228,8 +228,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
       } else {
         // We have operational channels, pass it further
-        // this is a ususal payment request so attempt to send a payment right away
-        FragWallet.worker.sendPayment(maxLocalSend, pr)(FragWallet.worker.doSendOffChain)
+        FragWallet.worker.normalOffChainSend(maxLocalSend, pr)
         // TransData value will be erased here
         me returnToBase null
       }
@@ -261,7 +260,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def initConnection(incoming: IncomingChannelRequest) = {
     ConnectionManager.listeners += new ConnectionListener { self =>
       override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
-        // Remove listener and make a request, OpenChannel message should arrive shortly
+        // Remove listener and make a request, peer should send OpenChannel message shortly
         obsOnIO.map(_ => incoming.requestChannel).foreach(none, none)
         ConnectionManager.listeners -= self
       }
@@ -278,22 +277,24 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def offerLogin(challenge: BinaryData) = {
-      val title = updateView2Blue(str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
-      lazy val linkingPrivKey = LNParams.getLinkingKey(domainName = lnUrl.uri.getHost)
-      lazy val pub = linkingPrivKey.publicKey.toString
+      lazy val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
+      lazy val linkingPubKey = linkingPrivKey.publicKey.toString
 
-      mkCheckFormNeutral(doLogin, none, _ => {
-        val msg = getString(ln_url_info_linking).format(lnUrl.uri.getHost, pub, lnUrl.uri.getHost).html
-        mkCheckFormNeutral(_.dismiss, none, _ => me share pub, baseTextBuilder(msg), dialog_ok, -1, dialog_share_key)
-      }, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
+      def wut(alert: AlertDialog): Unit = {
+        val msg = getString(ln_url_info_login).format(lnUrl.uri.getHost, linkingPubKey, lnUrl.uri.getHost).html
+        mkCheckFormNeutral(_.dismiss, none, _ => me share linkingPubKey, baseTextBuilder(msg), dialog_ok, -1, dialog_share_key)
+      }
 
       def doLogin(alert: AlertDialog) = rm(alert) {
-        val signature = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
-        val secondLevelCallback = get(s"${lnUrl.request}&key=$pub&sig=${signature.toString}", true)
+        val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
+        val secondLevelCallback = get(s"${lnUrl.request}&key=$linkingPubKey&sig=${sig.toString}", true)
         val secondLevelRequest = secondLevelCallback.connectTimeout(5000).trustAllCerts.trustAllHosts
         obsOnIO.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
         app toast ln_url_resolving
       }
+
+      val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
+      mkCheckFormNeutral(doLogin, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
     }
   }
 
@@ -382,13 +383,17 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
   }
 
-  val tokensPrice = MilliSatoshi(1000000L)
   def goStart = me goTo classOf[LNStartActivity]
   def goOps(top: View) = me goTo classOf[LNOpsActivity]
-  def goReceivePayment(top: View) = doReceivePayment(Nil)
-  def goAddChannel(top: View) = if (app.olympus.backupExhausted) {
-    val withFiatAmount = denom.coloredIn(tokensPrice, denom.sign) + s" <font color=#999999>${msatInFiatHuman apply tokensPrice}</font>"
-    val bld = baseTextBuilder(getString(tokens_warn).format(withFiatAmount).html).setCustomTitle(me getString action_ln_open)
+  def goReceivePayment(top: View) = doReceivePayment(wrOpt = Nil)
+  def goAddChannel(top: View) = if (app.olympus.backupExhausted) warnAboutTokens else goStart
+
+  def warnAboutTokens = {
+    val tokensPrice = MilliSatoshi(1000000L)
+    val fiatAmount = msatInFiatHuman(tokensPrice)
+    val amount = denom.coloredIn(tokensPrice, denom.sign)
+    val body = getString(tokens_warn).format(s"$amount <font color=#999999>$fiatAmount</font>")
+    val bld = baseTextBuilder(body.html).setCustomTitle(me getString action_ln_open)
     mkCheckForm(alert => rm(alert)(goStart), none, bld, dialog_ok, dialog_cancel)
-  } else goStart
+  }
 }

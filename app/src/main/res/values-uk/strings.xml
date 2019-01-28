@@ -185,7 +185,6 @@
     ]]></string>
 
     <string name="err_ln_no_open_chans">Немає відкритих каналів</string>
-    <string name="err_ln_chan_offline">Канал в офлайні, чекаємо&#8230;</string>
     <string name="err_ln_peer_offline">Помилка з\'єднання з вузлом %1$s</string>
     <string name="err_ln_peer_incompatible">Вузол %1$s не підтримує захист від втрати даних</string>
     <string name="err_ln_remote_amount_high">Не вийшло тому що загальна сума платежів у шляху буде занадто висока для вашого пiра</string>
@@ -294,16 +293,15 @@
         <item><![CDATA[<i>Немає даних про канали</i>]]></item>
     </array>
 
-    <string name="ln_ops_start_fund_external_title"><![CDATA[<small>Є питання?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про блискавку</a></small><br><br>відчиняється новий канал<br><strong>із зовнішнього джерела</strong>]]></string>
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Є питання?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Почитайте про блискавку</a></small><br><br>відчиняється новий канал<br><strong>платить ваш гаманець</strong>]]></string>
     <string name="ln_ops_start_fund_node_view"><![CDATA[<strong>%1$s</strong><br><font color=#999999><i>відчинення каналу</i></font><br>%2$s<br><br><font color=#999999>ID піра</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[<strong>%1$s</strong><br>%2$s<br><small><font color=#999999>%3$s</font></small>]]></string>
     <string name="ln_ops_start_fund_incoming_channel">вхідний канал</string>
     <string name="ln_url_resolving">Підключення до сервісу&#8230;</string>
 
-    <string name="ln_url_info_linking"><![CDATA[
+    <string name="ln_url_info_login"><![CDATA[
         Логiн-ключ для <i>%1$s</i>, згенерований вашим гаманцем:<br><br><strong>%2$s</strong><br><br>
-        Логiн-ключ можно розкрити, але його рекомендується передавати тiльки <i>%3$s</i>
+        Цей ключ можно розкрити, але його рекомендується передавати тiльки <i>%3$s</i>
     ]]></string>
 
     <!-- Olympus log messages and notification -->
