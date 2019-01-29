@@ -584,12 +584,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  def linkedOffChainSend(maxLocalSend: Vector[Long], pr: PaymentRequest) = new OffChainSender(maxLocalSend, pr) {
-    private[this] val title = app.getString(ln_send_linkable_title).format(Utils getDescription pr.description)
-    def getBaseTitle = updateView2Blue(str2View(new String), title)
-
-
-  }
+//  def linkedOffChainSend(maxLocalSend: Vector[Long], pr: PaymentRequest) = new OffChainSender(maxLocalSend, pr) {
+//    private[this] val title = app.getString(ln_send_linkable_title).format(Utils getDescription pr.description)
+//    def getBaseTitle = updateView2Blue(str2View(new String), title)
+//
+//
+//  }
 
   def doSendOffChain(rd: RoutingData) =
     ChannelManager.checkIfSendable(rd) match {

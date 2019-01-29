@@ -158,18 +158,18 @@ trait TimerActivity extends AppCompatActivity { me =>
   }
 
   def INIT(savedInstanceState: Bundle): Unit
-  implicit def str2View(textFieldData: CharSequence): LinearLayout = {
-    val view = getLayoutInflater.inflate(R.layout.frag_top_tip, null).asInstanceOf[LinearLayout]
-    Utils clickableTextField view.findViewById(R.id.titleTip) setText textFieldData
-    view setBackgroundColor 0x22AAAAAA
-    view
-  }
-
   def updateView2Blue(oldView: View, newText: String) = {
     val titleTip = oldView.findViewById(R.id.titleTip).asInstanceOf[TextView]
     oldView setBackgroundColor ContextCompat.getColor(me, R.color.ln)
     titleTip setText s"<font color=#FFFFFF>$newText</font>".html
     oldView
+  }
+
+  implicit def str2View(textFieldData: CharSequence): LinearLayout = {
+    val view = getLayoutInflater.inflate(R.layout.frag_top_tip, null).asInstanceOf[LinearLayout]
+    Utils clickableTextField view.findViewById(R.id.titleTip) setText textFieldData
+    view setBackgroundColor 0x22AAAAAA
+    view
   }
 
   implicit def UITask(exec: => Unit): TimerTask = {

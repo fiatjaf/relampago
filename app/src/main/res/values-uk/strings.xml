@@ -304,6 +304,12 @@
         Цей ключ можно розкрити, але його рекомендується передавати тiльки <i>%3$s</i>
     ]]></string>
 
+    <string name="ln_url_info_link"><![CDATA[
+        Linkable Lightning Payments are <i>pseudonymous</i>: on getting such a payment receiver does not know who you are yet can determine that a bunch of your payments belong to the same entity.<br><br>
+        Linkable Payments are used by services who wish to know nothing about payer identity yet need to accumulate multiple transfers from the same user to pay the funds back when requested.<br><br>
+        You may opt out and downgrade Linkable Payment to Basic Payment but please make sure a service you are paying to can handle this change correctly.
+    ]]></string>
+
     <!-- Olympus log messages and notification -->
     <string name="olympus_log_channel_backup">Збережений зашифрований бекап каналу з «%1$s»</string>
     <string name="olympus_log_watch_payments">Почато стеження за %1$s старими станами</string>
