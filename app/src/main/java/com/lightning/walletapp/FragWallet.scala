@@ -553,7 +553,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case Failure(emptyAmount) => app toast dialog_sum_small
 
       case Success(ms) => rm(alert) {
-        // payment requests without amounts are forbidden
+        // Payment requests without amounts are forbidden
         val rd = emptyRD(pr, ms.amount, useCache = true)
         onUserAcceptSend(rd)
       }

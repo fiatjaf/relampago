@@ -123,7 +123,6 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
   lazy val paymentHash = tags.collectFirst { case payHash: PaymentHashTag => payHash.hash }.get
   lazy val lnUrlOpt = tags.collectFirst { case lnURL: LNUrlTag => lnURL.contents }
   lazy val routingInfo = tags.collect { case r: RoutingInfoTag => r }
-  var straightForward: Boolean = false
 
   lazy val fallbackAddress = tags.collectFirst {
     case FallbackAddressTag(17, hash) if prefix == "lnbc" => Base58Check.encode(Base58.Prefix.PubkeyAddress, hash)

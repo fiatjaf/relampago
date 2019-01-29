@@ -154,8 +154,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def onNfcStateDisabled = none
   def onNfcStateEnabled = none
 
-  private[this] def readFail(readingError: Throwable) = app toast err_no_data
-  def readNdefMessage(nfc: Message) = <(app.TransData recordNdefValue nfc, readFail)(_ => checkTransData)
+  def readNdefMessage(nfcMessage: Message) =
+    <(app.TransData recordValue ndefMessageString(nfcMessage),
+      _ => app toast err_no_data)(_ => checkTransData)
 
   // EXTERNAL DATA CHECK
 
