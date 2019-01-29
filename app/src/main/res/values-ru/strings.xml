@@ -154,7 +154,7 @@
     <string name="send_scan_qr">Сканировать QR-код</string>
     <string name="send_paste_payment_request"><![CDATA[Вставить запрос-Молнию<br><font color=#999999><small>или Биткоин-адрес</small></font>]]></string>
     <string name="send_hivemind_deposit"><![CDATA[Послать в Hivemind<br><font color=#999999><small>сайдчейн для рынка предсказаний</small></font>]]></string>
-    <string name="ln_send_linkable_title"><![CDATA[<font color=#0099FE><strong>Привязанный платеж</strong></font><small><br><br>%1$s</small>]]></string>
+    <string name="ln_send_linkable_title"><![CDATA[<strong>Послать платеж-Молнию</strong><br><small>привязан к <i>%1$s</i><br><br>%2$s</small>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послать Биткоин-транзакцию</strong></font>]]></string>
 
@@ -305,9 +305,9 @@
     ]]></string>
 
     <string name="ln_url_info_link"><![CDATA[
-        Linkable Lightning Payments are <i>pseudonymous</i>: on getting such a payment receiver does not know who you are yet can determine that a bunch of your payments belong to the same entity.<br><br>
-        Linkable Payments are used by services who wish to know nothing about payer identity yet need to accumulate multiple transfers from the same user to pay the funds back when requested.<br><br>
-        You may opt out and downgrade Linkable Payment to Basic Payment but please make sure a service you are paying to can handle this change correctly.
+        Благодаря Связанным Платежам <i>%1$s</i> знает что все ваши переводы принадлежат именно вам, даже без логина и регистрации.<br><br>
+        В то же время <i>%1$s</i> не известны ваши персональные данные, поэтому вы можете пользоваться сервисом анонимно.<br><br>
+        Вы можете отказаться от cвязанного платежа и тогда это будет обычный платеж-Молния.
     ]]></string>
 
     <!-- Olympus log messages and notification -->

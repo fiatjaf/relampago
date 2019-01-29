@@ -177,9 +177,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case lnUrl: LNUrl =>
-      // Got an explicit lnurl, should resolve
+      val specialMeaningTag = scala.util.Try(lnUrl.uri getQueryParameter "tag") getOrElse null
+      if ("login" == specialMeaningTag) showLoginForm(lnUrl) else resolveStandardUrl(lnUrl)
       // TransData value will be erased here
-      resolveUrl(None, lnUrl)
       me returnToBase null
 
     case pr: PaymentRequest =>
@@ -205,7 +205,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         me returnToBase null
 
       } else if (maxLocalSend.isEmpty) {
-        // No channels are present at all currently, offer to open a new one
+        // No channels are present at all currently, see what we can do here...
         if (pr.amount.exists(_ > app.kit.conf0Balance) || app.kit.conf0Balance.isZero) {
           // They have requested too much or there is no amount but on-chain wallet is empty
           // TransData value will be erased here
@@ -220,15 +220,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           goStart
         }
 
-      } else if (pr.lnUrlOpt.isDefined) {
-        // Should resolve an embedded lnurl
-        resolveUrl(Some(pr), pr.lnUrlOpt.get)
-        // TransData value will be erased here
-        me returnToBase null
-
       } else {
-        // We have operational channels, pass it further
-        FragWallet.worker.normalOffChainSend(maxLocalSend, pr)
+        // We have operational channels at this point, check if we have an embedded lnurl
+        val specialMeaningTag = scala.util.Try(pr.lnUrlOpt.get.uri getQueryParameter "tag") getOrElse null
+        if ("link" == specialMeaningTag) FragWallet.worker.linkedOffChainSend(maxLocalSend, pr, pr.lnUrlOpt.get)
+        else FragWallet.worker.standardOffChainSend(maxLocalSend, pr)
         // TransData value will be erased here
         me returnToBase null
       }
@@ -237,13 +233,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   // LNURL
-
-  def resolveUrl(prOpt: Option[PaymentRequest], lnUrl: LNUrl) =
-    scala.util.Try(lnUrl.uri getQueryParameter "tag") -> prOpt match {
-      case scala.util.Success("link") \ Some(pr) => showLinkSendForm(lnUrl, pr)
-      case scala.util.Success("login") \ None => showLoginForm(lnUrl)
-      case _ => resolveStandardUrl(lnUrl)
-    }
 
   def resolveStandardUrl(lNUrl: LNUrl) = {
     val initialRequest = get(lNUrl.uri.toString, true).trustAllCerts.trustAllHosts
@@ -281,8 +270,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       lazy val linkingPubKey = linkingPrivKey.publicKey.toString
 
       def wut(alert: AlertDialog): Unit = {
-        val msg = getString(ln_url_info_login).format(lnUrl.uri.getHost, linkingPubKey, lnUrl.uri.getHost).html
-        mkCheckFormNeutral(_.dismiss, none, _ => me share linkingPubKey, baseTextBuilder(msg), dialog_ok, -1, dialog_share_key)
+        val bld = baseTextBuilder(getString(ln_url_info_login).format(lnUrl.uri.getHost, linkingPubKey).html)
+        mkCheckFormNeutral(_.dismiss, none, _ => me share linkingPubKey, bld, dialog_ok, -1, dialog_share_key)
       }
 
       def doLogin(alert: AlertDialog) = rm(alert) {
@@ -296,10 +285,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
       mkCheckFormNeutral(doLogin, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
     }
-  }
-
-  def showLinkSendForm(lnUrl: LNUrl, pr: PaymentRequest) = {
-
   }
 
   // BUTTONS REACTIONS
@@ -320,6 +305,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else FragWallet.worker.receive(operationalChannelsWithRoutes, finalMaxCanReceive, title, wr.defaultDescription) { rd =>
           def onRequestFailed(serverResponseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail serverResponseFail)
           obsOnIO.map(_ => wr requestWithdraw rd.pr).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
+          // In this case payment is already saved in db but has a HIDDEN status, make it visible
           PaymentInfoWrap.updStatus(PaymentInfo.WAITING, rd.pr.paymentHash)
           PaymentInfoWrap.uiNotify
         }

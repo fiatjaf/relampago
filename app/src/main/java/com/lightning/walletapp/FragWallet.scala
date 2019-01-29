@@ -15,6 +15,7 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
+import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
@@ -32,6 +33,7 @@ import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
+import com.lightning.walletapp.lnutils.JsonHttpUtils.obsOnIO
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
@@ -60,7 +62,7 @@ class FragWallet extends Fragment {
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
   import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail}
-  import host.{TxProcessor, mkCheckForm, rm, <, mkCheckFormNeutral, updateView2Blue}
+  import host.{TxProcessor, mkCheckForm, rm, <, mkCheckFormNeutral, updateView2Blue, baseTextBuilder}
 
   val fiatRate = frag.findViewById(R.id.fiatRate).asInstanceOf[TextView]
   val fiatBalance = frag.findViewById(R.id.fiatBalance).asInstanceOf[TextView]
@@ -540,8 +542,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
     val rateManager = new RateManager(baseContent) hint baseHint
 
-    def getBaseTitle: View
-    def displayOffChainPaymentForm: Unit
+    def getTitle: View
+    def displayPaymentForm: Unit
     def onUserAcceptSend(rd: RoutingData): Unit
 
     def sendAttempt(alert: AlertDialog) = rateManager.result match {
@@ -561,39 +563,61 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case Some(adr) \ Some(amount) if amount > maxCappedSend && amount < app.kit.conf0Balance =>
         val failureMessage = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
         // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback payment option
-        mkCheckFormNeutral(none, none, onChain(adr, amount, pr.paymentHash), baseBuilder(getBaseTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
+        mkCheckFormNeutral(none, none, onChain(adr, amount, pr.paymentHash), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
 
       case _ \ Some(amount) if amount > maxCappedSend =>
         // Either request contains no fallback address or we don't have enough funds on-chain at all
         val failureMessage = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
-        showForm(negBuilder(dialog_ok, getBaseTitle, failureMessage.html).create)
+        showForm(negBuilder(dialog_ok, getTitle, failureMessage.html).create)
 
       case _ =>
-        // We can pay this off-chain
-        displayOffChainPaymentForm
+        // We can pay this off-chain, show off-chain form
+        for (amount <- pr.amount) rateManager setSum Try(amount)
+        displayPaymentForm
     }
   }
 
-  def normalOffChainSend(maxLocalSend: Vector[Long], pr: PaymentRequest) = new OffChainSender(maxLocalSend, pr) {
-    def getBaseTitle = str2View(app.getString(ln_send_title).format(Utils getDescription pr.description).html)
+  def standardOffChainSend(maxLocalSend: Vector[Long], pr: PaymentRequest) = new OffChainSender(maxLocalSend, pr) {
+    def displayPaymentForm = mkCheckForm(sendAttempt, none, baseBuilder(getTitle, baseContent), dialog_pay, dialog_cancel)
+    def getTitle = str2View(app.getString(ln_send_title).format(Utils getDescription pr.description).html)
     def onUserAcceptSend(rd: RoutingData) = doSendOffChain(rd)
-
-    def displayOffChainPaymentForm = {
-      for (initialAmountRequested <- pr.amount) rateManager setSum Try(initialAmountRequested)
-      mkCheckForm(sendAttempt, none, baseBuilder(getBaseTitle, baseContent), dialog_pay, dialog_cancel)
-    }
   }
 
-//  def linkedOffChainSend(maxLocalSend: Vector[Long], pr: PaymentRequest) = new OffChainSender(maxLocalSend, pr) {
-//    private[this] val title = app.getString(ln_send_linkable_title).format(Utils getDescription pr.description)
-//    def getBaseTitle = updateView2Blue(str2View(new String), title)
-//
-//
-//  }
+  def linkedOffChainSend(maxLocalSend: Vector[Long], pr: PaymentRequest, lnUrl: LNUrl) = new OffChainSender(maxLocalSend, pr) {
+    def displayPaymentForm = mkCheckFormNeutral(sendAttempt, none, wut, baseBuilder(getTitle, baseContent), dialog_ok, dialog_cancel, dialog_wut)
+    def obtainLinkableTitle = app.getString(ln_send_linkable_title).format(lnUrl.uri.getHost, Utils getDescription pr.description)
+    def getTitle = updateView2Blue(str2View(new String), obtainLinkableTitle)
+
+    def wut(alert: AlertDialog) = {
+      val bld = baseTextBuilder(app.getString(ln_url_info_link).format(lnUrl.uri.getHost).html)
+      mkCheckFormNeutral(_.dismiss, none, optOut, bld, dialog_ok, -1, dialog_opt_out).create
+
+      def optOut(alert1: AlertDialog) = {
+        standardOffChainSend(maxLocalSend, pr)
+        alert1.dismiss
+        alert.dismiss
+      }
+    }
+
+    def onUserAcceptSend(rd: RoutingData) =
+      ChannelManager checkIfSendable rd match {
+        case Left(notSendable) => onFail(notSendable)
+        case _ => sendLinkingRequest(rd)
+      }
+
+    def sendLinkingRequest(rd: RoutingData) = {
+      val linkingPubKey = LNParams.getLinkingKey(lnUrl.uri.getHost).publicKey.toString
+      val request = get(s"${lnUrl.request}&key=$linkingPubKey", true).connectTimeout(5000).trustAllCerts.trustAllHosts
+      def onRequestFailed(serverResponseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(host onFail serverResponseFail)
+      obsOnIO.map(_ => request.body).map(LNUrlData.guardResponse).foreach(_ => doSendOffChain(rd), onRequestFailed)
+      PaymentInfoWrap insertOrUpdateOutgoingPayment rd
+      PaymentInfoWrap.uiNotify
+    }
+  }
 
   def doSendOffChain(rd: RoutingData) =
-    ChannelManager.checkIfSendable(rd) match {
-      case Left(sanityCheckErr) => onFail(sanityCheckErr)
+    ChannelManager checkIfSendable rd match {
+      case Left(notSendable) => onFail(notSendable)
       case _ => PaymentInfoWrap addPendingPayment rd
     }
 
