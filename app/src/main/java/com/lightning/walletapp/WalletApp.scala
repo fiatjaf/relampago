@@ -139,6 +139,11 @@ class WalletApp extends Application { me =>
       case lnUrl(prefix, data) => LNUrl.fromBech32(s"$prefix$data")
       case _ => toBitcoinUri(rawText)
     }
+
+    def recordNdefValue(nfc: org.ndeftools.Message) = {
+      self recordValue org.ndeftools.util.activity.NfcReaderActivity.ndefMessageString(nfc)
+      value match { case pr: PaymentRequest => pr.straightForward = true case _ => }
+    }
   }
 
   abstract class WalletKit extends AbstractKit {
