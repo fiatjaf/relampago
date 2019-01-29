@@ -164,7 +164,7 @@
     <string name="ln_send_howto"><![CDATA[
         You are trying to fulfill a Lightning payment request but there are currently no open
         <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channels</a> in this
-        wallet and also you don\'t have enough on-chain bitcoins which are required for channel funding.<br><br>
+        wallet.<br><br>Also you don\'t have enough on-chain bitcoins which are required for channel funding.<br><br>
         How to fix this? First, receive bitcoins into this wallet and then use them to open a new channel.
     ]]></string>
 

@@ -628,7 +628,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     // this code only gets executed when user taps a button to pay on-chain
     val fallback = Address.fromString(app.params, adr)
 
-    sendBtcPopup(fallback) { _ =>
+    sendBtcPopup(addr = fallback) { _ =>
       PaymentInfoWrap.updStatus(HIDDEN, hash)
       PaymentInfoWrap.uiNotify
     } setSum Try(amount)

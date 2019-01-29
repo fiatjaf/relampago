@@ -208,8 +208,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         // No channels are present at all currently, see what we can do here...
         if (pr.amount.exists(_ > app.kit.conf0Balance) || app.kit.conf0Balance.isZero) {
           // They have requested too much or there is no amount but on-chain wallet is empty
+          showForm(negTextBuilder(dialog_ok, app.getString(ln_send_howto).html).create)
           // TransData value will be erased here
-          onFail(app getString ln_send_howto)
           me returnToBase null
 
         } else {
