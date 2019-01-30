@@ -157,6 +157,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         informOfferClose(chan, msg).run
     }
 
+    override def onBecome = {
+      case (_, _, prev, SLEEPING) if prev != SLEEPING => updTitleTask.run
+      case (_, _, prev, OPEN) if prev != OPEN => updTitleTask.run
+    }
+
     override def onException = {
       case _ \ CMDAddImpossible(rd, code) =>
         // Remove this payment from unsent since it was not accepted by channel

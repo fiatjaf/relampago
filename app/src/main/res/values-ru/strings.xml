@@ -279,9 +279,9 @@
 
     <array name="ln_chan_issues_status">
         <item><![CDATA[Каналов нет]]></item>
-        <item><![CDATA[%1$s канал, %2$s оффлайн]]></item>
-        <item><![CDATA[%1$s канала, %2$s оффлайн]]></item>
-        <item><![CDATA[%1$s каналов, %2$s оффлайн]]></item>
+        <item><![CDATA[<font color=#E68A00>%1$s канал, %2$s оффлайн&#8230;</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>%1$s канала, %2$s оффлайн&#8230;</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>%1$s каналов, %2$s оффлайн&#8230;</font>]]></item>
     </array>
 
     <array name="ln_status_expiry">

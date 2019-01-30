@@ -183,7 +183,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
         val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
 
-        val name = s"Bitcoin Wallet Snapshot ${new Date}.txt"
+        val name = s"BLW Snapshot ${new Date}.txt"
         val walletSnapshotFilePath = new File(getCacheDir, "images")
         if (!walletSnapshotFilePath.isFile) walletSnapshotFilePath.mkdirs
         val savedFile = new File(walletSnapshotFilePath, name)

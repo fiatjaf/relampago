@@ -281,8 +281,8 @@
 
     <array name="ln_chan_issues_status">
         <item><![CDATA[No channels are present]]></item>
-        <item><![CDATA[<font color=#E68A00>%1$s channel, %2$s offline</font>]]></item>
-        <item><![CDATA[<font color=#E68A00>%1$s channels, %2$s offline</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>%1$s channel, %2$s offline&#8230;</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>%1$s channels, %2$s offline&#8230;</font>]]></item>
     </array>
 
     <array name="ln_status_expiry">
