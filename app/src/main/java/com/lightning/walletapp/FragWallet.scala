@@ -61,15 +61,18 @@ class FragWallet extends Fragment {
 }
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
-  import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail}
-  import host.{TxProcessor, mkCheckForm, rm, <, mkCheckFormNeutral, updateView2Blue, baseTextBuilder}
+  import host.{TxProcessor, mkCheckForm, <, mkCheckFormNeutral, updateView2Blue, baseTextBuilder, getSupportActionBar}
+  import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail, rm}
+
+  val lnStatus = frag.findViewById(R.id.lnStatus).asInstanceOf[TextView]
+  val lnBalance = frag.findViewById(R.id.lnBalance).asInstanceOf[TextView]
+  val lnDetails = frag.findViewById(R.id.lnDetails).asInstanceOf[LinearLayout]
 
   val fiatRate = frag.findViewById(R.id.fiatRate).asInstanceOf[TextView]
   val fiatBalance = frag.findViewById(R.id.fiatBalance).asInstanceOf[TextView]
   val fiatDetails = frag.findViewById(R.id.fiatDetails).asInstanceOf[LinearLayout]
 
   val mainWrap = frag.findViewById(R.id.mainWrap).asInstanceOf[LinearLayout]
-  val customTitle = frag.findViewById(R.id.customTitle).asInstanceOf[TextView]
   val mnemonicWarn = frag.findViewById(R.id.mnemonicWarn).asInstanceOf[LinearLayout]
   val itemsList = frag.findViewById(R.id.itemsList).asInstanceOf[ListView]
 
@@ -100,8 +103,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   val peersListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
-    def onPeerDisconnected(connectedPeer: Peer, currentPeerCount: Int) = updTitleTask.run
-    def onPeerConnected(connectedPeer: Peer, currentPeerCount: Int) = updTitleTask.run
+    def onPeerDisconnected(peer: Peer, leftPeers: Int) = if (leftPeers < 1) updTitleTask.run
+    def onPeerConnected(peer: Peer, leftPeers: Int) = if (leftPeers == 1) updTitleTask.run
   }
 
   val txsListener = new TxTracker {
@@ -204,24 +207,24 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom parsedWithSign btcTotalSum
-    val perBtcRate = formatFiat format msatInFiat(oneBtc).getOrElse(0L)
-    fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
-    fiatRate setText s"<small>$perBtcRate</small>".html
+    val perOneBtcRate = formatFiat format msatInFiat(oneBtc).getOrElse(0L)
 
     val subtitleText =
       if (app.kit.peerGroup.numConnectedPeers < 1) statusConnecting
       else if (ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay) statusOperational
-      else app.plurOrZero(syncOps, ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
+      else app.plur1OrZero(syncOps, ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
 
-    customTitle setText s"""
-      <img src="btc"/><strong>$btcFunds</strong><br>
-      <img src="ln"/><strong>$lnFunds</strong><br>
-      $subtitleText<img src="none"/>""".html
+    lnStatus setText chanStatusLine.html
+    lnBalance setText s"<img src='lnbig'/>$lnFunds".html
+    fiatRate setText s"<small>$perOneBtcRate</small>".html
+    fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
+    getSupportActionBar setTitle s"<img src='btcbig'/>$btcFunds".html
+    getSupportActionBar setSubtitle subtitleText.html
   }
 
   // DISPLAYING ITEMS LIST
 
-  val minLinesNum = 5
+  val minLinesNum = 4
   var currentCut = minLinesNum
   var lnItems = Vector.empty[LNWrap]
   var btcItems = Vector.empty[BTCWrap]
@@ -241,6 +244,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     mnemonicWarn setVisibility viewMap(allItems.isEmpty)
     itemsList setVisibility viewMap(allItems.nonEmpty)
     fiatDetails setVisibility viewMap(!isSearching)
+    lnDetails setVisibility viewMap(!isSearching)
   }
 
   val adapter = new BaseAdapter {
@@ -369,7 +373,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val feeHuman = denom.coloredOut(fee, denom.sign)
 
         val title = lnTitleOut.format(humanStatus, amountSentHuman, inFiat, feeHuman, paidFeePercent)
-        val expiryBlocksLeftPart = app.plurOrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
+        val expiryBlocksLeftPart = app.plur1OrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
         if (info.status == WAITING) s"$expiryBlocksLeftPart<br>$title" else title
       }
 
@@ -426,7 +430,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def generatePopup = {
-      val confs = app.plurOrZero(txsConfs, txDepth)
+      val confs = app.plur1OrZero(txsConfs, txDepth)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
       val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]

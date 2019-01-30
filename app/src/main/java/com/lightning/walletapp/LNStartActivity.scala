@@ -163,7 +163,7 @@ case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNo
 }
 
 case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
-  def asString(base: String) = base.format(ca.alias, app.plurOrZero(chansNumber, num), ca.pretty)
+  def asString(base: String) = base.format(ca.alias, app.plur1OrZero(chansNumber, num), ca.pretty)
   lazy val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
   val ca \ num = acn
 }

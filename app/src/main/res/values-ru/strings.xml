@@ -129,7 +129,7 @@
 
     <string name="btc_empty">Нет монет на цепи</string>
     <string name="ln_empty">Нет монет в каналах</string>
-    <string name="btc_status_operational">Кошелек онлайн</string>
+    <string name="btc_status_operational">Биткоин-кошелек онлайн</string>
     <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Поиск узлов&#8230;</font>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
@@ -270,11 +270,18 @@
         <item>Возвратная транзакция</item>
     </array>
 
-    <array name="ln_chan_present">
+    <array name="ln_chan_good_status">
         <item><![CDATA[Каналов нет]]></item>
-        <item><![CDATA[Всего %1$s канал]]></item>
-        <item><![CDATA[Всего %1$s канала]]></item>
-        <item><![CDATA[Всего %1$s каналов]]></item>
+        <item><![CDATA[%1$s канал онлайн]]></item>
+        <item><![CDATA[%1$s канала онлайн]]></item>
+        <item><![CDATA[%1$s каналов онлайн]]></item>
+    </array>
+
+    <array name="ln_chan_issues_status">
+        <item><![CDATA[Каналов нет]]></item>
+        <item><![CDATA[%1$s канал, %2$s оффлайн]]></item>
+        <item><![CDATA[%1$s канала, %2$s оффлайн]]></item>
+        <item><![CDATA[%1$s каналов, %2$s оффлайн]]></item>
     </array>
 
     <array name="ln_status_expiry">

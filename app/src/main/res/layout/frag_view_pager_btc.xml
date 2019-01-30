@@ -10,27 +10,43 @@
 
         <android.support.v7.widget.Toolbar
             xmlns:app="http://schemas.android.com/apk/res-auto"
-            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+            xmlns:android="http://schemas.android.com/apk/res/android"
             android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+            app:subtitleTextAppearance="@style/ToolbarSubtitleAppearance"
+            app:titleTextAppearance="@style/ToolbarTitleAppearance"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
             android:background="@android:color/black"
             android:layout_width="match_parent"
-            android:layout_height="84sp"
+            android:layout_height="70sp"
             android:id="@+id/toolbar"
 
             app:contentInsetLeft="@dimen/app_padding"
             app:contentInsetStart="@dimen/app_padding"
             app:contentInsetRight="@dimen/app_padding"
-            app:contentInsetEnd="@dimen/app_padding">
+            app:contentInsetEnd="@dimen/app_padding"/>
+
+        <LinearLayout
+            android:id="@+id/lnDetails"
+            style="@style/LineLinearLayout"
+            android:layout_width="fill_parent"
+            android:orientation="vertical"
+            android:background="#222222"
+            android:paddingBottom="9sp"
+            android:paddingTop="6sp">
 
             <TextView
-                style="@style/BaseText"
-                android:layout_width="match_parent"
+                style="@style/ToolbarTitleAppearance"
                 android:layout_height="wrap_content"
-                android:textColor="@android:color/white"
-                android:id="@+id/customTitle"
-                android:maxLines="3"/>
+                android:layout_width="match_parent"
+                android:id="@+id/lnBalance"/>
 
-        </android.support.v7.widget.Toolbar>
+            <TextView
+                style="@style/ToolbarSubtitleAppearance"
+                android:layout_height="wrap_content"
+                android:layout_width="match_parent"
+                android:id="@+id/lnStatus"/>
+
+        </LinearLayout>
 
         <LinearLayout
             android:id="@+id/fiatDetails"

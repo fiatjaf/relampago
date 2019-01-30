@@ -65,7 +65,10 @@ trait SearchBar { me =>
 
 trait HumanTimeDisplay {
   val host: TimerActivity
-  // Should be accessed after activity is initialized
+  val time: Date => String = new SimpleDateFormat(timeString) format _
+  lazy val chanGoodStatus = app.getResources getStringArray R.array.ln_chan_good_status
+  lazy val chanIssuesStatus = app.getResources getStringArray R.array.ln_chan_issues_status
+
   lazy val timeString = DateFormat is24HourFormat host match {
     case false if scrWidth < 2.2 & bigFont => "MM/dd/yy' <small>'h:mma'</small>'"
     case false if scrWidth < 2.2 => "MM/dd/yy' <small>'h:mma'</small>'"
@@ -82,7 +85,13 @@ trait HumanTimeDisplay {
     case true => "d MMM yyyy' <small>'HH:mm'</small>'"
   }
 
-  val time: Date => String = new SimpleDateFormat(timeString) format _
+  def chanStatusLine = {
+    val operational = ChannelManager.notClosingOrRefunding
+    val delta = operational.size - operational.count(_.state == OPEN)
+    if (delta > 0) app.plur2OrZero(chanIssuesStatus, operational.size, delta)
+    else app.plur1OrZero(chanGoodStatus, operational.size)
+  }
+
   def when(now: Long, thenDate: Date) = thenDate.getTime match { case ago =>
     if (now - ago < 129600000) getRelativeTimeSpanString(ago, now, 0).toString
     else time(thenDate)

@@ -26,18 +26,15 @@ import java.util.Date
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  lazy val localChanCache = for (channel <- ChannelManager.all if me canDisplay channel.data) yield channel
+  lazy val displayedChans = for (channel <- ChannelManager.all if me canDisplay channel.data) yield channel
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
-  lazy val presentChans = app.getResources getStringArray R.array.ln_chan_present
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
-  lazy val otherState = getString(ln_info_status_other)
-  lazy val fundingInfo = getString(ln_info_funding)
   lazy val host = me
 
   val adapter = new BaseAdapter {
-    def getItem(position: Int) = localChanCache(position)
+    def getItem(position: Int) = displayedChans(position)
     def getItemId(chanPosition: Int) = chanPosition
-    def getCount = localChanCache.size
+    def getCount = displayedChans.size
 
     def getView(position: Int, savedView: View, parent: ViewGroup) = {
       val card = if (null == savedView) getLayoutInflater.inflate(R.layout.chan_card, null) else savedView
@@ -47,15 +44,14 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
   }
 
-  val becomeListener = new ChannelListener {
-    override def onBecome: PartialFunction[Transition, Unit] = {
-      case anyStateChange => UITask(adapter.notifyDataSetChanged).run
-    }
-  }
+  val eventsListener = new ChannelListener with BlocksListener {
+    override def onBecome: PartialFunction[Transition, Unit] = { case anyStateChange => reactOnAnyIncomingOffChainEvent.run }
+    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = if (left < 1) reactOnAnyIncomingOffChainEvent.run
 
-  val blocksListener = new BlocksListener {
-    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) =
-      if (left < 1) UITask(adapter.notifyDataSetChanged).run
+    val reactOnAnyIncomingOffChainEvent = UITask {
+      getSupportActionBar setSubtitle chanStatusLine.html
+      adapter.notifyDataSetChanged
+    }
   }
 
   class ViewHolder(view: View) {
@@ -128,10 +124,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       startedAtText setText started.html
       totalPaymentsText setText getStat(cs.channelId).toString
+      fundingDepthText setText getString(ln_info_funding).format(txDepth, threshold)
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(canSendMsat) / 1000L).html
       refundableAmountText setText denom.parsedWithSign(refundable).html
-      fundingDepthText setText fundingInfo.format(txDepth, threshold)
       totalCapacityText setText denom.parsedWithSign(capacity).html
       paymentsInFlightText setText sumOrNothing(valueInFlight).html
       refundFeeText setText sumOrNothing(breakFee).html
@@ -233,18 +229,23 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   override def onDestroy = wrap(super.onDestroy) {
-    app.kit.peerGroup removeBlocksDownloadedEventListener blocksListener
-    for (chan <- localChanCache) chan.listeners -= becomeListener
+    app.kit.peerGroup removeBlocksDownloadedEventListener eventsListener
+    for (chan <- displayedChans) chan.listeners -= eventsListener
   }
 
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_ln_ops
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-    getSupportActionBar setSubtitle app.plurOrZero(presentChans, localChanCache.size)
-    wrap(gridView setAdapter adapter)(getSupportActionBar setTitle action_ln_details)
-    app.kit.peerGroup addBlocksDownloadedEventListener blocksListener
-    for (chan <- localChanCache) chan.listeners += becomeListener
+
+    // Populate toolbar with initial values
+    getSupportActionBar setTitle action_ln_details
+    getSupportActionBar setSubtitle chanStatusLine.html
     gridView setNumColumns math.round(scrWidth / 2.4).toInt
+    gridView setAdapter adapter
+
+    // Wire up listeners for blockchain and channels
+    app.kit.peerGroup addBlocksDownloadedEventListener eventsListener
+    for (chan <- displayedChans) chan.listeners += eventsListener
   } else me exitTo classOf[MainActivity]
 
   // UTILS
@@ -254,7 +255,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case (_: NormalData, _) if !isOperational(c) => me getString ln_info_status_shutdown
     case _ \ WAIT_FUNDING_DONE => me getString ln_info_status_opening
     case _ \ NEGOTIATIONS => me getString ln_info_status_negotiations
-    case _ => otherState format c.state
+    case _ => me getString ln_info_status_other format c.state
   }
 
   def connectivityStatusColor(c: Channel) =

@@ -133,7 +133,7 @@
 
     <string name="btc_empty">No on-chain funds</string>
     <string name="ln_empty">No off-chain funds</string>
-    <string name="btc_status_operational">Wallet is operational</string>
+    <string name="btc_status_operational">Bitcoin wallet is online</string>
     <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Connecting to peers&#8230;</font>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
@@ -273,10 +273,16 @@
         <item>View refunding transaction</item>
     </array>
 
-    <array name="ln_chan_present">
+    <array name="ln_chan_good_status">
         <item><![CDATA[No channels are present]]></item>
-        <item><![CDATA[%1$s channel in total]]></item>
-        <item><![CDATA[%1$s channels in total]]></item>
+        <item><![CDATA[%1$s channel is online]]></item>
+        <item><![CDATA[%1$s channels are online]]></item>
+    </array>
+
+    <array name="ln_chan_issues_status">
+        <item><![CDATA[No channels are present]]></item>
+        <item><![CDATA[<font color=#E68A00>%1$s channel, %2$s offline</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>%1$s channels, %2$s offline</font>]]></item>
     </array>
 
     <array name="ln_status_expiry">

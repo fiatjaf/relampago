@@ -41,7 +41,7 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       val cloud = getItem(pos)
       val serverAddress = Uri.parse(cloud.connector.url)
-      val tokensLeftHuman = app.plurOrZero(tokensLeft, cloud.data.tokens.size)
+      val tokensLeftHuman = app.plur1OrZero(tokensLeft, cloud.data.tokens.size)
       val finalTokensLeft = if (cloud.isAuthEnabled) tokensLeftHuman else tokensLeft.last
 
       olympusAddress setText serverAddress.getHost

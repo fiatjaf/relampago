@@ -26,14 +26,22 @@ object IconGetter extends Html.ImageGetter {
 
   import android.provider.Settings.{System => FontSystem}
   val bigFont = FontSystem.getFloat(app.getContentResolver, FontSystem.FONT_SCALE, 1) > 1
-  private val noneDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_none, null)
   private val btcDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_btc_shape, null)
   private val lnDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_bolt_shape, null)
-  def getDrawable(s: String) = s match { case "ln" => lnDrawable case "btc" => btcDrawable case "none" => noneDrawable }
+  private val btcDrawableStretched = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_btc_shape, null)
+  private val lnDrawableStretched = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_bolt_shape, null)
+
+  def getDrawable(s: String) = s match {
+    case "btcbig" => btcDrawableStretched
+    case "lnbig" => lnDrawableStretched
+    case "btc" => btcDrawable
+    case "ln" => lnDrawable
+  }
 
   private val fontAdjusted = if (bigFont) 7.5 else 8.3
   private val screenMetricsAdjusted = (metrics.densityDpi / fontAdjusted).toInt
-  noneDrawable.setBounds(0, -2, screenMetricsAdjusted, screenMetricsAdjusted)
+  btcDrawableStretched.setBounds(0, -5, screenMetricsAdjusted, screenMetricsAdjusted + 3)
+  lnDrawableStretched.setBounds(0, -5, screenMetricsAdjusted, screenMetricsAdjusted + 3)
   btcDrawable.setBounds(0, -2, screenMetricsAdjusted, screenMetricsAdjusted)
   lnDrawable.setBounds(0, -2, screenMetricsAdjusted, screenMetricsAdjusted)
 }
