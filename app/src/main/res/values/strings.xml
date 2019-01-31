@@ -131,10 +131,6 @@
         <item><![CDATA[<font color=#E68A00>Sync: %1$d days behind</font>]]></item>
     </array>
 
-    <string name="btc_empty">No on-chain funds</string>
-    <string name="ln_empty">No off-chain funds</string>
-    <string name="btc_status_operational">Bitcoin wallet is online</string>
-    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Connecting to peers&#8230;</font>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
@@ -273,16 +269,23 @@
         <item>View refunding transaction</item>
     </array>
 
-    <array name="ln_chan_good_status">
+    <string name="btc_empty">No on-chain funds</string>
+    <string name="ln_empty">No off-chain funds</string>
+    <string name="btc_status_operational">Bitcoin wallet is online</string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Connecting to peers</font>]]></string>
+    <string name="ln_status_operational_one">Payment channel is online</string>
+    <string name="ln_status_operational_many">All channels are online</string>
+
+    <array name="ln_chan_present">
         <item><![CDATA[No channels are present]]></item>
-        <item><![CDATA[%1$s channel is online]]></item>
-        <item><![CDATA[%1$s channels are online]]></item>
+        <item><![CDATA[%1$s channel in total]]></item>
+        <item><![CDATA[%1$s channels in total]]></item>
     </array>
 
-    <array name="ln_chan_issues_status">
-        <item><![CDATA[No channels are present]]></item>
-        <item><![CDATA[<font color=#E68A00>%1$s channel, %2$s offline&#8230;</font>]]></item>
-        <item><![CDATA[<font color=#E68A00>%1$s channels, %2$s offline&#8230;</font>]]></item>
+    <array name="ln_chan_connecting">
+        <item><![CDATA[No open channels are present]]></item>
+        <item><![CDATA[<font color=#E68A00>Getting %1$s channel up</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Getting %1$s channels up</font>]]></item>
     </array>
 
     <array name="ln_status_expiry">

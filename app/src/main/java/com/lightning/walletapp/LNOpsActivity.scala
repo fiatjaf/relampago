@@ -28,6 +28,7 @@ import java.util.Date
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val displayedChans = for (channel <- ChannelManager.all if me canDisplay channel.data) yield channel
   lazy val chanActions = for (txt <- getResources getStringArray R.array.ln_chan_actions_list) yield txt.html
+  lazy val presentChans = app.getResources getStringArray R.array.ln_chan_present
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
   lazy val host = me
 
@@ -45,13 +46,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   val eventsListener = new ChannelListener with BlocksListener {
-    override def onBecome: PartialFunction[Transition, Unit] = { case anyStateChange => reactOnAnyIncomingOffChainEvent.run }
-    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = if (left < 1) reactOnAnyIncomingOffChainEvent.run
-
-    val reactOnAnyIncomingOffChainEvent = UITask {
-      getSupportActionBar setSubtitle chanStatusLine.html
-      adapter.notifyDataSetChanged
-    }
+    override def onBecome: PartialFunction[Transition, Unit] = { case anyStateChange => UITask(adapter.notifyDataSetChanged).run }
+    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = if (left < 1) UITask(adapter.notifyDataSetChanged).run
   }
 
   class ViewHolder(view: View) {
@@ -236,14 +232,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_ln_ops
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-
-    // Populate toolbar with initial values
+    getSupportActionBar setSubtitle app.plur1OrZero(presentChans, displayedChans.size)
     getSupportActionBar setTitle action_ln_details
-    getSupportActionBar setSubtitle chanStatusLine.html
-    gridView setNumColumns math.round(scrWidth / 2.4).toInt
-    gridView setAdapter adapter
 
-    // Wire up listeners for blockchain and channels
+    gridView setAdapter adapter
+    gridView setNumColumns math.round(scrWidth / 2.4).toInt
     app.kit.peerGroup addBlocksDownloadedEventListener eventsListener
     for (chan <- displayedChans) chan.listeners += eventsListener
   } else me exitTo classOf[MainActivity]

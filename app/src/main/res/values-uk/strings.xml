@@ -127,10 +127,6 @@
         <item><![CDATA[<font color=#E68A00>Синхронізація %1$d днів</font>]]></item>
     </array>
 
-    <string name="btc_empty">Немає монет он-чейн</string>
-    <string name="ln_empty">Немає монет офф-чейн</string>
-    <string name="btc_status_operational">Біткоїн-гаманець онлайн</string>
-    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Пошук вузлів&#8230;</font>]]></string>
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>отримано %2$s<br><small>%3$s за поточним курсом</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small>]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
@@ -270,18 +266,25 @@
         <item>Зворотня транзакція</item>
     </array>
 
-    <array name="ln_chan_good_status">
+    <string name="btc_empty">Немає монет он-чейн</string>
+    <string name="ln_empty">Немає монет офф-чейн</string>
+    <string name="btc_status_operational">Біткоїн-гаманець онлайн</string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Пошук вузлів&#8230;</font>]]></string>
+    <string name="ln_status_operational_one">Платiжный канал працює</string>
+    <string name="ln_status_operational_many">Усi канали працюють</string>
+
+    <array name="ln_chan_present">
         <item><![CDATA[Каналів немає]]></item>
-        <item><![CDATA[%1$s канал онлайн]]></item>
-        <item><![CDATA[%1$s канала онлайн]]></item>
-        <item><![CDATA[%1$s каналів онлайн]]></item>
+        <item><![CDATA[Усього %1$s канал]]></item>
+        <item><![CDATA[Усього %1$s канала]]></item>
+        <item><![CDATA[Усього %1$s каналів]]></item>
     </array>
 
-    <array name="ln_chan_issues_status">
-        <item><![CDATA[Каналів немає]]></item>
-        <item><![CDATA[<font color=#E68A00>%1$s канал, %2$s офлайн&#8230;</font>]]></item>
-        <item><![CDATA[<font color=#E68A00>%1$s канала, %2$s офлайн&#8230;</font>]]></item>
-        <item><![CDATA[<font color=#E68A00>%1$s каналів, %2$s офлайн&#8230;</font>]]></item>
+    <array name="ln_chan_connecting">
+        <item><![CDATA[Вiдчинених каналiв немає]]></item>
+        <item><![CDATA[<font color=#E68A00>Вмикається %1$s канал&#8230;</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Вмикаються %1$s канала&#8230;</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Вмикається %1$s каналiв&#8230;</font>]]></item>
     </array>
 
     <array name="ln_status_expiry">

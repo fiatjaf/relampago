@@ -79,20 +79,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
   val imageMap = Array(await, await, conf1, dead, frozen)
-  val oneBtc = MilliSatoshi(100000000000L)
   val updTitleTask = UITask(updTitle)
 
   val paymentStates = app.getResources getStringArray R.array.ln_payment_states
   val expiryLeft = app.getResources getStringArray R.array.ln_status_expiry
-  val syncOps = app.getResources getStringArray R.array.info_progress
   val txsConfs = app.getResources getStringArray R.array.txs_confs
   val lnTitleOutNoFee = app getString ln_outgoing_title_no_fee
-  val statusOperational = app getString btc_status_operational
-  val statusConnecting = app getString btc_status_connecting
   val lnTitleOut = app getString ln_outgoing_title
   val lnTitleIn = app getString ln_incoming_title
-  val btcEmpty = app getString btc_empty
-  val lnEmpty = app getString ln_empty
   val lnProof = app getString ln_proof
 
   // LISTENERS
@@ -202,29 +196,47 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // UPDATING TITLE
 
+  val lnStateInfo = app.getResources getStringArray R.array.ln_chan_connecting
+  val lnStatusOperationalMany = app getString ln_status_operational_many
+  val lnStatusOperationalOne = app getString ln_status_operational_one
+  val lnEmpty = app getString ln_empty
+
+  val oneBtc = MilliSatoshi(100000000000L)
+  val btcSyncInfo = app.getResources getStringArray R.array.info_progress
+  val btcStatusOperational = app getString btc_status_operational
+  val btcStatusConnecting = app getString btc_status_connecting
+  val btcEmpty = app getString btc_empty
+
   def updTitle = {
-    val lnTotal = ChannelManager.notClosingOrRefunding map { chan =>
+    val operational = ChannelManager.notClosingOrRefunding
+    val delta = operational.size - operational.count(_.state == OPEN)
+
+    val btcTotalSum = coin2MSat(app.kit.conf0Balance)
+    val lnTotalSum = MilliSatoshi(operational.map { chan =>
       // Here we seek a total refundable amount which is not affected by on-chain fee changes
       chan.hasCsOr(data => Commitments.latestRemoteCommit(data.commitments).spec.toRemoteMsat, 0L)
-    }
+    }.sum)
 
-    val lnTotalSum = MilliSatoshi(lnTotal.sum)
-    val btcTotalSum = coin2MSat(app.kit.conf0Balance)
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom parsedWithSign btcTotalSum
     val perOneBtcRate = formatFiat format msatInFiat(oneBtc).getOrElse(0L)
 
-    val subtitleText =
-      if (app.kit.peerGroup.numConnectedPeers < 1) statusConnecting
-      else if (ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay) statusOperational
-      else app.plur1OrZero(syncOps, ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
+    val btcSubtitleText =
+      if (app.kit.peerGroup.numConnectedPeers < 1) btcStatusConnecting
+      else if (ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay) btcStatusOperational
+      else app.plur1OrZero(btcSyncInfo, ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
 
-    lnStatus setText chanStatusLine.html
+    val lnSubtitleText =
+      if (delta == 0 && operational.size == 1) lnStatusOperationalOne
+      else if (delta == 0 && operational.size > 1) lnStatusOperationalMany
+      else app.plur1OrZero(lnStateInfo, delta)
+
+    lnStatus setText lnSubtitleText.html
     lnBalance setText s"<img src='lnbig'/>$lnFunds".html
     fiatRate setText s"<small>$perOneBtcRate</small>".html
     fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
     getSupportActionBar setTitle s"<img src='btcbig'/>$btcFunds".html
-    getSupportActionBar setSubtitle subtitleText.html
+    getSupportActionBar setSubtitle btcSubtitleText.html
   }
 
   // DISPLAYING ITEMS LIST
