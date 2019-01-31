@@ -283,7 +283,7 @@
     </array>
 
     <array name="ln_chan_connecting">
-        <item><![CDATA[No open channels are present]]></item>
+        <item><![CDATA[No open channels]]></item>
         <item><![CDATA[<font color=#E68A00>Getting %1$s channel up</font>]]></item>
         <item><![CDATA[<font color=#E68A00>Getting %1$s channels up</font>]]></item>
     </array>
