@@ -34,12 +34,11 @@ class LNStartFundActivity extends TimerActivity { me =>
   def INIT(state: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_ln_start_fund)
     val fundNodeView = app getString ln_ops_start_fund_node_view
-    val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
 
     app.TransData checkAndMaybeErase {
       case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(fundNodeView), ann)
       case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(fundNodeView), ann)
-      case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, chansNumber.last).asString(fundNodeView), ann)
+      case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, tip = "( ͡° ͜ʖ ͡°)").asString(fundNodeView), ann)
       case icp: IncomingChannelParams => proceed(Some(icp), icp.nodeView.asString(fundNodeView), icp.nodeView.ann)
       case other => finish
     }

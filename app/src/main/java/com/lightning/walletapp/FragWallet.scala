@@ -79,7 +79,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
   val imageMap = Array(await, await, conf1, dead, frozen)
-  val updTitleTask = UITask(updTitle)
 
   val paymentStates = app.getResources getStringArray R.array.ln_payment_states
   val expiryLeft = app.getResources getStringArray R.array.ln_status_expiry
@@ -207,9 +206,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val btcStatusConnecting = app getString btc_status_connecting
   val btcEmpty = app getString btc_empty
 
-  def updTitle = {
+  val updTitleTask = UITask {
     val operational = ChannelManager.notClosingOrRefunding
-    val delta = operational.size - operational.count(_.state == OPEN)
+    val online = operational.count(_.state == OPEN)
+    val delta = operational.size - online
 
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
     val lnTotalSum = MilliSatoshi(operational.map { chan =>
@@ -255,7 +255,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
     fundTxIds = ChannelManager.all.map(_.fundTxId.toString).toSet
     adapter.notifyDataSetChanged
-    updTitle
+    updTitleTask.run
 
     allTxsWrapper setVisibility viewMap(allItems.size > minLinesNum)
     mnemonicWarn setVisibility viewMap(allItems.isEmpty)
@@ -718,8 +718,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def react = android.support.v4.app.LoaderManager.getInstance(host).restartLoader(1, null, loaderCallbacks).forceLoad
   val observer = new ContentObserver(new Handler) { override def onChange(fromSelf: Boolean) = if (!fromSelf) react }
 
-  host.timer.schedule(adapter.notifyDataSetChanged, 10000, 10000)
   host setSupportActionBar frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
+  host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
   host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
   itemsList setOnItemClickListener onTap { position => adapter.getItem(position).generatePopup }
   itemsList setFooterDividersEnabled false

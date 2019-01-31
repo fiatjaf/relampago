@@ -273,8 +273,8 @@
     <string name="ln_empty">No off-chain funds</string>
     <string name="btc_status_operational">Bitcoin wallet is online</string>
     <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Connecting to peers</font>]]></string>
-    <string name="ln_status_operational_one">Payment channel is online</string>
     <string name="ln_status_operational_many">All channels are online</string>
+    <string name="ln_status_operational_one">Channel is online</string>
 
     <array name="ln_chan_present">
         <item><![CDATA[No channels are present]]></item>
@@ -299,7 +299,6 @@
         <item><![CDATA[No public channels]]></item>
         <item><![CDATA[%1$s public channel]]></item>
         <item><![CDATA[%1$s public channels]]></item>
-        <item><![CDATA[<i>Public channels unknown</i>]]></item>
     </array>
 
     <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Got questions or feel lost?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Read about Lightning Network</a></small><br><br>payment channel funding<br><strong>from local wallet</strong>]]></string>

@@ -114,7 +114,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         fiatCode = fiatCodes.toList(pos)
         // Update fiatCode so UI update can react to changes right away
         app.prefs.edit.putString(AbstractKit.FIAT_TYPE, fiatCode).commit
-        Option(FragWallet.worker).foreach(_.updTitle.run)
+        Option(FragWallet.worker).foreach(_.updTitleTask.run)
       }
 
       lst setOnItemClickListener onTap(updateFiatType)
@@ -136,7 +136,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         denom = denoms(pos)
         app.prefs.edit.putInt(AbstractKit.DENOM_TYPE, pos).commit
         Option(FragWallet.worker).foreach(_.adapter.notifyDataSetChanged)
-        Option(FragWallet.worker).foreach(_.updTitle.run)
+        Option(FragWallet.worker).foreach(_.updTitleTask.run)
       }
 
       showForm(negBuilder(dialog_ok, me getString sets_choose_unit, form).create)
