@@ -40,7 +40,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(fundNodeView), ann)
       case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, tip = "( ͡° ͜ʖ ͡°)").asString(fundNodeView), ann)
       case icp: IncomingChannelParams => proceed(Some(icp), icp.nodeView.asString(fundNodeView), icp.nodeView.ann)
-      case other => finish
+      case _ => finish
     }
 
     // Or back if resources are freed
@@ -58,10 +58,19 @@ class LNStartFundActivity extends TimerActivity { me =>
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        case err: Error if nodeId == ann.nodeId => onException(freshChan -> err.exception)
-        case msg: ChannelSetupMessage if nodeId == ann.nodeId => freshChan process msg
+        case open: OpenChannel if nodeId == ann.nodeId && open.channelFlags == 0.toByte => onOpenOffer(nodeId, open)
+        case remoteError: Error if nodeId == ann.nodeId => onException(freshChan -> remoteError.exception)
+        case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChan process msg
         case _ => // We only listen to setup messages here to avoid conflicts
       }
+
+      override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) =
+        if (System.currentTimeMillis > ConnectionManager.lastOpenChannelOffer + 7500L) {
+          val hnv = HardcodedNodeView(ann, app getString ln_ops_start_fund_incoming_channel)
+          ConnectionManager.lastOpenChannelOffer = System.currentTimeMillis
+          app.TransData.value = IncomingChannelParams(hnv, open)
+          runAnd(finish)(me startActivity getIntent)
+        }
 
       override def onException = {
         case _ \ errorWhileOpening =>

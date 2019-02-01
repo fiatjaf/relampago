@@ -18,6 +18,7 @@ import java.net.Socket
 
 
 object ConnectionManager {
+  var lastOpenChannelOffer = 0L
   var listeners = Set.empty[ConnectionListener]
   val connections = new ConcurrentHashMap[PublicKey, Worker].asScala
 
@@ -89,6 +90,7 @@ object ConnectionManager {
 }
 
 class ConnectionListener {
+  def onOpenOffer(nodeId: PublicKey, msg: OpenChannel): Unit = none
   def onMessage(nodeId: PublicKey, msg: LightningMessage): Unit = none
   def onOperational(nodeId: PublicKey, isCompat: Boolean): Unit = none
   def onTerminalError(nodeId: PublicKey): Unit = none

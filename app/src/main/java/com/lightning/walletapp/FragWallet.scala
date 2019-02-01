@@ -109,22 +109,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // To fight spamming
   private[this] var errorLimit = 5
-  private[this] var lastOpenMsecStamp = 0L
   private[this] val connectionListener = new ConnectionListener {
-    override def onMessage(nodeId: PublicKey, incomingMessage: LightningMessage) = incomingMessage match {
-      case open: OpenChannel if System.currentTimeMillis > lastOpenMsecStamp + 10000L && open.channelFlags == 0.toByte =>
-        // We only consider incoming channels if they are private and last message arrived more than 10 seconds ago
+    override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+      case open: OpenChannel if open.channelFlags == 0.toByte => onOpenOffer(nodeId, open)
+      case _ => // Ignore public channel offers
+    }
 
-        lastOpenMsecStamp = System.currentTimeMillis
-        ConnectionManager.connections get nodeId foreach { worker =>
-          val incomingChannel = app getString ln_ops_start_fund_incoming_channel
-          val hardcodedNodeView = HardcodedNodeView(worker.ann, incomingChannel)
-          app.TransData.value = IncomingChannelParams(hardcodedNodeView, open)
+    override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) =
+      if (System.currentTimeMillis > ConnectionManager.lastOpenChannelOffer + 7500L)
+        ConnectionManager.connections get nodeId foreach { existingWorkerConnection =>
+          val startFundIncomingChannel = app getString ln_ops_start_fund_incoming_channel
+          val hnv = HardcodedNodeView(existingWorkerConnection.ann, startFundIncomingChannel)
+          ConnectionManager.lastOpenChannelOffer = System.currentTimeMillis
+          app.TransData.value = IncomingChannelParams(hnv, open)
           host goTo classOf[LNStartFundActivity]
         }
-
-      case _ =>
-    }
   }
 
   val chanListener = new ChannelListener {
