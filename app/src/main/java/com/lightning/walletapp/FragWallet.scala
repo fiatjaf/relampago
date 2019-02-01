@@ -584,7 +584,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case Some(adr) \ Some(amount) if amount > maxCappedSend && amount < app.kit.conf0Balance =>
         val failureMessage = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
         // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback payment option
-        mkCheckFormNeutral(none, none, onChain(adr, amount, pr.paymentHash), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
+        mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount, pr.paymentHash), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
 
       case _ \ Some(amount) if amount > maxCappedSend =>
         // Either request contains no fallback address or we don't have enough funds on-chain at all

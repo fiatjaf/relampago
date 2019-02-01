@@ -99,13 +99,10 @@ class RequestActivity extends TimerActivity { me =>
     shareText setOnClickListener onButtonTap(me share data)
   }
 
-  def setView(displayedImage: Bitmap) = {
-    shareQR setOnClickListener onButtonTap {
-      <(me shareBitmap displayedImage, onFail)(none)
-    }
-
-    // Enable after QR is fully generated
-    reqCode setImageBitmap displayedImage
+  def setView(image: Bitmap) = {
+    def share = <(me shareBitmap image, onFail)(none)
+    shareQR setOnClickListener onButtonTap(share)
+    reqCode setImageBitmap image
     shareQR setEnabled true
   }
 
