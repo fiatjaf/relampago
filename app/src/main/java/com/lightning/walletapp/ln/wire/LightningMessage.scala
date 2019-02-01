@@ -4,14 +4,14 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.ln.{HasCommitments, LightningException}
 import com.lightning.walletapp.ln.Tools.{bin2readable, fromShortId}
 import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
-
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
+
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import com.lightning.walletapp.lnutils.olympus.CloudSnapshot
+import fr.acinq.eclair.tor.OnionAddress
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
-import fr.acinq.eclair.tor.OnionAddress
 
 
 trait LightningMessage
