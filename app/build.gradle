@@ -44,8 +44,6 @@ dependencies {
         exclude group: 'com.google.guava', module: 'listenablefuture'
     }
 
-    compile group: 'commons-codec', name: 'commons-codec', version: '1.9'
-
     // Misc
     compile 'com.android.support:support-v4:28.0.0'
     compile 'com.android.support:cardview-v7:28.0.0'
@@ -58,5 +56,6 @@ dependencies {
     compile 'org.scala-lang:scala-library:2.11.12'
     compile 'com.hootsuite.android:nachos:1.1.1'
     compile 'io.reactivex:rxscala_2.11:0.26.5'
+    compile 'commons-codec:commons-codec:1.9'
     compile 'com.github.clans:fab:1.6.4'
 }
