@@ -6,9 +6,9 @@ import com.lightning.walletapp.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
+import com.lightning.walletapp.ln.wire.{ChannelUpdate, NodeAnnouncement}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
-import com.lightning.walletapp.ln.wire.{ChannelUpdate, NodeAnnouncement}
 import com.lightning.walletapp.ChannelManager
 import fr.acinq.eclair.UInt64
 

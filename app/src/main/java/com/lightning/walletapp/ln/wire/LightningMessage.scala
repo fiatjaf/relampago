@@ -4,13 +4,14 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.ln.{HasCommitments, LightningException}
 import com.lightning.walletapp.ln.Tools.{bin2readable, fromShortId}
 import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
+
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
-
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import com.lightning.walletapp.lnutils.olympus.CloudSnapshot
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
+import fr.acinq.eclair.tor.OnionAddress
 
 
 trait LightningMessage
@@ -118,9 +119,11 @@ case class NodeAnnouncement(signature: BinaryData,
                             nodeId: PublicKey, rgbColor: RGB, alias: String,
                             addresses: NodeAddressList) extends RoutingMessage {
 
-  lazy val workingAddress: InetSocketAddress = addresses.collect {
+  val workingAddress = addresses.collect {
     case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
     case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
+    case Tor2(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
+    case Tor3(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
   }.head
 
   lazy val identifier = (alias + nodeId.toString).toLowerCase
