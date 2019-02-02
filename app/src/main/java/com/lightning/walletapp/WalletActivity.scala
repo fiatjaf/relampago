@@ -357,8 +357,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def pasteRequest = rm(alert) {
-      val resultTry = app.getBufferTry map app.TransData.recordValue
-      if (resultTry.isSuccess) checkTransData else app toast err_no_data
+      def mayResolve(rawBufferString: String) = <(app.TransData recordValue rawBufferString, onFail)(_ => checkTransData)
+      scala.util.Try(app.getBufferUnsafe) match { case scala.util.Success(raw) => mayResolve(raw) case _ => app toast err_no_data }
     }
 
     def depositHivemind = rm(alert) {

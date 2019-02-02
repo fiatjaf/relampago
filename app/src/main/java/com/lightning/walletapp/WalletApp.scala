@@ -45,7 +45,6 @@ import scodec.bits.BitVector
 import android.widget.Toast
 import scodec.DecodeResult
 import android.os.Build
-import scala.util.Try
 import java.io.File
 
 
@@ -76,7 +75,7 @@ class WalletApp extends Application { me =>
   def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def plur1OrZero(opts: Array[String], num: Long) = if (num > 0) plur(opts, num).format(num) else opts(0)
-  def getBufferTry = Try(clipboardManager.getPrimaryClip.getItemAt(0).getText.toString)
+  def getBufferUnsafe = clipboardManager.getPrimaryClip.getItemAt(0).getText.toString
   def notMixedCase(s: String) = s.toLowerCase == s || s.toUpperCase == s
 
   def isAlive =

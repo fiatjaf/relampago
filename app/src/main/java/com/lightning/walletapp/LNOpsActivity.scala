@@ -22,6 +22,7 @@ import org.bitcoinj.script.ScriptBuilder
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
+import scala.util.Try
 import java.util.Date
 
 
@@ -184,7 +185,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           warnAndMaybeClose(me getString ln_chan_close_confirm_local)
         }
 
-        def closeToAddress = app.getBufferTry map app.TransData.toBitcoinUri foreach { uri =>
+        def closeToAddress = Try(app.TransData toBitcoinUri app.getBufferUnsafe) foreach { uri =>
           val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
           val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
           mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
