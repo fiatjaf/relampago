@@ -119,16 +119,22 @@ case class NodeAnnouncement(signature: BinaryData,
                             nodeId: PublicKey, rgbColor: RGB, alias: String,
                             addresses: NodeAddressList) extends RoutingMessage {
 
-  val workingAddress = addresses.collect {
+  val workingAddress = addresses.collectFirst {
     case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
     case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
     case Tor2(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
     case Tor3(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
-  }.head
+  }.get
 
-  lazy val identifier = (alias + nodeId.toString).toLowerCase
-  lazy val pretty = nodeId.toString take 15 grouped 3 mkString "\u0020"
-  def asString = s"<strong>${alias take 16}</strong><br><small>$pretty</small>"
+  val pretty = addresses.collectFirst {
+    case _: IPv4 => nodeId.toString take 15 grouped 3 mkString "\u0020"
+    case _: IPv6 => nodeId.toString take 15 grouped 3 mkString "\u0020"
+    case _: Tor2 => s"<strong>Tor</strong> ${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
+    case _: Tor3 => s"<strong>Tor</strong> ${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
+  }.get
+
+  val identifier = (alias + nodeId.toString).toLowerCase
+  val asString = s"<strong>${alias take 16}</strong><br><small>$pretty</small>"
 }
 
 sealed trait NodeAddress
