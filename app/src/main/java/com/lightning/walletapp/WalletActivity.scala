@@ -235,12 +235,12 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def resolveStandardUrl(lNUrl: LNUrl) = {
     val initialRequest = get(lNUrl.uri.toString, true).trustAllCerts.trustAllHosts
-    val ask = obsOnIO.map(_ => initialRequest.connectTimeout(5000).body) map to[LNUrlData]
-    ask.doOnSubscribe(app toast ln_url_resolving).foreach(doResolve, onFail)
+    <(to[LNUrlData](initialRequest.connectTimeout(5000).body), onFail)(doResolve)
+    app toast ln_url_resolving
 
     def doResolve(data: LNUrlData): Unit = data match {
-      case inChanReq: IncomingChannelRequest => initConnection(inChanReq)
-      case wthdReq: WithdrawRequest => doReceivePayment(wthdReq :: Nil)
+      case incomingChan: IncomingChannelRequest => initConnection(incomingChan)
+      case withdrawal: WithdrawRequest => doReceivePayment(withdrawal :: Nil)
       case unknown => throw new Exception(s"Unrecognized $unknown")
     }
   }
@@ -297,7 +297,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrOpt match {
       case wr :: Nil =>
         val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
-        val finalMaxCanReceive = if (wr.maxWithdrawable > maxCanReceive) maxCanReceive else wr.maxWithdrawable
+        val finalMaxCanReceive = MilliSatoshi(wr.maxWithdrawable min maxCanReceive.amount)
+
         if (openingOrOpenChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_howto).html).create)
         else if (operationalChannelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive.amount < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
