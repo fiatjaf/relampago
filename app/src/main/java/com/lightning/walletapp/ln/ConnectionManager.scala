@@ -8,13 +8,14 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.Features._
 
 import rx.lang.scala.{Observable => Obs}
+import java.net.{InetSocketAddress, Socket}
 import com.lightning.walletapp.ln.Tools.{Bytes, none}
 import com.lightning.walletapp.ln.crypto.Noise.KeyPair
 import java.util.concurrent.ConcurrentHashMap
 import fr.acinq.bitcoin.Crypto.PublicKey
+import fr.acinq.eclair.tor.OnionAddress
 import java.util.concurrent.Executors
 import fr.acinq.bitcoin.BinaryData
-import java.net.Socket
 
 
 object ConnectionManager {
@@ -48,10 +49,14 @@ object ConnectionManager {
     }
 
     val work = Future {
-      // First blocking connect, then send data
-      socket.connect(ann.workingAddress, 7500)
-      handler.init
+      socket.connect(ann.addresses.collectFirst {
+        case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
+        case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
+        case Tor2(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
+        case Tor3(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
+      }.get, 7500)
 
+      handler.init
       while (true) {
         val length = socket.getInputStream.read(buffer, 0, buffer.length)
         if (length < 0) throw new RuntimeException("Connection droppped")

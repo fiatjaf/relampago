@@ -181,8 +181,8 @@
     ]]></string>
 
     <string name="err_ln_no_open_chans">Немає відкритих каналів</string>
-    <string name="err_ln_peer_offline">Помилка з\'єднання з вузлом %1$s</string>
-    <string name="err_ln_peer_incompatible">Вузол %1$s не підтримує захист від втрати даних</string>
+    <string name="err_ln_peer_offline">Помилка з\'єднання з %1$s</string>
+    <string name="err_ln_peer_incompatible">%1$s не підтримує захист від втрати даних</string>
     <string name="err_ln_remote_amount_high">Не вийшло тому що загальна сума платежів у шляху буде занадто висока для вашого пiра</string>
     <string name="err_ln_remote_amount_low">Не вийшло тому що сума платежу занадто низька для вашого пiра</string>
     <string name="err_ln_amount_overflow">Не вийшло тому що сума платежу перевищує допустиму межу</string>

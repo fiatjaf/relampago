@@ -145,7 +145,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case (chan, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
         // Remote peer was OK but now has incompatible features, display details to user and offer force-close
-        val msg = host getString err_ln_peer_incompatible format chan.data.announce.workingAddress.toString
+        val msg = host getString err_ln_peer_incompatible format chan.data.announce.alias
         informOfferClose(chan, msg).run
     }
 

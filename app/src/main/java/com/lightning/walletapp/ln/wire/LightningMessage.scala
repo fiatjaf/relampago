@@ -9,7 +9,6 @@ import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import com.lightning.walletapp.lnutils.olympus.CloudSnapshot
-import fr.acinq.eclair.tor.OnionAddress
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
 
@@ -119,17 +118,10 @@ case class NodeAnnouncement(signature: BinaryData,
                             nodeId: PublicKey, rgbColor: RGB, alias: String,
                             addresses: NodeAddressList) extends RoutingMessage {
 
-  val workingAddress = addresses collectFirst {
-    case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
-    case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
-    case Tor2(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
-    case Tor3(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
-  } getOrElse new InetSocketAddress("127.0.0.1", 9735)
-
   val pretty = addresses collectFirst {
     case _: IPv4 | _: IPv6 => nodeId.toString take 15 grouped 3 mkString "\u0020"
-    case _: Tor2 => s"<strong>Tor</strong> ${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
-    case _: Tor3 => s"<strong>Tor</strong> ${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
+    case _: Tor2 => s"<strong>Tor</strong>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
+    case _: Tor3 => s"<strong>Tor</strong>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
   } getOrElse "No IP address"
 
   val identifier = (alias + nodeId.toString).toLowerCase

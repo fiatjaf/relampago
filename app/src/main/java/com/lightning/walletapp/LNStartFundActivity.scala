@@ -47,9 +47,9 @@ class LNStartFundActivity extends TimerActivity { me =>
   } else me exitTo classOf[MainActivity]
 
   def proceed(icrOpt: Option[IncomingChannelParams], asString: String, ann: NodeAnnouncement) = {
-    val peerOffline = new LightningException(me getString err_ln_peer_offline format ann.workingAddress.toString)
-    val peerIncompatible = new LightningException(me getString err_ln_peer_incompatible format ann.workingAddress.toString)
     val freshChan = ChannelManager.createChannel(bootstrap = InitData(ann), initialListeners = Set.empty)
+    val peerIncompatible = new LightningException(me getString err_ln_peer_incompatible format ann.alias)
+    val peerOffline = new LightningException(me getString err_ln_peer_offline format ann.alias)
     lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
     lnStartFundDetails setText asString.html
 
