@@ -450,9 +450,9 @@ object ChannelManager extends Broadcaster {
     case Right(rd) =>
       all filter isOperational find { chan =>
         // Empty used route means we're sending to peer and its nodeId is our target
+        val excludeChan = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
         val targetNodeId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
-        val notViaShortChanId = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
-        val wouldBeLoop = chan.hasCsOr(_.commitments.extraHop.exists(_.shortChannelId == notViaShortChanId), false)
+        val wouldBeLoop = chan.hasCsOr(_.commitments.extraHop.exists(_.shortChannelId == excludeChan), false)
         !wouldBeLoop && chan.data.announce.nodeId == targetNodeId && estimateCanSend(chan) >= rd.firstMsat
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)

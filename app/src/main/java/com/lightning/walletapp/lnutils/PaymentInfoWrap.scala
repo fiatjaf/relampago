@@ -263,30 +263,19 @@ object BadEntityWrap {
 }
 
 object GossipCatcher extends ChannelListener {
-  // Catch ChannelUpdate to enable funds receiving
+  override def onProcessSuccess: PartialFunction[Incoming, Unit] = {
+    case (chan, norm: NormalData, _: CMDBestHeight) if channelAndHop(chan).isEmpty =>
+      // Remote peer would allow receiving after tx is deeply buried so wait for 6 confs
+      val fundingDepth \ isFundingDead = broadcaster.getStatus(chan.fundTxId)
 
-  override def onProcessSuccess = {
-    case (chan, norm: NormalData, _: CMDBestHeight) if norm.commitments.extraHop.isEmpty =>
-      // Stage 1: we don't have any hop at all so at this point we need to obtain a shortChannelId
-
-      for {
+      if (fundingDepth > 5 && !isFundingDead) for {
         blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
-        shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, outputIndex = norm.commitments.commitInput.outPoint.index)
-        hop = Hop(chan.data.announce.nodeId, shortChannelId, cltvExpiryDelta = 0, 0L, 0L, feeProportionalMillionths = 0L)
-      } chan process hop
-
-    case (chan, norm: NormalData, _: CMDBestHeight)
-      // Stage 2: we have a dummy hop with real shortChannelId, obtain parameters
-      if norm.commitments.extraHop.nonEmpty && channelAndHop(chan).isEmpty =>
-
-      for {
-        dummyExtraHop <- norm.commitments.extraHop
+        shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
         ChannelUpdate(_, _, _, _, _, _, cltv, min, base, prop, _) <- app.olympus.findUpdate(chan.data.announce.nodeId)
-        hop = dummyExtraHop.copy(cltvExpiryDelta = cltv, htlcMinimumMsat = min, feeBaseMsat = base, feeProportionalMillionths = prop)
-      } chan process hop
+      } chan process Hop(chan.data.announce.nodeId, shortChannelId, cltv, min, base, prop)
 
     case (chan, norm: NormalData, upd: ChannelUpdate)
-      // Stage 3: we have an old or dummy Hop, replace it with (peer -> localPhone) hop
+      // We have an old or dummy Hop, replace it with (peer -> localPhone) Hop
       if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
       chan.listeners -= GossipCatcher
       updateHop(chan, upd)
