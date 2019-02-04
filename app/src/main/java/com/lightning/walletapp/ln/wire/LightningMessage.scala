@@ -27,7 +27,11 @@ case class OpenChannel(chainHash: BinaryData, temporaryChannelId: BinaryData, fu
                        dustLimitSatoshis: Long, maxHtlcValueInFlightMsat: UInt64, channelReserveSatoshis: Long, htlcMinimumMsat: Long,
                        feeratePerKw: Long, toSelfDelay: Int, maxAcceptedHtlcs: Int, fundingPubkey: PublicKey, revocationBasepoint: Point,
                        paymentBasepoint: Point, delayedPaymentBasepoint: Point, htlcBasepoint: Point, firstPerCommitmentPoint: Point,
-                       channelFlags: Byte) extends ChannelSetupMessage
+                       channelFlags: Byte) extends ChannelSetupMessage {
+
+  def isPublic = (channelFlags & 0x01) != 0
+  def isTurbo = (channelFlags & 0x04) != 0
+}
 
 case class AcceptChannel(temporaryChannelId: BinaryData, dustLimitSatoshis: Long, maxHtlcValueInFlightMsat: UInt64,
                          channelReserveSatoshis: Long, htlcMinimumMsat: Long, minimumDepth: Long, toSelfDelay: Int, maxAcceptedHtlcs: Int,

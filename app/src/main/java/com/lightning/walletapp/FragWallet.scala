@@ -111,7 +111,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   private[this] var errorLimit = 5
   private[this] val connectionListener = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-      case open: OpenChannel if open.channelFlags == 0.toByte => onOpenOffer(nodeId, open)
+      case openChan: OpenChannel if !openChan.isPublic => onOpenOffer(nodeId, openChan)
       case _ => // Ignore public channel offers
     }
 

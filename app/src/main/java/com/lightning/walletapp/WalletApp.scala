@@ -287,16 +287,6 @@ object ChannelManager extends Broadcaster {
       val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockSend tx catch none
-
-    case (chan, wait: WaitFundingDoneData, _: ChannelReestablish) if wait.our.isEmpty =>
-      // CMDConfirmed may be sent to an offline channel and there will be no reaction
-      // so always double check a funding state here as a failsafe measure
-
-      for {
-        txj <- getTx(wait.fundingTx.txid)
-        depth \ isDead = getStatus(wait.fundingTx.txid)
-        if depth >= LNParams.minDepth && !isDead
-      } chan process CMDConfirmed(txj)
   }
 
   override def onBecome = {

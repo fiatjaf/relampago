@@ -294,28 +294,28 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val negotiationsDataFmt =
     taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Shutdown, Shutdown, Seq[ClosingTxProposed], Option[ClosingTx],
-      NegotiationsData](NegotiationsData.apply, "announce", "commitments", "localShutdown", "remoteShutdown",
-      "localProposals", "lastSignedTx"), tag = "NegotiationsData")
+      NegotiationsData](NegotiationsData.apply, "announce", "commitments", "localShutdown", "remoteShutdown", "localProposals", "lastSignedTx"),
+      tag = "NegotiationsData")
 
   implicit val normalDataFmt =
     taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Option[Shutdown], Option[Shutdown], Option[Transaction],
-      NormalData](NormalData.apply, "announce", "commitments", "localShutdown", "remoteShutdown", "unknownSpend"), tag = "NormalData")
+      NormalData](NormalData.apply, "announce", "commitments", "localShutdown", "remoteShutdown", "unknownSpend"),
+      tag = "NormalData")
 
   implicit val waitFundingDoneDataFmt =
-    taggedJsonFmt(jsonFormat[NodeAnnouncement,
-      Option[FundingLocked], Option[FundingLocked], Transaction, Commitments,
-      WaitFundingDoneData](WaitFundingDoneData.apply, "announce", "our", "their",
-      "fundingTx", "commitments"), tag = "WaitFundingDoneData")
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, Option[FundingLocked], Option[FundingLocked], Transaction, Commitments,
+      WaitFundingDoneData](WaitFundingDoneData.apply, "announce", "our", "their", "fundingTx", "commitments"),
+      tag = "WaitFundingDoneData")
 
   implicit val waitFundingSignedCoreFmt =
     jsonFormat[LocalParams, BinaryData, AcceptChannel, CommitmentSpec, CommitTx, RemoteCommit,
-      WaitFundingSignedCore](WaitFundingSignedCore.apply, "localParams", "channelId",
-      "remoteParams", "localSpec", "localCommitTx", "remoteCommit")
+      WaitFundingSignedCore](WaitFundingSignedCore.apply, "localParams", "channelId", "remoteParams",
+      "localSpec", "localCommitTx", "remoteCommit")
 
   implicit val waitBroadcastRemoteDataFmt =
-    taggedJsonFmt(jsonFormat[NodeAnnouncement, WaitFundingSignedCore, BinaryData, Commitments,
-      WaitBroadcastRemoteData](WaitBroadcastRemoteData.apply, "announce", "core", "txHash",
-      "commitments"), tag = "WaitBroadcastRemoteData")
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, WaitFundingSignedCore, Commitments, Option[FundingLocked],
+      WaitBroadcastRemoteData](WaitBroadcastRemoteData.apply, "announce", "core", "commitments", "their"),
+      tag = "WaitBroadcastRemoteData")
 
   implicit val outRequestFmt = jsonFormat[Long, Set[String], Set[Long], Set[String], String,
       OutRequest](OutRequest.apply, "sat", "badNodes", "badChans", "from", "to")

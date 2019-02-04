@@ -39,7 +39,6 @@ case class CMDFailHtlc(id: Long, reason: BinaryData) extends Command
 // CHANNEL DATA
 
 sealed trait ChannelData { val announce: NodeAnnouncement }
-sealed trait HasCommitments extends ChannelData { val commitments: Commitments }
 case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 // INCOMING CHANNEL
@@ -64,25 +63,32 @@ case class WaitFundingSignedCore(localParams: LocalParams, channelId: BinaryData
       remotePerCommitmentSecrets = ShaHashesWithIndex(Map.empty, None), channelId)
 }
 
-case class WaitFundingSignedRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore, txHash: BinaryData) extends ChannelData {
-  def makeWaitBroadcastRemoteData(signedCommit: CommitTx) = WaitBroadcastRemoteData(announce, core, txHash, core makeCommitments signedCommit)
-}
-
 case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSignedCore, fundingTx: Transaction) extends ChannelData {
   def makeWaitFundingDoneData(signedCommit: CommitTx) = WaitFundingDoneData(announce, None, None, fundingTx, core makeCommitments signedCommit)
 }
 
 // ALL THE DATA BELOW WILL BE STORED
 
-case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore,
-                                   txHash: BinaryData, commitments: Commitments) extends HasCommitments {
+sealed trait HasCommitments extends ChannelData {
+  def isTurbo = commitments.remoteParams.minimumDepth < 1
+  val commitments: Commitments
 
+  def makeFirstFundingLocked = {
+    val first = Generators.perCommitPoint(commitments.localParams.shaSeed, 1L)
+    FundingLocked(commitments.channelId, nextPerCommitmentPoint = first)
+  }
+}
+
+case class WaitBroadcastRemoteData(announce: NodeAnnouncement,
+                                   core: WaitFundingSignedCore, commitments: Commitments,
+                                   their: Option[FundingLocked] = None) extends HasCommitments {
+
+  def makeWaitFundingDoneData(fundingTx: Transaction) = WaitFundingDoneData(announce, None, their, fundingTx, commitments)
   def isFailed = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 1000L
 }
 
-case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked],
-                               their: Option[FundingLocked], fundingTx: Transaction,
-                               commitments: Commitments) extends HasCommitments
+case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked], their: Option[FundingLocked],
+                               fundingTx: Transaction, commitments: Commitments) extends HasCommitments
 
 case class NormalData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Option[Shutdown] = None,
                       remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends HasCommitments

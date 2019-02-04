@@ -58,7 +58,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        case open: OpenChannel if nodeId == ann.nodeId && open.channelFlags == 0.toByte => onOpenOffer(nodeId, open)
+        case open: OpenChannel if nodeId == ann.nodeId && !open.isPublic => onOpenOffer(nodeId, open)
         case remoteError: Error if nodeId == ann.nodeId => onException(freshChan -> remoteError.exception)
         case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChan process msg
         case _ => // We only listen to setup messages here to avoid conflicts
