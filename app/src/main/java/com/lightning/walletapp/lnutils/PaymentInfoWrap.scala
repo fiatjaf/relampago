@@ -264,11 +264,11 @@ object BadEntityWrap {
 
 object GossipCatcher extends ChannelListener {
   override def onProcessSuccess: PartialFunction[Incoming, Unit] = {
+    // Depth barrier is relevant for Turbo channels: restrict receiving until confirmed
     case (chan, norm: NormalData, _: CMDBestHeight) if channelAndHop(chan).isEmpty =>
-      // Remote peer would allow receiving after tx is deeply buried so wait for 6 confs
       val fundingDepth \ isFundingDead = broadcaster.getStatus(chan.fundTxId)
 
-      if (fundingDepth > 5 && !isFundingDead) for {
+      if (fundingDepth >= minDepth && !isFundingDead) for {
         blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
         shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
         ChannelUpdate(_, _, _, _, _, _, cltv, min, base, prop, _) <- app.olympus.findUpdate(chan.data.announce.nodeId)

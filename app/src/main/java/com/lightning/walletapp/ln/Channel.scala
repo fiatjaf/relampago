@@ -86,12 +86,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           localParams.toSelfDelay, localParams.maxAcceptedHtlcs, localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint,
           localParams.paymentBasepoint, localParams.delayedPaymentBasepoint, localParams.htlcBasepoint, firstPerCommitPoint)
 
-        val remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis, open.maxHtlcValueInFlightMsat,
-          open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = if (open.isTurbo) 0 else 6, open.toSelfDelay,
-          open.maxAcceptedHtlcs, open.fundingPubkey, open.revocationBasepoint, open.paymentBasepoint,
-          open.delayedPaymentBasepoint, open.htlcBasepoint, open.firstPerCommitmentPoint)
+        val wait = WaitFundingCreatedRemote(announce, localParams, remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis,
+          open.maxHtlcValueInFlightMsat, open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = if (open.isTurbo) 0 else 6, open.toSelfDelay,
+          open.maxAcceptedHtlcs, open.fundingPubkey, open.revocationBasepoint, open.paymentBasepoint, open.delayedPaymentBasepoint, open.htlcBasepoint,
+          open.firstPerCommitmentPoint), open)
 
-        val wait = WaitFundingCreatedRemote(announce, localParams, remoteParams, open)
         BECOME(wait, WAIT_FOR_FUNDING) SEND accept
 
 
@@ -572,9 +571,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (some: HasCommitments, CMDSpent(tx), _)
         // GUARD: tx which spends our funding is broadcasted, must react
         if tx.txIn.exists(input => some.commitments.commitInput.outPoint == input.outPoint) =>
-        val nextRemoteCommitEither = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
-
-        Tuple3(GETREV(tx), nextRemoteCommitEither, some) match {
+        Tuple3(GETREV(tx), some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit), some) match {
           case (_, _, close: ClosingData) if close.refundRemoteCommit.nonEmpty => Tools log s"Existing refund $tx"
           case (_, _, close: ClosingData) if close.mutualClose.exists(_.txid == tx.txid) => Tools log s"Existing mutual $tx"
           case (_, _, close: ClosingData) if close.localCommit.exists(_.commitTx.txid == tx.txid) => Tools log s"Existing local $tx"
@@ -584,6 +581,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case (Some(claim), _, _) => me CLOSEANDWATCHREVHTLC ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil)
           case (_, Left(nextRemote), _) if nextRemote.txOpt.exists(_.txid == tx.txid) => startRemoteNextClose(some, nextRemote)
           case _ if some.commitments.remoteCommit.txOpt.exists(_.txid == tx.txid) => startRemoteCurrentClose(some)
+          case _ if some.commitments.localCommit.commitTx.tx.txid == tx.txid => startLocalClose(some)
 
           case (_, _, norm: NormalData) =>
             // May happen when old snapshot is used two times in a row
