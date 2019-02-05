@@ -159,10 +159,19 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // We have agreed to proposed incoming channel and they have published a funding tx, we now start waiting for block inclusion
       case (waitBroadcast: WaitBroadcastRemoteData, CMDSpent(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
 
-        // Store updated data because even is idempotent
+        // Store updated data because event is idempotent
         me UPDATA STORE(waitBroadcast makeWaitFundingDoneData fundTx)
-        // Also this is a Turbo channel which means we may become OPEN right away
+        // If this is a Turbo channel then we may become OPEN right away
         if (waitBroadcast.commitments.isTurbo) me doProcess CMDConfirmed(fundTx)
+
+
+      // We have agreed to proposed incoming channel and they have published a funding tx, but we see it included in a block right away
+      case (waitBroadcast: WaitBroadcastRemoteData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
+
+        // Store updated data because event is idempotent
+        me UPDATA STORE(waitBroadcast makeWaitFundingDoneData fundTx)
+        // Send CMDConfirmed again so we can properly react in new state
+        me doProcess CMDConfirmed(fundTx)
 
 
       case (waitBroadcast: WaitBroadcastRemoteData, their: FundingLocked, WAIT_FUNDING_DONE) =>

@@ -182,30 +182,24 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           none, baseTextBuilder(channelClosureWarning.html), dialog_ok, dialog_cancel)
 
       view setOnClickListener onButtonTap {
-        val chanMenu = makeChanMenu(chan.data)
+        val contextualChannelMenu = chan.data match {
+          // Unknown spend may be a future commit so we should not allow force-closing
+          case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(2, Nil, 2)
+          // This likely means they have not broadcasted a tx, wait for it instead of closing
+          case _: WaitBroadcastRemoteData => chanActions take 2
+          case _: ClosingData => chanActions.patch(2, Nil, 2)
+          // Should not allow force-closing with old commit
+          case _: RefundingData => chanActions take 2
+          // Cut out refunding tx option
+          case _ => chanActions take 4
+        }
+
         val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
         val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.asString.html, lst).create)
-        lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, chanMenu)
+        lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, contextualChannelMenu)
+        lst setOnItemClickListener onTap(defineAction)
         lst setDividerHeight 0
         lst setDivider null
-
-        def proceedCoopCloseOrWarn(informAndClose: => Unit) = rm(alert) {
-          val isOperationalOrFunding = isOperational(chan) || isOpening(chan)
-          if (isOperationalOrFunding && inFlightHtlcs(chan).isEmpty) informAndClose // Mutual closing is possible
-          else if (isOperationalOrFunding) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
-          else warnAndMaybeClose(me getString ln_chan_force_details)
-        }
-
-        def closeToWallet = {
-          // Simple case: send refunding transaction to this wallet
-          warnAndMaybeClose(me getString ln_chan_close_confirm_local)
-        }
-
-        def closeToAddress = Try(app.TransData toBitcoinUri app.getBufferUnsafe) map { uri =>
-          val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
-          val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
-          mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
-        } getOrElse { app toast err_no_data }
 
         def defineAction(pos: Int) = (pos, chan.data) match {
           case (0, _) => urlIntent(txid = chan.fundTxId.toString)
@@ -217,19 +211,23 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           case _ => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
         }
 
-        def makeChanMenu(some: ChannelData) = some match {
-          // Unknown spend may be a future commit so we should not allow force-closing
-          case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(2, Nil, 2)
-          // This likely means they have not broadcasted a tx, wait for a week instead of closing
-          case _: WaitBroadcastRemoteData => chanActions take 2
-          case _: ClosingData => chanActions.patch(2, Nil, 2)
-          // Should not allow force-closing with old commit
-          case _: RefundingData => chanActions take 2
-          case _ => chanActions take 4
+        def proceedCoopCloseOrWarn(informAndClose: => Unit) = rm(alert) {
+          val isOperationalOrFunding = isOperational(chan) || isOpening(chan)
+          if (isOperationalOrFunding && inFlightHtlcs(chan).isEmpty) informAndClose // Mutual closing is possible
+          else if (isOperationalOrFunding) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
+          else warnAndMaybeClose(me getString ln_chan_force_details)
         }
 
-        // Specify what to do once user taps a menu
-        lst setOnItemClickListener onTap(defineAction)
+        def closeToAddress = Try(app.TransData toBitcoinUri app.getBufferUnsafe) map { uri =>
+          val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
+          val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
+          mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
+        } getOrElse { app toast err_no_data }
+
+        def closeToWallet = {
+          // Simple case: send refunding transaction to this wallet
+          warnAndMaybeClose(me getString ln_chan_close_confirm_local)
+        }
       }
     }
 

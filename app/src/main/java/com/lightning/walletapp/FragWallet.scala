@@ -27,8 +27,6 @@ import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
-import com.lightning.walletapp.ln.wire.{ChannelReestablish, LightningMessage, OpenChannel}
-
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
@@ -37,9 +35,9 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils.obsOnIO
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
+import com.lightning.walletapp.ln.wire.ChannelReestablish
 import android.transition.TransitionManager
 import android.support.v4.content.Loader
-import fr.acinq.bitcoin.Crypto.PublicKey
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
@@ -109,23 +107,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // To fight spamming
   private[this] var errorLimit = 5
-  private[this] val connectionListener = new ConnectionListener {
-    override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-      case openChan: OpenChannel if !openChan.isPublic => onOpenOffer(nodeId, openChan)
-      case _ => // Ignore public channel offers
-    }
-
-    override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) =
-      if (System.currentTimeMillis > ConnectionManager.lastOpenChannelOffer + 7500L)
-        ConnectionManager.connections get nodeId foreach { existingWorkerConnection =>
-          val startFundIncomingChannel = app getString ln_ops_start_fund_incoming_channel
-          val hnv = HardcodedNodeView(existingWorkerConnection.ann, startFundIncomingChannel)
-          ConnectionManager.lastOpenChannelOffer = System.currentTimeMillis
-          app.TransData.value = IncomingChannelParams(hnv, open)
-          host goTo classOf[LNStartFundActivity]
-        }
-  }
-
   val chanListener = new ChannelListener {
     def informOfferClose(chan: Channel, message: String) = UITask {
       val bld = baseBuilder(chan.data.announce.asString.html, message)
@@ -503,7 +484,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // WORKER EVENT HANDLERS
 
   def onFragmentDestroy = {
-    ConnectionManager.listeners -= connectionListener
     for (c <- ChannelManager.all) c.listeners -= chanListener
     app.kit.wallet removeTransactionConfidenceEventListener txsListener
     app.kit.peerGroup removeBlocksDownloadedEventListener blocksTitleListener
@@ -725,7 +705,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter
 
-  ConnectionManager.listeners += connectionListener
   for (c <- ChannelManager.all) c.listeners += chanListener
   Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
   app.kit.wallet addTransactionConfidenceEventListener txsListener

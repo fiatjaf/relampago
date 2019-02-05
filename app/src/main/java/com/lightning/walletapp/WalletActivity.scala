@@ -12,14 +12,14 @@ import com.lightning.walletapp.Denomination._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import android.app.{Activity, AlertDialog}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
+import com.lightning.walletapp.ln.wire.{LightningMessage, NodeAnnouncement, OpenChannel}
+
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
-import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
@@ -106,8 +106,34 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     def getCount = 2
   }
 
+  private[this] val connectionListener = new ConnectionListener {
+    override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+      case openChan: OpenChannel if !openChan.isPublic => onOpenOffer(nodeId, openChan)
+      case _ => // Ignore public channel offers
+    }
+
+    override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) =
+      if (System.currentTimeMillis > ConnectionManager.lastOpenChannelOffer + 7500L)
+        ConnectionManager.connections get nodeId foreach { existingWorkerConnection =>
+          val startFundIncomingChannel = app getString ln_ops_start_fund_incoming_channel
+          val hnv = HardcodedNodeView(existingWorkerConnection.ann, startFundIncomingChannel)
+          ConnectionManager.lastOpenChannelOffer = System.currentTimeMillis
+          app.TransData.value = IncomingChannelParams(hnv, open)
+          me goTo classOf[LNStartFundActivity]
+        }
+  }
+
+  override def onStop = wrap(super.onStop) {
+    ConnectionManager.listeners -= connectionListener
+    me returnToBase null
+  }
+
+  override def onResume = wrap(super.onResume) {
+    ConnectionManager.listeners += connectionListener
+    me returnToBase null
+  }
+
   override def onDestroy = wrap(super.onDestroy)(stopDetecting)
-  override def onResume = wrap(super.onResume)(me returnToBase null)
   override def onOptionsItemSelected(m: MenuItem): Boolean = runAnd(true) {
     if (m.getItemId == R.id.actionSettings) me goTo classOf[SettingsActivity]
   }
