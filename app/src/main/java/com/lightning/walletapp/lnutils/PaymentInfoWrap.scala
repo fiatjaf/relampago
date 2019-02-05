@@ -180,11 +180,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onProcessSuccess = {
-    case (_, wbr: WaitBroadcastRemoteData, _: CMDBestHeight) if wbr.isFailed =>
+    // We don't allow manual deletion here as funding may not be on a blockchain
+    case (_, wbr: WaitBroadcastRemoteData, _: CMDBestHeight) if wbr.isLost =>
       app.kit.wallet.removeWatchedScripts(app.kit fundingPubScript wbr)
       db.change(ChannelTable.killSql, wbr.commitments.channelId)
 
-    case (_, close: ClosingData, _: CMDBestHeight) if close.isOutdated =>
+    case (_, close: ClosingData, _: CMDBestHeight) if close.canBeRemoved =>
       app.kit.wallet.removeWatchedScripts(app.kit closingPubKeyScripts close)
       app.kit.wallet.removeWatchedScripts(app.kit fundingPubScript close)
       db.change(RevokedInfoTable.killSql, close.commitments.channelId)

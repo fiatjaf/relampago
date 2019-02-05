@@ -48,7 +48,7 @@ object ConnectionManager {
       def handleError = { case _ => events onTerminalError ann.nodeId }
     }
 
-    val work = Future {
+    val thread = Future {
       socket.connect(ann.addresses.collectFirst {
         case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
         case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
@@ -64,7 +64,7 @@ object ConnectionManager {
       }
     }
 
-    work onComplete { _ =>
+    thread onComplete { _ =>
       connections -= ann.nodeId
       events onDisconnect ann.nodeId
     }

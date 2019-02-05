@@ -156,10 +156,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // BECOMING OPEN
 
 
+      // We have agreed to proposed incoming channel and they have published a funding tx, we now start waiting for block inclusion
       case (waitBroadcast: WaitBroadcastRemoteData, CMDSpent(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
-        // We have agreed to proposed incoming channel and they have published a funding tx, store since event is idempotent
+
+        // Store updated data because even is idempotent
         me UPDATA STORE(waitBroadcast makeWaitFundingDoneData fundTx)
-        if (waitBroadcast.isTurbo) me doProcess CMDConfirmed(fundTx)
+        // Also this is a Turbo channel which means we may become OPEN right away
+        if (waitBroadcast.commitments.isTurbo) me doProcess CMDConfirmed(fundTx)
 
 
       case (waitBroadcast: WaitBroadcastRemoteData, their: FundingLocked, WAIT_FUNDING_DONE) =>
@@ -176,14 +179,15 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (wait: WaitFundingDoneData, CMDConfirmed(fundTx), SLEEPING) if fundTxId == fundTx.txid =>
         // We have got an idempotent on-chain event while peer is offline, store it for further broadcast
-        val wait1 = wait.copy(our = Some apply wait.makeFirstFundingLocked)
+        val ourFirstFundingLockedOpt = Some apply makeFirstFundingLocked(wait)
+        val wait1 = wait.copy(our = ourFirstFundingLockedOpt)
         me UPDATA STORE(wait1)
 
 
       case (wait: WaitFundingDoneData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE) if fundTxId == fundTx.txid =>
         // We have got an idempotent on-chain event while peer is online, inform peer and maybe become open
 
-        val ourFirstFundingLocked = wait.makeFirstFundingLocked
+        val ourFirstFundingLocked = makeFirstFundingLocked(wait)
         val wait1 = wait.copy(our = Some apply ourFirstFundingLocked)
         if (wait.their.isEmpty) me UPDATA STORE(wait1) SEND ourFirstFundingLocked
         else becomeOpen(wait, wait.their.get) SEND ourFirstFundingLocked
@@ -349,7 +353,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm @ NormalData(announce, commitments, our, their, txOpt), CMDShutdown(scriptPubKey), OPEN | SLEEPING) =>
-        if (Commitments.localHasUnsignedOutgoing(commitments) | our.isDefined | their.isDefined) startLocalClose(norm) else {
+        if (Commitments.localHasUnsignedOutgoing(commitments) || our.isDefined || their.isDefined) startLocalClose(norm) else {
           val localShutdown = Shutdown(commitments.channelId, scriptPubKey getOrElse commitments.localParams.defaultFinalScriptPubKey)
           val norm1 = me STORE NormalData(announce, commitments, Some(localShutdown), their, txOpt)
           me UPDATA norm1 SEND localShutdown
@@ -358,7 +362,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       // Either they initiate a shutdown or respond to the one we have sent
       // should sign our unsigned outgoing HTLCs if present and then proceed with shutdown
-      case (norm @ NormalData(announce, commitments, our, None, txOpt), remote: Shutdown, OPEN) =>
+      case (NormalData(announce, commitments, our, None, txOpt), remote: Shutdown, OPEN) =>
         val norm = NormalData(announce, commitments, our, remoteShutdown = Some(remote), txOpt)
         if (Commitments remoteHasUnsignedOutgoing commitments) startLocalClose(norm)
         else me UPDATA norm doProcess CMDProceed
@@ -418,7 +422,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // and received, then the node MUST retransmit funding_locked, otherwise it MUST NOT
         if (cr.nextLocalCommitmentNumber == 1 && norm.commitments.localCommit.index == 0)
           if (norm.localShutdown.isEmpty && norm.remoteShutdown.isEmpty)
-            me SEND norm.makeFirstFundingLocked
+            me SEND makeFirstFundingLocked(norm)
 
         // First we clean up unacknowledged updates
         val localDelta = norm.commitments.localChanges.proposed collect { case _: UpdateAddHtlc => true }
@@ -626,6 +630,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     Scripts checkValid Scripts.addSigs(core.localCommitTx, localKey = core.localParams.fundingPrivKey.publicKey,
       core.remoteParams.fundingPubkey, Scripts.sign(core.localParams.fundingPrivKey)(core.localCommitTx), remoteSig)
 
+  private def makeFirstFundingLocked(some: HasCommitments) = {
+    val first = Generators.perCommitPoint(some.commitments.localParams.shaSeed, 1L)
+    FundingLocked(some.commitments.channelId, nextPerCommitmentPoint = first)
+  }
 
   private def becomeOpen(wait: WaitFundingDoneData, their: FundingLocked) = {
     val theirFirstPerCommitmentPoint = Right apply their.nextPerCommitmentPoint

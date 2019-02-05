@@ -101,13 +101,19 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       val capacity = cs.commitInput.txOut.amount
       val started = me time new Date(cs.startedAt)
       val breakFee = Satoshi(cs.reducedRemoteState.myFeeSat)
-      val txDepth \ _ = LNParams.broadcaster.getStatus(chan.fundTxId)
       val canReceiveMsat = estimateCanReceive(chan)
       val canSendMsat = estimateCanSend(chan)
 
+      val fundingDepth \ fundingIsDead =
+        LNParams.broadcaster.getStatus(chan.fundTxId)
+
+      val fundingState = if (cs.isTurbo) me getString ln_info_nothing else {
+        val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
+        getString(ln_info_funding).format(fundingDepth, threshold)
+      }
+
       val refundable = Satoshi(cs.localCommit.spec.toLocalMsat / 1000L)
       val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amountMsat).sum / 1000L)
-      val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
       val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
       val barCanReceive = barCanSend + canReceiveMsat / capacity.amount
 
@@ -120,8 +126,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       overBar setProgress barLocalReserve.toInt
 
       startedAtText setText started.html
+      fundingDepthText setText fundingState
       totalPaymentsText setText getStat(cs.channelId).toString
-      fundingDepthText setText getString(ln_info_funding).format(txDepth, threshold)
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(canSendMsat) / 1000L).html
       refundableAmountText setText denom.parsedWithSign(refundable).html
@@ -130,20 +136,29 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       refundFeeText setText sumOrNothing(breakFee).html
 
       chan.data match {
-        case _: WaitFundingDoneData | _: WaitBroadcastRemoteData =>
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
-            R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
-            R.id.totalPayments)
-
+        // Order matters: NormalData before WaitData
         case norm: NormalData if isOperational(chan) =>
-          if (txDepth > 6 && channelAndHop(chan).isEmpty) setExtraInfo(resource = ln_info_no_receive)
+          // We only can display one item so sort them by increasing importance
+          if (fundingDepth > 6 && channelAndHop(chan).isEmpty) setExtraInfo(resource = ln_info_no_receive)
+          // In a case of Turbo channels we may have an OPEN state with NormalData yet with unconfirmed funding
+          if (fundingDepth < 1 && norm.takesLongTime) setExtraInfo(resource = ln_info_funding_long)
           if (norm.unknownSpend.isDefined) setExtraInfo(resource = ln_info_unknown_spend)
+          if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
           visibleExcept(gone = R.id.fundingDepth, R.id.closedAt)
 
         case _: NormalData | _: NegotiationsData =>
           setExtraInfo(resource = ln_info_coop_attempt)
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
             R.id.canReceive, R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
+
+        case wait: WaitData =>
+          // This should catch WaitBroadcastRemoteData and WaitFundingDoneData, but not NormalData
+          if (fundingDepth < 1 && wait.takesLongTime) setExtraInfo(resource = ln_info_funding_long)
+          if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
+
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
+            R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
+            R.id.totalPayments)
 
         case cd: ClosingData =>
           setExtraInfo(text = me closedBy cd)
@@ -167,9 +182,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           none, baseTextBuilder(channelClosureWarning.html), dialog_ok, dialog_cancel)
 
       view setOnClickListener onButtonTap {
+        val chanMenu = makeChanMenu(chan.data)
         val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
         val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.asString.html, lst).create)
-        lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, me menu chan.data)
+        lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, chanMenu)
         lst setDividerHeight 0
         lst setDivider null
 
@@ -185,18 +201,31 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           warnAndMaybeClose(me getString ln_chan_close_confirm_local)
         }
 
-        def closeToAddress = Try(app.TransData toBitcoinUri app.getBufferUnsafe) foreach { uri =>
+        def closeToAddress = Try(app.TransData toBitcoinUri app.getBufferUnsafe) map { uri =>
           val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
           val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
           mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
-        }
+        } getOrElse { app toast err_no_data }
 
-        def defineAction(pos: Int) = pos -> chan.data match {
+        def defineAction(pos: Int) = (pos, chan.data) match {
           case (0, _) => urlIntent(txid = chan.fundTxId.toString)
           case (1, _) => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
+          // In the following two cases channel menu is reduced by 2 so we need to show an appropriate closing tx here
+          case (2, norm: NormalData) if norm.unknownSpend.isDefined => urlIntent(txid = norm.unknownSpend.get.txid.toString)
           case (2, cd: ClosingData) => urlIntent(txid = cd.bestClosing.commitTx.txid.toString)
           case (2, _) => proceedCoopCloseOrWarn(informAndClose = closeToAddress)
           case _ => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
+        }
+
+        def makeChanMenu(some: ChannelData) = some match {
+          // Unknown spend may be a future commit so we should not allow force-closing
+          case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(2, Nil, 2)
+          // This likely means they have not broadcasted a tx, wait for a week instead of closing
+          case _: WaitBroadcastRemoteData => chanActions take 2
+          case _: ClosingData => chanActions.patch(2, Nil, 2)
+          // Should not allow force-closing with old commit
+          case _: RefundingData => chanActions take 2
+          case _ => chanActions take 4
         }
 
         // Specify what to do once user taps a menu
@@ -247,8 +276,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def stateStatusColor(c: Channel) = (c.data, c.state) match {
     case (_: NormalData, OPEN) if isOperational(c) => me getString ln_info_status_open
     case (_: NormalData, _) if !isOperational(c) => me getString ln_info_status_shutdown
-    case _ \ WAIT_FUNDING_DONE => me getString ln_info_status_opening
-    case _ \ NEGOTIATIONS => me getString ln_info_status_negotiations
+    case (_, WAIT_FUNDING_DONE) => me getString ln_info_status_opening
+    case (_, NEGOTIATIONS) => me getString ln_info_status_negotiations
     case _ => me getString ln_info_status_other format c.state
   }
 
@@ -269,12 +298,6 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case _ => true
   }
 
-  def menu(chanData: ChannelData) = chanData match {
-    case _: ClosingData => chanActions.patch(2, Nil, 2)
-    case _: RefundingData => chanActions take 2
-    case _ => chanActions take 4
-  }
-
   def sumOrNothing(sats: Satoshi) = sats match {
     case Satoshi(0L) => me getString ln_info_nothing
     case _ => denom parsedWithSign sats
@@ -282,7 +305,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def getStat(chanId: BinaryData) = {
     val cursor = LNParams.db.select(PaymentTable.selectPaymentNumSql, chanId)
-    RichCursor(cursor) headTry { case RichCursor(cursor1) => cursor1 getLong 0 } getOrElse 0L
+    RichCursor(cursor) headTry { case RichCursor(c1) => c1 getLong 0 } getOrElse 0L
   }
 
   def urlIntent(txid: String) =

@@ -240,8 +240,12 @@
     <string name="ln_info_close_remote">Закрыт удаленным узлом</string>
     <string name="ln_info_close_local">Закрыт вашим кошельком</string>
     <string name="ln_info_coop_attempt">Канал закрывается&#8230;</string>
-    <string name="ln_info_unknown_spend">Обнаружена неизвестная трата</string>
-    <string name="ln_info_no_receive">Receiving is not enabled by peer</string>
+
+    <string name="ln_info_funding_lost">Канал потерян он-чейн!</string>
+    <string name="ln_info_funding_long">Канал все еще не подтвержден!</string>
+    <string name="ln_info_no_receive">Прием платежей все еще невозможен!</string>
+    <string name="ln_info_unknown_spend">Обнаружена неизвестная трата!</string>
+
     <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>отключен</small></font>]]></string>
     <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>онлайн</small></font>]]></string>
     <string name="ln_info_nothing"><![CDATA[<i>ничего</i>]]></string>

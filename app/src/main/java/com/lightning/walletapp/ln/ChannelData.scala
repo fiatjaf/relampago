@@ -39,6 +39,7 @@ case class CMDFailHtlc(id: Long, reason: BinaryData) extends Command
 // CHANNEL DATA
 
 sealed trait ChannelData { val announce: NodeAnnouncement }
+sealed trait HasCommitments extends ChannelData { val commitments: Commitments }
 case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 // INCOMING CHANNEL
@@ -69,29 +70,25 @@ case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSi
 
 // ALL THE DATA BELOW WILL BE STORED
 
-sealed trait HasCommitments extends ChannelData {
-  def isTurbo = commitments.remoteParams.minimumDepth < 1
-  val commitments: Commitments
-
-  def makeFirstFundingLocked = {
-    val first = Generators.perCommitPoint(commitments.localParams.shaSeed, 1L)
-    FundingLocked(commitments.channelId, nextPerCommitmentPoint = first)
-  }
+sealed trait WaitData extends HasCommitments {
+  def isLost = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 14 * 1000L
+  def takesLongTime = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 4 * 1000L
 }
 
 case class WaitBroadcastRemoteData(announce: NodeAnnouncement,
                                    core: WaitFundingSignedCore, commitments: Commitments,
-                                   their: Option[FundingLocked] = None) extends HasCommitments {
+                                   their: Option[FundingLocked] = None) extends WaitData {
 
-  def makeWaitFundingDoneData(fundingTx: Transaction) = WaitFundingDoneData(announce, None, their, fundingTx, commitments)
-  def isFailed = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 1000L
+  def makeWaitFundingDoneData(fundTx: Transaction) =
+    WaitFundingDoneData(announce, None, their, fundTx, commitments)
 }
 
-case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked], their: Option[FundingLocked],
-                               fundingTx: Transaction, commitments: Commitments) extends HasCommitments
+case class WaitFundingDoneData(announce: NodeAnnouncement,
+                               our: Option[FundingLocked], their: Option[FundingLocked],
+                               fundingTx: Transaction, commitments: Commitments) extends WaitData
 
 case class NormalData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Option[Shutdown] = None,
-                      remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends HasCommitments
+                      remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends WaitData
 
 case class ClosingTxProposed(unsignedTx: ClosingTx, localClosingSigned: ClosingSigned)
 case class NegotiationsData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Shutdown, remoteShutdown: Shutdown,
@@ -124,10 +121,10 @@ case class ClosingData(announce: NodeAnnouncement,
     }
   }
 
-  def isOutdated: Boolean = {
+  def canBeRemoved: Boolean = {
     val allConfirmedOrDead = bestClosing match {
       case MutualCommitPublished(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }
-      case info => info.getState.map(state => state.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
+      case info => info.getState.map(_.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
     }
 
     val hardDelay = closedAt + 1000L * 3600 * 24 * 21
@@ -284,7 +281,8 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
                        commitInput: InputInfo, remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, extraHop: Option[Hop] = None,
                        startedAt: Long = System.currentTimeMillis) { me =>
 
-  lazy val reducedRemoteState = {
+  def isTurbo = remoteParams.minimumDepth < 1
+  lazy val reducedRemoteState: ReducedState = {
     val reduced = CommitmentSpec.reduce(Commitments.latestRemoteCommit(me).spec, remoteChanges.acked, localChanges.proposed)
     val commitFeeSat = Scripts.commitTxFee(dustLimit = remoteParams.dustLimitSat, spec = reduced).amount
 

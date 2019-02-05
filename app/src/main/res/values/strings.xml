@@ -240,11 +240,15 @@
 
     <string name="ln_info_funding">%1$s of %2$s</string>
     <string name="ln_info_close_coop">Closed cooperatively</string>
-    <string name="ln_info_unknown_spend">Unknown spend detected</string>
     <string name="ln_info_close_local">Force-closed by your wallet</string>
     <string name="ln_info_close_remote">Force-closed by remote peer</string>
-    <string name="ln_info_no_receive">Receiving not yet enabled by peer</string>
     <string name="ln_info_coop_attempt">Trying to close cooperatively&#8230;</string>
+
+    <string name="ln_info_unknown_spend">Unknown spend detected!</string>
+    <string name="ln_info_no_receive">Receiving is still not enabled!</string>
+    <string name="ln_info_funding_long">Funding is still unconfirmed!</string>
+    <string name="ln_info_funding_lost">Funding was lost on-chain!</string>
+
     <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>disconnected</small></font>]]></string>
     <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>online</small></font>]]></string>
     <string name="ln_info_nothing"><![CDATA[<i>nothing</i>]]></string>
