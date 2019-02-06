@@ -93,6 +93,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val fundingLockedFmt = sCodecJsonFmt(fundingLockedCodec)
   implicit val channelUpdateFmt = sCodecJsonFmt(channelUpdateCodec)
   implicit val perHopPayloadFmt = sCodecJsonFmt(perHopPayloadCodec)
+  implicit val channelFlagsFmt = sCodecJsonFmt(channelFlagsCodec)
   implicit val commitSigFmt = sCodecJsonFmt(commitSigCodec)
   implicit val shutdownFmt = sCodecJsonFmt(shutdownCodec)
   implicit val uint64exFmt = sCodecJsonFmt(uint64ex)
@@ -236,11 +237,11 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     jsonFormat[LNMessageVector, LNMessageVector, LNMessageVector,
       Changes](Changes.apply, "proposed", "signed", "acked")
 
-  implicit val commitmentsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes, Changes,
-    Long, Long, Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, BinaryData, Option[Hop], Long,
+  implicit val commitmentsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes, Changes, Long, Long,
+    Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, BinaryData, Option[Hop], Option[ChannelFlags], Long,
     Commitments](Commitments.apply, "localParams", "remoteParams", "localCommit", "remoteCommit", "localChanges",
     "remoteChanges", "localNextHtlcId", "remoteNextHtlcId", "remoteNextCommitInfo", "commitInput",
-    "remotePerCommitmentSecrets", "channelId", "extraHop", "startedAt")
+    "remotePerCommitmentSecrets", "channelId", "extraHop", "channelFlags", "startedAt")
 
   implicit val localCommitPublishedFmt =
     jsonFormat[Seq[ClaimDelayedOutputTx], Seq[SuccessAndClaim], Seq[TimeoutAndClaim], Transaction,
@@ -308,9 +309,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       tag = "WaitFundingDoneData")
 
   implicit val waitFundingSignedCoreFmt =
-    jsonFormat[LocalParams, BinaryData, AcceptChannel, CommitmentSpec, CommitTx, RemoteCommit,
-      WaitFundingSignedCore](WaitFundingSignedCore.apply, "localParams", "channelId", "remoteParams",
-      "localSpec", "localCommitTx", "remoteCommit")
+    jsonFormat[LocalParams, BinaryData, Option[ChannelFlags], AcceptChannel, CommitmentSpec, RemoteCommit,
+      WaitFundingSignedCore](WaitFundingSignedCore.apply, "localParams", "channelId", "channelFlags",
+      "remoteParams", "localSpec", "remoteCommit")
 
   implicit val waitBroadcastRemoteDataFmt =
     taggedJsonFmt(jsonFormat[NodeAnnouncement, WaitFundingSignedCore, Commitments, Option[FundingLocked],

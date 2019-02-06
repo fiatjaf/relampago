@@ -58,7 +58,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChan -> peerOffline)
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        case open: OpenChannel if nodeId == ann.nodeId && !open.isPublic => onOpenOffer(nodeId, open)
+        case open: OpenChannel if nodeId == ann.nodeId && !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
         case remoteError: Error if nodeId == ann.nodeId => onException(freshChan -> remoteError.exception)
         case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChan process msg
         case _ => // We only listen to setup messages here to avoid conflicts
@@ -148,7 +148,7 @@ class LNStartFundActivity extends TimerActivity { me =>
                 val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
                 val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
                 val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
-                freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat, pushMsat = 0L)
+                freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat)
               }
 
               def onTxFail(err: Throwable) =
@@ -182,7 +182,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
-          freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat, pushMsat = 0L)
+          freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat)
         }, none, baseBuilder(title, text), dialog_next, dialog_cancel)
       }
     }

@@ -104,16 +104,16 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       val canReceiveMsat = estimateCanReceive(chan)
       val canSendMsat = estimateCanSend(chan)
 
-      val fundingDepth \ fundingIsDead =
-        LNParams.broadcaster.getStatus(chan.fundTxId)
+      val fundingDepth \ fundingIsDead = LNParams.broadcaster.getStatus(chan.fundTxId)
+      val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
 
-      val fundingState = if (cs.isTurbo) me getString ln_info_nothing else {
-        val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
-        getString(ln_info_funding).format(fundingDepth, threshold)
+      val humanFundingState = cs.channelFlags.exists(_.isTurbo) match {
+        case false => getString(ln_info_funding).format(fundingDepth, threshold)
+        case true => getString(ln_info_nothing)
       }
 
       val refundable = Satoshi(cs.localCommit.spec.toLocalMsat / 1000L)
-      val valueInFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amountMsat).sum / 1000L)
+      val inFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amountMsat).sum / 1000L)
       val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
       val barCanReceive = barCanSend + canReceiveMsat / capacity.amount
 
@@ -126,13 +126,13 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       overBar setProgress barLocalReserve.toInt
 
       startedAtText setText started.html
-      fundingDepthText setText fundingState
+      fundingDepthText setText humanFundingState.html
       totalPaymentsText setText getStat(cs.channelId).toString
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(canSendMsat) / 1000L).html
       refundableAmountText setText denom.parsedWithSign(refundable).html
       totalCapacityText setText denom.parsedWithSign(capacity).html
-      paymentsInFlightText setText sumOrNothing(valueInFlight).html
+      paymentsInFlightText setText sumOrNothing(inFlight).html
       refundFeeText setText sumOrNothing(breakFee).html
 
       chan.data match {
@@ -297,7 +297,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def sumOrNothing(sats: Satoshi) = sats match {
-    case Satoshi(0L) => me getString ln_info_nothing
+    case Satoshi(0L) => getString(ln_info_nothing)
     case _ => denom parsedWithSign sats
   }
 

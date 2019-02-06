@@ -58,13 +58,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           cmd.localParams.channelReserveSat, LNParams.minHtlcValue.amount, cmd.initialFeeratePerKw, cmd.localParams.toSelfDelay,
           cmd.localParams.maxAcceptedHtlcs, cmd.localParams.fundingPrivKey.publicKey, cmd.localParams.revocationBasepoint,
           cmd.localParams.paymentBasepoint, cmd.localParams.delayedPaymentBasepoint, cmd.localParams.htlcBasepoint,
-          Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), channelFlags = 0.toByte)
+          Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), cmd.channelFlags)
 
 
       case (InitData(announce), Tuple2(localParams: LocalParams, open: OpenChannel), WAIT_FOR_INIT) =>
         if (LNParams.chainHash != open.chainHash) throw new LightningException("They have provided a wrong chain hash")
-        if (open.isPublic) throw new LightningException("They are offering a public channel and we only support private ones")
         if (open.fundingSatoshis < LNParams.minCapacitySat) throw new LightningException("Their proposed capacity is too small")
+        if (open.channelFlags.isPublic) throw new LightningException("They are offering a public channel and we only support private ones")
         if (open.pushMsat > 1000L * open.fundingSatoshis) throw new LightningException("They are trying to push more than proposed capacity")
         if (open.dustLimitSatoshis > open.channelReserveSatoshis) throw new LightningException("Their dust limit exceeds their channel reserve")
         if (open.feeratePerKw < LNParams.minFeeratePerKw) throw new LightningException("Their proposed opening on-chain fee is too small")
@@ -80,18 +80,19 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         if (open.fundingSatoshis / open.channelReserveSatoshis < LNParams.channelReserveToFundingRatio / 5)
           throw new LightningException("Their proposed channel reserve is too high relative to capacity")
 
+        val remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis, open.maxHtlcValueInFlightMsat,
+          open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = 6, open.toSelfDelay, open.maxAcceptedHtlcs,
+          open.fundingPubkey, open.revocationBasepoint, open.paymentBasepoint, open.delayedPaymentBasepoint,
+          open.htlcBasepoint, open.firstPerCommitmentPoint)
+
         val firstPerCommitPoint = Generators.perCommitPoint(localParams.shaSeed, 0L)
-        val accept = AcceptChannel(open.temporaryChannelId, localParams.dustLimit.amount, localParams.maxHtlcValueInFlightMsat,
-          localParams.channelReserveSat, LNParams.minHtlcValue.amount, minimumDepth = if (open.isTurbo) 0 else LNParams.minDepth,
-          localParams.toSelfDelay, localParams.maxAcceptedHtlcs, localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint,
-          localParams.paymentBasepoint, localParams.delayedPaymentBasepoint, localParams.htlcBasepoint, firstPerCommitPoint)
-
-        val wait = WaitFundingCreatedRemote(announce, localParams, remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis,
-          open.maxHtlcValueInFlightMsat, open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = if (open.isTurbo) 0 else 6, open.toSelfDelay,
-          open.maxAcceptedHtlcs, open.fundingPubkey, open.revocationBasepoint, open.paymentBasepoint, open.delayedPaymentBasepoint, open.htlcBasepoint,
-          open.firstPerCommitmentPoint), open)
-
-        BECOME(wait, WAIT_FOR_FUNDING) SEND accept
+        val wait = WaitFundingCreatedRemote(announce, localParams, remoteParams, open)
+        BECOME(wait, WAIT_FOR_FUNDING) SEND AcceptChannel(open.temporaryChannelId, localParams.dustLimit.amount,
+          localParams.maxHtlcValueInFlightMsat, localParams.channelReserveSat, LNParams.minHtlcValue.amount,
+          minimumDepth = LNParams.minDepth, localParams.toSelfDelay, localParams.maxAcceptedHtlcs,
+          localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint,
+          localParams.paymentBasepoint, localParams.delayedPaymentBasepoint,
+          localParams.htlcBasepoint, firstPerCommitPoint)
 
 
       case (WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>
@@ -114,17 +115,16 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Funding.makeFirstCommitTxs(localParams, open.fundingSatoshis, open.pushMsat,
             open.feeratePerKw, accept, txHash, outIndex, open.firstPerCommitmentPoint)
 
-        val signedLocalCommitTx = Scripts.addSigs(localCommitTx, localParams.fundingPrivKey.publicKey,
-          accept.fundingPubkey, Scripts.sign(localParams.fundingPrivKey)(localCommitTx), remoteSig)
+        val signedLocalCommitTx =
+          Scripts.addSigs(localCommitTx, localParams.fundingPrivKey.publicKey,
+            accept.fundingPubkey, Scripts.sign(localParams.fundingPrivKey)(localCommitTx), remoteSig)
 
         if (Scripts.checkValid(signedLocalCommitTx).isSuccess) {
-          val channelId = Tools.toLongId(fundingHash = txHash, outIndex)
-          val rc = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), open.firstPerCommitmentPoint)
-          val core = WaitFundingSignedCore(localParams, channelId, accept, localSpec, signedLocalCommitTx, rc)
-          val waitBroadcast = WaitBroadcastRemoteData(announce, core, core makeCommitments signedLocalCommitTx)
           val localSigOfRemoteTx = Scripts.sign(localParams.fundingPrivKey)(remoteCommitTx)
-          val fundingSigned = FundingSigned(channelId, localSigOfRemoteTx)
-          BECOME(waitBroadcast, WAIT_FUNDING_DONE) SEND fundingSigned
+          val fundingSigned = FundingSigned(Tools.toLongId(txHash, outIndex), localSigOfRemoteTx)
+          val rc = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), open.firstPerCommitmentPoint)
+          val core = WaitFundingSignedCore(localParams, fundingSigned.channelId, Some(open.channelFlags), accept, localSpec, rc)
+          BECOME(WaitBroadcastRemoteData(announce, core, core makeCommitments signedLocalCommitTx), WAIT_FUNDING_DONE) SEND fundingSigned
         } else throw new LightningException
 
 
@@ -132,46 +132,49 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (WaitFundingData(announce, cmd, accept), CMDFunding(fundTx), WAIT_FOR_FUNDING) =>
-        // They have accepted our proposal, let them sign a first commit so we can broadcast a funding later
+        // We are the funder and user made a funding, let peer sign a first commit so we can broadcast a funding later
         if (fundTx.txOut(cmd.batch.fundOutIdx).amount.amount != cmd.batch.fundingAmountSat) throw new LightningException
         val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstCommitTxs(cmd.localParams, cmd.fundingSat,
           cmd.pushMsat, cmd.initialFeeratePerKw, accept, fundTx.hash, cmd.batch.fundOutIdx, accept.firstPerCommitmentPoint)
 
         val longId = Tools.toLongId(fundTx.hash, cmd.batch.fundOutIdx)
         val localSigOfRemoteTx = Scripts.sign(cmd.localParams.fundingPrivKey)(remoteCommitTx)
-        val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), accept.firstPerCommitmentPoint)
-        val core = WaitFundingSignedCore(cmd.localParams, longId, accept, localSpec, localCommitTx, firstRemoteCommit)
         val fundingCreated = FundingCreated(cmd.tempChanId, fundTx.hash, cmd.batch.fundOutIdx, localSigOfRemoteTx)
-        BECOME(WaitFundingSignedData(announce, core, fundTx), WAIT_FUNDING_SIGNED) SEND fundingCreated
+        val firstRemoteCommit = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), accept.firstPerCommitmentPoint)
+        val core = WaitFundingSignedCore(cmd.localParams, longId, Some(cmd.channelFlags), accept, localSpec, firstRemoteCommit)
+        BECOME(WaitFundingSignedData(announce, core, localCommitTx, fundTx), WAIT_FUNDING_SIGNED) SEND fundingCreated
 
 
       // They have signed our first commit, we can broadcast a local funding tx
       case (wait: WaitFundingSignedData, remote: FundingSigned, WAIT_FUNDING_SIGNED) =>
-        verifyFirstRemoteCommitTxSig(core = wait.core, remoteSig = remote.signature) match {
-          case Success(commitTx) => BECOME(wait makeWaitFundingDoneData commitTx, WAIT_FUNDING_DONE)
-          case _ => BECOME(wait, CLOSING)
+        val localSignature = Scripts.sign(wait.core.localParams.fundingPrivKey)(wait.localCommitTx)
+        val localKey \ remoteKey = wait.core.localParams.fundingPrivKey.publicKey -> wait.core.remoteParams.fundingPubkey
+        val signedLocalCommitTx = Scripts.addSigs(wait.localCommitTx, localKey, remoteKey, localSignature, remote.signature)
+        val wait1 = WaitFundingDoneData(wait.announce, None, None, wait.fundingTx, wait.core makeCommitments signedLocalCommitTx)
+
+        Scripts checkValid signedLocalCommitTx match {
+          case Success(_) => BECOME(wait1, WAIT_FUNDING_DONE)
+          case _ => throw new LightningException
         }
 
 
       // BECOMING OPEN
 
 
-      // We have agreed to proposed incoming channel and they have published a funding tx, we now start waiting for block inclusion
-      case (waitBroadcast: WaitBroadcastRemoteData, CMDSpent(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
-
-        // Store updated data because event is idempotent
-        me UPDATA STORE(waitBroadcast makeWaitFundingDoneData fundTx)
+      // We have agreed to proposed incoming channel and they have published a funding tx, we now wait for confirmation
+      case (wait: WaitBroadcastRemoteData, CMDSpent(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
+        val wait1 = me STORE WaitFundingDoneData(wait.announce, None, wait.their, fundTx, wait.commitments)
         // If this is a Turbo channel then we may become OPEN right away
-        if (waitBroadcast.commitments.isTurbo) me doProcess CMDConfirmed(fundTx)
+        val isTurbo = wait1.commitments.channelFlags.exists(_.isTurbo)
+        if (isTurbo) me UPDATA wait1 doProcess CMDConfirmed(fundTx)
+        else me UPDATA wait1
 
 
-      // We have agreed to proposed incoming channel and they have published a funding tx, but we see it included in a block right away
-      case (waitBroadcast: WaitBroadcastRemoteData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
-
-        // Store updated data because event is idempotent
-        me UPDATA STORE(waitBroadcast makeWaitFundingDoneData fundTx)
+      // We have agreed to proposed incoming channel and they have published a funding tx, we see it included in a block right away
+      case (wait: WaitBroadcastRemoteData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
+        val wait1 = me STORE WaitFundingDoneData(wait.announce, None, wait.their, fundTx, wait.commitments)
         // Send CMDConfirmed again so we can properly react in new state
-        me doProcess CMDConfirmed(fundTx)
+        me UPDATA wait1 doProcess CMDConfirmed(fundTx)
 
 
       case (waitBroadcast: WaitBroadcastRemoteData, their: FundingLocked, WAIT_FUNDING_DONE) =>
@@ -634,10 +637,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     ChannelReestablish(some.commitments.channelId, nextLocalCommitmentNumber, some.commitments.remoteCommit.index,
       Some apply Scalar(yourLastPerCommitmentSecret), Some apply myCurrentPerCommitmentPoint)
   }
-
-  private def verifyFirstRemoteCommitTxSig(core: WaitFundingSignedCore, remoteSig: BinaryData) =
-    Scripts checkValid Scripts.addSigs(core.localCommitTx, localKey = core.localParams.fundingPrivKey.publicKey,
-      core.remoteParams.fundingPubkey, Scripts.sign(core.localParams.fundingPrivKey)(core.localCommitTx), remoteSig)
 
   private def makeFirstFundingLocked(some: HasCommitments) = {
     val first = Generators.perCommitPoint(some.commitments.localParams.shaSeed, 1L)

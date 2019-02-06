@@ -108,7 +108,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   private[this] val connectionListener = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-      case openChan: OpenChannel if !openChan.isPublic => onOpenOffer(nodeId, openChan)
+      case open: OpenChannel if !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
       case _ => // Ignore public channel offers
     }
 

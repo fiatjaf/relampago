@@ -28,9 +28,9 @@ case object CMDProceed extends Command
 case object CMDOffline extends Command
 case object CMDOnline extends Command
 
-case class CMDOpenChannel(localParams: LocalParams, tempChanId: BinaryData,
-                          initialFeeratePerKw: Long, batch: Batch, fundingSat: Long,
-                          pushMsat: Long) extends Command
+case class CMDOpenChannel(localParams: LocalParams,
+                          tempChanId: BinaryData, initialFeeratePerKw: Long, batch: Batch, fundingSat: Long,
+                          channelFlags: ChannelFlags = ChannelFlags(0.toByte), pushMsat: Long = 0L) extends Command
 
 case class CMDFailMalformedHtlc(id: Long, onionHash: BinaryData, code: Int) extends Command
 case class CMDFulfillHtlc(id: Long, preimage: BinaryData) extends Command
@@ -53,20 +53,18 @@ case class WaitAcceptData(announce: NodeAnnouncement, cmd: CMDOpenChannel) exten
 case class WaitFundingData(announce: NodeAnnouncement, cmd: CMDOpenChannel, accept: AcceptChannel) extends ChannelData
 
 // Funding tx may arrive locally or from external funder
-case class WaitFundingSignedCore(localParams: LocalParams, channelId: BinaryData,
-                                 remoteParams: AcceptChannel, localSpec: CommitmentSpec,
-                                 localCommitTx: CommitTx, remoteCommit: RemoteCommit) {
+case class WaitFundingSignedCore(localParams: LocalParams, channelId: BinaryData, channelFlags: Option[ChannelFlags],
+                                 remoteParams: AcceptChannel, localSpec: CommitmentSpec, remoteCommit: RemoteCommit) {
 
   def makeCommitments(signedLocalCommitTx: CommitTx) =
     Commitments(localParams, remoteParams, LocalCommit(index = 0L, localSpec, Nil, signedLocalCommitTx), remoteCommit,
       localChanges = Changes(Vector.empty, Vector.empty, Vector.empty), remoteChanges = Changes(Vector.empty, Vector.empty, Vector.empty),
-      localNextHtlcId = 0L, remoteNextHtlcId = 0L, remoteNextCommitInfo = Right(Tools.randomPrivKey.toPoint), localCommitTx.input,
-      remotePerCommitmentSecrets = ShaHashesWithIndex(Map.empty, None), channelId)
+      localNextHtlcId = 0L, remoteNextHtlcId = 0L, remoteNextCommitInfo = Right(Tools.randomPrivKey.toPoint), signedLocalCommitTx.input,
+      ShaHashesWithIndex(Map.empty, None), channelId, extraHop = None, channelFlags, startedAt = System.currentTimeMillis)
 }
 
-case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSignedCore, fundingTx: Transaction) extends ChannelData {
-  def makeWaitFundingDoneData(signedCommit: CommitTx) = WaitFundingDoneData(announce, None, None, fundingTx, core makeCommitments signedCommit)
-}
+case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSignedCore,
+                                 localCommitTx: CommitTx, fundingTx: Transaction) extends ChannelData
 
 // ALL THE DATA BELOW WILL BE STORED
 
@@ -75,17 +73,12 @@ sealed trait WaitData extends HasCommitments {
   def takesLongTime = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 4 * 1000L
 }
 
-case class WaitBroadcastRemoteData(announce: NodeAnnouncement,
-                                   core: WaitFundingSignedCore, commitments: Commitments,
-                                   their: Option[FundingLocked] = None) extends WaitData {
+case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore,
+                                   commitments: Commitments, their: Option[FundingLocked] = None) extends WaitData
 
-  def makeWaitFundingDoneData(fundTx: Transaction) =
-    WaitFundingDoneData(announce, None, their, fundTx, commitments)
-}
-
-case class WaitFundingDoneData(announce: NodeAnnouncement,
-                               our: Option[FundingLocked], their: Option[FundingLocked],
-                               fundingTx: Transaction, commitments: Commitments) extends WaitData
+case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked],
+                               their: Option[FundingLocked], fundingTx: Transaction,
+                               commitments: Commitments) extends WaitData
 
 case class NormalData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Option[Shutdown] = None,
                       remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends WaitData
@@ -279,9 +272,8 @@ case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Lon
 case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit, remoteCommit: RemoteCommit, localChanges: Changes,
                        remoteChanges: Changes, localNextHtlcId: Long, remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point],
                        commitInput: InputInfo, remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, extraHop: Option[Hop] = None,
-                       startedAt: Long = System.currentTimeMillis) { me =>
+                       channelFlags: Option[ChannelFlags] = None, startedAt: Long = System.currentTimeMillis) { me =>
 
-  def isTurbo = remoteParams.minimumDepth < 1
   lazy val reducedRemoteState: ReducedState = {
     val reduced = CommitmentSpec.reduce(Commitments.latestRemoteCommit(me).spec, remoteChanges.acked, localChanges.proposed)
     val commitFeeSat = Scripts.commitTxFee(dustLimit = remoteParams.dustLimitSat, spec = reduced).amount

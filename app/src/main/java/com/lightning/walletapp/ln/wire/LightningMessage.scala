@@ -23,15 +23,16 @@ case class Pong(data: BinaryData) extends LightningMessage
 
 // CHANNEL SETUP MESSAGES: open channels never get these
 
+case class ChannelFlags(flags: Byte) {
+  def isPublic = (flags & 0x01) != 0
+  def isTurbo = (flags & 0x04) != 0
+}
+
 case class OpenChannel(chainHash: BinaryData, temporaryChannelId: BinaryData, fundingSatoshis: Long, pushMsat: Long,
                        dustLimitSatoshis: Long, maxHtlcValueInFlightMsat: UInt64, channelReserveSatoshis: Long, htlcMinimumMsat: Long,
                        feeratePerKw: Long, toSelfDelay: Int, maxAcceptedHtlcs: Int, fundingPubkey: PublicKey, revocationBasepoint: Point,
                        paymentBasepoint: Point, delayedPaymentBasepoint: Point, htlcBasepoint: Point, firstPerCommitmentPoint: Point,
-                       channelFlags: Byte) extends ChannelSetupMessage {
-
-  def isPublic = (channelFlags & 0x01) != 0
-  def isTurbo = (channelFlags & 0x04) != 0
-}
+                       channelFlags: ChannelFlags) extends ChannelSetupMessage
 
 case class AcceptChannel(temporaryChannelId: BinaryData, dustLimitSatoshis: Long, maxHtlcValueInFlightMsat: UInt64,
                          channelReserveSatoshis: Long, htlcMinimumMsat: Long, minimumDepth: Long, toSelfDelay: Int, maxAcceptedHtlcs: Int,
