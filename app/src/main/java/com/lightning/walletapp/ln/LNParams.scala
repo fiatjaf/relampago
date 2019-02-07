@@ -105,8 +105,8 @@ case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, commitTx:
 trait Broadcaster extends ChannelListener {
   def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
   def getStatus(txid: BinaryData): DepthAndDead
-  def currentHeight: Long
   def perKwThreeSat: Long
+  def currentHeight: Int
   def perKwSixSat: Long
 
   // Parent state and next tier cltv delay

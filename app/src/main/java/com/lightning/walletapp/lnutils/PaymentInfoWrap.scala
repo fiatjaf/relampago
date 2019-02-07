@@ -262,23 +262,3 @@ object BadEntityWrap {
     app.olympus findRoutes OutRequest(rd.firstMsat / 1000L, badNodes - targetStr -- fromAsStr, badChanLongs, fromAsStr, targetStr)
   }
 }
-
-object GossipCatcher extends ChannelListener {
-  override def onProcessSuccess: PartialFunction[Incoming, Unit] = {
-    // Depth barrier is relevant for Turbo channels: restrict receiving until confirmed
-    case (chan, norm: NormalData, _: CMDBestHeight) if channelAndHop(chan).isEmpty =>
-      val fundingDepth \ isFundingDead = broadcaster.getStatus(chan.fundTxId)
-
-      if (fundingDepth >= minDepth && !isFundingDead) for {
-        blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
-        shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
-        ChannelUpdate(_, _, _, _, _, _, cltv, min, base, prop, _) <- app.olympus.findUpdate(chan.data.announce.nodeId)
-      } chan process Hop(chan.data.announce.nodeId, shortChannelId, cltv, min, base, prop)
-
-    case (chan, norm: NormalData, upd: ChannelUpdate)
-      // We have an old or dummy Hop, replace it with (peer -> localPhone) Hop
-      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
-      chan.listeners -= GossipCatcher
-      updateHop(chan, upd)
-  }
-}

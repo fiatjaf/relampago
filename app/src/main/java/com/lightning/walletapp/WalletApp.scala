@@ -193,11 +193,11 @@ class WalletApp extends Application { me =>
 }
 
 object ChannelManager extends Broadcaster {
-  val CMDLocalShutdown: Command = CMDShutdown(None)
-  val operationalListeners: Set[ChannelListener] = Set(ChannelManager, bag, GossipCatcher)
-  private[this] var initialChainHeight: Long = app.kit.wallet.getLastBlockSeenHeight
+  val operationalListeners = Set(ChannelManager, bag)
+  val CMDLocalShutdown = CMDShutdown(scriptPubKey = None)
+  private[this] var initialChainHeight = app.kit.wallet.getLastBlockSeenHeight
   // Blocks download has not started yet and we don't know how many is left
-  var currentBlocksLeft: Int = Int.MaxValue
+  var currentBlocksLeft = Int.MaxValue
 
   val socketEventsListener = new ConnectionListener {
     override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDLocalShutdown)
@@ -266,7 +266,7 @@ object ChannelManager extends Broadcaster {
   def perKwSixSat = RatesSaver.rates.feeSix.value / 4
   def perKwThreeSat = RatesSaver.rates.feeThree.value / 4
 
-  def currentHeight =
+  def currentHeight: Int =
     // We may still be syncing but anyway a final chain height is known here
     if (currentBlocksLeft == Int.MaxValue) app.kit.wallet.getLastBlockSeenHeight
     else app.kit.wallet.getLastBlockSeenHeight + currentBlocksLeft
@@ -281,12 +281,29 @@ object ChannelManager extends Broadcaster {
     tx.getConfidence.getDepthInBlocks -> isTxDead
   } getOrElse 0 -> false
 
+  // CHANNEL LISTENER IMPLEMENTATION
+
   override def onProcessSuccess = {
     case (_, close: ClosingData, _: Command) =>
       // Repeatedly spend everything we can in this state in case it was unsuccessful before
       val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockSend tx catch none
+
+    case (chan, norm: NormalData, _: CMDBestHeight) if channelAndHop(chan).isEmpty =>
+      // Depth barrier is relevant for Turbo channels: restrict receiving until confirmed
+      val fundingDepth \ isFundingDead = broadcaster.getStatus(chan.fundTxId)
+
+      if (fundingDepth >= minDepth && !isFundingDead) for {
+        blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
+        shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
+        ChannelUpdate(_, _, _, _, _, _, cltv, min, base, prop, _) <- app.olympus.findUpdate(chan.data.announce.nodeId)
+      } chan process Hop(chan.data.announce.nodeId, shortChannelId, cltv, min, base, prop)
+
+    case (chan, norm: NormalData, upd: ChannelUpdate)
+      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
+      // We have an old or dummy Hop, replace it with a new one IF it updates parameters
+      updateHop(chan, upd)
   }
 
   override def onBecome = {
@@ -299,7 +316,7 @@ object ChannelManager extends Broadcaster {
 
   val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
   // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-  var all = for (chanState <- ChannelWrap doGet db) yield createChannel(operationalListeners, chanState)
+  var all: Vector[Channel] = for (chanState <- ChannelWrap doGet db) yield createChannel(operationalListeners, chanState)
   def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
   def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
   def notClosing = for (c <- all if c.state != CLOSING) yield c

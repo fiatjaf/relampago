@@ -103,15 +103,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       val breakFee = Satoshi(cs.reducedRemoteState.myFeeSat)
       val canReceiveMsat = estimateCanReceive(chan)
       val canSendMsat = estimateCanSend(chan)
-
-      val fundingDepth \ fundingIsDead = LNParams.broadcaster.getStatus(chan.fundTxId)
-      val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
-
-      val humanFundingState = cs.channelFlags.exists(_.isTurbo) match {
-        case false => getString(ln_info_funding).format(fundingDepth, threshold)
-        case true => getString(ln_info_nothing)
-      }
-
+      
       val refundable = Satoshi(cs.localCommit.spec.toLocalMsat / 1000L)
       val inFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amountMsat).sum / 1000L)
       val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
@@ -120,13 +112,14 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       // For incoming chans reserveAndFee is reserve only since fee is zero
       val reserveAndFee = breakFee.amount + cs.remoteParams.channelReserveSatoshis
       val barLocalReserve = math.min(barCanSend, reserveAndFee * 1000L / capacity.amount)
+      val fundingDepth \ fundingIsDead = LNParams.broadcaster.getStatus(chan.fundTxId)
+      val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
 
       baseBar setProgress barCanSend.toInt
       baseBar setSecondaryProgress barCanReceive.toInt
       overBar setProgress barLocalReserve.toInt
 
       startedAtText setText started.html
-      fundingDepthText setText humanFundingState.html
       totalPaymentsText setText getStat(cs.channelId).toString
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(canSendMsat) / 1000L).html
@@ -153,6 +146,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
         case wait: WaitData =>
           // This should catch WaitBroadcastRemoteData and WaitFundingDoneData, but not NormalData
+          fundingDepthText setText getString(ln_info_funding).format(fundingDepth, threshold).html
           if (fundingDepth < 1 && wait.takesLongTime) setExtraInfo(resource = ln_info_funding_long)
           if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
 
