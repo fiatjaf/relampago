@@ -1,7 +1,7 @@
 package com.lightning.walletapp.ln.wire
 
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-import com.lightning.walletapp.ln.{HasCommitments, LightningException}
+import com.lightning.walletapp.ln.{Features, HasCommitments, LightningException}
 import com.lightning.walletapp.ln.Tools.{bin2readable, fromShortId}
 import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
@@ -24,8 +24,8 @@ case class Pong(data: BinaryData) extends LightningMessage
 // CHANNEL SETUP MESSAGES: open channels never get these
 
 case class ChannelFlags(flags: Byte) {
-  def isPublic = (flags & 0x01) != 0
-  def isTurbo = (flags & 0x04) != 0
+  def isPublic = Features.isBitSet(0, flags)
+  def isTurbo = Features.isBitSet(3, flags)
 }
 
 case class OpenChannel(chainHash: BinaryData, temporaryChannelId: BinaryData, fundingSatoshis: Long, pushMsat: Long,

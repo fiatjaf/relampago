@@ -45,8 +45,9 @@ object Features {
   val OPTION_DATA_LOSS_PROTECT_MANDATORY = 0
   val OPTION_DATA_LOSS_PROTECT_OPTIONAL = 1
 
-  implicit def binData2BitSet(data: BinaryData): util.BitSet = util.BitSet valueOf data.reverse.toArray
+  def isBitSet(pos: Int, bitField: Byte) = bitField.&(1 << pos) == (1 << pos)
   def areSupported(bitset: util.BitSet) = !(0 until bitset.length by 2 exists bitset.get)
+  implicit def binData2BitSet(data: BinaryData): util.BitSet = util.BitSet.valueOf(data.reverse.toArray)
 
   def dataLossProtect(bitset: util.BitSet) =
     bitset.get(OPTION_DATA_LOSS_PROTECT_OPTIONAL) ||

@@ -349,7 +349,7 @@ object ChannelManager extends Broadcaster {
         DecodeResult(ri, _) <- revocationInfoCodec.decode(bitVec).toOption
         perCommitmentSecret <- Helpers.Closing.extractCommitmentSecret(cs, tx)
         riWithCurrentFeeRate = ri.copy(feeRate = ri.feeRate max broadcaster.perKwThreeSat)
-        ri1 = Helpers.Closing.reMakeRevocationInfo(riWithCurrentFeeRate, cs, tx)(perCommitmentSecret)
+        ri1 = Helpers.Closing.reMakeRevocationInfo(riWithCurrentFeeRate, cs, tx, perCommitmentSecret)
       } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri1, tx)
     }
 

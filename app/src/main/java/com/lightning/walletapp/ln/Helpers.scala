@@ -236,7 +236,7 @@ object Helpers {
 
     // Here we have an existing RevocationInfo with updated fee rate
     def reMakeRevocationInfo(ri: RevocationInfo, commitments: Commitments,
-                             tx: Transaction)(perCommitSecret: Scalar) = {
+                             tx: Transaction, perCommitSecret: Scalar) = {
 
       val finder = new PubKeyScriptIndexFinder(tx)
       val remotePerCommitmentPoint = perCommitSecret.toPoint

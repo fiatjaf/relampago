@@ -511,9 +511,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val rd = emptyRD(pr, sum.amount, useCache = true)
       db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
-      db.change(PaymentTable.newSql, pr.toJson, preimage, 1, HIDDEN,
-        System.currentTimeMillis, pr.description, pr.paymentHash,
-        sum.amount, 0L, 0L, NOCHANID)
+      db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* incoming */, HIDDEN /* invisible */,
+        System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
 
       rd
     }
