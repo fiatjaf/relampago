@@ -30,7 +30,7 @@ case object CMDOnline extends Command
 
 case class CMDOpenChannel(localParams: LocalParams,
                           tempChanId: BinaryData, initialFeeratePerKw: Long, batch: Batch, fundingSat: Long,
-                          channelFlags: ChannelFlags = ChannelFlags(0.toByte), pushMsat: Long = 0L) extends Command
+                          channelFlags: ChannelFlags = ChannelFlags(0), pushMsat: Long = 0L) extends Command
 
 case class CMDFailMalformedHtlc(id: Long, onionHash: BinaryData, code: Int) extends Command
 case class CMDFulfillHtlc(id: Long, preimage: BinaryData) extends Command
@@ -73,12 +73,13 @@ sealed trait WaitData extends HasCommitments {
   def takesLongTime = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 4 * 1000L
 }
 
-case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore,
-                                   commitments: Commitments, their: Option[FundingLocked] = None) extends WaitData
+case class WaitBroadcastRemoteData(announce: NodeAnnouncement,
+                                   core: WaitFundingSignedCore, commitments: Commitments,
+                                   their: Option[FundingLocked] = None) extends WaitData
 
-case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked],
-                               their: Option[FundingLocked], fundingTx: Transaction,
-                               commitments: Commitments) extends WaitData
+case class WaitFundingDoneData(announce: NodeAnnouncement,
+                               our: Option[FundingLocked], their: Option[FundingLocked],
+                               fundingTx: Transaction, commitments: Commitments) extends WaitData
 
 case class NormalData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Option[Shutdown] = None,
                       remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends WaitData
@@ -177,15 +178,22 @@ case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimThei
   }
 }
 
-case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig], claimMainTxSig: Option[BinaryData],
-                          claimPenaltyTxSig: Option[BinaryData], feeRate: Long, dustLimit: Long, finalScriptPubKey: BinaryData,
-                          toSelfDelay: Int, localPubKey: PublicKey, remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey) {
+case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig],
+                          claimMainTxSig: Option[BinaryData], claimPenaltyTxSig: Option[BinaryData], feeRate: Long,
+                          dustLimit: Long, finalScriptPubKey: BinaryData, toSelfDelay: Int, localPubKey: PublicKey,
+                          remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey) {
 
   lazy val dustLim = Satoshi(dustLimit)
-  def makeClaimP2WPKHOutput(tx: Transaction) = Scripts.makeClaimP2WPKHOutputTx(tx, localPubKey, finalScriptPubKey, feeRate, dustLim)
-  def makeHtlcPenalty(finder: PubKeyScriptIndexFinder)(rs: BinaryData) = Scripts.makeHtlcPenaltyTx(finder, rs, finalScriptPubKey, feeRate, dustLim)
-  def makeMainPenalty(tx: Transaction) = Scripts.makeMainPenaltyTx(tx, remoteRevocationPubkey, finalScriptPubKey, toSelfDelay, remoteDelayedPaymentKey,
-    feeRate, dustLim)
+  def makeClaimP2WPKHOutput(tx: Transaction) =
+    Scripts.makeClaimP2WPKHOutputTx(tx, localPubKey,
+      finalScriptPubKey, feeRate, dustLim)
+
+  def makeHtlcPenalty(finder: PubKeyScriptIndexFinder)(redeemScript: BinaryData) =
+    Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, feeRate, dustLim)
+
+  def makeMainPenalty(tx: Transaction) =
+    Scripts.makeMainPenaltyTx(tx, remoteRevocationPubkey, finalScriptPubKey,
+      toSelfDelay, remoteDelayedPaymentKey, feeRate, dustLim)
 }
 
 // COMMITMENTS

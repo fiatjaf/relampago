@@ -38,8 +38,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   def SEND(msg: LightningMessage): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit
-  def STORE(content: HasCommitments): HasCommitments
-  def GETREV(tx: Transaction): Option[RevokedCommitPublished]
+  def STORE(channelDataWithCommitments: HasCommitments): HasCommitments
+  def GETREV(cs: Commitments, tx: Transaction): Option[RevokedCommitPublished]
   def REV(cs: Commitments, rev: RevokeAndAck): Unit
 
   def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
@@ -577,9 +577,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (cd: ClosingData, CMDSpent(htlcTx), CLOSING)
         // This may be one of our own 1st tier transactions
         // or they may broadcast their 1st tier, catch all of them
-        if cd.revokedCommit.exists(_ spendsFromRevoked htlcTx) => for {
+        if cd.revokedCommit.exists(_ spendsFromRevoked htlcTx) =>
+
+        for {
           revCommitPublished <- cd.revokedCommit if revCommitPublished spendsFromRevoked htlcTx
-          Some(punishTx) <- Closing.claimRevokedHtlcTxOutputs(cd.commitments, revCommitPublished.commitTx, htlcTx)
+          perCommitmentSecret <- Helpers.Closing.extractCommitmentSecret(cd.commitments, revCommitPublished.commitTx)
+          punishTx <- Closing.claimRevokedHtlcTxOutputs(commitments = cd.commitments, htlcTx, perCommitmentSecret)
           punishTxj = com.lightning.walletapp.lnutils.ImplicitConversions.bitcoinLibTx2bitcoinjTx(punishTx)
         } com.lightning.walletapp.Utils.app.kit blockSend punishTxj
 
@@ -587,7 +590,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (some: HasCommitments, CMDSpent(tx), _)
         // GUARD: tx which spends our funding is broadcasted, must react
         if tx.txIn.exists(input => some.commitments.commitInput.outPoint == input.outPoint) =>
-        Tuple3(GETREV(tx), some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit), some) match {
+        val nextRemoteCommitLeft = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
+
+        Tuple3(GETREV(some.commitments, tx), nextRemoteCommitLeft, some) match {
           case (_, _, close: ClosingData) if close.refundRemoteCommit.nonEmpty => Tools log s"Existing refund $tx"
           case (_, _, close: ClosingData) if close.mutualClose.exists(_.txid == tx.txid) => Tools log s"Existing mutual $tx"
           case (_, _, close: ClosingData) if close.localCommit.exists(_.commitTx.txid == tx.txid) => Tools log s"Existing local $tx"
@@ -600,9 +605,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           case _ if some.commitments.localCommit.commitTx.tx.txid == tx.txid => startLocalClose(some)
 
           case (_, _, norm: NormalData) =>
-            // May happen when old snapshot is used two times in a row
-            val d1 = me STORE norm.copy(unknownSpend = Some apply tx)
-            me UPDATA d1
+            // Example: old snapshot is used two times in a row
+            val d1 = norm.copy(unknownSpend = Some apply tx)
+            me UPDATA STORE(d1)
 
           case _ =>
             // Nothing left to do here so at least inform user

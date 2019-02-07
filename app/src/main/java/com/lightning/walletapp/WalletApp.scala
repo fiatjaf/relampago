@@ -334,20 +334,23 @@ object ChannelManager extends Broadcaster {
 
       tx <- cs.remoteCommit.txOpt
       myBalance = cs.localCommit.spec.toLocalMsat
-      revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret)
+      watchtowerFee = broadcaster.perKwThreeSat * 2 // Scorched earth policy becuase WT can't regenerate
+      revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret, watchtowerFee)
       serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
     } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
 
-    def GETREV(tx: fr.acinq.bitcoin.Transaction) = {
-      // Extract RevocationInfo for a given breach transaction
-      val cursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
-      val rc = RichCursor(cursor).headTry(_ string RevokedInfoTable.info)
+    def GETREV(cs: Commitments, tx: fr.acinq.bitcoin.Transaction) = {
+      val dbCursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
+      val rc = RichCursor(dbCursor).headTry(_ string RevokedInfoTable.info)
 
       for {
         serialized <- rc.toOption
         bitVec = BitVector(BinaryData(serialized).data)
         DecodeResult(ri, _) <- revocationInfoCodec.decode(bitVec).toOption
-      } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri, tx)
+        perCommitmentSecret <- Helpers.Closing.extractCommitmentSecret(cs, tx)
+        riWithCurrentFeeRate = ri.copy(feeRate = ri.feeRate max broadcaster.perKwThreeSat)
+        ri1 = Helpers.Closing.reMakeRevocationInfo(riWithCurrentFeeRate, cs, tx)(perCommitmentSecret)
+      } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri1, tx)
     }
 
     def CLOSEANDWATCHREVHTLC(cd: ClosingData) = {
