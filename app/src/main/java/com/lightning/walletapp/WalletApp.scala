@@ -294,7 +294,7 @@ object ChannelManager extends Broadcaster {
       // Depth barrier is relevant for Turbo channels: restrict receiving until confirmed
       val fundingDepth \ isFundingDead = broadcaster.getStatus(chan.fundTxId)
 
-      if (fundingDepth >= minDepth && !isFundingDead) for {
+      if (fundingDepth > minDepth && !isFundingDead) for {
         blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
         shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
         ChannelUpdate(_, _, _, _, _, _, cltv, min, base, prop, _) <- app.olympus.findUpdate(chan.data.announce.nodeId)
@@ -327,13 +327,13 @@ object ChannelManager extends Broadcaster {
 
   def delayedPublishes = {
     // Select all ShowDelayed which can't be published yet because cltv/csv delay is not cleared
-    val statuses = all.map(_.data).collect { case cd: ClosingData => cd.bestClosing.getState }.flatten
-    statuses.collect { case sd: ShowDelayed if !sd.isPublishable && sd.delay > Long.MinValue => sd }
+    val statuses = all.map(chan => chan.data).collect { case cd: ClosingData => cd.bestClosing.getState }
+    statuses.flatten.collect { case sd: ShowDelayed if !sd.isPublishable && sd.delay > Long.MinValue => sd }
   }
 
   def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(_.add.paymentHash)
-  def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
-  def initConnect = for (c <- notClosing) ConnectionManager.connectTo(c.data.announce, notify = false)
+  def frozenInFlightHashes = all.map(chan => chan.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
+  def initConnect = for (chan <- notClosing) ConnectionManager.connectTo(chan.data.announce, notify = false)
 
   def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData): Channel = new Channel { self =>
     def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m

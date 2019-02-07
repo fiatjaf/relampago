@@ -98,32 +98,25 @@ case class ClosingData(announce: NodeAnnouncement,
                        refundRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
                        closedAt: Long = System.currentTimeMillis) extends HasCommitments {
 
-  private lazy val realTier12Closings =
-    revokedCommit ++ localCommit ++ remoteCommit ++
-      nextRemoteCommit ++ refundRemoteCommit
-
-  lazy val commitTxs = realTier12Closings.map(_.commitTx)
+  def tier12States = realTier12Closings.flatMap(_.getState) // Not a lazy val because results depend on blockchain state
+  private lazy val realTier12Closings = revokedCommit ++ localCommit ++ remoteCommit ++ nextRemoteCommit ++ refundRemoteCommit
   lazy val frozenPublishedHashes = realTier12Closings.flatMap(_.frozenHashes)
-  def tier12States: Seq[PublishStatus] = realTier12Closings.flatMap(_.getState)
+  lazy val commitTxs = realTier12Closings.map(_.commitTx)
 
   def bestClosing: CommitPublished = {
     // At least one closing is guaranteed to be here
     val mutualWrappers = mutualClose map MutualCommitPublished
     mutualWrappers ++ realTier12Closings maxBy { commitPublished =>
-      val confirmations \ isDead = getStatus(commitPublished.commitTx.txid)
-      if (isDead) -confirmations else confirmations
+      val txDepth \ isDead = getStatus(commitPublished.commitTx.txid)
+      if (isDead) -txDepth else txDepth
     }
   }
 
-  def canBeRemoved: Boolean = {
-    val allConfirmedOrDead = bestClosing match {
+  def canBeRemoved: Boolean =
+    if (System.currentTimeMillis > closedAt + 1000L * 3600 * 24 * 21) true else bestClosing match {
       case MutualCommitPublished(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }
-      case info => info.getState.map(_.txn.txid) map getStatus forall { case cfs \ isDead => cfs > minDepth || isDead }
+      case info => info.getState.map(_.txn.txid).map(getStatus) forall { case cfs \ isDead => cfs > minDepth || isDead }
     }
-
-    val hardDelay = closedAt + 1000L * 3600 * 24 * 21
-    allConfirmedOrDead || hardDelay < System.currentTimeMillis
-  }
 }
 
 sealed trait CommitPublished {
