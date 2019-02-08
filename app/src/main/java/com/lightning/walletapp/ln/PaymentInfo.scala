@@ -192,9 +192,8 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long, lastExpiry: Long,
                        callsLeft: Int, useCache: Boolean) {
 
-  lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
   lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toString}"
-  def plusOutOfBandRoute(newRoute: PaymentRoute) = copy(routes = newRoute +: routes)
+  lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
 }
 
 case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int, stamp: Long,

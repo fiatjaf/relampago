@@ -433,10 +433,9 @@ object ChannelManager extends Broadcaster {
         case restFrom if rd.useCache => RouteWrap.findRoutes(restFrom, target, rd)
         case restFrom => BadEntityWrap.findRoutes(restFrom, target, rd)
       } else from contains target match {
-        case true => Obs just Vector(Vector.empty)
-        case false if rd.routes.nonEmpty => Obs just Vector.empty
         case false if rd.useCache => RouteWrap.findRoutes(from, target, rd)
         case false => BadEntityWrap.findRoutes(from, target, rd)
+        case true => Obs just Vector(Vector.empty)
       }
 
     val paymentRoutesObs =
