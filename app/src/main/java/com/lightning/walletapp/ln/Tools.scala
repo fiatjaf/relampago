@@ -24,6 +24,11 @@ object Tools {
   def wrap(run: => Unit)(go: => Unit) = try go catch none finally run
   def none: PartialFunction[Any, Unit] = { case _ => }
 
+  def toMap[T, K, V](source: Seq[T], keyFun: T => K, valFun: T => V): Map[K, V] = {
+    val premap = for (mapElement <- source) yield keyFun(mapElement) -> valFun(mapElement)
+    premap.toMap
+  }
+
   def fromShortId(id: Long) = {
     val blockHeight = id.>>(40).&(0xFFFFFF).toInt
     val txIndex = id.>>(16).&(0xFFFFFF).toInt

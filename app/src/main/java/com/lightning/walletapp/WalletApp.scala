@@ -442,14 +442,15 @@ object ChannelManager extends Broadcaster {
     val paymentRoutesObs =
       if (from.isEmpty) Obs error new LightningException
       else if (rd.isReflexive) Obs.zip(observables = withHints).map(_.flatten.toVector)
-      // Normally rd does not conain routes at this point but it may have a (phone -> Joint -> payee) one
-      else Obs.zip(getRoutes(rd.pr.nodeId) +: Obs.just(rd.routes) +: withHints).map(_.flatten.toVector)
+      else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
 
     for {
-      routeVec <- paymentRoutesObs
-      busyMap = all.map(chan => chan.data.announce.nodeId -> inFlightHtlcs(chan).size).toMap
-      unloadest = routeVec.sortBy(route => if (route.nonEmpty) busyMap(route.head.nodeId) else 0)
-    } yield useFirstRoute(unloadest, rd)
+      cheapestRoutes <- paymentRoutesObs
+      busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => inFlightHtlcs(chan).size)
+      openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1)
+      lessBusyRoutes = cheapestRoutes.sortBy(route => if (route.isEmpty) busyMap apply rd.pr.nodeId else busyMap apply route.head.nodeId)
+      openRoutes = lessBusyRoutes.sortBy(route => if (route.isEmpty) openMap apply rd.pr.nodeId else busyMap apply route.head.nodeId)
+    } yield useFirstRoute(openRoutes, rd)
   }
 
   def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
@@ -462,8 +463,8 @@ object ChannelManager extends Broadcaster {
         // Empty used route means we're sending to peer and its nodeId is our target
         val excludeChan = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
         val targetNodeId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
-        val wouldBeLoop = chan.hasCsOr(_.commitments.extraHop.exists(_.shortChannelId == excludeChan), false)
-        !wouldBeLoop && chan.data.announce.nodeId == targetNodeId && estimateCanSend(chan) >= rd.firstMsat
+        val isKink = chan.hasCsOr(_.commitments.extraHop.exists(_.shortChannelId == excludeChan), false)
+        !isKink && chan.data.announce.nodeId == targetNodeId && estimateCanSend(chan) >= rd.firstMsat
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)
         case Some(targetGoodChannel) => targetGoodChannel process rd
