@@ -69,8 +69,7 @@ case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSi
 // ALL THE DATA BELOW WILL BE STORED
 
 sealed trait WaitData extends HasCommitments {
-  def isLost = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 14 * 1000L
-  def takesLongTime = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 4 * 1000L
+  def isLost = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 21 * 1000L
 }
 
 case class WaitBroadcastRemoteData(announce: NodeAnnouncement,

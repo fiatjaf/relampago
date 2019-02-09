@@ -121,6 +121,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       startedAtText setText started.html
       totalPaymentsText setText getStat(cs.channelId).toString
+      fundingDepthText setText getString(ln_info_funding).format(fundingDepth, threshold).html
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(canSendMsat) / 1000L).html
       refundableAmountText setText denom.parsedWithSign(refundable).html
@@ -134,10 +135,12 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           // We only can display one item so sort them by increasing importance
           if (fundingDepth > 6 && channelAndHop(chan).isEmpty) setExtraInfo(resource = ln_info_no_receive)
           // In a case of Turbo channels we may have an OPEN state with NormalData yet with unconfirmed funding
-          if (fundingDepth < 1 && norm.takesLongTime) setExtraInfo(resource = ln_info_funding_long)
           if (norm.unknownSpend.isDefined) setExtraInfo(resource = ln_info_unknown_spend)
           if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
-          visibleExcept(gone = R.id.fundingDepth, R.id.closedAt)
+
+          // Relevant for Turbo channels: show funding depth until it reaches threshold
+          val fundingDepthCondition = if (fundingDepth < threshold) -1 else R.id.fundingDepth
+          visibleExcept(gone = fundingDepthCondition, R.id.closedAt)
 
         case _: NormalData | _: NegotiationsData =>
           setExtraInfo(resource = ln_info_coop_attempt)
@@ -145,23 +148,20 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             R.id.canReceive, R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
 
         case wait: WaitData =>
-          // This should catch WaitBroadcastRemoteData and WaitFundingDoneData, but not NormalData
-          fundingDepthText setText getString(ln_info_funding).format(fundingDepth, threshold).html
-          if (fundingDepth < 1 && wait.takesLongTime) setExtraInfo(resource = ln_info_funding_long)
           if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
-
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
-            R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
-            R.id.totalPayments)
+          // Should catch WaitBroadcastRemoteData and WaitFundingDoneData, not NormalData
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+            R.id.closedAt, R.id.paymentsInFlight, R.id.totalPayments)
 
         case cd: ClosingData =>
           setExtraInfo(text = me closedBy cd)
           val closeDate = new Date(cd.closedAt)
           closedAtText setText time(closeDate).html
 
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
-            R.id.canReceive, if (cd.mutualClose.isEmpty) -1 else R.id.refundFee,
-            R.id.fundingDepth, R.id.paymentsInFlight)
+          // Show breaking fee if this is NOT a mutual closing
+          val refundFeeCondition = if (cd.mutualClose.isEmpty) -1 else R.id.refundFee
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+            refundFeeCondition, R.id.fundingDepth, R.id.paymentsInFlight)
 
         case _ =>
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
