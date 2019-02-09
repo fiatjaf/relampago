@@ -189,11 +189,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     // TransData value should be retained in both of these cases
     case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
 
-    case FragWallet.REDIRECT =>
-      // TransData value should be erased here
-      // so goOps return type is forced to Unit
-      goOps(null): Unit
-
     case uri: BitcoinURI =>
       // TransData value will be erased here
       val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)

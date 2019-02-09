@@ -99,10 +99,8 @@ class LNStartFundActivity extends TimerActivity { me =>
           ChannelManager.all +:= freshChan
           saveChan(wait)
 
-          // Broadcast a funding transaction
-          // Tell wallet activity to redirect to ops
+          // Broadcast a funding, exit to main activity
           LNParams.broadcaster nullOnBecome freshChan
-          app.TransData.value = FragWallet.REDIRECT
           me exitTo MainActivity.wallet
       }
 
@@ -199,8 +197,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           ChannelManager.all +:= freshChan
           saveChan(wait)
 
-          // Tell wallet activity to redirect to ops
-          app.TransData.value = FragWallet.REDIRECT
+          // Exit to main activity
           me exitTo MainActivity.wallet
       }
     }

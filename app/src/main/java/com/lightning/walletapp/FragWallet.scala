@@ -48,7 +48,6 @@ import android.net.Uri
 
 object FragWallet {
   var worker: FragWalletWorker = _
-  val REDIRECT = "goToLnOpsActivity"
 }
 
 class FragWallet extends Fragment {
@@ -164,13 +163,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     type InfoVec = Vector[PaymentInfo]
     def onLoaderReset(loaderCursor: LoaderCursor) = none
     def onLoadFinished(loaderCursor: LoaderCursor, c: Cursor) = none
-  }
-
-  toggler setOnClickListener onButtonTap {
-    val newImg = if (currentCut > minLinesNum) ic_explode_24dp else ic_implode_24dp
-    currentCut = if (currentCut > minLinesNum) minLinesNum else allItems.size
-    toggler setImageResource newImg
-    adapter.notifyDataSetChanged
   }
 
   // UPDATING TITLE
@@ -696,6 +688,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def react = android.support.v4.app.LoaderManager.getInstance(host).restartLoader(1, null, loaderCallbacks).forceLoad
   val observer = new ContentObserver(new Handler) { override def onChange(fromSelf: Boolean) = if (!fromSelf) react }
 
+  toggler setOnClickListener onButtonTap {
+    val newImg = if (currentCut > minLinesNum) ic_explode_24dp else ic_implode_24dp
+    currentCut = if (currentCut > minLinesNum) minLinesNum else allItems.size
+    toggler setImageResource newImg
+    adapter.notifyDataSetChanged
+  }
+
+  lnDetails setOnClickListener onButtonTap(host goOps null)
   host setSupportActionBar frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
   host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
   host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)

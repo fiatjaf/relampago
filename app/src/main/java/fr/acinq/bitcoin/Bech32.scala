@@ -117,6 +117,12 @@ object Bech32 {
     hrp + "1" + new String((data1 ++ checksum).map(i => Bech32.pam(i)).toArray)
   }
 
+  def encodeArbitraryData(hrp: String, data: BinaryData): String = {
+    val data1 = Bech32.eight2five(data)
+    val checksum = Bech32.checksum(hrp, data1)
+    hrp + "1" + new String((data1 ++ checksum).map(i => Bech32.pam(i)).toArray)
+  }
+
   /**
     * decode a bitcoin witness address
     *
