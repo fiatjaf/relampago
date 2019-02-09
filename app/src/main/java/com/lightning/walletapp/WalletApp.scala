@@ -297,6 +297,8 @@ object ChannelManager extends Broadcaster {
       if (fundingDepth > minDepth && !isFundingDead) for {
         blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
         shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
+        // Peer might not have public channels available so insert a preliminarily dummy hop to save shortChanId
+        _ = chan process Hop(chan.data.announce.nodeId, shortChannelId, 0, 0L, 0L, feeProportionalMillionths = 0L)
         ChannelUpdate(_, _, _, _, _, _, cltv, min, base, prop, _) <- app.olympus.findUpdate(chan.data.announce.nodeId)
       } chan process Hop(chan.data.announce.nodeId, shortChannelId, cltv, min, base, prop)
 
