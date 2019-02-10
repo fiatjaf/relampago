@@ -48,6 +48,7 @@ import android.net.Uri
 
 object FragWallet {
   var worker: FragWalletWorker = _
+  val REDIRECT = "goToLnOpsActivity"
 }
 
 class FragWallet extends Fragment {
@@ -285,14 +286,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def generatePopup = {
-      val inFiat = msatInFiatHuman(stat.amount)
-      val base = app.getString(btc_pending_title)
-      val paidFeePercent = stat.fee.amount / (stat.amount.amount / 100D)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
       val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
-      val title = base.format(humanWhen, humanSum, inFiat, denom.coloredOut(stat.fee, denom.sign), paidFeePercent)
-      showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
       viewTxOutside setOnClickListener onButtonTap {
         val uri = Uri parse s"https://smartbit.com.au/tx/$id"
@@ -303,6 +299,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val rawTx = fr.acinq.bitcoin.Transaction write stat.txn
         host share rawTx.toString
       }
+
+      val inFiat = msatInFiatHuman(stat.amount)
+      val base = app.getString(btc_pending_title)
+      val humanFee = denom.coloredOut(stat.fee, denom.sign)
+      val paidFeePct = stat.fee.amount / (stat.amount.amount / 100D)
+      val title = base.format(humanWhen, humanSum, inFiat, humanFee, paidFeePct)
+      showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
     }
   }
 
@@ -687,6 +690,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def react = android.support.v4.app.LoaderManager.getInstance(host).restartLoader(1, null, loaderCallbacks).forceLoad
   val observer = new ContentObserver(new Handler) { override def onChange(fromSelf: Boolean) = if (!fromSelf) react }
+  host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
+  host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
+  host setSupportActionBar frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
+  Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
+  lnDetails setOnClickListener onButtonTap(host goOps null)
 
   toggler setOnClickListener onButtonTap {
     val newImg = if (currentCut > minLinesNum) ic_explode_24dp else ic_implode_24dp
@@ -695,17 +703,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     adapter.notifyDataSetChanged
   }
 
-  lnDetails setOnClickListener onButtonTap(host goOps null)
-  host setSupportActionBar frag.findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-  host.timer.schedule(if (currentCut <= minLinesNum) adapter.notifyDataSetChanged, 10000, 10000)
-  host.getContentResolver.registerContentObserver(db sqlPath PaymentTable.table, true, observer)
-  itemsList setOnItemClickListener onTap { position => adapter.getItem(position).generatePopup }
+  itemsList setOnItemClickListener onTap { pos =>
+    // Different popups depending on transaction type
+    adapter.getItem(pos).generatePopup
+  }
+
   itemsList setFooterDividersEnabled false
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter
 
   for (c <- ChannelManager.all) c.listeners += chanListener
-  Utils clickableTextField frag.findViewById(R.id.mnemonicInfo)
   app.kit.wallet addTransactionConfidenceEventListener txsListener
   app.kit.peerGroup addBlocksDownloadedEventListener blocksTitleListener
   app.kit.peerGroup addDisconnectedEventListener peersListener
