@@ -106,7 +106,7 @@ class WalletApp extends Application { me =>
     NodeAnnouncement(dummySig, "", 0L, id, (-128, -128, -128), alias, NodeAddress(isa) :: Nil)
   }
 
-  object TransData { self =>
+  object TransData {
     var value: Any = new String
     private[this] val prefixes = PaymentRequest.prefixes.values mkString "|"
     private[this] val lnUrl = s"(?im).*?(lnurl)([0-9]{1,}[a-z0-9]+){1}".r.unanchored
