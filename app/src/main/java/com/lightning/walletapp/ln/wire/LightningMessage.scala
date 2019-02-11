@@ -25,7 +25,7 @@ case class Pong(data: BinaryData) extends LightningMessage
 
 case class ChannelFlags(flags: Byte) {
   def isPublic = Features.isBitSet(0, flags)
-  def isTurbo = Features.isBitSet(3, flags)
+  def isZeroConfSpendablePush = Features.isBitSet(3, flags)
 }
 
 case class OpenChannel(chainHash: BinaryData, temporaryChannelId: BinaryData, fundingSatoshis: Long, pushMsat: Long,

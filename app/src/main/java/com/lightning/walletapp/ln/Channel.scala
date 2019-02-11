@@ -164,9 +164,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // We have agreed to proposed incoming channel and they have published a funding tx, we now wait for confirmation
       case (wait: WaitBroadcastRemoteData, CMDSpent(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
         val wait1 = me STORE WaitFundingDoneData(wait.announce, None, wait.their, fundTx, wait.commitments)
-        // If this is a Turbo channel then we may become OPEN right away
-        val isTurbo = wait1.commitments.channelFlags.exists(_.isTurbo)
-        if (isTurbo) me UPDATA wait1 doProcess CMDConfirmed(fundTx)
+        val isZeroConfSpendablePush = wait1.commitments.channelFlags.exists(_.isZeroConfSpendablePush)
+        if (isZeroConfSpendablePush) me UPDATA wait1 doProcess CMDConfirmed(fundTx)
         else me UPDATA wait1
 
 
