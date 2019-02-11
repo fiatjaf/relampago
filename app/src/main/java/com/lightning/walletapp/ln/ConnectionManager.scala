@@ -11,9 +11,9 @@ import rx.lang.scala.{Observable => Obs}
 import java.net.{InetSocketAddress, Socket}
 import com.lightning.walletapp.ln.Tools.{Bytes, none}
 import com.lightning.walletapp.ln.crypto.Noise.KeyPair
+import com.lightning.walletapp.tor.OnionAddress
 import java.util.concurrent.ConcurrentHashMap
 import fr.acinq.bitcoin.Crypto.PublicKey
-import fr.acinq.eclair.tor.OnionAddress
 import java.util.concurrent.Executors
 import fr.acinq.bitcoin.BinaryData
 
