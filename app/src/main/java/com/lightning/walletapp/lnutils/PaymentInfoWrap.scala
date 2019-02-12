@@ -25,8 +25,8 @@ import com.lightning.walletapp.Utils.app
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
-  var inFlightPayments = Map.empty[BinaryData, RoutingData]
-  var unsentPayments = Map.empty[BinaryData, RoutingData]
+  private[this] var unsentPayments = Map.empty[BinaryData, RoutingData]
+  var acceptedPayments = Map.empty[BinaryData, RoutingData]
 
   def addPendingPayment(rd: RoutingData) = {
     // Add payment to unsentPayments and try to resolve it later
@@ -38,8 +38,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   def resolvePending =
     if (app.kit.peerGroup.numConnectedPeers > 0)
-      if (ChannelManager.currentBlocksLeft < Int.MaxValue)
+      if (ChannelManager.currentBlocksLeft < Int.MaxValue) {
+        // Clear unsent payments immediately to not retry them
         unsentPayments.values foreach fetchAndSend
+        unsentPayments = Map.empty
+      }
 
   def extractPreimage(candidateTx: Transaction) = {
     val fulfills = candidateTx.txIn.map(_.witness.stack) collect {
@@ -78,16 +81,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def failOnUI(rd: RoutingData) = {
-    // Fail this payment on UI and remove from unsent
-    // it may still be in unsent if no routes were found
-    unsentPayments = unsentPayments - rd.pr.paymentHash
     updStatus(FAILURE, rd.pr.paymentHash)
     uiNotify
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {
-    inFlightPayments = inFlightPayments.updated(rd.pr.paymentHash, rd)
-    unsentPayments = unsentPayments - rd.pr.paymentHash
+    // We will need this data when all routes fail and we fetch new ones
+    acceptedPayments = acceptedPayments.updated(rd.pr.paymentHash, rd)
     me insertOrUpdateOutgoingPayment rd
   }
 
@@ -95,7 +95,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     // Save preimage right away, don't wait for their next commitSig
     me updOkOutgoing ok
 
-    inFlightPayments get ok.paymentHash foreach { rd =>
+    acceptedPayments get ok.paymentHash foreach { rd =>
       // Make payment searchable + optimization: record sub-routes in database
       db.change(PaymentTable.newVirtualSql, rd.queryText, rd.pr.paymentHash)
       if (rd.usedRoute.nonEmpty) RouteWrap cacheSubRoutes rd
@@ -119,7 +119,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
 
-        val rdOpt = inFlightPayments get add.paymentHash
+        val rdOpt = acceptedPayments get add.paymentHash
         rdOpt map parseFailureCutRoutes(failReason) match {
           // Try to use the routes left or fetch new ones if empty
           // but account for possibility of rd not being in place

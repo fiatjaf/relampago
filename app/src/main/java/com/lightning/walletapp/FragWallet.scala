@@ -356,7 +356,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
       }
 
-      PaymentInfoWrap.inFlightPayments get rd.pr.paymentHash foreach { rd1 =>
+      PaymentInfoWrap.acceptedPayments get rd.pr.paymentHash foreach { rd1 =>
         val routingPath = for (usedHop <- rd1.usedRoute) yield usedHop.humanDetails
         val errors = PaymentInfo.errors.getOrElse(rd.pr.paymentHash, Vector.empty).reverse.map(_.toString) mkString "\n==\n"
         val receiverInfo = s"Payee: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
@@ -628,8 +628,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def onChain(adr: String, amount: MilliSatoshi, hash: BinaryData)(alert: AlertDialog) = rm(alert) {
     // This code only gets executed when user taps a button to pay on-chain instead of inital LN payment
-    val fallback = Address.fromString(app.params, adr)
-    sendBtcPopup(fallback) setSum Try(amount)
+    me sendBtcPopup Address.fromString(app.params, adr) setSum Try(amount)
   }
 
   def sendBtcPopup(addr: Address): RateManager = {

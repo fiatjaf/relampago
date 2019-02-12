@@ -191,7 +191,6 @@
     <string name="err_ln_amount_overflow">Failed because payment amount exceeds an allowed maximum</string>
     <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already</string>
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
-    <string name="err_ln_frozen">Can not retry this payment because it is frozen</string>
 
     <string name="err_ln_still_opening">Failed because a payment channel is not open yet\n\nFunding transaction needs to get up to 6 confirmations before a channel can be used to send payments</string>
     <string name="err_ln_expired"><![CDATA[Expired payment detected<br><br>You may force close a related channel or contact a faulty peer and let them sort this out<br><br><strong>Expired payment hash</strong><br>%1$s]]></string>

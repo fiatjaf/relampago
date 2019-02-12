@@ -410,8 +410,7 @@ object ChannelManager extends Broadcaster {
   // SENDING PAYMENTS
 
   def checkIfSendable(rd: RoutingData) =
-    if (frozenInFlightHashes contains rd.pr.paymentHash) Left(app getString err_ln_frozen)
-    else if (bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS).isSuccess) Left(app getString err_ln_fulfilled)
+    if (bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS).isSuccess) Left(app getString err_ln_fulfilled)
     // It may happen such that we had enough funds while were deciding whether to pay, but do not have enough funds currently
     else all.filter(isOperational).sortBy(estimateCanSend)(Ordering[Long].reverse).headOption match {
       case Some(chan) if estimateCanSend(chan) < rd.firstMsat => Left(app getString dialog_sum_big)
@@ -442,7 +441,7 @@ object ChannelManager extends Broadcaster {
 
     val paymentRoutesObs =
       if (from.isEmpty) Obs error new LightningException
-      else if (rd.isReflexive) Obs.zip(observables = withHints).map(_.flatten.toVector)
+      else if (rd.isReflexive) Obs.zip(withHints).map(_.flatten.toVector)
       else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
 
     for {
@@ -456,6 +455,7 @@ object ChannelManager extends Broadcaster {
 
   def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
     // Find a local channel which is online, can send an amount and belongs to a correct peer
+    case Right(rd) if frozenInFlightHashes contains rd.pr.paymentHash =>
     case Right(rd) if activeInFlightHashes contains rd.pr.paymentHash =>
     case Left(emptyRD) => noRoutes(emptyRD)
 
