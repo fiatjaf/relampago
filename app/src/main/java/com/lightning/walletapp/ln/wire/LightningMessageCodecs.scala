@@ -294,25 +294,8 @@ object LightningMessageCodecs { me =>
           (conditional(included = (messageFlags & 1) != 0, uint64) withContext "htlcMaximumMsat")
       }
 
-  private val hop =
-    (publicKey withContext "nodeId") ::
-      (int64 withContext "shortChannelId") ::
-      (uint16 withContext "cltvExpiryDelta") ::
-      (uint64 withContext "htlcMinimumMsat") ::
-      (uint32 withContext "feeBaseMsat") ::
-      (uint32 withContext "feeProportionalMillionths")
-
-  private val perHopPayload =
-    (constant(ByteVector fromByte 0) withContext "realm") ::
-      (uint64 withContext "shortChannelId") ::
-      (uint64 withContext "amtToForward") ::
-      (uint32 withContext "outgoingCltv") ::
-      (ignore(8 * 12) withContext "unusedWithV0VersionOnHeader")
-
   val nodeAnnouncementCodec = (signature.withContext("signature") :: nodeAnnouncementWitness).as[NodeAnnouncement]
   val channelUpdateCodec = (signature.withContext("signature") :: channelUpdateWitness).as[ChannelUpdate]
-  val perHopPayloadCodec = perHopPayload.as[PerHopPayload]
-  val hopCodec= hop.as[Hop]
 
   val lightningMessageCodec =
     discriminated[LightningMessage].by(uint16)
@@ -342,7 +325,24 @@ object LightningMessageCodecs { me =>
 
   // Not in a spec
 
-  private val revocationInfo =
+  val hopCodec = {
+    (publicKey withContext "nodeId") ::
+      (int64 withContext "shortChannelId") ::
+      (uint16 withContext "cltvExpiryDelta") ::
+      (uint64 withContext "htlcMinimumMsat") ::
+      (uint32 withContext "feeBaseMsat") ::
+      (uint32 withContext "feeProportionalMillionths")
+  }.as[Hop]
+
+  val perHopPayloadCodec = {
+    (constant(ByteVector fromByte 0) withContext "realm") ::
+      (uint64 withContext "shortChannelId") ::
+      (uint64 withContext "amtToForward") ::
+      (uint32 withContext "outgoingCltv") ::
+      (ignore(8 * 12) withContext "unusedWithV0VersionOnHeader")
+  }.as[PerHopPayload]
+
+  val revocationInfoCodec = {
     (listOfN(uint16, varsizebinarydata ~ signature) withContext "redeemScriptsToSigs") ::
       (optional(bool, signature) withContext "claimMainTxSig") ::
       (optional(bool, signature) withContext "claimPenaltyTxSig") ::
@@ -353,25 +353,23 @@ object LightningMessageCodecs { me =>
       (publicKey withContext "localPubKey") ::
       (publicKey withContext "remoteRevocationPubkey") ::
       (publicKey withContext "remoteDelayedPaymentKey")
+  }.as[RevocationInfo]
 
-  private val walletZygote =
+  val walletZygoteCodec = {
     (uint16 withContext "v") ::
       (varsizebinarydataLong withContext "db") ::
       (varsizebinarydataLong withContext "wallet") ::
       (varsizebinarydataLong withContext "chain")
+  }.as[WalletZygote]
 
-  private val aesZygote =
+  val aesZygoteCodec = {
     (uint16 withContext "v") ::
       (varsizebinarydataLong withContext "iv") ::
       (varsizebinarydataLong withContext "ciphertext")
+  }.as[AESZygote]
 
-  val aesZygoteCodec = aesZygote.as[AESZygote]
-
-  private val cerberusPayload =
+  val cerberusPayloadCodec = {
     (vectorOfN(uint16, aesZygoteCodec) withContext "payloads") ::
       (vectorOfN(uint16, zeropaddedstring) withContext "halfTxIds")
-
-  val walletZygoteCodec = walletZygote.as[WalletZygote]
-  val revocationInfoCodec = revocationInfo.as[RevocationInfo]
-  val cerberusPayloadCodec = cerberusPayload.as[CerberusPayload]
+  }.as[CerberusPayload]
 }

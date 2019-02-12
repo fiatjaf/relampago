@@ -31,7 +31,7 @@ case class DescriptionTag(description: String) extends Tag {
 }
 
 case class LNUrlTag(contents: LNUrl) extends Tag {
-  def toInt5s = encode(Bech32 eight2five contents.uri.toString.getBytes, 'l')
+  def toInt5s = encode(Bech32 eight2five contents.uri.toString.getBytes, 'v')
 }
 
 object LNUrl {
@@ -270,7 +270,7 @@ object PaymentRequest {
           val expiry = readUnsignedLong(len, ints)
           MinFinalCltvExpiryTag(expiry)
 
-        case lTag if lTag == Bech32.map('l') =>
+        case vTag if vTag == Bech32.map('v') =>
           val contents = Bech32 five2eight input.slice(3, len + 3)
           val lnUrl = LNUrl(Tools bin2readable contents.toArray)
           LNUrlTag(lnUrl)
@@ -334,7 +334,7 @@ object PaymentRequest {
         loop(data drop len, tags1)
       }
 
-    val Tuple2(hrp, data) = Bech32 decode input
+    val (hrp, data) = Bech32 decode input
     val stream = data.foldLeft(BitStream.empty)(write5)
     require(stream.bitCount >= 65 * 8, "Data is too short")
 
