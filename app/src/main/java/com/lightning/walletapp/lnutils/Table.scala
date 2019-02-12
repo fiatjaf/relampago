@@ -67,7 +67,7 @@ object BadEntityTable extends Table {
       $amount INTEGER NOT NULL
     );
 
-    /* resId index is created automatically because it's UNIQUE */
+    /* resId index is created automatically because this field is UNIQUE */
     CREATE INDEX IF NOT EXISTS idx1$table ON $table ($expire, $amount);
     COMMIT
     """
@@ -86,7 +86,7 @@ object RouteTable extends Table {
       $targetNode STRING NOT NULL UNIQUE, $expire INTEGER NOT NULL
     );
 
-    /* targetNode index is created automatically because it's UNIQUE */
+    /* targetNode index is created automatically because this field is UNIQUE */
     CREATE INDEX IF NOT EXISTS idx1$table ON $table ($targetNode, $expire);
     COMMIT
     """
@@ -101,30 +101,35 @@ object PaymentTable extends Table {
 
   // Selecting
   val selectSql = s"SELECT * FROM $table WHERE $hash = ?"
+  val selectRecentSql = s"SELECT * FROM $table ORDER BY $id DESC LIMIT 48"
   val selectPaymentNumSql = s"SELECT count($hash) FROM $table WHERE $status = $SUCCESS AND $chanId = ?"
-  val selectRecentSql = s"SELECT * FROM $table WHERE $status IN ($WAITING, $SUCCESS, $FAILURE, $FROZEN) ORDER BY $id DESC LIMIT 48"
   val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT 24)"
 
   // Updating, creating
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ?, $chanId = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ?, $chanId = ? WHERE $hash = ?"
   val updLastParamsSql = s"UPDATE $table SET $status = $WAITING, $firstMsat = ?, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
-  val updFailWaitingAndFrozenSql = s"UPDATE $table SET $status = $FAILURE WHERE $status IN ($WAITING, $FROZEN)"
   // Frozen payment may become fulfilled but then get overridden on restart unless we check for status
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ? AND $status <> $SUCCESS"
+
+  val updFailWaitingAndFrozenSql = s"""
+    UPDATE $table SET $status = $FAILURE /* automatically fail those payments which... */
+    WHERE ($status IN ($WAITING, $FROZEN) AND $incoming = 0) /* outgoing and pending or broken */
+    OR ($status = $WAITING AND $incoming = 1 AND $stamp < ?) /* incoming and expired by now */"""
 
   // Once incoming or outgoing payment is settled we can search it by various metadata
   val createVSql = s"CREATE VIRTUAL TABLE IF NOT EXISTS $fts$table USING $fts($search, $hash)"
 
-  val createSql = s"""
+  val reCreateSql = s"""
     CREATE TABLE IF NOT EXISTS $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $pr STRING NOT NULL, $preimage STRING NOT NULL, $incoming INTEGER NOT NULL,
       $status INTEGER NOT NULL, $stamp INTEGER NOT NULL, $description STRING NOT NULL, $hash STRING NOT NULL UNIQUE,
       $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL, $chanId STRING NOT NULL
     );
 
-    /* hash index is created automatically because it's UNIQUE */
-    CREATE INDEX IF NOT EXISTS idx1$table ON $table ($status);
+    DROP INDEX IF EXISTS idx1$table;
+    /* hash index is created automatically because this field is UNIQUE */
+    CREATE INDEX IF NOT EXISTS idx1$table ON $table ($status, $incoming, $stamp);
     CREATE INDEX IF NOT EXISTS idx2$table ON $table ($chanId);
     COMMIT
     """
@@ -153,7 +158,7 @@ object RevokedInfoTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-  extends SQLiteOpenHelper(context, name, null, 3) {
+extends SQLiteOpenHelper(context, name, null, 4) {
 
   val base = getWritableDatabase
   // Note: BinaryData and PublicKey should always yield raw strings for this to work
@@ -169,8 +174,8 @@ class LNOpenHelper(context: Context, name: String)
   def onCreate(dbs: SQLiteDatabase) = {
     dbs execSQL RevokedInfoTable.createSql
     dbs execSQL BadEntityTable.createSql
+    dbs execSQL PaymentTable.reCreateSql
     dbs execSQL PaymentTable.createVSql
-    dbs execSQL PaymentTable.createSql
     dbs execSQL ChannelTable.createSql
     dbs execSQL RouteTable.createSql
 
@@ -191,5 +196,6 @@ class LNOpenHelper(context: Context, name: String)
     // because each table and index has CREATE IF EXISTS prefix
     dbs execSQL RevokedInfoTable.createSql
     dbs execSQL OlympusLogTable.createSql
+    dbs execSQL PaymentTable.reCreateSql
   }
 }

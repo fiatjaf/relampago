@@ -196,7 +196,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     case uri: BitcoinURI =>
       // TransData value will be erased here
-      val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)(none)
+      val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)
       // Prohibit sum editing if uri contains a definite amount
       manager maybeLockAmount uri
       me returnToBase null
@@ -331,9 +331,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else FragWallet.worker.receive(operationalChannelsWithRoutes, finalMaxCanReceive, title, wr.defaultDescription) { rd =>
           def onRequestFailed(serverResponseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail serverResponseFail)
           obsOnIO.map(_ => wr requestWithdraw rd.pr).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
-          // In this case payment is already saved in db but has a HIDDEN status, make it visible
-          PaymentInfoWrap.updStatus(PaymentInfo.WAITING, rd.pr.paymentHash)
-          PaymentInfoWrap.uiNotify
         }
 
       case _ =>

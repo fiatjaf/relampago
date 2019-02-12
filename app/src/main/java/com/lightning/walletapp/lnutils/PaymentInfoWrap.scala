@@ -67,14 +67,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
-    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0, WAITING, System.currentTimeMillis, rd.pr.description,
-      rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
+    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* outgoing payment */, WAITING, System.currentTimeMillis,
+      rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
   def markFailedAndFrozen = db txWrap {
-    db change PaymentTable.updFailWaitingAndFrozenSql
-    for (hash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, hash)
-    for (hash <- ChannelManager.frozenInFlightHashes) updStatus(FROZEN, hash)
+    db.change(PaymentTable.updFailWaitingAndFrozenSql, System.currentTimeMillis - PaymentRequest.expiryTag.seconds * 1000L)
+    for (activeInFlightPaymentHash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, activeInFlightPaymentHash)
+    for (frozenPaymentHash <- ChannelManager.frozenInFlightHashes) updStatus(FROZEN, frozenPaymentHash)
   }
 
   def failOnUI(rd: RoutingData) = {

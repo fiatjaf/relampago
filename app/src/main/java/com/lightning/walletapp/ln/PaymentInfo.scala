@@ -18,7 +18,6 @@ import scala.util.{Success, Try}
 
 
 object PaymentInfo {
-  final val HIDDEN = 0
   final val WAITING = 1
   final val SUCCESS = 2
   final val FAILURE = 3

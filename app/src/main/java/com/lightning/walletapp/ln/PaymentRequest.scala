@@ -166,6 +166,7 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
 object PaymentRequest {
   type Int5Seq = Seq[Int5]
   type AmountOption = Option[MilliSatoshi]
+  val expiryTag = ExpiryTag(3600 * 48)
 
   val prefixes =
     Map(Block.RegtestGenesisBlock.hash -> "lnbcrt",
@@ -179,7 +180,7 @@ object PaymentRequest {
     val paymentHashTag = PaymentHashTag(paymentHash)
     val lnUrlTag = lnUrl.map(LNUrlTag.apply).toVector
     val fallbackTag = fallbackAddress.map(FallbackAddressTag.apply).toVector
-    val tags = routes.map(RoutingInfoTag.apply) ++ fallbackTag ++ lnUrlTag ++ Vector(DescriptionTag(description), ExpiryTag(3600 * 48), paymentHashTag)
+    val tags = routes.map(RoutingInfoTag.apply) ++ fallbackTag ++ lnUrlTag ++ Vector(DescriptionTag(description), expiryTag, paymentHashTag)
     val pr = PaymentRequest(prefixes(chain), amount, System.currentTimeMillis / 1000L, privateKey.publicKey, tags, BinaryData.empty)
     pr sign privateKey
   }

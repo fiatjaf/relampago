@@ -216,13 +216,12 @@
     <string name="ln_qr_disposable"><![CDATA[Валідний протягом 2 днів<br>Не використовуйте QR повторно]]></string>
 
     <!-- see PaymentInfo.scala -->
-    <array name="ln_payment_states">
-        <item>очікує отримання</item>
-        <item>знаходиться в дорозі</item>
-        <item>успішно оплачений</item>
-        <item>повернутий назад</item>
-        <item>заморожений</item>
-    </array>
+    <string name="ln_state_wait_in">очікуємо отримання</string>
+    <string name="ln_state_wait_out">знаходиться в дорозі</string>
+    <string name="ln_state_success">успішно оплачений</string>
+    <string name="ln_state_fail_in">більш не придатний</string>
+    <string name="ln_state_fail_out">повернутий назад</string>
+    <string name="ln_state_frozen">очікуємо відшкодування</string>
 
     <string name="ln_info_total_payments">total payments</string>
     <string name="ln_info_in_flight">value in-flight</string>

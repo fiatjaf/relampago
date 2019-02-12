@@ -219,13 +219,12 @@
     <string name="ln_qr_disposable"><![CDATA[Request is valid for 2 days<br>Do not reuse this QR code]]></string>
 
     <!-- see PaymentInfo.scala -->
-    <array name="ln_payment_states">
-        <item>waiting for payee</item>
-        <item>still in progress</item>
-        <item>paid successfully</item>
-        <item>failed and refunded</item>
-        <item>failed and frozen</item>
-    </array>
+    <string name="ln_state_wait_in">waiting for payee</string>
+    <string name="ln_state_wait_out">still in progress</string>
+    <string name="ln_state_success">paid successfully</string>
+    <string name="ln_state_fail_in">expired and cancelled</string>
+    <string name="ln_state_fail_out">failed and refunded</string>
+    <string name="ln_state_frozen">waiting for refund</string>
 
     <string name="ln_info_total_payments">total payments</string>
     <string name="ln_info_in_flight">value in-flight</string>

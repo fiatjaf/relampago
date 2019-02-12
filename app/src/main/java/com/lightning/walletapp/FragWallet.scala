@@ -78,7 +78,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
   val imageMap = Array(await, await, conf1, dead, frozen)
 
-  val paymentStates = app.getResources getStringArray R.array.ln_payment_states
   val expiryLeft = app.getResources getStringArray R.array.ln_status_expiry
   val txsConfs = app.getResources getStringArray R.array.txs_confs
   val lnTitleOutNoFee = app getString ln_outgoing_title_no_fee
@@ -326,10 +325,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def generatePopup = {
+      val humanStatus = info.incoming -> info.status match {
+        case 1 \ WAITING => s"<strong>${app getString ln_state_wait_in}</strong>"
+        case 0 \ WAITING => s"<strong>${app getString ln_state_wait_out}</strong>"
+        case _ \ SUCCESS => s"<strong>${app getString ln_state_success}</strong>"
+        case 1 \ FAILURE => s"<strong>${app getString ln_state_fail_in}</strong>"
+        case 0 \ FAILURE => s"<strong>${app getString ln_state_fail_out}</strong>"
+        case _ => s"<strong>${app getString ln_state_frozen}</strong>"
+      }
+
       val inFiat = msatInFiatHuman(info.firstSum)
       val retry = if (info.pr.isFresh) dialog_retry else -1
       val rd = emptyRD(info.pr, info.firstMsat, useCache = false)
-      val humanStatus = s"<strong>${paymentStates apply info.status}</strong>"
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
       val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
@@ -506,9 +513,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val rd = emptyRD(pr, sum.amount, useCache = true)
       db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
-      db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* incoming */, HIDDEN /* invisible */,
+      db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* incoming payment */, WAITING,
         System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
 
+      // Notify user on UI and proceed
+      PaymentInfoWrap.uiNotify
       rd
     }
 
@@ -618,17 +627,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // BTC SEND / BOOST
 
   def onChain(adr: String, amount: MilliSatoshi, hash: BinaryData)(alert: AlertDialog) = rm(alert) {
-    // Hide off-chain payment once on-chain is sent so user does not see the same on/off-chain records
-    // this code only gets executed when user taps a button to pay on-chain
+    // This code only gets executed when user taps a button to pay on-chain instead of inital LN payment
     val fallback = Address.fromString(app.params, adr)
-
-    sendBtcPopup(addr = fallback) { _ =>
-      PaymentInfoWrap.updStatus(HIDDEN, hash)
-      PaymentInfoWrap.uiNotify
-    } setSum Try(amount)
+    sendBtcPopup(fallback) setSum Try(amount)
   }
 
-  def sendBtcPopup(addr: Address)(and: Transaction => Unit): RateManager = {
+  def sendBtcPopup(addr: Address): RateManager = {
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign app.kit.conf0Balance)
     val form = host.getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
     val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
@@ -640,7 +644,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case Success(ms) =>
         val txProcessor = new TxProcessor {
-          def futureProcess(unsigned: SendRequest) = and(app.kit blockSend app.kit.sign(unsigned).tx)
+          def futureProcess(unsigned: SendRequest) = app.kit blockSend app.kit.sign(unsigned).tx
           def onTxFail(paymentGenerationError: Throwable) = onFail(paymentGenerationError)
           val pay = AddrData(ms, addr)
         }
