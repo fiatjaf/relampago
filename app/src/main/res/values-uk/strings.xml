@@ -127,7 +127,7 @@
         <item><![CDATA[<font color=#E68A00>Синхронізація %1$d днів</font>]]></item>
     </array>
 
-    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>отримано %2$s<br><small>%3$s за поточним курсом</small>]]></string>
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>%2$s<br><small>%3$s за поточним курсом</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small>]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
 
