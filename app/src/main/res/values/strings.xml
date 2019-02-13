@@ -218,7 +218,7 @@
     <string name="ln_qr_disposable"><![CDATA[Request is valid for 2 days<br>Do not reuse this QR code]]></string>
 
     <!-- see PaymentInfo.scala -->
-    <string name="ln_state_wait_in">waiting for payee</string>
+    <string name="ln_state_wait_in">waiting to receive</string>
     <string name="ln_state_wait_out">still in progress</string>
     <string name="ln_state_success">paid successfully</string>
     <string name="ln_state_fail_in">expired and cancelled</string>
