@@ -326,12 +326,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def generatePopup = {
       val humanStatus = info.incoming -> info.status match {
-        case 1 \ WAITING => s"<strong>${app getString ln_state_wait_in}</strong>"
-        case 0 \ WAITING => s"<strong>${app getString ln_state_wait_out}</strong>"
-        case _ \ SUCCESS => s"<strong>${app getString ln_state_success}</strong>"
-        case 1 \ FAILURE => s"<strong>${app getString ln_state_fail_in}</strong>"
+        case _ \ FROZEN => s"<strong>${app getString ln_state_frozen}</strong>"
         case 0 \ FAILURE => s"<strong>${app getString ln_state_fail_out}</strong>"
-        case _ => s"<strong>${app getString ln_state_frozen}</strong>"
+        case 1 \ FAILURE => s"<strong>${app getString ln_state_fail_in}</strong>"
+        case _ \ SUCCESS => s"<strong>${app getString ln_state_success}</strong>"
+        case 0 \ _ => s"<strong>${app getString ln_state_wait_out}</strong>"
+        case 1 \ _ => s"<strong>${app getString ln_state_wait_in}</strong>"
       }
 
       val inFiat = msatInFiatHuman(info.firstSum)

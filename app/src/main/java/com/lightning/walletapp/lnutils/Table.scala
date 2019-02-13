@@ -115,7 +115,7 @@ object PaymentTable extends Table {
   val updFailWaitingAndFrozenSql = s"""
     UPDATE $table SET $status = $FAILURE /* automatically fail those payments which... */
     WHERE ($status IN ($WAITING, $FROZEN) AND $incoming = 0) /* outgoing and pending or broken */
-    OR ($status = $WAITING AND $incoming = 1 AND $stamp < ?) /* incoming and expired by now */"""
+    OR ($status IN ($WAITING, 0) AND $incoming = 1 AND $stamp < ?) /* incoming and expired by now */"""
 
   // Once incoming or outgoing payment is settled we can search it by various metadata
   val createVSql = s"CREATE VIRTUAL TABLE IF NOT EXISTS $fts$table USING $fts($search, $hash)"
