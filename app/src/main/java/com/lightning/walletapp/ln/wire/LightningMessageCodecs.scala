@@ -4,7 +4,9 @@ import java.net._
 import scodec.codecs._
 import java.math.BigInteger
 import fr.acinq.eclair.UInt64
+import org.apache.commons.codec.binary.Base32
 import com.lightning.walletapp.ln.crypto.Sphinx
+
 import com.lightning.walletapp.ln.{LightningException, PerHopPayload, RevocationInfo}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import fr.acinq.bitcoin.{BinaryData, Crypto}
@@ -97,13 +99,17 @@ object LightningMessageCodecs { me =>
     inet4Address => ByteVector(inet4Address.getAddress)
   )
 
-  val nodeaddress: Codec[NodeAddress] =
+  def base32(size: Int): Codec[String] = bytes(size).xmap(
+    bv => (new Base32 encodeAsString bv.toArray).toLowerCase,
+    address => ByteVector(new Base32 decode address.toUpperCase)
+  )
+
+  def nodeaddress: Codec[NodeAddress] =
     discriminated[NodeAddress].by(uint8)
-      .typecase(cr = provide(Padding), tag = 0)
-      .typecase(cr = (ipv4address ~ uint16).xmap[IPv4](IPv4.tupled, x => x.ipv4 -> x.port), tag = 1)
-      .typecase(cr = (ipv6address ~ uint16).xmap[IPv6](IPv6.tupled, x => x.ipv6 -> x.port), tag = 2)
-      .typecase(cr = (binarydata(10) ~ uint16).xmap[Tor2](Tor2.tupled, x => x.tor2 -> x.port), tag = 3)
-      .typecase(cr = (binarydata(35) ~ uint16).xmap[Tor3](Tor3.tupled, x => x.tor3 -> x.port), tag = 4)
+      .typecase(cr = (ipv4address :: uint16).as[IPv4], tag = 1)
+      .typecase(cr = (ipv6address :: uint16).as[IPv6], tag = 2)
+      .typecase(cr = (base32(10) :: uint16).as[Tor2], tag = 3)
+      .typecase(cr = (base32(35) :: uint16).as[Tor3], tag = 4)
 
   def binarydata(size: Int): Codec[BinaryData] = bytes(size).xmap(vec2Bin, bin2Vec)
   val varsizebinarydata: Codec[BinaryData] = variableSizeBytes(value = bytes.xmap(vec2Bin, bin2Vec), size = uint16)

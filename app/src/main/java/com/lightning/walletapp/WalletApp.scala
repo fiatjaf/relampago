@@ -101,9 +101,9 @@ class WalletApp extends Application { me =>
     clipboardManager setPrimaryClip bufferContent
   }
 
-  def mkNodeAnnouncement(id: PublicKey, isa: InetSocketAddress, alias: String) = {
+  def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) = {
     val dummySig = Crypto encodeSignature Crypto.sign(random getBytes 32, randomPrivKey)
-    NodeAnnouncement(dummySig, "", 0L, id, (-128, -128, -128), alias, NodeAddress(isa) :: Nil)
+    NodeAnnouncement(dummySig, "", 0L, id, (-128, -128, -128), alias, na :: Nil)
   }
 
   object TransData {
@@ -132,8 +132,8 @@ class WalletApp extends Application { me =>
     def recordValue(rawText: String) = value = rawText take 2880 match {
       case bitcoinUriLink if bitcoinUriLink startsWith "bitcoin" => bitcoinUri(bitcoinUriLink)
       case bitcoinUriLink if bitcoinUriLink startsWith "BITCOIN" => bitcoinUri(bitcoinUriLink.toLowerCase)
-      case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, port.toInt), host)
-      case shortNodeLink(key, host) => mkNodeAnnouncement(PublicKey(key), new InetSocketAddress(host, 9735), host)
+      case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, port.toInt), host)
+      case shortNodeLink(key, host) => mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, 9735), host)
       case lnPayReq(prefix, data) => PaymentRequest.read(s"$prefix$data")
       case lnUrl(prefix, data) => LNUrl.fromBech32(s"$prefix$data")
       case _ => toBitcoinUri(rawText)

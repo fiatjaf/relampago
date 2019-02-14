@@ -12,6 +12,7 @@ import com.lightning.walletapp.Denomination._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+
 import android.app.{Activity, AlertDialog}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
@@ -275,13 +276,15 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     ConnectionManager.listeners += new ConnectionListener { self =>
       override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
         // Remove listener and make a request, peer should send OpenChannel message shortly
-        obsOnIO.map(_ => incoming.requestChannel).foreach(none, none)
+        <(incoming.requestChannel, none)(none)
         ConnectionManager.listeners -= self
       }
     }
 
-    // Make sure we definitely have an LN connection before asking
-    ConnectionManager.connectTo(incoming.getAnnounce, notify = true)
+    <(incoming.resolveAnnounce, onFail) { ann =>
+      // Make sure we have an LN connection before asking
+      ConnectionManager.connectTo(ann, notify = true)
+    }
   }
 
   def showLoginForm(lnUrl: LNUrl) = {

@@ -11,7 +11,6 @@ import rx.lang.scala.{Observable => Obs}
 import java.net.{InetSocketAddress, Socket}
 import com.lightning.walletapp.ln.Tools.{Bytes, none}
 import com.lightning.walletapp.ln.crypto.Noise.KeyPair
-import com.lightning.walletapp.tor.OnionAddress
 import java.util.concurrent.ConcurrentHashMap
 import fr.acinq.bitcoin.Crypto.PublicKey
 import java.util.concurrent.Executors
@@ -52,8 +51,8 @@ object ConnectionManager {
       socket.connect(ann.addresses.collectFirst {
         case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
         case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
-        case Tor2(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
-        case Tor3(address, port) => OnionAddress.fromParts(address, port).toInetSocketAddress
+        case Tor2(address, port) => NodeAddress.onion2Isa(address, port)
+        case Tor3(address, port) => NodeAddress.onion2Isa(address, port)
       }.get, 7500)
 
       handler.init

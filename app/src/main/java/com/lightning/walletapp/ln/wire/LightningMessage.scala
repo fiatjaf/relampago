@@ -1,14 +1,15 @@
 package com.lightning.walletapp.ln.wire
 
+import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.ln.{Features, HasCommitments, LightningException}
-import com.lightning.walletapp.ln.Tools.{bin2readable, fromShortId}
-import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
+import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
+
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
-
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import com.lightning.walletapp.lnutils.olympus.CloudSnapshot
+import org.apache.commons.codec.binary.Base32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
 
@@ -137,15 +138,27 @@ sealed trait NodeAddress
 case object Padding extends NodeAddress
 case class IPv4(ipv4: Inet4Address, port: Int) extends NodeAddress
 case class IPv6(ipv6: Inet6Address, port: Int) extends NodeAddress
-case class Tor2(tor2: BinaryData, port: Int) extends NodeAddress
-case class Tor3(tor3: BinaryData, port: Int) extends NodeAddress
+case class Tor2(tor2: String, port: Int) extends NodeAddress
+case class Tor3(tor3: String, port: Int) extends NodeAddress
 
 case object NodeAddress {
-  def apply(isa: InetSocketAddress) = isa.getAddress match {
-    case inet4Address: Inet4Address => IPv4(inet4Address, isa.getPort)
-    case inet6Address: Inet6Address => IPv6(inet6Address, isa.getPort)
-    case otherwise => throw new LightningException(otherwise.toString)
+  val onionSuffix = ".onion"
+  val V2Len = 16
+  val V3Len = 56
+
+  def onion2Isa(encodedHost: String, port: Int) = encodedHost match {
+    case address if address.length == V2Len => new InetSocketAddress(s"$address$onionSuffix", port)
+    case address if address.length == V3Len => new InetSocketAddress(s"$address$onionSuffix", port)
+    case unknownAddress => throw new RuntimeException(s"Invalid Tor address $unknownAddress")
   }
+
+  def fromParts(host: String, port: Int) =
+    if (host.endsWith(onionSuffix) && host.length == V2Len + onionSuffix.length) Tor2(host dropRight onionSuffix.length, port)
+    else if (host.endsWith(onionSuffix) && host.length == V3Len + onionSuffix.length) Tor3(host dropRight onionSuffix.length, port)
+    else InetAddress getByName host match {
+      case ip4Addr: Inet4Address => IPv4(ip4Addr, port)
+      case ip6Addr: Inet6Address => IPv6(ip6Addr, port)
+    }
 }
 
 // Not in a spec

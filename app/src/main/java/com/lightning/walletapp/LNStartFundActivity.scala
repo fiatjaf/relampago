@@ -95,8 +95,6 @@ class LNStartFundActivity extends TimerActivity { me =>
 
         case (_, wait: WaitFundingDoneData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
           // Preliminary negotiations are complete, save channel and broadcast a fund tx
-          freshChan.listeners = ChannelManager.operationalListeners
-          ChannelManager.all +:= freshChan
           saveChan(wait)
 
           // Broadcast a funding transaction
@@ -120,6 +118,10 @@ class LNStartFundActivity extends TimerActivity { me =>
       val encrypted = AES.encReadable(RefundingData(some.announce, None, some.commitments).toJson.toString, LNParams.cloudSecret)
       val chanUpload = ChannelUploadAct(encrypted.toHex, Seq("key" -> LNParams.cloudId.toString), "data/put", some.announce.alias)
       app.olympus.tellClouds(chanUpload)
+
+      // Make this channel able to receive ordinary events
+      freshChan.listeners = ChannelManager.operationalListeners
+      ChannelManager.all +:= freshChan
     }
 
     def localWalletListener = new LocalOpenListener {
@@ -195,8 +197,6 @@ class LNStartFundActivity extends TimerActivity { me =>
       override def onBecome = {
         case (_, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>
           // Preliminary negotiations are complete, save channel and wait for their tx
-          freshChan.listeners = ChannelManager.operationalListeners
-          ChannelManager.all +:= freshChan
           saveChan(wait)
 
           // Tell wallet activity to redirect to ops
