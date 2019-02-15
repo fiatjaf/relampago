@@ -78,7 +78,15 @@ case class WaitBroadcastRemoteData(announce: NodeAnnouncement,
 
 case class WaitFundingDoneData(announce: NodeAnnouncement,
                                our: Option[FundingLocked], their: Option[FundingLocked],
-                               fundingTx: Transaction, commitments: Commitments) extends WaitData
+                               fundingTx: Transaction, commitments: Commitments) extends WaitData {
+
+  def doubleSpendsFunding(that: Transaction) = {
+    val thatInputOutPoints = that.txIn.map(_.outPoint)
+    val fundingInputOutPoints = fundingTx.txIn.map(_.outPoint)
+    val sameOuts = thatInputOutPoints.intersect(fundingInputOutPoints)
+    that.txid != fundingTx.txid && sameOuts.nonEmpty
+  }
+}
 
 case class NormalData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Option[Shutdown] = None,
                       remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends WaitData
@@ -111,11 +119,10 @@ case class ClosingData(announce: NodeAnnouncement,
     }
   }
 
-  def canBeRemoved: Boolean =
-    if (System.currentTimeMillis > closedAt + 1000L * 3600 * 24 * 21) true else bestClosing match {
-      case MutualCommitPublished(mutualTx) => getStatus(mutualTx.txid) match { case cfs \ isDead => cfs > minDepth || isDead }
-      case info => info.getState.map(_.txn.txid).map(getStatus) forall { case cfs \ isDead => cfs > minDepth || isDead }
-    }
+  def canBeRemoved: Boolean = if (System.currentTimeMillis > closedAt + 1000L * 3600 * 24 * 21) true else bestClosing match {
+    case MutualCommitPublished(closingTx) => getStatus(closingTx.txid) match { case confs \ isDead => confs > minDepth || isDead }
+    case info => info.getState.map(_.txn.txid).map(getStatus) forall { case confs \ isDead => confs > minDepth || isDead }
+  }
 }
 
 sealed trait CommitPublished {

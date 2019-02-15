@@ -19,7 +19,7 @@ import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 abstract class Channel extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
   def hasCsOr[T](fun: HasCommitments => T, defaultNoCommits: T) = data match { case some: HasCommitments => fun(some) case _ => defaultNoCommits }
-  def fundTxId = data match { case some: HasCommitments => BinaryData(some.commitments.commitInput.outPoint.hash.reverse) case _ => BinaryData.empty }
+  def fundTxId = data match { case some: HasCommitments => some.commitments.commitInput.outPoint.txid case _ => BinaryData.empty }
   def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onException me -> err }
   var listeners: Set[ChannelListener] = _
 
@@ -202,6 +202,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val wait1 = wait.copy(our = Some apply ourFirstFundingLocked)
         if (wait.their.isEmpty) me UPDATA STORE(wait1) SEND ourFirstFundingLocked
         else becomeOpen(wait, wait.their.get) SEND ourFirstFundingLocked
+
+
+      case (wait: WaitFundingDoneData, CMDConfirmed(otherTx), _) if wait doubleSpendsFunding otherTx =>
+        // Other tx has successfully double-spent our channel funding, let user know on UI
+        throw new Exception("Channel funding transaction was double-spent!")
 
 
       // OPEN MODE
