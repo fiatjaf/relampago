@@ -44,7 +44,7 @@ class RevokedInfoSpec {
       localParams = LocalParams(null, 0, 0, 0, null, null, null, null, null, null, null, null, isFunder = true),
       remoteParams = null,
       LocalCommit(index = 0L, spec = CommitmentSpec(0L, toLocalMsat = 900000000L, toRemoteMsat = 0L), null, null),
-      remoteCommit = null,
+      RemoteCommit(index = 0L, spec = CommitmentSpec(0L, toLocalMsat = 0L, toRemoteMsat = 900000000L), None, null),
       localChanges = null,
       remoteChanges = null,
       localNextHtlcId = 0L,
@@ -80,7 +80,7 @@ class RevokedInfoSpec {
       localParams = LocalParams(null, 0, 0, 0, null, null, null, null, null, null, null, null, isFunder = false),
       remoteParams = null,
       LocalCommit(index = 0L, spec = CommitmentSpec(0L, toLocalMsat = 1000000000L, toRemoteMsat = 0L), null, null),
-      remoteCommit = null,
+      RemoteCommit(index = 0L, spec = CommitmentSpec(0L, toLocalMsat = 0L, toRemoteMsat = 1000000000L), None, null),
       localChanges = null,
       remoteChanges = null,
       localNextHtlcId = 0L,
@@ -115,7 +115,7 @@ class RevokedInfoSpec {
     assert(Set(txid2.toString take 16, txid3.toString take 16, txid6.toString take 16) == halfTxIds.toSet)
 
     for {
-      // Taken from Olympus
+    // Taken from Olympus
       halfTxId \ aesz <- halfTxIds zip aesZygotes
       fullTxidBin <- halfTxIds.zip(Vector(txid2, txid3)).toMap get halfTxId
       revBitVec <- AES.decZygote(aesz, fullTxidBin) map BitVector.apply
