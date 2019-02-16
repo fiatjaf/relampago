@@ -311,7 +311,9 @@ object ChannelManager extends Broadcaster {
   override def onBecome = {
     // Repeatedly resend a funding tx, update feerate on becoming open
     case (_, wait: WaitFundingDoneData, _, _) => app.kit blockSend wait.fundingTx
-    case (chan, _: NormalData, SLEEPING, OPEN) => chan process CMDFeerate(perKwThreeSat)
+    case (chan, n: NormalData, SLEEPING, OPEN) =>
+      db.change(RevokedInfoTable.killSql, n.commitments.channelId)
+      chan process CMDFeerate(perKwThreeSat)
   }
 
   // CHANNEL CREATION AND MANAGEMENT
@@ -348,12 +350,9 @@ object ChannelManager extends Broadcaster {
     }
 
     def REV(cs: Commitments, rev: RevokeAndAck) = for {
-      // We use old commitments to save a punishment for
-      // remote commit before it gets dropped forever
-
-      tx <- cs.remoteCommit.txOpt
-      myBalance = cs.localCommit.spec.toLocalMsat
-      watchtowerFee = broadcaster.perKwThreeSat * 2 // Scorched earth policy becuase WT can't regenerate
+      tx <- cs.remoteCommit.txOpt // We use old commitments to save a punishment for remote commit before it gets dropped
+      myBalance = cs.remoteCommit.spec.toRemoteMsat // Local commit is cleared by now, remote still has relevant balance
+      watchtowerFee = broadcaster.perKwThreeSat * 2 // Scorched earth policy becuase watchtower can't regenerate tx
       revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret, watchtowerFee)
       serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
     } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
@@ -434,7 +433,7 @@ object ChannelManager extends Broadcaster {
         case restFrom if rd.useCache => RouteWrap.findRoutes(restFrom, target, rd)
         case restFrom => BadEntityWrap.findRoutes(restFrom, target, rd)
       } else from contains target match {
-        case false if rd.useCache => RouteWrap.findRoutes(from, target, rd)
+//        case false if rd.useCache => RouteWrap.findRoutes(from, target, rd)
         case false => BadEntityWrap.findRoutes(from, target, rd)
         case true => Obs just Vector(Vector.empty)
       }

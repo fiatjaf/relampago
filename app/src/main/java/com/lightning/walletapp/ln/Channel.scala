@@ -317,7 +317,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val c1 = Commitments.receiveRevocation(norm.commitments, rev)
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 doProcess CMDHTLCProcess
-        // Old commit which has tx to discard
+        // We should use an old commit here
         REV(norm.commitments, rev)
 
 
