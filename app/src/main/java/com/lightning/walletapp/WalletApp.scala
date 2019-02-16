@@ -311,9 +311,7 @@ object ChannelManager extends Broadcaster {
   override def onBecome = {
     // Repeatedly resend a funding tx, update feerate on becoming open
     case (_, wait: WaitFundingDoneData, _, _) => app.kit blockSend wait.fundingTx
-    case (chan, n: NormalData, SLEEPING, OPEN) =>
-      db.change(RevokedInfoTable.killSql, n.commitments.channelId)
-      chan process CMDFeerate(perKwThreeSat)
+    case (chan, n: NormalData, SLEEPING, OPEN) => chan process CMDFeerate(perKwThreeSat)
   }
 
   // CHANNEL CREATION AND MANAGEMENT
@@ -433,7 +431,7 @@ object ChannelManager extends Broadcaster {
         case restFrom if rd.useCache => RouteWrap.findRoutes(restFrom, target, rd)
         case restFrom => BadEntityWrap.findRoutes(restFrom, target, rd)
       } else from contains target match {
-//        case false if rd.useCache => RouteWrap.findRoutes(from, target, rd)
+        case false if rd.useCache => RouteWrap.findRoutes(from, target, rd)
         case false => BadEntityWrap.findRoutes(from, target, rd)
         case true => Obs just Vector(Vector.empty)
       }
