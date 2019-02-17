@@ -8,7 +8,7 @@ class ThrottledWorkSpec {
   def allTests = {
 
     val worker = new ThrottledWork[String, String] {
-      def work(input: String) = obsOnIO.map { _ =>
+      def work(input: String) = queue.map { _ =>
         Thread.sleep(5000)
         input * 2
       }

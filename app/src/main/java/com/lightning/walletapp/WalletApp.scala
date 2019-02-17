@@ -26,7 +26,7 @@ import androidx.work.{ExistingWorkPolicy, WorkManager}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor}
 import android.app.{Application, NotificationChannel, NotificationManager}
-import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, pickInc, repeat}
+import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, pickInc, repeat}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit.MILLISECONDS
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
+import rx.lang.scala.schedulers.IOScheduler
 import java.util.Collections.singletonList
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
@@ -175,11 +176,11 @@ class WalletApp extends Application { me =>
       peerGroup.addWallet(wallet)
 
       for {
-        _ <- obsOnIO delay 20.seconds
-        chan <- ChannelManager.notClosing if chan.state == SLEEPING
-        // Can call findNodes without `retry` wrapper because it gives `Obs.empty` on error
-        Vector(ann1 \ _, _*) <- app.olympus findNodes chan.data.announce.nodeId.toString
-      } chan process ann1
+        _ <- Obs just null subscribeOn IOScheduler.apply delay 20.seconds
+        stillOfflineChan <- ChannelManager.notClosing if stillOfflineChan.state == SLEEPING
+        // Can call findNodes without `retry` wrapper because it gives harmless `Obs.empty` on error
+        Vector(ann1 \ _, _*) <- app.olympus findNodes stillOfflineChan.data.announce.nodeId.toString
+      } stillOfflineChan process ann1
 
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)

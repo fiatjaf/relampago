@@ -16,7 +16,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import android.app.{Activity, AlertDialog}
 import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
-import com.lightning.walletapp.lnutils.JsonHttpUtils.{obsOnIO, to}
+import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{LightningMessage, NodeAnnouncement, OpenChannel}
 
@@ -306,7 +306,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
         val secondLevelCallback = get(s"${lnUrl.request}&key=$linkingPubKey&sig=${sig.toString}", true)
         val secondLevelRequest = secondLevelCallback.connectTimeout(5000).trustAllCerts.trustAllHosts
-        obsOnIO.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
+        queue.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
         app toast ln_url_resolving
       }
 
@@ -333,7 +333,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else if (maxCanReceive.amount < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
         else FragWallet.worker.receive(operationalChannelsWithRoutes, finalMaxCanReceive, title, wr.defaultDescription) { rd =>
           def onRequestFailed(serverResponseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail serverResponseFail)
-          obsOnIO.map(_ => wr requestWithdraw rd.pr).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
+          queue.map(_ => wr requestWithdraw rd.pr).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
         }
 
       case _ =>

@@ -39,6 +39,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def resolvePending =
     if (app.kit.peerGroup.numConnectedPeers > 0)
       if (ChannelManager.currentBlocksLeft < Int.MaxValue)
+        // When uncapable chan becomes online: persists, waits for capable channel
+        // When no routes found or any other error happens: gets removed in failOnUI
+        // When accepted by channel: gets removed in outPaymentAccepted
         unsentPayments.values foreach fetchAndSend
 
   def extractPreimage(candidateTx: Transaction) = {

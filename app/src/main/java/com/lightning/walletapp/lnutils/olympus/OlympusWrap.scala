@@ -112,7 +112,7 @@ trait OlympusProvider {
 
 class Connector(val url: String) extends OlympusProvider {
   def ask[T: JsonFormat](commandPath: String, parameters: HttpParam*): Obs[T] =
-    obsOnIO.map(_ => http(commandPath).form(parameters.toMap.asJava).body.parseJson) map {
+    queue.map(_ => http(commandPath).form(parameters.toMap.asJava).body.parseJson) map {
       case JsArray(JsString("error") +: JsString(why) +: _) => throw new ProtocolException(why)
       case JsArray(JsString("ok") +: response +: _) => response.convertTo[T]
       case _ => throw new ProtocolException

@@ -31,9 +31,9 @@ import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
-import com.lightning.walletapp.lnutils.JsonHttpUtils.obsOnIO
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
+import com.lightning.walletapp.lnutils.JsonHttpUtils.queue
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import com.lightning.walletapp.ln.wire.ChannelReestablish
 import android.transition.TransitionManager
@@ -610,8 +610,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def sendLinkingRequest(rd: RoutingData) = {
       val linkingPubKey = LNParams.getLinkingKey(lnUrl.uri.getHost).publicKey.toString
       val request = get(s"${lnUrl.request}&key=$linkingPubKey", true).connectTimeout(5000).trustAllCerts.trustAllHosts
-      def onRequestFailed(serverResponseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(host onFail serverResponseFail)
-      obsOnIO.map(_ => request.body).map(LNUrlData.guardResponse).foreach(_ => doSendOffChain(rd), onRequestFailed)
+      def onReqFailed(serverResponseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(host onFail serverResponseFail)
+      queue.map(_ => request.body).map(LNUrlData.guardResponse).foreach(_ => doSendOffChain(rd), onReqFailed)
       PaymentInfoWrap insertOrUpdateOutgoingPayment rd
       PaymentInfoWrap.uiNotify
     }

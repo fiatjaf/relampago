@@ -93,7 +93,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
 
   def check(client: GoogleSignInClient) =
-    obsOnIO.map(_ => GDrive signInAccount me) foreach {
+    queue.map(_ => GDrive signInAccount me) foreach {
       case Some(signedInAccount) => checkBackup(signedInAccount)
       case _ => startActivityForResult(client.getSignInIntent, 102)
     }
