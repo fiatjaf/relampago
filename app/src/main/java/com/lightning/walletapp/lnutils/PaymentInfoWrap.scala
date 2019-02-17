@@ -38,11 +38,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   def resolvePending =
     if (app.kit.peerGroup.numConnectedPeers > 0)
-      if (ChannelManager.currentBlocksLeft < Int.MaxValue) {
-        // Clear unsent payments immediately to not retry them
+      if (ChannelManager.currentBlocksLeft < Int.MaxValue)
         unsentPayments.values foreach fetchAndSend
-        unsentPayments = Map.empty
-      }
 
   def extractPreimage(candidateTx: Transaction) = {
     val fulfills = candidateTx.txIn.map(_.witness.stack) collect {
@@ -81,13 +78,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def failOnUI(rd: RoutingData) = {
+    unsentPayments = unsentPayments - rd.pr.paymentHash
     updStatus(FAILURE, rd.pr.paymentHash)
     uiNotify
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {
-    // We will need this data when all routes fail and we fetch new ones
     acceptedPayments = acceptedPayments.updated(rd.pr.paymentHash, rd)
+    unsentPayments = unsentPayments - rd.pr.paymentHash
     me insertOrUpdateOutgoingPayment rd
   }
 
