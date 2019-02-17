@@ -60,7 +60,7 @@ object Utils {
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
   val fiatNames = Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan",
     "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel ", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
-    "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound sterling")
+    "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling", "aud" -> "Australian Dollar")
 
   def getDescription(rawText: String) =
     if (rawText.isEmpty) s"<i>$noDesc</i>"
