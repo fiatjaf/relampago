@@ -89,7 +89,7 @@ object TopNodes {
 
   lazy val subscription =
     // Can later be cancelled if don't want updates
-    initDelay(obsOnIO.map(_ => get(api, true).trustAllCerts.trustAllHosts.body),
+    initDelay(queue.map(_ => get(api, true).trustAllCerts.trustAllHosts.body),
       top.stamp, 60 * 60 * 24 * 7 * 1000L).foreach(process, Tools.none)
 }
 
