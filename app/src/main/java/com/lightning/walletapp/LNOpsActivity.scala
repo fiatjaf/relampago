@@ -19,6 +19,7 @@ import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
+import org.bitcoinj.uri.BitcoinURI
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
@@ -212,11 +213,12 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           else warnAndMaybeClose(me getString ln_chan_force_details)
         }
 
-        def closeToAddress = Try(app.TransData toBitcoinUri app.getBufferUnsafe) map { uri =>
-          val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
-          val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
-          mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
-        } getOrElse { app toast err_no_data }
+        def closeToAddress =
+          Try(app.TransData parse app.getBufferUnsafe).toOption collectFirst { case uri: BitcoinURI =>
+            val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
+            val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
+            mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
+          } getOrElse { app toast err_no_data }
 
         def closeToWallet = {
           // Simple case: send refunding transaction to this wallet

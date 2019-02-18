@@ -25,8 +25,8 @@ import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import androidx.work.{ExistingWorkPolicy, WorkManager}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor}
+import com.lightning.walletapp.lnutils.JsonHttpUtils.{pickInc, repeat}
 import android.app.{Application, NotificationChannel, NotificationManager}
-import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, pickInc, repeat}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
@@ -40,7 +40,6 @@ import rx.lang.scala.schedulers.IOScheduler
 import java.util.Collections.singletonList
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
-import java.net.InetSocketAddress
 import scala.concurrent.Future
 import scodec.bits.BitVector
 import android.widget.Toast
@@ -129,15 +128,15 @@ class WalletApp extends Application { me =>
       uri
     }
 
-    def toBitcoinUri(addr: String) = bitcoinUri(s"bitcoin:$addr")
-    def recordValue(rawText: String) = value = rawText take 2880 match {
+    def recordValue(input: String) = value = parse(input)
+    def parse(rawText: String) = rawText take 2880 match {
       case bitcoinUriLink if bitcoinUriLink startsWith "bitcoin" => bitcoinUri(bitcoinUriLink)
       case bitcoinUriLink if bitcoinUriLink startsWith "BITCOIN" => bitcoinUri(bitcoinUriLink.toLowerCase)
       case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, port.toInt), host)
       case shortNodeLink(key, host) => mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, 9735), host)
       case lnPayReq(prefix, data) => PaymentRequest.read(s"$prefix$data")
       case lnUrl(prefix, data) => LNUrl.fromBech32(s"$prefix$data")
-      case _ => toBitcoinUri(rawText)
+      case address => bitcoinUri(s"bitcoin:$address")
     }
   }
 
