@@ -12,9 +12,11 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
-import android.view.{Menu, MenuItem, View}
 
+import android.view.{Menu, MenuItem, View}
+import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
+import com.google.android.gms.common.api.CommonStatusCodes.SIGN_IN_REQUIRED
+import com.google.android.gms.common.api.ApiException
 import com.lightning.walletapp.ln.wire.WalletZygote
 import com.google.android.gms.drive.MetadataBuffer
 import android.support.v4.content.FileProvider
@@ -66,36 +68,45 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     val driveResClient = GDrive.driveResClient(app)(signInAcc)
 
     val onMedaData = TaskWrap.onSuccess[MetadataBuffer] { buf =>
+      // Update values right away and upload backup since it may be stale
       val stamp = if (buf.getCount < 1) 0L else System.currentTimeMillis
       GDrive.updatePreferences(app, isEnabled = true, lastSave = stamp)
       UITask(updateBackupView).run
       ChannelManager.backUp
     }
 
-    val onFailure = TaskWrap.onFailure { exc =>
+    val updateInterface = TaskWrap.onFailure { exc =>
       // At this point we know it does not work so update UI and settings
       app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, false).commit
       UITask(updateBackupView).run
-      app toast exc.getMessage
+    }
+
+    val maybeAskSignIn = TaskWrap.onFailure {
+      case api: ApiException if api.getStatusCode == SIGN_IN_REQUIRED =>
+        val onDGriveAccessRevoked = TaskWrap.onSuccess[Void] { _ => askGDriveSignIn }
+        GDrive.signInAttemptClient(me).revokeAccess.addOnSuccessListener(onDGriveAccessRevoked)
+
+      case exc =>
+        // At least let user know
+        app toast exc.getMessage
     }
 
     new TaskWrap[Void, MetadataBuffer] sContinueWithTask syncTask apply { _ =>
       GDrive.getMetaTask(driveResClient.getAppFolder, driveResClient, backupFileName)
-        .addOnSuccessListener(onMedaData).addOnFailureListener(onFailure)
+        .addOnFailureListener(updateInterface).addOnFailureListener(maybeAskSignIn)
+        .addOnSuccessListener(onMedaData)
     }
   }
 
   def onGDrive(cb: View) =
-    if (gDriveBackups.isChecked) check(GDrive signInAttemptClient me) else {
+    if (gDriveBackups.isChecked) queue.map(_ => GDrive signInAccount me) foreach {
+      case Some(mayBeSignedOutGDriveAccount) => checkBackup(mayBeSignedOutGDriveAccount)
+      case _ => askGDriveSignIn
+    } else {
+      // User has opted out of GDrive backups, revoke access immediately
       app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, false).commit
       GDrive.signInAttemptClient(me).revokeAccess
       updateBackupView
-    }
-
-  def check(client: GoogleSignInClient) =
-    queue.map(_ => GDrive signInAccount me) foreach {
-      case Some(signedInAccount) => checkBackup(signedInAccount)
-      case _ => startActivityForResult(client.getSignInIntent, 102)
     }
 
   def INIT(s: Bundle) = if (app.isAlive) {
