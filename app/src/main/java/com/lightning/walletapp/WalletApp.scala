@@ -137,7 +137,7 @@ class WalletApp extends Application { me =>
       case shortNodeLink(key, host) => mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, 9735), host)
       case lnPayReq(prefix, data) => PaymentRequest.read(s"$prefix$data")
       case lnUrl(prefix, data) => LNUrl.fromBech32(s"$prefix$data")
-      case address => bitcoinUri(s"bitcoin:$address")
+      case _ => toBitcoinUri(rawInputTextToParse)
     }
   }
 
