@@ -131,7 +131,7 @@ case class NodeAnnouncement(signature: BinaryData,
   } getOrElse "No IP address"
 
   val identifier = (alias + nodeId.toString).toLowerCase
-  val asString = s"<strong>${alias take 16}</strong><br><small>$pretty</small>"
+  val asString = s"<strong>${alias take 15}</strong><br><small>$pretty</small>"
 }
 
 sealed trait NodeAddress
