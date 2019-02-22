@@ -41,6 +41,7 @@ import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
+import org.bitcoinj.uri.BitcoinURI
 import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
@@ -561,7 +562,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
     }
 
-    Tuple2(pr.fallbackAddress, pr.amount) match {
+    pr.fallbackAddress -> pr.amount match {
       case Some(adr) \ Some(amount) if amount > maxCappedSend && amount < app.kit.conf0Balance =>
         val failureMessage = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
         // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback payment option
@@ -627,10 +628,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def onChain(adr: String, amount: MilliSatoshi, hash: BinaryData)(alert: AlertDialog) = rm(alert) {
     // This code only gets executed when user taps a button to pay on-chain instead of inital LN payment
-    me sendBtcPopup Address.fromString(app.params, adr) setSum Try(amount)
+    sendBtcPopup(app.TransData toBitcoinUri adr) setSum Try(amount)
   }
 
-  def sendBtcPopup(addr: Address): RateManager = {
+  def sendBtcPopup(uri: BitcoinURI): RateManager = {
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign app.kit.conf0Balance)
     val form = host.getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
     val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
@@ -644,7 +645,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val txProcessor = new TxProcessor {
           def futureProcess(unsigned: SendRequest) = app.kit blockSend app.kit.sign(unsigned).tx
           def onTxFail(paymentGenerationError: Throwable) = onFail(paymentGenerationError)
-          val pay = AddrData(ms, addr)
+          val pay = AddrData(ms, uri.getAddress)
         }
 
         val coloredAmount = denom.coloredOut(txProcessor.pay.cn, denom.sign)
@@ -652,9 +653,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         rm(alert)(txProcessor start coloredExplanation)
     }
 
+    def sendOffChainAttempt(alert: AlertDialog) = rm(alert) {
+      // Bitcoin URI may contain an embedded LN invoice so user need to have an off-chain option
+      <(app.TransData recordValue uri.getLightningRequest, onFail)(_ => host.checkTransData)
+    }
+
     val bld = baseBuilder(app.getString(btc_send_title).html, form)
-    mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
-    addressData setText humanSix(addr.toString)
+    if (uri.getLightningRequest == null) mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
+    else mkCheckFormNeutral(sendAttempt, none, sendOffChainAttempt, bld, dialog_next, dialog_cancel, dialog_pay_offchain)
+    addressData setText humanSix(uri.getAddress.toString)
     rateManager
   }
 

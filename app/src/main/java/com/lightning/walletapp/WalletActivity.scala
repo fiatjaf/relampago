@@ -196,10 +196,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       goOps(null): Unit
 
     case uri: BitcoinURI =>
-      // TransData value will be erased here
-      val manager = FragWallet.worker.sendBtcPopup(uri.getAddress)
       // Prohibit sum editing if uri contains a definite amount
-      manager maybeLockAmount uri
+      FragWallet.worker sendBtcPopup uri maybeLockAmount uri
+      // TransData value should be erased here
       me returnToBase null
 
     case lnUrl: LNUrl =>
