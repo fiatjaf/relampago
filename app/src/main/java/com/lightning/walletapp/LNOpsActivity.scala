@@ -104,9 +104,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       val breakFee = Satoshi(cs.reducedRemoteState.myFeeSat)
       val canReceiveMsat = estimateCanReceive(chan)
       val canSendMsat = estimateCanSend(chan)
-      
-      val refundable = Satoshi(cs.localCommit.spec.toLocalMsat / 1000L)
-      val inFlight = Satoshi(inFlightHtlcs(chan).map(_.add.amountMsat).sum / 1000L)
+
+      val refundable = cs.localCommit.spec.toLocalMsat
+      val inFlight = inFlightHtlcs(chan).toList.map(_.add.amountMsat).sum
       val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
       val barCanReceive = barCanSend + canReceiveMsat / capacity.amount
 
@@ -123,11 +123,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       startedAtText setText started.html
       totalPaymentsText setText getStat(cs.channelId).toString
       fundingDepthText setText getString(ln_info_funding).format(fundingDepth, threshold).html
+      refundableAmountText setText denom.parsedWithSign(Satoshi(refundable) / 1000L).html
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(canSendMsat) / 1000L).html
-      refundableAmountText setText denom.parsedWithSign(refundable).html
+      paymentsInFlightText setText sumOrNothing(Satoshi(inFlight) / 1000L).html
       totalCapacityText setText denom.parsedWithSign(capacity).html
-      paymentsInFlightText setText sumOrNothing(inFlight).html
       refundFeeText setText sumOrNothing(breakFee).html
 
       chan.data match {
