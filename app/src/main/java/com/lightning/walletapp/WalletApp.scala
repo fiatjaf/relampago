@@ -103,7 +103,7 @@ class WalletApp extends Application { me =>
 
   def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) = {
     val dummySig = Crypto encodeSignature Crypto.sign(random getBytes 32, randomPrivKey)
-    NodeAnnouncement(dummySig, "", 0L, id, (-128, -128, -128), alias, na :: Nil)
+    NodeAnnouncement(dummySig, "", 0L, id, (-128, -128, -128), alias take 15, na :: Nil)
   }
 
   object TransData {
