@@ -126,7 +126,7 @@ class BackupWorker(ctxt: Context, params: WorkerParameters) extends Worker(ctxt,
     GDrive.signInAccount(ctxt) map GDrive.driveResClient(ctxt) map { drc =>
       val plainText = GDriveBackup(hasCommitmentsBackup.flatten, storageTokensBackup, v = 1).toJson.toString
       val res = GDrive.createOrUpdateBackup(AES.encReadable(plainText, secretBytes).toByteArray, backupFileName, drc)
-      GDrive.updatePreferences(ctxt, res.isSuccess, lastSave = if (res.isSuccess) System.currentTimeMillis else -1L)
+      GDrive.updatePreferences(ctxt, isEnabled = true, lastSave = if (res.isSuccess) System.currentTimeMillis else -1L)
       if (res.isSuccess) Result.SUCCESS else Result.FAILURE
     } getOrElse {
       // We could not get a resource client so data can't be saved
