@@ -72,8 +72,11 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
   }
 
   override def onBackPressed = wrap(super.onBackPressed)(app.kit.stopAsync)
-  override def onActivityResult(reqCode: Int, resultCode: Int, result: Intent) =
-    if (reqCode == 102 && resultCode != Activity.RESULT_OK) warnNoBackups(none).run
+  override def onActivityResult(reqCode: Int, resultCode: Int, result: Intent) = {
+    val isGDriveSignInSuccessful = reqCode == 102 && resultCode == Activity.RESULT_OK
+    app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, isGDriveSignInSuccessful).commit
+    if (!isGDriveSignInSuccessful) warnNoBackups(none).run
+  }
 
   def warnNoBackups(go: => Unit) = UITask {
     val bld = baseTextBuilder(me getString err_gdrive_sign_in_failed)
@@ -125,7 +128,6 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
   def useGDriveBackup(googleDriveBackup: GDriveBackup) = {
     for (snapshot <- googleDriveBackup.clouds) app.olympus tellClouds snapshot
     ChannelManager.all = for (data <- googleDriveBackup.chans) yield restoreChannel(data)
-    GDrive.updatePreferences(app, isEnabled = true, lastSave = System.currentTimeMillis)
     me prepareFreshWallet app.kit
   }
 
@@ -135,7 +137,7 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
         val syncTask = GDrive.syncClientTask(app)(googleSignInAccount)
         val driveResClient = GDrive.driveResClient(app)(googleSignInAccount)
 
-        val onError = TaskWrap.onFailure { exc =>
+        val onError = TaskWrap.onFailure { _ =>
           // This may be normal if user has no backup at all
           warnNoBackups(me prepareFreshWallet app.kit).run
         }

@@ -168,7 +168,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   override def onActivityResult(reqCode: Int, resultCode: Int, results: Intent) = {
     val isGDriveSignInSuccessful = reqCode == 102 && resultCode == Activity.RESULT_OK
     app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, isGDriveSignInSuccessful).commit
-    if (!isGDriveSignInSuccessful) app toast gdrive_disabled
+    // This updates lastSaved if user restores wallet from migration file, otherwise no effect
+    if (isGDriveSignInSuccessful) ChannelManager.backUp else app toast gdrive_disabled
   }
 
   // NFC

@@ -27,7 +27,7 @@
         android:id="@+id/gDriveBackups"
         android:layout_width="wrap_content"
         android:text="@string/sets_gdrive"
-        android:onClick="onGDrive"/>
+        android:onClick="onGDriveTap"/>
 
     <TextView
         style="@style/Info"

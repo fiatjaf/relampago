@@ -98,7 +98,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
   }
 
-  def onGDrive(cb: View) =
+  def onGDriveTap(cb: View) =
     if (gDriveBackups.isChecked) queue.map(_ => GDrive signInAccount me) foreach {
       case Some(mayBeSignedOutGDriveAccount) => checkBackup(mayBeSignedOutGDriveAccount)
       case _ => askGDriveSignIn
