@@ -173,16 +173,15 @@ object PaymentRequest {
       Block.TestnetGenesisBlock.hash -> "lntb",
       Block.LivenetGenesisBlock.hash -> "lnbc")
 
-  def apply(chain: BinaryData, amount: Option[MilliSatoshi], paymentHash: BinaryData,
-            privateKey: PrivateKey, description: String, fallbackAddress: Option[String],
-            routes: PaymentRouteVec, lnUrl: Option[LNUrl] = None): PaymentRequest = {
+  def unsigned(chain: BinaryData, amount: Option[MilliSatoshi], paymentHash: BinaryData,
+               publicKey: PublicKey, description: String, fallbackAddress: Option[String],
+               routes: PaymentRouteVec, lnUrl: Option[LNUrl] = None): PaymentRequest = {
 
     val paymentHashTag = PaymentHashTag(paymentHash)
     val lnUrlTag = lnUrl.map(LNUrlTag.apply).toVector
     val fallbackTag = fallbackAddress.map(FallbackAddressTag.apply).toVector
-    val tags = routes.map(RoutingInfoTag.apply) ++ fallbackTag ++ lnUrlTag ++ Vector(DescriptionTag(description), expiryTag, paymentHashTag)
-    val pr = PaymentRequest(prefixes(chain), amount, System.currentTimeMillis / 1000L, privateKey.publicKey, tags, BinaryData.empty)
-    pr sign privateKey
+    val tags = routes.map(RoutingInfoTag.apply) ++ Vector(DescriptionTag(description), expiryTag, paymentHashTag) ++ fallbackTag
+    PaymentRequest(prefixes(chain), amount, System.currentTimeMillis / 1000L, publicKey, tags ++ lnUrlTag, BinaryData.empty)
   }
 
   object Amount {

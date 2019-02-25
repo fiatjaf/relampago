@@ -37,7 +37,7 @@ object PaymentInfo {
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
-      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache)
+      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache, throughNodes = Vector.empty)
   }
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
@@ -65,10 +65,9 @@ object PaymentInfo {
         (nextPayload +: loads, nodeId +: nodes, nextFee, expiry + delta)
     }
 
-    val cltvDeltaFail = lastExpiry - LNParams.broadcaster.currentHeight > LNParams.maxCltvDelta
-    val lnFeeFail = LNParams.isFeeNotOk(lastMsat, lastMsat - rd.firstMsat, route.size)
-
-    if (cltvDeltaFail || lnFeeFail) useFirstRoute(rest, rd) else {
+    val maxFee = LNParams.maxAcceptableFee(lastMsat, route.size)
+    val cltvDelta = lastExpiry - LNParams.broadcaster.currentHeight
+    if (cltvDelta > LNParams.maxCltvDelta || lastMsat - rd.firstMsat > maxFee) useFirstRoute(rest, rd) else {
       val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, payloads = allPayloads, assoc = rd.pr.paymentHash)
       val rd1 = rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
       Right(rd1)
@@ -155,7 +154,7 @@ object PaymentInfo {
   }
 
   // After mutually signed HTLCs are present we need to parse and fail/fulfill them
-  def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag, isLoop: Boolean) = Try {
+  def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag) = Try {
     val packet = parsePacket(privateKey = nodeSecret, associatedData = add.paymentHash, add.onionRoutingPacket)
     Tuple3(perHopPayloadCodec decode BitVector(packet.payload), packet.nextPacket, packet.sharedSecret)
   } map {
@@ -166,9 +165,9 @@ object PaymentInfo {
 
     case (Attempt.Successful(_), nextPacket, ss) if nextPacket.isLast => bag getPaymentInfo add.paymentHash match {
       // Payment request may not have a zero final sum which means it's a donation and should not be checked for overflow
-      case Success(info) if !isLoop && info.pr.amount.exists(add.amountMsat > _.amount * 2) => failHtlc(ss, IncorrectPaymentAmount, add)
-      case Success(info) if !isLoop && info.pr.amount.exists(add.amountMsat < _.amount) => failHtlc(ss, IncorrectPaymentAmount, add)
-      case Success(info) if !isLoop && info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
+      case Success(info) if info.pr.amount.exists(add.amountMsat > _.amount * 2) => failHtlc(ss, IncorrectPaymentAmount, add)
+      case Success(info) if info.pr.amount.exists(add.amountMsat < _.amount) => failHtlc(ss, IncorrectPaymentAmount, add)
+      case Success(info) if info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
       case _ => failHtlc(ss, UnknownPaymentHash, add)
     }
 
@@ -189,14 +188,13 @@ object PaymentInfo {
 case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv: Long)
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
                        onion: SecretsAndPacket, firstMsat: Long, lastMsat: Long, lastExpiry: Long,
-                       callsLeft: Int, useCache: Boolean) {
+                       callsLeft: Int, useCache: Boolean, throughNodes: PublicKeyVec) {
 
   lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toString}"
-  lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
 }
 
 case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int, stamp: Long,
-                       description: String, hash: String, firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
+                       description: String, firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
 
   // Keep serialized for performance
   lazy val firstSum = MilliSatoshi(firstMsat)

@@ -152,7 +152,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  val loaderCallbacks: LoaderCallbacks[Cursor] = new LoaderCallbacks[Cursor] {
+  val loaderCallbacks = new LoaderCallbacks[Cursor] {
     def onCreateLoader(id: Int, bn: Bundle) = new ReactLoader[PaymentInfo](host) {
       val consume = (vec: InfoVec) => runAnd(lnItems = vec map LNWrap)(updPaymentList.run)
       def getCursor = if (lastQuery.isEmpty) bag.byRecent else bag byQuery lastQuery
@@ -267,7 +267,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   case class ShowDelayedWrap(stat: ShowDelayed) extends ItemWrap {
     val getDate = new java.util.Date(System.currentTimeMillis + stat.delay)
     def humanSum = denom.coloredIn(stat.amount, new String)
-    val id = stat.commitTx.txid.toString
+    val txid = stat.commitTx.txid.toString
 
     def humanWhen = {
       val now = System.currentTimeMillis
@@ -281,7 +281,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       holder.transactWhat setVisibility viewMap(isTablet)
       holder.transactCircle setImageResource await
       holder.transactWhen setText humanWhen
-      holder.transactWhat setText id
+      holder.transactWhat setText txid
     }
 
     def generatePopup = {
@@ -290,7 +290,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
 
       viewTxOutside setOnClickListener onButtonTap {
-        val uri = Uri parse s"https://smartbit.com.au/tx/$id"
+        val uri = Uri parse s"https://smartbit.com.au/tx/$txid"
         host startActivity new Intent(Intent.ACTION_VIEW, uri)
       }
 
@@ -506,19 +506,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val rateManager = new RateManager(content) hint baseHint
     val bld = baseBuilder(title, content)
 
-    def makeRequest(sum: MilliSatoshi, preimage: BinaryData) = {
-      val pr = PaymentRequest(chainHash, amount = Some(sum), paymentHash = Crypto sha256 preimage,
-        nodePrivateKey, inputDescription.getText.toString.trim, Some(app.kit.currentAddress.toString),
-        chansWithRoutes.filterKeys(chan => estimateCanReceiveCapped(chan) >= sum.amount).values.toVector)
-
-      val rd = emptyRD(pr, sum.amount, useCache = true)
-      db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
-      db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* incoming payment */, WAITING,
-        System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount, 0L, 0L, NOCHANID)
-
-      // Notify user on UI and proceed
-      PaymentInfoWrap.uiNotify
-      rd
+    def makeNormalRequest(sum: MilliSatoshi) = {
+      val toAllChans = chansWithRoutes.filterKeys(chan => estimateCanReceiveCapped(chan) >= sum.amount).values.toVector
+      val rd = PaymentInfoWrap.makeRequest(toAllChans, sum, random getBytes 32, inputDescription.getText.toString.trim)
+      rd.copy(pr = rd.pr sign nodePrivateKey)
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
@@ -527,8 +518,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case Failure(reason) => app toast dialog_sum_small
 
       case Success(ms) => rm(alert) {
-        // Requests without amount are not allowed for now
-        <(makeRequest(ms, random getBytes 32), onFail)(onDone)
+        // Requests without amount are not allowed
+        <(makeNormalRequest(ms), onFail)(onDone)
         app toast dialog_pr_making
       }
     }

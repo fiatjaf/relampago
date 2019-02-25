@@ -51,8 +51,9 @@ object LNParams { me =>
     app.olympus = new OlympusWrap
   }
 
-  def isFeeNotOk(msat: Long, fee: Long, hops: Int) =
-    fee > 25000 * (hops + 1) + msat / 50
+  def maxAcceptableFee(msat: Long, hops: Int) =
+    // 25 SAT per hop + 1% of payment sum
+    25000 * (hops + 1) + msat / 100
 
   def shouldUpdateFee(network: Long, commit: Long) = {
     val mismatch = 2.0 * (network - commit) / (commit + network)

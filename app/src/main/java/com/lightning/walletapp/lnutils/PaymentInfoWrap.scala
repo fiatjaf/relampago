@@ -12,8 +12,8 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import rx.lang.scala.{Observable => Obs}
-import fr.acinq.bitcoin.{BinaryData, Transaction}
 import com.lightning.walletapp.helper.{AES, RichCursor}
+import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Transaction}
 import com.lightning.walletapp.lnutils.olympus.{CerberusAct, OlympusWrap}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.cerberusPayloadCodec
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs
@@ -64,14 +64,28 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def byRecent = db select PaymentTable.selectRecentSql
 
   def toPaymentInfo(rc: RichCursor) =
-    PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage, rc int PaymentTable.incoming, rc int PaymentTable.status,
-      rc long PaymentTable.stamp, rc string PaymentTable.description, rc string PaymentTable.hash, rc long PaymentTable.firstMsat,
-      rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
+    PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage, rc int PaymentTable.incoming,
+      rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
+      rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat,
+      rc long PaymentTable.lastExpiry)
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
     db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* outgoing payment */, WAITING, System.currentTimeMillis,
       rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
+  }
+
+  def makeRequest(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: BinaryData, description: String) = {
+    val unsigned = PaymentRequest.unsigned(chainHash, amount = Some(sum), paymentHash = Crypto sha256 preimage, nodePublicKey,
+      description, fallbackAddress = Some(app.kit.currentAddress.toString), extraRoutes)
+
+    val rd = emptyRD(unsigned, sum.amount, useCache = true)
+    db.change(PaymentTable.newVirtualSql, rd.queryText, unsigned.paymentHash)
+    db.change(PaymentTable.newSql, unsigned.toJson, preimage, 1 /* incoming payment */, WAITING,
+      System.currentTimeMillis, unsigned.description, unsigned.paymentHash, sum.amount, 0L, 0L, NOCHANID)
+
+    uiNotify
+    rd
   }
 
   def markFailedAndFrozen = db txWrap {

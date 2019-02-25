@@ -418,28 +418,22 @@ object ChannelManager extends Broadcaster {
 
   def fetchRoutes(rd: RoutingData) = {
     // First we collect chans which in principle can handle a given payment sum right now, then prioritize less busy chans
-    val from = all filter isOperational collect { case chan if estimateCanSend(chan) >= rd.firstMsat => chan.data.announce.nodeId }
+    val good = all filter isOperational collect { case chan if estimateCanSend(chan) >= rd.firstMsat => chan.data.announce.nodeId }
+    val from = if (rd.throughNodes.isEmpty) good else good.filter(rd.throughNodes.contains)
 
     def withHints = for {
       tag <- Obs from rd.pr.routingInfo
       partialRoutes <- getRoutes(tag.route.head.nodeId)
-      completeRoutes = partialRoutes.map(_ ++ tag.route)
-    } yield Obs just completeRoutes
+    } yield Obs just partialRoutes.map(_ ++ tag.route)
 
-    def getRoutes(target: PublicKey) =
-      if (rd.isReflexive) from.filter(_ != target) match {
-        case restFrom if restFrom.isEmpty => Obs just Vector(Vector.empty)
-        case restFrom if rd.useCache => RouteWrap.findRoutes(restFrom, target, rd)
-        case restFrom => BadEntityWrap.findRoutes(restFrom, target, rd)
-      } else from contains target match {
-        case false if rd.useCache => RouteWrap.findRoutes(from, target, rd)
-        case false => BadEntityWrap.findRoutes(from, target, rd)
-        case true => Obs just Vector(Vector.empty)
-      }
+    def getRoutes(target: PublicKey) = from contains target match {
+      case false if rd.useCache => RouteWrap.findRoutes(from, target, rd)
+      case false => BadEntityWrap.findRoutes(from, target, rd)
+      case true => Obs just Vector(Vector.empty)
+    }
 
     val paymentRoutesObs =
-      if (from.isEmpty) Obs error new LightningException
-      else if (rd.isReflexive) Obs.zip(withHints).map(_.flatten.toVector)
+      if (from.isEmpty) Obs error new LightningException("No source nodes")
       else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
 
     for {
@@ -460,10 +454,8 @@ object ChannelManager extends Broadcaster {
     case Right(rd) =>
       all filter isOperational find { chan =>
         // Empty used route means we're sending to peer and its nodeId is our target
-        val excludeChan = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
         val targetNodeId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
-        val isKink = chan.hasCsOr(_.commitments.extraHop.exists(_.shortChannelId == excludeChan), false)
-        !isKink && chan.data.announce.nodeId == targetNodeId && estimateCanSend(chan) >= rd.firstMsat
+        chan.data.announce.nodeId == targetNodeId && estimateCanSend(chan) >= rd.firstMsat
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)
         case Some(targetGoodChannel) => targetGoodChannel process rd
