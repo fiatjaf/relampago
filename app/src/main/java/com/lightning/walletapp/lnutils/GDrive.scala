@@ -61,31 +61,25 @@ object GDrive {
       res.openFile(metaTaskReady.getResult.get(0).getDriveId.asDriveFile, DriveFile.MODE_READ_ONLY)
     }
 
-  def createBackupTask(res: DriveResourceClient, backupProvider: BinaryData => Bytes,
-                       backupFileName: String, secret: BinaryData) = {
-
-    val appFolderTask = res.getAppFolder
-    val contentsTask = res.createContents
-
-    new TaskWrap[Void, DriveFile] sContinueWithTask Tasks.whenAll(appFolderTask, contentsTask) apply { _ =>
+  def createBackupTask(res: DriveResourceClient, backup: Bytes, backupFileName: String) = {
+    val (appFolderObtainingTask, contentsCreationTask) = res.getAppFolder -> res.createContents
+    new TaskWrap[Void, DriveFile] sContinueWithTask Tasks.whenAll(appFolderObtainingTask, contentsCreationTask) apply { _ =>
       val changeSet = (new MetadataChangeSet.Builder).setTitle(backupFileName).setMimeType("application/octet-stream")
-      MultiStreamUtils.writeone(backupProvider(secret), contentsTask.getResult.getOutputStream)
-      res.createFile(appFolderTask.getResult, changeSet.build, contentsTask.getResult)
+      MultiStreamUtils.writeone(inputData = backup, out = contentsCreationTask.getResult.getOutputStream)
+      res.createFile(appFolderObtainingTask.getResult, changeSet.build, contentsCreationTask.getResult)
     }
   }
 
-  def updateBackupTask(res: DriveResourceClient, backupProvider: BinaryData => Bytes, driveFile: DriveFile, secret: BinaryData) =
+  def updateBackupTask(res: DriveResourceClient, backup: Bytes, driveFile: DriveFile) =
     new TaskWrap[DriveContents, Void] sContinueWithTask res.openFile(driveFile, DriveFile.MODE_WRITE_ONLY) apply { contentsTask =>
-      MultiStreamUtils.writeone(backupProvider(secret), contentsTask.getResult.getOutputStream)
+      MultiStreamUtils.writeone(inputData = backup, out = contentsTask.getResult.getOutputStream)
       res.commitContents(contentsTask.getResult, null)
     }
 
-  def createOrUpdateBackup(backupProvider: BinaryData => Bytes, backupFileName: String,
-                           secret: BinaryData, drc: DriveResourceClient) = Try {
-
-    val buffer = Tasks await getMetaTask(drc.getAppFolder, drc, backupFileName)
-    if (0 == buffer.getCount) Tasks await createBackupTask(drc, backupProvider, backupFileName, secret)
-    else Tasks await updateBackupTask(drc, backupProvider, buffer.get(0).getDriveId.asDriveFile, secret)
+  def createOrUpdateBackup(backup: Bytes, backupFileName: String, drc: DriveResourceClient) = Try {
+    val listOfAllExistingBackupFiles = Tasks await getMetaTask(drc.getAppFolder, drc, backupFileName)
+    if (0 == listOfAllExistingBackupFiles.getCount) Tasks await createBackupTask(drc, backup, backupFileName)
+    else Tasks await updateBackupTask(drc, backup, listOfAllExistingBackupFiles.get(0).getDriveId.asDriveFile)
   }
 }
 
@@ -123,17 +117,15 @@ class BackupWorker(ctxt: Context, params: WorkerParameters) extends Worker(ctxt,
 
     val secret = getInputData.getString(BackupWorker.SECRET)
     val backupFileName = getInputData.getString(BackupWorker.BACKUP_FILE_NAME)
-    if (null == secret || null == backupFileName) return Result.FAILURE
+    val storageTokensBackup = for (olympusCloud <- app.olympus.clouds) yield olympusCloud.snapshot
+    val hasCommitmentsBackup = for (channel <- ChannelManager.all) yield channel.hasCsOr(Some.apply, None)
+    if (null == secret || null == backupFileName || hasCommitmentsBackup.isEmpty) return Result.SUCCESS
 
-    val channelsAndTokens: BinaryData => Bytes = secret => {
-      val tokensBackup = for (cloud <- app.olympus.clouds) yield cloud.snapshot
-      val hasCommitmentsBackup = for (channel <- ChannelManager.all) yield channel.hasCsOr(Some.apply, None)
-      val backup = GDriveBackup(hasCommitmentsBackup.flatten, tokensBackup, v = 1).toJson.toString
-      AES.encReadable(backup, secret).toByteArray
-    }
-
+    // Convert hex to byte array
+    val secretBytes = BinaryData(secret).toArray
     GDrive.signInAccount(ctxt) map GDrive.driveResClient(ctxt) map { drc =>
-      val res = GDrive.createOrUpdateBackup(channelsAndTokens, backupFileName, BinaryData(secret), drc)
+      val plainText = GDriveBackup(hasCommitmentsBackup.flatten, storageTokensBackup, v = 1).toJson.toString
+      val res = GDrive.createOrUpdateBackup(AES.encReadable(plainText, secretBytes).toByteArray, backupFileName, drc)
       GDrive.updatePreferences(ctxt, res.isSuccess, lastSave = if (res.isSuccess) System.currentTimeMillis else -1L)
       if (res.isSuccess) Result.SUCCESS else Result.FAILURE
     } getOrElse {

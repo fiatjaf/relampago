@@ -27,8 +27,8 @@ object MultiStreamUtils {
       buffer
     }
 
-  def writeone(data: Bytes, out: OutputStream) = {
-    val inputStream = new ByteArrayInputStream(data)
+  def writeone(inputData: Bytes, out: OutputStream) = {
+    val inputStream = new ByteArrayInputStream(inputData)
     ByteStreams.copy(inputStream, out)
     inputStream.close
   }
