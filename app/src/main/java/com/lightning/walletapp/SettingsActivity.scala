@@ -46,10 +46,11 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val viewMnemonic = findViewById(R.id.viewMnemonic).asInstanceOf[Button]
   lazy val host = me
 
-  override def onActivityResult(reqCode: Int, resultCode: Int, result: Intent) = reqCode match {
-    case 102 if resultCode == Activity.RESULT_OK => checkBackup(GoogleSignIn.getSignedInAccountFromIntent(result).getResult)
-    case 102 => runAnd(app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, false).commit)(updateBackupView)
-    case _ =>
+  override def onActivityResult(reqCode: Int, resultCode: Int, result: Intent) = {
+    val isGDriveSignInSuccessful = reqCode == 102 && resultCode == Activity.RESULT_OK
+    app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, isGDriveSignInSuccessful).commit
+    if (isGDriveSignInSuccessful) checkBackup(GoogleSignIn.getSignedInAccountFromIntent(result).getResult)
+    updateBackupView
   }
 
   override def onCreateOptionsMenu(menu: Menu) = {
@@ -68,9 +69,9 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     val driveResClient = GDrive.driveResClient(app)(signInAcc)
 
     val onMedaData = TaskWrap.onSuccess[MetadataBuffer] { buf =>
-      // Update values right away and upload backup since it may be stale
-      val stamp = if (buf.getCount < 1) 0L else System.currentTimeMillis
-      GDrive.updatePreferences(app, isEnabled = true, lastSave = stamp)
+      // Update values right away and upload backup since it may be stale at this point
+      // for example: user turned backups off a long time ago and now has changed his mind
+      GDrive.updateLastSaved(app, if (buf.getCount < 1) 0L else System.currentTimeMillis)
       UITask(updateBackupView).run
       ChannelManager.backUp
     }

@@ -29,11 +29,9 @@ object GDrive {
   def syncClientTask(ctxt: Context)(signInAccount: GoogleSignInAccount) = Drive.getDriveClient(ctxt, signInAccount).requestSync
   def isMissing(ctxt: Context) = GoogleApiAvailability.getInstance.isGooglePlayServicesAvailable(ctxt) != ConnectionResult.SUCCESS
 
-  def updatePreferences(ctxt: Context, isEnabled: Boolean, lastSave: Long) =
-    ctxt.getSharedPreferences("prefs", Context.MODE_PRIVATE).edit
-      .putBoolean(AbstractKit.GDRIVE_ENABLED, isEnabled)
-      .putLong(AbstractKit.GDRIVE_LAST_SAVE, lastSave)
-      .commit
+  def updateLastSaved(ctxt: Context, lastSave: Long) =
+    ctxt.getSharedPreferences("prefs", Context.MODE_PRIVATE)
+      .edit.putLong(AbstractKit.GDRIVE_LAST_SAVE, lastSave).commit
 
   def signInAttemptClient(ctxt: Context) =
     GoogleSignIn.getClient(ctxt, (new GoogleSignInOptions.Builder)
@@ -126,12 +124,12 @@ class BackupWorker(ctxt: Context, params: WorkerParameters) extends Worker(ctxt,
     GDrive.signInAccount(ctxt) map GDrive.driveResClient(ctxt) map { drc =>
       val plainText = GDriveBackup(hasCommitmentsBackup.flatten, storageTokensBackup, v = 1).toJson.toString
       val res = GDrive.createOrUpdateBackup(AES.encReadable(plainText, secretBytes).toByteArray, backupFileName, drc)
-      GDrive.updatePreferences(ctxt, isEnabled = true, lastSave = if (res.isSuccess) System.currentTimeMillis else -1L)
+      GDrive.updateLastSaved(ctxt, if (res.isSuccess) System.currentTimeMillis else -1L)
       if (res.isSuccess) Result.SUCCESS else Result.FAILURE
     } getOrElse {
       // We could not get a resource client so data can't be saved
       // user should see a login window when app gets opened next time
-      GDrive.updatePreferences(ctxt, isEnabled = true, lastSave = -1L)
+      GDrive.updateLastSaved(ctxt, -1L)
       Result.FAILURE
     }
   }
