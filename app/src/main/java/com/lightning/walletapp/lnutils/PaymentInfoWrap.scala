@@ -70,9 +70,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       rc long PaymentTable.lastExpiry)
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
-    db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
-    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* outgoing payment */, WAITING, System.currentTimeMillis,
-      rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
+    db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash) // Silently fails for the first time
+    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* this is outgoing payment */, WAITING, System.currentTimeMillis, rd.pr.description,
+      rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
   def makeRequest(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: BinaryData, description: String) = {
@@ -81,8 +81,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     val rd = emptyRD(unsigned, sum.amount, useCache = true)
     db.change(PaymentTable.newVirtualSql, rd.queryText, unsigned.paymentHash)
-    db.change(PaymentTable.newSql, unsigned.toJson, preimage, 1 /* incoming payment */, WAITING,
-      System.currentTimeMillis, unsigned.description, unsigned.paymentHash, sum.amount, 0L, 0L, NOCHANID)
+    db.change(PaymentTable.newSql, unsigned.toJson, preimage, 1 /* this is incoming payment */, WAITING,
+      System.currentTimeMillis, unsigned.description, unsigned.paymentHash, sum.amount, 0L /* lastMsat */,
+      0L /* lastExpiry, will not be 0 for reflexive payments */, NOCHANID)
 
     uiNotify
     rd

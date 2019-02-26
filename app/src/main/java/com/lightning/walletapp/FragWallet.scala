@@ -313,8 +313,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def fillView(holder: ViewHolder) = {
       val humanSum = info.incoming == 1 match {
-        case true => denom.coloredIn(info.firstSum, new String)
         case false => denom.coloredOut(info.firstSum, new String)
+        // This means we have a reflexive payment which is incoming, but also outgoing
+        case true if info.lastExpiry != 0 => denom.coloredP2WSH(info.firstSum, new String)
+        case true => denom.coloredIn(info.firstSum, new String)
       }
 
       holder.transactCircle setImageResource imageMap(info.status)
@@ -377,12 +379,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       info.incoming -> rd.pr.fallbackAddress -> rd.pr.amount match {
-        case 0 \ Some(adr) \ Some(amount) if info.lastMsat == 0 && info.lastExpiry == 0 && info.status == FAILURE =>
-          // Payment was failed without even trying because wallet is offline or no suitable payment routes were found on Olympus server
+        case 0 \ Some(adr) \ Some(amount) if info.lastExpiry == 0 && info.status == FAILURE =>
+          // Payment was failed without even trying because wallet is offline or no suitable routes were found
           val bld = baseBuilder(lnTitleOutNoFee.format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper)
           mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount, rd.pr.paymentHash), bld, dialog_ok, -1, dialog_pay_onchain)
 
-        case 0 \ _ \ _ if info.lastMsat == 0 && info.lastExpiry == 0 =>
+        case 0 \ _ \ _ if info.lastExpiry == 0 =>
           // Payment has not been tried yet because an wallet is offline
           val amountSentHuman = denom.coloredOut(info.firstSum, denom.sign)
           val title = lnTitleOutNoFee.format(humanStatus, amountSentHuman, inFiat)
@@ -410,12 +412,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   case class BTCWrap(wrap: TxWrap) extends ItemWrap {
     private[this] def txDepth = wrap.tx.getConfidence.getDepthInBlocks
     private[this] def txDead = DEAD == wrap.tx.getConfidence.getConfidenceType
-    private[this] val id = wrap.tx.getHashAsString
+    private[this] val txid = wrap.tx.getHashAsString
     val getDate = wrap.tx.getUpdateTime
 
     def fillView(holder: ViewHolder) = {
       val humanSum = wrap.visibleValue.isPositive match {
-        case _ if fundTxIds contains id => denom.coloredP2WSH(-wrap.visibleValue, new String)
+        case _ if fundTxIds contains txid => denom.coloredP2WSH(-wrap.visibleValue, new String)
         case false => denom.coloredOut(-wrap.visibleValue, new String)
         case true => denom.coloredIn(wrap.visibleValue, new String)
       }
@@ -425,7 +427,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       holder.transactSum setText s"<img src='btc'/>$humanSum".html
       holder.transactWhat setVisibility viewMap(isTablet)
       holder.transactCircle setImageResource status
-      holder.transactWhat setText id
+      holder.transactWhat setText txid
     }
 
     def generatePopup = {
@@ -444,7 +446,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       viewTxOutside setOnClickListener onButtonTap {
-        val uri = Uri parse s"https://smartbit.com.au/tx/$id"
+        val uri = Uri parse s"https://smartbit.com.au/tx/$txid"
         host startActivity new Intent(Intent.ACTION_VIEW, uri)
       }
 
