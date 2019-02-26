@@ -75,9 +75,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
-  def makeRequest(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: BinaryData, description: String) = {
-    val unsigned = PaymentRequest.unsigned(chainHash, amount = Some(sum), paymentHash = Crypto sha256 preimage, nodePublicKey,
-      description, fallbackAddress = Some(app.kit.currentAddress.toString), extraRoutes)
+  def makeRequest(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi,
+                  preimage: BinaryData, description: String) = {
+
+    val unsigned = PaymentRequest.unsigned(chainHash, Some(sum), Crypto sha256 preimage,
+      nodePublicKey, description, Some(app.kit.currentAddress.toString), extraRoutes)
 
     val rd = emptyRD(unsigned, sum.amount, useCache = true)
     db.change(PaymentTable.newVirtualSql, rd.queryText, unsigned.paymentHash)
