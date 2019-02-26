@@ -314,7 +314,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def fillView(holder: ViewHolder) = {
       val humanSum = info.incoming == 1 match {
         case false => denom.coloredOut(info.firstSum, new String)
-        // This means we have a reflexive payment which is incoming, but also outgoing
+        // This means we have a reflexive payment with updated lastExpiry value
         case true if info.lastExpiry != 0 => denom.coloredP2WSH(info.firstSum, new String)
         case true => denom.coloredIn(info.firstSum, new String)
       }

@@ -83,7 +83,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     db.change(PaymentTable.newVirtualSql, rd.queryText, unsigned.paymentHash)
     db.change(PaymentTable.newSql, unsigned.toJson, preimage, 1 /* this is incoming payment */, WAITING,
       System.currentTimeMillis, unsigned.description, unsigned.paymentHash, sum.amount, 0L /* lastMsat */,
-      0L /* lastExpiry, will not be 0 for reflexive payments */, NOCHANID)
+      0L /* lastExpiry, will be updated for reflexive payments */, NOCHANID)
 
     uiNotify
     rd
