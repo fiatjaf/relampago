@@ -459,7 +459,7 @@ object ChannelManager extends Broadcaster {
     case Right(rd) =>
       all filter isOperational find { chan =>
         // Reflexive payment may happen through two chans belonging to the same peer
-        // here we must make sure we don't accidently use tarminal channel as source one
+        // here we must make sure we don't accidently use terminal channel as source one
         val excludeChan = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
         // Empty used route means we're sending to peer and its nodeId should be our targetId
         val targetNodeId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
