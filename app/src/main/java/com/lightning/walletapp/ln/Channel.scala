@@ -713,6 +713,7 @@ object Channel {
     else receiveWithReserveAndCommitFeeMsat
   }, 0L)
 
+  def estimateUsefulBalance(chan: Channel) = estimateCanSend(chan) + estimateCanReceive(chan)
   def estimateCanReceiveCapped(chan: Channel) = math.min(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
   def inFlightHtlcs(chan: Channel): Set[Htlc] = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }
