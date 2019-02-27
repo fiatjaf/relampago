@@ -1,6 +1,5 @@
 package com.lightning.walletapp
 
-import spray.json._
 import android.view._
 import android.widget._
 import org.bitcoinj.core._
@@ -16,17 +15,16 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.github.kevinsawicki.http.HttpRequest._
-import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
-import android.os.{Bundle, Handler}
-import scala.util.{Failure, Success, Try}
-import org.bitcoinj.wallet.{SendRequest, Wallet}
-import android.database.{ContentObserver, Cursor}
-import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
-import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
-import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
+import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
+import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
+import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
+import android.database.{ContentObserver, Cursor}
+import org.bitcoinj.wallet.{SendRequest, Wallet}
+import scala.util.{Failure, Success, Try}
+import android.os.{Bundle, Handler}
+
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import org.bitcoinj.core.listeners.PeerConnectedEventListener
@@ -42,6 +40,7 @@ import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
 import org.bitcoinj.uri.BitcoinURI
+import scala.util.Random.shuffle
 import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
@@ -506,8 +505,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val bld = baseBuilder(title, content)
 
     def makeNormalRequest(sum: MilliSatoshi) = {
-      val toAllChans = chansWithRoutes.filterKeys(chan => estimateCanReceiveCapped(chan) >= sum.amount).values.toVector
-      val rd = PaymentInfoWrap.makeRequest(toAllChans, sum, random getBytes 32, inputDescription.getText.toString.trim)
+      val goodChans = shuffle(chansWithRoutes.filterKeys(chan => estimateCanReceiveCapped(chan) >= sum.amount).values.toVector)
+      val rd = PaymentInfoWrap.makeRequest(goodChans take 4, sum, random getBytes 32, inputDescription.getText.toString.trim)
       rd.copy(pr = rd.pr sign nodePrivateKey)
     }
 
