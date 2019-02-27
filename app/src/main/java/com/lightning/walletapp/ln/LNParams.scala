@@ -42,8 +42,8 @@ object LNParams { me =>
 
   lazy val bag = PaymentInfoWrap
   lazy val broadcaster: Broadcaster = ChannelManager
-  lazy val nodePublicKey: PublicKey = nodePrivateKey.publicKey
   lazy val nodePrivateKey: PrivateKey = extendedNodeKey.privateKey
+  lazy val nodePublicKey: PublicKey = nodePrivateKey.publicKey
 
   def setup(walletSeed: BinaryData) = {
     master = generate(seed = walletSeed)

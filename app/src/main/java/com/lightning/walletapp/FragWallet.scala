@@ -312,12 +312,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
-      val humanSum = info.incoming == 1 match {
-        case false => denom.coloredOut(info.firstSum, new String)
-        // This means we have a reflexive payment with updated lastExpiry value
-        case true if info.lastExpiry != 0 => denom.coloredP2WSH(info.firstSum, new String)
-        case true => denom.coloredIn(info.firstSum, new String)
-      }
+      val humanSum = if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
+        else if (info.incoming == 1) denom.coloredIn(info.firstSum, new String)
+        else denom.coloredOut(info.firstSum, new String)
 
       holder.transactCircle setImageResource imageMap(info.status)
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
@@ -385,7 +382,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount, rd.pr.paymentHash), bld, dialog_ok, -1, dialog_pay_onchain)
 
         case 0 \ _ \ _ if info.lastExpiry == 0 =>
-          // Payment has not been tried yet because an wallet is offline
+          // Payment has not been tried yet because wallet is offline
           val amountSentHuman = denom.coloredOut(info.firstSum, denom.sign)
           val title = lnTitleOutNoFee.format(humanStatus, amountSentHuman, inFiat)
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)

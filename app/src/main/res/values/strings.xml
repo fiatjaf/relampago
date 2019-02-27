@@ -243,7 +243,7 @@
     <string name="ln_info_close_remote">Force-closed by remote peer</string>
     <string name="ln_info_coop_attempt">Trying to close cooperatively&#8230;</string>
 
-    <string name="ln_info_no_receive">Receiving is still not enabled!</string>
+    <string name="ln_info_no_receive">Receiving is still not enabled</string>
     <string name="ln_info_funding_lost">Funding was lost on-chain!</string>
     <string name="ln_info_unknown_spend">Unknown spend detected!</string>
 

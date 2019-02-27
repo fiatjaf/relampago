@@ -64,10 +64,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def byRecent = db select PaymentTable.selectRecentSql
 
   def toPaymentInfo(rc: RichCursor) =
-    PaymentInfo(rc string PaymentTable.pr, rc string PaymentTable.preimage, rc int PaymentTable.incoming,
-      rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
-      rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat,
-      rc long PaymentTable.lastExpiry)
+    PaymentInfo(rawPr = rc string PaymentTable.pr, rc string PaymentTable.preimage,
+      rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp,
+      rc string PaymentTable.description, rc long PaymentTable.firstMsat,
+      rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)

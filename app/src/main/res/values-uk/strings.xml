@@ -240,7 +240,7 @@
     <string name="ln_info_close_local">Зачинений вашим гаманцем</string>
     <string name="ln_info_coop_attempt">Канал зачиняється&#8230;</string>
 
-    <string name="ln_info_no_receive">Прийом платежів досi неможливий!</string>
+    <string name="ln_info_no_receive">Прийом платежів досi неможливий</string>
     <string name="ln_info_unknown_spend">Виявлена невідома трата!</string>
     <string name="ln_info_funding_lost">Канал втрачений он-чейн!</string>
 

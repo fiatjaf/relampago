@@ -198,8 +198,9 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
 case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int, stamp: Long,
                        description: String, firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
 
-  // Keep serialized for performance
-  lazy val firstSum = MilliSatoshi(firstMsat)
+  val firstSum = MilliSatoshi(firstMsat)
+  val isLooper = status == 1 && lastExpiry != 0
+  // Keep pr serialized for performance reasons
   lazy val pr = to[PaymentRequest](rawPr)
 }
 

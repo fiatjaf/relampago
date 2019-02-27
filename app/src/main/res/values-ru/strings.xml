@@ -240,7 +240,7 @@
     <string name="ln_info_close_local">Закрыт вашим кошельком</string>
     <string name="ln_info_coop_attempt">Канал закрывается&#8230;</string>
 
-    <string name="ln_info_no_receive">Прием платежей все еще невозможен!</string>
+    <string name="ln_info_no_receive">Прием платежей все еще невозможен</string>
     <string name="ln_info_unknown_spend">Обнаружена неизвестная трата!</string>
     <string name="ln_info_funding_lost">Канал потерян он-чейн!</string>
 
