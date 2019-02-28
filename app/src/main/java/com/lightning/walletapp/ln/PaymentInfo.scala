@@ -200,7 +200,7 @@ case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, statu
 
   val firstSum = MilliSatoshi(firstMsat)
   // Incoming lastExpiry is 0, updated if reflexive
-  val isLooper = status == 1 && lastExpiry != 0
+  val isLooper = incoming == 1 && lastExpiry != 0
   // Keep serialized for performance reasons
   lazy val pr = to[PaymentRequest](rawPr)
 }

@@ -1,8 +1,10 @@
 package com.lightning.walletapp.lnutils
 
+import android.graphics.drawable.BitmapDrawable
 import com.lightning.walletapp.Utils.app
 import language.implicitConversions
 import fr.acinq.bitcoin.BinaryData
+import android.view.Gravity
 import android.text.Html
 
 
@@ -19,31 +21,36 @@ object ImplicitConversions {
 }
 
 object IconGetter extends Html.ImageGetter {
+  import android.provider.Settings.System.{getFloat, FONT_SCALE}
+  val bigFont = getFloat(app.getContentResolver, FONT_SCALE, 1) > 1
+  private val fontAdjusted = if (bigFont) 2 else 0
+
   private val metrics = app.getResources.getDisplayMetrics
   val scrWidth = metrics.widthPixels.toDouble / metrics.densityDpi
   val maxDialog = metrics.densityDpi * 2.1
   val isTablet = scrWidth > 3.5
 
-  import android.provider.Settings.{System => FontSystem}
-  val bigFont = FontSystem.getFloat(app.getContentResolver, FontSystem.FONT_SCALE, 1) > 1
-  private val btcDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_btc_shape, null)
-  private val lnDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_bolt_shape, null)
-  private val btcDrawableStretched = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_btc_shape, null)
-  private val lnDrawableStretched = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_bolt_shape, null)
+  val btcDrawableTitle = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_btc_shape, null).asInstanceOf[BitmapDrawable]
+  val lnDrawableTitle = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_bolt_shape, null).asInstanceOf[BitmapDrawable]
+  val btcDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_btc_shape, null).asInstanceOf[BitmapDrawable]
+  val lnDrawable = app.getResources.getDrawable(com.lightning.walletapp.R.drawable.icon_bolt_shape, null).asInstanceOf[BitmapDrawable]
 
   def getDrawable(s: String) = s match {
-    case "btcbig" => btcDrawableStretched
-    case "lnbig" => lnDrawableStretched
+    case "btcbig" => btcDrawableTitle
+    case "lnbig" => lnDrawableTitle
     case "btc" => btcDrawable
     case "ln" => lnDrawable
   }
 
-  private val fontAdjusted = if (bigFont) 7.5 else 8.3
-  private val screenMetricsAdjusted = (metrics.densityDpi / fontAdjusted).toInt
-  btcDrawableStretched.setBounds(0, -5, screenMetricsAdjusted, screenMetricsAdjusted + 3)
-  lnDrawableStretched.setBounds(0, -5, screenMetricsAdjusted, screenMetricsAdjusted + 3)
-  btcDrawable.setBounds(0, -2, screenMetricsAdjusted, screenMetricsAdjusted)
-  lnDrawable.setBounds(0, -2, screenMetricsAdjusted, screenMetricsAdjusted)
+  btcDrawableTitle.setBounds(0, 0, btcDrawable.getIntrinsicWidth, btcDrawable.getIntrinsicHeight + 12 + fontAdjusted * 2)
+  lnDrawableTitle.setBounds(0, 0, lnDrawable.getIntrinsicWidth, lnDrawable.getIntrinsicHeight + 18 + fontAdjusted * 2)
+  btcDrawable.setBounds(0, 0, btcDrawable.getIntrinsicWidth, btcDrawable.getIntrinsicHeight + 9 + fontAdjusted)
+  lnDrawable.setBounds(0, 0, lnDrawable.getIntrinsicWidth, lnDrawable.getIntrinsicHeight + 9 + fontAdjusted)
+
+  btcDrawableTitle.setGravity(Gravity.TOP)
+  lnDrawableTitle.setGravity(Gravity.TOP)
+  btcDrawable.setGravity(Gravity.TOP)
+  lnDrawable.setGravity(Gravity.TOP)
 }
 
 class StringOps(source: String) {
