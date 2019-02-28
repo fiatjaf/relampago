@@ -42,9 +42,9 @@ object IconGetter extends Html.ImageGetter {
     case "ln" => lnDrawable
   }
 
-  btcDrawableTitle.setBounds(0, 0, btcDrawable.getIntrinsicWidth, btcDrawable.getIntrinsicHeight + 12 + fontAdjusted * 2)
+  btcDrawableTitle.setBounds(0, 0, btcDrawable.getIntrinsicWidth, btcDrawable.getIntrinsicHeight + 11 + fontAdjusted * 2)
   lnDrawableTitle.setBounds(0, 0, lnDrawable.getIntrinsicWidth, lnDrawable.getIntrinsicHeight + 18 + fontAdjusted * 2)
-  btcDrawable.setBounds(0, 0, btcDrawable.getIntrinsicWidth, btcDrawable.getIntrinsicHeight + 9 + fontAdjusted)
+  btcDrawable.setBounds(0, 0, btcDrawable.getIntrinsicWidth, btcDrawable.getIntrinsicHeight + 8 + fontAdjusted)
   lnDrawable.setBounds(0, 0, lnDrawable.getIntrinsicWidth, lnDrawable.getIntrinsicHeight + 9 + fontAdjusted)
 
   btcDrawableTitle.setGravity(Gravity.TOP)
