@@ -15,8 +15,13 @@ import android.os.Bundle
 
 trait ScanActivity extends TimerActivity {
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
-  def returnToBase(view: View) = walletPager.setCurrentItem(0, false)
   def checkTransData: Unit
+
+  def returnToBase(view: View) = {
+    // Hack to fix a strange behavior
+    walletPager.setCurrentItem(1, false)
+    walletPager.setCurrentItem(0, false)
+  }
 }
 
 class FragScan extends Fragment with BarcodeCallback { me =>

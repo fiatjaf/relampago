@@ -125,8 +125,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   override def onStop = wrap(super.onStop) {
+    // We need to remove this listener on leaving activity
+    // so it does not interfere with listener on another page
     ConnectionManager.listeners -= connectionListener
-    me returnToBase null
   }
 
   override def onResume = wrap(super.onResume) {
