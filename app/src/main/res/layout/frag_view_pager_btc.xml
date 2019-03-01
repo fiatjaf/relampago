@@ -26,15 +26,14 @@
             app:contentInsetEnd="@dimen/app_padding"/>
 
         <LinearLayout
-            android:id="@+id/lnDetails"
             style="@style/LineLinearLayout"
             android:layout_width="fill_parent"
             android:orientation="vertical"
-            android:background="#222222">
+            android:background="#222222"
+            android:id="@+id/lnDetails"
+            android:paddingTop="8dp">
 
             <TextView
-                android:gravity="top"
-                android:layout_gravity="top"
                 style="@style/ToolbarTitleAppearance"
                 android:layout_height="wrap_content"
                 android:layout_width="wrap_content"
