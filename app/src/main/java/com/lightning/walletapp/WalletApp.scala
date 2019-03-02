@@ -324,18 +324,14 @@ object ChannelManager extends Broadcaster {
   def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
   def notClosing = for (c <- all if c.state != CLOSING) yield c
 
-  def notClosingOrRefunding: Vector[Channel] = for {
-    chan <- all if isOpening(chan) || isOperational(chan)
-  } yield chan
-
   def delayedPublishes = {
-    // Select all ShowDelayed which can't be published yet because cltv/csv delay is not cleared
-    val statuses = all.map(chan => chan.data).collect { case cd: ClosingData => cd.bestClosing.getState }
+    val statuses = all.map(_.data).collect { case cd: ClosingData => cd.bestClosing.getState }
+    // Select all ShowDelayed which can't be published yet because cltv/csv delays are not cleared on them
     statuses.flatten.collect { case sd: ShowDelayed if !sd.isPublishable && sd.delay > Long.MinValue => sd }
   }
 
-  def activeInFlightHashes = notClosingOrRefunding.flatMap(inFlightHtlcs).map(_.add.paymentHash)
-  def frozenInFlightHashes = all.map(chan => chan.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
+  def activeInFlightHashes = all.filter(isOperational).flatMap(inFlightHtlcs).map(_.add.paymentHash)
+  def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
   def initConnect = for (chan <- notClosing) ConnectionManager.connectTo(chan.data.announce, notify = false)
 
   def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData): Channel = new Channel { self =>

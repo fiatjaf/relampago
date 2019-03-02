@@ -178,18 +178,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val btcEmpty = app getString btc_empty
 
   val updTitleTask = UITask {
-    val operational = ChannelManager.notClosingOrRefunding
-    val online = operational.count(_.state == OPEN)
-    val delta = operational.size - online
+    val viable = ChannelManager.all.filter(isOpeningOrOperational)
+    val online = viable.count(chan => OPEN == chan.state)
+    val delta = viable.size - online
 
-    val btcTotalSum = coin2MSat(app.kit.conf0Balance)
-    val lnTotalSum = MilliSatoshi(operational.map { chan =>
-      // Here we seek a total refundable amount which is not affected by on-chain fee changes
+    val lnTotalSum = MilliSatoshi(viable.map { chan =>
+      // Here we seek for total refundable amount which is not affected by on-chain fee changes
       chan.hasCsOr(data => Commitments.latestRemoteCommit(data.commitments).spec.toRemoteMsat, 0L)
     }.sum)
 
-    val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
+    val btcTotalSum = coin2MSat(app.kit.conf0Balance)
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom parsedWithSign btcTotalSum
+    val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
     val perOneBtcRate = formatFiat format msatInFiat(oneBtc).getOrElse(0L)
 
     val btcSubtitleText =
@@ -198,8 +198,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       else app.plur1OrZero(btcSyncInfo, ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
 
     val lnSubtitleText =
-      if (delta == 0 && operational.size == 1) lnStatusOperationalOne
-      else if (delta == 0 && operational.size > 1) lnStatusOperationalMany
+      if (delta == 0 && viable.size == 1) lnStatusOperationalOne
+      else if (delta == 0 && viable.size > 1) lnStatusOperationalMany
       else app.plur1OrZero(lnStateInfo, delta)
 
     lnStatus setText lnSubtitleText.html
@@ -496,7 +496,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // LN SEND / RECEIVE
 
   def receive(chansWithRoutes: Map[Channel, PaymentRoute], maxCanReceive: MilliSatoshi,
-              title: View, defDescr: String = new String)(onDone: RoutingData => Unit) = {
+              title: View, defDescr: String)(onDone: RoutingData => Unit) = {
 
     val baseHint = app.getString(amount_hint_can_receive).format(denom parsedWithSign maxCanReceive)
     val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)

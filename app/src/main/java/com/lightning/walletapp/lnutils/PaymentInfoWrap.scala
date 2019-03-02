@@ -165,7 +165,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     if (fulfilledIncoming.nonEmpty) {
       // Collect vulnerable infos from ALL currently active channels on incoming payment
-      val infos = ChannelManager.notClosingOrRefunding.flatMap(getVulnerableRevInfos)
+      val infos = ChannelManager.all.filter(isOperational).flatMap(getVulnerableRevInfos)
       getCerberusActs(infos.toMap) foreach app.olympus.tellClouds
     }
   }

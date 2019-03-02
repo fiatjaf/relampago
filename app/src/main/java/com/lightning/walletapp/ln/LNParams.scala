@@ -65,8 +65,8 @@ object LNParams { me =>
     derivePrivateKey(master, hardened(138L) :: 0L :: BigInt(prefix).toLong :: Nil).privateKey
   }
 
-  def updateExtraHop(upd: ChannelUpdate) = for (chan <- ChannelManager.notClosingOrRefunding) Channel.updateHop(chan, upd)
-  def updateFeerate = for (chan <- ChannelManager.notClosingOrRefunding) chan process CMDFeerate(broadcaster.perKwThreeSat)
+  def updateExtraHop(upd: ChannelUpdate) = for (chan <- ChannelManager.notClosing) Channel.updateHop(chan, upd)
+  def updateFeerate = for (chan <- ChannelManager.notClosing) chan process CMDFeerate(broadcaster.perKwThreeSat)
 
   def backupFileName = s"blw${chainHash.toString}-${cloudId.toString}.bkup"
   def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {
