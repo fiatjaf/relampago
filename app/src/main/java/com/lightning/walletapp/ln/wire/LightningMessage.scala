@@ -60,7 +60,7 @@ case class UpdateAddHtlc(channelId: BinaryData, id: Long,
                          onionRoutingPacket: BinaryData) extends ChannelMessage {
 
   lazy val hash160 = Crypto ripemd160 paymentHash
-  val amount = MilliSatoshi(amountMsat)
+  lazy val amount = MilliSatoshi(amountMsat)
 }
 
 case class UpdateFailHtlc(channelId: BinaryData, id: Long, reason: BinaryData) extends ChannelMessage

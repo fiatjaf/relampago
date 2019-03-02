@@ -167,7 +167,6 @@ object Scripts { me =>
   def weight2fee(perKw: Long, weight: Int) = Satoshi(perKw * weight / 1000L)
 
   val htlcWeight = 172
-  val safeWeight = 200
   val commitWeight = 724
   val htlcTimeoutWeight = 663
   val htlcSuccessWeight = 703

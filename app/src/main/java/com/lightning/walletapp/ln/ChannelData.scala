@@ -314,7 +314,7 @@ object Commitments {
   def ifSenderCanAffordFees(cs: Commitments) = {
     val reduced = CommitmentSpec.reduce(cs.localCommit.spec, cs.localChanges.acked, cs.remoteChanges.proposed)
     val feesSat = if (cs.localParams.isFunder) 0L else Scripts.commitTxFee(cs.localParams.dustLimit, reduced).amount
-    if (reduced.toRemoteMsat / 1000L - feesSat - cs.localParams.channelReserveSat < 0L) throw new LightningException
+    if (reduced.toRemoteMsat - (feesSat + cs.localParams.channelReserveSat) * 1000L < 0L) throw new LightningException
     cs -> reduced
   }
 
