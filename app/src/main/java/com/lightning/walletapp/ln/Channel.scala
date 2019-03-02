@@ -286,6 +286,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           // We don't want to receive a payment into a channel we have sent it from in an attempt to rebalance
           isLoop = localCommittedHtlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == add.paymentHash)
         } me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, isLoop)
+        // And sign changes once done
+        doProcess(CMDProceed)
 
 
       case (norm: NormalData, CMDProceed, OPEN)
