@@ -127,6 +127,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     def newRoutes(rd: RoutingData) = {
       // UI will be updated upstream if we can't re-send any more
+      // When considering whether payment is still sendable we don't use AIR here
       val stillCanReSend = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
       if (stillCanReSend) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
       else updStatus(FAILURE, rd.pr.paymentHash)

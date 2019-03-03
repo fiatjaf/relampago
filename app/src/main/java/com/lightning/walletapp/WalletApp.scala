@@ -3,11 +3,13 @@ package com.lightning.walletapp
 import R.string._
 import spray.json._
 import org.bitcoinj.core._
+
 import scala.concurrent.duration._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.ln.wire._
+
 import scala.collection.JavaConverters._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
@@ -17,7 +19,6 @@ import com.google.common.util.concurrent.Service.State._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
-
 import rx.lang.scala.{Observable => Obs}
 import fr.acinq.bitcoin.{BinaryData, Crypto}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
@@ -31,21 +32,27 @@ import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCode
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.lnutils.olympus.TxUploadAct
+
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
+
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import rx.lang.scala.schedulers.IOScheduler
 import java.util.Collections.singletonList
+
 import fr.acinq.bitcoin.Hash.Zeroes
 import org.bitcoinj.uri.BitcoinURI
+
 import scala.concurrent.Future
 import scodec.bits.BitVector
 import android.widget.Toast
 import scodec.DecodeResult
 import android.os.Build
 import java.io.File
+
+import com.lightning.walletapp.test.FeaturesSpec
 
 
 class WalletApp extends Application { me =>
@@ -330,6 +337,21 @@ object ChannelManager extends Broadcaster {
     statuses.flatten.collect { case sd: ShowDelayed if !sd.isPublishable && sd.delay > Long.MinValue => sd }
   }
 
+  def airCanSend = {
+    // The whole amount will be sent through the single most funded channel
+    // in case of rebalancing other channels will lose some off-chain fee, assume it will always be max allowed fee
+    val restOfBalances = all.filter(isOperational).diff(mostFundedChanOpt.toSeq).map(estimateCanSendWithMaxOffChainFee)
+    val hardCap = all.filter(isOperational).map(estimateUsefulCap).reduceOption(_ max _) getOrElse 0L
+    val airSendable = restOfBalances ++ mostFundedChanOpt.map(estimateCanSend)
+    hardCap min airSendable.sum
+  }
+
+  def accumulatorChanOpt(amountWithoutOffChainFees: Long) =
+    all.filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty) // Can in principle receive reflexive payments
+      .filter(chan => estimateCanSendWithMaxOffChainFee(chan) + estimateCanReceive(chan) >= amountWithoutOffChainFees)
+      .sortBy(estimateCanReceive).headOption // The one most likely to be chosen in case of many chans to one peer
+
+  def mostFundedChanOpt = all.filter(isOperational).sortBy(estimateCanSend).lastOption
   def activeInFlightHashes = all.filter(isOperational).flatMap(inFlightHtlcs).map(_.add.paymentHash)
   def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
   def initConnect = for (chan <- notClosing) ConnectionManager.connectTo(chan.data.announce, notify = false)
@@ -403,14 +425,16 @@ object ChannelManager extends Broadcaster {
 
   // SENDING PAYMENTS
 
-  def checkIfSendable(rd: RoutingData) =
-    if (bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS).isSuccess) Left(app getString err_ln_fulfilled)
-    // It may happen such that we had enough funds while were deciding whether to pay, but do not have enough funds currently
-    else all.filter(isOperational).sortBy(estimateCanSend)(Ordering[Long].reverse).headOption match {
-      case Some(chan) if estimateCanSend(chan) < rd.firstMsat => Left(app getString dialog_sum_big)
-      case None => Left(app getString err_ln_no_open_chans)
+  def checkIfSendable(rd: RoutingData) = {
+    val isFulfilledAlready = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS)
+    if (isFulfilledAlready.isSuccess) Left(app getString err_ln_fulfilled, false) else mostFundedChanOpt match {
+      // It may happen such that we had enough funds while were deciding whether to pay, but do not have enough funds currently
+      case Some(chan) if estimateCanSend(chan) < rd.firstMsat && airCanSend >= rd.firstMsat => Left(app getString dialog_sum_big, true)
+      case Some(chan) if estimateCanSend(chan) < rd.firstMsat => Left(app getString dialog_sum_big, false)
+      case None => Left(app getString err_ln_no_open_chans, false)
       case _ => Right(rd)
     }
+  }
 
   def fetchRoutes(rd: RoutingData) = {
     // First we collect chans which in principle can handle a given payment sum right now, then prioritize less busy chans

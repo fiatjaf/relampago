@@ -11,8 +11,9 @@ class FeaturesSpec {
 
     {
       println("'data_loss_protect' feature")
-      assert(dataLossProtect(BinaryData("02")))
+      assert(dataLossProtect(BinaryData("02"))) // optional
       assert(!dataLossProtect(BinaryData("00")))
+      assert(dataLossProtect(BinaryData("81"))) // mandatory
     }
 
     {

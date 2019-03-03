@@ -527,9 +527,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     inputDescription setText defDescr
   }
 
-  abstract class OffChainSender(maxLocalSend: Vector[Long], pr: PaymentRequest) {
-    // At this point we know we have operational channels, check if we have enough off-chain funds, maybe offer on-chain option
-    val maxCappedSend = MilliSatoshi(pr.amount.map(_.amount * 2 min maxHtlcValueMsat) getOrElse maxHtlcValueMsat min maxLocalSend.max)
+  abstract class OffChainSender(pr: PaymentRequest) {
+    val requestedCappedAmountOpt = pr.amount.map(_.amount * 2 min maxHtlcValueMsat)
+    val maxCappedSend = MilliSatoshi(requestedCappedAmountOpt getOrElse maxHtlcValueMsat min ChannelManager.airCanSend)
     val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
     val rateManager = new RateManager(baseContent) hint baseHint
@@ -569,13 +569,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  def standardOffChainSend(maxLocalSend: Vector[Long], pr: PaymentRequest) = new OffChainSender(maxLocalSend, pr) {
+  def standardOffChainSend(pr: PaymentRequest) = new OffChainSender(pr) {
     def displayPaymentForm = mkCheckForm(sendAttempt, none, baseBuilder(getTitle, baseContent), dialog_pay, dialog_cancel)
     def getTitle = str2View(app.getString(ln_send_title).format(Utils getDescription pr.description).html)
     def onUserAcceptSend(rd: RoutingData) = doSendOffChain(rd)
   }
 
-  def linkedOffChainSend(maxLocalSend: Vector[Long], pr: PaymentRequest, lnUrl: LNUrl) = new OffChainSender(maxLocalSend, pr) {
+  def linkedOffChainSend(pr: PaymentRequest, lnUrl: LNUrl) = new OffChainSender(pr) {
     def displayPaymentForm = mkCheckFormNeutral(sendAttempt, none, wut, baseBuilder(getTitle, baseContent), dialog_ok, dialog_cancel, dialog_wut)
     def obtainLinkableTitle = app.getString(ln_send_linkable_title).format(lnUrl.uri.getHost, Utils getDescription pr.description)
     def getTitle = updateView2Blue(str2View(new String), obtainLinkableTitle)
@@ -585,7 +585,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       mkCheckFormNeutral(_.dismiss, none, optOut, bld, dialog_ok, -1, dialog_opt_out).create
 
       def optOut(alert1: AlertDialog) = {
-        standardOffChainSend(maxLocalSend, pr)
+        // Switch to ordinary off-chain payment
+        // and remove both current popup windows
+        standardOffChainSend(pr)
         alert1.dismiss
         alert.dismiss
       }
@@ -593,7 +595,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def onUserAcceptSend(rd: RoutingData) =
       ChannelManager checkIfSendable rd match {
-        case Left(notSendable) => onFail(notSendable)
+        // We proceed if it's sendable right away or via AIR
+        case Left(notSendable \ false) => onFail(notSendable)
         case _ => sendLinkingRequest(rd)
       }
 
@@ -609,7 +612,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def doSendOffChain(rd: RoutingData) =
     ChannelManager checkIfSendable rd match {
-      case Left(notSendable) => onFail(notSendable)
+      case Left(notSendable \ false) => onFail(notSendable)
+      case Left(_ \ true) => // Initiate AIR
       case _ => PaymentInfoWrap addPendingPayment rd
     }
 

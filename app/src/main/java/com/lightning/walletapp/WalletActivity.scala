@@ -209,28 +209,25 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case pr: PaymentRequest =>
-      val hasOpeningChans = ChannelManager.all.exists(isOpening)
-      val maxLocalSend = ChannelManager.all.filter(isOperational).map(estimateCanSend)
-
-      if (!pr.isFresh) {
-        // Expired payment request, reject
-        // TransData value will be erased here
-        app toast dialog_pr_expired
-        me returnToBase null
-
-      } else if (PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix) {
-        // Payee has provided a payment request from some other network, reject
+      if (PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix) {
+        // Payee has provided a payment request from some other network
         // TransData value will be erased here
         app toast err_general
         me returnToBase null
 
-      } else if (hasOpeningChans && maxLocalSend.isEmpty) {
-        // Only opening channels are here, tell user about it
+      } else if (!pr.isFresh) {
+        // Payment request has expired by now
+        // TransData value will be erased here
+        app toast dialog_pr_expired
+        me returnToBase null
+
+      } else if (ChannelManager.all.exists(isOpening) && ChannelManager.mostFundedChanOpt.isEmpty) {
+        // Only opening channels are present so sending is not enabled yet, inform user about situation
         onFail(app getString err_ln_still_opening)
         // TransData value will be erased here
         me returnToBase null
 
-      } else if (maxLocalSend.isEmpty) {
+      } else if (ChannelManager.mostFundedChanOpt.isEmpty) {
         // No channels are present at all currently, see what we can do here...
         if (pr.amount.exists(_ > app.kit.conf0Balance) || app.kit.conf0Balance.isZero) {
           // They have requested too much or there is no amount but on-chain wallet is empty
@@ -249,8 +246,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       } else {
         // We have operational channels at this point, check if we have an embedded lnurl
         val specialMeaningTag = scala.util.Try(pr.lnUrlOpt.get.uri getQueryParameter "tag") getOrElse null
-        if ("link" == specialMeaningTag) FragWallet.worker.linkedOffChainSend(maxLocalSend, pr, pr.lnUrlOpt.get)
-        else FragWallet.worker.standardOffChainSend(maxLocalSend, pr)
+        if ("link" == specialMeaningTag) FragWallet.worker.linkedOffChainSend(pr, pr.lnUrlOpt.get)
+        else FragWallet.worker.standardOffChainSend(pr)
         // TransData value will be erased here
         me returnToBase null
       }
@@ -321,7 +318,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val viableChannels = ChannelManager.all.filter(isOpeningOrOperational)
     val channelsWithRoutes = ChannelManager.all.filter(isOperational).flatMap(channelAndHop).toMap
     val maxCanReceive = MilliSatoshi(channelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L)
-    val reserveUnspent = getString(ln_receive_reserve) format denom.coloredP2WSH(-maxCanReceive, denom.sign)
+    val reserveUnspent: String = getString(ln_receive_reserve) format denom.coloredP2WSH(-maxCanReceive, denom.sign)
 
     wrOpt match {
       case wr :: Nil =>

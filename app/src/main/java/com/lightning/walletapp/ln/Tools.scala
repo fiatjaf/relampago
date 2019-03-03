@@ -14,7 +14,6 @@ object \ {
 }
 
 object Tools {
-  type UserId = String
   type Bytes = Array[Byte]
   val random = new RandomGenerator
   def runAnd[T](result: T)(action: Any): T = result
@@ -50,9 +49,14 @@ object Features {
   val OPTION_DATA_LOSS_PROTECT_MANDATORY = 0
   val OPTION_DATA_LOSS_PROTECT_OPTIONAL = 1
 
-  def isBitSet(pos: Int, bitField: Byte) = bitField.&(1 << pos) == (1 << pos)
-  def areSupported(bitset: util.BitSet) = !(0 until bitset.length by 2 exists bitset.get)
+  def isBitSet(position: Int, bitField: Byte): Boolean = bitField.&(1 << position) == (1 << position)
   implicit def binData2BitSet(data: BinaryData): util.BitSet = util.BitSet.valueOf(data.reverse.toArray)
+
+  def areSupported(bitset: util.BitSet): Boolean = {
+    val mandatoryFeatures: Set[Int] = Set(OPTION_DATA_LOSS_PROTECT_MANDATORY)
+    def mandatoryUnsupported(n: Int) = bitset.get(n) && !mandatoryFeatures.contains(n)
+    !(0 until bitset.length by 2 exists mandatoryUnsupported)
+  }
 
   def dataLossProtect(bitset: util.BitSet) =
     bitset.get(OPTION_DATA_LOSS_PROTECT_OPTIONAL) ||

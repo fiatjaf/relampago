@@ -706,8 +706,8 @@ object Channel {
   def estimateCanSend(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.maxHtlcValueMsat max 0L, 0L)
   def estimateCanSendWithMaxOffChainFee(chan: Channel) = estimateCanSend(chan) match { case msat => msat - LNParams.maxAcceptableFee(msat, 3) max 0L }
   def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat max 0L, 0L)
-  def estimateCanReceiveCapped(chan: Channel) = math.min(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
-  def estimateUsefulBalance(chan: Channel) = estimateCanSend(chan) + estimateCanReceive(chan)
+  def estimateCanReceiveCapped(chan: Channel) = math.max(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
+  def estimateUsefulCap(chan: Channel) = estimateCanSendWithMaxOffChainFee(chan) + estimateCanReceive(chan)
 
   def inFlightHtlcs(chan: Channel): Set[Htlc] = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }
