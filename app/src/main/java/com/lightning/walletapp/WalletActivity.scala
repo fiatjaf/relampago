@@ -317,18 +317,22 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def doReceivePayment(wrOpt: List[WithdrawRequest] = Nil) = {
     val viableChannels = ChannelManager.all.filter(isOpeningOrOperational)
     val channelsWithRoutes = ChannelManager.all.filter(isOperational).flatMap(channelAndHop).toMap
-    val maxCanReceive = MilliSatoshi(channelsWithRoutes.keys.map(estimateCanReceiveCapped).reduceOption(_ max _) getOrElse 0L)
-    val reserveUnspent: String = getString(ln_receive_reserve) format denom.coloredP2WSH(-maxCanReceive, denom.sign)
+    val maxCanReceive = if (channelsWithRoutes.isEmpty) 0L else channelsWithRoutes.keys.map(estimateCanReceive).max
+
+    // maxCanReceive may be negative, show a warning to user in this case
+    val maxCanReceiveCapped = MilliSatoshi(maxCanReceive min LNParams.maxHtlcValueMsat)
+    val humanShouldSpend = s"<strong>${denom parsedWithSign -maxCanReceiveCapped}</strong>"
+    val reserveUnspent = getString(ln_receive_reserve) format humanShouldSpend
 
     wrOpt match {
       case wr :: Nil =>
         val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
-        val finalMaxCanReceive = MilliSatoshi(wr.maxWithdrawable min maxCanReceive.amount)
+        val finalMaxCanReceiveCapped = MilliSatoshi(wr.maxWithdrawable min maxCanReceiveCapped.amount)
 
         if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_howto).html).create)
         else if (channelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
-        else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
-        else FragWallet.worker.receive(channelsWithRoutes, finalMaxCanReceive, title, wr.defaultDescription) { rd =>
+        else if (maxCanReceive < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
+        else FragWallet.worker.receive(channelsWithRoutes, finalMaxCanReceiveCapped, title, wr.defaultDescription) { rd =>
           def onRequestFailed(responseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail responseFail)
           queue.map(_ => wr requestWithdraw rd.pr).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
         }
@@ -337,7 +341,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         val alertLNHint =
           if (viableChannels.isEmpty) getString(ln_receive_suggestion)
           else if (channelsWithRoutes.isEmpty) getString(ln_receive_6conf)
-          else if (maxCanReceive.amount < 0L) reserveUnspent
+          else if (maxCanReceive < 0L) reserveUnspent
           else getString(ln_receive_ok)
 
         val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
@@ -346,7 +350,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
         def offChain = rm(alert) {
           if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
-          else FragWallet.worker.receive(channelsWithRoutes, maxCanReceive, app.getString(ln_receive_title).html, new String) { rd =>
+          else FragWallet.worker.receive(channelsWithRoutes, maxCanReceiveCapped, app.getString(ln_receive_title).html, new String) { rd =>
             awaitServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
             ContextCompat.startForegroundService(me, awaitServiceIntent)
             me goTo classOf[RequestActivity]

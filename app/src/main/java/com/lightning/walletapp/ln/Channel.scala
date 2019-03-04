@@ -701,13 +701,11 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  private[this] val nextHtlc = UpdateAddHtlc("00", 0, LNParams.maxHtlcValueMsat, Hash.Zeroes, 551, new String)
-  def nextReducedRemoteState(commitments: Commitments) = Commitments.addLocalProposal(commitments, nextHtlc).reducedRemoteState
-  def estimateCanSend(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.maxHtlcValueMsat max 0L, 0L)
-  def estimateCanSendWithMaxOffChainFee(chan: Channel) = estimateCanSend(chan) match { case msat => msat - LNParams.maxAcceptableFee(msat, 3) max 0L }
-  def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat max 0L, 0L)
-  def estimateCanReceiveCapped(chan: Channel) = math.max(estimateCanReceive(chan), LNParams.maxHtlcValueMsat)
-  def estimateUsefulCap(chan: Channel) = estimateCanSendWithMaxOffChainFee(chan) + estimateCanReceive(chan)
+  private[this] val nextDummyHtlc = UpdateAddHtlc("00", id = -1, LNParams.maxHtlcValueMsat, Hash.Zeroes, 144 * 3, new String)
+  def nextReducedRemoteState(commitments: Commitments) = Commitments.addLocalProposal(commitments, nextDummyHtlc).reducedRemoteState
+  def estimateNextUsefulCapacity(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).usefulCapacityMsat, 0L)
+  def estimateCanSend(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.maxHtlcValueMsat, 0L)
+  def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat, 0L)
 
   def inFlightHtlcs(chan: Channel): Set[Htlc] = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }

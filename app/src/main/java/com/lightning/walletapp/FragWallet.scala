@@ -505,7 +505,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val bld = baseBuilder(title, content)
 
     def makeNormalRequest(sum: MilliSatoshi) = {
-      val goodChans = shuffle(chansWithRoutes.filterKeys(chan => estimateCanReceiveCapped(chan) >= sum.amount).values.toVector)
+      val goodChans = shuffle(chansWithRoutes.filterKeys(chan => estimateCanReceive(chan) >= sum.amount).values.toVector)
       val rd = PaymentInfoWrap.makeRequest(goodChans take 4, sum, random getBytes 32, inputDescription.getText.toString.trim)
       rd.copy(pr = rd.pr sign nodePrivateKey)
     }
@@ -529,7 +529,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   abstract class OffChainSender(pr: PaymentRequest) {
     val requestedCappedAmountOpt = pr.amount.map(_.amount * 2 min maxHtlcValueMsat)
-    val maxCappedSend = MilliSatoshi(requestedCappedAmountOpt getOrElse maxHtlcValueMsat min ChannelManager.airCanSend)
+    val maxCappedSend = MilliSatoshi(requestedCappedAmountOpt getOrElse maxHtlcValueMsat min ChannelManager.estimateAIRCanSend)
     val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
     val rateManager = new RateManager(baseContent) hint baseHint
@@ -553,18 +553,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     pr.fallbackAddress -> pr.amount match {
       case Some(adr) \ Some(amount) if amount > maxCappedSend && amount < app.kit.conf0Balance =>
-        val failureMessage = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
+        val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
         // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback payment option
         mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount, pr.paymentHash), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
 
       case _ \ Some(amount) if amount > maxCappedSend =>
-        // Either request contains no fallback address or we don't have enough funds on-chain at all
-        val failureMessage = app getString err_ln_not_enough format denom.coloredP2WSH(amount, denom.sign)
+        val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
+        // Either this payment request contains no fallback address or we don't have enough funds on-chain at all
         showForm(negBuilder(dialog_ok, getTitle, failureMessage.html).create)
 
       case _ =>
-        // We can pay this off-chain, show off-chain form
         for (amount <- pr.amount) rateManager setSum Try(amount)
+        // We can pay this off-chain, show payment form
         displayPaymentForm
     }
   }
@@ -611,9 +611,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def doSendOffChain(rd: RoutingData) =
-    ChannelManager checkIfSendable rd match {
-      case Left(notSendable \ false) => onFail(notSendable)
-      case Left(_ \ true) => // Initiate AIR
+    (ChannelManager checkIfSendable rd, ChannelManager accumulatorChanOpt rd.firstMsat) match {
+      case Left(_ \ true) \ Some(chan) => // Initiate AIR
+      case Left(notSendable \ _) \ _ => onFail(notSendable)
       case _ => PaymentInfoWrap addPendingPayment rd
     }
 

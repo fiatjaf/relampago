@@ -78,10 +78,6 @@ object ConnectionManager {
         case their: Init =>
           val dlp = dataLossProtect(their.localFeatures)
           val baseCompat = areSupported(their.localFeatures)
-
-          println(s"-- dlp: $dlp")
-          println(s"-- baseCompat: $baseCompat")
-
           events.onOperational(ann.nodeId, dlp && baseCompat)
 
         case Ping(len, _) if len > 0 && len <= 65532 => handler process Pong("00" * len)

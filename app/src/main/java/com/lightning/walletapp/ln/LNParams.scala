@@ -51,8 +51,8 @@ object LNParams { me =>
     app.olympus = new OlympusWrap
   }
 
+  // Up to 1% of payment sum + 25 SAT per hop
   def maxAcceptableFee(msat: Long, hops: Int) =
-    // 25 SAT per hop + 1% of payment sum
     25000 * (hops + 1) + msat / 100
 
   def shouldUpdateFee(network: Long, commit: Long) = {
