@@ -212,7 +212,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       if (PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix) {
         // Payee has provided a payment request from some other network
         // TransData value will be erased here
-        app toast err_general
+        app toast err_no_data
         me returnToBase null
 
       } else if (!pr.isFresh) {

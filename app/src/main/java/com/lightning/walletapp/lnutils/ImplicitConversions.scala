@@ -21,10 +21,6 @@ object ImplicitConversions {
 }
 
 object IconGetter extends Html.ImageGetter {
-  import android.provider.Settings.System.{getFloat, FONT_SCALE}
-  val bigFont = getFloat(app.getContentResolver, FONT_SCALE, 1) > 1
-  private val fontAdjusted = if (bigFont) 2 else 0
-
   private val metrics = app.getResources.getDisplayMetrics
   val scrWidth = metrics.widthPixels.toDouble / metrics.densityDpi
   val maxDialog = metrics.densityDpi * 2.1
@@ -42,10 +38,11 @@ object IconGetter extends Html.ImageGetter {
     case "ln" => lnDrawable
   }
 
-  btcDrawableTitle.setBounds(0, 0, btcDrawable.getIntrinsicWidth, btcDrawable.getIntrinsicHeight + 11 + fontAdjusted * 2)
-  lnDrawableTitle.setBounds(0, 0, lnDrawable.getIntrinsicWidth, lnDrawable.getIntrinsicHeight + 18 + fontAdjusted * 2)
-  btcDrawable.setBounds(0, 0, btcDrawable.getIntrinsicWidth, btcDrawable.getIntrinsicHeight + 8 + fontAdjusted)
-  lnDrawable.setBounds(0, 0, lnDrawable.getIntrinsicWidth, lnDrawable.getIntrinsicHeight + 9 + fontAdjusted)
+  val bigFont = android.provider.Settings.System.getFloat(app.getContentResolver, android.provider.Settings.System.FONT_SCALE, 1) > 1
+  btcDrawableTitle.setBounds(0, 0, btcDrawable.getIntrinsicWidth, { if (bigFont) 16 else 11 } + btcDrawableTitle.getIntrinsicHeight)
+  lnDrawableTitle.setBounds(0, 0, lnDrawable.getIntrinsicWidth, { if (bigFont) 22 else 16 } + lnDrawableTitle.getIntrinsicHeight)
+  btcDrawable.setBounds(0, 0, btcDrawable.getIntrinsicWidth, { if (bigFont) 10 else 6 } + btcDrawable.getIntrinsicHeight)
+  lnDrawable.setBounds(0, 0, lnDrawable.getIntrinsicWidth, { if (bigFont) 11 else 5 } + lnDrawable.getIntrinsicHeight)
 
   btcDrawableTitle.setGravity(Gravity.TOP)
   lnDrawableTitle.setGravity(Gravity.TOP)
@@ -56,5 +53,5 @@ object IconGetter extends Html.ImageGetter {
 class StringOps(source: String) {
   def html = Html.fromHtml(source, IconGetter, null)
   def hex = BinaryData(source getBytes "UTF-8").toString
-  def noSpaces = source.replace(" ", "")
+  def noSpaces = source.replace(" ", "").replace("\u00A0", "")
 }

@@ -14,7 +14,7 @@ import language.postfixOps
 object Denomination {
   val locale = new java.util.Locale("en", "US")
   val symbols = new DecimalFormatSymbols(locale)
-  symbols.setGroupingSeparator(' ')
+  symbols.setGroupingSeparator('\u00A0')
   symbols.setDecimalSeparator('.')
 
   val formatFiat = new DecimalFormat("#,###,###.##")

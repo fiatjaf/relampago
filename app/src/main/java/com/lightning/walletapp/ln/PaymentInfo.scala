@@ -38,7 +38,7 @@ object PaymentInfo {
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int = 0) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
-      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache, airLeft)
+      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache, airLeft, airAskUser = true)
   }
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
@@ -188,9 +188,9 @@ object PaymentInfo {
 
 case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv: Long)
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
-                       onion: SecretsAndPacket, firstMsat: Long /* without off-chain fee */,
-                       lastMsat: Long /* with off-chain fee */, lastExpiry: Long,
-                       callsLeft: Int, useCache: Boolean, airLeft: Int) {
+                       onion: SecretsAndPacket, firstMsat: Long /* amount without off-chain fee */,
+                       lastMsat: Long /* amount with off-chain fee */, lastExpiry: Long, callsLeft: Int,
+                       useCache: Boolean, airLeft: Int, airAskUser: Boolean) {
 
   lazy val withMaxOffChainFeeAdded = firstMsat + LNParams.maxAcceptableFee(firstMsat, hops = 3)
   lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toString}"

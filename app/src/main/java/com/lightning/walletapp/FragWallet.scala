@@ -615,33 +615,38 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val accumulatorOpt = ChannelManager.accumulatorChanOpt(rd)
 
     sendableEither -> accumulatorOpt match {
-      case Left(_ \ true) \ Some(chan) if rd.airLeft > 1 => <(startAIR(chan, rd), onFail)(none)
+      case Left(_ \ true) \ Some(accChan) if rd.airLeft > 1 => startAir(accChan, rd)
       case Left(notSendableNoAIRPossible \ _) \ _ => onFail(notSendableNoAIRPossible)
       case _ => PaymentInfoWrap addPendingPayment rd
     }
   }
 
-  def startAIR(toChan: Channel, originalEmptyRD: RoutingData) = {
-    val originalEmptyRD1 = originalEmptyRD.copy(airLeft = originalEmptyRD.airLeft - 1)
-    val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
-    val deltaToSend = originalEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
-    require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
-    require(deltaToSend > 0, "Accumulator already has enough money")
+  def startAir(toChan: Channel, originalEmptyRD: RoutingData) = {
+    val warnMessage = app getString err_ln_rebalance format s"<strong>${originalEmptyRD.pr.amount.map(denom.parsedWithSign) getOrElse new String}</strong>"
+    if (originalEmptyRD.airAskUser) mkCheckForm(alert => rm(alert)(start), none, baseBuilder(warnMessage.html, null), dialog_ok, dialog_cancel) else start
 
-    val Some(_ \ extraHops) \ finalAmount = channelAndHop(toChan) -> MilliSatoshi(deltaToSend min amountCanRebalance)
-    val rebalanceRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, random getBytes 32, REBALANCING)
+    def start = <(fun = {
+      val originalEmptyRD1 = originalEmptyRD.copy(airLeft = originalEmptyRD.airLeft - 1, airAskUser = false)
+      val deltaAmountToSend = originalEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
+      val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
+      require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
+      require(deltaAmountToSend > 0, "Accumulator already has enough money")
 
-    val listener = new ChannelListener { self =>
-      override def settled(commitments: Commitments) = {
-        val rebalanceSuccess = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
-        val rebalanceFail = commitments.localCommit.spec.failed.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
-        if (rebalanceSuccess || rebalanceFail) ChannelManager detachListener self
-        if (rebalanceSuccess) UITask(me doSendOffChain originalEmptyRD1).run
+      val Some(_ \ extraHops) \ finalAmount = channelAndHop(toChan) -> MilliSatoshi(deltaAmountToSend min amountCanRebalance)
+      val rebalanceRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, random getBytes 32, REBALANCING)
+
+      val listener = new ChannelListener { self =>
+        override def settled(commitments: Commitments) = {
+          val rebalanceSuccess = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
+          val rebalanceFail = commitments.localCommit.spec.failed.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
+          if (rebalanceSuccess || rebalanceFail) ChannelManager detachListener self
+          if (rebalanceSuccess) UITask(me doSendOffChain originalEmptyRD1).run
+        }
       }
-    }
 
-    ChannelManager attachListener listener
-    PaymentInfoWrap addPendingPayment rebalanceRD
+      ChannelManager attachListener listener
+      PaymentInfoWrap addPendingPayment rebalanceRD
+    }, onFail)(none)
   }
 
   // BTC SEND / BOOST

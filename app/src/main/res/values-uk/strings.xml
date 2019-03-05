@@ -197,7 +197,7 @@
     <string name="err_tx_too_large">Не вийшло тому що розмір транзакції занадто великий. Спробуйте розбити її на кілька дрібніших транзакцій</string>
     <string name="err_gdrive_sign_in_failed">Не вийшло залогінитися в GDrive, хочете продовжити без відновлення каналів з бекапів GDrive?</string>
     <string name="err_ln_not_enough">У вас немає каналу, в якому було б достатньо грошей, щоб відправити %1$s офф-чейн</string>
-    <string name="err_general">Не вийшло тому що сталася неочікувана помилка</string>
+    <string name="err_ln_rebalance">Перед відправкою %1$s ваші канали потрібно перебалансувати, бажаєте це зробити?</string>
     <string name="err_no_data">Нічого не знайдено</string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->

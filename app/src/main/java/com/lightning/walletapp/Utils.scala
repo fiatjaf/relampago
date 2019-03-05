@@ -249,7 +249,7 @@ trait TimerActivity extends AppCompatActivity { me =>
         getString(err_not_enough_funds).format(canSend, sending, missing).html
 
       case _: Throwable =>
-        app getString err_general
+        app getString err_no_data
     }
   }
 }
@@ -263,7 +263,6 @@ class RateManager(val content: View) { me =>
   def result = Try(denom rawString2MSat satInput.getText.toString.noSpaces)
   def setSum(res: TryMSat) = satInput.setText(res map denom.asString getOrElse null)
   def hint(ex: String) = runAnd(me)(hintDenom setText denom.amountInTxt.format(ex).html)
-  def fiatDecimal = BigDecimal(fiatInput.getText.toString.noSpaces)
 
   def maybeLockAmount(uri: BitcoinURI) = {
     val amountTry: TryMSat = Try(uri.getAmount)
@@ -273,13 +272,15 @@ class RateManager(val content: View) { me =>
   }
 
   val fiatListener = new TextChangedWatcher {
-    def upd = setSum(currentRate.map(perBtc => fiatDecimal / perBtc) map btcBigDecimal2MSat)
-    def onTextChanged(s: CharSequence, start: Int, b: Int, c: Int) = if (fiatInput.hasFocus) upd
+    def onTextChanged(s: CharSequence, start: Int, b: Int, c: Int) = if (fiatInput.hasFocus) {
+      setSum(currentRate.map(perBtc => BigDecimal(fiatInput.getText.toString.noSpaces) / perBtc) map btcBigDecimal2MSat)
+    }
   }
 
   val bitListener = new TextChangedWatcher {
-    def upd = fiatInput.setText(result flatMap msatInFiat map formatFiat.format getOrElse null)
-    def onTextChanged(s: CharSequence, start: Int, b: Int, c: Int) = if (satInput.hasFocus) upd
+    def onTextChanged(s: CharSequence, start: Int, b: Int, c: Int) = if (satInput.hasFocus) {
+      fiatInput.setText(result flatMap msatInFiat map formatFiat.format getOrElse null)
+    }
   }
 
   satInput addTextChangedListener bitListener

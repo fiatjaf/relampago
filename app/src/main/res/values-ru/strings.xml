@@ -197,7 +197,7 @@
     <string name="err_not_enough_funds"><![CDATA[<strong>Недостаточно средств</strong><br><br>доступно %1$s<br>отправлено %2$s<br>не хватает %3$s]]></string>
     <string name="err_gdrive_sign_in_failed">Не получилось залогиниться в GDrive, хотите продолжить без восстановления каналов из бекапов GDrive?</string>
     <string name="err_ln_not_enough">У вас нет канала, в котором было бы достаточно денег, чтобы отправить %1$s офф-чейн</string>
-    <string name="err_general">Не получилось потому что произошла непредвиденная ошибка</string>
+    <string name="err_ln_rebalance">Перед отправкой %1$s ваши каналы нужно перебалансировать, хотите продолжить?</string>
     <string name="err_no_data">Ничего не найдено</string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->

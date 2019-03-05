@@ -76,8 +76,10 @@ class OlympusWrap extends OlympusProvider {
   def remove(identifier: String) = db.change(OlympusTable.killSql, identifier)
   def updData(data: String, identifier: String) = db.change(OlympusTable.updDataSql, data, identifier)
   def updMeta(cd: Cloud, order: Int) = db.change(OlympusTable.updMetaSql, cd.connector.url, cd.auth, order, cd.identifier)
-  def addServer(cloud: Cloud, order: Int) = db.change(OlympusTable.newSql, cloud.identifier, cloud.connector.url,
-    cloud.data.toJson.toString, cloud.auth, order, cloud.removable)
+
+  def addServer(cloud: Cloud, order: Int) =
+    db.change(OlympusTable.newSql, cloud.identifier, cloud.connector.url,
+      cloud.data.toJson.toString, cloud.auth, order, cloud.removable)
 
   // Olympus RPC interface
 
