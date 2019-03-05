@@ -26,6 +26,7 @@ import com.lightning.walletapp.Utils.app
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   private[this] var unsentPayments = Map.empty[BinaryData, RoutingData]
+  private[this] var fulfilledInPayments = Set.empty[BinaryData]
   var acceptedPayments = Map.empty[BinaryData, RoutingData]
 
   def addPendingPayment(rd: RoutingData) = {
@@ -54,14 +55,20 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (fulfills.nonEmpty) uiNotify
   }
 
-  def fetchAndSend(rd: RoutingData) = ChannelManager.fetchRoutes(rd).foreach(ChannelManager.sendEither(_, failOnUI), olympusErr => me failOnUI rd)
-  def updOkIncoming(m: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
+  def fetchAndSend(rd: RoutingData) = ChannelManager.fetchRoutes(rd).foreach(ChannelManager.sendEither(_, failOnUI), _ => me failOnUI rd)
   def updOkOutgoing(m: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
   def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
   def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
+
+  def updOkIncoming(message: UpdateAddHtlc) = {
+    val UpdateAddHtlc(channelId, _, amountMsat, paymentHash, _, _) = message
+    db.change(PaymentTable.updOkIncomingSql, amountMsat, System.currentTimeMillis, channelId, paymentHash)
+    // This prevents double vibrator on reflexive payments: incoming hash will be present in set once fulfilled
+    fulfilledInPayments += paymentHash
+  }
 
   def toPaymentInfo(rc: RichCursor) =
     PaymentInfo(rawPr = rc string PaymentTable.pr, rc string PaymentTable.preimage,
@@ -118,20 +125,20 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
   }
 
-  override def settled(cs: Commitments) = {
-    // Update affected record states in a database, then retry failed payments where possible
-    val fulfilledIncoming = for (Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled) yield add
+  def newRoutes(rd: RoutingData) = {
+    // UI will be updated upstream if we can't re-send any more
+    // When considering whether payment is still sendable we don't use AIR here
+    val stillCanReSend = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
+    if (stillCanReSend) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
+    else updStatus(FAILURE, rd.pr.paymentHash)
+  }
 
-    def newRoutes(rd: RoutingData) = {
-      // UI will be updated upstream if we can't re-send any more
-      // When considering whether payment is still sendable we don't use AIR here
-      val stillCanReSend = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
-      if (stillCanReSend) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-      else updStatus(FAILURE, rd.pr.paymentHash)
-    }
+  override def settled(cs: Commitments) = {
+    val okHtlcs \ _ = cs.localCommit.spec.fulfilled.unzip
+    val inOK \ outOK = okHtlcs.partition(_.incoming)
 
     db txWrap {
-      fulfilledIncoming foreach updOkIncoming
+      for (htlc <- inOK) updOkIncoming(htlc.add)
       // Malformed payments are returned by our direct peer and should never be retried again
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
@@ -154,21 +161,17 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     uiNotify
-    if (cs.localCommit.spec.fulfilled.nonEmpty) {
-      // Let the clouds know since they may be waiting
-      // also vibrate to let a user know it's fulfilled
-      app.olympus tellClouds OlympusWrap.CMDStart
-      com.lightning.walletapp.Vibrator.vibrate
-    }
-
-    if (fulfilledIncoming.nonEmpty) {
-      // Collect vulnerable infos from ALL currently active channels on incoming payment
-      val infos = ChannelManager.all.filter(isOperational).flatMap(getVulnerableRevInfos)
-      getCerberusActs(infos.toMap) foreach app.olympus.tellClouds
-    }
+    val isLoop = outOK.exists(fulfilledInPayments contains _.add.paymentHash)
+    if (inOK.nonEmpty || outOK.nonEmpty && !isLoop) com.lightning.walletapp.Vibrator.vibrate
+    if (inOK.nonEmpty) getCerberusActs(getVulnerableRevMap) foreach app.olympus.tellClouds
+    else if (outOK.nonEmpty) app.olympus tellClouds OlympusWrap.CMDStart
   }
 
-  def getVulnerableRevInfos(chan: Channel) = chan.hasCsOr(some => {
+  def getVulnerableRevMap =
+    ChannelManager.all.filter(isOperational)
+      .flatMap(getVulnerableRevVec).toMap
+
+  def getVulnerableRevVec(chan: Channel) = chan.hasCsOr(some => {
     // Find previous channel states which peer might be now tempted to spend
     val threshold = some.commitments.remoteCommit.spec.toRemoteMsat - dust.amount * 4 * 1000L
     def toTxidAndInfo(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)

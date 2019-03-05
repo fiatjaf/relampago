@@ -623,12 +623,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def startAIR(toChan: Channel, originalEmptyRD: RoutingData) = {
     val originalEmptyRD1 = originalEmptyRD.copy(airLeft = originalEmptyRD.airLeft - 1)
-    val amountCanSend = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
+    val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
     val deltaToSend = originalEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
-    require(amountCanSend > 0, "No channel is able to send funds into accumulator")
+    require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
     require(deltaToSend > 0, "Accumulator already has enough money")
 
-    val Some(_ \ extraHops) \ finalAmount = channelAndHop(toChan) -> MilliSatoshi(deltaToSend min amountCanSend)
+    val Some(_ \ extraHops) \ finalAmount = channelAndHop(toChan) -> MilliSatoshi(deltaToSend min amountCanRebalance)
     val rebalanceRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, random getBytes 32, REBALANCING)
 
     val listener = new ChannelListener { self =>

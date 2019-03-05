@@ -253,15 +253,17 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // We're fulfilling an HTLC we got from them earlier
-      case (norm: NormalData, cmd: CMDFulfillHtlc, OPEN) => for {
-        // this is a special case where we don't throw if cross signed HTLC is not found
-        // such a case may happen when we have already fulfilled it just before connection got lost
-        add <- Commitments.getHtlcCrossSigned(norm.commitments, incomingRelativeToLocal = true, cmd.id)
-        updateFulfillHtlc = UpdateFulfillHtlc(norm.commitments.channelId, cmd.id, cmd.preimage)
+      case (norm: NormalData, cmd: CMDFulfillHtlc, OPEN) =>
 
-        if updateFulfillHtlc.paymentHash == add.paymentHash
-        c1 = Commitments.addLocalProposal(norm.commitments, updateFulfillHtlc)
-      } me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
+        for {
+          // this is a special case where we don't throw if cross signed HTLC is not found
+          // such a case may happen when we have already fulfilled it just before connection got lost
+          add <- Commitments.getHtlcCrossSigned(norm.commitments, incomingRelativeToLocal = true, cmd.id)
+          updateFulfillHtlc = UpdateFulfillHtlc(norm.commitments.channelId, cmd.id, cmd.preimage)
+
+          if updateFulfillHtlc.paymentHash == add.paymentHash
+          c1 = Commitments.addLocalProposal(norm.commitments, updateFulfillHtlc)
+        } me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
 
 
       // Failing an HTLC we got earlier

@@ -103,7 +103,7 @@ class RevokedInfoSpec {
     }
 
     val reports = Vector(chan1, chan2)
-    val cerberusAct = PaymentInfoWrap.getCerberusActs(reports.flatMap(PaymentInfoWrap.getVulnerableRevInfos).toMap).next
+    val cerberusAct = PaymentInfoWrap.getCerberusActs(reports.flatMap(PaymentInfoWrap.getVulnerableRevVec).toMap).next
     val cerberusPayloadHex = cerberusAct.data.toString
 
     // Taken from Olympus
@@ -123,6 +123,6 @@ class RevokedInfoSpec {
     } assert(ri1 == ri)
 
     cerberusAct.onDone
-    assert(reports.flatMap(PaymentInfoWrap.getVulnerableRevInfos).isEmpty)
+    assert(reports.flatMap(PaymentInfoWrap.getVulnerableRevVec).isEmpty)
   }
 }
