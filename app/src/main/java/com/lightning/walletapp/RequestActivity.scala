@@ -65,7 +65,7 @@ class RequestActivity extends TimerActivity { me =>
 
   def INIT(state: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_qr_request)
-    // Sbapshot target hash, data will be erased soon
+    // Snapshot target hash, data will be erased soon
     val targetPayHash = app.TransData.value match {
       case pr: PaymentRequest => pr.paymentHash
       case _ => BinaryData.empty
