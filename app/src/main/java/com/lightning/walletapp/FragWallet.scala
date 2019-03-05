@@ -484,13 +484,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // WORKER EVENT HANDLERS
 
   def onFragmentDestroy = {
-    for (c <- ChannelManager.all) c.listeners -= chanListener
     app.kit.wallet removeTransactionConfidenceEventListener txsListener
     app.kit.peerGroup removeBlocksDownloadedEventListener blocksTitleListener
     app.kit.peerGroup removeDisconnectedEventListener peersListener
     app.kit.peerGroup removeConnectedEventListener peersListener
     app.kit.wallet removeCoinsReceivedEventListener txsListener
     app.kit.wallet removeCoinsSentEventListener txsListener
+    ChannelManager detachListener chanListener
   }
 
   // LN SEND / RECEIVE
@@ -506,8 +506,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def makeNormalRequest(sum: MilliSatoshi) = {
       val goodChans = shuffle(chansWithRoutes.filterKeys(chan => estimateCanReceive(chan) >= sum.amount).values.toVector)
-      val rd = PaymentInfoWrap.makeRequest(goodChans take 4, sum, random getBytes 32, inputDescription.getText.toString.trim)
-      rd.copy(pr = rd.pr sign nodePrivateKey)
+      PaymentInfoWrap.recordRoutingDataWithPr(goodChans take 4, sum, random getBytes 32, inputDescription.getText.toString.trim)
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
@@ -546,7 +545,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case Success(ms) => rm(alert) {
         // Payment requests without amounts are forbidden
-        val rd = emptyRD(pr, ms.amount, useCache = true)
+        val airLeft = ChannelManager.all.count(isOperational)
+        val rd = emptyRD(pr, ms.amount, useCache = true, airLeft)
         onUserAcceptSend(rd)
       }
     }
@@ -610,12 +610,39 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  def doSendOffChain(rd: RoutingData) =
-    (ChannelManager checkIfSendable rd, ChannelManager accumulatorChanOpt rd.firstMsat) match {
-      case Left(_ \ true) \ Some(chan) => // Initiate AIR
-      case Left(notSendable \ _) \ _ => onFail(notSendable)
+  def doSendOffChain(rd: RoutingData): Unit = {
+    val sendableEither = ChannelManager.checkIfSendable(rd)
+    val accumulatorOpt = ChannelManager.accumulatorChanOpt(rd)
+
+    sendableEither -> accumulatorOpt match {
+      case Left(_ \ true) \ Some(chan) if rd.airLeft > 1 => <(startAIR(chan, rd), onFail)(none)
+      case Left(notSendableNoAIRPossible \ _) \ _ => onFail(notSendableNoAIRPossible)
       case _ => PaymentInfoWrap addPendingPayment rd
     }
+  }
+
+  def startAIR(toChan: Channel, originalEmptyRD: RoutingData) = {
+    val originalEmptyRD1 = originalEmptyRD.copy(airLeft = originalEmptyRD.airLeft - 1)
+    val amountCanSend = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
+    val deltaToSend = originalEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
+    require(amountCanSend > 0, "No channel is able to send funds into accumulator")
+    require(deltaToSend > 0, "Accumulator already has enough money")
+
+    val Some(_ \ extraHops) \ finalAmount = channelAndHop(toChan) -> MilliSatoshi(deltaToSend min amountCanSend)
+    val rebalanceRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, random getBytes 32, REBALANCING)
+
+    val listener = new ChannelListener { self =>
+      override def settled(commitments: Commitments) = {
+        val rebalanceSuccess = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
+        val rebalanceFail = commitments.localCommit.spec.failed.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
+        if (rebalanceSuccess || rebalanceFail) ChannelManager detachListener self
+        if (rebalanceSuccess) UITask(me doSendOffChain originalEmptyRD1).run
+      }
+    }
+
+    ChannelManager attachListener listener
+    PaymentInfoWrap addPendingPayment rebalanceRD
+  }
 
   // BTC SEND / BOOST
 
@@ -714,12 +741,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   itemsList addFooterView allTxsWrapper
   itemsList setAdapter adapter
 
-  for (c <- ChannelManager.all) c.listeners += chanListener
   app.kit.wallet addTransactionConfidenceEventListener txsListener
   app.kit.peerGroup addBlocksDownloadedEventListener blocksTitleListener
   app.kit.peerGroup addDisconnectedEventListener peersListener
   app.kit.peerGroup addConnectedEventListener peersListener
   app.kit.wallet addCoinsReceivedEventListener txsListener
   app.kit.wallet addCoinsSentEventListener txsListener
+  ChannelManager attachListener chanListener
   runAnd(react)(updBtcItems)
 }

@@ -76,17 +76,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       rd.lastExpiry, NOCHANID)
   }
 
-  def makeRequest(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi,
-                  preimage: BinaryData, description: String) = {
+  def recordRoutingDataWithPr(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: BinaryData, description: String): RoutingData = {
+    val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, description, Some(app.kit.currentAddress.toString), extraRoutes)
+    val rd = emptyRD(pr, sum.amount, useCache = true)
 
-    val unsigned = PaymentRequest.unsigned(chainHash, Some(sum), Crypto sha256 preimage,
-      nodePublicKey, description, Some(app.kit.currentAddress.toString), extraRoutes)
-
-    val rd = emptyRD(unsigned, sum.amount, useCache = true)
-    db.change(PaymentTable.newVirtualSql, rd.queryText, unsigned.paymentHash)
-    db.change(PaymentTable.newSql, unsigned.toJson, preimage, 1 /* this is incoming payment */, WAITING,
-      System.currentTimeMillis, unsigned.description, unsigned.paymentHash, sum.amount, 0L /* lastMsat */,
-      0L /* lastExpiry, will be updated for reflexive payments */, NOCHANID)
+    db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
+    db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* this is incoming payment */, WAITING,
+      System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount, 0L /* lastMsat */,
+      0L /* lastExpiry, will be updated on incoming for reflexive payments */, NOCHANID)
 
     uiNotify
     rd

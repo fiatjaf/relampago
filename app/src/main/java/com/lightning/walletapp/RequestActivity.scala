@@ -65,14 +65,15 @@ class RequestActivity extends TimerActivity { me =>
 
   def INIT(state: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_qr_request)
+    // Sbapshot target hash, data will be erased soon
     val targetPayHash = app.TransData.value match {
       case pr: PaymentRequest => pr.paymentHash
       case _ => BinaryData.empty
     }
 
     val receivedListener = new ChannelListener {
-      override def settled(cs: Commitments) = for {
-        Htlc(true, add) \ _ <- cs.localCommit.spec.fulfilled
+      override def settled(commitments: Commitments) = for {
+        Htlc(true, add) \ _ <- commitments.localCommit.spec.fulfilled
         if add.paymentHash == targetPayHash
       } showPaid.run
     }
@@ -83,8 +84,8 @@ class RequestActivity extends TimerActivity { me =>
       case _ => finish
     }
 
-    whenDestroy = UITask { for (channel <- ChannelManager.all) channel.listeners -= receivedListener }
-    for (channel <- ChannelManager.all) channel.listeners += receivedListener
+    whenDestroy = UITask(ChannelManager detachListener receivedListener)
+    ChannelManager attachListener receivedListener
   } else me exitTo classOf[MainActivity]
 
   def showPaid = UITask {

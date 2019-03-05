@@ -703,9 +703,9 @@ object Channel {
 
   private[this] val nextDummyHtlc = UpdateAddHtlc("00", id = -1, LNParams.maxHtlcValueMsat, Hash.Zeroes, 144 * 3, new String)
   def nextReducedRemoteState(commitments: Commitments) = Commitments.addLocalProposal(commitments, nextDummyHtlc).reducedRemoteState
-  def estimateNextUsefulCapacity(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).usefulCapacityMsat, 0L)
   def estimateCanSend(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.maxHtlcValueMsat, 0L)
   def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat, 0L)
+  def estimateNextUsefulCapacity(chan: Channel) = estimateCanSend(chan) + estimateCanReceive(chan)
 
   def inFlightHtlcs(chan: Channel): Set[Htlc] = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }

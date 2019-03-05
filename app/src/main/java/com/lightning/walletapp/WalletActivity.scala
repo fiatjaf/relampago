@@ -271,9 +271,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def initConnection(incoming: IncomingChannelRequest) = {
     ConnectionManager.listeners += new ConnectionListener { self =>
-      override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
-        // Remove listener and make a request, peer should send OpenChannel message shortly
-        <(incoming.requestChannel, none)(none)
+      override def onOperational(nodeId: PublicKey, isCompat: Boolean) = {
+        // Remove listener, send a request, peer should reply with OpenChannel
+        if (isCompat) <(incoming.requestChannel, none)(none)
         ConnectionManager.listeners -= self
       }
     }

@@ -25,6 +25,7 @@ object PaymentInfo {
 
   final val NOIMAGE = BinaryData("3030303030303030")
   final val NOCHANID = BinaryData("3131313131313131")
+  final val REBALANCING = "Rebalancing"
 
   type FailureTry = Try[ErrorPacket]
   type FailureTryVec = Vector[FailureTry]
@@ -34,10 +35,10 @@ object PaymentInfo {
   var errors = Map.empty[BinaryData, FailureTryVec] withDefaultValue Vector.empty
   private[this] var replacedChans = Set.empty[Long]
 
-  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
+  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int = 0) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
-      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache)
+      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache, airLeft)
   }
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
@@ -189,9 +190,9 @@ case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv:
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
                        onion: SecretsAndPacket, firstMsat: Long /* without off-chain fee */,
                        lastMsat: Long /* with off-chain fee */, lastExpiry: Long,
-                       callsLeft: Int, useCache: Boolean) {
+                       callsLeft: Int, useCache: Boolean, airLeft: Int) {
 
-  // User may search by payment description, recipient nodeId, or related payment hash
+  lazy val withMaxOffChainFeeAdded = firstMsat + LNParams.maxAcceptableFee(firstMsat, hops = 3)
   lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toString}"
   lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
 }

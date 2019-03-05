@@ -105,10 +105,9 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         val pubKeyR = ECKey.fromPublicOnly(HEX decode signerSessionPubKey)
         val ecBlind = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
 
-        val lang = app.getString(com.lightning.walletapp.R.string.lang)
         val memo = BlindMemo(ecBlind params quantity, ecBlind tokens quantity, pubKeyR.getPublicKeyAsHex)
         connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
-          "lang" -> lang, "seskey" -> memo.key).map(PaymentRequest.read).map(pr => pr -> memo)
+          "seskey" -> memo.key).map(PaymentRequest.read).map(pr => pr -> memo)
     }
 
   def isAuthEnabled = 1 == auth

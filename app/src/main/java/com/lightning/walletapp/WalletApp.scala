@@ -19,10 +19,10 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
 
 import rx.lang.scala.{Observable => Obs}
-import fr.acinq.bitcoin.{BinaryData, Crypto}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import androidx.work.{ExistingWorkPolicy, WorkManager}
+import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{pickInc, repeat}
@@ -330,32 +330,39 @@ object ChannelManager extends Broadcaster {
     statuses.flatten.collect { case sd: ShowDelayed if !sd.isPublishable && sd.delay > Long.MinValue => sd }
   }
 
-  def estimateAIRCanSend = {
-    val goodChans = all.filter(isOperational)
-    val airCanSendCompoundThroughRestOfChannels = for {
-      canSend <- goodChans diff mostFundedChanOpt.toSeq map estimateCanSend
-      // While rebalancing payments from these channels lose off-chain fee
-      canSendFeeIncluded = canSend - maxAcceptableFee(canSend, hops = 3)
-      if canSendFeeIncluded < canSend && canSendFeeIncluded > 0L
-    } yield canSendFeeIncluded
+  // AIR
 
-    // We are ultimately bound by the total capacity of the largest channel
-    val airCanSend = airCanSendCompoundThroughRestOfChannels ++ mostFundedChanOpt.map(estimateCanSend)
-    math.min(airCanSend.sum, if (goodChans.isEmpty) 0L else goodChans.map(estimateNextUsefulCapacity).max)
+  def airCanSendInto(targetChan: Channel) = for {
+    canSend <- all.filter(isOperational) diff Vector(targetChan) map estimateCanSend
+    // While rebalancing, payments from other channels will lose some off-chain fee
+    canSendFeeIncluded = canSend - maxAcceptableFee(canSend, hops = 3)
+    // Estimation should be smaller than original but not negative
+    if canSendFeeIncluded < canSend && canSendFeeIncluded > 0L
+  } yield canSendFeeIncluded
+
+  def estimateAIRCanSend = {
+    // We are ultimately bound by the useful capacity of the largest channel
+    val airCanSend = mostFundedChanOpt.map(chan => estimateCanSend(chan) + airCanSendInto(chan).sum)
+    val largestCapOpt = all.filter(isOperational).map(estimateNextUsefulCapacity).reduceOption(_ max _)
+    math.min(airCanSend getOrElse 0L, largestCapOpt getOrElse 0L)
   }
 
-  def accumulatorChanOpt(amountWithoutFee: Long) =
-    all.filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty && estimateCanReceive(chan) > 0L)
-      .filter(chan => estimateNextUsefulCapacity(chan) - maxAcceptableFee(amountWithoutFee, hops = 3) >= amountWithoutFee)
-      .sortBy(estimateCanReceive).headOption // The one most likely to be chosen in case of many chans to the same peer
+  def accumulatorChanOpt(rd: RoutingData) =
+    all.filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty)
+      .filter(chan => estimateNextUsefulCapacity(chan) >= rd.withMaxOffChainFeeAdded)
+      .sortBy(estimateCanReceive).headOption // The one most likely to be chosen by direct peer
+
+  // CHANNEL
 
   def mostFundedChanOpt = all.filter(isOperational).sortBy(estimateCanSend).lastOption
   def activeInFlightHashes = all.filter(isOperational).flatMap(inFlightHtlcs).map(_.add.paymentHash)
   def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
   def initConnect = for (chan <- notClosing) ConnectionManager.connectTo(chan.data.announce, notify = false)
+  def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
+  def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
   def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData): Channel = new Channel { self =>
-    def SEND(m: LightningMessage) = for (w <- ConnectionManager.connections get data.announce.nodeId) w.handler process m
+    def SEND(m: LightningMessage) = for (work <- ConnectionManager.connections get data.announce.nodeId) work.handler process m
 
     def STORE(data: HasCommitments) = runAnd(data) {
       // Put updated data into db, schedule gdrive upload,
