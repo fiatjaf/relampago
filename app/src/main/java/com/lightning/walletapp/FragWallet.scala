@@ -615,8 +615,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def startAir(toChan: Channel, originalEmptyRD: RoutingData) = {
     val warnMessage = app getString err_ln_rebalance format s"<strong>${originalEmptyRD.pr.amount.map(denom.parsedWithSign) getOrElse new String}</strong>"
     if (originalEmptyRD.airAskUser) mkCheckForm(alert => rm(alert)(start), none, baseBuilder(warnMessage.html, null), dialog_ok, dialog_cancel) else start
+    def start = <(rebalance, onFail)(none)
 
-    def start = <(fun = {
+    def rebalance = {
       val originalEmptyRD1 = originalEmptyRD.copy(airLeft = originalEmptyRD.airLeft - 1, airAskUser = false)
       val deltaAmountToSend = originalEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
       val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
@@ -631,7 +632,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val listener = new ChannelListener { self =>
         override def settled(commitments: Commitments) = {
           val rebalanceSuccess = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
-          if (rebalanceSuccess || ChannelManager.activeInFlightHashes.diff(inFlightHashesSnapshot).nonEmpty) ChannelManager detachListener self
+          if (rebalanceSuccess || ChannelManager.activeInFlightHashes.distinct.diff(inFlightHashesSnapshot).nonEmpty) ChannelManager detachListener self
           // Won't happen if this listener has been detached due to new payments appearing some time ago
           if (rebalanceSuccess) UITask(me doSendOffChain originalEmptyRD1).run
         }
@@ -639,7 +640,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       ChannelManager attachListener listener
       PaymentInfoWrap addPendingPayment rebalanceRD
-    }, onFail)(none)
+    }
   }
 
   // BTC SEND / BOOST
