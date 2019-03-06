@@ -199,7 +199,7 @@
     <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>
     <string name="err_not_enough_funds"><![CDATA[<strong>Not enough funds</strong><br><br>can send %1$s<br>sending %2$s<br>missing %3$s]]></string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees. Please add some funds and try again</string>
-    <string name="err_ln_rebalance">Channel rebalancing is required before %1$s can be sent, would you like to proceed?</string>
+    <string name="err_ln_rebalance">Channel rebalancing is required before %1$s can be sent, would you still like to proceed?</string>
     <string name="err_ln_not_enough">None of your channels contains enough funds to send %1$s off-chain</string>
     <string name="err_no_data">No useful data found</string>
 

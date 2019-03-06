@@ -80,10 +80,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val expiryLeft = app.getResources getStringArray R.array.ln_status_expiry
   val txsConfs = app.getResources getStringArray R.array.txs_confs
-  val lnTitleOutNoFee = app getString ln_outgoing_title_no_fee
-  val lnTitleOut = app getString ln_outgoing_title
-  val lnTitleIn = app getString ln_incoming_title
-  val lnProof = app getString ln_proof
 
   // LISTENERS
 
@@ -349,8 +345,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         paymentRequest setVisibility View.GONE
         paymentProof setVisibility View.VISIBLE
         paymentProof setOnClickListener onButtonTap {
-          // Signed payment request along with a preimage is a proof
-          host share lnProof.format(serializedPR, info.preimage.toString)
+          // Signed payment request along with a preimage is sufficient proof of payment
+          host share app.getString(ln_proof).format(serializedPR, info.preimage.toString)
         }
       }
 
@@ -366,10 +362,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       def outgoingTitle = {
         val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
         val paidFeePercent = fee.amount / (info.firstMsat / 100D)
-        val amountSentHuman = denom.coloredOut(info.firstSum, denom.sign)
-        val feeHuman = denom.coloredOut(fee, denom.sign)
-
-        val title = lnTitleOut.format(humanStatus, amountSentHuman, inFiat, feeHuman, paidFeePercent)
+        val sentHuman = if (info.isLooper) denom.coloredP2WSH(info.firstSum, denom.sign) else denom.coloredOut(info.firstSum, denom.sign)
+        val title = app.getString(ln_outgoing_title).format(humanStatus, sentHuman, inFiat, denom.coloredOut(fee, denom.sign), paidFeePercent)
         val expiryBlocksLeftPart = app.plur1OrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
         if (info.status == WAITING) s"$expiryBlocksLeftPart<br>$title" else title
       }
@@ -377,30 +371,27 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       info.incoming -> rd.pr.fallbackAddress -> rd.pr.amount match {
         case 0 \ Some(adr) \ Some(amount) if info.lastExpiry == 0 && info.status == FAILURE =>
           // Payment was failed without even trying because wallet is offline or no suitable routes were found
-          val bld = baseBuilder(lnTitleOutNoFee.format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper)
-          mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount, rd.pr.paymentHash), bld, dialog_ok, -1, dialog_pay_onchain)
+          mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount, rd.pr.paymentHash), baseBuilder(app.getString(ln_outgoing_title_no_fee)
+            .format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper), dialog_ok, -1, dialog_pay_onchain)
 
         case 0 \ _ \ _ if info.lastExpiry == 0 =>
-          // Payment has not been tried yet because wallet is offline
-          val amountSentHuman = denom.coloredOut(info.firstSum, denom.sign)
-          val title = lnTitleOutNoFee.format(humanStatus, amountSentHuman, inFiat)
-          showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
+          // This is not a failure yet, don't care about on-chain
+          showForm(alertDialog = negBuilder(neg = dialog_ok, title = app.getString(ln_outgoing_title_no_fee)
+            .format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper).create)
 
-        case 0 \ Some(adr) \ Some(amount) =>
-          // Offer a fallback on-chain address along with off-chain retry if payment was not successfull
-          if (info.status != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckFormNeutral(_.dismiss, doSendOffChain(rd), onChain(adr, amount, rd.pr.paymentHash),
+        case 0 \ Some(adr) \ Some(amount) if info.status == FAILURE =>
+          // Offer a fallback on-chain address along with off-chain retry
+          mkCheckFormNeutral(_.dismiss, doSendOffChain(rd), onChain(adr, amount, rd.pr.paymentHash),
             baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry, dialog_pay_onchain)
 
-        case 0 \ _ \ _ =>
-          // Allow off-chain retry only, no on-chain fallback
-          if (info.status != FAILURE) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else mkCheckForm(_.dismiss, doSendOffChain(rd), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry)
+        case 0 \ _ \ _ if info.status == FAILURE =>
+          // Allow off-chain retry only, no on-chain fallback options since no embedded address is present
+          mkCheckForm(_.dismiss, doSendOffChain(rd), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry)
 
-        case 1 \ _ \ _ =>
-          val amountReceivedHuman = denom.coloredIn(info.firstSum, denom.sign)
-          val title = lnTitleIn.format(humanStatus, amountReceivedHuman, inFiat)
-          showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
+        case _ =>
+          val title = app.getString(ln_incoming_title).format(humanStatus, denom.coloredIn(info.firstSum, denom.sign), inFiat)
+          if (info.incoming == 0 || info.isLooper) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
+          else showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
       }
     }
   }
