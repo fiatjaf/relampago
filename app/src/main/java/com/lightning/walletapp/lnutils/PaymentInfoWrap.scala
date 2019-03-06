@@ -26,7 +26,6 @@ import com.lightning.walletapp.Utils.app
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   private[this] var unsentPayments = Map.empty[BinaryData, RoutingData]
-  private[this] var fulfilledInPayments = Set.empty[BinaryData]
   var acceptedPayments = Map.empty[BinaryData, RoutingData]
 
   def addPendingPayment(rd: RoutingData) = {
@@ -55,20 +54,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (fulfills.nonEmpty) uiNotify
   }
 
-  def fetchAndSend(rd: RoutingData) = ChannelManager.fetchRoutes(rd).foreach(ChannelManager.sendEither(_, failOnUI), _ => me failOnUI rd)
+  def fetchAndSend(rd: RoutingData) = ChannelManager.fetchRoutes(rd).foreach(ChannelManager.sendEither(_, failOnUI), anyError => me failOnUI rd)
+  def updOkIncoming(m: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
   def updOkOutgoing(m: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
   def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
   def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
-
-  def updOkIncoming(message: UpdateAddHtlc) = {
-    val UpdateAddHtlc(channelId, _, amountMsat, paymentHash, _, _) = message
-    db.change(PaymentTable.updOkIncomingSql, amountMsat, System.currentTimeMillis, channelId, paymentHash)
-    // This prevents double vibrator on reflexive payments: incoming hash will be present in set once fulfilled
-    fulfilledInPayments += paymentHash
-  }
 
   def toPaymentInfo(rc: RichCursor) =
     PaymentInfo(rawPr = rc string PaymentTable.pr, rc string PaymentTable.preimage,
@@ -161,10 +154,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     uiNotify
-    val isLoop = outOK.exists(fulfilledInPayments contains _.add.paymentHash)
-    if (inOK.nonEmpty || outOK.nonEmpty && !isLoop) com.lightning.walletapp.Vibrator.vibrate
+    if (inOK.nonEmpty || outOK.nonEmpty) com.lightning.walletapp.Vibrator.vibrate
     if (inOK.nonEmpty) getCerberusActs(getVulnerableRevMap) foreach app.olympus.tellClouds
-    else if (outOK.nonEmpty) app.olympus tellClouds OlympusWrap.CMDStart
+    if (outOK.nonEmpty) app.olympus tellClouds OlympusWrap.CMDStart
   }
 
   def getVulnerableRevMap =
