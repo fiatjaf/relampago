@@ -625,12 +625,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val Some(_ \ extraHops) \ finalAmount = channelAndHop(toChan) -> MilliSatoshi(deltaAmountToSend min amountCanRebalance)
       val rebalanceRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, random getBytes 32, REBALANCING)
+      // Further rebalancing should always be halted if new off-chain payment is detected since rebalancing has started
+      val inFlightHashesSnapshot = ChannelManager.activeInFlightHashes :+ rebalanceRD.pr.paymentHash
 
       val listener = new ChannelListener { self =>
         override def settled(commitments: Commitments) = {
           val rebalanceSuccess = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
-          val rebalanceFail = commitments.localCommit.spec.failed.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
-          if (rebalanceSuccess || rebalanceFail) ChannelManager detachListener self
+          if (rebalanceSuccess || ChannelManager.activeInFlightHashes.diff(inFlightHashesSnapshot).nonEmpty) ChannelManager detachListener self
+          // Won't happen if this listener has been detached due to new payments appearing some time ago
           if (rebalanceSuccess) UITask(me doSendOffChain originalEmptyRD1).run
         }
       }
