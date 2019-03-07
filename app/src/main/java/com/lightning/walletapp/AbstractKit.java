@@ -15,6 +15,7 @@ import javax.annotation.Nullable;
 
 public abstract class AbstractKit extends AbstractIdleService {
     public static final String GDRIVE_LAST_SAVE = "gDriveLastSave";
+    public static final String FINGERPRINT_ENABLED = "fpEnabled";
     public static final String GDRIVE_ENABLED = "gDriveEnabled";
     public static final String ERROR_REPORT = "errorReport";
     public static final String DENOM_TYPE = "denomType1";

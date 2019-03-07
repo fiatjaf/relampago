@@ -36,6 +36,7 @@ import java.io.File
 
 class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val gDriveBackups = findViewById(R.id.gDriveBackups).asInstanceOf[CheckBox]
+  lazy val fpAuthentication = findViewById(R.id.fpAuthentication).asInstanceOf[CheckBox]
   lazy val gDriveBackupState = findViewById(R.id.gDriveBackupState).asInstanceOf[TextView]
   lazy val exportWalletSnapshot = findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
   lazy val chooseBitcoinUnit = findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
@@ -109,6 +110,10 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
       GDrive.signInAttemptClient(me).revokeAccess
       updateBackupView
     }
+
+  def onFpTap(cb: View) = {
+
+  }
 
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_settings

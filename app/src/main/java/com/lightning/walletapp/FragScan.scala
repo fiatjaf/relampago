@@ -1,11 +1,11 @@
 package com.lightning.walletapp
 
 import android.view._
+import android.support.v4.app._
 import com.journeyapps.barcodescanner._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.R.string._
 
-import android.support.v4.app.{ActivityCompat, Fragment}
 import android.support.v4.content.ContextCompat
 import android.content.pm.PackageManager
 import com.lightning.walletapp.Utils.app
@@ -15,6 +15,7 @@ import android.os.Bundle
 
 trait ScanActivity extends TimerActivity {
   lazy val walletPager = findViewById(R.id.walletPager).asInstanceOf[ViewPager]
+  val slidingFragmentAdapter: FragmentStatePagerAdapter
   def checkTransData: Unit
 
   def returnToBase(view: View) = {
@@ -35,8 +36,8 @@ class FragScan extends Fragment with BarcodeCallback { me =>
     inflator.inflate(R.layout.frag_view_pager_scan, vg, false)
 
   override def onViewCreated(view: View, savedInstanceState: Bundle) = if (app.isAlive) {
-    val camDenied = ContextCompat.checkSelfPermission(host, android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED
-    if (camDenied) ActivityCompat.requestPermissions(host, Array(android.Manifest.permission.CAMERA), 102)
+    val allowed = ContextCompat.checkSelfPermission(host, android.Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    if (!allowed) ActivityCompat.requestPermissions(host, Array(android.Manifest.permission.CAMERA), 104)
     barcodeReader = view.findViewById(R.id.reader).asInstanceOf[BarcodeView]
   }
 

@@ -631,10 +631,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val listener = new ChannelListener { self =>
         override def settled(commitments: Commitments) = {
-          val rebalanceSuccess = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
-          if (rebalanceSuccess || ChannelManager.activeInFlightHashes.distinct.diff(inFlightHashesSnapshot).nonEmpty) ChannelManager detachListener self
+          val isOK = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => !htlc.incoming && htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
+          if (isOK || ChannelManager.activeInFlightHashes.distinct.diff(inFlightHashesSnapshot).nonEmpty) ChannelManager detachListener self
           // Won't happen if this listener has been detached due to new payments appearing some time ago
-          if (rebalanceSuccess) UITask(me doSendOffChain originalEmptyRD1).run
+          if (isOK) UITask(me doSendOffChain originalEmptyRD1).run
         }
       }
 

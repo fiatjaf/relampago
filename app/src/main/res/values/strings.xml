@@ -125,7 +125,13 @@
     <string name="dialog_max">Max</string>
     <string name="dialog_ok">OK</string>
 
-    <!-- notifications -->
+    <!-- fingerprint -->
+    <string name="fp_err_try_again">Try again</string>
+    <string name="fp_err_dirty">Sensor is dirty</string>
+    <string name="fp_err_failure">Fingerprint failed</string>
+    <string name="fp_err_timeout">Fingerprint timed out</string>
+    <string name="sets_fp">Fingerprint auth for payments</string>
+
     <array name="info_progress">
         <item>Sync is complete</item>
         <item><![CDATA[<font color=#E68A00>Sync: %1$d day behind</font>]]></item>
