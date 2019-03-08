@@ -56,12 +56,20 @@ class MarshmallowGoldfinger implements Goldfinger {
 
     @Override
     public boolean hasEnrolledFingerprint() throws SecurityException {
-        return fingerprintManagerCompat.hasEnrolledFingerprints();
+        try {
+            return fingerprintManagerCompat.hasEnrolledFingerprints();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
     public boolean hasFingerprintHardware() throws SecurityException {
-        return fingerprintManagerCompat.isHardwareDetected();
+        try {
+            return fingerprintManagerCompat.isHardwareDetected();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void notifyCryptoObjectInitError(Callback callback) {

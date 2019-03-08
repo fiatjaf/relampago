@@ -184,10 +184,8 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String, cap
   val nodeLink(key, host, port) = uri
   def resolveAnnounce = app.mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, port.toInt), host)
   def requestChannel = unsafe(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1")
-  require(callback contains "https://", "Not an HTTPS callback")
 }
 
 case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, defaultDescription: String) extends LNUrlData {
   def requestWithdraw(paymentRequest: PaymentRequest) = unsafe(s"$callback?k1=$k1&pr=${PaymentRequest write paymentRequest}")
-  require(callback contains "https://", "Not an HTTPS callback")
 }

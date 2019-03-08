@@ -131,6 +131,8 @@
     <string name="fp_err_failure">Fingerprint failed</string>
     <string name="fp_err_timeout">Fingerprint timed out</string>
     <string name="sets_fp">Fingerprint auth for payments</string>
+    <string name="fp_no_support">This phone does not support fingerprints</string>
+    <string name="fp_add_print">Add at least one fingerprint in system settings</string>
 
     <array name="info_progress">
         <item>Sync is complete</item>
@@ -162,7 +164,7 @@
     <string name="send_hivemind_deposit"><![CDATA[Deposit funds to Hivemind<br><font color=#999999><small>a prediction market sidechain</small></font>]]></string>
     <string name="ln_send_linkable_title"><![CDATA[<strong>Send Lightning Payment</strong><br><small>linked to <i>%1$s</i><br><br>%2$s</small>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning Payment</strong></font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Send Bitcoin Transaction</strong></font>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Send Bitcoin Transaction</strong></font><br><br>%1$s]]></string>
 
     <string name="ln_send_howto"><![CDATA[
         You are trying to fulfill a Lightning payment request but there are currently no open

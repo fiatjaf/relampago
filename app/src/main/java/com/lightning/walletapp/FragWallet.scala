@@ -652,9 +652,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def sendBtcPopup(uri: BitcoinURI): RateManager = {
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign app.kit.conf0Balance)
-    val form = host.getLayoutInflater.inflate(R.layout.frag_input_send_btc, null, false)
-    val addressData = form.findViewById(R.id.addressData).asInstanceOf[TextView]
-    val rateManager = new RateManager(form) hint baseHint
+    val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
+    val rateManager = new RateManager(content) hint baseHint
 
     def sendAttempt(alert: AlertDialog): Unit = rateManager.result match {
       case Success(ms) if MIN isGreaterThan ms => app toast dialog_sum_small
@@ -677,10 +676,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       <(app.TransData recordValue uri.getLightningRequest, onFail)(_ => host.checkTransData)
     }
 
-    val bld = baseBuilder(app.getString(btc_send_title).html, form)
-    if (uri.getLightningRequest == null) mkCheckForm(sendAttempt, none, bld, dialog_next, dialog_cancel)
-    else mkCheckFormNeutral(sendAttempt, none, sendOffChainAttempt, bld, dialog_next, dialog_cancel, dialog_pay_offchain)
-    addressData setText humanSix(uri.getAddress.toString)
+    val title = app getString btc_send_title format humanSix(uri.getAddress.toString)
+    if (uri.getLightningRequest == null) mkCheckForm(sendAttempt, none, baseBuilder(title.html, content), dialog_next, dialog_cancel)
+    else mkCheckFormNeutral(sendAttempt, none, sendOffChainAttempt, baseBuilder(title.html, content), dialog_next, dialog_cancel, dialog_pay_offchain)
     rateManager
   }
 

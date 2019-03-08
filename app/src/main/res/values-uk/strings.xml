@@ -126,6 +126,8 @@
     <string name="fp_err_failure">Fingerprint failed</string>
     <string name="fp_err_timeout">Fingerprint timed out</string>
     <string name="sets_fp">Fingerprint auth for payments</string>
+    <string name="fp_no_support">This phone does not support fingerprints</string>
+    <string name="fp_add_print">Add at least one fingerprint in system settings</string>
 
     <array name="info_progress">
         <item>Синхронізацію завершено</item>
@@ -159,7 +161,7 @@
     <string name="send_hivemind_deposit"><![CDATA[Відіслати в Hivemind<br><font color=#999999><small>сайдчейн для ринку передбачень</small></font>]]></string>
     <string name="ln_send_linkable_title"><![CDATA[<strong>Послати платіж-Блискавку</strong><br><small>прив\'язаний до <i>%1$s</i><br><br>%2$s</small>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послати платіж-Блискавку</strong></font><small><br><br>%1$s</small>]]></string>
-    <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послати Біткоїн-транзакцію</strong></font>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послати Біткоїн-транзакцію</strong></font><br><br>%1$s]]></string>
 
     <string name="ln_send_howto"><![CDATA[
         Ви намагаєтеся оплатити запит-Блискавку, але в цьому гаманці зараз немає відкритих

@@ -62,12 +62,8 @@ object Utils {
     "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel ", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
     "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling", "aud" -> "Australian Dollar")
 
-  def getDescription(rawText: String) =
-    if (rawText.isEmpty) s"<i>$noDesc</i>"
-    else rawText take 140
-
-  def humanSix(adr: String) =
-    adr grouped 6 mkString "\u0020"
+  def getDescription(raw: String) = if (raw.isEmpty) s"<i>$noDesc</i>" else raw take 140
+  def humanSix(bitcoinAddress: String) = bitcoinAddress grouped 6 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {
     val field: TextView = view.asInstanceOf[TextView]
@@ -257,6 +253,7 @@ trait TimerActivity extends AppCompatActivity { me =>
 class RateManager(val content: View) { me =>
   val satInput = content.findViewById(R.id.inputAmount).asInstanceOf[EditText]
   val fiatInput = content.findViewById(R.id.fiatInputAmount).asInstanceOf[EditText]
+  val fingerprint = content.findViewById(R.id.fingerprint).asInstanceOf[LinearLayout]
   val hintFiatDenom = Utils clickableTextField content.findViewById(R.id.hintFiatDenom)
   val hintDenom = Utils clickableTextField content.findViewById(R.id.hintDenom)
 

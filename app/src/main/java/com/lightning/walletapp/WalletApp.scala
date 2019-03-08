@@ -500,7 +500,7 @@ object ChannelManager extends Broadcaster {
 object Vibrator {
   private[this] var lastVibrated = 0L
   private[this] val vib = app.getSystemService(Context.VIBRATOR_SERVICE).asInstanceOf[android.os.Vibrator]
-  def canVibrate = null != vib && vib.hasVibrator && lastVibrated < System.currentTimeMillis - 2000L
+  def canVibrate = null != vib && vib.hasVibrator && lastVibrated < System.currentTimeMillis - 3000L
 
   def vibrate = if (canVibrate) {
     vib.vibrate(Array(0L, 85, 200), -1)

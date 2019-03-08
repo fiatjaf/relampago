@@ -12,26 +12,31 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-
-import android.view.{Menu, MenuItem, View}
 import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
+import android.view.{Menu, MenuItem, View}
 import com.google.android.gms.common.api.CommonStatusCodes.SIGN_IN_REQUIRED
 import com.google.android.gms.common.api.ApiException
 import com.lightning.walletapp.ln.wire.WalletZygote
 import com.google.android.gms.drive.MetadataBuffer
 import android.support.v4.content.FileProvider
 import com.lightning.walletapp.lnutils.GDrive
-import com.lightning.walletapp.helper.AES
 import android.support.v7.widget.Toolbar
+import com.lightning.walletapp.helper.{AES, FingerPrint}
 import org.bitcoinj.store.SPVBlockStore
+import co.infinum.goldfinger.Goldfinger
 import org.bitcoinj.core.Utils.HEX
 import com.google.common.io.Files
 import android.content.Intent
 import android.app.Activity
 import android.os.Bundle
+import android.os.Build.{VERSION, VERSION_CODES}
 import android.net.Uri
 import java.util.Date
 import java.io.File
+
+import android.provider.Settings
+
+
 
 
 class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
@@ -45,6 +50,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val manageOlympus = findViewById(R.id.manageOlympus).asInstanceOf[Button]
   lazy val rescanWallet = findViewById(R.id.rescanWallet).asInstanceOf[Button]
   lazy val viewMnemonic = findViewById(R.id.viewMnemonic).asInstanceOf[Button]
+  lazy val gf = new Goldfinger.Builder(me).build
   lazy val host = me
 
   override def onActivityResult(reqCode: Int, resultCode: Int, result: Intent) = {
@@ -100,24 +106,32 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
   }
 
-  def onGDriveTap(cb: View) =
-    if (gDriveBackups.isChecked) queue.map(_ => GDrive signInAccount me) foreach {
-      case Some(mayBeSignedOutGDriveAccount) => checkBackup(mayBeSignedOutGDriveAccount)
+  def onGDriveTap(cb: View) = {
+    def proceed = queue.map(_ => GDrive signInAccount me) foreach {
+      case Some(gDriveAccountMaybe) => checkBackup(gDriveAccountMaybe)
       case _ => askGDriveSignIn
-    } else {
+    }
+
+    if (gDriveBackups.isChecked) proceed else {
       // User has opted out of GDrive backups, revoke access immediately
       app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, false).commit
       GDrive.signInAttemptClient(me).revokeAccess
       updateBackupView
     }
+  }
 
-  def onFpTap(cb: View) = {
-
+  def onFpTap(cb: View) = fpAuthentication.isChecked match {
+    case true if VERSION.SDK_INT < VERSION_CODES.M => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
+    case true if !FingerPrint.isPermissionGranted => runAnd(fpAuthentication setChecked false)(FingerPrint askPermission me)
+    case true if !gf.hasFingerprintHardware => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
+    case true if !gf.hasEnrolledFingerprint => runAnd(fpAuthentication setChecked false)(app toast fp_add_print)
+    case newState => app.prefs.edit.putBoolean(AbstractKit.FINGERPRINT_ENABLED, newState).commit
   }
 
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_settings
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
+    fpAuthentication.setChecked(FingerPrint isOperational gf)
     getSupportActionBar setSubtitle "App version 0.3-112"
     getSupportActionBar setTitle wallet_settings
     updateBackupView
