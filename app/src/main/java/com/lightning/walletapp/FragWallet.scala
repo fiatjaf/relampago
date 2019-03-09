@@ -76,10 +76,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
-  val imageMap = Array(await, await, conf1, dead, frozen)
-
   val expiryLeft = app.getResources getStringArray R.array.ln_status_expiry
   val txsConfs = app.getResources getStringArray R.array.txs_confs
+  val imageMap = Array(await, await, conf1, dead, frozen)
 
   // LISTENERS
 

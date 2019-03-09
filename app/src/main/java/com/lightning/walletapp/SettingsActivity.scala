@@ -26,7 +26,7 @@ import org.bitcoinj.store.SPVBlockStore
 import co.infinum.goldfinger.Goldfinger
 import org.bitcoinj.core.Utils.HEX
 import com.google.common.io.Files
-import android.content.Intent
+import android.content.{DialogInterface, Intent}
 import android.app.Activity
 import android.os.Bundle
 import android.os.Build.{VERSION, VERSION_CODES}
@@ -34,6 +34,7 @@ import android.net.Uri
 import java.util.Date
 import java.io.File
 
+import android.content.DialogInterface.OnDismissListener
 import android.provider.Settings
 
 
@@ -125,7 +126,25 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case true if !FingerPrint.isPermissionGranted => runAnd(fpAuthentication setChecked false)(FingerPrint askPermission me)
     case true if !gf.hasFingerprintHardware => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
     case true if !gf.hasEnrolledFingerprint => runAnd(fpAuthentication setChecked false)(app toast fp_add_print)
-    case newState => app.prefs.edit.putBoolean(AbstractKit.FINGERPRINT_ENABLED, newState).commit
+    case true => app.prefs.edit.putBoolean(AbstractKit.FINGERPRINT_ENABLED, true).commit
+    case false => runAnd(fpAuthentication setChecked true)(authFpOff)
+  }
+
+  def authFpOff = {
+    val content = getLayoutInflater.inflate(R.layout.frag_touch, null)
+    val alert = showForm(negBuilder(dialog_cancel, null, content).create)
+
+    gf authenticate new Goldfinger.Callback {
+      def onSuccess(cipher: String) = runAnd(alert.dismiss) { app.prefs.edit.putBoolean(AbstractKit.FINGERPRINT_ENABLED, false).commit }
+      def onError(error: co.infinum.goldfinger.Error) = runAnd(FingerPrint informUser error) { if (error.isCritical) alert.dismiss }
+    }
+
+    alert setOnDismissListener new OnDismissListener {
+      def onDismiss(dialogInterface: DialogInterface) = {
+        fpAuthentication.setChecked(FingerPrint isOperational gf)
+        gf.cancel
+      }
+    }
   }
 
   def INIT(s: Bundle) = if (app.isAlive) {

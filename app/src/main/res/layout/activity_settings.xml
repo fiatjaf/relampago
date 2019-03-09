@@ -37,12 +37,21 @@
         android:layout_width="wrap_content"/>
 
     <CheckBox
-        style="@style/MarginInfo"
+        style="@style/Info"
+        android:layout_marginTop="25dp"
         android:layout_gravity="center"
         android:id="@+id/fpAuthentication"
         android:layout_width="wrap_content"
         android:text="@string/sets_fp"
         android:onClick="onFpTap"/>
+
+    <TextView
+        style="@style/Info"
+        android:textColor="#999999"
+        android:layout_gravity="center"
+        android:layout_marginBottom="25dp"
+        android:layout_width="wrap_content"
+        android:text="@string/sets_fp_details"/>
 
     <View style="@style/GrayDivider"/>
 
