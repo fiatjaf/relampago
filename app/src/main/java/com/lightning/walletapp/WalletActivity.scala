@@ -49,6 +49,7 @@ trait SearchBar { me =>
       def onViewAttachedToWindow(lens: View) = runAnd(isSearching = true)(react)
     }
 
+    searchView.setQueryHint(app getString search_hint)
     searchView setOnQueryTextListener new SearchView.OnQueryTextListener {
       def onQueryTextChange(txt: String) = runAnd(true)(me search txt)
       def onQueryTextSubmit(txt: String) = true
@@ -196,9 +197,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       // so goOps return type is forced to Unit
       goOps(null): Unit
 
-    case uri: BitcoinURI =>
-      // Prohibit sum editing if uri contains a definite amount
-      FragWallet.worker sendBtcPopup uri maybeLockAmount uri
+    case bitcoinUri: BitcoinURI =>
+      FragWallet.worker sendBtcPopup bitcoinUri
       // TransData value should be erased here
       me returnToBase null
 

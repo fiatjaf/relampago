@@ -17,7 +17,6 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
-import org.bitcoinj.core.Transaction.{MIN_NONDUST_OUTPUT => MIN}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 import android.database.{ContentObserver, Cursor}
@@ -185,7 +184,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
     val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom parsedWithSign btcTotalSum
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
-    val perOneBtcRate = formatFiat format msatInFiat(oneBtc).getOrElse(0L)
+    val perOneBtcRate = formatFiat.format(msatInFiat(oneBtc) getOrElse 0L)
 
     val btcSubtitleText =
       if (app.kit.peerGroup.numConnectedPeers < 1) btcStatusConnecting
@@ -199,8 +198,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     lnStatus setText lnSubtitleText.html
     lnBalance setText s"<img src='lnbig'/>$lnFunds".html
-    fiatRate setText s"<small>$perOneBtcRate</small>".html
     fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
+    fiatRate setText s"<small>$perOneBtcRate $fiatCode / btc</small>".html
     getSupportActionBar setTitle s"<img src='btcbig'/>$btcFunds".html
     getSupportActionBar setSubtitle btcSubtitleText.html
   }
@@ -650,19 +649,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def sendBtcPopup(uri: BitcoinURI): RateManager = {
+    val minMsatAmountTry = Try(uri.getAmount).filter(_.value > 0L) map coin2MSat
+    val minMsatAmount = minMsatAmountTry getOrElse coin2MSat(org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT)
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign app.kit.conf0Balance)
     val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
     val rateManager = new RateManager(content) hint baseHint
 
     def sendAttempt(alert: AlertDialog): Unit = rateManager.result match {
-      case Success(ms) if MIN isGreaterThan ms => app toast dialog_sum_small
+      case Success(small) if small < minMsatAmount => app toast dialog_sum_small
       case Failure(probablyEmptySum) => app toast dialog_sum_small
 
       case Success(ms) =>
         val txProcessor = new TxProcessor {
-          def futureProcess(unsigned: SendRequest) = app.kit blockSend app.kit.sign(unsigned).tx
-          def onTxFail(paymentGenerationError: Throwable) = onFail(paymentGenerationError)
           val pay = AddrData(ms, uri.getAddress)
+          def futureProcess(unsigned: SendRequest) =
+            app.kit blockSend app.kit.sign(unsigned).tx
         }
 
         val coloredAmount = denom.coloredOut(txProcessor.pay.cn, denom.sign)
@@ -678,6 +679,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val title = app getString btc_send_title format humanSix(uri.getAddress.toString)
     if (uri.getLightningRequest == null) mkCheckForm(sendAttempt, none, baseBuilder(title.html, content), dialog_next, dialog_cancel)
     else mkCheckFormNeutral(sendAttempt, none, sendOffChainAttempt, baseBuilder(title.html, content), dialog_next, dialog_cancel, dialog_pay_offchain)
+    rateManager setSum minMsatAmountTry
     rateManager
   }
 

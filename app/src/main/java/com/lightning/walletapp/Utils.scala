@@ -77,7 +77,7 @@ object Utils {
   }
 
   val msatInFiatHuman: MilliSatoshi => String = ms => msatInFiat(ms) match {
-    case Success(amount) => s"≈ ${formatFiat format amount} $fiatCode"
+    case Success(providedAmount) => s"≈ ${formatFiat format providedAmount} $fiatCode"
     case _ => s"≈ ? $fiatCode"
   }
 }
@@ -196,7 +196,6 @@ trait TimerActivity extends AppCompatActivity { me =>
 
   abstract class TxProcessor { self =>
     def futureProcess(req: SendRequest)
-    def onTxFail(exc: Throwable)
     val pay: PayData
 
     def start(coloredAmount: String) = <(app.kit sign plainRequest(RatesSaver.rates.feeSix), onTxFail) { estimate =>
@@ -247,6 +246,10 @@ trait TimerActivity extends AppCompatActivity { me =>
       case _: Throwable =>
         app getString err_no_data
     }
+
+    def onTxFail(err: Throwable): Unit =
+      mkCheckForm(alert => rm(alert)(finish), no = none,
+        baseBuilder(txMakeError(err), null), dialog_ok, -1)
   }
 }
 
@@ -261,23 +264,14 @@ class RateManager(val content: View) { me =>
   def setSum(res: TryMSat) = satInput.setText(res map denom.asString getOrElse null)
   def hint(ex: String) = runAnd(me)(hintDenom setText denom.amountInTxt.format(ex).html)
 
-  def maybeLockAmount(uri: BitcoinURI) = {
-    val amountTry: TryMSat = Try(uri.getAmount)
-    fiatInput setEnabled amountTry.isFailure
-    satInput setEnabled amountTry.isFailure
-    setSum(amountTry)
-  }
-
   val fiatListener = new TextChangedWatcher {
-    def onTextChanged(s: CharSequence, start: Int, b: Int, c: Int) = if (fiatInput.hasFocus) {
-      setSum(currentRate.map(perBtc => BigDecimal(fiatInput.getText.toString.noSpaces) / perBtc) map btcBigDecimal2MSat)
-    }
+    def upd = setSum(currentRate.map(perBtc => BigDecimal(fiatInput.getText.toString.noSpaces) / perBtc) map btcBigDecimal2MSat)
+    def onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) = if (fiatInput.hasFocus) upd
   }
 
   val bitListener = new TextChangedWatcher {
-    def onTextChanged(s: CharSequence, start: Int, b: Int, c: Int) = if (satInput.hasFocus) {
-      fiatInput.setText(result flatMap msatInFiat map formatFiat.format getOrElse null)
-    }
+    def upd = fiatInput.setText(result flatMap msatInFiat map formatFiat.format getOrElse null)
+    def onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) = if (satInput.hasFocus) upd
   }
 
   satInput addTextChangedListener bitListener

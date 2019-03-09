@@ -152,10 +152,6 @@ class LNStartFundActivity extends TimerActivity { me =>
                 val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
                 freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat)
               }
-
-              def onTxFail(err: Throwable) =
-                mkCheckForm(alert => rm(alert)(finish), none,
-                  baseBuilder(txMakeError(err), null), dialog_ok, -1)
             }
 
             val coloredAmount = denom.coloredP2WSH(txProcessor.pay.cn, denom.sign)
