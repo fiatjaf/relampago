@@ -17,6 +17,7 @@ import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
+import com.lightning.walletapp.ln.wire.Hop
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
 import org.bitcoinj.uri.BitcoinURI
@@ -131,11 +132,17 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       refundFeeText setText sumOrNothing(breakFee).html
 
       chan.data match {
-        // Order matters: NormalData before WaitData
         case norm: NormalData if isOperational(chan) =>
-          // We only can display one item so sort them by increasing importance
-          if (fundingDepth > 6 && channelAndHop(chan).isEmpty) setExtraInfo(resource = ln_info_no_receive)
-          // In a case of Turbo channels we may have an OPEN state with NormalData yet with unconfirmed funding
+          // Order matters: NormalData should always come before WaitData
+          // we only can display one item so sort them by increasing importance
+
+          channelAndHop(chan) match {
+            case Some(_ \ vec) if isFeeTooHigh(vec.head) => setExtraInfo(me getString ln_info_high_fee format vec.head.feeBreakdown)
+            case None if fundingDepth > 6 => setExtraInfo(resource = ln_info_no_receive)
+            case _ => // We may not have it until 6 confs, do nothing
+          }
+
+          // In Turbo channels we will have an OPEN state with NormalData and zeroconf
           if (norm.unknownSpend.isDefined) setExtraInfo(resource = ln_info_unknown_spend)
           if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
 
@@ -300,6 +307,12 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def getStat(chanId: BinaryData) = {
     val cursor = LNParams.db.select(PaymentTable.selectPaymentNumSql, chanId)
     RichCursor(cursor) headTry { case RichCursor(c1) => c1 getLong 0 } getOrElse 0L
+  }
+
+  def isFeeTooHigh(hop: Hop) = {
+    val amountToSendMsat = 25000000L
+    val hopFee = LNParams.feeFor(amountToSendMsat, hop.feeBaseMsat, hop.feeProportionalMillionths)
+    hopFee >= LNParams.maxAcceptableFee(amountToSendMsat, hops = 3)
   }
 
   def urlIntent(txid: String) =

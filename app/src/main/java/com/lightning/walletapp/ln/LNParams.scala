@@ -6,7 +6,7 @@ import com.lightning.walletapp.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
-import com.lightning.walletapp.ln.wire.{ChannelUpdate, NodeAnnouncement}
+import com.lightning.walletapp.ln.wire.{ChannelUpdate, Hop, NodeAnnouncement}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import com.lightning.walletapp.ChannelManager
@@ -52,8 +52,8 @@ object LNParams { me =>
   }
 
   // Up to 1% of payment sum + 25 SAT per hop
-  def maxAcceptableFee(msat: Long, hops: Int) =
-    25000 * (hops + 1) + msat / 100
+  def maxAcceptableFee(msat: Long, hops: Int) = 25000 * (hops + 1) + msat / 100
+  def feeFor(msat: Long, base: Long, prop: Long) = base + (prop * msat) / 1000000L
 
   def shouldUpdateFee(network: Long, commit: Long) = {
     val mismatch = 2.0 * (network - commit) / (commit + network)

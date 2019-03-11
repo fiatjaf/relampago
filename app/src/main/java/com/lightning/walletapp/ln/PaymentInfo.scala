@@ -61,7 +61,7 @@ object PaymentInfo {
       case (loads, nodes, msat, expiry) \ Hop(nodeId, shortChannelId, delta, _, base, prop) =>
         // Walk in reverse direction from receiver to sender and accumulate cltv deltas with fees
 
-        val nextFee = msat + base + (prop * msat) / 1000000L
+        val nextFee = msat + LNParams.feeFor(msat, base, prop)
         val nextPayload = PerHopPayload(shortChannelId, msat, expiry)
         (nextPayload +: loads, nodeId +: nodes, nextFee, expiry + delta)
     }

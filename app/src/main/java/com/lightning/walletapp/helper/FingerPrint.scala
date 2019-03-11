@@ -12,10 +12,9 @@ import android.app.Activity
 
 
 object FingerPrint {
-  final val CODE = 105
   private[this] var lastToast = 0L
   def isEnabled = app.prefs.getBoolean(AbstractKit.FINGERPRINT_ENABLED, false)
-  def askPermission(host: Activity) = ActivityCompat.requestPermissions(host, Array(USE_FINGERPRINT), CODE)
+  def askPermission(host: Activity) = ActivityCompat.requestPermissions(host, Array(USE_FINGERPRINT), 105)
   def isPermissionGranted = ContextCompat.checkSelfPermission(app, USE_FINGERPRINT) == PERMISSION_GRANTED
   def isOperational(gf: Goldfinger) = isEnabled && isPermissionGranted && gf.hasEnrolledFingerprint
 
