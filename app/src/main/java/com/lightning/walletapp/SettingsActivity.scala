@@ -13,7 +13,10 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
+import com.lightning.walletapp.helper.{AES, FingerPrint}
+import android.os.Build.{VERSION, VERSION_CODES}
 import android.view.{Menu, MenuItem, View}
+
 import com.google.android.gms.common.api.CommonStatusCodes.SIGN_IN_REQUIRED
 import com.google.android.gms.common.api.ApiException
 import com.lightning.walletapp.ln.wire.WalletZygote
@@ -21,23 +24,16 @@ import com.google.android.gms.drive.MetadataBuffer
 import android.support.v4.content.FileProvider
 import com.lightning.walletapp.lnutils.GDrive
 import android.support.v7.widget.Toolbar
-import com.lightning.walletapp.helper.{AES, FingerPrint}
 import org.bitcoinj.store.SPVBlockStore
 import co.infinum.goldfinger.Goldfinger
 import org.bitcoinj.core.Utils.HEX
 import com.google.common.io.Files
-import android.content.{DialogInterface, Intent}
+import android.content.Intent
 import android.app.Activity
 import android.os.Bundle
-import android.os.Build.{VERSION, VERSION_CODES}
 import android.net.Uri
 import java.util.Date
 import java.io.File
-
-import android.content.DialogInterface.OnDismissListener
-import android.provider.Settings
-
-
 
 
 class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
@@ -126,34 +122,17 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case true if !FingerPrint.isPermissionGranted => runAnd(fpAuthentication setChecked false)(FingerPrint askPermission me)
     case true if !gf.hasFingerprintHardware => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
     case true if !gf.hasEnrolledFingerprint => runAnd(fpAuthentication setChecked false)(app toast fp_add_print)
-    case true => app.prefs.edit.putBoolean(AbstractKit.FINGERPRINT_ENABLED, true).commit
-    case false => runAnd(fpAuthentication setChecked true)(authFpOff)
-  }
-
-  def authFpOff = {
-    val content = getLayoutInflater.inflate(R.layout.frag_touch, null)
-    val alert = showForm(negBuilder(dialog_cancel, null, content).create)
-
-    gf authenticate new Goldfinger.Callback {
-      def onSuccess(cipher: String) = runAnd(alert.dismiss) { app.prefs.edit.putBoolean(AbstractKit.FINGERPRINT_ENABLED, false).commit }
-      def onError(error: co.infinum.goldfinger.Error) = runAnd(FingerPrint informUser error) { if (error.isCritical) alert.dismiss }
-    }
-
-    alert setOnDismissListener new OnDismissListener {
-      def onDismiss(dialogInterface: DialogInterface) = {
-        fpAuthentication.setChecked(FingerPrint isOperational gf)
-        gf.cancel
-      }
-    }
+    case false => fpAuth(gf, onFail = updateFpView)(FingerPrint switch false)
+    case true => FingerPrint switch true
   }
 
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_settings
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-    fpAuthentication.setChecked(FingerPrint isOperational gf)
     getSupportActionBar setSubtitle "App version 0.3-112"
     getSupportActionBar setTitle wallet_settings
     updateBackupView
+    updateFpView
 
     setFiatCurrency setOnClickListener onButtonTap {
       val fiatCodes \ fiatHumanNames = fiatNames.toSeq.reverse.unzip
@@ -221,9 +200,13 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
 
     exportWalletSnapshot setOnClickListener onButtonTap {
-      val bld = me baseTextBuilder getString(migrator_usage_warning).html
-      mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
-      def proceed = <(createZygote, onFail)(none)
+      // Warn user about risks before proceeding with this
+
+      fpAuth(gf, onFail = none) {
+        val bld = me baseTextBuilder getString(migrator_usage_warning).html
+        mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
+        def proceed = <(createZygote, onFail)(none)
+      }
 
       def createZygote = {
         // Prevent channel state updates
@@ -293,5 +276,10 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     else gDriveBackupState setText getString(gdrive_last_saved).format(state).html
     gDriveBackups.setChecked(!gDriveMissing && isUserEnabled)
     gDriveBackups.setEnabled(!gDriveMissing)
+  }
+
+  def updateFpView = {
+    val isOperational = FingerPrint isOperational gf
+    fpAuthentication setChecked isOperational
   }
 }

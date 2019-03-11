@@ -20,6 +20,7 @@ import com.lightning.walletapp.helper.RichCursor
 import com.lightning.walletapp.ln.wire.Hop
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
+import co.infinum.goldfinger.Goldfinger
 import org.bitcoinj.uri.BitcoinURI
 import android.content.Intent
 import android.os.Bundle
@@ -184,52 +185,61 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           none, baseTextBuilder(channelClosureWarning.html), dialog_ok, dialog_cancel)
 
       view setOnClickListener onButtonTap {
-        val contextualChannelMenu = chan.data match {
-          // Unknown spend may be a future commit so we should not allow force-closing
-          case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(2, Nil, 2)
-          // This likely means they have not broadcasted a tx, wait for it instead of closing
-          case _: WaitBroadcastRemoteData => chanActions take 2
-          case _: ClosingData => chanActions.patch(2, Nil, 2)
-          // Should not allow force-closing with old commit
-          case _: RefundingData => chanActions take 2
-          // Cut out refunding tx option
-          case _ => chanActions take 4
-        }
+        // All channel actions are sensitive, require auth
+        fpAuth(new Goldfinger.Builder(me).build, none)(next)
 
-        val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-        val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.asString.html, lst).create)
-        lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, contextualChannelMenu)
-        lst setOnItemClickListener onTap(defineAction)
-        lst setDividerHeight 0
-        lst setDivider null
+        def next = {
+          val contextualChannelMenu = chan.data match {
+            // Unknown spend may be a future commit so we should not allow force-closing
+            case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(2, Nil, 2)
+            // This likely means they have not broadcasted a tx, wait for it instead of closing
+            case _: WaitBroadcastRemoteData => chanActions take 2
+            case _: ClosingData => chanActions.patch(2, Nil, 2)
+            // Should not allow force-closing with old commit
+            case _: RefundingData => chanActions take 2
+            // Cut out refunding tx option
+            case _ => chanActions take 4
+          }
 
-        def defineAction(pos: Int) = (pos, chan.data) match {
-          case (0, _) => urlIntent(txid = chan.fundTxId.toString)
-          case (1, _) => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
-          // In the following two cases channel menu is reduced by 2 so we need to show an appropriate closing tx here
-          case (2, norm: NormalData) if norm.unknownSpend.isDefined => urlIntent(txid = norm.unknownSpend.get.txid.toString)
-          case (2, cd: ClosingData) => urlIntent(txid = cd.bestClosing.commitTx.txid.toString)
-          case (2, _) => proceedCoopCloseOrWarn(informAndClose = closeToAddress)
-          case _ => proceedCoopCloseOrWarn(informAndClose = closeToWallet)
-        }
+          val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+          val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.asString.html, lst).create)
+          lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, contextualChannelMenu)
+          lst setDividerHeight 0
+          lst setDivider null
 
-        def proceedCoopCloseOrWarn(informAndClose: => Unit) = rm(alert) {
-          val isOperationalOrFunding = isOperational(chan) || isOpening(chan)
-          if (isOperationalOrFunding && inFlightHtlcs(chan).isEmpty) informAndClose // Mutual closing is possible
-          else if (isOperationalOrFunding) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
-          else warnAndMaybeClose(me getString ln_chan_force_details)
-        }
+          lst setOnItemClickListener onTap { pos =>
+            // User has already authorized these actions
+            // so display to action list right away here
+            rm(alert)(defineAction)
 
-        def closeToAddress =
-          Try(app.TransData parse app.getBufferUnsafe).toOption collectFirst { case uri: BitcoinURI =>
-            val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
-            val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
-            mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
-          } getOrElse { app toast err_no_data }
+            def defineAction = chan.data match {
+              case _ if 0 == pos => urlIntent(txid = chan.fundTxId.toString)
+              case _ if 1 == pos => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
+              // In the following two cases channel menu is reduced by 2 so we need to show an appropriate closing tx here
+              case norm: NormalData if 2 == pos && norm.unknownSpend.isDefined => urlIntent(txid = norm.unknownSpend.get.txid.toString)
+              case closing: ClosingData if 2 == pos => urlIntent(txid = closing.bestClosing.commitTx.txid.toString)
+              case _ if 2 == pos => proceedCoopCloseOrWarn(closeToWalletOrAddress = closeToAddress)
+              case _ => proceedCoopCloseOrWarn(closeToWalletOrAddress = closeToWallet)
+            }
+          }
 
-        def closeToWallet = {
-          // Simple case: send refunding transaction to this wallet
-          warnAndMaybeClose(me getString ln_chan_close_confirm_local)
+          def proceedCoopCloseOrWarn(closeToWalletOrAddress: => Unit) = isOpeningOrOperational(chan) match {
+            case true if inFlightHtlcs(chan).nonEmpty => warnAndMaybeClose(me getString ln_chan_close_inflight_details)
+            case false => warnAndMaybeClose(me getString ln_chan_force_details)
+            case true => closeToWalletOrAddress
+          }
+
+          def closeToAddress =
+            Try(app.TransData parse app.getBufferUnsafe).toOption collectFirst { case uri: BitcoinURI =>
+              val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
+              val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
+              mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
+            } getOrElse { app toast err_no_data }
+
+          def closeToWallet = {
+            // Simple case: send refunding transaction to this wallet
+            warnAndMaybeClose(me getString ln_chan_close_confirm_local)
+          }
         }
       }
     }
@@ -294,15 +304,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     else if (cd.mutualClose.nonEmpty) me getString ln_info_close_coop
     else me getString ln_info_close_local
 
-  def canDisplay(chanData: ChannelData) = chanData match {
-    case ref: RefundingData => ref.remoteLatestPoint.isDefined
-    case _ => true
-  }
-
-  def sumOrNothing(sats: Satoshi) = sats match {
-    case Satoshi(0L) => getString(ln_info_nothing)
-    case _ => denom parsedWithSign sats
-  }
+  def urlIntent(txid: String) = host startActivity new Intent(Intent.ACTION_VIEW, Uri parse s"https://testnet.smartbit.com.au/tx/$txid")
+  def canDisplay(some: ChannelData) = some match { case ref: RefundingData => ref.remoteLatestPoint.isDefined case _ => true }
+  def sumOrNothing(sats: Satoshi) = if (0L == sats.toLong) getString(ln_info_nothing) else denom parsedWithSign sats
 
   def getStat(chanId: BinaryData) = {
     val cursor = LNParams.db.select(PaymentTable.selectPaymentNumSql, chanId)
@@ -311,11 +315,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def isFeeTooHigh(hop: Hop) = {
     val amountToSendMsat = 25000000L
-    val hopFee = LNParams.feeFor(amountToSendMsat, hop.feeBaseMsat, hop.feeProportionalMillionths)
+    val prop = hop.feeProportionalMillionths
+    val hopFee = LNParams.feeFor(amountToSendMsat, hop.feeBaseMsat, prop)
     hopFee >= LNParams.maxAcceptableFee(amountToSendMsat, hops = 3)
   }
-
-  def urlIntent(txid: String) =
-    host startActivity new Intent(Intent.ACTION_VIEW,
-      Uri parse s"https://smartbit.com.au/tx/$txid")
 }

@@ -198,8 +198,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     lnStatus setText lnSubtitleText.html
     lnBalance setText s"<img src='lnbig'/>$lnFunds".html
+    fiatRate setText s"<small>$perOneBtcRate</small>".html
     fiatBalance setText msatInFiatHuman(lnTotalSum + btcTotalSum)
-    fiatRate setText s"<small>$perOneBtcRate $fiatCode / btc</small>".html
     getSupportActionBar setTitle s"<img src='btcbig'/>$btcFunds".html
     getSupportActionBar setSubtitle btcSubtitleText.html
   }
