@@ -170,7 +170,7 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 
 object LNUrlData {
   def guardResponse(raw: String): Unit = {
-    val validJson = Try(raw.toJson.asJsObject.fields)
+    val validJson = Try(raw.parseJson.asJsObject.fields)
     val hasError = validJson.map(_ apply "reason").map(json2String)
     if (validJson.isFailure) throw new Exception(s"Invalid response $raw")
     if (hasError.isSuccess) throw new Exception(hasError.get)
