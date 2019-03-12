@@ -16,7 +16,6 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
 import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
-import co.infinum.goldfinger.Goldfinger
 import org.bitcoinj.uri.BitcoinURI
 import org.bitcoinj.core.Batch
 import android.os.Bundle
@@ -76,10 +75,13 @@ object FragLNStart {
 }
 
 class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
-  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_ln_start, vg, false)
-  override def onDestroy = wrap(run = super.onDestroy) { FragLNStart.batchOpt = None }
-  lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
-  lazy val gf = new Goldfinger.Builder(host).build
+  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) =
+    inf.inflate(R.layout.frag_ln_start, vg, false)
+
+  override def onDestroy = {
+    FragLNStart.batchOpt = None
+    super.onDestroy
+  }
 
   var setBatchMode: Batch => Unit = none
   var setNormalMode = new Runnable { def run = none }
@@ -118,10 +120,6 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     host goTo classOf[LNStartFundActivity]
   }
 
-  def onNodeSelectedWrap(pos: Int) =
-    if (FragLNStart.batchOpt.isEmpty) me onNodeSelected pos
-    else host.fpAuth(gf, onFail = none)(me onNodeSelected pos)
-
   override def onViewCreated(view: View, state: Bundle) = if (app.isAlive) {
     val batchPresentInfo = view.findViewById(R.id.batchPresentInfo).asInstanceOf[TextView]
     val batchPresentCancel = view.findViewById(R.id.batchPresentCancel).asInstanceOf[Button]
@@ -146,7 +144,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     me initToolbar view.findViewById(R.id.toolbar).asInstanceOf[android.support.v7.widget.Toolbar]
     wrap(host.getSupportActionBar setTitle action_ln_open)(host.getSupportActionBar setSubtitle ln_status_peer)
     batchPresentCancel setOnClickListener host.onButtonTap(setNormalMode.run)
-    lnStartNodesList setOnItemClickListener host.onTap(onNodeSelectedWrap)
+    lnStartNodesList setOnItemClickListener host.onTap(onNodeSelected)
     lnStartNodesList.setAdapter(adapter)
     runAnd(host.checkTransData)(react)
   }

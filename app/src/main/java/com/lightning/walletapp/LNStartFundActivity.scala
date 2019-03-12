@@ -10,22 +10,24 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import android.widget.{ImageButton, TextView}
+
+import scala.util.{Success, Try}
 import com.lightning.walletapp.lnutils.olympus.ChannelUploadAct
 import com.lightning.walletapp.ln.Scripts.pubKeyScript
 import com.lightning.walletapp.helper.AES
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.script.ScriptBuilder
+import co.infinum.goldfinger.Goldfinger
 import org.bitcoinj.wallet.SendRequest
 import fr.acinq.bitcoin.MilliSatoshi
 import android.app.AlertDialog
 import org.bitcoinj.core.Batch
 import android.os.Bundle
 
-import android.widget.{ImageButton, TextView}
-import scala.util.{Success, Try}
-
 
 class LNStartFundActivity extends TimerActivity { me =>
+  lazy val gf: Goldfinger = new Goldfinger.Builder(me).build
   lazy val lnStartFundCancel = findViewById(R.id.lnStartFundCancel).asInstanceOf[ImageButton]
   lazy val lnStartFundDetails = findViewById(R.id.lnStartFundDetails).asInstanceOf[TextView]
   var whenBackPressed: Runnable = UITask(super.onBackPressed)
@@ -145,12 +147,11 @@ class LNStartFundActivity extends TimerActivity { me =>
               val pay = P2WSHData(ms, pay2wsh = dummyScript)
 
               def futureProcess(unsigned: SendRequest) = {
-                val fee = LNParams.broadcaster.perKwThreeSat
                 val batch = Batch(unsigned, dummyScript, null)
                 val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
                 val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
                 val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
-                freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat)
+                freshChan process CMDOpenChannel(localParams, random getBytes 32, LNParams.broadcaster.perKwThreeSat, batch, batch.fundingAmountSat)
               }
             }
 
@@ -176,11 +177,10 @@ class LNStartFundActivity extends TimerActivity { me =>
         val title = getString(ln_ops_start_fund_local_title).html
 
         mkCheckForm(alert => rm(alert) {
-          val fee = LNParams.broadcaster.perKwThreeSat
           val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
           val finalPubKeyScript = ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram
           val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
-          freshChan process CMDOpenChannel(localParams, tempChanId = random getBytes 32, fee, batch, batch.fundingAmountSat)
+          freshChan process CMDOpenChannel(localParams, random getBytes 32, LNParams.broadcaster.perKwThreeSat, batch, batch.fundingAmountSat)
         }, none, baseBuilder(title, text), dialog_next, dialog_cancel)
       }
     }
@@ -201,22 +201,24 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
     }
 
-    lazy val openListener = FragLNStart.batchOpt -> icrOpt match {
-      case None \ Some(inChan) => remoteOpenFundeeListener(inChan.open)
-      case Some(batch) \ None => localBatchListener(batch)
-      case _ => localWalletListener
-    }
+    fpAuth(new Goldfinger.Builder(me).build, onFail = none) {
+      val openListener = Tuple2(FragLNStart.batchOpt, icrOpt) match {
+        case None \ Some(inChan) => remoteOpenFundeeListener(inChan.open)
+        case Some(batch) \ None => localBatchListener(batch)
+        case _ => localWalletListener
+      }
 
-    whenBackPressed = UITask {
-      freshChan.listeners -= openListener
-      ConnectionManager.listeners -= openListener
-      // Worker may have already been removed on some connection failure
-      ConnectionManager.connections.get(ann.nodeId).foreach(_.disconnect)
-      finish
-    }
+      whenBackPressed = UITask {
+        freshChan.listeners -= openListener
+        ConnectionManager.listeners -= openListener
+        // Worker may have already been removed on some connection failure
+        ConnectionManager.connections.get(ann.nodeId).foreach(_.disconnect)
+        finish
+      }
 
-    freshChan.listeners += openListener
-    ConnectionManager.listeners += openListener
-    ConnectionManager.connectTo(ann, notify = true)
+      freshChan.listeners += openListener
+      ConnectionManager.listeners += openListener
+      ConnectionManager.connectTo(ann, notify = true)
+    }
   }
 }
