@@ -126,20 +126,20 @@ case class NodeAnnouncement(signature: BinaryData,
 
   val pretty = addresses collectFirst {
     case _: IPv4 | _: IPv6 => nodeId.toString take 15 grouped 3 mkString "\u0020"
-    case _: Tor2 => s"<strong>Tor</strong>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
-    case _: Tor3 => s"<strong>Tor</strong>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
+    case _: Tor2 => s"<font color='#0099FE'>Tor</font>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
+    case _: Tor3 => s"<font color='#0099FE'>Tor</font>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
   } getOrElse "No IP address"
 
   val identifier = (alias + nodeId.toString).toLowerCase
   val asString = s"<strong>${alias take 15}</strong><br><small>$pretty</small>"
 }
 
-sealed trait NodeAddress
-case object Padding extends NodeAddress
-case class IPv4(ipv4: Inet4Address, port: Int) extends NodeAddress
-case class IPv6(ipv6: Inet6Address, port: Int) extends NodeAddress
-case class Tor2(tor2: String, port: Int) extends NodeAddress
-case class Tor3(tor3: String, port: Int) extends NodeAddress
+sealed trait NodeAddress { def canBeUpdatedIfOffline: Boolean }
+case object Padding extends NodeAddress { def canBeUpdatedIfOffline = false }
+case class IPv4(ipv4: Inet4Address, port: Int) extends NodeAddress { def canBeUpdatedIfOffline = true }
+case class IPv6(ipv6: Inet6Address, port: Int) extends NodeAddress { def canBeUpdatedIfOffline = true }
+case class Tor2(tor2: String, port: Int) extends NodeAddress { def canBeUpdatedIfOffline = false }
+case class Tor3(tor3: String, port: Int) extends NodeAddress { def canBeUpdatedIfOffline = false }
 
 case object NodeAddress {
   val onionSuffix = ".onion"

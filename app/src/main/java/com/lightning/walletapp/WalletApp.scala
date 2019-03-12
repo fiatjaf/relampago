@@ -177,10 +177,11 @@ class WalletApp extends Application { me =>
 
       for {
         _ <- Obs just null subscribeOn IOScheduler.apply delay 20.seconds
-        stillOfflineChan <- ChannelManager.notClosing if stillOfflineChan.state == SLEEPING
-        // Can call findNodes without `retry` wrapper because it gives harmless `Obs.empty` on error
-        Vector(ann1 \ _, _*) <- app.olympus findNodes stillOfflineChan.data.announce.nodeId.toString
-      } stillOfflineChan process ann1
+        offlineChan <- ChannelManager.notClosing if offlineChan.state == SLEEPING
+        if offlineChan.data.announce.addresses.headOption.forall(_.canBeUpdatedIfOffline)
+        // Call findNodes without `retry` wrapper because it gives harmless `Obs.empty` on error
+        Vector(ann1 \ _, _*) <- app.olympus findNodes offlineChan.data.announce.nodeId.toString
+      } offlineChan process ann1
 
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
