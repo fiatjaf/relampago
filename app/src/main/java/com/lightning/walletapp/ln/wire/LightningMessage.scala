@@ -119,19 +119,17 @@ case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
 
 // NODE ADDRESS HANDLING
 
-case class NodeAnnouncement(signature: BinaryData,
-                            features: BinaryData, timestamp: Long,
-                            nodeId: PublicKey, rgbColor: RGB, alias: String,
-                            addresses: NodeAddressList) extends RoutingMessage {
+case class NodeAnnouncement(signature: BinaryData, features: BinaryData, timestamp: Long, nodeId: PublicKey,
+                            rgbColor: RGB, alias: String, addresses: NodeAddressList) extends RoutingMessage {
 
   val pretty = addresses collectFirst {
     case _: IPv4 | _: IPv6 => nodeId.toString take 15 grouped 3 mkString "\u0020"
-    case _: Tor2 => s"<font color='#0099FE'>Tor</font>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
-    case _: Tor3 => s"<font color='#0099FE'>Tor</font>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
+    case _: Tor2 => s"<strong>Tor</strong>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
+    case _: Tor3 => s"<strong>Tor</strong>\u0020${nodeId.toString take 12 grouped 3 mkString "\u0020"}"
   } getOrElse "No IP address"
 
   val identifier = (alias + nodeId.toString).toLowerCase
-  val asString = s"<strong>${alias take 15}</strong><br><small>$pretty</small>"
+  val asString = s"<strong>${alias take 16}</strong><br><small>$pretty</small>"
 }
 
 sealed trait NodeAddress { def canBeUpdatedIfOffline: Boolean }
