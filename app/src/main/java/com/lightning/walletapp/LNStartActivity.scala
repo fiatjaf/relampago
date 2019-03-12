@@ -86,6 +86,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   var setBatchMode: Batch => Unit = none
   var setNormalMode = new Runnable { def run = none }
   private[this] var nodes = Vector.empty[StartNodeView]
+  lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
   lazy val worker = new ThrottledWork[String, AnnounceChansNumVec] {
     private[this] val acinqKey = PublicKey("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
     private[this] val acinqAnnounce = app.mkNodeAnnouncement(acinqKey, NodeAddress.fromParts("34.239.230.56", 9735), "ACINQ")
@@ -183,8 +184,10 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String, cap
   val nodeLink(key, host, port) = uri
   def resolveAnnounce = app.mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, port.toInt), host)
   def requestChannel = unsafe(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1")
+  require(callback contains "https://", "Not an HTTPS callback")
 }
 
 case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, defaultDescription: String) extends LNUrlData {
   def requestWithdraw(paymentRequest: PaymentRequest) = unsafe(s"$callback?k1=$k1&pr=${PaymentRequest write paymentRequest}")
+  require(callback contains "https://", "Not an HTTPS callback")
 }
