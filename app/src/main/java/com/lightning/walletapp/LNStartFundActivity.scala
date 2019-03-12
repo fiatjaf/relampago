@@ -11,8 +11,8 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import android.widget.{ImageButton, TextView}
-
 import scala.util.{Success, Try}
+
 import com.lightning.walletapp.lnutils.olympus.ChannelUploadAct
 import com.lightning.walletapp.ln.Scripts.pubKeyScript
 import com.lightning.walletapp.helper.AES
@@ -27,7 +27,6 @@ import android.os.Bundle
 
 
 class LNStartFundActivity extends TimerActivity { me =>
-  lazy val gf: Goldfinger = new Goldfinger.Builder(me).build
   lazy val lnStartFundCancel = findViewById(R.id.lnStartFundCancel).asInstanceOf[ImageButton]
   lazy val lnStartFundDetails = findViewById(R.id.lnStartFundDetails).asInstanceOf[TextView]
   var whenBackPressed: Runnable = UITask(super.onBackPressed)
