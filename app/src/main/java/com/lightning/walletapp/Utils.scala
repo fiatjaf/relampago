@@ -290,7 +290,6 @@ trait TimerActivity extends AppCompatActivity { me =>
 class RateManager(val content: View) { me =>
   val satInput = content.findViewById(R.id.inputAmount).asInstanceOf[EditText]
   val fiatInput = content.findViewById(R.id.fiatInputAmount).asInstanceOf[EditText]
-  val fingerprint = content.findViewById(R.id.fingerprint).asInstanceOf[LinearLayout]
   val hintFiatDenom = Utils clickableTextField content.findViewById(R.id.hintFiatDenom)
   val hintDenom = Utils clickableTextField content.findViewById(R.id.hintDenom)
 
@@ -299,8 +298,8 @@ class RateManager(val content: View) { me =>
   def hint(ex: String) = runAnd(me)(hintDenom setText denom.amountInTxt.format(ex).html)
 
   val fiatListener = new TextChangedWatcher {
-    def upd = setSum(currentRate.map(perBtc => BigDecimal(fiatInput.getText.toString.noSpaces) / perBtc) map btcBigDecimal2MSat)
-    def onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) = if (fiatInput.hasFocus) upd
+    def upd = currentRate.map(perBtc => BigDecimal(fiatInput.getText.toString.noSpaces) / perBtc) map btcBigDecimal2MSat
+    def onTextChanged(s: CharSequence, start: Int, before: Int, count: Int) = if (fiatInput.hasFocus) setSum(upd)
   }
 
   val bitListener = new TextChangedWatcher {

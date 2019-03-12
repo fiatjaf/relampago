@@ -27,6 +27,7 @@ import android.support.v4.content.ContextCompat
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
 import fr.acinq.bitcoin.Crypto.PublicKey
+import co.infinum.goldfinger.Goldfinger
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
@@ -100,8 +101,10 @@ trait HumanTimeDisplay {
 }
 
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
-  lazy val awaitServiceIntent: Intent = new Intent(me, AwaitService.classof)
   lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
+  lazy val awaitServiceIntent = new Intent(me, AwaitService.classof)
+  lazy val gf = new Goldfinger.Builder(me).build
+
   lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
     def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
     def getCount = 2
@@ -189,67 +192,62 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   // EXTERNAL DATA CHECK
 
   def checkTransData = app.TransData checkAndMaybeErase {
-    // TransData value should be retained in both of these cases
     case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
 
     case FragWallet.REDIRECT =>
-      // TransData value should be erased here
-      // so goOps return type is forced to Unit
+      // Erase TransData value
       goOps(null): Unit
 
     case bitcoinUri: BitcoinURI =>
-      FragWallet.worker sendBtcPopup bitcoinUri
-      // TransData value should be erased here
+      // Sending on-chain is a sensitive action so should be authorized
+      fpAuth(gf, onFail = none)(FragWallet.worker sendBtcPopup bitcoinUri)
       me returnToBase null
 
     case lnUrl: LNUrl =>
       val specialMeaningTag = scala.util.Try(lnUrl.uri getQueryParameter "tag") getOrElse null
       if ("login" == specialMeaningTag) showLoginForm(lnUrl) else resolveStandardUrl(lnUrl)
-      // TransData value will be erased here
       me returnToBase null
 
-    case pr: PaymentRequest =>
-      if (PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix) {
-        // Payee has provided a payment request from some other network
-        // TransData value will be erased here
-        app toast err_no_data
+    case pr: PaymentRequest if PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix =>
+      // Payee has provided a payment request from some other network, can't be fulfilled
+      app toast err_no_data
+      me returnToBase null
+
+    case pr: PaymentRequest if !pr.isFresh =>
+      // Payment request has expired by now
+      app toast dialog_pr_expired
+      me returnToBase null
+
+    case pr: PaymentRequest if ChannelManager.all.exists(isOpening) && ChannelManager.mostFundedChanOpt.isEmpty =>
+      // Only opening channels are present so sending is not enabled yet, inform user about situation
+      onFail(app getString err_ln_still_opening)
+      me returnToBase null
+
+    case pr: PaymentRequest if ChannelManager.mostFundedChanOpt.isEmpty =>
+      // No channels are present at all currently, see what we can do here...
+      if (pr.amount.exists(_ >= app.kit.conf0Balance) || app.kit.conf0Balance.isZero) {
+        // They have requested too much or there is no amount but on-chain wallet is empty
+        showForm(negTextBuilder(dialog_ok, app.getString(ln_send_howto).html).create)
         me returnToBase null
-
-      } else if (!pr.isFresh) {
-        // Payment request has expired by now
-        // TransData value will be erased here
-        app toast dialog_pr_expired
-        me returnToBase null
-
-      } else if (ChannelManager.all.exists(isOpening) && ChannelManager.mostFundedChanOpt.isEmpty) {
-        // Only opening channels are present so sending is not enabled yet, inform user about situation
-        onFail(app getString err_ln_still_opening)
-        // TransData value will be erased here
-        me returnToBase null
-
-      } else if (ChannelManager.mostFundedChanOpt.isEmpty) {
-        // No channels are present at all currently, see what we can do here...
-        if (pr.amount.exists(_ > app.kit.conf0Balance) || app.kit.conf0Balance.isZero) {
-          // They have requested too much or there is no amount but on-chain wallet is empty
-          showForm(negTextBuilder(dialog_ok, app.getString(ln_send_howto).html).create)
-          // TransData value will be erased here
-          me returnToBase null
-
-        } else {
-          // TransData is set to batch or null to erase previous value
-          app.TransData.value = TxWrap findBestBatch pr getOrElse null
-          // Do not erase data which we have just updated
-          app toast err_ln_no_open_chans
-          goStart
-        }
 
       } else {
+        // TransData is set to batch or null to erase previous value
+        app.TransData.value = TxWrap findBestBatch pr getOrElse null
+        // Do not erase data which we have just updated
+        app toast err_ln_no_open_chans
+        goStart
+      }
+
+    case pr: PaymentRequest =>
+      // We can fulfill a payment request
+      // authorize this sensitive action
+
+      me returnToBase null
+      fpAuth(gf, onFail = none) {
         // We have operational channels at this point, check if we have an embedded lnurl
         val specialMeaningTag = scala.util.Try(pr.lnUrlOpt.get.uri getQueryParameter "tag") getOrElse null
         if ("link" == specialMeaningTag) FragWallet.worker.linkedOffChainSend(pr, pr.lnUrlOpt.get)
         else FragWallet.worker.standardOffChainSend(pr)
-        // TransData value will be erased here
-        me returnToBase null
       }
 
     case _ =>
@@ -370,7 +368,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
   }
 
-  def goSendPayment(top: View) = {
+  def goSendPaymentForm(top: View) = {
     val fragCenterList = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
     val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, fragCenterList).create)
     val options = Array(send_scan_qr, send_paste_payment_request, send_hivemind_deposit).map(res => getString(res).html)

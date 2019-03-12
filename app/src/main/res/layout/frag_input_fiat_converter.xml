@@ -37,21 +37,4 @@
         android:layout_width="fill_parent"/>
 
     <View style="@style/GrayDivider"/>
-
-    <LinearLayout
-        style="@style/StandardLinearLayout"
-        android:layout_width="fill_parent"
-        android:orientation="vertical"
-        android:id="@+id/fingerprint"
-        android:visibility="gone">
-
-        <ImageView
-            style="@style/MarginInfo"
-            android:background="@drawable/ic_fingerprint_black_24dp"
-            android:layout_width="wrap_content"
-            android:layout_gravity="center"/>
-
-        <View style="@style/GrayDivider"/>
-
-    </LinearLayout>
 </LinearLayout>

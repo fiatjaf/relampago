@@ -149,10 +149,10 @@
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_upward_white_18dp"
             fab:fab_label="@string/action_coins_send"
+            android:onClick="goSendPaymentForm"
             fab:fab_colorPressed="@color/btc"
             fab:fab_colorNormal="@color/btc"
             fab:fab_colorRipple="@color/btc"
-            android:onClick="goSendPayment"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 
