@@ -29,23 +29,22 @@ import android.os.Bundle
 class LNStartFundActivity extends TimerActivity { me =>
   lazy val lnStartFundCancel = findViewById(R.id.lnStartFundCancel).asInstanceOf[ImageButton]
   lazy val lnStartFundDetails = findViewById(R.id.lnStartFundDetails).asInstanceOf[TextView]
+  lazy val fundNodeView = app getString ln_ops_start_fund_node_view
   var whenBackPressed: Runnable = UITask(super.onBackPressed)
   override def onBackPressed = whenBackPressed.run
 
-  def INIT(state: Bundle) = if (app.isAlive) {
+  def INIT(s: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_ln_start_fund)
-    val fundNodeView = app getString ln_ops_start_fund_node_view
-
-    app.TransData checkAndMaybeErase {
-      case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(fundNodeView), ann)
-      case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(fundNodeView), ann)
-      case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, tip = "( ͡° ͜ʖ ͡°)").asString(fundNodeView), ann)
-      case icp: IncomingChannelParams => proceed(Some(icp), icp.nodeView.asString(fundNodeView), icp.nodeView.ann)
-      case _ => finish
-    }
-
-    // Or back if resources are freed
+    fpAuth(new Goldfinger.Builder(me).build, none)(defineAction)
   } else me exitTo classOf[MainActivity]
+
+  def defineAction = app.TransData checkAndMaybeErase {
+    case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(fundNodeView), ann)
+    case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(fundNodeView), ann)
+    case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, tip = "( ͡° ͜ʖ ͡°)").asString(fundNodeView), ann)
+    case icp: IncomingChannelParams => proceed(Some(icp), icp.nodeView.asString(fundNodeView), icp.nodeView.ann)
+    case _ => finish
+  }
 
   def proceed(icrOpt: Option[IncomingChannelParams], asString: String, ann: NodeAnnouncement) = {
     val freshChan = ChannelManager.createChannel(bootstrap = InitData(ann), initialListeners = Set.empty)
@@ -200,24 +199,22 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
     }
 
-    fpAuth(new Goldfinger.Builder(me).build, onFail = none) {
-      val openListener = Tuple2(FragLNStart.batchOpt, icrOpt) match {
-        case None \ Some(inChan) => remoteOpenFundeeListener(inChan.open)
-        case Some(batch) \ None => localBatchListener(batch)
-        case _ => localWalletListener
-      }
-
-      whenBackPressed = UITask {
-        freshChan.listeners -= openListener
-        ConnectionManager.listeners -= openListener
-        // Worker may have already been removed on some connection failure
-        ConnectionManager.connections.get(ann.nodeId).foreach(_.disconnect)
-        finish
-      }
-
-      freshChan.listeners += openListener
-      ConnectionManager.listeners += openListener
-      ConnectionManager.connectTo(ann, notify = true)
+    val openListener = Tuple2(FragLNStart.batchOpt, icrOpt) match {
+      case None \ Some(inChan) => remoteOpenFundeeListener(inChan.open)
+      case Some(batch) \ None => localBatchListener(batch)
+      case _ => localWalletListener
     }
+
+    whenBackPressed = UITask {
+      freshChan.listeners -= openListener
+      ConnectionManager.listeners -= openListener
+      // Worker may have already been removed on some connection failure
+      ConnectionManager.connections.get(ann.nodeId).foreach(_.disconnect)
+      finish
+    }
+
+    freshChan.listeners += openListener
+    ConnectionManager.listeners += openListener
+    ConnectionManager.connectTo(ann, notify = true)
   }
 }
