@@ -178,8 +178,7 @@ object LNUrlData {
 }
 
 sealed trait LNUrlData { def unsafe(request: String) = get(request, true).trustAllCerts.trustAllHosts.body }
-case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long, cltvExpiryDelta: Int,
-                                  htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) extends LNUrlData {
+case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long) extends LNUrlData {
 
   val nodeLink(key, host, port) = uri
   def resolveAnnounce = app.mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, port.toInt), host)
