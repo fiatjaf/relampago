@@ -304,7 +304,6 @@ object ChannelManager extends Broadcaster {
     case (chan, norm: NormalData, upd: ChannelUpdate)
       if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
       // We have an old or dummy Hop, replace it with a new one IF it updates parameters
-      println(s"-- GOT THEIR UPDATE $upd")
       updateHop(chan, upd)
   }
 
@@ -318,7 +317,7 @@ object ChannelManager extends Broadcaster {
 
   val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
   // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-  var all: Vector[Channel] = { for (chanState <- ChannelWrap doGet db) yield createChannel(operationalListeners, chanState) } drop 1
+  var all: Vector[Channel] = for (chanState <- ChannelWrap doGet db) yield createChannel(operationalListeners, chanState)
   def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
   def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
   def notClosing = for (c <- all if c.state != CLOSING) yield c
