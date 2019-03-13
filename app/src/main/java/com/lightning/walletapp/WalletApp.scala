@@ -19,10 +19,10 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
 
 import rx.lang.scala.{Observable => Obs}
+import fr.acinq.bitcoin.{BinaryData, Crypto}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import androidx.work.{ExistingWorkPolicy, WorkManager}
-import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
 import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{pickInc, repeat}
@@ -299,14 +299,12 @@ object ChannelManager extends Broadcaster {
       if (fundingDepth > minDepth && !isFundingDead) for {
         blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
         shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
-        // Peer might not have public channels available so insert a preliminarily dummy hop to save shortChanId
-        _ = chan process Hop(chan.data.announce.nodeId, shortChannelId, 0, 0L, 0L, feeProportionalMillionths = 0L)
-        ChannelUpdate(_, _, _, _, _, _, cltv, min, base, prop, _) <- app.olympus.findUpdate(chan.data.announce.nodeId)
-      } chan process Hop(chan.data.announce.nodeId, shortChannelId, cltv, min, base, prop)
+      } chan process Hop(chan.data.announce.nodeId, shortChannelId, 0, 0L, 0L, feeProportionalMillionths = 0L)
 
     case (chan, norm: NormalData, upd: ChannelUpdate)
       if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
       // We have an old or dummy Hop, replace it with a new one IF it updates parameters
+      println(s"-- GOT THEIR UPDATE $upd")
       updateHop(chan, upd)
   }
 
@@ -320,7 +318,7 @@ object ChannelManager extends Broadcaster {
 
   val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
   // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-  var all: Vector[Channel] = for (chanState <- ChannelWrap doGet db) yield createChannel(operationalListeners, chanState)
+  var all: Vector[Channel] = { for (chanState <- ChannelWrap doGet db) yield createChannel(operationalListeners, chanState) } drop 1
   def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
   def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
   def notClosing = for (c <- all if c.state != CLOSING) yield c

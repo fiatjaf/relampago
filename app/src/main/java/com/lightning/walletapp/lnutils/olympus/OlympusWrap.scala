@@ -96,7 +96,6 @@ class OlympusWrap extends OlympusProvider {
 
   def findNodes(query: String) = failOver(_.connector findNodes query, Obs.empty, clouds)
   def getShortId(txid: BinaryData) = failOver(_.connector getShortId txid, Obs.empty, clouds)
-  def findUpdate(nodeKey: PublicKey) = failOver(_.connector findUpdate nodeKey, Obs.empty, clouds)
   def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, Obs just Vector.empty, clouds)
   def getRates = failOver(_.connector.getRates, Obs error new ProtocolException("Could not obtain feerates and fiat prices"), clouds)
   def getChildTxs(ids: BinaryDataSeq) = failOver(_.connector getChildTxs ids, Obs error new ProtocolException("Try again later"), clouds)
@@ -104,7 +103,6 @@ class OlympusWrap extends OlympusProvider {
 
 trait OlympusProvider {
   def findRoutes(out: OutRequest): Obs[PaymentRouteVec]
-  def findUpdate(nodeKey: PublicKey): Obs[ChannelUpdate]
   def findNodes(query: String): Obs[AnnounceChansNumVec]
   def getShortId(txid: BinaryData): Obs[BlockHeightAndTxIdx]
   def getChildTxs(txIds: BinaryDataSeq): Obs[TxSeq]
@@ -125,7 +123,6 @@ class Connector(val url: String) extends OlympusProvider {
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getShortId(txid: BinaryData) = ask[BlockHeightAndTxIdx]("shortid/get", "txid" -> txid.toString)
   def getChildTxs(txIds: BinaryDataSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
-  def findUpdate(nodeKey: PublicKey) = ask[ChannelUpdate]("router/update", "nodekey" -> nodeKey.toString)
   def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.hex)
   def http(requestPath: String) = post(s"$url/$requestPath", true).trustAllCerts.trustAllHosts.connectTimeout(15000)
 }
