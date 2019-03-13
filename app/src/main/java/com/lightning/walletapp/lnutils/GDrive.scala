@@ -108,6 +108,7 @@ class BackupWorker(ctxt: Context, params: WorkerParameters) extends Worker(ctxt,
   // Attempt to save channel state data and storage tokens on a gdrive server, update settings
 
   def doWork: Result = {
+    if (!app.isAlive) return Result.FAILURE
     if (GDrive isMissing ctxt) return Result.SUCCESS
     val prefs = ctxt.getSharedPreferences("prefs", Context.MODE_PRIVATE)
     val isEnabled = prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true)
