@@ -6,9 +6,9 @@ import com.lightning.walletapp.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
-import com.lightning.walletapp.ln.wire.{ChannelUpdate, Hop, NodeAnnouncement}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
+import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import com.lightning.walletapp.ChannelManager
 import fr.acinq.eclair.UInt64
 
@@ -65,10 +65,8 @@ object LNParams { me =>
     derivePrivateKey(master, hardened(138L) :: 0L :: BigInt(prefix).toLong :: Nil).privateKey
   }
 
-  def updateExtraHop(upd: ChannelUpdate) = for (chan <- ChannelManager.notClosing) Channel.updateHop(chan, upd)
-  def updateFeerate = for (chan <- ChannelManager.notClosing) chan process CMDFeerate(broadcaster.perKwThreeSat)
-
   def backupFileName = s"blw${chainHash.toString}-${cloudId.toString}.bkup"
+  def updateFeerate = for (chan <- ChannelManager.notClosing) chan process CMDFeerate(broadcaster.perKwThreeSat)
   def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (ord <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: ord :: Nil)
     LocalParams(UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay = 2016, maxAcceptedHtlcs = 25, fund.privateKey, revoke.privateKey,

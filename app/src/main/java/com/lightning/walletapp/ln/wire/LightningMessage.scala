@@ -110,8 +110,9 @@ case class ChannelUpdate(signature: BinaryData, chainHash: BinaryData, shortChan
   lazy val feeEstimate = feeBaseMsat + feeProportionalMillionths * 10
 }
 
-case class Hop(nodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
-               htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long) {
+case class Hop(nodeId: PublicKey, shortChannelId: Long,
+               cltvExpiryDelta: Int, htlcMinimumMsat: Long,
+               feeBaseMsat: Long, feeProportionalMillionths: Long) {
 
   lazy val feeBreakdown = f"${feeProportionalMillionths / 10000D}%2f%% of payment sum + baseline $feeBaseMsat msat"
   lazy val humanDetails = s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry: $cltvExpiryDelta blocks, Routing fees: $feeBreakdown"

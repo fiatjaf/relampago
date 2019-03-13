@@ -29,9 +29,10 @@ object ConnectionManager {
     override def onDisconnect(nodeId: PublicKey) = for (lst <- listeners) lst.onDisconnect(nodeId)
   }
 
-  def connectTo(ann: NodeAnnouncement, notify: Boolean) = connections get ann.nodeId match {
-    case Some(workerIsPresent) => if (notify) events.onOperational(ann.nodeId, isCompat = true)
-    case None => connections += ann.nodeId -> new Worker(ann)
+  def connectTo(ann: NodeAnnouncement, notify: Boolean) = {
+    val noWorkerPresent = connections.get(ann.nodeId).isEmpty
+    if (noWorkerPresent) connections += ann.nodeId -> new Worker(ann)
+    else if (notify) events.onOperational(ann.nodeId, isCompat = true)
   }
 
   class Worker(val ann: NodeAnnouncement) {
