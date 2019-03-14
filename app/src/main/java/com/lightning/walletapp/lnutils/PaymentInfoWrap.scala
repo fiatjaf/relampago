@@ -112,9 +112,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     me updOkOutgoing ok
 
     acceptedPayments get ok.paymentHash foreach { rd =>
-      // Make payment searchable + optimization: record sub-routes in database
+      val isFeeLow = !isFeeBreach(rd.usedRoute, rd.firstMsat, percent = 1000L)
       db.change(PaymentTable.newVirtualSql, rd.queryText, rd.pr.paymentHash)
-      if (rd.usedRoute.nonEmpty) RouteWrap cacheSubRoutes rd
+      if (rd.usedRoute.nonEmpty && isFeeLow) RouteWrap cacheSubRoutes rd
     }
   }
 

@@ -61,14 +61,13 @@ object PaymentInfo {
       case (loads, nodes, msat, expiry) \ Hop(nodeId, shortChannelId, delta, _, base, prop) =>
         // Walk in reverse direction from receiver to sender and accumulate cltv deltas with fees
 
-        val nextFee = msat + LNParams.feeFor(msat, base, prop)
+        val nextFee = LNParams.feeFor(msat, base, prop)
         val nextPayload = PerHopPayload(shortChannelId, msat, expiry)
-        (nextPayload +: loads, nodeId +: nodes, nextFee, expiry + delta)
+        (nextPayload +: loads, nodeId +: nodes, msat + nextFee, expiry + delta)
     }
 
-    val maxFee = LNParams.maxAcceptableFee(lastMsat, route.size)
-    val cltvDelta = lastExpiry - LNParams.broadcaster.currentHeight
-    if (cltvDelta > LNParams.maxCltvDelta || lastMsat - rd.firstMsat > maxFee) useFirstRoute(rest, rd) else {
+    val isCltvBreach = lastExpiry - LNParams.broadcaster.currentHeight > LNParams.maxCltvDelta
+    if (LNParams.isFeeBreach(route, rd.firstMsat) || isCltvBreach) useFirstRoute(rest, rd) else {
       val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, payloads = allPayloads, assoc = rd.pr.paymentHash)
       val rd1 = rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
       Right(rd1)
@@ -96,27 +95,23 @@ object PaymentInfo {
   def replaceRoute(rd: RoutingData, upd: ChannelUpdate) = {
     // In some cases we can just replace a faulty hop with a supplied one
     // but only do this once per each channel to avoid infinite loops
-
-    val withReplacedHop = rd.usedRoute map { hop =>
-      // Replace a single hop and return it otherwise unchanged
-      val shouldReplace = hop.shortChannelId == upd.shortChannelId
-      if (shouldReplace) upd toHop hop.nodeId else hop
-    }
-
-    // Put reconstructed route back, nothing to blacklist
-    val rd1 = rd.copy(routes = withReplacedHop +: rd.routes)
+    val rd1 = rd.copy(routes = updateHop(rd, upd) +: rd.routes)
     // Prevent endless loop by marking this channel
     replacedChans += upd.shortChannelId
     Some(rd1) -> Vector.empty
   }
 
-  def ignoreFeeInsufficient(rd: RoutingData, upd: ChannelUpdate) =
-    rd.usedRoute.find(_.shortChannelId == upd.shortChannelId) forall { oldHop =>
-      val isPropRadical = upd.feeProportionalMillionths / oldHop.feeProportionalMillionths > 2
-      val isBaseRadical = upd.feeBaseMsat / oldHop.feeBaseMsat > 2
-      val isTried = replacedChans.contains(upd.shortChannelId)
-      isTried || isPropRadical || isBaseRadical
-    }
+  def ignoreFeeInsufficient(rd: RoutingData, upd: ChannelUpdate) = {
+    val newRouteFee = LNParams.getCompundFee(updateHop(rd, upd), rd.firstMsat)
+    val oldRouteFee = LNParams.getCompundFee(rd.usedRoute, rd.firstMsat)
+    val triedAlready = replacedChans.contains(upd.shortChannelId)
+    triedAlready || newRouteFee / oldRouteFee > 2
+  }
+
+  def updateHop(rd: RoutingData, upd: ChannelUpdate) = rd.usedRoute map {
+    case keepHop if keepHop.shortChannelId != upd.shortChannelId => keepHop
+    case oldHop => upd.toHop(oldHop.nodeId)
+  }
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
     // Try to reduce remaining routes and also remember bad nodes and channels

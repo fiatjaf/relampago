@@ -304,7 +304,13 @@ object ChannelManager extends Broadcaster {
     case (chan, norm: NormalData, upd: ChannelUpdate)
       if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
       // We have an old or dummy Hop, replace it with a new one IF it updates parameters
-      updateHop(chan, upd)
+
+      for {
+        oldExtraHop <- chan.hasCsOr(_.commitments.extraHop, None)
+        if oldExtraHop.shortChannelId == upd.shortChannelId
+        newExtraHop = upd.toHop(chan.data.announce.nodeId)
+        if oldExtraHop != newExtraHop
+      } chan process newExtraHop
   }
 
   override def onBecome = {

@@ -14,10 +14,10 @@ import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
+import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
-import com.lightning.walletapp.ln.wire.Hop
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
 import co.infinum.goldfinger.Goldfinger
@@ -138,7 +138,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           // we only can display one item so sort them by increasing importance
 
           channelAndHop(chan) match {
-            case Some(_ \ vec) if isFeeTooHigh(vec.head) => setExtraInfo(me getString ln_info_high_fee format vec.head.feeBreakdown)
+            case Some(_ \ vec) if isHighFee(vec) => setExtraInfo(me getString ln_info_high_fee format vec.head.feeBreakdown)
             case None if fundingDepth > 6 => setExtraInfo(resource = ln_info_no_receive)
             case _ => // We may not have it until 6 confs, do nothing
           }
@@ -307,16 +307,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def urlIntent(txid: String) = host startActivity new Intent(Intent.ACTION_VIEW, Uri parse s"https://smartbit.com.au/tx/$txid")
   def canDisplay(some: ChannelData) = some match { case ref: RefundingData => ref.remoteLatestPoint.isDefined case _ => true }
   def sumOrNothing(sats: Satoshi) = if (0L == sats.toLong) getString(ln_info_nothing) else denom parsedWithSign sats
+  def isHighFee(route: PaymentRoute) = LNParams.isFeeBreach(route, msat = 1000000000L)
 
   def getStat(chanId: BinaryData) = {
     val cursor = LNParams.db.select(PaymentTable.selectPaymentNumSql, chanId)
     RichCursor(cursor) headTry { case RichCursor(c1) => c1 getLong 0 } getOrElse 0L
-  }
-
-  def isFeeTooHigh(hop: Hop) = {
-    val amountToSendMsat = 25000000L
-    val prop = hop.feeProportionalMillionths
-    val hopFee = LNParams.feeFor(amountToSendMsat, hop.feeBaseMsat, prop)
-    hopFee >= LNParams.maxAcceptableFee(amountToSendMsat, hops = 3)
   }
 }
