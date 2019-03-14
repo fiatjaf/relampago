@@ -6,11 +6,11 @@ import com.lightning.walletapp.ln.Scripts._
 import fr.acinq.bitcoin.DeterministicWallet._
 import com.lightning.walletapp.Utils.{app, dbFileName}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, sha256}
+import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
-import com.lightning.walletapp.ln.wire.{Hop, NodeAnnouncement}
+import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import com.lightning.walletapp.ChannelManager
-import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import fr.acinq.eclair.UInt64
 
 
@@ -52,14 +52,14 @@ object LNParams { me =>
     app.olympus = new OlympusWrap
   }
 
-  def feeFor(msat: Long, base: Long, proportional: Long) = base + (proportional * msat) / 1000000L
+  def hopFee(msat: Long, base: Long, proportional: Long) = base + (proportional * msat) / 1000000L
   def maxAcceptableFee(msat: Long, hops: Int, percent: Long = 100L) = 25000 * (hops + 1) + msat / percent
 
   def isFeeBreach(route: PaymentRoute, msat: Long, percent: Long = 100L) =
     getCompundFee(route, msat) > maxAcceptableFee(msat, route.size, percent)
 
   def getCompundFee(route: PaymentRoute, msat: Long) = route.reverse.foldLeft(msat) {
-    case sum \ hop => sum + feeFor(sum, hop.feeBaseMsat, hop.feeProportionalMillionths)
+    case sum \ hop => sum + hopFee(sum, hop.feeBaseMsat, hop.feeProportionalMillionths)
   } - msat
 
   def shouldUpdateFee(network: Long, commit: Long) = {

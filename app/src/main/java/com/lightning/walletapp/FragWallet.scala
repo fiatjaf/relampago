@@ -39,7 +39,6 @@ import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
 import org.bitcoinj.uri.BitcoinURI
-import scala.util.Random.shuffle
 import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
@@ -494,8 +493,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val bld = baseBuilder(title, content)
 
     def makeNormalRequest(sum: MilliSatoshi) = {
-      val goodChans = shuffle(chansWithRoutes.filterKeys(chan => estimateCanReceive(chan) >= sum.amount).values.toVector)
-      PaymentInfoWrap.recordRoutingDataWithPr(goodChans take 4, sum, random getBytes 32, inputDescription.getText.toString.trim)
+      val goodChans = chansWithRoutes.keys.toVector.filter(chan => estimateCanReceive(chan) >= sum.amount).sortBy(receivedHtlcs) take 4
+      PaymentInfoWrap.recordRoutingDataWithPr(goodChans map chansWithRoutes, sum, random getBytes 32, inputDescription.getText.toString.trim)
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {

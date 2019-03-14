@@ -709,7 +709,8 @@ object Channel {
   def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat, 0L)
   def estimateNextUsefulCapacity(chan: Channel) = estimateCanSend(chan) + estimateCanReceive(chan)
 
-  def inFlightHtlcs(chan: Channel): Set[Htlc] = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
+  def receivedHtlcs(chan: Channel) = chan.hasCsOr(_.commitments.remoteNextHtlcId, Long.MaxValue)
+  def inFlightHtlcs(chan: Channel) = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
   def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }
   def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
   def isOpeningOrOperational(chan: Channel) = isOperational(chan) || isOpening(chan)
