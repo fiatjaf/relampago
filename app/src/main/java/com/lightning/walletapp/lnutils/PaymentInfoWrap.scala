@@ -236,17 +236,18 @@ object RouteWrap {
     val subs = (rd.usedRoute drop 1).scanLeft(rd.usedRoute take 1) { case rs \ hop => rs :+ hop }
 
     for (_ \ node \ path <- rd.onion.sharedSecrets drop 1 zip subs) {
-      val expiration = System.currentTimeMillis + 1000L * 3600 * 24 * 14
-      val subPathJson \ subNodeString = path.toJson.toString -> node.toString
-      db.change(RouteTable.newSql, subPathJson, subNodeString, expiration)
-      db.change(RouteTable.updSql, subPathJson, expiration, subNodeString)
+      val pathJson \ nodeString = path.toJson.toString -> node.toString
+      db.change(RouteTable.newSql, pathJson, nodeString)
+      db.change(RouteTable.updSql, pathJson, nodeString)
     }
   }
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
-    val cursor = db.select(RouteTable.selectSql, targetId, System.currentTimeMillis)
+    // Cached routes never expire, but local channels might be closed or excluded
+    // so make sure we still have a matching channel for retrieved cached route
+
+    val cursor = db.select(RouteTable.selectSql, targetId)
     val routeTry = RichCursor(cursor).headTry(_ string RouteTable.path) map to[PaymentRoute]
-    // Channels could be closed or excluded so make sure we still have a matching channel for cached route
     val validRouteTry = for (rt <- routeTry if from contains rt.head.nodeId) yield Obs just Vector(rt)
 
     db.change(RouteTable.killSql, targetId)

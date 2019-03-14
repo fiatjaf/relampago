@@ -74,22 +74,18 @@ object BadEntityTable extends Table {
 }
 
 object RouteTable extends Table {
-  val (table, path, targetNode, expire) = Tuple4("route", "path", "targetNode", "expire")
-  val newSql = s"INSERT OR IGNORE INTO $table ($path, $targetNode, $expire) VALUES (?, ?, ?)"
-  val updSql = s"UPDATE $table SET $path = ?, $expire = ? WHERE $targetNode = ?"
-  val selectSql = s"SELECT * FROM $table WHERE $targetNode = ? AND $expire > ?"
+  val (table, path, targetNode) = Tuple3("route", "path", "targetNode")
+  val newSql = s"INSERT OR IGNORE INTO $table ($path, $targetNode) VALUES (?, ?)"
+  val updSql = s"UPDATE $table SET $path = ? WHERE $targetNode = ?"
+  val selectSql = s"SELECT * FROM $table WHERE $targetNode = ?"
   val killSql = s"DELETE FROM $table WHERE $targetNode = ?"
 
   val createSql = s"""
     CREATE TABLE IF NOT EXISTS $table (
-      $id INTEGER PRIMARY KEY AUTOINCREMENT, $path STRING NOT NULL,
-      $targetNode STRING NOT NULL UNIQUE, $expire INTEGER NOT NULL
-    );
-
-    /* targetNode index is created automatically because this field is UNIQUE */
-    CREATE INDEX IF NOT EXISTS idx1$table ON $table ($targetNode, $expire);
-    COMMIT
-    """
+      $id INTEGER PRIMARY KEY AUTOINCREMENT,
+      $targetNode STRING NOT NULL UNIQUE,
+      $path STRING NOT NULL
+    )"""
 }
 
 object PaymentTable extends Table {
@@ -158,7 +154,7 @@ object RevokedInfoTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-extends SQLiteOpenHelper(context, name, null, 4) {
+extends SQLiteOpenHelper(context, name, null, 5) {
 
   val base = getWritableDatabase
   // Note: BinaryData and PublicKey should always yield raw strings for this to work
@@ -192,10 +188,14 @@ extends SQLiteOpenHelper(context, name, null, 4) {
   }
 
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
+    // Old version of RouteTable had a useless expiry column
+    dbs execSQL s"DROP TABLE IF EXISTS ${RouteTable.table}"
+
     // Should work even for updates across many version ranges
     // because each table and index has CREATE IF EXISTS prefix
     dbs execSQL RevokedInfoTable.createSql
     dbs execSQL OlympusLogTable.createSql
     dbs execSQL PaymentTable.reCreateSql
+    dbs execSQL RouteTable.createSql
   }
 }

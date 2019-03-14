@@ -441,7 +441,7 @@ object ChannelManager extends Broadcaster {
 
   def fetchRoutes(rd: RoutingData) = {
     // First we collect chans which in principle can handle a given payment sum right now, then prioritize less busy chans
-    val from = all filter isOperational collect { case chan if estimateCanSend(chan) >= rd.firstMsat => chan.data.announce.nodeId }
+    val from = all.filter(chan => isOperational(chan) && estimateCanSend(chan) >= rd.firstMsat).map(_.data.announce.nodeId).distinct
 
     def withHints = for {
       tag <- Obs from rd.pr.routingInfo
