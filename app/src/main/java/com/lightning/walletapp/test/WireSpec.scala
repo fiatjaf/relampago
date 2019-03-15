@@ -49,7 +49,7 @@ class WireSpec {
 
       {
         // IPv4 mapped
-        val bin = hex"00000000000000000000ffffae8a0b08".toBitVector
+        val bin = BitVector.fromValidHex("00000000000000000000ffffae8a0b08")
         val ipv6 = Inet6Address.getByAddress(null, bin.toByteArray, null)
         val bin2 = ipv6address.encode(ipv6).require
         assert(bin == bin2)
@@ -69,7 +69,7 @@ class WireSpec {
 
       val color = (47.toByte, 255.toByte, 142.toByte)
       val bin = rgb.encode(color).toOption.get
-      assert(bin == hex"2f ff 8e".toBitVector)
+      assert(bin == BitVector.fromValidHex("2f ff 8e"))
       val color2 = rgb.decode(bin).toOption.get.value
       assert(color == color2)
     }
@@ -79,7 +79,7 @@ class WireSpec {
 
       {
         // IPv4 mapped
-        val bin = hex"00000000000000000000ffffae8a0b08".toBitVector
+        val bin = BitVector.fromValidHex("00000000000000000000ffffae8a0b08")
         val ipv6 = Inet6Address.getByAddress(null, bin.toByteArray, null)
         val bin2 = ipv6address.encode(ipv6).require
         assert(bin == bin2)
@@ -101,15 +101,15 @@ class WireSpec {
         val ipv4addr = InetAddress.getByAddress(Array[Byte](192.toByte, 168.toByte, 1.toByte, 42.toByte)).asInstanceOf[Inet4Address]
         val nodeaddr = IPv4(ipv4addr, 4231)
         val bin = nodeaddress.encode(nodeaddr).require
-        assert(bin == hex"01 C0 A8 01 2A 10 87".toBitVector)
+        assert(bin == BitVector.fromValidHex("01 C0 A8 01 2A 10 87"))
         val nodeaddr2 = nodeaddress.decode(bin).require.value
         assert(nodeaddr == nodeaddr2)
       }
       {
-        val ipv6addr = InetAddress.getByAddress(hex"2001 0db8 0000 85a3 0000 0000 ac1f 8001".toArray).asInstanceOf[Inet6Address]
+        val ipv6addr = InetAddress.getByAddress(ByteVector.fromValidHex("2001 0db8 0000 85a3 0000 0000 ac1f 8001").toArray).asInstanceOf[Inet6Address]
         val nodeaddr = IPv6(ipv6addr, 4231)
         val bin = nodeaddress.encode(nodeaddr).require
-        assert(bin == hex"02 2001 0db8 0000 85a3 0000 0000 ac1f 8001 1087".toBitVector)
+        assert(bin == BitVector.fromValidHex("02 2001 0db8 0000 85a3 0000 0000 ac1f 8001 1087"))
         val nodeaddr2 = nodeaddress.decode(bin).require.value
         assert(nodeaddr == nodeaddr2)
       }
