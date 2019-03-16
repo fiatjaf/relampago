@@ -14,7 +14,7 @@ case class Satoshi(amount: Long) extends BtcAmount {
     def >= (that: Satoshi): Boolean = compare(that) >= 0
     def <  (that: Satoshi): Boolean = compare(that) <  0
     def >  (that: Satoshi): Boolean = compare(that) > 0
-
+    def unary_-() = Satoshi(-amount)
     // @formatter:on
 }
 
@@ -29,11 +29,13 @@ case class MilliBtc(amount: BigDecimal) extends BtcAmount {
     def >= (that: MilliBtc): Boolean = compare(that) >= 0
     def <  (that: MilliBtc): Boolean = compare(that) <  0
     def >  (that: MilliBtc): Boolean = compare(that) > 0
+    def unary_-() = MilliBtc(-amount)
     // @formatter:on
 }
 
 case class Btc(amount: BigDecimal) extends BtcAmount {
   require(amount.abs <= 21e6, "amount must not be greater than 21 millions")
+
   // @formatter:off
     def +(other: Btc) = Btc(amount + other.amount)
     def -(other: Btc) = Btc(amount - other.amount)
@@ -44,6 +46,7 @@ case class Btc(amount: BigDecimal) extends BtcAmount {
     def >= (that: Btc): Boolean = compare(that) >= 0
     def <  (that: Btc): Boolean = compare(that) <  0
     def >  (that: Btc): Boolean = compare(that) > 0
+    def unary_-() = Btc(-amount)
     // @formatter:on
 }
 
@@ -59,7 +62,7 @@ case class MilliSatoshi(amount: Long) extends BtcAmount {
     def >= (that: MilliSatoshi): Boolean = compare(that) >= 0
     def <  (that: MilliSatoshi): Boolean = compare(that) <  0
     def >  (that: MilliSatoshi): Boolean = compare(that) > 0
-    def unary_-(): MilliSatoshi = MilliSatoshi(-amount)
+    def unary_-() = MilliSatoshi(-amount)
     // @formatter:on
 }
 
