@@ -11,18 +11,17 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import language.postfixOps
 import java.math.BigInteger
+import scodec.bits.ByteVector
 import java.net.ProtocolException
+import fr.acinq.bitcoin.Transaction
 import com.lightning.walletapp.Utils.app
-import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.ln.Tools.none
 import com.lightning.walletapp.ln.PaymentRequest
 import com.lightning.walletapp.helper.RichCursor
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
-
 import com.lightning.walletapp.lnutils.{OlympusLogTable, OlympusTable, RevokedInfoTable}
-import com.lightning.walletapp.ln.wire.{ChannelUpdate, NodeAnnouncement, OutRequest}
-import fr.acinq.bitcoin.{BinaryData, Transaction}
+import com.lightning.walletapp.ln.wire.{NodeAnnouncement, OutRequest}
 import rx.lang.scala.{Observable => Obs}
 
 
@@ -42,7 +41,7 @@ object OlympusWrap {
   type CloudVec = Vector[Cloud]
 
   // Tx request/response
-  type BinaryDataSeq = Seq[BinaryData]
+  type BVecSeq = Seq[ByteVector]
   type TxSeq = Seq[Transaction]
 
   // BTC and fiat rates
@@ -88,25 +87,25 @@ class OlympusWrap extends OlympusProvider {
     if (cs.isEmpty) onRunOut else run(cs.head) onErrorResumeNext tryAgainWithNextCloud
   }
 
-  def getBackup(key: BinaryData) = {
+  def getBackup(key: ByteVector) = {
     def empty(failure: Throwable) = Vector.empty[String]
     // Special case: we need to query all the available clouds at once
     Obs.from(clouds).flatMap(_.connector getBackup key onErrorReturn empty)
   }
 
   def findNodes(query: String) = failOver(_.connector findNodes query, Obs.empty, clouds)
-  def getShortId(txid: BinaryData) = failOver(_.connector getShortId txid, Obs.empty, clouds)
+  def getShortId(txid: ByteVector) = failOver(_.connector getShortId txid, Obs.empty, clouds)
   def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, Obs just Vector.empty, clouds)
   def getRates = failOver(_.connector.getRates, Obs error new ProtocolException("Could not obtain feerates and fiat prices"), clouds)
-  def getChildTxs(ids: BinaryDataSeq) = failOver(_.connector getChildTxs ids, Obs error new ProtocolException("Try again later"), clouds)
+  def getChildTxs(ids: BVecSeq) = failOver(_.connector getChildTxs ids, Obs error new ProtocolException("Try again later"), clouds)
 }
 
 trait OlympusProvider {
   def findRoutes(out: OutRequest): Obs[PaymentRouteVec]
   def findNodes(query: String): Obs[AnnounceChansNumVec]
-  def getShortId(txid: BinaryData): Obs[BlockHeightAndTxIdx]
-  def getChildTxs(txIds: BinaryDataSeq): Obs[TxSeq]
-  def getBackup(key: BinaryData): Obs[StringVec]
+  def getShortId(txid: ByteVector): Obs[BlockHeightAndTxIdx]
+  def getBackup(key: ByteVector): Obs[StringVec]
+  def getChildTxs(txIds: BVecSeq): Obs[TxSeq]
   def getRates: Obs[Result]
 }
 
@@ -119,10 +118,10 @@ class Connector(val url: String) extends OlympusProvider {
     }
 
   def getRates = ask[Result]("rates/get")
-  def getBackup(key: BinaryData) = ask[StringVec]("data/get", "key" -> key.toString)
+  def getBackup(key: ByteVector) = ask[StringVec]("data/get", "key" -> key.toString)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
-  def getShortId(txid: BinaryData) = ask[BlockHeightAndTxIdx]("shortid/get", "txid" -> txid.toString)
-  def getChildTxs(txIds: BinaryDataSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
+  def getChildTxs(txIds: BVecSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
+  def getShortId(txid: ByteVector) = ask[BlockHeightAndTxIdx]("shortid/get", "txid" -> txid.toString)
   def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.hex)
   def http(requestPath: String) = post(s"$url/$requestPath", true).trustAllCerts.trustAllHosts.connectTimeout(15000)
 }
@@ -132,14 +131,14 @@ class Connector(val url: String) extends OlympusProvider {
 trait CloudAct {
   def onDone: Unit
   val plus: Seq[HttpParam]
-  val data: BinaryData
+  val data: ByteVector
   val path: String
 }
 
 case class CloudSnapshot(tokens: Vector[ClearToken], url: String)
 case class CloudData(info: Option[RequestAndMemo], tokens: Vector[ClearToken], acts: CloudActVec)
-case class LegacyAct(data: BinaryData, plus: Seq[HttpParam], path: String) extends CloudAct { def onDone = none }
-case class CerberusAct(data: BinaryData, plus: Seq[HttpParam], path: String, txids: StringVec) extends CloudAct {
+case class LegacyAct(data: ByteVector, plus: Seq[HttpParam], path: String) extends CloudAct { def onDone = none }
+case class CerberusAct(data: ByteVector, plus: Seq[HttpParam], path: String, txids: StringVec) extends CloudAct {
   // This is an act for uploading a pack of RevocationInfo objects, affected records should be marked once uploaded
 
   def onDone = db txWrap {
@@ -149,12 +148,7 @@ case class CerberusAct(data: BinaryData, plus: Seq[HttpParam], path: String, txi
   }
 }
 
-case class TxUploadAct(data: BinaryData, plus: Seq[HttpParam], path: String) extends CloudAct {
-  // This is an act for uploading refunding transactions immediately when channel gets closed uncooperatively
-  def onDone = db.change(OlympusLogTable.newSql, 1, app.getString(olympus_log_refunding_tx), System.currentTimeMillis)
-}
-
-case class ChannelUploadAct(data: BinaryData, plus: Seq[HttpParam], path: String, alias: String) extends CloudAct {
+case class ChannelUploadAct(data: ByteVector, plus: Seq[HttpParam], path: String, alias: String) extends CloudAct {
   // This is an act for uploading a channel encrypted backup immediately once a transaction for a new channel gets broadcasted
   def onDone = db.change(OlympusLogTable.newSql, 1, app.getString(olympus_log_channel_backup).format(alias), System.currentTimeMillis)
 }

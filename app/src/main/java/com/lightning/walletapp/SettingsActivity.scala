@@ -26,9 +26,9 @@ import com.lightning.walletapp.lnutils.GDrive
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.store.SPVBlockStore
 import co.infinum.goldfinger.Goldfinger
-import org.bitcoinj.core.Utils.HEX
 import com.google.common.io.Files
 import android.content.Intent
+import scodec.bits.ByteVector
 import android.app.Activity
 import android.os.Bundle
 import android.net.Uri
@@ -211,16 +211,19 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
       def createZygote = {
         // Prevent channel state updates
         RatesSaver.subscription.unsubscribe
+        val walletByteVec = ByteVector.view(Files toByteArray app.walletFile)
+        val chainByteVec = ByteVector.view(Files toByteArray app.chainFile)
         val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
-        val sourceFilesSeq = Seq(dbFile, app.walletFile, app.chainFile)
-        val Seq(dbBytes, walletBytes, chainBytes) = sourceFilesSeq map Files.toByteArray
-        val encoded = walletZygoteCodec encode WalletZygote(1, dbBytes, walletBytes, chainBytes)
+        val dbByteVec = ByteVector.view(Files toByteArray dbFile)
+
+        val zygote = WalletZygote(1, dbByteVec, walletByteVec, chainByteVec)
+        val encoded = walletZygoteCodec.encode(zygote).require.toByteArray
 
         val name = s"BLW Snapshot ${new Date}.txt"
         val walletSnapshotFilePath = new File(getCacheDir, "images")
         if (!walletSnapshotFilePath.isFile) walletSnapshotFilePath.mkdirs
         val savedFile = new File(walletSnapshotFilePath, name)
-        Files.write(encoded.require.toByteArray, savedFile)
+        Files.write(encoded, savedFile)
 
         val fileURI = FileProvider.getUriForFile(me, "com.lightning.walletapp", savedFile)
         val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
@@ -236,7 +239,8 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
         for {
           encryptedHexBackup <- backups
-          ref <- AES.decBytes(HEX decode encryptedHexBackup, cloudSecret) map bin2readable map to[RefundingData]
+          encryptedBackupBytes = ByteVector.fromValidHex(encryptedHexBackup).toArray
+          ref <- AES.decBytes(encryptedBackupBytes, cloudSecret.toArray) map bin2readable map to[RefundingData]
           if ChannelManager.all.forall(_.hasCsOr(_.commitments.channelId, null) != ref.commitments.channelId)
         } ChannelManager.all +:= ChannelManager.createChannel(ChannelManager.operationalListeners, ref)
 

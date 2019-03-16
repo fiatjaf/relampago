@@ -6,20 +6,22 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
 import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
+import scodec.bits.ByteVector
 import scala.util.Success
 
-import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
+import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import fr.acinq.bitcoin.{BinaryData, Hash, Satoshi, Transaction}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
+import fr.acinq.bitcoin.{Satoshi, Transaction}
 import fr.acinq.bitcoin.Crypto.{Point, Scalar}
+import fr.acinq.bitcoin.Protocol.{Zeroes, One}
 
 
 abstract class Channel extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
   def hasCsOr[T](fun: HasCommitments => T, defaultNoCommits: T) = data match { case some: HasCommitments => fun(some) case _ => defaultNoCommits }
-  def fundTxId = data match { case some: HasCommitments => some.commitments.commitInput.outPoint.txid case _ => BinaryData.empty }
+  def fundTxId = data match { case some: HasCommitments => some.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
   def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onException me -> err }
   var listeners: Set[ChannelListener] = _
 
@@ -109,11 +111,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       // They have proposed us a channel, we have agreed to their terms and now they have created a funding tx which we should check
-      case (WaitFundingCreatedRemote(announce, localParams, accept, open), FundingCreated(_, txHash, outIndex, remoteSig), WAIT_FOR_FUNDING) =>
+      case (WaitFundingCreatedRemote(announce, localParams, accept, open), FundingCreated(_, txid, outIndex, remoteSig), WAIT_FOR_FUNDING) =>
 
         val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) =
           Funding.makeFirstCommitTxs(localParams, open.fundingSatoshis, open.pushMsat,
-            open.feeratePerKw, accept, txHash, outIndex, open.firstPerCommitmentPoint)
+            open.feeratePerKw, accept, txid, outIndex, open.firstPerCommitmentPoint)
 
         val signedLocalCommitTx =
           Scripts.addSigs(localCommitTx, localParams.fundingPrivKey.publicKey,
@@ -121,7 +123,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         if (Scripts.checkValid(signedLocalCommitTx).isSuccess) {
           val localSigOfRemoteTx = Scripts.sign(localParams.fundingPrivKey)(remoteCommitTx)
-          val fundingSigned = FundingSigned(Tools.toLongId(txHash, outIndex), localSigOfRemoteTx)
+          val fundingSigned = FundingSigned(Tools.toLongId(txid, outIndex), localSigOfRemoteTx)
           val rc = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), open.firstPerCommitmentPoint)
           val core = WaitFundingSignedCore(localParams, fundingSigned.channelId, Some(open.channelFlags), accept, localSpec, rc)
           BECOME(WaitBroadcastRemoteData(announce, core, core makeCommitments signedLocalCommitTx), WAIT_FUNDING_DONE) SEND fundingSigned
@@ -294,7 +296,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // Only if we have a point and something to sign
         if norm.commitments.remoteNextCommitInfo.isRight &&
           (norm.commitments.localChanges.proposed.nonEmpty ||
-          norm.commitments.remoteChanges.acked.nonEmpty) =>
+            norm.commitments.remoteChanges.acked.nonEmpty) =>
 
         // Propose new remote commit via commit tx sig
         val nextRemotePoint = norm.commitments.remoteNextCommitInfo.right.get
@@ -642,10 +644,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
   def makeReestablish(some: HasCommitments, nextLocalCommitmentNumber: Long) = {
     val ShaHashesWithIndex(hashes, lastIndex) = some.commitments.remotePerCommitmentSecrets
-    val yourLastPerCommitmentSecret = lastIndex.map(ShaChain.moves).flatMap(ShaChain getHash hashes).getOrElse(Sphinx zeroes 32)
+    val yourLastPerCommitmentSecret = lastIndex.map(ShaChain.moves).flatMap(ShaChain getHash hashes).map(ByteVector.view)
     val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
+
     ChannelReestablish(some.commitments.channelId, nextLocalCommitmentNumber, some.commitments.remoteCommit.index,
-      Some apply Scalar(yourLastPerCommitmentSecret), Some apply myCurrentPerCommitmentPoint)
+      yourLastPerCommitmentSecret = Some apply Scalar(yourLastPerCommitmentSecret getOrElse Zeroes),
+      myCurrentPerCommitmentPoint = Some apply myCurrentPerCommitmentPoint)
   }
 
   private def makeFirstFundingLocked(some: HasCommitments) = {
@@ -666,7 +670,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   }
 
   def startLocalClose(some: HasCommitments): Unit =
-    // Something went wrong and we decided to spend our CURRENT commit transaction
+  // Something went wrong and we decided to spend our CURRENT commit transaction
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
       case (_, neg: NegotiationsData) if neg.lastSignedTx.isDefined => startMutualClose(neg, neg.lastSignedTx.get.tx)
       case (localClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(localCommit = localClaim :: Nil)
@@ -674,14 +678,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     }
 
   private def startRemoteCurrentClose(some: HasCommitments) =
-    // They've decided to spend their CURRENT commit tx, we need to take what's ours
+  // They've decided to spend their CURRENT commit tx, we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, some.commitments.remoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(remoteCommit = remoteClaim :: Nil)
       case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, remoteCommit = remoteClaim :: Nil)
     }
 
   private def startRemoteNextClose(some: HasCommitments, nextRemoteCommit: RemoteCommit) =
-    // They've decided to spend their NEXT commit tx, once again we need to take what's ours
+  // They've decided to spend their NEXT commit tx, once again we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, nextRemoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(nextRemoteCommit = remoteClaim :: Nil)
       case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, nextRemoteCommit = remoteClaim :: Nil)
@@ -703,7 +707,7 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  private[this] val nextDummyHtlc = UpdateAddHtlc("00", id = -1, LNParams.maxHtlcValueMsat, Hash.Zeroes, 144 * 3, new String)
+  private[this] val nextDummyHtlc = UpdateAddHtlc(Zeroes, -1, LNParams.maxHtlcValueMsat, One, 144 * 3, ByteVector.empty)
   def nextReducedRemoteState(commitments: Commitments) = Commitments.addLocalProposal(commitments, nextDummyHtlc).reducedRemoteState
   def estimateCanSend(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.maxHtlcValueMsat, 0L)
   def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat, 0L)

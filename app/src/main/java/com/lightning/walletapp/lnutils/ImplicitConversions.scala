@@ -3,21 +3,21 @@ package com.lightning.walletapp.lnutils
 import android.graphics.drawable.BitmapDrawable
 import com.lightning.walletapp.Utils.app
 import language.implicitConversions
-import fr.acinq.bitcoin.BinaryData
+import scodec.bits.ByteVector
 import android.view.Gravity
 import android.text.Html
 
 
 object ImplicitConversions {
   implicit def string2Ops(raw: String): StringOps = new StringOps(raw)
-  implicit def bitcoinLibScript2bitcoinjScript(pubKeyScript: BinaryData): org.bitcoinj.script.Script =
-    new org.bitcoinj.script.Script(pubKeyScript, System.currentTimeMillis / 1000L - 3600 * 24)
+  implicit def bitcoinLibScript2bitcoinjScript(pubKeyScript: ByteVector): org.bitcoinj.script.Script =
+    new org.bitcoinj.script.Script(pubKeyScript.toArray, System.currentTimeMillis / 1000L - 3600 * 24)
 
   implicit def bitcoinjTx2bitcoinLibTx(bitcoinjTx: org.bitcoinj.core.Transaction): fr.acinq.bitcoin.Transaction =
     fr.acinq.bitcoin.Transaction.read(bitcoinjTx.unsafeBitcoinSerialize)
 
   implicit def bitcoinLibTx2bitcoinjTx(bitcoinLibTx: fr.acinq.bitcoin.Transaction): org.bitcoinj.core.Transaction =
-    new org.bitcoinj.core.Transaction(app.params, fr.acinq.bitcoin.Transaction write bitcoinLibTx)
+    new org.bitcoinj.core.Transaction(app.params, fr.acinq.bitcoin.Transaction.write(bitcoinLibTx).toArray)
 }
 
 object IconGetter extends Html.ImageGetter {
@@ -52,6 +52,6 @@ object IconGetter extends Html.ImageGetter {
 
 class StringOps(source: String) {
   def html = Html.fromHtml(source, IconGetter, null)
-  def hex = BinaryData(source getBytes "UTF-8").toString
+  def hex = ByteVector.view(source getBytes "UTF-8").toHex
   def noSpaces = source.replace(" ", "").replace("\u00A0", "")
 }

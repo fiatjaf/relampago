@@ -11,16 +11,15 @@ import com.lightning.walletapp.ln.crypto.ShaHashesWithIndex
 import com.lightning.walletapp.ln.crypto.ShaChain.Index
 import com.lightning.walletapp.ln.Tools.Bytes
 import fr.acinq.eclair.UInt64
-import scodec.bits.BitVector
 import java.math.BigInteger
-import scala.util.Try
 import scodec.Codec
 
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData, WithdrawRequest}
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
+import fr.acinq.bitcoin.{MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
+import scodec.bits.{BitVector, ByteVector}
 
 
 object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
@@ -37,21 +36,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     private val extension = "tag" -> JsString(tag)
   }
 
-  def decide(raw: String) = {
-    val validJson = Try(raw.toJson.asJsObject.fields)
-    val hasError = validJson.map(_ apply "reason").map(json2String)
-    if (validJson.isFailure) throw new Exception("Invalid Json response")
-    if (hasError.isSuccess) throw new Exception(hasError.get)
-  }
-
   implicit object BigIntegerFmt extends JsonFormat[BigInteger] {
     def read(json: JsValue): BigInteger = new BigInteger(me json2String json)
     def write(internal: BigInteger): JsValue = internal.toString.toJson
-  }
-
-  implicit object BinaryDataFmt extends JsonFormat[BinaryData] {
-    def read(json: JsValue): BinaryData = BinaryData(me json2String json)
-    def write(internal: BinaryData): JsValue = internal.toString.toJson
   }
 
   implicit object TransactionFmt extends JsonFormat[Transaction] {
@@ -60,8 +47,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   }
 
   implicit object PublicKeyFmt extends JsonFormat[PublicKey] {
-    def read(json: JsValue): PublicKey = PublicKey(me json2String json)
-    def write(internal: PublicKey): JsValue = internal.toString.toJson
+    def read(json: JsValue): PublicKey = Tools pubKeyFromByteVectorUnchecked ByteVector.fromValidHex(me json2String json)
+    def write(internalRepresentationAsHex: PublicKey): JsValue = internalRepresentationAsHex.toString.toJson
   }
 
   implicit object ShaHashesWithIndexFmt
@@ -94,6 +81,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val channelUpdateFmt = sCodecJsonFmt(channelUpdateCodec)
   implicit val perHopPayloadFmt = sCodecJsonFmt(perHopPayloadCodec)
   implicit val channelFlagsFmt = sCodecJsonFmt(channelFlagsCodec)
+  implicit val byteVectorFmt = sCodecJsonFmt(scodec.codecs.bytes)
   implicit val commitSigFmt = sCodecJsonFmt(commitSigCodec)
   implicit val shutdownFmt = sCodecJsonFmt(shutdownCodec)
   implicit val uint64exFmt = sCodecJsonFmt(uint64ex)
@@ -138,9 +126,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   // Channel data
 
-  implicit val outPointFmt = jsonFormat[BinaryData, Long, OutPoint](OutPoint.apply, "hash", "index")
-  implicit val txOutFmt = jsonFormat[Satoshi, BinaryData, TxOut](TxOut.apply, "amount", "publicKeyScript")
-  implicit val inputInfoFmt = jsonFormat[OutPoint, TxOut, BinaryData, InputInfo](InputInfo.apply, "outPoint", "txOut", "redeemScript")
+  implicit val outPointFmt = jsonFormat[ByteVector, Long, OutPoint](OutPoint.apply, "hash", "index")
+  implicit val txOutFmt = jsonFormat[Satoshi, ByteVector, TxOut](TxOut.apply, "amount", "publicKeyScript")
+  implicit val inputInfoFmt = jsonFormat[OutPoint, TxOut, ByteVector, InputInfo](InputInfo.apply, "outPoint", "txOut", "redeemScript")
 
   implicit object TransactionWithInputInfoFmt
   extends JsonFormat[TransactionWithInputInfo] {
@@ -210,7 +198,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     ClosingTx](ClosingTx.apply, "input", "tx"), tag = "ClosingTx")
 
   implicit val localParamsFmt =
-    jsonFormat[UInt64, Long, Int, Int, PrivateKey, Scalar, Scalar, Scalar, Scalar, BinaryData, Satoshi, BinaryData, Boolean,
+    jsonFormat[UInt64, Long, Int, Int, PrivateKey, Scalar, Scalar, Scalar, Scalar, ByteVector, Satoshi, ByteVector, Boolean,
       LocalParams](LocalParams.apply, "maxHtlcValueInFlightMsat", "channelReserveSat", "toSelfDelay", "maxAcceptedHtlcs", "fundingPrivKey",
       "revocationSecret", "paymentKey", "delayedPaymentKey", "htlcKey", "defaultFinalScriptPubKey", "dustLimit", "shaSeed", "isFunder")
 
@@ -218,7 +206,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val commitmentSpecFmt = jsonFormat[Long, Long, Long, Set[Htlc], Set[HtlcAndFulfill], Set[HtlcAndFail], Set[Htlc],
     CommitmentSpec](CommitmentSpec.apply, "feeratePerKw", "toLocalMsat", "toRemoteMsat", "htlcs", "fulfilled", "failed", "malformed")
 
-  implicit val htlcTxAndSigs = jsonFormat[TransactionWithInputInfo, BinaryData, BinaryData,
+  implicit val htlcTxAndSigs = jsonFormat[TransactionWithInputInfo, ByteVector, ByteVector,
     HtlcTxAndSigs](HtlcTxAndSigs.apply, "txinfo", "localSig", "remoteSig")
 
   implicit val localCommitFmt = jsonFormat[Long, CommitmentSpec, Seq[HtlcTxAndSigs], CommitTx,
@@ -236,7 +224,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       Changes](Changes.apply, "proposed", "signed", "acked")
 
   implicit val commitmentsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes, Changes, Long, Long,
-    Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, BinaryData, Option[Hop], Option[ChannelFlags], Long,
+    Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, ByteVector, Option[Hop], Option[ChannelFlags], Long,
     Commitments](Commitments.apply, "localParams", "remoteParams", "localCommit", "remoteCommit", "localChanges",
     "remoteChanges", "localNextHtlcId", "remoteNextHtlcId", "remoteNextCommitInfo", "commitInput",
     "remotePerCommitmentSecrets", "channelId", "extraHop", "channelFlags", "startedAt")
@@ -307,7 +295,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       tag = "WaitFundingDoneData")
 
   implicit val waitFundingSignedCoreFmt =
-    jsonFormat[LocalParams, BinaryData, Option[ChannelFlags], AcceptChannel, CommitmentSpec, RemoteCommit,
+    jsonFormat[LocalParams, ByteVector, Option[ChannelFlags], AcceptChannel, CommitmentSpec, RemoteCommit,
       WaitFundingSignedCore](WaitFundingSignedCore.apply, "localParams", "channelId", "channelFlags",
       "remoteParams", "localSpec", "remoteCommit")
 
@@ -327,36 +315,31 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   }
 
   implicit val paymentRequestFmt =
-    jsonFormat[String, Option[MilliSatoshi], Long, PublicKey, Vector[Tag], BinaryData,
+    jsonFormat[String, Option[MilliSatoshi], Long, PublicKey, Vector[Tag], ByteVector,
       PaymentRequest](PaymentRequest.apply, "prefix", "amount", "timestamp", "nodeId", "tags", "signature")
 
   implicit object CloudActFmt extends JsonFormat[CloudAct] {
     def write(unserialized: CloudAct): JsValue = unserialized match {
       case unserialiedMessage: ChannelUploadAct => unserialiedMessage.toJson
-      case unserialiedMessage: TxUploadAct => unserialiedMessage.toJson
       case unserialiedMessage: CerberusAct => unserialiedMessage.toJson
       case unserialiedMessage: LegacyAct => unserialiedMessage.toJson
     }
 
     def read(serialized: JsValue): CloudAct = serialized.asJsObject.fields get "tag" match {
       case Some(s: JsString) if s.value == "ChannelUploadAct" => serialized.convertTo[ChannelUploadAct]
-      case Some(s: JsString) if s.value == "TxUploadAct" => serialized.convertTo[TxUploadAct]
       case Some(s: JsString) if s.value == "CerberusAct" => serialized.convertTo[CerberusAct]
       case _ => serialized.convertTo[LegacyAct] // TODO: remove later
     }
   }
 
   implicit val legacyActFmt =
-    jsonFormat[BinaryData, Seq[HttpParam], String,
+    jsonFormat[ByteVector, Seq[HttpParam], String,
       LegacyAct](LegacyAct.apply, "data", "plus", "path")
 
-  implicit val cerberusActFmt = taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String, StringVec,
+  implicit val cerberusActFmt = taggedJsonFmt(jsonFormat[ByteVector, Seq[HttpParam], String, StringVec,
     CerberusAct](CerberusAct.apply, "data", "plus", "path", "txids"), tag = "CerberusAct")
 
-  implicit val txUploadActFmt = taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String,
-    TxUploadAct](TxUploadAct.apply, "data", "plus", "path"), tag = "TxUploadAct")
-
-  implicit val channelUploadActFmt = taggedJsonFmt(jsonFormat[BinaryData, Seq[HttpParam], String, String,
+  implicit val channelUploadActFmt = taggedJsonFmt(jsonFormat[ByteVector, Seq[HttpParam], String, String,
     ChannelUploadAct](ChannelUploadAct.apply, "data", "plus", "path", "alias"), tag = "ChannelUploadAct")
 
   implicit val cloudSnapshot = jsonFormat[Vector[ClearToken], String, CloudSnapshot](CloudSnapshot.apply, "tokens", "url")

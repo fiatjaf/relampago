@@ -12,9 +12,9 @@ import android.support.v4.content.FileProvider
 import com.google.zxing.qrcode.QRCodeWriter
 import android.graphics.Bitmap.createBitmap
 import android.transition.TransitionManager
-import fr.acinq.bitcoin.BinaryData
 import org.bitcoinj.core.Address
 import android.content.Intent
+import scodec.bits.ByteVector
 import android.view.View
 import android.os.Bundle
 
@@ -68,7 +68,7 @@ class RequestActivity extends TimerActivity { me =>
     // Snapshot target hash, data will be erased soon
     val targetPayHash = app.TransData.value match {
       case pr: PaymentRequest => pr.paymentHash
-      case _ => BinaryData.empty
+      case _ => ByteVector.empty
     }
 
     val receivedListener = new ChannelListener {

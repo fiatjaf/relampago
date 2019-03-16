@@ -13,8 +13,8 @@ import scala.collection.mutable.ArrayBuffer
   */
 
 object Protocol {
-  val Zeroes = ByteVector(hex"0000000000000000000000000000000000000000000000000000000000000000")
-  val One = ByteVector(hex"0100000000000000000000000000000000000000000000000000000000000000")
+  val Zeroes = ByteVector.fromValidHex("0000000000000000000000000000000000000000000000000000000000000000")
+  val One = ByteVector.fromValidHex("0100000000000000000000000000000000000000000000000000000000000000")
   val PROTOCOL_VERSION = 70015
 
   def uint8(input: InputStream): Int = input.read()
@@ -34,12 +34,14 @@ object Protocol {
 
   def writeUInt16(input: Int, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt16(input, order).toArray)
 
-  def writeUInt16(input: Int, order: ByteOrder): ByteVector = {
+  def writeUInt16Array(input: Int, order: ByteOrder): Array[Byte] = {
     val bin = new Array[Byte](2)
     val buffer = ByteBuffer.wrap(bin).order(order)
     buffer.putShort(input.toShort)
-    ByteVector.view(bin)
+    bin
   }
+
+  def writeUInt16(input: Int, order: ByteOrder): ByteVector = ByteVector.view(writeUInt16Array(input, order))
 
   def uint32(input: InputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Long = {
     val bin = new Array[Byte](4)
@@ -54,12 +56,14 @@ object Protocol {
 
   def writeUInt32(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt32(input, order).toArray)
 
-  def writeUInt32(input: Long, order: ByteOrder): ByteVector = {
+  def writeUInt32Array(input: Long, order: ByteOrder): Array[Byte] = {
     val bin = new Array[Byte](4)
     val buffer = ByteBuffer.wrap(bin).order(order)
     buffer.putInt((input & 0xffffffff).toInt)
-    ByteVector.view(bin)
+    bin
   }
+
+  def writeUInt32(input: Long, order: ByteOrder): ByteVector = ByteVector.view(writeUInt32Array(input, order))
 
   def writeUInt32(input: Long): ByteVector = writeUInt32(input, ByteOrder.LITTLE_ENDIAN)
 
@@ -76,12 +80,14 @@ object Protocol {
 
   def writeUInt64(input: Long, out: OutputStream, order: ByteOrder = ByteOrder.LITTLE_ENDIAN): Unit = out.write(writeUInt64(input, order).toArray)
 
-  def writeUInt64(input: Long, order: ByteOrder): ByteVector = {
+  def writeUInt64Array(input: Long, order: ByteOrder): Array[Byte] = {
     val bin = new Array[Byte](8)
     val buffer = ByteBuffer.wrap(bin).order(order)
     buffer.putLong(input)
-    ByteVector.view(bin)
+    bin
   }
+
+  def writeUInt64(input: Long, order: ByteOrder): ByteVector = ByteVector.view(writeUInt64Array(input, order))
 
   def varint(blob: Array[Byte]): Long = varint(new ByteArrayInputStream(blob))
 
@@ -308,7 +314,7 @@ object NetworkAddressWithTimestamp extends BtcSerializer[NetworkAddressWithTimes
     writeUInt32(input.time.toInt, out)
     writeUInt64(input.services, out)
     input.address match {
-      case _: Inet4Address => writeBytes(hex"00000000000000000000ffff".toArray, out)
+      case _: Inet4Address => writeBytes(ByteVector.fromValidHex("00000000000000000000ffff").toArray, out)
       case _: Inet6Address => ()
     }
     writeBytes(input.address.getAddress, out)
@@ -333,7 +339,7 @@ object NetworkAddress extends BtcSerializer[NetworkAddress] {
   override def write(input: NetworkAddress, out: OutputStream, protocolVersion: Long) = {
     writeUInt64(input.services, out)
     input.address match {
-      case _: Inet4Address => writeBytes(hex"00000000000000000000ffff".toArray, out)
+      case _: Inet4Address => writeBytes(ByteVector.fromValidHex("00000000000000000000ffff").toArray, out)
       case _: Inet6Address => ()
     }
     writeBytes(input.address.getAddress, out)
@@ -441,7 +447,7 @@ object Getheaders extends BtcSerializer[Getheaders] {
   }
 
   override def read(in: InputStream, protocolVersion: Long): Getheaders = {
-    Getheaders(version = uint32(in), locatorHashes = readCollection[ByteVector](in, (i: InputStream, _: Long) => hash(i).bytes, protocolVersion), stopHash = hash(in))
+    Getheaders(version = uint32(in), locatorHashes = readCollection[ByteVector](in, (i: InputStream, _: Long) => hash(i), protocolVersion), stopHash = hash(in))
   }
 }
 

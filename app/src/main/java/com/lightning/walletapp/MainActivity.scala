@@ -117,9 +117,9 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
     val bitVector = BitVector(ByteStreams toByteArray inputStream)
     val zygote = walletZygoteCodec.decode(bitVector).require.value
     if (!databaseFile.exists) databaseFile.getParentFile.mkdirs
-    Files.write(zygote.wallet, app.walletFile)
-    Files.write(zygote.chain, app.chainFile)
-    Files.write(zygote.db, databaseFile)
+    Files.write(zygote.wallet.toArray, app.walletFile)
+    Files.write(zygote.chain.toArray, app.chainFile)
+    Files.write(zygote.db.toArray, databaseFile)
     next
   }
 

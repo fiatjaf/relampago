@@ -13,7 +13,7 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
 import rx.lang.scala.{Observable => Obs}
 import com.lightning.walletapp.helper.{AES, RichCursor}
-import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Transaction}
+import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Transaction}
 import com.lightning.walletapp.lnutils.olympus.{CerberusAct, OlympusWrap}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.cerberusPayloadCodec
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs
@@ -22,11 +22,12 @@ import com.lightning.walletapp.ln.crypto.Sphinx.PublicKeyVec
 import com.lightning.walletapp.ChannelManager
 import fr.acinq.bitcoin.Crypto.PublicKey
 import com.lightning.walletapp.Utils.app
+import scodec.bits.ByteVector
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
-  private[this] var unsentPayments = Map.empty[BinaryData, RoutingData]
-  var acceptedPayments = Map.empty[BinaryData, RoutingData]
+  private[this] var unsentPayments = Map.empty[ByteVector, RoutingData]
+  var acceptedPayments = Map.empty[ByteVector, RoutingData]
 
   def addPendingPayment(rd: RoutingData) = {
     // Add payment to unsentPayments and try to resolve it later
@@ -57,17 +58,16 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def fetchAndSend(rd: RoutingData) = ChannelManager.fetchRoutes(rd).foreach(ChannelManager.sendEither(_, failOnUI), anyError => me failOnUI rd)
   def updOkIncoming(m: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
   def updOkOutgoing(m: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
-  def getPaymentInfo(hash: BinaryData) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
-  def updStatus(status: Int, hash: BinaryData) = db.change(PaymentTable.updStatusSql, status, hash)
+  def getPaymentInfo(hash: ByteVector) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
+  def updStatus(status: Int, hash: ByteVector) = db.change(PaymentTable.updStatusSql, status, hash)
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
 
   def toPaymentInfo(rc: RichCursor) =
-    PaymentInfo(rawPr = rc string PaymentTable.pr, rc string PaymentTable.preimage,
-      rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp,
-      rc string PaymentTable.description, rc long PaymentTable.firstMsat,
-      rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
+    PaymentInfo(rawPr = rc string PaymentTable.pr, preimage = ByteVector.fromValidHex(rc string PaymentTable.preimage),
+      rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
+      rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
@@ -76,7 +76,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       rd.lastExpiry, NOCHANID)
   }
 
-  def recordRoutingDataWithPr(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: BinaryData, description: String): RoutingData = {
+  def recordRoutingDataWithPr(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: ByteVector, description: String): RoutingData = {
     val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, description, Some(app.kit.currentAddress.toString), extraRoutes)
     val rd = emptyRD(pr, sum.amount, useCache = true)
 
@@ -177,8 +177,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     val encrypted = for {
       txid \ revInfo <- notPendingInfos
-      txidBytes = BinaryData(txid).toArray
-      revInfoBytes = BinaryData(revInfo).toArray
+      txidBytes = ByteVector.fromValidHex(txid).toArray
+      revInfoBytes = ByteVector.fromValidHex(revInfo).toArray
       enc = AES.encBytes(revInfoBytes, txidBytes)
     } yield txid -> enc
 
@@ -212,7 +212,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 }
 
 object ChannelWrap {
-  def doPut(chanId: BinaryData, data: String) = db txWrap {
+  def doPut(chanId: ByteVector, data: String) = db txWrap {
     // Insert and then update because of INSERT IGNORE effects
     db.change(ChannelTable.newSql, chanId, data)
     db.change(ChannelTable.updSql, data, chanId)

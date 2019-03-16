@@ -1,10 +1,11 @@
 package com.lightning.walletapp.ln
 
 import com.lightning.walletapp.ln.Tools.runAnd
-import fr.acinq.bitcoin.Crypto.PrivateKey
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+
 import language.implicitConversions
-import fr.acinq.bitcoin.BinaryData
 import crypto.RandomGenerator
+import scodec.bits.ByteVector
 import java.util
 
 
@@ -16,10 +17,12 @@ object \ {
 object Tools {
   type Bytes = Array[Byte]
   val random = new RandomGenerator
+
   def runAnd[T](result: T)(action: Any): T = result
   def bin2readable(bin: Bytes) = new String(bin, "UTF-8")
-  def log(message: String): Unit = android.util.Log.d("LN", message)
-  def randomPrivKey = PrivateKey(random getBytes 32, compressed = true)
+  def log(consoleMessage: String): Unit = android.util.Log.d("LN", consoleMessage)
+  def randomPrivKey = PrivateKey(ByteVector.view(random getBytes 32), compressed = true)
+  def pubKeyFromByteVectorUnchecked(bv: ByteVector) = PublicKey(bv, checkValid = false)
   def wrap(run: => Unit)(go: => Unit) = try go catch none finally run
   def none: PartialFunction[Any, Unit] = { case _ => }
 
@@ -40,16 +43,19 @@ object Tools {
     if (txIndex < 0) None else Some(result)
   }
 
-  def toLongId(fundingHash: BinaryData, fundingOutputIndex: Int) =
-    if (fundingOutputIndex >= 65536 | fundingHash.size != 32) throw new LightningException("Funding index > 65535 or funding hash != 32")
-    else fundingHash.take(30) :+ fundingHash.data(30).^(fundingOutputIndex >> 8).toByte :+ fundingHash.data(31).^(fundingOutputIndex).toByte
+  def toLongId(txid: ByteVector, fundingOutputIndex: Int) = {
+    require(fundingOutputIndex < 65536, "Index is larger than 65535")
+    val part2 = txid(30).^(fundingOutputIndex >> 8).toByte
+    val part3 = txid(31).^(fundingOutputIndex).toByte
+    txid.take(30) :+ part2 :+ part3
+  }
 }
 
 object Features {
   val OPTION_DATA_LOSS_PROTECT_MANDATORY = 0
   val OPTION_DATA_LOSS_PROTECT_OPTIONAL = 1
 
-  implicit def binData2BitSet(featuresBinaryData: BinaryData): util.BitSet = util.BitSet.valueOf(featuresBinaryData.reverse.toArray)
+  implicit def binData2BitSet(featuresBinaryData: ByteVector): util.BitSet = util.BitSet.valueOf(featuresBinaryData.reverse.toArray)
   def dataLossProtect(bitset: util.BitSet) = bitset.get(OPTION_DATA_LOSS_PROTECT_OPTIONAL) || bitset.get(OPTION_DATA_LOSS_PROTECT_MANDATORY)
   def isBitSet(position: Int, bitField: Byte): Boolean = bitField.&(1 << position) == (1 << position)
 

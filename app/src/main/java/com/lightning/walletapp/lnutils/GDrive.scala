@@ -9,6 +9,7 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.{AbstractKit, ChannelManager}
 import com.lightning.walletapp.ln.Tools.{Bytes, bin2readable}
 import androidx.work.{Data, OneTimeWorkRequest, Worker, WorkerParameters}
+
 import com.google.android.gms.common.GoogleApiAvailability
 import com.lightning.walletapp.ln.crypto.MultiStreamUtils
 import com.google.android.gms.common.ConnectionResult
@@ -18,8 +19,8 @@ import com.lightning.walletapp.helper.AES
 import com.lightning.walletapp.Utils.app
 import com.google.common.collect.Sets
 import java.util.concurrent.TimeUnit
-import fr.acinq.bitcoin.BinaryData
 import android.content.Context
+import scodec.bits.ByteVector
 import scala.util.Try
 
 
@@ -42,9 +43,9 @@ object GDrive {
     Option(GoogleSignIn getLastSignedInAccount ctxt)
       .filter(_.getGrantedScopes containsAll scopes)
 
-  def decrypt(contents: DriveContents, secret: BinaryData) = for {
+  def decrypt(contents: DriveContents, secret: ByteVector) = for {
     encryptedData <- Try(MultiStreamUtils readone contents.getInputStream)
-    someBackup <- AES.decBytes(encryptedData, secret) map bin2readable
+    someBackup <- AES.decBytes(encryptedData, secret.toArray) map bin2readable
   } yield someBackup
 
   def getMetaTask(folderTask: Task[DriveFolder], res: DriveResourceClient, fileName: String) =
@@ -98,7 +99,7 @@ object BackupWorker {
   val BACKUP_FILE_NAME = "backupFileName"
   private[this] val bwClass = classOf[BackupWorker]
 
-  def workRequest(backupFileName: String, secret: BinaryData) = {
+  def workRequest(backupFileName: String, secret: ByteVector) = {
     val bld = (new Data.Builder).putString(BACKUP_FILE_NAME, backupFileName).putString(SECRET, secret.toString).build
     new OneTimeWorkRequest.Builder(bwClass).setInputData(bld).setInitialDelay(5, TimeUnit.SECONDS).addTag("ChannelsBackupWork").build
   }
@@ -114,14 +115,14 @@ class BackupWorker(ctxt: Context, params: WorkerParameters) extends Worker(ctxt,
     val isEnabled = prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true)
     if (!isEnabled) return Result.SUCCESS
 
-    val secret = getInputData.getString(BackupWorker.SECRET)
+    val secretHex = getInputData.getString(BackupWorker.SECRET)
     val backupFileName = getInputData.getString(BackupWorker.BACKUP_FILE_NAME)
     val storageTokensBackup = for (olympusCloud <- app.olympus.clouds) yield olympusCloud.snapshot
     val hasCommitmentsBackup = for (channel <- ChannelManager.all) yield channel.hasCsOr(Some.apply, None)
-    if (null == secret || null == backupFileName || hasCommitmentsBackup.isEmpty) return Result.SUCCESS
+    if (null == secretHex || null == backupFileName || hasCommitmentsBackup.isEmpty) return Result.SUCCESS
 
     // Convert hex to byte array
-    val secretBytes = BinaryData(secret).toArray
+    val secretBytes = ByteVector.fromValidHex(secretHex).toArray
     GDrive.signInAccount(ctxt) map GDrive.driveResClient(ctxt) map { drc =>
       val plainText = GDriveBackup(hasCommitmentsBackup.flatten, storageTokensBackup, v = 1).toJson.toString
       val res = GDrive.createOrUpdateBackup(AES.encReadable(plainText, secretBytes).toByteArray, backupFileName, drc)

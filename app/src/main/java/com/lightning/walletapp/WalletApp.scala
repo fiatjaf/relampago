@@ -1,7 +1,6 @@
 package com.lightning.walletapp
 
 import R.string._
-import spray.json._
 import org.bitcoinj.core._
 import scala.concurrent.duration._
 import com.lightning.walletapp.ln._
@@ -14,12 +13,11 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.google.common.util.concurrent.Service.State._
-import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
 
 import rx.lang.scala.{Observable => Obs}
-import fr.acinq.bitcoin.{BinaryData, Crypto}
+import scodec.bits.{BitVector, ByteVector}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import androidx.work.{ExistingWorkPolicy, WorkManager}
@@ -30,7 +28,6 @@ import android.app.{Application, NotificationChannel, NotificationManager}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.revocationInfoCodec
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap
-import com.lightning.walletapp.lnutils.olympus.TxUploadAct
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
@@ -38,10 +35,10 @@ import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
 import rx.lang.scala.schedulers.IOScheduler
 import java.util.Collections.singletonList
-import fr.acinq.bitcoin.Hash.Zeroes
+import fr.acinq.bitcoin.Protocol.Zeroes
 import org.bitcoinj.uri.BitcoinURI
 import scala.concurrent.Future
-import scodec.bits.BitVector
+import fr.acinq.bitcoin.Crypto
 import android.widget.Toast
 import scodec.DecodeResult
 import android.os.Build
@@ -103,7 +100,7 @@ class WalletApp extends Application { me =>
 
   def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) = {
     val dummySig = Crypto encodeSignature Crypto.sign(random getBytes 32, randomPrivKey)
-    NodeAnnouncement(dummySig, "", 0L, id, (-128, -128, -128), alias take 16, na :: Nil)
+    NodeAnnouncement(dummySig, ByteVector.empty, 0L, id, (-128, -128, -128), alias take 16, na :: Nil)
   }
 
   object TransData {
@@ -133,8 +130,8 @@ class WalletApp extends Application { me =>
     def parse(rawInputTextToParse: String) = rawInputTextToParse take 2880 match {
       case bitcoinUriLink if bitcoinUriLink startsWith "bitcoin" => bitcoinUri(bitcoinUriLink)
       case bitcoinUriLink if bitcoinUriLink startsWith "BITCOIN" => bitcoinUri(bitcoinUriLink.toLowerCase)
-      case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, port.toInt), host)
-      case shortNodeLink(key, host) => mkNodeAnnouncement(PublicKey(key), NodeAddress.fromParts(host, 9735), host)
+      case nodeLink(key, host, port) => mkNodeAnnouncement(PublicKey(ByteVector fromValidHex key), NodeAddress.fromParts(host, port.toInt), host)
+      case shortNodeLink(key, host) => mkNodeAnnouncement(PublicKey(ByteVector fromValidHex key), NodeAddress.fromParts(host, 9735), host)
       case lnPayReq(prefix, data) => PaymentRequest.read(s"$prefix$data")
       case lnUrl(prefix, data) => LNUrl.fromBech32(s"$prefix$data")
       case _ => toBitcoinUri(rawInputTextToParse)
@@ -273,12 +270,12 @@ object ChannelManager extends Broadcaster {
     if (currentBlocksLeft == Int.MaxValue) app.kit.wallet.getLastBlockSeenHeight
     else app.kit.wallet.getLastBlockSeenHeight + currentBlocksLeft
 
-  def getTx(txid: BinaryData) = {
+  def getTx(txid: ByteVector) = {
     val wrapped = Sha256Hash wrap txid.toArray
     Option(app.kit.wallet getTransaction wrapped)
   }
 
-  def getStatus(txid: BinaryData) = getTx(txid) map { tx =>
+  def getStatus(txid: ByteVector) = getTx(txid) map { tx =>
     val isTxDead = tx.getConfidence.getConfidenceType == DEAD
     tx.getConfidence.getDepthInBlocks -> isTxDead
   } getOrElse 0 -> false
@@ -389,7 +386,7 @@ object ChannelManager extends Broadcaster {
 
       for {
         serialized <- rc.toOption
-        bitVec = BitVector(BinaryData(serialized).data)
+        bitVec = BitVector.fromValidHex(serialized)
         DecodeResult(ri, _) <- revocationInfoCodec.decode(bitVec).toOption
         perCommitmentSecret <- Helpers.Closing.extractCommitmentSecret(cs, tx)
         riWithCurrentFeeRate = ri.copy(feeRate = ri.feeRate max broadcaster.perKwThreeSat)
@@ -406,8 +403,6 @@ object ChannelManager extends Broadcaster {
     }
 
     def CLOSEANDWATCH(cd: ClosingData) = {
-      val tier12txs = for (state <- cd.tier12States) yield state.txn
-      if (tier12txs.nonEmpty) app.olympus tellClouds TxUploadAct(tier12txs.toJson.toString.hex, Nil, "txs/schedule")
       repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
       // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
       app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
@@ -440,7 +435,7 @@ object ChannelManager extends Broadcaster {
       // It may happen such that we had enough funds while were deciding whether to pay, but do not have enough funds at this point
       case Some(chan) if estimateCanSend(chan) < rd.firstMsat && estimateAIRCanSend >= rd.firstMsat => Left(app getString dialog_sum_big, true)
       case Some(chan) if estimateCanSend(chan) < rd.firstMsat => Left(app getString dialog_sum_big, false)
-      case None => Left(app getString err_ln_no_open_chans, false)
+      case None => Left(app getString err_no_data, false)
       case _ => Right(rd)
     }
   }

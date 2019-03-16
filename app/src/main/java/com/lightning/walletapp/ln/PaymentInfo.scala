@@ -8,12 +8,12 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.FailureMessageCodecs._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.lnutils.JsonHttpUtils.to
-import com.lightning.walletapp.ln.Tools.random
-import scodec.bits.BitVector
 import scodec.Attempt
 
-import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi, Transaction}
+import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Transaction}
+import com.lightning.walletapp.ln.Tools.{Bytes, random}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+import scodec.bits.{BitVector, ByteVector}
 import scala.util.{Success, Try}
 
 
@@ -23,8 +23,8 @@ object PaymentInfo {
   final val FAILURE = 3
   final val FROZEN = 4
 
-  final val NOIMAGE = BinaryData("3030303030303030")
-  final val NOCHANID = BinaryData("3131313131313131")
+  final val NOIMAGE = ByteVector.fromValidHex("3030303030303030")
+  final val NOCHANID = ByteVector.fromValidHex("3131313131313131")
   final val REBALANCING = "Rebalancing"
 
   type FailureTry = Try[ErrorPacket]
@@ -32,7 +32,7 @@ object PaymentInfo {
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
 
   // Stores a history of error responses from peers per each outgoing payment request
-  var errors = Map.empty[BinaryData, FailureTryVec] withDefaultValue Vector.empty
+  var errors = Map.empty[ByteVector, FailureTryVec] withDefaultValue Vector.empty
   private[this] var replacedChans = Set.empty[Long]
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int = 0) = {
@@ -41,9 +41,11 @@ object PaymentInfo {
       lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache, airLeft, airAskUser = true)
   }
 
-  def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: BinaryData): SecretsAndPacket = {
+  def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: ByteVector): SecretsAndPacket = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
-    makePacket(PrivateKey(random getBytes 32), keys, payloads.map(php => serialize(perHopPayloadCodec encode php).toArray), assoc)
+    val encodedPayloads = for (rawPayload <- payloads) yield serialize(perHopPayloadCodec encode rawPayload).toArray
+    val privateKey = PrivateKey(ByteVector.view(random getBytes 32), compressed = false)
+    makePacket(privateKey, keys, encodedPayloads, assoc.toArray)
   }
 
   def useFirstRoute(rest: PaymentRouteVec, rd: RoutingData) = rest match {
@@ -75,8 +77,8 @@ object PaymentInfo {
   }
 
   def without(rs: PaymentRouteVec, fun: Hop => Boolean) = rs.filterNot(_ exists fun)
-  def failHtlc(sharedSecret: BinaryData, failure: FailureMessage, add: UpdateAddHtlc) =
-    CMDFailHtlc(reason = createErrorPacket(sharedSecret, failure), id = add.id)
+  def failHtlc(sharedSecret: Bytes, failure: FailureMessage, add: UpdateAddHtlc): CMDFailHtlc =
+    CMDFailHtlc(reason = ByteVector view createErrorPacket(sharedSecret, failure), id = add.id)
 
   def withoutChan(shortId: Long, rd: RoutingData, span: Long, msat: Long) = {
     val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == shortId)
@@ -115,7 +117,7 @@ object PaymentInfo {
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
     // Try to reduce remaining routes and also remember bad nodes and channels
-    val parsed = Try apply parseErrorPacket(rd.onion.sharedSecrets, fail.reason)
+    val parsed = Try apply parseErrorPacket(rd.onion.sharedSecrets, fail.reason.toArray)
     errors = errors.updated(rd.pr.paymentHash, errors(rd.pr.paymentHash) :+ parsed)
 
     parsed map {
@@ -157,7 +159,7 @@ object PaymentInfo {
 
   // After mutually signed HTLCs are present we need to parse and fail/fulfill them
   def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag, isLoop: Boolean) = Try {
-    val packet = parsePacket(privateKey = nodeSecret, associatedData = add.paymentHash, add.onionRoutingPacket)
+    val packet = parsePacket(privateKey = nodeSecret, add.paymentHash.toArray, add.onionRoutingPacket.toArray)
     Tuple3(perHopPayloadCodec decode BitVector(packet.payload), packet.nextPacket, packet.sharedSecret)
   } map {
     // We are the final HTLC recipient, sanity checks first
@@ -198,7 +200,7 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
   lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
 }
 
-case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, status: Int, stamp: Long,
+case class PaymentInfo(rawPr: String, preimage: ByteVector, incoming: Int, status: Int, stamp: Long,
                        description: String, firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
 
   val firstSum = MilliSatoshi(firstMsat)
@@ -210,8 +212,8 @@ case class PaymentInfo(rawPr: String, preimage: BinaryData, incoming: Int, statu
 
 trait PaymentInfoBag { me =>
   def extractPreimage(tx: Transaction)
-  def getPaymentInfo(hash: BinaryData): Try[PaymentInfo]
-  def updStatus(paymentStatus: Int, hash: BinaryData)
+  def getPaymentInfo(hash: ByteVector): Try[PaymentInfo]
+  def updStatus(paymentStatus: Int, hash: ByteVector)
   def updOkOutgoing(m: UpdateFulfillHtlc)
   def updOkIncoming(m: UpdateAddHtlc)
 }

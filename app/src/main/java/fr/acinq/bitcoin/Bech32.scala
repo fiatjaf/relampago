@@ -85,7 +85,7 @@ object Bech32 {
     * @param data data (a sequence of 5 bits integers)
     * @return a checksum computed over hrp and data
     */
-  private def checksum(hrp: String, data: Array[Int5]): Array[Int5] = {
+  def checksum(hrp: String, data: Array[Int5]): Array[Int5] = {
     val values = expand(hrp) ++ data
     val poly = polymod(values, Array(0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte, 0.toByte)) ^ 1.toByte
     val result = new Array[Int5](6)
@@ -98,7 +98,7 @@ object Bech32 {
     * @param input a sequence of 8 bits integers
     * @return a sequence of 5 bits integers
     */
-  private def eight2five(input: Array[Byte]): Array[Int5] = {
+  def eight2five(input: Array[Byte]): Array[Int5] = {
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
@@ -119,7 +119,7 @@ object Bech32 {
     * @param input a sequence of 5 bits integers
     * @return a sequence of 8 bits integers
     */
-  private def five2eight(input: Array[Int5]): Array[Byte] = {
+  def five2eight(input: Array[Int5]): Array[Byte] = {
     var buffer = 0L
     val output = collection.mutable.ArrayBuffer.empty[Byte]
     var count = 0
@@ -159,16 +159,27 @@ object Bech32 {
     *         is the witness version and program the decoded witness program.
     *         If version is 0, it will be either 20 bytes (P2WPKH) or 32 bytes (P2WSH)
     */
-  def decodeWitnessAddress(address: String): (String, Byte, ByteVector) = {
+  private def decodeWitnessAddress(address: String): (String, Byte, ByteVector) = {
     if (address.indexWhere(_.isLower) != -1 && address.indexWhere(_.isUpper) != -1) throw new IllegalArgumentException("input mixes lowercase and uppercase characters")
     val (hrp, data) = decode(address)
-    require(hrp == "bc" || hrp == "tb" || hrp == "bcrt", s"invalid HRP $hrp")
     val version = data(0)
     require(version >= 0 && version <= 16, "invalid segwit version")
     val bin = five2eight(data.drop(1))
     require(bin.length >= 2 && bin.length <= 40, s"invalid witness program length ${bin.length}")
     if (version == 0) require(bin.length == 20 || bin.length == 32, s"invalid witness program length ${bin.length}")
     (hrp, version, ByteVector.view(bin))
+  }
+
+  def decodeWitnessAddressMainChain(address: String): (String, Byte, ByteVector) = {
+    val (hrp, version, bin) = decodeWitnessAddress(address)
+    require(hrp == "bc" || hrp == "tb" || hrp == "bcrt", s"invalid main chain HRP $hrp")
+    (hrp, version, bin)
+  }
+
+  def decodeWitnessAddressHivemind(address: String): (String, Byte, ByteVector) = {
+    val (hrp, version, bin) = decodeWitnessAddress(address)
+    require(hrp == "hmbc" || hrp == "hmtb" || hrp == "hmbcrt", s"invalid hivemind HRP $hrp")
+    (hrp, version, bin)
   }
 
   /**

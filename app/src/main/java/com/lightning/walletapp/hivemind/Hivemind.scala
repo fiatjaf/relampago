@@ -3,23 +3,24 @@ package com.lightning.walletapp.hivemind
 import com.lightning.walletapp.Utils._
 import org.bitcoinj.wallet.SendRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-import fr.acinq.bitcoin.{Base58Check, BinaryData, OP_0, OP_PUSHDATA, SIGHASH_ALL, Satoshi, Script, Transaction}
+import fr.acinq.bitcoin.{Base58Check, OP_0, OP_PUSHDATA, SIGHASH_ALL, Satoshi, Script, Transaction}
 import org.bitcoinj.core.{Coin, TransactionInput, TransactionOutPoint}
 import com.lightning.walletapp.ln.PubKeyScriptIndexFinder
 import fr.acinq.bitcoin.SigVersion.SIGVERSION_BASE
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import org.bitcoinj.script.ScriptBuilder
 import language.implicitConversions
+import scodec.bits.ByteVector
 
 
 object Hivemind {
   val encodedPrivKey = "L3UjtLhNXKZaDgFtf14EHkxV1p5CKUoyRUT5DcU7aUS1X2yX8hhg"
-  val scriptPubKey = BinaryData("76a9147c33a3f6d9d5b873f96dba4b12d6aaf6be71fbd288ac")
+  val scriptPubKey = ByteVector.fromValidHex("76a9147c33a3f6d9d5b873f96dba4b12d6aaf6be71fbd288ac")
   val (_, data) = Base58Check decode encodedPrivKey
   val privateKey = PrivateKey(data)
 
   implicit def sat2Coin(sat: Satoshi): Coin = Coin valueOf sat.amount
-  def madeDepositTx(hiveMindHash: BinaryData, depositAmount: Satoshi, prevTx: Transaction) = {
+  def madeDepositTx(hiveMindHash: ByteVector, depositAmount: Satoshi, prevTx: Transaction) = {
     val prevDepositIndex = new PubKeyScriptIndexFinder(prevTx).findPubKeyScriptIndex(scriptPubKey)
     val prevDepositAmount = prevTx.txOut(prevDepositIndex).amount
     val newDepositAmount = prevDepositAmount + depositAmount
@@ -27,7 +28,7 @@ object Hivemind {
 
     // Add OP_RETURN with our pubkey hash so sidechain knows about it
     val opReturnScript = Script.write(OP_0 :: OP_PUSHDATA(hiveMindHash) :: Nil)
-    rq.tx.addOutput(Coin.ZERO, ScriptBuilder createOpReturnScript opReturnScript)
+    rq.tx.addOutput(Coin.ZERO, ScriptBuilder createOpReturnScript opReturnScript.toArray)
 
     // Include previous tx to make input connected, see `addLocalInputsToTx`
     val outPoint = new TransactionOutPoint(app.params, prevDepositIndex, prevTx)

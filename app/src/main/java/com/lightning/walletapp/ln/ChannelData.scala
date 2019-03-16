@@ -7,17 +7,18 @@ import com.lightning.walletapp.ln.Scripts._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.AddErrorCodes._
 import com.lightning.walletapp.ln.LNParams.broadcaster._
-import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction}
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{LNMessageVector, RedeemScriptAndSig}
+import fr.acinq.bitcoin.{Satoshi, Transaction}
 import org.bitcoinj.core.Batch
+import scodec.bits.ByteVector
 import fr.acinq.eclair.UInt64
 
 
 sealed trait Command
-case class CMDShutdown(scriptPubKey: Option[BinaryData] = None) extends Command
+case class CMDShutdown(scriptPubKey: Option[ByteVector] = None) extends Command
 case class CMDBestHeight(heightNow: Long, heightInit: Long) extends Command
 case class CMDConfirmed(tx: Transaction) extends Command
 case class CMDFunding(tx: Transaction) extends Command
@@ -29,12 +30,12 @@ case object CMDOffline extends Command
 case object CMDOnline extends Command
 
 case class CMDOpenChannel(localParams: LocalParams,
-                          tempChanId: BinaryData, initialFeeratePerKw: Long, batch: Batch, fundingSat: Long,
+                          tempChanId: ByteVector, initialFeeratePerKw: Long, batch: Batch, fundingSat: Long,
                           channelFlags: ChannelFlags = ChannelFlags(0), pushMsat: Long = 0L) extends Command
 
-case class CMDFailMalformedHtlc(id: Long, onionHash: BinaryData, code: Int) extends Command
-case class CMDFulfillHtlc(id: Long, preimage: BinaryData) extends Command
-case class CMDFailHtlc(id: Long, reason: BinaryData) extends Command
+case class CMDFailMalformedHtlc(id: Long, onionHash: ByteVector, code: Int) extends Command
+case class CMDFulfillHtlc(id: Long, preimage: ByteVector) extends Command
+case class CMDFailHtlc(id: Long, reason: ByteVector) extends Command
 
 // CHANNEL DATA
 
@@ -53,7 +54,7 @@ case class WaitAcceptData(announce: NodeAnnouncement, cmd: CMDOpenChannel) exten
 case class WaitFundingData(announce: NodeAnnouncement, cmd: CMDOpenChannel, accept: AcceptChannel) extends ChannelData
 
 // Funding tx may arrive locally or from external funder
-case class WaitFundingSignedCore(localParams: LocalParams, channelId: BinaryData, channelFlags: Option[ChannelFlags],
+case class WaitFundingSignedCore(localParams: LocalParams, channelId: ByteVector, channelFlags: Option[ChannelFlags],
                                  remoteParams: AcceptChannel, localSpec: CommitmentSpec, remoteCommit: RemoteCommit) {
 
   def makeCommitments(signedLocalCommitTx: CommitTx) =
@@ -126,7 +127,7 @@ case class ClosingData(announce: NodeAnnouncement,
 }
 
 sealed trait CommitPublished {
-  def frozenHashes: Seq[BinaryData] = Nil
+  def frozenHashes: Seq[ByteVector] = Nil
   def getState: Seq[PublishStatus] = Nil
   val commitTx: Transaction
 }
@@ -178,8 +179,8 @@ case class RevokedCommitPublished(claimMain: Seq[ClaimP2WPKHOutputTx], claimThei
 }
 
 case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig],
-                          claimMainTxSig: Option[BinaryData], claimPenaltyTxSig: Option[BinaryData], feeRate: Long,
-                          dustLimit: Long, finalScriptPubKey: BinaryData, toSelfDelay: Int, localPubKey: PublicKey,
+                          claimMainTxSig: Option[ByteVector], claimPenaltyTxSig: Option[ByteVector], feeRate: Long,
+                          dustLimit: Long, finalScriptPubKey: ByteVector, toSelfDelay: Int, localPubKey: PublicKey,
                           remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey) {
 
   lazy val dustLim = Satoshi(dustLimit)
@@ -187,7 +188,7 @@ case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig],
     Scripts.makeClaimP2WPKHOutputTx(tx, localPubKey,
       finalScriptPubKey, feeRate, dustLim)
 
-  def makeHtlcPenalty(finder: PubKeyScriptIndexFinder)(redeemScript: BinaryData) =
+  def makeHtlcPenalty(finder: PubKeyScriptIndexFinder)(redeemScript: ByteVector) =
     Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, feeRate, dustLim)
 
   def makeMainPenalty(tx: Transaction) =
@@ -260,8 +261,8 @@ object CommitmentSpec {
 case class LocalParams(maxHtlcValueInFlightMsat: UInt64, channelReserveSat: Long, toSelfDelay: Int,
                        maxAcceptedHtlcs: Int, fundingPrivKey: PrivateKey, revocationSecret: Scalar,
                        paymentKey: Scalar, delayedPaymentKey: Scalar, htlcKey: Scalar,
-                       defaultFinalScriptPubKey: BinaryData, dustLimit: Satoshi,
-                       shaSeed: BinaryData, isFunder: Boolean) {
+                       defaultFinalScriptPubKey: ByteVector, dustLimit: Satoshi,
+                       shaSeed: ByteVector, isFunder: Boolean) {
 
   lazy val delayedPaymentBasepoint = delayedPaymentKey.toPoint
   lazy val revocationBasepoint = revocationSecret.toPoint
@@ -272,13 +273,13 @@ case class LocalParams(maxHtlcValueInFlightMsat: UInt64, channelReserveSat: Long
 case class WaitingForRevocation(nextRemoteCommit: RemoteCommit, sent: CommitSig, localCommitIndexSnapshot: Long)
 case class LocalCommit(index: Long, spec: CommitmentSpec, htlcTxsAndSigs: Seq[HtlcTxAndSigs], commitTx: CommitTx)
 case class RemoteCommit(index: Long, spec: CommitmentSpec, txOpt: Option[Transaction], remotePerCommitmentPoint: Point)
-case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: BinaryData, remoteSig: BinaryData)
+case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: ByteVector, remoteSig: ByteVector)
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 
 case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long)
 case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit, remoteCommit: RemoteCommit, localChanges: Changes,
                        remoteChanges: Changes, localNextHtlcId: Long, remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point],
-                       commitInput: InputInfo, remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: BinaryData, extraHop: Option[Hop] = None,
+                       commitInput: InputInfo, remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: ByteVector, extraHop: Option[Hop] = None,
                        channelFlags: Option[ChannelFlags] = None, startedAt: Long = System.currentTimeMillis) { me =>
 
   lazy val reducedRemoteState: ReducedState = {
@@ -336,15 +337,12 @@ object Commitments {
   def sendAdd(c: Commitments, rd: RoutingData) =
     if (rd.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
     else if (rd.firstMsat > maxHtlcValueMsat) throw CMDAddImpossible(rd, ERR_AMOUNT_OVERFLOW)
-    else if (rd.pr.paymentHash.size != 32) throw CMDAddImpossible(rd, ERR_FAILED)
     else {
 
-      // Let's compute the current commitment
-      // *as seen by them* with this change taken into account
-      val add = UpdateAddHtlc(c.channelId, c.localNextHtlcId, rd.lastMsat,
-        rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet.serialize)
-
-      val c1 = addLocalProposal(c, add).modify(_.localNextHtlcId).using(_ + 1)
+      val orp = ByteVector view rd.onion.packet.serialize
+      // Let's compute the current commitment *as seen by them* with this change taken into account
+      val add = UpdateAddHtlc(c.channelId, c.localNextHtlcId, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, orp)
+      val c1 = addLocalProposal(c, add).modify(_.localNextHtlcId).using(current => 1 + current)
       // This is their point of view so our outgoing HTLCs are their incoming
       val outgoingHtlcs = c1.reducedRemoteState.htlcs.filter(_.incoming)
       val inFlight = outgoingHtlcs.map(_.add.amountMsat).sum
@@ -359,12 +357,11 @@ object Commitments {
   def receiveAdd(c: Commitments, add: UpdateAddHtlc) =
     if (add.amountMsat < minHtlcValue.amount) throw new LightningException
     else if (add.id != c.remoteNextHtlcId) throw new LightningException
-    else if (add.paymentHash.size != 32) throw new LightningException
     else {
 
       // We should both check if WE can accept another HTLC and if PEER can send another HTLC
       // let's compute the current commitment *as seen by us* with this change taken into account
-      val c1 = addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(_ + 1)
+      val c1 = addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(current => 1 + current)
       val c2 \ reduced = Commitments ifSenderCanAffordFees c1
 
       val incomingHtlcs = reduced.htlcs.filter(_.incoming)
@@ -470,7 +467,7 @@ object Commitments {
 
     case Left(wait) =>
       val nextIndex = ShaChain.largestTxIndex - c.remoteCommit.index
-      val secrets1 = ShaChain.addHash(c.remotePerCommitmentSecrets, rev.perCommitmentSecret.toBin, nextIndex)
+      val secrets1 = ShaChain.addHash(c.remotePerCommitmentSecrets, rev.perCommitmentSecret.toBin.toArray, nextIndex)
       val localChanges1 = c.localChanges.copy(signed = Vector.empty, acked = c.localChanges.acked ++ c.localChanges.signed)
       val remoteChanges1 = c.remoteChanges.copy(signed = Vector.empty)
 

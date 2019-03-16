@@ -9,7 +9,6 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 
-import fr.acinq.bitcoin.{BinaryData, Satoshi}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
@@ -19,13 +18,12 @@ import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
 import android.support.v7.widget.Toolbar
-import org.bitcoinj.script.ScriptBuilder
 import co.infinum.goldfinger.Goldfinger
-import org.bitcoinj.uri.BitcoinURI
+import fr.acinq.bitcoin.Satoshi
 import android.content.Intent
+import scodec.bits.ByteVector
 import android.os.Bundle
 import android.net.Uri
-import scala.util.Try
 import java.util.Date
 
 
@@ -194,11 +192,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(2, Nil, 2)
             // This likely means they have not broadcasted a tx, wait for it instead of closing
             case _: WaitBroadcastRemoteData => chanActions take 2
-            case _: ClosingData => chanActions.patch(2, Nil, 2)
+            case _: ClosingData => chanActions.patch(2, Nil, 1)
             // Should not allow force-closing with old commit
             case _: RefundingData => chanActions take 2
             // Cut out refunding tx option
-            case _ => chanActions take 4
+            case _ => chanActions take 3
           }
 
           val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
@@ -218,27 +216,13 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
               // In the following two cases channel menu is reduced by 2 so we need to show an appropriate closing tx here
               case norm: NormalData if 2 == pos && norm.unknownSpend.isDefined => urlIntent(txid = norm.unknownSpend.get.txid.toString)
               case closing: ClosingData if 2 == pos => urlIntent(txid = closing.bestClosing.commitTx.txid.toString)
-              case _ if 2 == pos => proceedCoopCloseOrWarn(closeToWalletOrAddress = closeToAddress)
-              case _ => proceedCoopCloseOrWarn(closeToWalletOrAddress = closeToWallet)
+              case _ =>
+                val canCoopClose = isOpeningOrOperational(chan)
+                val isBlockerPresent = inFlightHtlcs(chan).nonEmpty
+                if (canCoopClose && isBlockerPresent) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
+                else if (canCoopClose) warnAndMaybeClose(me getString ln_chan_close_confirm_local)
+                else warnAndMaybeClose(me getString ln_chan_force_details)
             }
-          }
-
-          def proceedCoopCloseOrWarn(closeToWalletOrAddress: => Unit) = isOpeningOrOperational(chan) match {
-            case true if inFlightHtlcs(chan).nonEmpty => warnAndMaybeClose(me getString ln_chan_close_inflight_details)
-            case false => warnAndMaybeClose(me getString ln_chan_force_details)
-            case true => closeToWalletOrAddress
-          }
-
-          def closeToAddress =
-            Try(app.TransData parse app.getBufferUnsafe).toOption collectFirst { case uri: BitcoinURI =>
-              val text = me getString ln_chan_close_confirm_address format humanSix(uri.getAddress.toString)
-              val customShutdown = CMDShutdown apply Some(ScriptBuilder.createOutputScript(uri.getAddress).getProgram)
-              mkCheckForm(alert => rm(alert)(chan process customShutdown), none, baseTextBuilder(text.html), dialog_ok, dialog_cancel)
-            } getOrElse { app toast err_no_data }
-
-          def closeToWallet = {
-            // Simple case: send refunding transaction to this wallet
-            warnAndMaybeClose(me getString ln_chan_close_confirm_local)
           }
         }
       }
@@ -309,7 +293,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def sumOrNothing(sats: Satoshi) = if (0L == sats.toLong) getString(ln_info_nothing) else denom parsedWithSign sats
   def isHighFee(route: PaymentRoute) = LNParams.isFeeBreach(route, msat = 1000000000L)
 
-  def getStat(chanId: BinaryData) = {
+  def getStat(chanId: ByteVector) = {
     val cursor = LNParams.db.select(PaymentTable.selectPaymentNumSql, chanId)
     RichCursor(cursor) headTry { case RichCursor(c1) => c1 getLong 0 } getOrElse 0L
   }

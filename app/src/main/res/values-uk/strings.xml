@@ -188,7 +188,6 @@
         зі звичайною адресою для отримання ончейн Біткоїн-транзакцій</small>
     ]]></string>
 
-    <string name="err_ln_no_open_chans">Немає відкритих каналів</string>
     <string name="err_ln_peer_offline">Помилка з\'єднання з %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s не підтримує захист від втрати даних</string>
     <string name="err_ln_remote_amount_high">Не вийшло тому що сума платежу занадто висока після додавання комісії</string>
@@ -208,9 +207,6 @@
     <string name="err_no_data">Нічого не знайдено</string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
-
-    <string name="ln_open_batch_inform"><![CDATA[Платіжний запит буде оплачений разом з відкриттям нового каналу в єдиній Біткойн-транзакції з метою економії на комісії]]></string>
-    <string name="ln_open_batch_confirm"><![CDATA[Хочете оплатити запит і використати здачу для відкриття нового платіжного каналу?<br><br><small>%1$s</small><br><br>запит %2$s<br>канал %3$s<br>комса %4$s]]></string>
 
     <string name="ln_status_peer">Оберіть піра</string>
     <string name="ln_share_pr">Платіжний запит</string>
@@ -264,14 +260,12 @@
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В каналі є завислі платежі</font> тому кооперативне закриття буде відкладено поки вони не зникнуть<br><br>Рекомендується не закривати канал прямо зараз, а замість цього дати завислим платежам деякий час, все ще хочете продовжити?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; Майте на увазі, що спроба закриття каналу прямо зараз призведе до <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсованого закриття</a>, на яке піде велика сума комісії і більше часу, все ще хочете продовжити?]]></string>
-    <string name="ln_chan_close_confirm_address"><![CDATA[Хочете закрити канал і відправити зворотню Біткоїн-транзакцію на наступну адресу?<br><br><strong>%1$s</strong><br><br>Переконайтеся, що адреса вірна, тому що пізніше закриття каналу не можна буде скасувати!]]></string>
     <string name="ln_chan_close_confirm_local">Хочете закрити канал і відправити зворотню Біткоїн-транзакцію назад в цей гаманець?</string>
     <string name="ln_chan_close">Зачинити канал</string>
 
     <array name="ln_chan_actions_list">
         <item>View funding transaction</item>
-        <item><![CDATA[Зберегти снапшот каналу<br><font color=#999999><small>містить приватні дані</small></font>]]></item>
-        <item><![CDATA[Зачинити на адресу<br><font color=#999999><small>спочатку скопіюйте адресу</small></font>]]></item>
+        <item>Зберегти снапшот каналу</item>
         <item>Закрити в цей гаманець</item>
         <item>Зворотня транзакція</item>
     </array>
@@ -332,7 +326,6 @@
     <!-- Olympus log messages and notification -->
     <string name="olympus_log_channel_backup">Збережений зашифрований бекап каналу з «%1$s»</string>
     <string name="olympus_log_watch_payments">Почато стеження за %1$s старими станами</string>
-    <string name="olympus_log_refunding_tx">Збережена відкладена зворотня транзакція</string>
     <string name="notify_body">Додаток залишається відкритим, щоб отримати %1$s</string>
     <string name="notify_title">Очікується платіж-Блискавка</string>
 </resources>

@@ -16,8 +16,8 @@ import com.lightning.walletapp.lnutils.OlympusLogTable
 import com.lightning.walletapp.helper.RichCursor
 import com.lightning.walletapp.ln.LNParams
 import com.lightning.walletapp.Utils.app
-import org.bitcoinj.core.Utils.HEX
 import android.app.AlertDialog
+import scodec.bits.ByteVector
 import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
@@ -90,7 +90,7 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def addNewCloud(url: String, auth: Int) = {
-    val randomIdentity = HEX.encode(random getBytes 16)
+    val randomIdentity = ByteVector(random getBytes 16).toHex
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty)
     val cd = new Cloud(randomIdentity, new Connector(url), auth, 1) { data = emptyData }
     if (adapter add cd) onUpdate

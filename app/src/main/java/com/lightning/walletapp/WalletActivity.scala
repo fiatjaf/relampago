@@ -8,13 +8,12 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
-import com.lightning.walletapp.Denomination._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import android.app.{Activity, AlertDialog}
-import fr.acinq.bitcoin.{BinaryData, Crypto, MilliSatoshi}
+import fr.acinq.bitcoin.{Crypto, MilliSatoshi}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
@@ -31,7 +30,7 @@ import co.infinum.goldfinger.Goldfinger
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-import org.bitcoinj.core.TxWrap
+import scodec.bits.ByteVector
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
@@ -224,19 +223,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case pr: PaymentRequest if ChannelManager.mostFundedChanOpt.isEmpty =>
-      // No channels are present at all currently, see what we can do here...
-      if (pr.amount.exists(_ >= app.kit.conf0Balance) || app.kit.conf0Balance.isZero) {
-        // They have requested too much or there is no amount but on-chain wallet is empty
-        showForm(negTextBuilder(dialog_ok, app.getString(ln_send_howto).html).create)
-        me returnToBase null
-
-      } else {
-        // TransData is set to batch or null to erase previous value
-        app.TransData.value = TxWrap findBestBatch pr getOrElse null
-        // Do not erase data which we have just updated
-        app toast err_ln_no_open_chans
-        goStart
-      }
+      // No channels are present at all currently, inform user about what to do
+      showForm(negTextBuilder(dialog_ok, app.getString(ln_send_howto).html).create)
+      me returnToBase null
 
     case pr: PaymentRequest =>
       // We can fulfill a payment request
@@ -282,12 +271,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def showLoginForm(lnUrl: LNUrl) = {
-    scala.util.Try(lnUrl.uri getQueryParameter "c").map(BinaryData.apply) match {
-      case scala.util.Success(loginChallenge) => offerLogin(loginChallenge take 64)
-      case _ => app toast err_no_data
-    }
-
-    def offerLogin(challenge: BinaryData) = {
+    def offerLogin(challenge: ByteVector) = {
       lazy val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
       lazy val linkingPubKey = linkingPrivKey.publicKey.toString
 
@@ -306,6 +290,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
       val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
       mkCheckFormNeutral(doLogin, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
+    }
+
+    scala.util.Try(lnUrl.getChallenge) match {
+      case scala.util.Success(clg) => offerLogin(clg)
+      case _ => app toast err_no_data
     }
   }
 

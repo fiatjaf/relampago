@@ -7,6 +7,7 @@ import com.lightning.walletapp.ln.crypto.ShaChain._
 import com.lightning.walletapp.ln.crypto.Generators._
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import scala.util.{Success, Try}
+import scodec.bits.ByteVector
 
 
 object Helpers {
@@ -59,18 +60,18 @@ object Helpers {
     type SuccessAndClaim = (HtlcSuccessTx, ClaimDelayedOutputTx)
     type TimeoutAndClaim = (HtlcTimeoutTx, ClaimDelayedOutputTx)
 
-    def isValidFinalScriptPubkey(raw: BinaryData) = Try(Script parse raw) match {
-      case Success(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pkh, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) => pkh.data.size == 20
-      case Success(OP_HASH160 :: OP_PUSHDATA(scriptHash, _) :: OP_EQUAL :: Nil) => scriptHash.data.size == 20
+    def isValidFinalScriptPubkey(raw: ByteVector) = Try(Script parse raw) match {
+      case Success(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pkh, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) => pkh.size == 20
+      case Success(OP_HASH160 :: OP_PUSHDATA(scriptHash, _) :: OP_EQUAL :: Nil) => scriptHash.size == 20
       case Success(OP_0 :: OP_PUSHDATA(pubkeyHash, _) :: Nil) if pubkeyHash.length == 20 => true
       case Success(OP_0 :: OP_PUSHDATA(scriptHash, _) :: Nil) if scriptHash.length == 32 => true
       case _ => false
     }
 
-    def makeFirstClosing(commitments: Commitments, localScriptPubkey: BinaryData, remoteScriptPubkey: BinaryData) = {
+    def makeFirstClosing(commitments: Commitments, localScriptPubkey: ByteVector, remoteScriptPubkey: ByteVector) = {
       val closingTx = Scripts.addSigs(makeClosingTx(commitments.commitInput, localScriptPubkey, remoteScriptPubkey, Satoshi(0),
         Satoshi(0), commitments.localCommit.spec, commitments.localParams.isFunder), commitments.localParams.fundingPrivKey.publicKey,
-        commitments.remoteParams.fundingPubkey, "aa" * 71, "bb" * 71)
+        commitments.remoteParams.fundingPubkey, ByteVector fromValidHex "aa" * 71, ByteVector fromValidHex "bb" * 71)
 
       // There is no need for a high fee in a mutual closing tx AND mutual fee can't be bigger than last commit tx fee
       val computedClosingFee = Scripts.weight2fee(LNParams.broadcaster.perKwSixSat / 2, Transaction weight closingTx.tx)
@@ -79,7 +80,7 @@ object Helpers {
       makeClosing(commitments, closingFee, localScriptPubkey, remoteScriptPubkey)
     }
 
-    def makeClosing(commitments: Commitments, closingFee: Satoshi, local: BinaryData, remote: BinaryData) = {
+    def makeClosing(commitments: Commitments, closingFee: Satoshi, local: ByteVector, remote: ByteVector) = {
       val theirDustIsHigherThanOurs: Boolean = commitments.localParams.dustLimit < commitments.remoteParams.dustLimitSat
       val dustLimit = if (theirDustIsHigherThanOurs) commitments.remoteParams.dustLimitSat else commitments.localParams.dustLimit
 
@@ -94,7 +95,7 @@ object Helpers {
       ClosingTxProposed(closing, closingSigned)
     }
 
-    def makeClosingTx(commitTxInput: InputInfo, localScriptPubKey: BinaryData, remoteScriptPubKey: BinaryData,
+    def makeClosingTx(commitTxInput: InputInfo, localScriptPubKey: ByteVector, remoteScriptPubKey: ByteVector,
                       dustLimit: Satoshi, closingFee: Satoshi, spec: CommitmentSpec, localIsFunder: Boolean) = {
 
       require(spec.htlcs.isEmpty, "No pending HTLCs allowed")
@@ -102,7 +103,7 @@ object Helpers {
       val toLocalAmount: Satoshi = if (localIsFunder) MilliSatoshi(spec.toLocalMsat) - closingFee else MilliSatoshi(spec.toLocalMsat)
       val toRemoteOutput = if (toRemoteAmount < dustLimit) Nil else TxOut(toRemoteAmount, remoteScriptPubKey) :: Nil
       val toLocalOutput = if (toLocalAmount < dustLimit) Nil else TxOut(toLocalAmount, localScriptPubKey) :: Nil
-      val input = TxIn(commitTxInput.outPoint, BinaryData.empty, sequence = 0xffffffffL) :: Nil
+      val input = TxIn(commitTxInput.outPoint, ByteVector.empty, sequence = 0xffffffffL) :: Nil
       val tx = Transaction(2, input, toLocalOutput ++ toRemoteOutput, lockTime = 0)
       ClosingTx(commitTxInput, LexicographicalOrdering sort tx)
     }
@@ -155,7 +156,7 @@ object Helpers {
 
       val claimSuccessTxs = for {
         HtlcTimeoutTx(_, _, add) <- timeout
-        info <- bag.getPaymentInfo(add.paymentHash).toOption
+        info <- bag.getPaymentInfo(hash = add.paymentHash).toOption
         claimHtlcSuccessTx <- Scripts.makeClaimHtlcSuccessTx(finder, localHtlcPubkey, remoteHtlcPubkey,
           remoteRevocationPubkey, commitments.localParams.defaultFinalScriptPubKey, add, feeRate,
           commitments.localParams.dustLimit).toOption
@@ -291,7 +292,7 @@ object Helpers {
 
       val index = moves(largestTxIndex - txNumber)
       val hashes = commitments.remotePerCommitmentSecrets.hashes
-      getHash(hashes)(index).map(secretBytes => Scalar apply secretBytes)
+      getHash(hashes)(index).map(ByteVector.view).map(Scalar.apply)
     }
 
     def claimRevokedHtlcTxOutputs(commitments: Commitments, htlcTx: Transaction,
@@ -314,18 +315,18 @@ object Helpers {
   }
 
   object Funding {
-    def makeFundingInputInfo(fundingTxHash: BinaryData, fundingTxOutputIndex: Int,
+    def makeFundingInputInfo(fundingTxid: ByteVector, fundingTxOutputIndex: Int,
                              fundingSatoshis: Satoshi, fundingPubkey1: PublicKey,
                              fundingPubkey2: PublicKey): InputInfo = {
 
       val multisig = Scripts.multiSig2of2(fundingPubkey1, fundingPubkey2)
       val fundingTxOut = TxOut(fundingSatoshis, Script pay2wsh multisig)
-      val outPoint = OutPoint(fundingTxHash, fundingTxOutputIndex)
+      val outPoint = OutPoint(fundingTxid, fundingTxOutputIndex)
       InputInfo(outPoint, fundingTxOut, Script write multisig)
     }
 
     def makeFirstCommitTxs(localParams: LocalParams, fundingSat: Long, pushMsat: Long, initialFeeratePerKw: Long,
-                           remoteParams: AcceptChannel, fundingTxHash: BinaryData, fundingTxOutputIndex: Int,
+                           remoteParams: AcceptChannel, fundingTxid: ByteVector, fundingTxOutputIndex: Int,
                            remoteFirstPoint: Point) = {
 
       val toLocalMsat = if (localParams.isFunder) fundingSat * 1000L - pushMsat else pushMsat
@@ -341,7 +342,7 @@ object Helpers {
       }
 
       val localPerCommitmentPoint = perCommitPoint(localParams.shaSeed, 0L)
-      val commitmentInput = makeFundingInputInfo(fundingTxHash, fundingTxOutputIndex,
+      val commitmentInput = makeFundingInputInfo(fundingTxid, fundingTxOutputIndex,
         Satoshi(fundingSat), localParams.fundingPrivKey.publicKey, remoteParams.fundingPubkey)
 
       val (localCommitTx, _, _) = makeLocalTxs(0L, localParams, remoteParams, commitmentInput, localPerCommitmentPoint, localSpec)

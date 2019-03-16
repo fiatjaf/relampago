@@ -18,7 +18,6 @@ import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
-import fr.acinq.bitcoin.{BinaryData, MilliSatoshi}
 import android.database.{ContentObserver, Cursor}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
@@ -38,9 +37,11 @@ import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
+import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import android.app.AlertDialog
 import android.content.Intent
+import scodec.bits.ByteVector
 import android.net.Uri
 
 
@@ -368,7 +369,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       info.incoming -> rd.pr.fallbackAddress -> rd.pr.amount match {
         case 0 \ Some(adr) \ Some(amount) if info.lastExpiry == 0 && info.status == FAILURE =>
           // Payment was failed without even trying because wallet is offline or no suitable routes were found
-          mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount, rd.pr.paymentHash), baseBuilder(app.getString(ln_outgoing_title_no_fee)
+          mkCheckFormNeutral(_.dismiss, none, neutral = onChain(adr, amount), baseBuilder(app.getString(ln_outgoing_title_no_fee)
             .format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper), dialog_ok, -1, dialog_pay_onchain)
 
         case 0 \ _ \ _ if info.lastExpiry == 0 =>
@@ -378,7 +379,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         case 0 \ Some(adr) \ Some(amount) if info.status == FAILURE =>
           // Offer a fallback on-chain address along with off-chain retry
-          mkCheckFormNeutral(_.dismiss, doSendOffChain(rd), onChain(adr, amount, rd.pr.paymentHash),
+          mkCheckFormNeutral(_.dismiss, doSendOffChain(rd), neutral = onChain(adr, amount),
             baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry, dialog_pay_onchain)
 
         case 0 \ _ \ _ if info.status == FAILURE =>
@@ -434,7 +435,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         host startActivity new Intent(Intent.ACTION_VIEW, uri)
       }
 
-      viewShareBody setOnClickListener onButtonTap { host share BinaryData(wrap.tx.unsafeBitcoinSerialize).toString }
+      viewShareBody setOnClickListener onButtonTap { host share ByteVector(wrap.tx.unsafeBitcoinSerialize).toString }
       val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, humanValues.map(_.html).toArray)
       val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
       lst setHeaderDividersEnabled false
@@ -493,8 +494,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val bld = baseBuilder(title, content)
 
     def makeNormalRequest(sum: MilliSatoshi) = {
-      val goodChans = chansWithRoutes.keys.toVector.filter(chan => estimateCanReceive(chan) >= sum.amount).sortBy(receivedHtlcs) take 4
-      PaymentInfoWrap.recordRoutingDataWithPr(goodChans map chansWithRoutes, sum, random getBytes 32, inputDescription.getText.toString.trim)
+      val goodChans = chansWithRoutes.keys.toVector.filter(channel => estimateCanReceive(channel) >= sum.amount).sortBy(receivedHtlcs) take 4
+      PaymentInfoWrap.recordRoutingDataWithPr(goodChans map chansWithRoutes, sum, ByteVector(random getBytes 32), inputDescription.getText.toString.trim)
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
@@ -542,8 +543,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     pr.fallbackAddress -> pr.amount match {
       case Some(adr) \ Some(amount) if amount > maxCappedSend && amount < app.kit.conf0Balance =>
         val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
-        // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback payment option
-        mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount, pr.paymentHash), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
+        // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback option
+        mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
 
       case _ \ Some(amount) if amount > maxCappedSend =>
         val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
@@ -621,14 +622,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
       require(deltaAmountToSend > 0, "Accumulator already has enough money")
 
-      val Some(_ \ extraHops) \ finalAmount = channelAndHop(toChan) -> MilliSatoshi(deltaAmountToSend min amountCanRebalance)
-      val rebalanceRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, random getBytes 32, REBALANCING)
       // Further rebalancing should always be halted if new off-chain payment is detected since rebalancing has started
-      val inFlightHashesSnapshot = ChannelManager.activeInFlightHashes :+ rebalanceRD.pr.paymentHash
+      val Some(_ \ extraHops) \ finalAmount = channelAndHop(toChan) -> MilliSatoshi(deltaAmountToSend min amountCanRebalance)
+      val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, ByteVector(random getBytes 32), REBALANCING)
+      val inFlightHashesSnapshot = ChannelManager.activeInFlightHashes :+ rbRD.pr.paymentHash
 
       val listener = new ChannelListener { self =>
         override def settled(commitments: Commitments) = {
-          val isOK = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => !htlc.incoming && htlc.add.paymentHash == rebalanceRD.pr.paymentHash }
+          val isOK = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => !htlc.incoming && htlc.add.paymentHash == rbRD.pr.paymentHash }
           if (isOK || ChannelManager.activeInFlightHashes.distinct.diff(inFlightHashesSnapshot).nonEmpty) ChannelManager detachListener self
           // Won't happen if this listener has been detached due to new payments appearing some time ago
           if (isOK) UITask(me doSendOffChain originalEmptyRD1).run
@@ -636,14 +637,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       ChannelManager attachListener listener
-      PaymentInfoWrap addPendingPayment rebalanceRD
+      PaymentInfoWrap addPendingPayment rbRD
     }
   }
 
   // BTC SEND / BOOST
 
-  def onChain(adr: String, amount: MilliSatoshi, hash: BinaryData)(alert: AlertDialog) = rm(alert) {
-    // This code only gets executed when user taps a button to pay on-chain instead of inital LN payment
+  def onChain(adr: String, amount: MilliSatoshi)(alert: AlertDialog) = rm(alert) {
+    // This code only gets executed when user taps a button to pay on-chain
     sendBtcPopup(app.TransData toBitcoinUri adr) setSum Try(amount)
   }
 

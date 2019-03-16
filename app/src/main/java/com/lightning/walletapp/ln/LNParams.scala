@@ -11,15 +11,17 @@ import com.lightning.walletapp.lnutils.olympus.OlympusWrap
 import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import com.lightning.walletapp.ChannelManager
+import com.lightning.walletapp.ln.Tools.Bytes
 import fr.acinq.eclair.UInt64
+import scodec.bits.ByteVector
 
 
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
+  val localFeatures = ByteVector.fromValidHex("02")
+  val globalFeatures = ByteVector.fromValidHex("")
   val chainHash = Block.LivenetGenesisBlock.hash
   val channelReserveToFundingRatio = 100
-  val localFeatures = "02"
-  val globalFeatures = ""
   val minDepth = 1
 
   val maxToSelfDelay = 2016
@@ -36,18 +38,18 @@ object LNParams { me =>
   lazy val extendedNodeKey = derivePrivateKey(master, hardened(46L) :: hardened(0L) :: Nil)
   lazy val extendedCloudKey = derivePrivateKey(master, hardened(92L) :: hardened(0L) :: Nil)
   // HashingKey is used for creating domain-specific identifiers when using "linkable payment" LNUrl
-  lazy val hashingKey = derivePrivateKey(master, hardened(138L) :: 0L :: Nil).privateKey.toBin.data
+  lazy val hashingKey = derivePrivateKey(master, hardened(138L) :: 0L :: Nil).privateKey.toBin
   // Cloud secret is used to encrypt Olympus and GDrive data, cloud ID is used as identifier
-  lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin.data)
-  lazy val cloudId = sha256(cloudSecret.data)
+  lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin)
+  lazy val cloudId = sha256(cloudSecret)
 
   lazy val bag = PaymentInfoWrap
   lazy val broadcaster: Broadcaster = ChannelManager
   lazy val nodePrivateKey: PrivateKey = extendedNodeKey.privateKey
   lazy val nodePublicKey: PublicKey = nodePrivateKey.publicKey
 
-  def setup(walletSeed: BinaryData) = {
-    master = generate(seed = walletSeed)
+  def setup(seed: Bytes) = {
+    master = generate(ByteVector view seed)
     db = new LNOpenHelper(app, dbFileName)
     app.olympus = new OlympusWrap
   }
@@ -74,7 +76,7 @@ object LNParams { me =>
 
   def backupFileName = s"blw${chainHash.toString}-${cloudId.toString}.bkup"
   def updateFeerate = for (chan <- ChannelManager.notClosing) chan process CMDFeerate(broadcaster.perKwThreeSat)
-  def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: BinaryData, idx: Long, isFunder: Boolean) = {
+  def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: ByteVector, idx: Long, isFunder: Boolean) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (ord <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: ord :: Nil)
     LocalParams(UInt64(maxHtlcValueMsat), theirReserve, toSelfDelay = 2016, maxAcceptedHtlcs = 25, fund.privateKey, revoke.privateKey,
       pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey, dust, shaSeed = sha256(sha.privateKey.toBin), isFunder)
@@ -87,7 +89,6 @@ object AddErrorCodes {
   val ERR_REMOTE_AMOUNT_HIGH = err_ln_remote_amount_high
   val ERR_REMOTE_AMOUNT_LOW = err_ln_remote_amount_low
   val ERR_TOO_MANY_HTLC = err_ln_too_many
-  val ERR_FAILED = err_no_data
 }
 
 trait PublishStatus {
@@ -109,8 +110,8 @@ case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, commitTx:
                        fee: Satoshi, amount: Satoshi) extends DelayedPublishStatus
 
 trait Broadcaster extends ChannelListener {
-  def getTx(txid: BinaryData): Option[org.bitcoinj.core.Transaction]
-  def getStatus(txid: BinaryData): DepthAndDead
+  def getTx(txid: ByteVector): Option[org.bitcoinj.core.Transaction]
+  def getStatus(txid: ByteVector): DepthAndDead
   def perKwThreeSat: Long
   def currentHeight: Int
   def perKwSixSat: Long

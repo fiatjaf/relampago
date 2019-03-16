@@ -157,7 +157,7 @@ class LNOpenHelper(context: Context, name: String)
 extends SQLiteOpenHelper(context, name, null, 5) {
 
   val base = getWritableDatabase
-  // Note: BinaryData and PublicKey should always yield raw strings for this to work
+  // Note: ByteVector and PublicKey should *always* yield HEX strings for this to work
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(_.toString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(_.toString).toArray)
   def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.walletapp/table/$tbl"

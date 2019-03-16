@@ -76,7 +76,7 @@ object BlockHeader extends BtcSerializer[BlockHeader] {
     target = target.multiply(BigInteger.valueOf(actualTimespan))
     target = target.divide(BigInteger.valueOf(targetTimespan))
 
-    val powLimit = new BigInteger(1, hex"00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff".toArray)
+    val powLimit = new BigInteger(1, ByteVector.fromValidHex("00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffff").toArray)
     target = target.min(powLimit)
     encodeCompact(target)
   }
@@ -126,10 +126,10 @@ object Block extends BtcSerializer[Block] {
 
   // genesis blocks
   val LivenetGenesisBlock = {
-    val script = OP_PUSHDATA(writeUInt32(486604799L)) :: OP_PUSHDATA(hex"04") :: OP_PUSHDATA(ByteVector("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".getBytes("UTF-8"))) :: Nil
-    val scriptPubKey = OP_PUSHDATA(hex"04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") :: OP_CHECKSIG :: Nil
+    val script = OP_PUSHDATA(writeUInt32(486604799L)) :: OP_PUSHDATA(ByteVector.fromValidHex("04")) :: OP_PUSHDATA(ByteVector("The Times 03/Jan/2009 Chancellor on brink of second bailout for banks".getBytes("UTF-8"))) :: Nil
+    val scriptPubKey = OP_PUSHDATA(ByteVector.fromValidHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f")) :: OP_CHECKSIG :: Nil
     Block(
-      BlockHeader(version = 1, hashPreviousBlock = Zeroes, hashMerkleRoot = ByteVector(hex"3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"), time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
+      BlockHeader(version = 1, hashPreviousBlock = Zeroes, hashMerkleRoot = ByteVector.fromValidHex("3ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a"), time = 1231006505, bits = 0x1d00ffff, nonce = 2083236893),
       List(
         Transaction(version = 1,
           txIn = List(TxIn.coinbase(script)),

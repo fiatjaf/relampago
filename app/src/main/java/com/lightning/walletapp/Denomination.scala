@@ -25,7 +25,7 @@ object Denomination {
   implicit def coin2MSat(cn: Coin): MilliSatoshi = MilliSatoshi(cn.value * 1000L)
 }
 
-trait Denomination {
+trait Denomination { me =>
   def rawString2MSat(raw: String) = MilliSatoshi(BigDecimal(raw) * factor toLong)
   def asString(msat: MilliSatoshi) = fmt format BigDecimal(msat.amount) / factor
   def parsedWithSign(msat: MilliSatoshi) = parsed(msat) + sign
@@ -38,8 +38,8 @@ trait Denomination {
     s"$start$content$end"
   }
 
-  def coloredOut(msat: MilliSatoshi, suffix: String) = s"<font color=#E31300><tt>-</tt>${this parsed msat}</font>$suffix"
-  def coloredIn(msat: MilliSatoshi, suffix: String) = s"<font color=#6AAB38><tt>+</tt>${this parsed msat}</font>$suffix"
+  def coloredOut(msat: MilliSatoshi, suffix: String) = s"<font color=#E31300><tt>-</tt>${me parsed msat}</font>$suffix"
+  def coloredIn(msat: MilliSatoshi, suffix: String) = s"<font color=#6AAB38><tt>+</tt>${me parsed msat}</font>$suffix"
 
   val amountInTxt: String
   val fmt: DecimalFormat
