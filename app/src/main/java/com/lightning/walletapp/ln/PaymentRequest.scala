@@ -50,10 +50,6 @@ case class LNUrl(request: String) {
   def getChallenge = ByteVector.fromValidHex(uri getQueryParameter "c").take(64)
 }
 
-case class DescriptionHashTag(hash: Bytes) extends Tag {
-  def toInt5s = encode(Bech32 eight2five hash, 'h')
-}
-
 case class FallbackAddressTag(version: Byte, hash: ByteVector) extends Tag {
   def toInt5s = encode(version +: Bech32.eight2five(hash.toArray), 'f')
 }
@@ -122,6 +118,7 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
 
   lazy val unsafeMsat = amount.get.amount
   lazy val adjustedMinFinalCltvExpiry = minFinalCltvExpiry.getOrElse(0L) + 10L
+  lazy val description = tags.collectFirst { case DescriptionTag(info) => info }.getOrElse(new String)
   lazy val minFinalCltvExpiry = tags.collectFirst { case m: MinFinalCltvExpiryTag => m.expiryDelta }
   lazy val paymentHash = tags.collectFirst { case payHash: PaymentHashTag => payHash.hash }.get
   lazy val lnUrlOpt = tags.collectFirst { case lnURL: LNUrlTag => lnURL.contents }
@@ -141,10 +138,7 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
     timestamp + expiry.getOrElse(3600L) > System.currentTimeMillis / 1000L
   }
 
-  def description = tags.collectFirst {
-    case DescriptionHashTag(hash) => hash.toString
-    case DescriptionTag(description) => description
-  }.get
+
 
   def stream: BitStream = {
     val int5s = Timestamp.encode(timestamp) ++ tags.flatMap(_.toInt5s)
@@ -247,10 +241,6 @@ object PaymentRequest {
         case dTag if dTag == Bech32.map('d') =>
           val description = Bech32 five2eight input.slice(3, len + 3)
           DescriptionTag(Tools bin2readable description)
-
-        case hTag if hTag == Bech32.map('h') =>
-          val hash = Bech32 five2eight input.slice(3, len + 3)
-          DescriptionHashTag(hash)
 
         case fTag if fTag == Bech32.map('f') =>
           val fallbackAddress = input.slice(4, len + 4 - 1)
