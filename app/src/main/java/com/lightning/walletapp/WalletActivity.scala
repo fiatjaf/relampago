@@ -49,7 +49,6 @@ trait SearchBar { me =>
       def onViewAttachedToWindow(lens: View) = runAnd(isSearching = true)(react)
     }
 
-    searchView.setQueryHint(app getString search_hint)
     searchView setOnQueryTextListener new SearchView.OnQueryTextListener {
       def onQueryTextChange(txt: String) = runAnd(true)(me search txt)
       def onQueryTextSubmit(txt: String) = true
@@ -151,10 +150,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   override def onCreateOptionsMenu(menu: Menu) = {
-    // Called after fragLN sets toolbar as actionbar
+    // Called after worker sets toolbar as actionbar
     getMenuInflater.inflate(R.menu.wallet, menu)
-    // Updated here to make sure it's present
+
+    // Set search when worker is here
     FragWallet.worker setupSearch menu
+    val hint = app getString search_hint_payments
+    FragWallet.worker.searchView setQueryHint hint
     true
   }
 
