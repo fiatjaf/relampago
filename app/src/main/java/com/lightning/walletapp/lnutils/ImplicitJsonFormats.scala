@@ -47,8 +47,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   }
 
   implicit object PublicKeyFmt extends JsonFormat[PublicKey] {
-    def read(json: JsValue): PublicKey = Tools pubKeyFromByteVectorUnchecked ByteVector.fromValidHex(me json2String json)
-    def write(internalRepresentationAsHex: PublicKey): JsValue = internalRepresentationAsHex.toBin.toHex.toJson
+    def read(json: JsValue): PublicKey = PublicKey.fromValidHex(me json2String json)
+    def write(internal: PublicKey): JsValue = internal.toBin.toHex.toJson
   }
 
   implicit object ShaHashesWithIndexFmt

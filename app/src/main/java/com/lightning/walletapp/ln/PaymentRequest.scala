@@ -32,6 +32,10 @@ case class DescriptionTag(description: String) extends Tag {
   def toInt5s = encode(Bech32 eight2five description.getBytes, 'd')
 }
 
+case class DescriptionHashTag(hash: ByteVector) extends Tag {
+  def toInt5s = encode(Bech32 eight2five hash.toArray, 'h')
+}
+
 case class LNUrlTag(contents: LNUrl) extends Tag {
   def toInt5s = encode(Bech32 eight2five contents.uri.toString.getBytes, 'v')
 }
@@ -88,7 +92,7 @@ object RoutingInfoTag {
     val feeBaseMsat = uint32(data.slice(33 + 8, 33 + 8 + 4), BIG_ENDIAN)
     val cltvExpiryDelta = uint16(data.slice(33 + 8 + 4 + 4, chunkLength), BIG_ENDIAN)
     val feeProportionalMillionths = uint32(data.slice(33 + 8 + 4, 33 + 8 + 4 + 4), BIG_ENDIAN)
-    Hop(pubKeyFromByteVectorUnchecked(pubkey), shortChanId, cltvExpiryDelta, 0L, feeBaseMsat, feeProportionalMillionths)
+    Hop(PublicKey(pubkey), shortChanId, cltvExpiryDelta, 0L, feeBaseMsat, feeProportionalMillionths)
   }
 
   type PaymentRoute = Vector[Hop]
@@ -118,7 +122,6 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
 
   lazy val unsafeMsat = amount.get.amount
   lazy val adjustedMinFinalCltvExpiry = minFinalCltvExpiry.getOrElse(0L) + 10L
-  lazy val description = tags.collectFirst { case DescriptionTag(info) => info }.getOrElse(new String)
   lazy val minFinalCltvExpiry = tags.collectFirst { case m: MinFinalCltvExpiryTag => m.expiryDelta }
   lazy val paymentHash = tags.collectFirst { case payHash: PaymentHashTag => payHash.hash }.get
   lazy val lnUrlOpt = tags.collectFirst { case lnURL: LNUrlTag => lnURL.contents }
@@ -138,7 +141,10 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
     timestamp + expiry.getOrElse(3600L) > System.currentTimeMillis / 1000L
   }
 
-
+  def description = tags.collectFirst {
+    case DescriptionHashTag(hash) => hash.toHex
+    case DescriptionTag(description) => description
+  }.get
 
   def stream: BitStream = {
     val int5s = Timestamp.encode(timestamp) ++ tags.flatMap(_.toInt5s)
@@ -241,6 +247,11 @@ object PaymentRequest {
         case dTag if dTag == Bech32.map('d') =>
           val description = Bech32 five2eight input.slice(3, len + 3)
           DescriptionTag(Tools bin2readable description)
+
+        case hTag if hTag == Bech32.map('h') =>
+          val hash = Bech32 five2eight input.slice(3, len + 3)
+          val byteVec = ByteVector.view(hash)
+          DescriptionHashTag(byteVec)
 
         case fTag if fTag == Bech32.map('f') =>
           val fallbackAddress = input.slice(4, len + 4 - 1)

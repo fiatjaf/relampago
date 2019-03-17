@@ -7,7 +7,6 @@ import fr.acinq.eclair.UInt64
 import fr.acinq.bitcoin.Crypto
 import org.apache.commons.codec.binary.Base32
 import com.lightning.walletapp.ln.crypto.Sphinx
-import com.lightning.walletapp.ln.Tools.pubKeyFromByteVectorUnchecked
 import com.lightning.walletapp.ln.{LightningException, PerHopPayload, RevocationInfo}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import scodec.bits.{BitVector, ByteVector}
@@ -82,7 +81,7 @@ object LightningMessageCodecs { me =>
 
   val publicKey = Codec[PublicKey] (
     encoder = (publicKey: PublicKey) => bytes(33).encode(publicKey.value toBin true),
-    decoder = (wire: BitVector) => bytes(33).decode(wire).map(_ map pubKeyFromByteVectorUnchecked)
+    decoder = (wire: BitVector) => bytes(33).decode(wire).map(_ map PublicKey.apply)
   )
 
   val ipv6address: Codec[Inet6Address] = bytes(16).exmap(
@@ -108,12 +107,12 @@ object LightningMessageCodecs { me =>
       .typecase(cr = (base32(35) :: uint16).as[Tor3], tag = 4)
 
   val uint64: Codec[Long] = int64.narrow(ln => if (ln < 0) Attempt failure Err(s"Overflow $ln") else Attempt successful ln, identity)
+  val bytes32: Codec[ByteVector] = limitedSizeBytes(codec = bytesStrict(32).xmap(identity, identity), limit = 32)
   val zeropaddedstring: Codec[String] = fixedSizeBytes(32, utf8).xmap(_.takeWhile(_ != '\u0000'), identity)
   val uint64ex: Codec[UInt64] = bytes(8).xmap(UInt64.apply, _.toByteVector padLeft 8)
   val varsizebinarydataLong: Codec[ByteVector] = variableSizeBytesLong(uint32, bytes)
   val varsizebinarydata: Codec[ByteVector] = variableSizeBytes(uint16, bytes)
   val rgb: Codec[RGB] = bytes(3).xmap(bv2Rgb, rgb2Bv)
-  val bytes32: Codec[ByteVector] = bytesStrict(32)
 
   // Data formats
 

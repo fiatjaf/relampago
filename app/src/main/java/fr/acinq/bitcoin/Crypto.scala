@@ -172,10 +172,7 @@ object Crypto {
   }
 
   object Point {
-    def apply(data: ByteVector): Point = if (Secp256k1Context.isEnabled)
-      Point(curve.getCurve.decodePoint(NativeSecp256k1.decompress(data.toArray)))
-    else
-      Point(curve.getCurve.decodePoint(data.toArray))
+    def apply(data: ByteVector): Point = Point(curve.getCurve.decodePoint(data.toArray))
   }
 
   implicit def point2ecpoint(point: Point): ECPoint = point.value
@@ -186,21 +183,17 @@ object Crypto {
     def apply(point: Point) = new PublicKey(point.toBin(true))
 
     def apply(point: Point, compressed: Boolean) = new PublicKey(point.toBin(compressed))
+
+    def fromValidHex(hex: String) = PublicKey(ByteVector.fromValidHex(hex))
   }
 
   /**
     *
     * @param raw        serialized value of this public key (a point)
-    * @param checkValid indicates whether or not we check that this is a valid public key; this should be used
-    *                   carefully for optimization purposes
     */
-  case class PublicKey(raw: ByteVector, checkValid: Boolean = true) {
+  case class PublicKey(raw: ByteVector) {
     // we always make this very basic check
     require(isPubKeyValid(raw))
-    if (checkValid) {
-      // this is expensive and done only if needed
-      require(value.isInstanceOf[Point])
-    }
 
     lazy val compressed = isPubKeyCompressed(raw)
 

@@ -4,18 +4,14 @@ set -e
 
 # The version of wally to fetch and its sha256 checksum for integrity checking
 TARBALL="wallycore-android-jni.tar.gz"
-URL="https://github.com/ElementsProject/libwally-core/releases/download/release_0.4.0/${TARBALL}"
-SHA256="b90f9895a2e5a13bbadd4d458906a7f84c140d9905765b3873275b5aa58dd67a"
+URL="https://github.com/ElementsProject/libwally-core/releases/download/release_0.6.3/${TARBALL}"
+SHA256="2979b7cba8d895e0c0c927fee17a58a7da8fde133a3f0c25f365a8d6559a16d8"
 
-# Pre-requisites
-function check_command() {
-    command -v $1 >/dev/null 2>&1 || { echo >&2 "$1 not found, exiting."; exit 1; }
-}
-check_command wget
-check_command gzip
-check_command shasum
-check_command javac
-check_command jar
+command -v curl >/dev/null 2>&1 || { echo >&2 "$1 not found, exiting."; exit 1; }
+command -v gzip >/dev/null 2>&1 || { echo >&2 "$1 not found, exiting."; exit 1; }
+command -v shasum >/dev/null 2>&1 || { echo >&2 "$1 not found, exiting."; exit 1; }
+command -v javac >/dev/null 2>&1 || { echo >&2 "$1 not found, exiting."; exit 1; }
+command -v jar >/dev/null 2>&1 || { echo >&2 "$1 not found, exiting."; exit 1; }
 
 # Find out where we are being run from to get paths right
 OLD_PWD=$(pwd)
@@ -29,7 +25,7 @@ WALLY_JAVA_DIR="${APP_ROOT}/libwally-core/src/swig_java/src/com/blockstream/libw
 rm -rf wallycore-android-jni* ${APP_ROOT}/src/main/jniLibs ${WALLY_JAVA_DIR}
 
 # Fetch, validate and decompress wally
-wget -q "${URL}"
+curl -sL -o ${TARBALL} "${URL}"
 echo "${SHA256}  ${TARBALL}" | shasum -a 256 --check
 gzip -d wallycore-android-jni.tar.gz && tar xf wallycore-android-jni.tar
 

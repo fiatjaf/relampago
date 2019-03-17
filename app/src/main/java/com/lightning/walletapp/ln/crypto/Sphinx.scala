@@ -20,7 +20,7 @@ case class Packet(v: Bytes, publicKey: Bytes, routingInfo: Bytes, hmac: Bytes) {
   require(hmac.length == MacLength, s"Onion header hmac length should be exactly $MacLength bytes")
   require(publicKey.length == 33, "Onion header public key length should be exactly 33 bytes")
   require(routingInfo.length == DataLength, "Invalid routing info length")
-  lazy val pubKey = PublicKey(ByteVector(publicKey), checkValid = true)
+  lazy val pubKey = PublicKey(ByteVector view publicKey)
   def isLast = hmac sameElements zeroes(MacLength)
   def serialize = Packet write me
 }

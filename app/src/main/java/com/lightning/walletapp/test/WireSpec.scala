@@ -147,7 +147,7 @@ class WireSpec {
     {
       println("encode/decode with public key codec")
 
-      val value = PrivateKey(randomBytes(32), true).publicKey
+      val value = PrivateKey(randomBytes(32), compressed = true).publicKey
       val wire = LightningMessageCodecs.publicKey.encode(value).toOption.get
       assert(wire.length == 33 * 8)
       val value1 = LightningMessageCodecs.publicKey.decode(wire).toOption.get.value

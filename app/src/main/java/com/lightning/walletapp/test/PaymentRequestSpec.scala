@@ -115,8 +115,8 @@ class PaymentRequestSpec {
       assert(pr.description == "3925b6f67e2c340036ed12093dd44e0368df1b6ea26c53dbe4811f58fd5db8c1")
 
       assert(pr.routingInfo == Vector(RoutingInfoTag(Vector(
-          Hop(PublicKey(ByteVector.fromValidHex("029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255")),72623859790382856L,3,0,1,20),
-          Hop(PublicKey(ByteVector.fromValidHex("039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255")),217304205466536202L,4,0,2,30)))))
+      Hop(PublicKey(ByteVector.fromValidHex("029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255")),72623859790382856L,3,0,1,20),
+      Hop(PublicKey(ByteVector.fromValidHex("039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255")),217304205466536202L,4,0,2,30)))))
 
       assert(pr.fallbackAddress.contains("1RustyRX2oai4EYYDpQGWvEL62BBGqN9T"))
       assert(Protocol.writeUInt64(0x0102030405060708L, ByteOrder.BIG_ENDIAN) == ByteVector.fromValidHex("0102030405060708"))

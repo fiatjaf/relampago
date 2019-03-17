@@ -75,15 +75,15 @@ object Announcements { me =>
     val witness = channelAnnouncementWitnessEncode(ann.chainHash, ann.shortChannelId,
       ann.nodeId1, ann.nodeId2, ann.bitcoinKey1, ann.bitcoinKey2, ann.features)
 
-    verifySignature(witness, ann.nodeSignature1, PublicKey apply ann.nodeId1) &&
-      verifySignature(witness, ann.nodeSignature2, PublicKey apply ann.nodeId2) &&
-      verifySignature(witness, ann.bitcoinSignature1, PublicKey apply ann.bitcoinKey1) &&
-      verifySignature(witness, ann.bitcoinSignature2, PublicKey apply ann.bitcoinKey2)
+    verifySignature(witness, ann.nodeSignature1, ann.nodeId1) &&
+      verifySignature(witness, ann.nodeSignature2, ann.nodeId2) &&
+      verifySignature(witness, ann.bitcoinSignature1, ann.bitcoinKey1) &&
+      verifySignature(witness, ann.bitcoinSignature2, ann.bitcoinKey2)
   }
 
   def checkSig(ann: NodeAnnouncement): Boolean =
     verifySignature(nodeAnnouncementWitnessEncode(ann.timestamp, ann.nodeId, ann.rgbColor,
-      ann.alias, ann.features, ann.addresses), ann.signature, PublicKey apply ann.nodeId)
+      ann.alias, ann.features, ann.addresses), ann.signature, ann.nodeId)
 
   def checkSig(upd: ChannelUpdate, nodeId: PublicKey): Boolean =
     verifySignature(channelUpdateWitnessEncode(upd.chainHash, upd.shortChannelId, upd.timestamp, upd.messageFlags,

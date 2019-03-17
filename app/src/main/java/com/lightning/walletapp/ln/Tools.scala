@@ -1,8 +1,7 @@
 package com.lightning.walletapp.ln
 
 import com.lightning.walletapp.ln.Tools.runAnd
-import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
-
+import fr.acinq.bitcoin.Crypto.PrivateKey
 import language.implicitConversions
 import crypto.RandomGenerator
 import scodec.bits.ByteVector
@@ -22,7 +21,6 @@ object Tools {
   def bin2readable(bin: Bytes) = new String(bin, "UTF-8")
   def log(consoleMessage: String): Unit = android.util.Log.d("LN", consoleMessage)
   def randomPrivKey = PrivateKey(ByteVector.view(random getBytes 32), compressed = true)
-  def pubKeyFromByteVectorUnchecked(bv: ByteVector) = PublicKey(bv, checkValid = false)
   def wrap(run: => Unit)(go: => Unit) = try go catch none finally run
   def none: PartialFunction[Any, Unit] = { case _ => }
 
