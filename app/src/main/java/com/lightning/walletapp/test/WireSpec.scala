@@ -1,14 +1,14 @@
 package com.lightning.walletapp.test
 
-import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
+import java.net.{Inet4Address, Inet6Address, InetAddress}
 
 import com.google.common.net.InetAddresses
 import com.lightning.walletapp.ln.{Announcements, PerHopPayload}
 import com.lightning.walletapp.ln.crypto.Sphinx
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-import scodec.bits.{BitVector, ByteVector, HexStringSyntax}
-import fr.acinq.bitcoin.{BinaryData, Block, Crypto}
+import scodec.bits.{BitVector, ByteVector}
+import fr.acinq.bitcoin.{Block, Crypto}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, Scalar}
 import fr.acinq.eclair.UInt64
 
@@ -19,16 +19,16 @@ class WireSpec {
   def randomKey: PrivateKey = PrivateKey({
     val bin = Array.fill[Byte](32)(0)
     Random.nextBytes(bin)
-    bin
+    ByteVector.view(bin)
   }, compressed = true)
 
-  def randomBytes(size: Int): BinaryData = {
+  def randomBytes(size: Int) = {
     val bin = new Array[Byte](size)
     Random.nextBytes(bin)
-    bin
+    ByteVector.view(bin)
   }
 
-  def randomSignature: BinaryData = {
+  def randomSignature: ByteVector = {
     val priv = randomBytes(32)
     val data = randomBytes(32)
     val (r, s) = Crypto.sign(data, PrivateKey(priv, true))
@@ -36,7 +36,7 @@ class WireSpec {
   }
 
   def allTests = {
-    def bin(size: Int, fill: Byte): BinaryData = Array.fill[Byte](size)(fill)
+    def bin(size: Int, fill: Byte) = ByteVector.view(Array.fill[Byte](size)(fill))
 
     def scalar(fill: Byte) = Scalar(bin(32, fill))
 
@@ -201,8 +201,8 @@ class WireSpec {
       val node_announcement = NodeAnnouncement(randomSignature, bin(0, 0), 1, randomKey.publicKey, (100.toByte, 200.toByte, 300.toByte), "node-alias", IPv4(InetAddress.getByAddress(Array[Byte](192.toByte, 168.toByte, 1.toByte, 42.toByte)).asInstanceOf[Inet4Address], 42000) :: Nil)
       val channel_update = ChannelUpdate(randomSignature, Block.RegtestGenesisBlock.hash, 1, 2, 42, 0, 3, 4, 5, 6, None)
       val announcement_signatures = AnnouncementSignatures(randomBytes(32), 42, randomSignature, randomSignature)
-      val ping = Ping(100, BinaryData("01" * 10))
-      val pong = Pong(BinaryData("01" * 10))
+      val ping = Ping(100, ByteVector.fromValidHex("01" * 10))
+      val pong = Pong(ByteVector.fromValidHex("01" * 10))
       val channel_reestablish = ChannelReestablish(randomBytes(32), 242842L, 42L, None, None)
 
       val msgs: List[LightningMessage] =
@@ -237,12 +237,12 @@ class WireSpec {
 
     {
       println("decode channel_update with htlc_maximum_msat")
-      val bin = BinaryData("010258fff7d0e987e2cdd560e3bb5a046b4efe7b26c969c2f51da1dceec7bcb8ae1b634790503d5290c1a6c51d681cf8f4211d27ed33a257dcc1102862571bf1792306226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f0005a100000200005bc75919010100060000000000000001000000010000000a000000003a699d00")
+      val bin = ByteVector.fromValidHex("010258fff7d0e987e2cdd560e3bb5a046b4efe7b26c969c2f51da1dceec7bcb8ae1b634790503d5290c1a6c51d681cf8f4211d27ed33a257dcc1102862571bf1792306226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f0005a100000200005bc75919010100060000000000000001000000010000000a000000003a699d00")
       val update = LightningMessageCodecs.lightningMessageCodec.decode(BitVector(bin.toArray)).require.value.asInstanceOf[ChannelUpdate]
-      assert(update == ChannelUpdate("3044022058fff7d0e987e2cdd560e3bb5a046b4efe7b26c969c2f51da1dceec7bcb8ae1b0220634790503d5290c1a6c51d681cf8f4211d27ed33a257dcc1102862571bf1792301", "06226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f", 0x5a10000020000L, 1539791129, 1, 1, 6, 1, 1, 10, Some(980000000L)))
-      val nodeId = PublicKey("03370c9bac836e557eb4f017fe8f9cc047f44db39c1c4e410ff0f7be142b817ae4")
+      assert(update == ChannelUpdate(ByteVector.fromValidHex("3044022058fff7d0e987e2cdd560e3bb5a046b4efe7b26c969c2f51da1dceec7bcb8ae1b0220634790503d5290c1a6c51d681cf8f4211d27ed33a257dcc1102862571bf1792301"), ByteVector.fromValidHex("06226e46111a0b59caaf126043eb5bbf28c34f3a5e332a1fc7b2b73cf188910f"), 0x5a10000020000L, 1539791129, 1, 1, 6, 1, 1, 10, Some(980000000L)))
+      val nodeId = PublicKey(ByteVector.fromValidHex("03370c9bac836e557eb4f017fe8f9cc047f44db39c1c4e410ff0f7be142b817ae4"))
       assert(Announcements.checkSig(update, nodeId))
-      val bin2 = BinaryData(LightningMessageCodecs.lightningMessageCodec.encode(update).require.toByteArray)
+      val bin2 = ByteVector.view(LightningMessageCodecs.lightningMessageCodec.encode(update).require.toByteArray)
       assert(bin == bin2)
     }
   }

@@ -1,7 +1,9 @@
 package com.lightning.walletapp.test
 
 import java.nio.ByteOrder
-import fr.acinq.bitcoin.{BinaryData, Protocol}
+
+import fr.acinq.bitcoin.Protocol
+import scodec.bits.ByteVector
 
 
 class FeaturesSpec {
@@ -11,16 +13,16 @@ class FeaturesSpec {
 
     {
       println("'data_loss_protect' feature")
-      assert(dataLossProtect(BinaryData("02"))) // optional
-      assert(!dataLossProtect(BinaryData("00")))
-      assert(dataLossProtect(BinaryData("81"))) // mandatory
+      assert(dataLossProtect(ByteVector.fromValidHex("02"))) // optional
+      assert(!dataLossProtect(ByteVector.fromValidHex("00")))
+      assert(dataLossProtect(ByteVector.fromValidHex("81"))) // mandatory
     }
 
     {
       println("features compatibility")
-      assert(areSupported(BinaryData(Protocol.writeUInt64(1L << OPTION_DATA_LOSS_PROTECT_OPTIONAL, ByteOrder.BIG_ENDIAN))))
-      assert(!areSupported(BinaryData("14")))
-      assert(!areSupported(BinaryData("0141")))
+      assert(areSupported(Protocol.writeUInt64(1L << OPTION_DATA_LOSS_PROTECT_OPTIONAL, ByteOrder.BIG_ENDIAN)))
+      assert(!areSupported(ByteVector.fromValidHex("14")))
+      assert(!areSupported(ByteVector.fromValidHex("0141")))
     }
 
   }

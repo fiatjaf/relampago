@@ -53,8 +53,9 @@ trait SkippingStreamCipherEngine {
   }
 }
 
-object ChaCha20 extends SkippingStreamCipherEngine { def getEngine = new ChaCha7539Engine }
-object ChaCha20Legacy extends SkippingStreamCipherEngine { def getEngine = new ChaChaEngine }
+object ChaCha20 extends SkippingStreamCipherEngine {
+  def getEngine = new ChaCha7539Engine
+}
 
 object Poly1305 {
   def mac(key: Bytes, data: Bytes) = {

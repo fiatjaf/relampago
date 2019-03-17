@@ -8,27 +8,27 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.lnutils.{PaymentInfoWrap, RevokedInfoTable}
-import fr.acinq.bitcoin.{BinaryData, Satoshi, Transaction, TxOut}
+import fr.acinq.bitcoin.{Satoshi, Transaction, TxOut}
 import fr.acinq.bitcoin.Crypto.Point
 import scodec.DecodeResult
-import scodec.bits.BitVector
+import scodec.bits.{BitVector, ByteVector}
 
 class RevokedInfoSpec {
-  val chanId1 = BinaryData(random getBytes 32)
-  val chanId2 = BinaryData(random getBytes 32)
+  val chanId1 = ByteVector.view(random getBytes 32)
+  val chanId2 = ByteVector.view(random getBytes 32)
 
   val ri = RevocationInfo(redeemScriptsToSigs = Nil, claimMainTxSig = None, claimPenaltyTxSig = None, LNParams.broadcaster.perKwThreeSat,
     LNParams.dust.amount, randomPrivKey.publicKey, 144, randomPrivKey.publicKey, randomPrivKey.publicKey, randomPrivKey.publicKey)
 
-  val txid1 = BinaryData(random getBytes 32)
-  val txid2 = BinaryData(random getBytes 32)
-  val txid3 = BinaryData(random getBytes 32)
-  val txid4 = BinaryData(random getBytes 32)
+  val txid1 = ByteVector.view(random getBytes 32)
+  val txid2 = ByteVector.view(random getBytes 32)
+  val txid3 = ByteVector.view(random getBytes 32)
+  val txid4 = ByteVector.view(random getBytes 32)
 
-  val txid5 = BinaryData(random getBytes 32)
-  val txid6 = BinaryData(random getBytes 32)
-  val txid7 = BinaryData(random getBytes 32)
-  val txid8 = BinaryData(random getBytes 32)
+  val txid5 = ByteVector.view(random getBytes 32)
+  val txid6 = ByteVector.view(random getBytes 32)
+  val txid7 = ByteVector.view(random getBytes 32)
+  val txid8 = ByteVector.view(random getBytes 32)
 
   def allTests = {
     val serialized1 = LightningMessageCodecs.serialize(revocationInfoCodec encode ri)
@@ -107,8 +107,8 @@ class RevokedInfoSpec {
     val cerberusPayloadHex = cerberusAct.data.toString
 
     // Taken from Olympus
-    val cerberusPayloadBitVec = BitVector(BinaryData(cerberusPayloadHex).data)
-    val cerberusPayloadDecoded = cerberusPayloadCodec decode cerberusPayloadBitVec
+    val cerberusPayloadBitVec = ByteVector.fromValidHex(cerberusPayloadHex)
+    val cerberusPayloadDecoded = cerberusPayloadCodec decode cerberusPayloadBitVec.toBitVector
     val CerberusPayload(aesZygotes, halfTxIds) = cerberusPayloadDecoded.require.value
 
     assert(aesZygotes.size == halfTxIds.size)
@@ -118,7 +118,7 @@ class RevokedInfoSpec {
     // Taken from Olympus
       halfTxId \ aesz <- halfTxIds zip aesZygotes
       fullTxidBin <- halfTxIds.zip(Vector(txid2, txid3)).toMap get halfTxId
-      revBitVec <- AES.decZygote(aesz, fullTxidBin) map BitVector.apply
+      revBitVec <- AES.decZygote(aesz, fullTxidBin.toArray) map BitVector.apply
       DecodeResult(ri1, _) <- revocationInfoCodec.decode(revBitVec).toOption
     } assert(ri1 == ri)
 

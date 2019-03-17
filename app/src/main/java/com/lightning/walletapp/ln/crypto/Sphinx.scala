@@ -80,12 +80,8 @@ object Sphinx { me =>
     PublicKey(pub.multiply(scalar).normalize)
   }
 
-  def computeSharedSecret(pub: PublicKey, secret: PrivateKey): Bytes =
-    Sha256Hash.hash(pub.multiply(secret).normalize getEncoded true)
-
-  def generateStream(key: Bytes, length: Int): Bytes =
-    ChaCha20Legacy.process(me zeroes length, key, me zeroes 8,
-      encrypt = true, skipBlock = false)
+  def computeSharedSecret(pub: PublicKey, secret: PrivateKey): Bytes = Sha256Hash.hash(pub.multiply(secret).normalize getEncoded true)
+  def generateStream(key: Bytes, length: Int): Bytes = ChaCha20.process(zeroes(length), key, zeroes(12), encrypt = true, skipBlock = false)
 
   def computeEphemerealPublicKeysAndSharedSecrets(publicKeys: PublicKeyVec, sessionKey: PrivateKey): (PublicKeyVec, BytesVec) = {
     val firstEphemerealPublicKey = blind(PublicKey(Crypto.curve.getG, compressed = true), sessionKey.value.toByteArray)

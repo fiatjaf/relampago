@@ -864,12 +864,12 @@ object Script {
         case 0 if program.length == 32 =>
           // P2WPSH, program is the hash of the script, and witness is the stack + the script
           val check = Crypto.sha256(witness.stack.last)
-          require(check.bytes == program, "witness program mismatch")
+          require(check == program, "witness program mismatch")
           (witness.stack.dropRight(1), Script.parse(witness.stack.last))
         case 0 =>
           throw new IllegalArgumentException(s"Invalid witness program length: ${program.length}")
         case _ if (scriptFlag & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM) != 0 =>
-          throw new IllegalArgumentException(s"Invalid witness version: ${witnessVersion}")
+          throw new IllegalArgumentException(s"Invalid witness version: $witnessVersion")
         case _ =>
           // Higher version witness scripts return true for future softfork compatibility
           return

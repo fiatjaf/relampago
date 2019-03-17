@@ -3,9 +3,10 @@ package com.lightning.walletapp.test
 import java.nio.ByteOrder
 
 import com.lightning.walletapp.ln._
-import com.lightning.walletapp.ln.wire.{ChannelUpdate, Hop}
-import fr.acinq.bitcoin.{BinaryData, Block, Btc, Crypto, MilliBtc, MilliSatoshi, Protocol, Satoshi}
+import com.lightning.walletapp.ln.wire.Hop
+import fr.acinq.bitcoin.{Btc, Crypto, MilliBtc, MilliSatoshi, Protocol, Satoshi}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+import scodec.bits.ByteVector
 
 /**
   * Created by anton on 13.07.17.
@@ -15,10 +16,10 @@ class PaymentRequestSpec {
   def allTests = {
     import com.lightning.walletapp.ln.PaymentRequest._
 
-    val priv = PrivateKey(BinaryData("e126f68f7eafcc8b74f54d269fe206be715000f94dac067d1c04a8ca3b2db734"), compressed = true)
+    val priv = PrivateKey(ByteVector.fromValidHex("e126f68f7eafcc8b74f54d269fe206be715000f94dac067d1c04a8ca3b2db734"), compressed = true)
     val pub = priv.publicKey
     val nodeId = pub
-    assert(nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
+    assert(nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
 
     {
       println("check minimal unit is used")
@@ -55,9 +56,9 @@ class PaymentRequestSpec {
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lnbc")
       assert(pr.amount.isEmpty)
-      assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
+      assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
-      assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
+      assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
       assert(pr.tags.size == 2)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
@@ -68,9 +69,9 @@ class PaymentRequestSpec {
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lnbc")
       assert(pr.amount == Some(MilliSatoshi(250000000L)))
-      assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
+      assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
-      assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
+      assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
       assert(pr.tags.size == 3)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
@@ -81,9 +82,9 @@ class PaymentRequestSpec {
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lnbc")
       assert(pr.amount == Some(MilliSatoshi(2000000000L)))
-      assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
+      assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
-      assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
+      assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
       assert(pr.tags.size == 2)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
@@ -94,9 +95,9 @@ class PaymentRequestSpec {
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lntb")
       assert(pr.amount == Some(MilliSatoshi(2000000000L)))
-      assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
+      assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
-      assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
+      assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
       assert(pr.tags.collect { case u: FallbackAddressTag => u }.size == 1)
       assert(pr.tags.size == 3)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
@@ -108,18 +109,18 @@ class PaymentRequestSpec {
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lnbc")
       assert(pr.amount.contains(MilliSatoshi(2000000000L)))
-      assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
+      assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
-      assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
+      assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
       assert(pr.description == "3925b6f67e2c340036ed12093dd44e0368df1b6ea26c53dbe4811f58fd5db8c1")
 
       assert(pr.routingInfo == Vector(RoutingInfoTag(Vector(
-          Hop(PublicKey("029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255"),72623859790382856L,3,0,1,20),
-          Hop(PublicKey("039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255"),217304205466536202L,4,0,2,30)))))
+          Hop(PublicKey(ByteVector.fromValidHex("029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255")),72623859790382856L,3,0,1,20),
+          Hop(PublicKey(ByteVector.fromValidHex("039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255")),217304205466536202L,4,0,2,30)))))
 
       assert(pr.fallbackAddress.contains("1RustyRX2oai4EYYDpQGWvEL62BBGqN9T"))
-      assert(BinaryData(Protocol.writeUInt64(0x0102030405060708L, ByteOrder.BIG_ENDIAN)) == BinaryData("0102030405060708"))
-      assert(BinaryData(Protocol.writeUInt64(0x030405060708090aL, ByteOrder.BIG_ENDIAN)) == BinaryData("030405060708090a"))
+      assert(Protocol.writeUInt64(0x0102030405060708L, ByteOrder.BIG_ENDIAN) == ByteVector.fromValidHex("0102030405060708"))
+      assert(Protocol.writeUInt64(0x030405060708090aL, ByteOrder.BIG_ENDIAN) == ByteVector.fromValidHex("030405060708090a"))
       assert(pr.tags.size == 4)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
@@ -130,9 +131,9 @@ class PaymentRequestSpec {
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lnbc")
       assert(pr.amount == Some(MilliSatoshi(2000000000L)))
-      assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
+      assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
-      assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
+      assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
       assert(pr.tags.size == 3)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
@@ -143,9 +144,9 @@ class PaymentRequestSpec {
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lnbc")
       assert(pr.amount == Some(MilliSatoshi(2000000000L)))
-      assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
+      assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
-      assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
+      assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
       assert(pr.tags.size == 3)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
@@ -157,9 +158,9 @@ class PaymentRequestSpec {
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lnbc")
       assert(pr.amount == Some(MilliSatoshi(2000000000L)))
-      assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
+      assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
-      assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
+      assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
       assert(pr.tags.size == 3)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
@@ -170,10 +171,9 @@ class PaymentRequestSpec {
       val pr = PaymentRequest.read(ref)
       assert(pr.prefix == "lnbc")
       assert(pr.amount == Some(MilliSatoshi(2000000000L)))
-      assert(pr.paymentHash == BinaryData("0001020304050607080900010203040506070809000102030405060708090102"))
+      assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
-      assert(pr.nodeId == PublicKey(BinaryData("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
-      assert(pr.description == Crypto.sha256("One piece of chocolate cake, one icecream cone, one pickle, one slice of swiss cheese, one slice of salami, one lollypop, one piece of cherry pie, one sausage, one cupcake, and one slice of watermelon".getBytes).toString)
+      assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
       assert(pr.minFinalCltvExpiry == Some(12))
       assert(pr.tags.size == 4)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
