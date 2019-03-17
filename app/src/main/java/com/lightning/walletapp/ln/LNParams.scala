@@ -74,7 +74,7 @@ object LNParams { me =>
     derivePrivateKey(master, hardened(138L) :: 0L :: BigInt(prefix).toLong :: Nil).privateKey
   }
 
-  def backupFileName = s"blw${chainHash.toString}-${cloudId.toString}.bkup"
+  def backupFileName = s"blw${chainHash.toHex}-${cloudId.toHex}.bkup"
   def updateFeerate = for (chan <- ChannelManager.notClosing) chan process CMDFeerate(broadcaster.perKwThreeSat)
   def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: ByteVector, idx: Long, isFunder: Boolean) = {
     val Seq(fund, revoke, pay, delay, htlc, sha) = for (ord <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: ord :: Nil)

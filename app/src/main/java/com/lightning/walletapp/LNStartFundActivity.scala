@@ -117,7 +117,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
       // Start watching a channel funding script and save a channel, order an encrypted backup upload
       val encrypted = AES.encReadable(RefundingData(some.announce, None, some.commitments).toJson.toString, LNParams.cloudSecret.toArray)
-      val chanUpload = ChannelUploadAct(encrypted.toByteVector, Seq("key" -> LNParams.cloudId.toString), "data/put", some.announce.alias)
+      val chanUpload = ChannelUploadAct(encrypted.toByteVector, Seq("key" -> LNParams.cloudId.toHex), "data/put", some.announce.alias)
       app.olympus.tellClouds(chanUpload)
 
       // Make this channel able to receive ordinary events

@@ -100,7 +100,7 @@ object BackupWorker {
   private[this] val bwClass = classOf[BackupWorker]
 
   def workRequest(backupFileName: String, secret: ByteVector) = {
-    val bld = (new Data.Builder).putString(BACKUP_FILE_NAME, backupFileName).putString(SECRET, secret.toString).build
+    val bld = (new Data.Builder).putString(BACKUP_FILE_NAME, backupFileName).putString(SECRET, secret.toHex).build
     new OneTimeWorkRequest.Builder(bwClass).setInputData(bld).setInitialDelay(5, TimeUnit.SECONDS).addTag("ChannelsBackupWork").build
   }
 }

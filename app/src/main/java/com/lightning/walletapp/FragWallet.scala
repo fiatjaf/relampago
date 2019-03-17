@@ -135,7 +135,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         PaymentInfoWrap failOnUI rd
 
       case chan \ HTLCHasExpired(_, htlc) =>
-        val paymentHash = htlc.add.paymentHash.toString
+        val paymentHash = htlc.add.paymentHash.toHex
         val bld = negTextBuilder(dialog_ok, app.getString(err_ln_expired).format(paymentHash).html)
         UITask(host showForm bld.setCustomTitle(chan.data.announce.asString.html).create).run
 
@@ -218,7 +218,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
     allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
-    fundTxIds = ChannelManager.all.map(_.fundTxId.toString).toSet
+    fundTxIds = ChannelManager.all.map(_.fundTxId.toHex).toSet
     adapter.notifyDataSetChanged
     updTitleTask.run
 
@@ -260,7 +260,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   case class ShowDelayedWrap(stat: ShowDelayed) extends ItemWrap {
     val getDate = new java.util.Date(System.currentTimeMillis + stat.delay)
     def humanSum = denom.coloredIn(stat.amount, new String)
-    val txid = stat.commitTx.txid.toString
+    val txid = stat.commitTx.txid.toHex
 
     def humanWhen = {
       val now = System.currentTimeMillis
@@ -288,8 +288,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       viewShareBody setOnClickListener onButtonTap {
-        val rawTx = fr.acinq.bitcoin.Transaction write stat.txn
-        host share rawTx.toString
+        val rawTx = fr.acinq.bitcoin.Transaction.write(stat.txn)
+        host share rawTx.toHex
       }
 
       val inFiat = msatInFiatHuman(stat.amount)
@@ -344,14 +344,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         paymentProof setVisibility View.VISIBLE
         paymentProof setOnClickListener onButtonTap {
           // Signed payment request along with a preimage is sufficient proof of payment
-          host share app.getString(ln_proof).format(serializedPR, info.preimage.toString)
+          host share app.getString(ln_proof).format(serializedPR, info.preimage.toHex)
         }
       }
 
       PaymentInfoWrap.acceptedPayments get rd.pr.paymentHash foreach { rd1 =>
         val routingPath = for (usedHop <- rd1.usedRoute) yield usedHop.humanDetails
         val errors = PaymentInfo.errors.getOrElse(rd.pr.paymentHash, Vector.empty).reverse.map(_.toString) mkString "\n==\n"
-        val receiverInfo = s"Payee: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
+        val receiverInfo = s"Payee node: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
         val debugInfo = ("Your wallet" +: routingPath :+ receiverInfo mkString "\n-->\n") + s"\n\n$errors"
         paymentDebug setOnClickListener onButtonTap(host share debugInfo)
         paymentDebug setVisibility View.VISIBLE
@@ -435,7 +435,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         host startActivity new Intent(Intent.ACTION_VIEW, uri)
       }
 
-      viewShareBody setOnClickListener onButtonTap { host share ByteVector(wrap.tx.unsafeBitcoinSerialize).toString }
+      viewShareBody setOnClickListener onButtonTap { host share ByteVector(wrap.tx.unsafeBitcoinSerialize).toHex }
       val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, humanValues.map(_.html).toArray)
       val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
       lst setHeaderDividersEnabled false

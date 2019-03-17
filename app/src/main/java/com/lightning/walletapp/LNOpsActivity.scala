@@ -211,11 +211,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             rm(alert)(defineAction)
 
             def defineAction = chan.data match {
-              case _ if 0 == pos => urlIntent(txid = chan.fundTxId.toString)
+              case _ if 0 == pos => urlIntent(txid = chan.fundTxId.toHex)
               case _ if 1 == pos => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
               // In the following two cases channel menu is reduced by 2 so we need to show an appropriate closing tx here
               case norm: NormalData if 2 == pos && norm.unknownSpend.isDefined => urlIntent(txid = norm.unknownSpend.get.txid.toString)
-              case closing: ClosingData if 2 == pos => urlIntent(txid = closing.bestClosing.commitTx.txid.toString)
+              case closing: ClosingData if 2 == pos => urlIntent(txid = closing.bestClosing.commitTx.txid.toHex)
               case _ =>
                 val canCoopClose = isOpeningOrOperational(chan)
                 val isBlockerPresent = inFlightHtlcs(chan).nonEmpty

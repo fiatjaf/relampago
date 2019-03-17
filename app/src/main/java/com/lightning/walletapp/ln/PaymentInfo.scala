@@ -196,7 +196,7 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        useCache: Boolean, airLeft: Int, airAskUser: Boolean) {
 
   lazy val withMaxOffChainFeeAdded = firstMsat + LNParams.maxAcceptableFee(firstMsat, hops = 3)
-  lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toString}"
+  lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toHex}"
   lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
 }
 

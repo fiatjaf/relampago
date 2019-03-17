@@ -104,7 +104,7 @@ class RevokedInfoSpec {
 
     val reports = Vector(chan1, chan2)
     val cerberusAct = PaymentInfoWrap.getCerberusActs(reports.flatMap(PaymentInfoWrap.getVulnerableRevVec).toMap).next
-    val cerberusPayloadHex = cerberusAct.data.toString
+    val cerberusPayloadHex = cerberusAct.data.toHex
 
     // Taken from Olympus
     val cerberusPayloadBitVec = ByteVector.fromValidHex(cerberusPayloadHex)
@@ -112,7 +112,7 @@ class RevokedInfoSpec {
     val CerberusPayload(aesZygotes, halfTxIds) = cerberusPayloadDecoded.require.value
 
     assert(aesZygotes.size == halfTxIds.size)
-    assert(Set(txid2.toString take 16, txid3.toString take 16, txid6.toString take 16) == halfTxIds.toSet)
+    assert(Set(txid2.toHex take 16, txid3.toHex take 16, txid6.toHex take 16) == halfTxIds.toSet)
 
     for {
     // Taken from Olympus

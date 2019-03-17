@@ -282,7 +282,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
       def doLogin(alert: AlertDialog) = rm(alert) {
         val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
-        val secondLevelCallback = get(s"${lnUrl.request}&key=$linkingPubKey&sig=${sig.toString}", true)
+        val secondLevelCallback = get(s"${lnUrl.request}&key=$linkingPubKey&sig=${sig.toHex}", true)
         val secondLevelRequest = secondLevelCallback.connectTimeout(5000).trustAllCerts.trustAllHosts
         queue.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
         app toast ln_url_resolving

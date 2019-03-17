@@ -43,12 +43,12 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit object TransactionFmt extends JsonFormat[Transaction] {
     def read(json: JsValue): Transaction = Transaction.read(me json2String json)
-    def write(internal: Transaction): JsValue = Transaction.write(internal).toString.toJson
+    def write(internal: Transaction): JsValue = Transaction.write(internal).toHex.toJson
   }
 
   implicit object PublicKeyFmt extends JsonFormat[PublicKey] {
     def read(json: JsValue): PublicKey = Tools pubKeyFromByteVectorUnchecked ByteVector.fromValidHex(me json2String json)
-    def write(internalRepresentationAsHex: PublicKey): JsValue = internalRepresentationAsHex.toString.toJson
+    def write(internalRepresentationAsHex: PublicKey): JsValue = internalRepresentationAsHex.toBin.toHex.toJson
   }
 
   implicit object ShaHashesWithIndexFmt

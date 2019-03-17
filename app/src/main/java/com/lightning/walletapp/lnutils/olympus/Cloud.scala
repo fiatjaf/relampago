@@ -44,7 +44,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
     // Execute anyway if we are free and have available tokens and actions
     case CloudData(_, (point, clear, signature) +: ts, action +: _) \ CMDStart if isFree =>
-      val params = Seq("point" -> point, "cleartoken" -> clear, "clearsig" -> signature, BODY -> action.data.toString)
+      val params = Seq("point" -> point, "cleartoken" -> clear, "clearsig" -> signature, BODY -> action.data.toHex)
       // Be careful here: must make sure `doOnTerminate` changes `isFree` before `doOnCompleted` sends `CMDStart`
 
       val send = connector.ask[String](action.path, params ++ action.plus:_*)
