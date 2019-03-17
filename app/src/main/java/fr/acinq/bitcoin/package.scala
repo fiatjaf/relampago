@@ -129,16 +129,6 @@ package object bitcoin {
 
   def isHashNone(sighashType: Int): Boolean = (sighashType & 0x1f) == SIGHASH_NONE
 
-  def computeP2PkhAddress(pub: PublicKey, chainHash: ByteVector): String = {
-    val hash = pub.hash160
-    chainHash match {
-      case Block.RegtestGenesisBlock.hash | Block.TestnetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddressTestnet, hash)
-      case Block.LivenetGenesisBlock.hash => Base58Check.encode(Base58.Prefix.PubkeyAddress, hash)
-    }
-  }
-
-  def computeBIP44Address(pub: PublicKey, chainHash: ByteVector) = computeP2PkhAddress(pub, chainHash)
-
   /**
     *
     * @param pub       public key
