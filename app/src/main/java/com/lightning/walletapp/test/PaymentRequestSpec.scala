@@ -112,7 +112,7 @@ class PaymentRequestSpec {
       assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
       assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
-      assert(pr.description == "3925b6f67e2c340036ed12093dd44e0368df1b6ea26c53dbe4811f58fd5db8c1")
+      assert(pr.description == "")
 
       assert(pr.routingInfo == Vector(RoutingInfoTag(Vector(
       Hop(PublicKey(ByteVector.fromValidHex("029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255")),72623859790382856L,3,0,1,20),
