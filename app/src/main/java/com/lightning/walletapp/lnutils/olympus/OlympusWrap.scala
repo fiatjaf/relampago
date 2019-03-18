@@ -148,6 +148,11 @@ case class CerberusAct(data: ByteVector, plus: Seq[HttpParam], path: String, txi
   }
 }
 
+case class TxUploadAct(data: ByteVector, plus: Seq[HttpParam], path: String) extends CloudAct {
+  // This is an act for uploading refunding transactions immediately when channel gets closed uncooperatively
+  def onDone = db.change(OlympusLogTable.newSql, 1, app.getString(olympus_log_refunding_tx), System.currentTimeMillis)
+}
+
 case class ChannelUploadAct(data: ByteVector, plus: Seq[HttpParam], path: String, alias: String) extends CloudAct {
   // This is an act for uploading a channel encrypted backup immediately once a transaction for a new channel gets broadcasted
   def onDone = db.change(OlympusLogTable.newSql, 1, app.getString(olympus_log_channel_backup).format(alias), System.currentTimeMillis)

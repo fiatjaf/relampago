@@ -321,12 +321,14 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit object CloudActFmt extends JsonFormat[CloudAct] {
     def write(unserialized: CloudAct): JsValue = unserialized match {
       case unserialiedMessage: ChannelUploadAct => unserialiedMessage.toJson
+      case unserialiedMessage: TxUploadAct => unserialiedMessage.toJson
       case unserialiedMessage: CerberusAct => unserialiedMessage.toJson
       case unserialiedMessage: LegacyAct => unserialiedMessage.toJson
     }
 
     def read(serialized: JsValue): CloudAct = serialized.asJsObject.fields get "tag" match {
       case Some(s: JsString) if s.value == "ChannelUploadAct" => serialized.convertTo[ChannelUploadAct]
+      case Some(s: JsString) if s.value == "TxUploadAct" => serialized.convertTo[TxUploadAct]
       case Some(s: JsString) if s.value == "CerberusAct" => serialized.convertTo[CerberusAct]
       case _ => serialized.convertTo[LegacyAct] // TODO: remove later
     }
@@ -338,6 +340,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val cerberusActFmt = taggedJsonFmt(jsonFormat[ByteVector, Seq[HttpParam], String, StringVec,
     CerberusAct](CerberusAct.apply, "data", "plus", "path", "txids"), tag = "CerberusAct")
+
+  implicit val txUploadActFmt = taggedJsonFmt(jsonFormat[ByteVector, Seq[HttpParam], String,
+    TxUploadAct](TxUploadAct.apply, "data", "plus", "path"), tag = "TxUploadAct")
 
   implicit val channelUploadActFmt = taggedJsonFmt(jsonFormat[ByteVector, Seq[HttpParam], String, String,
     ChannelUploadAct](ChannelUploadAct.apply, "data", "plus", "path", "alias"), tag = "ChannelUploadAct")

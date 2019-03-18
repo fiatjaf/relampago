@@ -325,6 +325,7 @@
     <!-- Olympus log messages and notification -->
     <string name="olympus_log_channel_backup">Збережений зашифрований бекап каналу з «%1$s»</string>
     <string name="olympus_log_watch_payments">Почато стеження за %1$s старими станами</string>
+    <string name="olympus_log_refunding_tx">Збережена відкладена зворотня транзакція</string>
     <string name="notify_body">Додаток залишається відкритим, щоб отримати %1$s</string>
     <string name="notify_title">Очікується платіж-Блискавка</string>
 </resources>

@@ -113,6 +113,7 @@ object LightningMessageCodecs { me =>
   val varsizebinarydataLong: Codec[ByteVector] = variableSizeBytesLong(uint32, bytes)
   val varsizebinarydata: Codec[ByteVector] = variableSizeBytes(uint16, bytes)
   val rgb: Codec[RGB] = bytes(3).xmap(bv2Rgb, rgb2Bv)
+  val txvec = vectorOfN(uint16, varsizebinarydata)
 
   // Data formats
 
