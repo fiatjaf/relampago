@@ -322,8 +322,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case 0 \ FAILURE => s"<strong>${app getString ln_state_fail_out}</strong>"
         case 1 \ FAILURE => s"<strong>${app getString ln_state_fail_in}</strong>"
         case _ \ SUCCESS => s"<strong>${app getString ln_state_success}</strong>"
-        case 0 \ _ => s"<strong>${app getString ln_state_wait_out}</strong>"
-        case 1 \ _ => s"<strong>${app getString ln_state_wait_in}</strong>"
+        case _ => s"<strong>${app getString ln_state_wait}</strong>"
       }
 
       val inFiat = msatInFiatHuman(info.firstSum)
@@ -387,9 +386,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           mkCheckForm(_.dismiss, doSendOffChain(rd), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry)
 
         case _ =>
-          val title = app.getString(ln_incoming_title).format(humanStatus, denom.coloredIn(info.firstSum, denom.sign), inFiat)
-          if (info.incoming == 0 || info.isLooper) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
-          else showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
+          val incomingTitle = app.getString(ln_incoming_title).format(humanStatus, denom.coloredIn(info.firstSum, denom.sign), inFiat)
+          if (info.incoming == 1 && info.status != WAITING) showForm(negBuilder(dialog_ok, incomingTitle.html, detailsWrapper).create)
+          else if (info.incoming == 0 || info.isLooper) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
+          else host PRQR info.pr
       }
     }
   }
