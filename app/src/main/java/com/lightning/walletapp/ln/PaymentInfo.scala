@@ -123,9 +123,9 @@ object PaymentInfo {
     parsed map {
       case ErrorPacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case ErrorPacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
+      case ErrorPacket(_, u: ExpiryTooSoon) if !ignoreFeeInsufficient(rd, u.update) => replaceRoute(rd, u.update)
       case ErrorPacket(_, u: FeeInsufficient) if !ignoreFeeInsufficient(rd, u.update) => replaceRoute(rd, u.update)
-      case ErrorPacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
-      case ErrorPacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case ErrorPacket(_, u: IncorrectCltvExpiry) if !ignoreFeeInsufficient(rd, u.update) => replaceRoute(rd, u.update)
 
       case ErrorPacket(nodeKey, u: Update) =>
         val isHonest = Announcements.checkSig(u.update, nodeKey)
