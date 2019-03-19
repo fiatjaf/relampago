@@ -494,7 +494,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val bld = baseBuilder(title, content)
 
     def makeNormalRequest(sum: MilliSatoshi) = {
-      val goodChans = chansWithRoutes.keys.toVector.filter(channel => estimateCanReceive(channel) >= sum.amount).sortBy(receivedHtlcs) take 4
+      val goodChans = chansWithRoutes.keys.toVector.filter(channel => estimateCanReceive(channel) >= sum.amount).sortBy(estimateCanReceive) take 4
       PaymentInfoWrap.recordRoutingDataWithPr(goodChans map chansWithRoutes, sum, ByteVector(random getBytes 32), inputDescription.getText.toString.trim)
     }
 
