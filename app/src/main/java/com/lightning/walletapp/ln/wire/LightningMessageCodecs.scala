@@ -87,8 +87,8 @@ object LightningMessageCodecs { me =>
   val publicKey = pk(PublicKey.apply)
   val checkedPublicKey = pk { byteVector =>
     val checkedPublicKey = PublicKey(byteVector)
-    val point = checkedPublicKey.value.isInstanceOf[Point]
-    require(point, "Not a valid pubkey")
+    val okPoint = checkedPublicKey.value.isInstanceOf[Point]
+    require(okPoint, "Not a valid pubkey")
     checkedPublicKey
   }
 
