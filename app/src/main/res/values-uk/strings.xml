@@ -215,7 +215,7 @@
     <string name="ln_share_node_id">ID мого LN-вузла</string>
     <string name="ln_share_debug">Отладочна інформація</string>
     <string name="ln_proof">Підписаний платіжний запит: %1$s\n\nПрообраз платежу: %2$s</string>
-    <string name="ln_qr_disposable"><![CDATA[Валідний протягом 2 днів<br>Не використовуйте QR повторно]]></string>
+    <string name="ln_qr_disposable"><![CDATA[Запит валідний 1 день<br>Не використовуйте QR повторно]]></string>
 
     <!-- see PaymentInfo.scala -->
     <string name="ln_state_wait">знаходиться в дорозі</string>

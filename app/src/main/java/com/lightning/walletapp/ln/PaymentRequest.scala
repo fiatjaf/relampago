@@ -161,7 +161,7 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
 
 object PaymentRequest {
   type AmountOption = Option[MilliSatoshi]
-  val expiryTag = ExpiryTag(3600 * 48)
+  val expiryTag = ExpiryTag(3600 * 24 + 1)
 
   val prefixes =
     Map(Block.RegtestGenesisBlock.hash -> "lnbcrt",
