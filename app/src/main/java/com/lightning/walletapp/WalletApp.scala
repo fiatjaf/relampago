@@ -472,7 +472,7 @@ object ChannelManager extends Broadcaster {
       busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => inFlightHtlcs(chan).size)
       openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1)
       lessBusyRoutes = cheapestRoutes.sortBy(route => if (route.isEmpty) busyMap apply rd.pr.nodeId else busyMap apply route.head.nodeId)
-      openRoutes = lessBusyRoutes.sortBy(route => if (route.isEmpty) openMap apply rd.pr.nodeId else busyMap apply route.head.nodeId)
+      openRoutes = lessBusyRoutes.sortBy(route => if (route.isEmpty) openMap apply rd.pr.nodeId else openMap apply route.head.nodeId)
     } yield useFirstRoute(openRoutes, rd)
   }
 
