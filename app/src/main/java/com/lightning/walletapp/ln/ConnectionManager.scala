@@ -9,7 +9,7 @@ import com.lightning.walletapp.ln.Features._
 
 import rx.lang.scala.{Observable => Obs}
 import java.net.{InetSocketAddress, Socket}
-import com.lightning.walletapp.ln.Tools.{Bytes, none}
+import com.lightning.walletapp.ln.Tools.{Bytes, none, random}
 import com.lightning.walletapp.ln.crypto.Noise.KeyPair
 import java.util.concurrent.ConcurrentHashMap
 import fr.acinq.bitcoin.Crypto.PublicKey
@@ -83,11 +83,12 @@ object ConnectionManager {
     }
   }
 
-  for {
-    _ <- Obs interval 20.seconds
-    outdated = System.currentTimeMillis - 1000L * 40
-    _ \ work <- connections if work.lastMsg < outdated
-  } work.disconnect
+  Obs interval 20.seconds foreach { _ =>
+    val randomData = random.getBytes(random.nextInt(15) + 1)
+    val dead \ stale = connections.values.partition(_.lastMsg < System.currentTimeMillis - 1000L * 40)
+    for (work <- stale) work.handler process Ping(random.nextInt(15) + 1, ByteVector view randomData)
+    for (work <- dead) work.disconnect
+  }
 }
 
 class ConnectionListener {
