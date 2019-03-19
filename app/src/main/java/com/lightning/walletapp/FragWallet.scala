@@ -281,15 +281,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
       val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
+      viewShareBody setOnClickListener onButtonTap(host share stat.txn.bin.toHex)
 
       viewTxOutside setOnClickListener onButtonTap {
         val uri = Uri parse s"https://smartbit.com.au/tx/$txid"
         host startActivity new Intent(Intent.ACTION_VIEW, uri)
-      }
-
-      viewShareBody setOnClickListener onButtonTap {
-        val rawTx = fr.acinq.bitcoin.Transaction.write(stat.txn)
-        host share rawTx.toHex
       }
 
       val inFiat = msatInFiatHuman(stat.amount)

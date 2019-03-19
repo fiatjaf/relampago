@@ -41,7 +41,7 @@ object OlympusWrap {
   type CloudVec = Vector[Cloud]
 
   // Tx request/response
-  type BVecSeq = Seq[ByteVector]
+  type ByteVecSeq = Seq[ByteVector]
   type TxSeq = Seq[Transaction]
 
   // BTC and fiat rates
@@ -97,7 +97,7 @@ class OlympusWrap extends OlympusProvider {
   def getShortId(txid: ByteVector) = failOver(_.connector getShortId txid, Obs.empty, clouds)
   def findRoutes(out: OutRequest) = failOver(_.connector findRoutes out, Obs just Vector.empty, clouds)
   def getRates = failOver(_.connector.getRates, Obs error new ProtocolException("Could not obtain feerates and fiat prices"), clouds)
-  def getChildTxs(ids: BVecSeq) = failOver(_.connector getChildTxs ids, Obs error new ProtocolException("Try again later"), clouds)
+  def getChildTxs(ids: ByteVecSeq) = failOver(_.connector getChildTxs ids, Obs error new ProtocolException("Try again later"), clouds)
 }
 
 trait OlympusProvider {
@@ -105,7 +105,7 @@ trait OlympusProvider {
   def findNodes(query: String): Obs[AnnounceChansNumVec]
   def getShortId(txid: ByteVector): Obs[BlockHeightAndTxIdx]
   def getBackup(key: ByteVector): Obs[StringVec]
-  def getChildTxs(txIds: BVecSeq): Obs[TxSeq]
+  def getChildTxs(txIds: ByteVecSeq): Obs[TxSeq]
   def getRates: Obs[Result]
 }
 
@@ -120,7 +120,7 @@ class Connector(val url: String) extends OlympusProvider {
   def getRates = ask[Result]("rates/get")
   def getBackup(key: ByteVector) = ask[StringVec]("data/get", "key" -> key.toHex)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
-  def getChildTxs(txIds: BVecSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
+  def getChildTxs(txIds: ByteVecSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
   def getShortId(txid: ByteVector) = ask[BlockHeightAndTxIdx]("shortid/get", "txid" -> txid.toHex)
   def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.hex)
   def http(requestPath: String) = post(s"$url/$requestPath", true).trustAllCerts.trustAllHosts.connectTimeout(15000)

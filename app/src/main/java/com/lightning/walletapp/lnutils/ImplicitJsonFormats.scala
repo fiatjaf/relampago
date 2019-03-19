@@ -43,7 +43,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit object TransactionFmt extends JsonFormat[Transaction] {
     def read(json: JsValue): Transaction = Transaction.read(me json2String json)
-    def write(internal: Transaction): JsValue = Transaction.write(internal).toHex.toJson
+    def write(internal: Transaction): JsValue = internal.bin.toHex.toJson
   }
 
   implicit object PublicKeyFmt extends JsonFormat[PublicKey] {

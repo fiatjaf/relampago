@@ -17,7 +17,7 @@ object ImplicitConversions {
     fr.acinq.bitcoin.Transaction.read(bitcoinjTx.unsafeBitcoinSerialize)
 
   implicit def bitcoinLibTx2bitcoinjTx(bitcoinLibTx: fr.acinq.bitcoin.Transaction): org.bitcoinj.core.Transaction =
-    new org.bitcoinj.core.Transaction(app.params, fr.acinq.bitcoin.Transaction.write(bitcoinLibTx).toArray)
+    new org.bitcoinj.core.Transaction(app.params, bitcoinLibTx.bin.toArray)
 }
 
 object IconGetter extends Html.ImageGetter {
