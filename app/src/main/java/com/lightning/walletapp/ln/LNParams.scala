@@ -21,14 +21,14 @@ object LNParams { me =>
   val localFeatures = ByteVector.fromValidHex("02")
   val globalFeatures = ByteVector.fromValidHex("")
   val chainHash = Block.LivenetGenesisBlock.hash
-  val channelReserveToFundingRatio = 100
-  val minDepth = 1
 
+  val minDepth = 1
   val minCapacitySat = 300000L
   final val dust = Satoshi(2730L)
   final val maxToSelfDelay = 2016
   final val minFeeratePerKw = 253
   final val maxCltvDelta = 7 * 144L
+  val channelReserveToFundingRatio = 100
   final val maxHtlcValueMsat = 4000000000L
   final val maxCapacity = Satoshi(16777215L)
   final val minHtlcValue = MilliSatoshi(1000L)
