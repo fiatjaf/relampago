@@ -45,11 +45,9 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     // Execute anyway if we are free and have available tokens and actions
     case CloudData(_, (point, clear, signature) +: ts, action +: _) \ CMDStart if isFree =>
       val params = Seq("point" -> point, "cleartoken" -> clear, "clearsig" -> signature, BODY -> action.data.toHex)
-      // Be careful here: must make sure `doOnTerminate` changes `isFree` before `doOnCompleted` sends `CMDStart`
-
-      val send = connector.ask[String](action.path, params ++ action.plus:_*)
-      val send1 = send doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
-      send1.doOnCompleted(me doProcess CMDStart).foreach(onGotResponse, onGotResponse)
+      val send = connector.ask[String](action.path, params ++ action.plus:_*) doOnSubscribe { isFree = false } doOnTerminate { isFree = true }
+      // Be careful here: must make sure `doOnTerminate` sets `isFree` to true before `doOnCompleted` sends `CMDStart` so we can react again
+      send.doOnCompleted(me doProcess CMDStart).foreach(onGotResponse, onGotResponse)
 
       def onGotResponse(response: Any) = response match {
         case err: Throwable if err.getMessage == "tokeninvalid" => me BECOME data.copy(tokens = ts)

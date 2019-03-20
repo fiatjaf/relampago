@@ -375,7 +375,7 @@ object ChannelManager extends Broadcaster {
     def REV(cs: Commitments, rev: RevokeAndAck) = for {
       tx <- cs.remoteCommit.txOpt // We use old commitments to save a punishment for remote commit before it gets dropped
       myBalance = cs.remoteCommit.spec.toRemoteMsat // Local commit is cleared by now, remote still has relevant balance
-      watchtowerFee = broadcaster.perKwThreeSat * 2 // Scorched earth policy becuase watchtower can't regenerate tx
+      watchtowerFee = broadcaster.perKwThreeSat * 3 // Scorched earth policy becuase watchtower can't regenerate tx
       revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret, watchtowerFee)
       serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
     } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
@@ -418,9 +418,14 @@ object ChannelManager extends Broadcaster {
     }
 
     def ASKREFUNDPEER(some: HasCommitments, point: Point) = {
+      val msg = ByteVector.fromValidHex("please publish your local commitment".hex)
       val ref = RefundingData(some.announce, Some(point), some.commitments)
+      val error = Error(some.commitments.channelId, msg)
+
+      // Send both invalid reestablish and an error
       app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
       BECOME(STORE(ref), REFUNDING) SEND makeReestablish(some, 0L)
+      SEND(error)
     }
 
     // First add listeners, then call

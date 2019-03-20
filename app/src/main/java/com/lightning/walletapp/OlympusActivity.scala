@@ -120,15 +120,20 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   class FormManager(next: (String, Int) => Unit, title: Int) {
     val content = getLayoutInflater.inflate(R.layout.frag_olympus_details, null, false)
     val serverHostPort = content.findViewById(R.id.serverHostPort).asInstanceOf[EditText]
-    val serverBackup = content.findViewById(R.id.serverBackup).asInstanceOf[CheckBox]
-
+    val serverBackupWatchtower = content.findViewById(R.id.serverBackup).asInstanceOf[CheckBox]
     mkCheckForm(addAttempt, none, baseBuilder(getString(title), content), dialog_ok, dialog_cancel)
-    def set(c: Cloud) = wrap(serverHostPort setText c.connector.url)(serverBackup setChecked c.isAuthEnabled)
+
+    def set(c: Cloud) = {
+      serverHostPort setText c.connector.url
+      serverBackupWatchtower setChecked c.isAuthEnabled
+      // Changing host will render existing tokens invalid
+      serverHostPort setEnabled c.data.tokens.isEmpty
+    }
 
     def addAttempt(alert: AlertDialog): Unit = {
       val uriChecker = Uri parse serverHostPort.getText.toString
       if (uriChecker.getHost == null || uriChecker.getPort < 80) return
-      next(uriChecker.toString, if (serverBackup.isChecked) 1 else 0)
+      next(uriChecker.toString, if (serverBackupWatchtower.isChecked) 1 else 0)
       alert.dismiss
     }
   }

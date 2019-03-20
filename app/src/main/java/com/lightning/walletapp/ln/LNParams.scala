@@ -20,7 +20,7 @@ object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
   val localFeatures = ByteVector.fromValidHex("02")
   val globalFeatures = ByteVector.fromValidHex("")
-  val chainHash = Block.LivenetGenesisBlock.hash
+  val chainHash = Block.TestnetGenesisBlock.hash
   val channelReserveToFundingRatio = 100
   val minDepth = 1
 

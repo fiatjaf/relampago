@@ -34,9 +34,9 @@
     <string name="restore_hint">Your BIP32 mnemonic phrase</string>
 
     <string name="channel_recovery_info">
-        Recovery tool downloads available channel backups from Olympus servers and uses them to reimburse locked funds back into your on-chain wallet.\n\n
-        You should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds, otherwise nothing
-        will happen.\n\nUsing this tool does not affect open channels currently present on this phone
+        Recovery tool downloads available channel backups from Olympus servers and uses them to reimburse locked funds back into your on-chain wallet.
+        \n\nYou should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds, otherwise nothing
+        will happen.\n\nUsing this tool does not affect open channels currently present on this phone.
     </string>
 
     <string name="tokens_warn"><![CDATA[
@@ -242,7 +242,7 @@
     <string name="ln_info_close_coop">Closed cooperatively</string>
     <string name="ln_info_close_local">Force-closed by your wallet</string>
     <string name="ln_info_close_remote">Force-closed by remote peer</string>
-    <string name="ln_info_coop_attempt">Closing this channel&#8230;</string>
+    <string name="ln_info_coop_attempt">Closing may take some time&#8230;</string>
 
     <string name="ln_info_high_fee">Incoming payment fee is too high: %1$s</string>
     <string name="ln_info_no_receive">Receiving is still not enabled</string>
