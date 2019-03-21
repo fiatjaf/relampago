@@ -40,11 +40,9 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
       val olympusTokens = holder.itemView.findViewById(R.id.rightSideLine).asInstanceOf[TextView]
 
       val cloud = getItem(pos)
-      val serverAddress = Uri.parse(cloud.connector.url)
       val tokensLeftHuman = app.plur1OrZero(tokensLeft, cloud.data.tokens.size)
       val finalTokensLeft = if (cloud.isAuthEnabled) tokensLeftHuman else tokensLeft.last
-
-      olympusAddress setText serverAddress.getHost
+      olympusAddress setText Uri.parse(cloud.connector.url).getHost
       olympusTokens setText finalTokensLeft.html
       holder.swipable = 1 == cloud.removable
     }
@@ -126,8 +124,6 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
     def set(c: Cloud) = {
       serverHostPort setText c.connector.url
       serverBackupWatchtower setChecked c.isAuthEnabled
-      // Changing host will render existing tokens invalid
-      serverHostPort setEnabled c.data.tokens.isEmpty
     }
 
     def addAttempt(alert: AlertDialog): Unit = {
