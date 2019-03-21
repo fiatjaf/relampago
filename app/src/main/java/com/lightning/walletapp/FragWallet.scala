@@ -383,8 +383,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         case _ =>
           val incomingTitle = app.getString(ln_incoming_title).format(humanStatus, denom.coloredIn(info.firstSum, denom.sign), inFiat)
-          if (info.incoming == 1 && info.status != WAITING) showForm(negBuilder(dialog_ok, incomingTitle.html, detailsWrapper).create)
-          else if (info.incoming == 0 || info.isLooper) showForm(negBuilder(dialog_ok, outgoingTitle.html, detailsWrapper).create)
+          if (info.incoming == 0 || info.isLooper) showForm(negBuilder(dialog_ok, title = outgoingTitle.html, body = detailsWrapper).create)
+          else if (info.incoming == 1 && info.status != WAITING) showForm(negBuilder(dialog_ok, incomingTitle.html, detailsWrapper).create)
           else host PRQR info.pr
       }
     }
