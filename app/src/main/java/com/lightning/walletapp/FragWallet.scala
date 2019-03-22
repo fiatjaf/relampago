@@ -607,8 +607,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def startAir(toChan: Channel, originalEmptyRD: RoutingData) = {
-    val warnMessage = app getString err_ln_rebalance format s"<strong>${originalEmptyRD.pr.amount.map(denom.parsedWithSign) getOrElse new String}</strong>"
-    if (originalEmptyRD.airAskUser) mkCheckForm(alert => rm(alert)(start), none, baseBuilder(warnMessage.html, null), dialog_ok, dialog_cancel) else start
+    val amount = denom parsedWithSign MilliSatoshi(originalEmptyRD.firstMsat)
+    val bld = baseBuilder(app.getString(err_ln_rebalance).format(s"<strong>$amount</strong>").html, null)
+    if (originalEmptyRD.airAskUser) mkCheckForm(alert => rm(alert)(start), none, bld, dialog_ok, dialog_cancel) else start
     def start = <(rebalance, onFail)(none)
 
     def rebalance = {
