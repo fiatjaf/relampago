@@ -49,14 +49,11 @@ object ConnectionManager {
     }
 
     val thread = Future {
-      socket.connect(ann.addresses.collectFirst {
-        case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
-        case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
-        case Tor2(address, port) => NodeAddress.onion2Isa(address, port)
-        case Tor3(address, port) => NodeAddress.onion2Isa(address, port)
-      }.get, 7500)
-
+      // Node may have many addresses but we use the first valid for simplicity
+      val theOne = ann.addresses.collectFirst(NodeAddress.toInetSocketAddress)
+      socket.connect(theOne.get, 7500)
       handler.init
+
       while (true) {
         val length = socket.getInputStream.read(buffer, 0, buffer.length)
         if (length < 0) throw new RuntimeException("Connection droppped")

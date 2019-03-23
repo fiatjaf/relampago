@@ -14,6 +14,7 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.google.common.util.concurrent.Service.State._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
 
 import rx.lang.scala.{Observable => Obs}
@@ -26,7 +27,6 @@ import com.lightning.walletapp.helper.{AwaitService, RichCursor}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{pickInc, repeat}
 import com.lightning.walletapp.lnutils.olympus.{OlympusWrap, TxUploadAct}
 import android.app.{Application, NotificationChannel, NotificationManager}
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{revocationInfoCodec, txvec}
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -42,6 +42,7 @@ import fr.acinq.bitcoin.Crypto
 import android.widget.Toast
 import scodec.DecodeResult
 import android.os.Build
+import scala.util.Try
 import java.io.File
 
 
@@ -144,6 +145,7 @@ class WalletApp extends Application { me =>
     def blockSend(txj: Transaction) = peerGroup.broadcastTransaction(txj, 1).broadcast.get
     def shutDown = none
 
+    def trustedIsaTry = Try(nodeaddress.decode(BitVector fromValidHex wallet.getDescription).require.value) map NodeAddress.toInetSocketAddress
     def fundingPubScript(some: HasCommitments) = singletonList(some.commitments.commitInput.txOut.publicKeyScript: org.bitcoinj.script.Script)
     def closingPubKeyScripts(cd: ClosingData) = cd.commitTxs.flatMap(_.txOut).map(_.publicKeyScript: org.bitcoinj.script.Script).asJava
     def useCheckPoints(time: Long) = CheckpointManager.checkpoint(params, getAssets open "checkpoints.txt", store, time)
@@ -163,9 +165,17 @@ class WalletApp extends Application { me =>
       wallet.addTransactionConfidenceEventListener(ChannelManager.chainEventsListener)
       peerGroup.addDisconnectedEventListener(ChannelManager.chainEventsListener)
 
-      // Speed up initial connection by using a random top node
-      Future(peerGroup addAddress TopNodes.randomPeerAddress)
-      peerGroup addPeerDiscovery new DnsDiscovery(params)
+      Future {
+        trustedIsaTry map { node =>
+          // Either connect to a trusted node only OR to many random nodes
+          val trusted = new PeerAddress(params, node.getAddress, node.getPort)
+          peerGroup.addAddress(trusted)
+        } getOrElse {
+          peerGroup addPeerDiscovery new DnsDiscovery(params)
+          peerGroup.addAddress(TopNodes.randomPeerAddress)
+        }
+      }
+
       peerGroup.setMinRequiredProtocolVersion(70015)
       peerGroup.setDownloadTxDependencies(0)
       peerGroup.setPingIntervalMsec(10000)

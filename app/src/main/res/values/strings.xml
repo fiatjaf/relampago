@@ -42,7 +42,7 @@
     <string name="tokens_warn"><![CDATA[
         Please note: this wallet uses paid <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>storage tokens</a> to store your encrypted channel backups and
         <a href=https://medium.com/@akumaigorodski/watchtower-support-is-coming-to-bitcoin-lightning-wallet-8f969ac206b2>secure off-chain balance</a> while your device is offline.
-        <br><br>An automatic Lightning payment of <i>%1$s</i> will acquire 50 storage tokens once your first channel becomes open
+        <br><br>An automatic Lightning payment of <i>%1$s</i> will acquire 50 storage tokens once your first channel becomes open.
     ]]></string>
 
     <string name="migrator_usage_warning"><![CDATA[
@@ -68,8 +68,8 @@
     <string name="olympus_add">Add Olympus server</string>
     <string name="olympus_edit">Edit Olympus server</string>
     <string name="olympus_actions">Add, remove or reorder</string>
+    <string name="olympus_hint">Format is https://host:port</string>
     <string name="olympus_backup">Watchtower and backups</string>
-    <string name="olympus_hint">Server host:port</string>
 
     <array name="olympus_tokens_left">
         <item><![CDATA[<small><i>no tokens left</i></small>]]></item>
@@ -132,6 +132,16 @@
     <string name="fp_touch">touch a sensor\nto authorise action</string>
     <string name="fp_no_support">This phone does not support fingerprints</string>
     <string name="fp_add_print">Register at least one fingerprint in system settings</string>
+
+    <!-- trusted node -->
+    <string name="sets_trusted">Use trusted Bitcoin node</string>
+    <string name="hint_trusted_none">Not enabled, using random nodes</string>
+    <string name="hint_trusted">Format is address/host:port\nTor is supported</string>
+
+    <string name="sets_trusted_title">
+        Trusted Bitcoin node\n<small>Once an address is provided wallet will only
+        be using your trusted node instead of connecting to random ones</small>
+    </string>
 
     <array name="info_progress">
         <item>Sync is complete</item>
@@ -267,7 +277,7 @@
     <array name="ln_chan_actions_list">
         <item>View funding transaction</item>
         <item>Export channel snapshot</item>
-        <item>Close channel to this wallet</item>
+        <item>Close channel</item>
         <item>View refunding transaction</item>
     </array>
 

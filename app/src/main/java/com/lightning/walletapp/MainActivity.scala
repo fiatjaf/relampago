@@ -51,7 +51,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
     MainActivity.proceedOnSuccess = UITask { me exitTo MainActivity.wallet }
     MainActivity.actOnError = { case error => UITask(throw error).run }
     Utils clickableTextField findViewById(R.id.mainGreetings)
-    lnutils.TopNodes.subscription
   }
 
   // NFC AND SHARE

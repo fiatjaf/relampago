@@ -87,10 +87,8 @@ object TopNodes {
     new PeerAddress(app.params, h1, p1)
   }
 
-  lazy val subscription =
-    // Can later be cancelled if don't want updates
-    initDelay(queue.map(_ => get(api, true).trustAllCerts.trustAllHosts.body),
-      top.stamp, 60 * 60 * 24 * 7 * 1000L).foreach(process, Tools.none)
+  initDelay(queue.map(_ => get(api, true).trustAllCerts.trustAllHosts.body),
+    top.stamp, 60 * 60 * 24 * 7 * 1000L).foreach(process, Tools.none)
 }
 
 // Top nodes are updated once per week, have ipv4 only

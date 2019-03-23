@@ -25,38 +25,54 @@
         android:layout_height="match_parent">
 
         <LinearLayout
+            android:layout_marginStart="@dimen/app_padding"
+            android:layout_marginEnd="@dimen/app_padding"
             style="@style/StandardLinearLayout">
 
+            <!-- CHECKBOXES -->
+
             <CheckBox
-                style="@style/Info"
-                android:layout_marginTop="25dp"
-                android:layout_gravity="center"
+                style="@style/RightCheckBox"
                 android:id="@+id/gDriveBackups"
-                android:layout_width="wrap_content"
                 android:text="@string/sets_gdrive"
                 android:onClick="onGDriveTap"/>
 
             <TextView
-                style="@style/Info"
-                android:layout_gravity="center"
-                android:layout_marginBottom="25dp"
+                style="@style/BaseText"
+                android:layout_marginBottom="15dp"
                 android:id="@+id/gDriveBackupState"
-                android:layout_width="wrap_content"/>
+                android:layout_width="match_parent"/>
+
+            <View style="@style/GrayDivider"/>
 
             <CheckBox
-                style="@style/Info"
-                android:layout_gravity="center"
+                style="@style/RightCheckBox"
                 android:id="@+id/fpAuthentication"
-                android:layout_width="wrap_content"
                 android:text="@string/sets_fp"
                 android:onClick="onFpTap"/>
 
             <TextView
-                style="@style/Info"
-                android:layout_gravity="center"
-                android:layout_marginBottom="25dp"
-                android:layout_width="wrap_content"
+                style="@style/BaseText"
+                android:layout_marginBottom="15dp"
+                android:layout_width="match_parent"
                 android:text="@string/sets_fp_details"/>
+
+            <View style="@style/GrayDivider"/>
+
+            <CheckBox
+                style="@style/RightCheckBox"
+                android:id="@+id/useTrustedNode"
+                android:text="@string/sets_trusted"
+                android:onClick="onTrustedTap"/>
+
+            <TextView
+                style="@style/BaseText"
+                android:layout_marginBottom="15dp"
+                android:id="@+id/useTrustedNodeState"
+                android:layout_width="match_parent"
+                android:maxLines="1"/>
+
+            <!-- BUTTONS -->
 
             <View style="@style/GrayDivider"/>
 

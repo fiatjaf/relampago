@@ -12,7 +12,7 @@
 
     <TextView
         style="@style/StdText"
-        android:text="@string/olympus_hint"
+        android:id="@+id/formatInputHint"
         android:layout_width="wrap_content"/>
 
     <CheckBox

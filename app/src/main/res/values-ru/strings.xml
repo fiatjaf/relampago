@@ -264,7 +264,7 @@
     <array name="ln_chan_actions_list">
         <item>Открывающая транзакция</item>
         <item>Сохранить снапшот канала</item>
-        <item>Закрыть в этот кошелек</item>
+        <item>Закрыть канал</item>
         <item>Возвратная транзакция</item>
     </array>
 

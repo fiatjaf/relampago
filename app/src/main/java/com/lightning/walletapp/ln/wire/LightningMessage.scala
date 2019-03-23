@@ -144,10 +144,12 @@ case object NodeAddress {
   val V2Len = 16
   val V3Len = 56
 
-  def onion2Isa(encodedHost: String, port: Int) = encodedHost match {
-    case address if address.length == V2Len => new InetSocketAddress(s"$address$onionSuffix", port)
-    case address if address.length == V3Len => new InetSocketAddress(s"$address$onionSuffix", port)
-    case unknownAddress => throw new RuntimeException(s"Invalid Tor address $unknownAddress")
+  def toInetSocketAddress: PartialFunction[NodeAddress, InetSocketAddress] = {
+    case Tor2(onionHost, port) => new InetSocketAddress(s"$onionHost$onionSuffix", port)
+    case Tor3(onionHost, port) => new InetSocketAddress(s"$onionHost$onionSuffix", port)
+    case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
+    case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
+    case _ => throw new RuntimeException
   }
 
   def fromParts(host: String, port: Int) =

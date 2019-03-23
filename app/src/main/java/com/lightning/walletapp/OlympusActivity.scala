@@ -118,8 +118,10 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   class FormManager(next: (String, Int) => Unit, title: Int) {
     val content = getLayoutInflater.inflate(R.layout.frag_olympus_details, null, false)
     val serverHostPort = content.findViewById(R.id.serverHostPort).asInstanceOf[EditText]
+    val formatInputHint = content.findViewById(R.id.formatInputHint).asInstanceOf[TextView]
     val serverBackupWatchtower = content.findViewById(R.id.serverBackup).asInstanceOf[CheckBox]
     mkCheckForm(addAttempt, none, baseBuilder(getString(title), content), dialog_ok, dialog_cancel)
+    formatInputHint setText olympus_hint
 
     def set(c: Cloud) = {
       serverHostPort setText c.connector.url

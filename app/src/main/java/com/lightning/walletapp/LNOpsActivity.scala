@@ -178,9 +178,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       // MENU PART
 
-      def warnAndMaybeClose(channelClosureWarning: String) =
-        mkCheckForm(alert => rm(alert)(chan process ChannelManager.CMDLocalShutdown),
-          none, baseTextBuilder(channelClosureWarning.html), dialog_ok, dialog_cancel)
+      def warnAndMaybeClose(channelClosureWarning: String) = {
+        val bld = baseTextBuilder(channelClosureWarning.html).setCustomTitle(chan.data.announce.asString.html)
+        mkCheckForm(alert => rm(alert)(chan process ChannelManager.CMDLocalShutdown), none, bld, dialog_ok, dialog_cancel)
+      }
 
       view setOnClickListener onButtonTap {
         // All channel actions are sensitive, require auth

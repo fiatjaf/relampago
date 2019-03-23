@@ -4,12 +4,16 @@
 
     <EditText
         android:minWidth="100dp"
+        android:gravity="center"
         android:paddingTop="20dp"
-        style="@style/BigInputText"
         android:digits=" .0123456789"
         android:inputType="numberDecimal"
         android:id="@+id/fiatInputAmount"
-        android:focusableInTouchMode="true"/>
+        android:focusableInTouchMode="true"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:imeOptions="actionDone"
+        android:textSize="26sp"/>
 
     <TextView
         style="@style/StdText"
@@ -24,11 +28,14 @@
 
     <EditText
         android:minWidth="100dp"
-        android:focusable="true"
-        style="@style/BigInputText"
-        android:id="@+id/inputAmount"
+        android:gravity="center"
         android:digits=" .0123456789"
-        android:inputType="numberDecimal"/>
+        android:inputType="numberDecimal"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:imeOptions="actionDone"
+        android:id="@+id/inputAmount"
+        android:textSize="26sp"/>
 
     <TextView
         style="@style/StdText"
