@@ -134,10 +134,26 @@ case class NodeAnnouncement(signature: ByteVector, features: ByteVector, timesta
 
 sealed trait NodeAddress { def canBeUpdatedIfOffline: Boolean }
 case object Padding extends NodeAddress { def canBeUpdatedIfOffline = false }
-case class IPv4(ipv4: Inet4Address, port: Int) extends NodeAddress { def canBeUpdatedIfOffline = true }
-case class IPv6(ipv6: Inet6Address, port: Int) extends NodeAddress { def canBeUpdatedIfOffline = true }
-case class Tor2(tor2: String, port: Int) extends NodeAddress { def canBeUpdatedIfOffline = false }
-case class Tor3(tor3: String, port: Int) extends NodeAddress { def canBeUpdatedIfOffline = false }
+
+case class IPv4(ipv4: Inet4Address, port: Int) extends NodeAddress {
+  override def toString: String = s"${ipv4.toString.tail}:$port"
+  def canBeUpdatedIfOffline = true
+}
+
+case class IPv6(ipv6: Inet6Address, port: Int) extends NodeAddress {
+  override def toString: String = s"${ipv6.toString.tail}:$port"
+  def canBeUpdatedIfOffline = true
+}
+
+case class Tor2(tor2: String, port: Int) extends NodeAddress {
+  override def toString: String = s"$tor2:$port"
+  def canBeUpdatedIfOffline = false
+}
+
+case class Tor3(tor3: String, port: Int) extends NodeAddress {
+  override def toString: String = s"$tor3:$port"
+  def canBeUpdatedIfOffline = false
+}
 
 case object NodeAddress {
   val onionSuffix = ".onion"
@@ -149,16 +165,17 @@ case object NodeAddress {
     case Tor3(onionHost, port) => new InetSocketAddress(s"$onionHost$onionSuffix", port)
     case IPv4(sockAddress, port) => new InetSocketAddress(sockAddress, port)
     case IPv6(sockAddress, port) => new InetSocketAddress(sockAddress, port)
-    case _ => throw new RuntimeException
   }
 
   def fromParts(host: String, port: Int) =
     if (host.endsWith(onionSuffix) && host.length == V2Len + onionSuffix.length) Tor2(host dropRight onionSuffix.length, port)
     else if (host.endsWith(onionSuffix) && host.length == V3Len + onionSuffix.length) Tor3(host dropRight onionSuffix.length, port)
-    else InetAddress getByName host match {
-      case ip4Addr: Inet4Address => IPv4(ip4Addr, port)
-      case ip6Addr: Inet6Address => IPv6(ip6Addr, port)
-    }
+    else resolveIp(host, port)
+
+  def resolveIp(host: String, port: Int) = InetAddress getByName host match {
+    case inetVersion4Address: Inet4Address => IPv4(ipv4 = inetVersion4Address, port)
+    case inetVersion6Address: Inet6Address => IPv6(ipv6 = inetVersion6Address, port)
+  }
 }
 
 // Not in a spec

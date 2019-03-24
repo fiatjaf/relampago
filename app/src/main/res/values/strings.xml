@@ -68,7 +68,7 @@
     <string name="olympus_add">Add Olympus server</string>
     <string name="olympus_edit">Edit Olympus server</string>
     <string name="olympus_actions">Add, remove or reorder</string>
-    <string name="olympus_hint">Format is https://host:port</string>
+    <string name="olympus_hint">format is https://host:port</string>
     <string name="olympus_backup">Watchtower and backups</string>
 
     <array name="olympus_tokens_left">
@@ -135,13 +135,13 @@
 
     <!-- trusted node -->
     <string name="sets_trusted">Use trusted Bitcoin node</string>
-    <string name="hint_trusted_none">Not enabled, using random nodes</string>
-    <string name="hint_trusted">Format is address/host:port\nTor is supported</string>
+    <string name="trusted_hint_none">Disabled, using random nodes</string>
+    <string name="trusted_hint">format is address/host:port\ntor address is supported</string>
 
-    <string name="sets_trusted_title">
-        Trusted Bitcoin node\n<small>Once an address is provided wallet will only
-        be using your trusted node instead of connecting to random ones</small>
-    </string>
+    <string name="sets_trusted_title"><![CDATA[
+        Trusted Bitcoin node<br><br><small>Once an address is provided wallet
+        will only be using your trusted node instead of random ones.</small>
+    ]]></string>
 
     <array name="info_progress">
         <item>Sync is complete</item>

@@ -11,8 +11,8 @@
     <string name="mnemonic_info">Мнемонический код важен!\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> зачем он нужен и сохраните его прямо сейчас\n\n\n<small>Подсказка: свайпните влево\nчтобы открыть QR сканер</small></string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Может занять несколько часов</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Более быстрое подтверждение</font></small></small>]]></string>
-    <string name="copied_to_clipboard">Скопировано «%1$s»</string>
     <string name="search_hint_payments">Поиск по платежам-молниям</string>
+    <string name="copied_to_clipboard">Скопировано «%1$s»</string>
     <string name="wallet_restore">Восстановить кошелек</string>
     <string name="wallet_settings">Настройки кошелька</string>
     <string name="wallet_create">Новый кошелек</string>
@@ -127,6 +127,16 @@
     <string name="fp_touch">коснитесь сенсора\nчтобы продолжить</string>
     <string name="fp_no_support">Этот телефон не поддерживает отпечатки пальцев</string>
     <string name="fp_add_print">Зарегистрируйте хотя-бы один отпечаток пальца в настройках</string>
+
+    <!-- trusted node -->
+    <string name="sets_trusted">Свой Биткоин-узел</string>
+    <string name="trusted_hint_none">Нету, используем случайные</string>
+    <string name="trusted_hint">формат вида адрес/IP:порт\nможно tor-адрес</string>
+
+    <string name="sets_trusted_title"><![CDATA[
+        Свой Биткоин-узел<br><br><small>Если адрес указан, то кошелек будет
+        использовать только ваш Биткоин-узел, а не случайные из сети</small>
+    ]]></string>
 
     <array name="info_progress">
         <item>Синхронизация завершена</item>

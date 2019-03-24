@@ -145,7 +145,7 @@ class WalletApp extends Application { me =>
     def blockSend(txj: Transaction) = peerGroup.broadcastTransaction(txj, 1).broadcast.get
     def shutDown = none
 
-    def trustedIsaTry = Try(nodeaddress.decode(BitVector fromValidHex wallet.getDescription).require.value) map NodeAddress.toInetSocketAddress
+    def trustedNodeTry = Try(nodeaddress.decode(BitVector fromValidHex wallet.getDescription).require.value)
     def fundingPubScript(some: HasCommitments) = singletonList(some.commitments.commitInput.txOut.publicKeyScript: org.bitcoinj.script.Script)
     def closingPubKeyScripts(cd: ClosingData) = cd.commitTxs.flatMap(_.txOut).map(_.publicKeyScript: org.bitcoinj.script.Script).asJava
     def useCheckPoints(time: Long) = CheckpointManager.checkpoint(params, getAssets open "checkpoints.txt", store, time)
@@ -166,20 +166,20 @@ class WalletApp extends Application { me =>
       peerGroup.addDisconnectedEventListener(ChannelManager.chainEventsListener)
 
       Future {
-        trustedIsaTry map { node =>
+        trustedNodeTry map NodeAddress.toInetSocketAddress map { isa =>
           // Either connect to a trusted node only OR to many random nodes
-          val trusted = new PeerAddress(params, node.getAddress, node.getPort)
+          val trusted = new PeerAddress(params, isa.getAddress, isa.getPort)
           peerGroup.addAddress(trusted)
         } getOrElse {
           peerGroup addPeerDiscovery new DnsDiscovery(params)
           peerGroup.addAddress(TopNodes.randomPeerAddress)
+          peerGroup.setMaxConnections(5)
         }
       }
 
       peerGroup.setMinRequiredProtocolVersion(70015)
       peerGroup.setDownloadTxDependencies(0)
       peerGroup.setPingIntervalMsec(10000)
-      peerGroup.setMaxConnections(5)
       peerGroup.addWallet(wallet)
 
       for {

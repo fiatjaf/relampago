@@ -301,8 +301,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         // Propose new remote commit via commit tx sig
         val nextRemotePoint = norm.commitments.remoteNextCommitInfo.right.get
         val c1 \ commitSig = Commitments.sendCommit(norm.commitments, nextRemotePoint)
-        val d1RemoteSigSent = me STORE norm.copy(commitments = c1)
-        me UPDATA d1RemoteSigSent SEND commitSig
+        val d1 = me STORE norm.copy(commitments = c1)
+        me UPDATA d1 SEND commitSig
 
 
       case (norm: NormalData, sig: CommitSig, OPEN) =>

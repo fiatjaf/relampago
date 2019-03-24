@@ -128,6 +128,16 @@
     <string name="fp_no_support">Цей телефон не підтримує відбитки пальців</string>
     <string name="fp_add_print">Зареєструйте хоча-б один відбиток пальця в налаштуваннях</string>
 
+    <!-- trusted node -->
+    <string name="sets_trusted">Свій біткоїн-вузол</string>
+    <string name="trusted_hint_none">Немає, використовуємо випадкові</string>
+    <string name="trusted_hint">формат виду адреса/IP:порт\nтакож можно tor-адресу</string>
+
+    <string name="sets_trusted_title"><![CDATA[
+        Свій біткоіни-вузол<br><br><small>Якщо адреса вказана, то гаманець буде
+        використовувати тільки ваш Біткоїн-вузол, а не випадкові з мережі</small>
+    ]]></string>
+
     <array name="info_progress">
         <item>Синхронізацію завершено</item>
         <item><![CDATA[<font color=#E68A00>Синхронізація %1$d день</font>]]></item>

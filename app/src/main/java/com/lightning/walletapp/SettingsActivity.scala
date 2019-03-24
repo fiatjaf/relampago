@@ -17,9 +17,11 @@ import com.lightning.walletapp.helper.{AES, FingerPrint}
 import android.os.Build.{VERSION, VERSION_CODES}
 import android.view.{Menu, MenuItem, View}
 
+import scala.concurrent.Future
+import concurrent.ExecutionContext.Implicits.global
 import com.google.android.gms.common.api.CommonStatusCodes.SIGN_IN_REQUIRED
 import com.google.android.gms.common.api.ApiException
-import com.lightning.walletapp.ln.wire.WalletZygote
+import com.lightning.walletapp.ln.wire.{NodeAddress, WalletZygote}
 import com.google.android.gms.drive.MetadataBuffer
 import android.support.v4.content.FileProvider
 import com.lightning.walletapp.lnutils.GDrive
@@ -27,19 +29,25 @@ import android.support.v7.widget.Toolbar
 import org.bitcoinj.store.SPVBlockStore
 import co.infinum.goldfinger.Goldfinger
 import com.google.common.io.Files
-import android.content.Intent
+import android.content.{DialogInterface, Intent}
 import scodec.bits.ByteVector
-import android.app.Activity
+import android.app.{Activity, AlertDialog}
+
+import scala.util.Success
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
 import java.io.File
 
+import android.content.DialogInterface.OnDismissListener
+
 
 class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val gDriveBackups = findViewById(R.id.gDriveBackups).asInstanceOf[CheckBox]
+  lazy val useTrustedNode = findViewById(R.id.useTrustedNode).asInstanceOf[CheckBox]
   lazy val fpAuthentication = findViewById(R.id.fpAuthentication).asInstanceOf[CheckBox]
   lazy val gDriveBackupState = findViewById(R.id.gDriveBackupState).asInstanceOf[TextView]
+  lazy val useTrustedNodeState = findViewById(R.id.useTrustedNodeState).asInstanceOf[TextView]
   lazy val exportWalletSnapshot = findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
   lazy val chooseBitcoinUnit = findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
   lazy val recoverFunds = findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
@@ -126,11 +134,36 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case true => FingerPrint switch true
   }
 
+  def onTrustedTap(cb: View) = {
+    val title = getString(sets_trusted_title).html
+    val content = getLayoutInflater.inflate(R.layout.frag_olympus_details, null, false)
+    val serverHostPort = content.findViewById(R.id.serverHostPort).asInstanceOf[EditText]
+    val formatInputHint = content.findViewById(R.id.formatInputHint).asInstanceOf[TextView]
+    lazy val alert = mkCheckForm(addAttempt, none, baseBuilder(title, content), dialog_ok, dialog_cancel)
+    def addAttempt(alert: AlertDialog) = <(process(serverHostPort.getText.toString), onFail)(_ => alert.dismiss)
+    alert setOnDismissListener new OnDismissListener { def onDismiss(some: DialogInterface) = updateTrustedView }
+    content.findViewById(R.id.serverBackup).asInstanceOf[CheckBox] setVisibility View.GONE
+    app.kit.trustedNodeTry.foreach(serverHostPort setText _.toString)
+    formatInputHint setText trusted_hint
+
+    def process(rawText: String) = if (rawText.nonEmpty) {
+      val host \ port = rawText.splitAt(rawText lastIndexOf ':')
+      val nodeAddress = NodeAddress.fromParts(host, port.tail.toInt)
+      val serialized = nodeaddress.encode(nodeAddress).require
+      app.kit.wallet.setDescription(serialized.toHex)
+      app.kit.wallet.saveToFile(app.walletFile)
+    } else {
+      app.kit.wallet.setDescription(new String)
+      app.kit.wallet.saveToFile(app.walletFile)
+    }
+  }
+
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_settings
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     getSupportActionBar setSubtitle "App version 0.3-115"
     getSupportActionBar setTitle wallet_settings
+    updateTrustedView
     updateBackupView
     updateFpView
 
@@ -285,5 +318,12 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def updateFpView = {
     val isOperational = FingerPrint isOperational gf
     fpAuthentication setChecked isOperational
+  }
+
+  def updateTrustedView = {
+    val naTry = app.kit.trustedNodeTry
+    if (naTry.isFailure) useTrustedNodeState setText trusted_hint_none
+    else useTrustedNodeState setText naTry.get.toString
+    useTrustedNode setChecked naTry.isSuccess
   }
 }

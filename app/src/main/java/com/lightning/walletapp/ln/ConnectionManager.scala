@@ -8,13 +8,13 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.Features._
 
 import rx.lang.scala.{Observable => Obs}
-import java.net.{InetSocketAddress, Socket}
 import com.lightning.walletapp.ln.Tools.{Bytes, none, random}
 import com.lightning.walletapp.ln.crypto.Noise.KeyPair
 import java.util.concurrent.ConcurrentHashMap
 import fr.acinq.bitcoin.Crypto.PublicKey
 import java.util.concurrent.Executors
 import scodec.bits.ByteVector
+import java.net.Socket
 
 
 object ConnectionManager {

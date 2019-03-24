@@ -2,15 +2,16 @@ package com.lightning.walletapp.ln
 
 import TransportHandler._
 import com.lightning.walletapp.ln.crypto.Noise._
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
+import scala.concurrent.{ExecutionContext, Future}
+
+import com.lightning.walletapp.ln.wire.LightningMessage
 import scala.concurrent.ExecutionContextExecutor
 import com.lightning.walletapp.ln.Tools.random
 import java.util.concurrent.Executors
 import fr.acinq.bitcoin.Protocol
 import scodec.bits.ByteVector
 import java.nio.ByteOrder
-
-import com.lightning.walletapp.ln.wire.{LightningMessage, LightningMessageCodecs}
-import scala.concurrent.{ExecutionContext, Future}
 
 
 // Used to decrypt remote messages -> send to channel as well as encrypt outgoing messages -> send to socket
@@ -71,7 +72,7 @@ abstract class TransportHandler(keyPair: KeyPair, remotePubKey: ByteVector) exte
     // Normal operation phase: messages can be sent and received here
     case (cd: CyphertextData, msg: LightningMessage, WAITING_CYPHERTEXT) =>
 
-      val binary = LightningMessageCodecs serialize msg
+      val binary = serialize(lightningMessageCodec encode msg)
       val (encoder1, ciphertext) = encryptMsg(cd.enc, binary)
       handleEncryptedOutgoingData(ciphertext)
       me UPDATE cd.copy(enc = encoder1)

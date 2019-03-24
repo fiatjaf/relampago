@@ -21,9 +21,6 @@ object LightningMessageCodecs { me =>
   type RedeemScriptAndSig = (ByteVector, ByteVector)
   type RGB = (Byte, Byte, Byte)
 
-  def serialize(msg: LightningMessage): ByteVector =
-    serialize(lightningMessageCodec encode msg)
-
   def serialize(attempt: BitVectorAttempt) = attempt match {
     case Attempt.Successful(binary) => ByteVector.view(binary.toByteArray)
     case Attempt.Failure(err) => throw new LightningException(err.message)

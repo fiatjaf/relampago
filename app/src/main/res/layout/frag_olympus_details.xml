@@ -13,11 +13,13 @@
     <TextView
         style="@style/StdText"
         android:id="@+id/formatInputHint"
+        android:layout_marginBottom="25dp"
         android:layout_width="wrap_content"/>
 
     <CheckBox
-        style="@style/MarginInfo"
+        style="@style/Info"
         android:id="@+id/serverBackup"
+        android:layout_marginBottom="25dp"
         android:layout_width="wrap_content"
         android:text="@string/olympus_backup"/>
 
