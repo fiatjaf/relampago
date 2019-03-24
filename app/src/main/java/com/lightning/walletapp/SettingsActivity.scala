@@ -12,16 +12,17 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
+import com.lightning.walletapp.ln.wire.{NodeAddress, WalletZygote}
 import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
 import com.lightning.walletapp.helper.{AES, FingerPrint}
+import android.content.{DialogInterface, Intent}
 import android.os.Build.{VERSION, VERSION_CODES}
+import android.app.{Activity, AlertDialog}
 import android.view.{Menu, MenuItem, View}
 
-import scala.concurrent.Future
-import concurrent.ExecutionContext.Implicits.global
 import com.google.android.gms.common.api.CommonStatusCodes.SIGN_IN_REQUIRED
+import android.content.DialogInterface.OnDismissListener
 import com.google.android.gms.common.api.ApiException
-import com.lightning.walletapp.ln.wire.{NodeAddress, WalletZygote}
 import com.google.android.gms.drive.MetadataBuffer
 import android.support.v4.content.FileProvider
 import com.lightning.walletapp.lnutils.GDrive
@@ -29,17 +30,11 @@ import android.support.v7.widget.Toolbar
 import org.bitcoinj.store.SPVBlockStore
 import co.infinum.goldfinger.Goldfinger
 import com.google.common.io.Files
-import android.content.{DialogInterface, Intent}
 import scodec.bits.ByteVector
-import android.app.{Activity, AlertDialog}
-
-import scala.util.Success
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
 import java.io.File
-
-import android.content.DialogInterface.OnDismissListener
 
 
 class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
