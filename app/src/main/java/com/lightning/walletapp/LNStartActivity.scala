@@ -65,8 +65,19 @@ object FragLNStart {
 }
 
 class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
-  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) =
-    inf.inflate(R.layout.frag_ln_start, vg, false)
+  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_ln_start, vg, false)
+  val bitrefillKey = PublicKey.fromValidHex("030c3f19d742ca294a55c00376b3b355c3c90d61c6b6b39554dbc7ac19b141c14f")
+  val liteGoKey = PublicKey.fromValidHex("02c12b5459cf107ee0440cae41902f1189db50fa003a077f3a6fbe6b5760218695")
+  val acinqKey = PublicKey.fromValidHex("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
+
+  val bitrefillNa = app.mkNodeAnnouncement(bitrefillKey, NodeAddress.fromParts("52.50.244.44", 9735), "Bitrefill")
+  val liteGoNa = app.mkNodeAnnouncement(liteGoKey, NodeAddress.fromParts("141.101.8.36", 9735), "LiteGo")
+  val acinqNa = app.mkNodeAnnouncement(acinqKey, NodeAddress.fromParts("34.239.230.56", 9735), "ACINQ")
+
+  val bitrefill = HardcodedNodeView(bitrefillNa, "<i>bitrefill.com</i>")
+  val acinq = HardcodedNodeView(acinqNa, "<i>strike.acinq.co</i>")
+  val liteGo = HardcodedNodeView(liteGoNa, "<i>litego.io</i>")
+  val hardcodedNodes = Vector(acinq, bitrefill, liteGo)
 
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
   private[this] var nodes = Vector.empty[StartNodeView]
@@ -75,8 +86,10 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   val worker = new ThrottledWork[String, AnnounceChansNumVec] {
     def work(nodeSearchAsk: String) = app.olympus findNodes nodeSearchAsk
     def error(nodeSearchError: Throwable) = host onFail nodeSearchError
+
     def process(userQuery: String, results: AnnounceChansNumVec) = {
-      nodes = for (result <- results) yield RemoteNodeView(result)
+      val remoteNodeViewWraps = for (nodeInfo <- results) yield RemoteNodeView(nodeInfo)
+      nodes = if (userQuery.isEmpty) hardcodedNodes ++ remoteNodeViewWraps else remoteNodeViewWraps
       host.UITask(adapter.notifyDataSetChanged).run
     }
   }
@@ -140,14 +153,18 @@ object LNUrlData {
 
 sealed trait LNUrlData { def unsafe(request: String) = get(request, true).trustAllCerts.trustAllHosts.body }
 case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long) extends LNUrlData {
-
-  val nodeLink(key, host, port) = uri
   def resolveAnnounce = app.mkNodeAnnouncement(PublicKey(ByteVector fromValidHex key), NodeAddress.fromParts(host, port.toInt), host)
   def requestChannel = unsafe(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1")
   require(callback contains "https://", "Not an HTTPS callback")
+  val nodeLink(key, host, port) = uri
 }
 
 case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, defaultDescription: String) extends LNUrlData {
   def requestWithdraw(paymentRequest: PaymentRequest) = unsafe(s"$callback?k1=$k1&pr=${PaymentRequest write paymentRequest}")
   require(callback contains "https://", "Not an HTTPS callback")
+}
+
+case class MultipartPayment(requests: Vector[String], paymentId: String) extends LNUrlData {
+  val parsedPaymentRequests = requests.map(PaymentRequest.read).filter(_.amount.isEmpty)
+  require(parsedPaymentRequests.size > 1, "Too few additional payment requests")
 }

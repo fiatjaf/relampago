@@ -149,7 +149,7 @@
         <item><![CDATA[<font color=#E68A00>Sync: %1$d days behind</font>]]></item>
     </array>
 
-    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>incoming %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
 
@@ -177,8 +177,8 @@
 
     <string name="ln_send_howto"><![CDATA[
         You are trying to fulfill a Lightning payment request but there are currently no open
-        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channels</a> in this
-        wallet.<br><br>How to fix this? First, receive bitcoins into this wallet and then use them to open a new channel.
+        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channels</a> in this wallet.
+        <br><br>How to fix this? First, receive bitcoins into this wallet and then use them to open a new channel.
     ]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
