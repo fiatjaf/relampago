@@ -299,25 +299,20 @@ object ChannelManager extends Broadcaster {
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockSend tx catch none
 
-    case (chan, norm: NormalData, _: CMDBestHeight) if channelAndHop(chan).isEmpty =>
+    case (chan, norm: NormalData, _: CMDBestHeight) if norm.commitments.updateOpt.isEmpty =>
       // Depth barrier is relevant for Turbo channels: restrict receiving until confirmed
       val fundingDepth \ isFundingDead = broadcaster.getStatus(chan.fundTxId)
 
       if (fundingDepth > minDepth && !isFundingDead) for {
         blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
         shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
-      } chan process Hop(chan.data.announce.nodeId, shortChannelId, 0, 0L, 0L, feeProportionalMillionths = 0L)
+        dummy = Announcements.makeChannelUpdate(chainHash, nodePrivateKey, chan.data.announce.nodeId, shortChannelId)
+      } chan process ('extra, dummy)
 
-    case (chan, norm: NormalData, upd: ChannelUpdate)
-      if norm.commitments.extraHop.exists(_.shortChannelId == upd.shortChannelId) =>
-      // We have an old or dummy Hop, replace it with a new one IF it updates parameters
-
-      for {
-        oldExtraHop <- chan.hasCsOr(_.commitments.extraHop, None)
-        if oldExtraHop.shortChannelId == upd.shortChannelId
-        newExtraHop = upd.toHop(chan.data.announce.nodeId)
-        if oldExtraHop != newExtraHop
-      } chan process newExtraHop
+    case (chan, norm: NormalData, real: ChannelUpdate)
+      if norm.commitments.updateOpt.exists(old => old.shortChannelId == real.shortChannelId && old.timestamp < real.timestamp) =>
+      // We have an old or dummy ChannelUpdate, replace it with a new one IF it updates parameters and is a more recent one
+      chan process ('extra, real)
   }
 
   override def onBecome = {
@@ -504,7 +499,7 @@ object ChannelManager extends Broadcaster {
         val excludeChan = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
         // Empty used route means we're sending to peer and its nodeId should be our targetId
         val targetNodeId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
-        val isLoop = chan.hasCsOr(_.commitments.extraHop.exists(_.shortChannelId == excludeChan), false)
+        val isLoop = chan.hasCsOr(_.commitments.updateOpt.exists(_.shortChannelId == excludeChan), false)
         !isLoop && chan.data.announce.nodeId == targetNodeId && estimateCanSend(chan) >= rd.firstMsat
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)

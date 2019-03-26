@@ -214,10 +214,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // OPEN MODE
 
 
-      case (norm: NormalData, hop: Hop, OPEN | SLEEPING) =>
-        // Got either an empty Hop with shortChannelId or a final one
-        // do not trigger listeners and silently update a current state
-        val d1 = norm.modify(_.commitments.extraHop) setTo Some(hop)
+      case (norm: NormalData, ('extra, upd: ChannelUpdate), OPEN | SLEEPING) =>
+        // Got either an empty ChannelUpdate with shortChannelId or a final one
+        val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
         data = me STORE d1
 
 
@@ -719,10 +718,10 @@ object Channel {
   def isOpeningOrOperational(chan: Channel) = isOperational(chan) || isOpening(chan)
 
   def channelAndHop(chan: Channel) = for {
-    exHop <- chan.hasCsOr(_.commitments.extraHop, None)
-    // Make sure this is not an empty placeholder hop
-    if exHop.cltvExpiryDelta > 0
-  } yield chan -> Vector(exHop)
+    upd <- chan.hasCsOr(_.commitments.updateOpt, None)
+    hop = upd.toHop(chan.data.announce.nodeId)
+    if upd.cltvExpiryDelta > 0
+  } yield chan -> Vector(hop)
 }
 
 trait ChannelListener {

@@ -230,10 +230,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       Changes](Changes.apply, "proposed", "signed", "acked")
 
   implicit val commitmentsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes, Changes, Long, Long,
-    Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, ByteVector, Option[Hop], Option[ChannelFlags], Long,
-    Commitments](Commitments.apply, "localParams", "remoteParams", "localCommit", "remoteCommit", "localChanges",
-    "remoteChanges", "localNextHtlcId", "remoteNextHtlcId", "remoteNextCommitInfo", "commitInput",
-    "remotePerCommitmentSecrets", "channelId", "extraHop", "channelFlags", "startedAt")
+    Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, ByteVector, Option[ChannelUpdate], Option[ChannelFlags], Long,
+    Commitments](Commitments.apply, "localParams", "remoteParams", "localCommit", "remoteCommit", "localChanges", "remoteChanges", "localNextHtlcId",
+    "remoteNextHtlcId", "remoteNextCommitInfo", "commitInput", "remotePerCommitmentSecrets", "channelId", "updateOpt", "channelFlags", "startedAt")
 
   implicit val localCommitPublishedFmt =
     jsonFormat[Seq[ClaimDelayedOutputTx], Seq[SuccessAndClaim], Seq[TimeoutAndClaim], Transaction,

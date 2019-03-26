@@ -55,8 +55,8 @@ object Announcements { me =>
   def makeMessageFlags(hasOptionChannelHtlcMax: Boolean) = BitVector.bits(hasOptionChannelHtlcMax :: Nil).padLeft(8).toByte(true)
   def makeChannelFlags(isNode1: Boolean, enable: Boolean) = BitVector.bits(!enable :: !isNode1 :: Nil).padLeft(8).toByte(true)
 
-  def makeChannelUpdate(chainHash: ByteVector, nodeSecret: PrivateKey, remoteNodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int,
-                        htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long, htlcMaximumMsat: Long,
+  def makeChannelUpdate(chainHash: ByteVector, nodeSecret: PrivateKey, remoteNodeId: PublicKey, shortChannelId: Long, cltvExpiryDelta: Int = 0,
+                        htlcMinimumMsat: Long = 0L, feeBaseMsat: Long = 0L, feeProportionalMillionths: Long = 0L, htlcMaximumMsat: Long = 0L,
                         enable: Boolean = true, timestamp: Long = System.currentTimeMillis / 1000) = {
 
     val htlcMaximumMsatOpt = Some(htlcMaximumMsat)

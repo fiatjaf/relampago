@@ -61,7 +61,7 @@ case class WaitFundingSignedCore(localParams: LocalParams, channelId: ByteVector
     Commitments(localParams, remoteParams, LocalCommit(index = 0L, localSpec, Nil, signedLocalCommitTx), remoteCommit,
       localChanges = Changes(Vector.empty, Vector.empty, Vector.empty), remoteChanges = Changes(Vector.empty, Vector.empty, Vector.empty),
       localNextHtlcId = 0L, remoteNextHtlcId = 0L, remoteNextCommitInfo = Right(Tools.randomPrivKey.toPoint), signedLocalCommitTx.input,
-      ShaHashesWithIndex(Map.empty, None), channelId, extraHop = None, channelFlags, startedAt = System.currentTimeMillis)
+      ShaHashesWithIndex(Map.empty, None), channelId, updateOpt = None, channelFlags, startedAt = System.currentTimeMillis)
 }
 
 case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSignedCore,
@@ -277,9 +277,10 @@ case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: ByteVector,
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 
 case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long)
-case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit, remoteCommit: RemoteCommit, localChanges: Changes,
-                       remoteChanges: Changes, localNextHtlcId: Long, remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point],
-                       commitInput: InputInfo, remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: ByteVector, extraHop: Option[Hop] = None,
+case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
+                       remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
+                       remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point], commitInput: InputInfo,
+                       remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: ByteVector, updateOpt: Option[ChannelUpdate] = None,
                        channelFlags: Option[ChannelFlags] = None, startedAt: Long = System.currentTimeMillis) { me =>
 
   lazy val reducedRemoteState: ReducedState = {

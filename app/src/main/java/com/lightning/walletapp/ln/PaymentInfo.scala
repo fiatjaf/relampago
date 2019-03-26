@@ -103,13 +103,6 @@ object PaymentInfo {
     Some(rd1) -> Vector.empty
   }
 
-  def ignoreFeeInsufficient(rd: RoutingData, upd: ChannelUpdate) = {
-    val newRouteFee = LNParams.getCompundFee(updateHop(rd, upd), rd.firstMsat)
-    val oldRouteFee = LNParams.getCompundFee(rd.usedRoute, rd.firstMsat)
-    val triedAlready = replacedChans.contains(upd.shortChannelId)
-    triedAlready || newRouteFee / oldRouteFee > 2
-  }
-
   def updateHop(rd: RoutingData, upd: ChannelUpdate) = rd.usedRoute map {
     case keepHop if keepHop.shortChannelId != upd.shortChannelId => keepHop
     case oldHop => upd.toHop(oldHop.nodeId)
@@ -123,9 +116,9 @@ object PaymentInfo {
     parsed map {
       case ErrorPacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case ErrorPacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
-      case ErrorPacket(_, u: ExpiryTooSoon) if !ignoreFeeInsufficient(rd, u.update) => replaceRoute(rd, u.update)
-      case ErrorPacket(_, u: FeeInsufficient) if !ignoreFeeInsufficient(rd, u.update) => replaceRoute(rd, u.update)
-      case ErrorPacket(_, u: IncorrectCltvExpiry) if !ignoreFeeInsufficient(rd, u.update) => replaceRoute(rd, u.update)
+      case ErrorPacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case ErrorPacket(_, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case ErrorPacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
 
       case ErrorPacket(nodeKey, u: Update) =>
         val isHonest = Announcements.checkSig(u.update, nodeKey)
