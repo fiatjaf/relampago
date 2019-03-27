@@ -10,7 +10,9 @@ import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import ln.wire.LightningMessageCodecs.walletZygoteCodec
 import org.ndeftools.util.activity.NfcReaderActivity
 import org.bitcoinj.wallet.WalletProtobufSerializer
+import com.lightning.walletapp.helper.FingerPrint
 import com.lightning.walletapp.ln.LNParams
+import co.infinum.goldfinger.Goldfinger
 import android.content.Intent
 import org.ndeftools.Message
 import scodec.bits.BitVector
@@ -43,13 +45,17 @@ object MainActivity {
 }
 
 class MainActivity extends NfcReaderActivity with TimerActivity { me =>
+  lazy val mainChoice = findViewById(R.id.mainChoice).asInstanceOf[View]
+  lazy val mainFingerprint = findViewById(R.id.mainFingerprint).asInstanceOf[View]
+  lazy val gf = new Goldfinger.Builder(me).build
+
   override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent) =
     if (requestCode == 101 & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
 
   def INIT(state: Bundle) = {
     runAnd(me setContentView R.layout.activity_main)(me initNfc state)
-    MainActivity.proceedOnSuccess = UITask { me exitTo MainActivity.wallet }
-    MainActivity.actOnError = { case error => UITask(throw error).run }
+    MainActivity.proceedOnSuccess = UITask { if (FingerPrint isOperational gf) proceedWithAuth else me exitTo MainActivity.wallet }
+    MainActivity.actOnError = { case reThrowToEnterEmergencyActivity => UITask { throw reThrowToEnterEmergencyActivity }.run }
     Utils clickableTextField findViewById(R.id.mainGreetings)
   }
 
@@ -73,21 +79,27 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // STARTUP LOGIC
 
-  def next: Unit = (app.walletFile.exists, app.isAlive) match {
-    // What exactly should be done depends on wallet app file existence and runtime objects presence
-    case (false, _) => findViewById(R.id.mainChoice).asInstanceOf[View] setVisibility View.VISIBLE
-    case (true, true) => MainActivity.proceedOnSuccess.run
-
-    case (true, false) =>
-      MainActivity.prepareKit
-      // First load wallet files, then init db, then init the rest
-      LNParams setup app.kit.wallet.getKeyChainSeed.getSeedBytes
-      app.kit.startAsync
-
-    // Just should not ever happen
-    // and when it does we just exit
-    case _ => System exit 0
+  def proceedWithAuth = gf authenticate new Goldfinger.Callback {
+    def onError(error: co.infinum.goldfinger.Error) = FingerPrint informUser error
+    def onSuccess(decodedCipher: String) = me exitTo MainActivity.wallet
+    mainFingerprint setVisibility View.VISIBLE
   }
+
+  def next: Unit =
+    Tuple2(app.walletFile.exists, app.isAlive) match {
+      case (false, _) => mainChoice setVisibility View.VISIBLE
+      case (true, true) => MainActivity.proceedOnSuccess.run
+
+      case (true, false) =>
+        MainActivity.prepareKit
+        // First load wallet files, then init db, then init the rest
+        LNParams setup app.kit.wallet.getKeyChainSeed.getSeedBytes
+        app.kit.startAsync
+
+      // Just should not ever happen
+      // and when it does we just exit
+      case _ => System exit 0
+    }
 
   // MISC
 
@@ -113,7 +125,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   def restoreFromZygote(intent: Intent) = {
     val databaseFile = new File(app.getDatabasePath(dbFileName).getPath)
     val inputStream = getContentResolver.openInputStream(intent.getData)
-    val bitVector = BitVector(ByteStreams toByteArray inputStream)
+    val bitVector = BitVector.view(ByteStreams toByteArray inputStream)
     val zygote = walletZygoteCodec.decode(bitVector).require.value
     if (!databaseFile.exists) databaseFile.getParentFile.mkdirs
     Files.write(zygote.wallet.toArray, app.walletFile)

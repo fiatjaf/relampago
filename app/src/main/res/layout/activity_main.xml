@@ -34,4 +34,18 @@
             android:text="@string/wallet_restore"/>
 
     </LinearLayout>
+
+    <LinearLayout
+        style="@style/StandardLinearLayout"
+        android:id="@+id/mainFingerprint"
+        android:background="@color/bg"
+        android:visibility="gone">
+
+        <ImageView
+            android:background="@drawable/baseline_fingerprint_white_36"
+            android:layout_height="wrap_content"
+            android:layout_width="wrap_content"
+            android:layout_gravity="center"/>
+
+    </LinearLayout>
 </LinearLayout>
