@@ -17,24 +17,22 @@ import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
 import android.widget.AdapterView.OnItemClickListener
 import concurrent.ExecutionContext.Implicits.global
 import com.lightning.walletapp.ln.LNParams.minDepth
-import com.lightning.walletapp.helper.FingerPrint
 import android.support.v7.app.AppCompatActivity
 import android.support.v4.content.ContextCompat
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.View.OnClickListener
-import co.infinum.goldfinger.Goldfinger
 import android.app.AlertDialog.Builder
 import fr.acinq.bitcoin.MilliSatoshi
 import language.implicitConversions
 import org.bitcoinj.script.Script
 import scala.concurrent.Future
+import android.content.Intent
 import android.os.Bundle
 
 import com.lightning.walletapp.lnutils.IconGetter.{maxDialog, scrWidth}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import com.lightning.walletapp.lnutils.{GDrive, RatesSaver}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
-import android.content.{DialogInterface, Intent}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
@@ -154,39 +152,6 @@ trait TimerActivity extends AppCompatActivity { me =>
     alertDialog
   }
 
-  def fpAuth(gf: Goldfinger, onFail: => Unit)(onOK: => Unit) = {
-    if (FingerPrint isOperational gf) proceedWithFingerprintAuth else onOK
-
-    def proceedWithFingerprintAuth = {
-      val content = getLayoutInflater.inflate(R.layout.frag_touch, null)
-      val alert = showForm(negBuilder(dialog_cancel, content, null).create)
-
-      alert setOnDismissListener new OnDismissListener {
-        def onDismiss(alertDialogInterface: DialogInterface) = {
-          // Will be called when either BACK or CANCEL button is tapped
-          // but won't be called if fingerprint auth was successful
-          gf.cancel
-          onFail
-        }
-      }
-
-      gf authenticate new Goldfinger.Callback {
-        def onError(error: co.infinum.goldfinger.Error) = {
-          // Here gf cancelling will happen in dismiss method
-          if (error.isCritical) alert.dismiss
-          FingerPrint informUser error
-        }
-
-        def onSuccess(cipher: String) = {
-          // Here gf is cancelled automatically
-          // prevent onDismissed from being called
-          alert setOnDismissListener null
-          rm(alert)(onOK)
-        }
-      }
-    }
-  }
-
   def INIT(savedInstanceState: Bundle): Unit
   def updateView2Blue(oldView: View, newText: String) = {
     val titleTip = oldView.findViewById(R.id.titleTip).asInstanceOf[TextView]
@@ -223,9 +188,9 @@ trait TimerActivity extends AppCompatActivity { me =>
     me startActivity share.putExtra(Intent.EXTRA_TEXT, exportedTextData)
   }
 
-  def viewMnemonic(view: View) = fpAuth(new Goldfinger.Builder(me).build, onFail = none) {
+  def viewMnemonic(view: View) = {
     val recoveryCode = TextUtils.join("\u0020", app.kit.wallet.getKeyChainSeed.getMnemonicCode)
-    showForm(alertDialog = negBuilder(dialog_ok, me getString sets_mnemonic, recoveryCode).create)
+    showForm(negBuilder(dialog_ok, me getString sets_mnemonic, recoveryCode).create)
   }
 
   abstract class TxProcessor { self =>

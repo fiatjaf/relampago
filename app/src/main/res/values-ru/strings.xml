@@ -123,7 +123,6 @@
 
     <!-- fingerprint -->
     <string name="sets_fp">Защита отпечатком пальца</string>
-    <string name="sets_fp_details">Платежи, каналы, мнемо-код</string>
     <string name="fp_touch">коснитесь сенсора\nчтобы продолжить</string>
     <string name="fp_no_support">Этот телефон не поддерживает отпечатки пальцев</string>
     <string name="fp_add_print">Зарегистрируйте хотя-бы один отпечаток пальца в настройках</string>

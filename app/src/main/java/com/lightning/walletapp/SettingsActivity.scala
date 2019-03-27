@@ -125,8 +125,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case true if !FingerPrint.isPermissionGranted => runAnd(fpAuthentication setChecked false)(FingerPrint askPermission me)
     case true if !gf.hasFingerprintHardware => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
     case true if !gf.hasEnrolledFingerprint => runAnd(fpAuthentication setChecked false)(app toast fp_add_print)
-    case false => fpAuth(gf, onFail = updateFpView)(FingerPrint switch false)
-    case true => FingerPrint switch true
+    case mode => FingerPrint switch mode
   }
 
   def onTrustedTap(cb: View) = {
@@ -227,13 +226,10 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
 
     exportWalletSnapshot setOnClickListener onButtonTap {
-      // Warn user about risks before proceeding with this
-
-      fpAuth(gf, onFail = none) {
-        val bld = me baseTextBuilder getString(migrator_usage_warning).html
-        mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
-        def proceed = <(createZygote, onFail)(none)
-      }
+      // Warn user about risks before proceeding with this further
+      val bld = me baseTextBuilder getString(migrator_usage_warning).html
+      mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
+      def proceed = <(createZygote, onFail)(none)
 
       def createZygote = {
         // Prevent channel state updates

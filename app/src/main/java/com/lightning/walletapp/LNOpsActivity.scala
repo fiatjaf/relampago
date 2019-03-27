@@ -18,7 +18,6 @@ import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
 import android.support.v7.widget.Toolbar
-import co.infinum.goldfinger.Goldfinger
 import fr.acinq.bitcoin.Satoshi
 import android.content.Intent
 import scodec.bits.ByteVector
@@ -184,46 +183,41 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       }
 
       view setOnClickListener onButtonTap {
-        // All channel actions are sensitive, require auth
-        fpAuth(new Goldfinger.Builder(me).build, none)(next)
+        val contextualChannelMenu = chan.data match {
+          // Unknown spend may be a future commit so we should not allow force-closing
+          case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(2, Nil, 2)
+          // This likely means they have not broadcasted a tx, wait for it instead of closing
+          case _: WaitBroadcastRemoteData => chanActions take 2
+          case _: ClosingData => chanActions.patch(2, Nil, 1)
+          // Should not allow force-closing with old commit
+          case _: RefundingData => chanActions take 2
+          // Cut out refunding tx option
+          case _ => chanActions take 3
+        }
 
-        def next = {
-          val contextualChannelMenu = chan.data match {
-            // Unknown spend may be a future commit so we should not allow force-closing
-            case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(2, Nil, 2)
-            // This likely means they have not broadcasted a tx, wait for it instead of closing
-            case _: WaitBroadcastRemoteData => chanActions take 2
-            case _: ClosingData => chanActions.patch(2, Nil, 1)
-            // Should not allow force-closing with old commit
-            case _: RefundingData => chanActions take 2
-            // Cut out refunding tx option
-            case _ => chanActions take 3
-          }
+        val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+        val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.asString.html, lst).create)
+        lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, contextualChannelMenu)
+        lst setDividerHeight 0
+        lst setDivider null
 
-          val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-          val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.asString.html, lst).create)
-          lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, contextualChannelMenu)
-          lst setDividerHeight 0
-          lst setDivider null
+        lst setOnItemClickListener onTap { pos =>
+          // User has already authorized these actions
+          // so display to action list right away here
+          rm(alert)(defineAction)
 
-          lst setOnItemClickListener onTap { pos =>
-            // User has already authorized these actions
-            // so display to action list right away here
-            rm(alert)(defineAction)
-
-            def defineAction = chan.data match {
-              case _ if 0 == pos => urlIntent(txid = chan.fundTxId.toHex)
-              case _ if 1 == pos => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
-              // In the following two cases channel menu is reduced by 2 so we need to show an appropriate closing tx here
-              case norm: NormalData if 2 == pos && norm.unknownSpend.isDefined => urlIntent(txid = norm.unknownSpend.get.txid.toString)
-              case closing: ClosingData if 2 == pos => urlIntent(txid = closing.bestClosing.commitTx.txid.toHex)
-              case _ =>
-                val canCoopClose = isOpeningOrOperational(chan)
-                val isBlockerPresent = inFlightHtlcs(chan).nonEmpty
-                if (canCoopClose && isBlockerPresent) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
-                else if (canCoopClose) warnAndMaybeClose(me getString ln_chan_close_confirm_local)
-                else warnAndMaybeClose(me getString ln_chan_force_details)
-            }
+          def defineAction = chan.data match {
+            case _ if 0 == pos => urlIntent(txid = chan.fundTxId.toHex)
+            case _ if 1 == pos => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
+            // In the following two cases channel menu is reduced by 2 so we need to show an appropriate closing tx here
+            case norm: NormalData if 2 == pos && norm.unknownSpend.isDefined => urlIntent(txid = norm.unknownSpend.get.txid.toString)
+            case closing: ClosingData if 2 == pos => urlIntent(txid = closing.bestClosing.commitTx.txid.toHex)
+            case _ =>
+              val canCoopClose = isOpeningOrOperational(chan)
+              val isBlockerPresent = inFlightHtlcs(chan).nonEmpty
+              if (canCoopClose && isBlockerPresent) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
+              else if (canCoopClose) warnAndMaybeClose(me getString ln_chan_close_confirm_local)
+              else warnAndMaybeClose(me getString ln_chan_force_details)
           }
         }
       }

@@ -48,14 +48,9 @@
             <CheckBox
                 style="@style/RightCheckBox"
                 android:id="@+id/fpAuthentication"
+                android:layout_marginBottom="15dp"
                 android:text="@string/sets_fp"
                 android:onClick="onFpTap"/>
-
-            <TextView
-                style="@style/BaseText"
-                android:layout_marginBottom="15dp"
-                android:layout_width="match_parent"
-                android:text="@string/sets_fp_details"/>
 
             <View style="@style/GrayDivider"/>
 

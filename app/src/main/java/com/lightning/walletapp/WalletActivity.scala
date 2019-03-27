@@ -26,7 +26,6 @@ import android.support.v4.content.ContextCompat
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
 import fr.acinq.bitcoin.Crypto.PublicKey
-import co.infinum.goldfinger.Goldfinger
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
@@ -100,7 +99,6 @@ trait HumanTimeDisplay {
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
   lazy val awaitServiceIntent = new Intent(me, AwaitService.classof)
-  lazy val gf = new Goldfinger.Builder(me).build
 
   lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
     def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
@@ -199,8 +197,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       goOps(null): Unit
 
     case bitcoinUri: BitcoinURI =>
-      // Sending on-chain is a sensitive action so should be authorized
-      fpAuth(gf, onFail = none)(FragWallet.worker sendBtcPopup bitcoinUri)
+      FragWallet.worker.sendBtcPopup(bitcoinUri)
       me returnToBase null
 
     case lnUrl: LNUrl =>
@@ -229,19 +226,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case pr: PaymentRequest =>
-      // We can fulfill a payment request
-      // authorize this sensitive action
-
+      // We have operational channels at this point
+      // check if we also have an embedded lnurl
       me returnToBase null
-      fpAuth(gf, onFail = none) {
-        // We have operational channels at this point
-        // check if we also have an embedded lnurl
 
-        pr.lnUrlOpt match {
-          case Some(lnUrl) if lnUrl.isLinkablePayment => FragWallet.worker.linkedOffChainSend(pr, lnUrl)
-          case Some(lnUrl) if lnUrl.isMultipartPayment => FragWallet.worker.multipartOffChainSend(pr, lnUrl)
-          case _ => FragWallet.worker.standardOffChainSend(pr)
-        }
+      pr.lnUrlOpt match {
+        case Some(lnUrl) if lnUrl.isLinkablePayment => FragWallet.worker.linkedOffChainSend(pr, lnUrl)
+        case Some(lnUrl) if lnUrl.isMultipartPayment => FragWallet.worker.multipartOffChainSend(pr, lnUrl)
+        case _ => FragWallet.worker.standardOffChainSend(pr)
       }
 
     case _ =>
