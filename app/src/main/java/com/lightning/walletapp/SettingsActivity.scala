@@ -12,14 +12,14 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-import com.lightning.walletapp.ln.wire.{NodeAddress, WalletZygote}
-import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
-import com.lightning.walletapp.helper.{AES, FingerPrint}
-import android.content.{DialogInterface, Intent}
-import android.os.Build.{VERSION, VERSION_CODES}
+
 import android.app.{Activity, AlertDialog}
 import android.view.{Menu, MenuItem, View}
-
+import android.content.{DialogInterface, Intent}
+import android.os.Build.{VERSION, VERSION_CODES}
+import com.lightning.walletapp.helper.{AES, FingerPrint}
+import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
+import com.lightning.walletapp.ln.wire.{Domain, NodeAddress, WalletZygote}
 import com.google.android.gms.common.api.CommonStatusCodes.SIGN_IN_REQUIRED
 import android.content.DialogInterface.OnDismissListener
 import com.google.android.gms.common.api.ApiException
@@ -142,10 +142,9 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     formatInputHint setText trusted_hint
 
     def process(rawText: String) = if (rawText.nonEmpty) {
-      val host \ port = rawText.splitAt(rawText lastIndexOf ':')
-      val nodeAddress = NodeAddress.fromParts(host, port.tail.toInt)
-      val serialized = nodeaddress.encode(nodeAddress).require
-      app.kit.wallet.setDescription(serialized.toHex)
+      val hostOrIP \ port = rawText.splitAt(rawText lastIndexOf ':')
+      val nodeAddress = NodeAddress.fromParts(hostOrIP, port.tail.toInt, orElse = Domain)
+      app.kit.wallet.setDescription(nodeaddress.encode(nodeAddress).require.toHex)
       app.kit.wallet.saveToFile(app.walletFile)
     } else {
       app.kit.wallet.setDescription(new String)

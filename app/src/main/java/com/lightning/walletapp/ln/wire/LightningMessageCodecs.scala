@@ -104,13 +104,6 @@ object LightningMessageCodecs { me =>
     address => ByteVector.view(new Base32 decode address.toUpperCase)
   )
 
-  def nodeaddress: Codec[NodeAddress] =
-    discriminated[NodeAddress].by(uint8)
-      .typecase(cr = (ipv4address :: uint16).as[IPv4], tag = 1)
-      .typecase(cr = (ipv6address :: uint16).as[IPv6], tag = 2)
-      .typecase(cr = (base32(10) :: uint16).as[Tor2], tag = 3)
-      .typecase(cr = (base32(35) :: uint16).as[Tor3], tag = 4)
-
   val uint64: Codec[Long] = int64.narrow(ln => if (ln < 0) Attempt failure Err(s"Overflow $ln") else Attempt successful ln, identity)
   val bytes32: Codec[ByteVector] = limitedSizeBytes(codec = bytesStrict(32).xmap(identity, identity), limit = 32)
   val zeropaddedstring: Codec[String] = fixedSizeBytes(32, utf8).xmap(_.takeWhile(_ != '\u0000'), identity)
@@ -119,6 +112,14 @@ object LightningMessageCodecs { me =>
   val varsizebinarydata: Codec[ByteVector] = variableSizeBytes(uint16, bytes)
   val rgb: Codec[RGB] = bytes(3).xmap(bv2Rgb, rgb2Bv)
   val txvec = vectorOfN(uint16, varsizebinarydata)
+
+  def nodeaddress: Codec[NodeAddress] =
+    discriminated[NodeAddress].by(uint8)
+      .typecase(cr = (ipv4address :: uint16).as[IPv4], tag = 1)
+      .typecase(cr = (ipv6address :: uint16).as[IPv6], tag = 2)
+      .typecase(cr = (base32(10) :: uint16).as[Tor2], tag = 3)
+      .typecase(cr = (base32(35) :: uint16).as[Tor3], tag = 4)
+      .typecase(cr = (zeropaddedstring :: uint16).as[Domain], tag = 5)
 
   // Data formats
 

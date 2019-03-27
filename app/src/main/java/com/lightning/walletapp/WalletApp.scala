@@ -17,6 +17,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType._
 
+import scala.util.{Success, Try}
 import rx.lang.scala.{Observable => Obs}
 import scodec.bits.{BitVector, ByteVector}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
@@ -42,7 +43,6 @@ import fr.acinq.bitcoin.Crypto
 import android.widget.Toast
 import scodec.DecodeResult
 import android.os.Build
-import scala.util.Try
 import java.io.File
 
 
@@ -166,14 +166,16 @@ class WalletApp extends Application { me =>
       peerGroup.addDisconnectedEventListener(ChannelManager.chainEventsListener)
 
       Future {
-        trustedNodeTry map NodeAddress.toInetSocketAddress map { isa =>
-          // Either connect to a trusted node only OR to many random nodes
-          val trusted = new PeerAddress(params, isa.getAddress, isa.getPort)
-          peerGroup.addAddress(trusted)
-        } getOrElse {
-          peerGroup addPeerDiscovery new DnsDiscovery(params)
-          peerGroup.addAddress(TopNodes.randomPeerAddress)
-          peerGroup.setMaxConnections(5)
+        trustedNodeTry match {
+          case Success(nodeAddress) =>
+            val isa = NodeAddress.toInetSocketAddress(nodeAddress)
+            val trusted = new PeerAddress(params, isa.getAddress, isa.getPort)
+            peerGroup.addAddress(trusted)
+
+          case _ =>
+            peerGroup addPeerDiscovery new DnsDiscovery(params)
+            peerGroup.addAddress(TopNodes.randomPeerAddress)
+            peerGroup.setMaxConnections(5)
         }
       }
 
