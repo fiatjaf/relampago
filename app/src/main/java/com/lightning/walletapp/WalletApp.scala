@@ -307,12 +307,12 @@ object ChannelManager extends Broadcaster {
         blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
         shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
         dummy = Announcements.makeChannelUpdate(chainHash, nodePrivateKey, chan.data.announce.nodeId, shortChannelId)
-      } chan process ('extra, dummy)
+      } chan process Tuple2('update, dummy)
 
     case (chan, norm: NormalData, real: ChannelUpdate)
       if norm.commitments.updateOpt.exists(old => old.shortChannelId == real.shortChannelId && old.timestamp < real.timestamp) =>
       // We have an old or dummy ChannelUpdate, replace it with a new one IF it updates parameters and is a more recent one
-      chan process ('extra, real)
+      chan process Tuple2('update, real)
   }
 
   override def onBecome = {

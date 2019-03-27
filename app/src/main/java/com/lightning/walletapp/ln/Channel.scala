@@ -214,7 +214,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // OPEN MODE
 
 
-      case (norm: NormalData, ('extra, upd: ChannelUpdate), OPEN | SLEEPING) =>
+      case (norm: NormalData, ('update, upd: ChannelUpdate), OPEN | SLEEPING) =>
         // Got either an empty ChannelUpdate with shortChannelId or a final one
         val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
         data = me STORE d1

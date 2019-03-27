@@ -560,6 +560,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def onUserAcceptSend(rd: RoutingData) = doSendOffChain(rd)
   }
 
+  def multipartOffChainSend(pr: PaymentRequest, lnUrl: LNUrl) = standardOffChainSend(pr)
+
   def linkedOffChainSend(pr: PaymentRequest, lnUrl: LNUrl) = new OffChainSender(pr) {
     def displayPaymentForm = mkCheckFormNeutral(sendAttempt, none, wut, baseBuilder(getTitle, baseContent), dialog_ok, dialog_cancel, dialog_wut)
     def obtainLinkableTitle = app.getString(ln_send_linkable_title).format(lnUrl.uri.getHost, Utils getDescription pr.description)

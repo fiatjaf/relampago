@@ -30,7 +30,6 @@ import co.infinum.goldfinger.Goldfinger
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-import scodec.bits.ByteVector
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
@@ -205,8 +204,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case lnUrl: LNUrl =>
-      val specialMeaningTag = scala.util.Try(lnUrl.uri getQueryParameter "tag") getOrElse null
-      if ("login" == specialMeaningTag) showLoginForm(lnUrl) else resolveStandardUrl(lnUrl)
+      if (lnUrl.isLogin) showLoginForm(lnUrl)
+      else resolveStandardUrl(lnUrl)
       me returnToBase null
 
     case pr: PaymentRequest if PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix =>
@@ -235,10 +234,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
       me returnToBase null
       fpAuth(gf, onFail = none) {
-        // We have operational channels at this point, check if we have an embedded lnurl
-        val specialMeaningTag = scala.util.Try(pr.lnUrlOpt.get.uri getQueryParameter "tag") getOrElse null
-        if ("link" == specialMeaningTag) FragWallet.worker.linkedOffChainSend(pr, pr.lnUrlOpt.get)
-        else FragWallet.worker.standardOffChainSend(pr)
+        // We have operational channels at this point
+        // check if we also have an embedded lnurl
+
+        pr.lnUrlOpt match {
+          case Some(lnUrl) if lnUrl.isLinkablePayment => FragWallet.worker.linkedOffChainSend(pr, lnUrl)
+          case Some(lnUrl) if lnUrl.isMultipartPayment => FragWallet.worker.multipartOffChainSend(pr, lnUrl)
+          case _ => FragWallet.worker.standardOffChainSend(pr)
+        }
       }
 
     case _ =>
@@ -272,33 +275,26 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
   }
 
-  def showLoginForm(lnUrl: LNUrl) = {
-    def offerLogin(challenge: ByteVector) = {
-      lazy val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
-      lazy val linkingPubKey = linkingPrivKey.publicKey.toString
+  def showLoginForm(lnUrl: LNUrl) = lnUrl.challenge map { challenge =>
+    lazy val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
+    lazy val linkingPubKey = linkingPrivKey.publicKey.toString
 
-      def wut(alert: AlertDialog): Unit = {
-        val bld = baseTextBuilder(getString(ln_url_info_login).format(lnUrl.uri.getHost, linkingPubKey).html)
-        mkCheckFormNeutral(_.dismiss, none, _ => me share linkingPubKey, bld, dialog_ok, -1, dialog_share_key)
-      }
-
-      def doLogin(alert: AlertDialog) = rm(alert) {
-        val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
-        val secondLevelCallback = get(s"${lnUrl.request}&key=$linkingPubKey&sig=${sig.toHex}", true)
-        val secondLevelRequest = secondLevelCallback.connectTimeout(5000).trustAllCerts.trustAllHosts
-        queue.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
-        app toast ln_url_resolving
-      }
-
-      val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
-      mkCheckFormNeutral(doLogin, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
+    def wut(alert: AlertDialog): Unit = {
+      val bld = baseTextBuilder(getString(ln_url_info_login).format(lnUrl.uri.getHost, linkingPubKey).html)
+      mkCheckFormNeutral(_.dismiss, none, _ => me share linkingPubKey, bld, dialog_ok, -1, dialog_share_key)
     }
 
-    scala.util.Try(lnUrl.getChallenge) match {
-      case scala.util.Success(clg) => offerLogin(clg)
-      case _ => app toast err_no_data
+    def doLogin(alert: AlertDialog) = rm(alert) {
+      val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
+      val secondLevelCallback = get(s"${lnUrl.request}&key=$linkingPubKey&sig=${sig.toHex}", true)
+      val secondLevelRequest = secondLevelCallback.connectTimeout(5000).trustAllCerts.trustAllHosts
+      queue.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
+      app.toast(ln_url_resolving)
     }
-  }
+
+    val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
+    mkCheckFormNeutral(doLogin, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
+  } getOrElse app.toast(err_no_data)
 
   // BUTTONS REACTIONS
 
