@@ -42,6 +42,7 @@
         android:visibility="gone">
 
         <ImageView
+            android:layout_marginBottom="25dp"
             android:background="@drawable/baseline_fingerprint_white_36"
             android:layout_height="wrap_content"
             android:layout_width="wrap_content"

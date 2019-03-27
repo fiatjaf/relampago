@@ -123,7 +123,6 @@
 
     <!-- fingerprint -->
     <string name="sets_fp">Захист відбитком пальця</string>
-    <string name="fp_touch">торкніться сенсора\nщоб продовжити</string>
     <string name="fp_no_support">Цей телефон не підтримує відбитки пальців</string>
     <string name="fp_add_print">Зареєструйте хоча-б один відбиток пальця в налаштуваннях</string>
 

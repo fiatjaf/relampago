@@ -45,8 +45,8 @@ object MainActivity {
 }
 
 class MainActivity extends NfcReaderActivity with TimerActivity { me =>
-  lazy val mainChoice = findViewById(R.id.mainChoice).asInstanceOf[View]
   lazy val mainFingerprint = findViewById(R.id.mainFingerprint).asInstanceOf[View]
+  lazy val mainChoice = findViewById(R.id.mainChoice).asInstanceOf[View]
   lazy val gf = new Goldfinger.Builder(me).build
 
   override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent) =
@@ -80,8 +80,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   // STARTUP LOGIC
 
   def proceedWithAuth = gf authenticate new Goldfinger.Callback {
-    def onError(error: co.infinum.goldfinger.Error) = FingerPrint informUser error
-    def onSuccess(decodedCipher: String) = me exitTo MainActivity.wallet
+    def onError(fingerPrintError: co.infinum.goldfinger.Error) = FingerPrint.informUser(fingerPrintError)
+    def onSuccess(ok: String) = runAnd(mainFingerprint setVisibility View.GONE)(me exitTo MainActivity.wallet)
     mainFingerprint setVisibility View.VISIBLE
   }
 

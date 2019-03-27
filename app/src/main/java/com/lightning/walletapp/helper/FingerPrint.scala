@@ -19,7 +19,7 @@ object FingerPrint {
   def isOperational(gf: Goldfinger) = isEnabled && isPermissionGranted && gf.hasEnrolledFingerprint
 
   def informUser(err: GFError) =
-    if (lastToast < System.currentTimeMillis - 3000L) {
+    if (lastToast < System.currentTimeMillis - 1500L) {
       // Debounce to prevent toast stacking if user is hasty
       lastToast = System.currentTimeMillis
       app toast err.toString

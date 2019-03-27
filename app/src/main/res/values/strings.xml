@@ -128,7 +128,6 @@
 
     <!-- fingerprint -->
     <string name="sets_fp">Use fingerprint protection</string>
-    <string name="fp_touch">touch a sensor\nto authorise action</string>
     <string name="fp_no_support">This phone does not support fingerprints</string>
     <string name="fp_add_print">Register at least one fingerprint in system settings</string>
 
