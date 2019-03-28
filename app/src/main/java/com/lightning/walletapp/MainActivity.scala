@@ -4,6 +4,7 @@ import R.string._
 import android.widget._
 import com.lightning.walletapp.Utils._
 import java.io.{File, FileInputStream}
+import co.infinum.goldfinger.{Error => FPError}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
 import com.google.common.io.{ByteStreams, Files}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
@@ -45,6 +46,7 @@ object MainActivity {
 }
 
 class MainActivity extends NfcReaderActivity with TimerActivity { me =>
+  lazy val mainFingerprintImage = findViewById(R.id.mainFingerprintImage).asInstanceOf[ImageView]
   lazy val mainFingerprint = findViewById(R.id.mainFingerprint).asInstanceOf[View]
   lazy val mainChoice = findViewById(R.id.mainChoice).asInstanceOf[View]
   lazy val gf = new Goldfinger.Builder(me).build
@@ -79,10 +81,19 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // STARTUP LOGIC
 
-  def proceedWithAuth = gf authenticate new Goldfinger.Callback {
-    def onError(fingerPrintError: co.infinum.goldfinger.Error) = FingerPrint.informUser(fingerPrintError)
-    def onSuccess(ok: String) = runAnd(mainFingerprint setVisibility View.GONE)(me exitTo MainActivity.wallet)
-    mainFingerprint setVisibility View.VISIBLE
+  def proceedWithAuth =
+    gf authenticate new Goldfinger.Callback {
+      mainFingerprint setVisibility View.VISIBLE
+      def onError(fpError: FPError) = fpError match {
+        case FPError.LOCKOUT => mainFingerprintImage.setAlpha(0.25F)
+        case FPError.CANCELED => onSuccess(cipherText = null)
+        case _ => app toast fpError.toString
+      }
+
+      def onSuccess(cipherText: String) = {
+        mainFingerprint setVisibility View.GONE
+        me exitTo MainActivity.wallet
+      }
   }
 
   def next: Unit =
