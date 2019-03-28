@@ -7,8 +7,8 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.Tools.{random, runAnd}
 import com.lightning.walletapp.lnutils.olympus.CloudData
 import android.content.Context
-import android.net.Uri
 import scodec.bits.ByteVector
+import android.net.Uri
 
 
 object OlympusTable extends Table {

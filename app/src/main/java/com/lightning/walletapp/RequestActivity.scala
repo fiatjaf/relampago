@@ -72,9 +72,9 @@ class RequestActivity extends TimerActivity { me =>
     }
 
     val receivedListener = new ChannelListener {
-      override def settled(commitments: Commitments) = for {
-        Htlc(true, add) \ _ <- commitments.localCommit.spec.fulfilled
-        if add.paymentHash == targetPayHash
+      override def onSettled(chan: Channel, cs: Commitments) = for {
+        Htlc(true, updateAddHtlc) \ _ <- cs.localCommit.spec.fulfilled
+        if updateAddHtlc.paymentHash == targetPayHash
       } showPaid.run
     }
 

@@ -36,6 +36,7 @@ case class CMDOpenChannel(localParams: LocalParams,
 case class CMDFailMalformedHtlc(id: Long, onionHash: ByteVector, code: Int) extends Command
 case class CMDFulfillHtlc(id: Long, preimage: ByteVector) extends Command
 case class CMDFailHtlc(id: Long, reason: ByteVector) extends Command
+case class CMDPaymentFailed(rd: RoutingData) extends Command
 
 // CHANNEL DATA
 

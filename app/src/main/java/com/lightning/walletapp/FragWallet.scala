@@ -107,20 +107,24 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       mkCheckFormNeutral(_.dismiss, none, close, bld, dialog_ok, -1, ln_chan_close)
     }
 
-    override def settled(cs: Commitments) =
-      if (cs.localCommit.spec.fulfilled.nonEmpty)
-        host stopService host.awaitServiceIntent
+    override def onSettled(chan: Channel, cs: Commitments) = {
+      val canClearNotification = cs.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.incoming }
+      if (canClearNotification) host stopService host.awaitForegroundServiceIntent
+    }
 
     override def onProcessSuccess = {
       case (chan, _: HasCommitments, remoteError: wire.Error) if errorLimit > 0 =>
-        // Remote peer has sent us an error, display details to user and offer force-close
+        // Peer has sent us an error, display details to user and offer force-close
         informOfferClose(chan, remoteError.exception.getMessage).run
         errorLimit -= 1
 
       case (chan, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
-        // Remote peer was OK but now has incompatible features, display details to user and offer force-close
+        // Peer was OK but now has incompatible features, display details to user and offer force-close
         val msg = host getString err_ln_peer_incompatible format chan.data.announce.alias
         informOfferClose(chan, msg).run
+
+      case (chan, _: NormalData, cmd: CMDPaymentFailed) =>
+        // Offer multipart payment if request supports that
     }
 
     override def onBecome = {
@@ -560,8 +564,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def onUserAcceptSend(rd: RoutingData) = doSendOffChain(rd)
   }
 
-  def multipartOffChainSend(pr: PaymentRequest, lnUrl: LNUrl) = standardOffChainSend(pr)
-
   def linkedOffChainSend(pr: PaymentRequest, lnUrl: LNUrl) = new OffChainSender(pr) {
     def displayPaymentForm = mkCheckFormNeutral(sendAttempt, none, wut, baseBuilder(getTitle, baseContent), dialog_ok, dialog_cancel, dialog_wut)
     def obtainLinkableTitle = app.getString(ln_send_linkable_title).format(lnUrl.uri.getHost, Utils getDescription pr.description)
@@ -599,13 +601,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def doSendOffChain(rd: RoutingData): Unit = {
     val sendableEither = ChannelManager.checkIfSendable(rd)
-    val accumulatorOpt = ChannelManager.accumulatorChanOpt(rd)
+    val accChanOpt = ChannelManager.accumulatorChanOpt(rd)
 
-    sendableEither -> accumulatorOpt match {
-      case Left(_ \ true) \ Some(accChan) if rd.airLeft > 1 => startAir(accChan, rd)
+    sendableEither -> accChanOpt match {
+      case Left(_ \ true) \ _ if rd.pr.lnUrlOpt.exists(_.isLinkablePayment) => startLinkable(rd)
+      case Left(_ \ true) \ Some(accumulator) if rd.airLeft > 1 => startAir(accumulator, rd)
       case Left(notSendableNoAIRPossible \ _) \ _ => onFail(notSendableNoAIRPossible)
       case _ => PaymentInfoWrap addPendingPayment rd
     }
+  }
+
+  def startLinkable(rd: RoutingData) = {
+
   }
 
   def startAir(toChan: Channel, originalEmptyRD: RoutingData) = {
@@ -627,8 +634,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val inFlightHashesSnapshot = ChannelManager.activeInFlightHashes :+ rbRD.pr.paymentHash
 
       val listener = new ChannelListener { self =>
-        override def settled(commitments: Commitments) = {
-          val isOK = commitments.localCommit.spec.fulfilled.exists { case htlc \ _ => !htlc.incoming && htlc.add.paymentHash == rbRD.pr.paymentHash }
+        override def onSettled(chan: Channel, cs: Commitments) = {
+          val isOK = cs.localCommit.spec.fulfilled.exists { case htlc \ _ => !htlc.incoming && htlc.add.paymentHash == rbRD.pr.paymentHash }
           if (isOK || ChannelManager.activeInFlightHashes.distinct.diff(inFlightHashesSnapshot).nonEmpty) ChannelManager detachListener self
           // Won't happen if this listener has been detached due to new payments appearing some time ago
           if (isOK) UITask(me doSendOffChain originalEmptyRD1).run

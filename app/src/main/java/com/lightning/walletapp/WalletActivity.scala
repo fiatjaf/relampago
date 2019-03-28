@@ -97,9 +97,8 @@ trait HumanTimeDisplay {
 }
 
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
+  lazy val awaitForegroundServiceIntent = new Intent(me, AwaitService.classof)
   lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
-  lazy val awaitServiceIntent = new Intent(me, AwaitService.classof)
-
   lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
     def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
     def getCount = 2
@@ -226,15 +225,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case pr: PaymentRequest =>
+      pr.lnUrlOpt.filter(_.isLinkablePayment) match {
+        case Some(lnUrl) => FragWallet.worker.linkedOffChainSend(pr, lnUrl)
+        case None => FragWallet.worker.standardOffChainSend(pr)
+      }
+
       // We have operational channels at this point
       // check if we also have an embedded lnurl
       me returnToBase null
-
-      pr.lnUrlOpt match {
-        case Some(lnUrl) if lnUrl.isLinkablePayment => FragWallet.worker.linkedOffChainSend(pr, lnUrl)
-        case Some(lnUrl) if lnUrl.isMultipartPayment => FragWallet.worker.multipartOffChainSend(pr, lnUrl)
-        case _ => FragWallet.worker.standardOffChainSend(pr)
-      }
 
     case _ =>
   }
@@ -326,8 +324,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         def offChain = rm(alert) {
           if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
           else FragWallet.worker.receive(channelsWithRoutes, maxCanReceiveCapped, app.getString(ln_receive_title).html, new String) { rd =>
-            awaitServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
-            ContextCompat.startForegroundService(me, awaitServiceIntent)
+            awaitForegroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
+            ContextCompat.startForegroundService(me, awaitForegroundServiceIntent)
             me PRQR rd.pr
           }
         }

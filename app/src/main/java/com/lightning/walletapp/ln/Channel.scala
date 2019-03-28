@@ -30,8 +30,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
     override def fulfillReceived(updateFulfill: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived updateFulfill
+    override def onSettled(chan: Channel, cs: Commitments) = for (lst <- listeners) lst.onSettled(chan, cs)
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
-    override def settled(cs: Commitments) = for (lst <- listeners) lst settled cs
   }
 
   def ASKREFUNDTX(ref: RefundingData): Unit
@@ -307,11 +307,12 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (norm: NormalData, sig: CommitSig, OPEN) =>
         // We received a commit sig from them, now we can update our local commit
         val c1 \ revokeAndAck = Commitments.receiveCommit(norm.commitments, sig)
-        val d1LocalSigReceived = me STORE norm.copy(commitments = c1)
-        me UPDATA d1LocalSigReceived SEND revokeAndAck
+        val d1 = me STORE norm.copy(commitments = c1)
+        me UPDATA d1 SEND revokeAndAck
+
         // Clear remote commit first
-        doProcess(CMDProceed)
-        events settled c1
+        doProcess(change = CMDProceed)
+        events.onSettled(me, c1)
 
 
       case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
@@ -738,6 +739,6 @@ trait ChannelListener {
   def onBecome: PartialFunction[Transition, Unit] = none
 
   def fulfillReceived(updateFulfill: UpdateFulfillHtlc): Unit = none
+  def onSettled(chan: Channel, cs: Commitments): Unit = none
   def outPaymentAccepted(rd: RoutingData): Unit = none
-  def settled(cs: Commitments): Unit = none
 }

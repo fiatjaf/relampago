@@ -118,17 +118,22 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
   }
 
-  def newRoutes(rd: RoutingData) = {
-    // UI will be updated upstream if we can't re-send any more
-    // When considering whether payment is still sendable we don't use AIR here
-    val stillCanReSend = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
-    if (stillCanReSend) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-    else updStatus(FAILURE, rd.pr.paymentHash)
-  }
-
-  override def settled(cs: Commitments) = {
+  override def onSettled(chan: Channel, cs: Commitments) = {
     val okHtlcs \ _ = cs.localCommit.spec.fulfilled.unzip
     val inOK \ outOK = okHtlcs.partition(_.incoming)
+
+    def finalizeFail(rd: RoutingData) = {
+      // UI will be updated a bit later here
+      updStatus(FAILURE, rd.pr.paymentHash)
+      chan process CMDPaymentFailed(rd)
+    }
+
+    def newRoutes(rd: RoutingData) = {
+      // when considering whether payment is still sendable we don't use AIR here
+      val stillCanReSend = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
+      if (stillCanReSend) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
+      else finalizeFail(rd)
+    }
 
     db txWrap {
       for (htlc <- inOK) updOkIncoming(htlc.add)
@@ -142,7 +147,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
           // but account for possibility of rd not being in place
 
           case Some(Some(rd1) \ excludes) =>
-            for (entity <- excludes) BadEntityWrap.putEntity tupled entity
+            for (badEntity <- excludes) BadEntityWrap.putEntity.tupled(badEntity)
             ChannelManager.sendEither(useFirstRoute(rd1.routes, rd1), newRoutes)
 
           case _ =>
