@@ -108,7 +108,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     override def onSettled(chan: Channel, cs: Commitments) = {
-      val canClearNotification = cs.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.incoming }
+      val canClearNotification = cs.localCommit.spec.fulfilled.nonEmpty
       if (canClearNotification) host stopService host.awaitForegroundServiceIntent
     }
 
@@ -123,8 +123,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val msg = host getString err_ln_peer_incompatible format chan.data.announce.alias
         informOfferClose(chan, msg).run
 
-      case (chan, _: NormalData, cmd: CMDPaymentFailed) =>
-        // Offer multipart payment if request supports that
+      case (chan, _: NormalData, cmd: CMDPaymentFailed) if cmd.rd.pr.lnUrlOpt.exists(_.isMultipartPayment) =>
+        // Offer multipart payment if request supports it and we have more than one channel capable of sending
     }
 
     override def onBecome = {
@@ -604,14 +604,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val accChanOpt = ChannelManager.accumulatorChanOpt(rd)
 
     sendableEither -> accChanOpt match {
-      case Left(_ \ true) \ _ if rd.pr.lnUrlOpt.exists(_.isLinkablePayment) => startLinkable(rd)
+      case Left(_ \ true) \ _ if rd.pr.lnUrlOpt.exists(_.isMultipartPayment) => startMultipart(rd)
       case Left(_ \ true) \ Some(accumulator) if rd.airLeft > 1 => startAir(accumulator, rd)
       case Left(notSendableNoAIRPossible \ _) \ _ => onFail(notSendableNoAIRPossible)
       case _ => PaymentInfoWrap addPendingPayment rd
     }
   }
 
-  def startLinkable(rd: RoutingData) = {
+  def startMultipart(rd: RoutingData) = {
 
   }
 
