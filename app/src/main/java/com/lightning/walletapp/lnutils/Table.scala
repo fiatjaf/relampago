@@ -102,12 +102,13 @@ object PaymentTable extends Table {
   val selectPaymentNumSql = s"SELECT count($hash) FROM $table WHERE $status = $SUCCESS AND $chanId = ?"
   val searchSql = s"SELECT * FROM $table WHERE $hash IN (SELECT $hash FROM $fts$table WHERE $search MATCH ? LIMIT 24)"
 
-  // Updating, creating
+  // Updating, creating, removing
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ?, $chanId = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ?, $chanId = ? WHERE $hash = ?"
   val updLastParamsSql = s"UPDATE $table SET $status = $WAITING, $firstMsat = ?, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
   // Frozen payment may become fulfilled but then get overridden on restart unless we check for status
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ? AND $status <> $SUCCESS"
+  val killSql = s"DELETE FROM $table WHERE $hash = ? AND $status <> $SUCCESS"
 
   val updFailWaitingAndFrozenSql = s"""
     UPDATE $table SET $status = $FAILURE /* automatically fail those payments which... */

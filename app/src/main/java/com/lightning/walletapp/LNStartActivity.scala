@@ -165,6 +165,7 @@ case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, 
 }
 
 case class MultipartPayment(requests: Vector[String], paymentId: String) extends LNUrlData {
-  val parsedPaymentRequests = requests.map(PaymentRequest.read).filter(_.amount.isEmpty)
-  require(parsedPaymentRequests.size > 1, "Too few additional payment requests")
+  val parsedPaymentRequests = requests.map(raw => PaymentRequest read raw).filter(_.amount.isEmpty)
+  require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size)
+  require(parsedPaymentRequests.size > 1)
 }

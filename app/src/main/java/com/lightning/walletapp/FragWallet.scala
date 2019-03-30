@@ -125,6 +125,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case (chan, _: NormalData, cmd: CMDPaymentFailed) if cmd.rd.pr.lnUrlOpt.exists(_.isMultipartPayment) =>
         // Offer multipart payment if request supports it and we have more than one channel capable of sending
+        offerMultipart(cmd.rd)
     }
 
     override def onBecome = {
@@ -604,18 +605,29 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val accChanOpt = ChannelManager.accumulatorChanOpt(rd)
 
     sendableEither -> accChanOpt match {
-      case Left(_ \ true) \ _ if rd.pr.lnUrlOpt.exists(_.isMultipartPayment) => startMultipart(rd)
-      case Left(_ \ true) \ Some(accumulator) if rd.airLeft > 1 => startAir(accumulator, rd)
-      case Left(notSendableNoAIRPossible \ _) \ _ => onFail(notSendableNoAIRPossible)
+      case Left(_ \ true) \ _ if rd.pr.lnUrlOpt.exists(_.isMultipartPayment) => offerMultipart(rd)
+      case Left(_ \ true) \ Some(accumulator) if rd.airLeft > 1 => offerAir(accumulator, rd)
+      case Left(notSendable \ _) \ _ => onFail(notSendable)
       case _ => PaymentInfoWrap addPendingPayment rd
     }
   }
 
-  def startMultipart(rd: RoutingData) = {
+  def offerMultipart(rd: RoutingData) = {
+    val amount = denom parsedWithSign MilliSatoshi(rd.firstMsat)
+    val title = app.getString(err_ln_multipart).format(s"<strong>$amount</strong>").html
+    mkCheckForm(alert => rm(alert)(start), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
 
+    def start = for (lnUrl <- rd.pr.lnUrlOpt) host.fetch1stLevelUrl(lnUrl) {
+      case multipartPayment: MultipartPayment => startMultipart(multipartPayment)
+      case _ => app toast err_no_data
+    }
+
+    def startMultipart(multipartPayment: MultipartPayment) = {
+      LNParams.db.change(PaymentTable.killSql, rd.pr.paymentHash)
+    }
   }
 
-  def startAir(toChan: Channel, originalEmptyRD: RoutingData) = {
+  def offerAir(toChan: Channel, originalEmptyRD: RoutingData) = {
     val amount = denom parsedWithSign MilliSatoshi(originalEmptyRD.firstMsat)
     val bld = baseBuilder(app.getString(err_ln_rebalance).format(s"<strong>$amount</strong>").html, null)
     if (originalEmptyRD.airAskUser) mkCheckForm(alert => rm(alert)(start), none, bld, dialog_ok, dialog_cancel) else start
@@ -628,9 +640,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
       require(deltaAmountToSend > 0, "Accumulator already has enough money")
 
-      // Further rebalancing should always be halted if new off-chain payment is detected since rebalancing has started
-      val Some(_ \ extraHops) \ finalAmount = channelAndHop(toChan) -> MilliSatoshi(deltaAmountToSend min amountCanRebalance)
+      val Some(_ \ extraHops) = channelAndHop(toChan)
+      val finalAmount = MilliSatoshi(deltaAmountToSend min amountCanRebalance)
       val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, ByteVector(random getBytes 32), REBALANCING)
+      // Further rebalancing should always be halted if new off-chain payment is detected since rebalancing has started
       val inFlightHashesSnapshot = ChannelManager.activeInFlightHashes :+ rbRD.pr.paymentHash
 
       val listener = new ChannelListener { self =>
