@@ -167,7 +167,7 @@ case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, 
 }
 
 case class MultipartPayment(requests: StringVec, paymentId: String) extends LNUrlData {
-  val parsedPaymentRequests: PayReqVec = requests.take(5).map(raw => PaymentRequest read raw).filter(_.amount.isEmpty)
+  val parsedPaymentRequests: PayReqVec = requests.take(5).map(PaymentRequest.read).filter(_.amount.isEmpty)
   require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size, "Same invoices contain the same hash")
   require(parsedPaymentRequests.forall(_.description contains paymentId), s"Some invoice descriptions do not contain $paymentId")
   require(parsedPaymentRequests.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which are not allowed")

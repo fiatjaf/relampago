@@ -123,8 +123,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val msg = host getString err_ln_peer_incompatible format chan.data.announce.alias
         informOfferClose(chan, msg).run
 
-      case (chan, _: NormalData, cmd: CMDPaymentGiveUp)
-        if cmd.rd.pr.lnUrlOpt.exists(_.isMultipartPayment) =>
+      case (chan, _: NormalData, cmd: CMDPaymentGiveUp) if cmd.rd.isValidMultipart =>
+        // Payment has failed, but can be broken down into a bunch of smaller parts
         offerMultipart(cmd.rd)
     }
 
@@ -604,8 +604,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val accChanOpt = ChannelManager.accumulatorChanOpt(rd)
 
     sendableEither -> accChanOpt match {
-      case Left(_ \ true) \ _ if rd.pr.lnUrlOpt.exists(_.isMultipartPayment) => offerMultipart(rd)
-      case Left(_ \ true) \ Some(accumulator) if rd.airLeft > 1 => offerAir(accumulator, rd)
+      case Left(_ \ true) \ _ if rd.isValidMultipart => offerMultipart(rd)
+      case Left(_ \ true) \ Some(acc) if rd.airLeft > 1 => offerAir(acc, rd)
       case Left(notSendable \ _) \ _ => onFail(notSendable)
       case _ => PaymentInfoWrap addPendingPayment rd
     }
@@ -615,8 +615,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val amount = denom parsedWithSign MilliSatoshi(rd.firstMsat)
     val title = app.getString(err_ln_multipart).format(s"<strong>$amount</strong>").html
     mkCheckForm(alert => rm(alert)(start), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
+    def start = for (url <- rd.pr.lnUrlOpt if url.isMultipartPayment) host.fetch1stLevelUrl(url, guard)
 
-    def start = for (lnUrl <- rd.pr.lnUrlOpt) host.fetch1stLevelUrl(lnUrl) {
+    def guard(mayBeMultipart: LNUrlData): Unit = mayBeMultipart match {
       case multipart: MultipartPayment => <(startMultipart(multipart), onFail)(none)
       case _ => app toast err_no_data
     }
