@@ -32,6 +32,7 @@ import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import com.lightning.walletapp.lnutils.JsonHttpUtils.queue
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
 import com.lightning.walletapp.ln.wire.ChannelReestablish
+import com.lightning.walletapp.LNUrlData.PayReqVec
 import android.transition.TransitionManager
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
@@ -123,8 +124,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val msg = host getString err_ln_peer_incompatible format chan.data.announce.alias
         informOfferClose(chan, msg).run
 
-      case (chan, _: NormalData, cmd: CMDPaymentFailed) if cmd.rd.pr.lnUrlOpt.exists(_.isMultipartPayment) =>
-        // Offer multipart payment if request supports it and we have more than one channel capable of sending
+      case (chan, _: NormalData, cmd: CMDPaymentFailed)
+        if cmd.rd.pr.lnUrlOpt.exists(_.isMultipartPayment) =>
         offerMultipart(cmd.rd)
     }
 
@@ -328,7 +329,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val inFiat = msatInFiatHuman(info.firstSum)
       val retry = if (info.pr.isFresh) dialog_retry else -1
-      val rd = emptyRD(info.pr, info.firstMsat, useCache = false)
+      val rd = emptyRD(info.pr, info.firstMsat, useCache = false, airLeft = 0)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
       val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
@@ -534,7 +535,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case Failure(emptyAmount) => app toast dialog_sum_small
 
       case Success(ms) => rm(alert) {
-        // Payment requests without amounts are forbidden
         val airLeft = ChannelManager.all.count(isOperational)
         val rd = emptyRD(pr, ms.amount, useCache = true, airLeft)
         onUserAcceptSend(rd)
@@ -618,12 +618,38 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     mkCheckForm(alert => rm(alert)(start), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
 
     def start = for (lnUrl <- rd.pr.lnUrlOpt) host.fetch1stLevelUrl(lnUrl) {
-      case multipartPayment: MultipartPayment => startMultipart(multipartPayment)
+      case multipart: MultipartPayment => <(startMultipart(multipart), onFail)(none)
       case _ => app toast err_no_data
     }
 
     def startMultipart(multipartPayment: MultipartPayment) = {
+      // Remove an old payment from db so user can't re-send it
       LNParams.db.change(PaymentTable.killSql, rd.pr.paymentHash)
+      sendNextPart(multipartPayment.parsedPaymentRequests)
+
+      def sendNextPart(paymentReqsLeft: PayReqVec): Unit = {
+        // Add one MilliSatoshi because when Long is divided a sum of parts may be smaller
+        val partAmountMsat = (rd.firstMsat / multipartPayment.parsedPaymentRequests.size) + 1
+        val partRD = emptyRD(paymentReqsLeft.head, partAmountMsat, useCache = true, airLeft = 0)
+
+        val listener = new ChannelListener { self =>
+          override def onSettled(chan: Channel, cs: Commitments) = {
+            val isOK = cs.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.add.paymentHash == partRD.pr.paymentHash }
+            if (isOK && paymentReqsLeft.nonEmpty) sendNextPart(paymentReqsLeft = paymentReqsLeft.tail)
+            if (isOK) ChannelManager detachListener self
+          }
+
+          override def onProcessSuccess = {
+            case (chan, _: NormalData, cmd: CMDPaymentFailed)
+              if cmd.rd.pr.paymentHash == partRD.pr.paymentHash =>
+              // Smaller payment has also failed, halt everything
+              ChannelManager detachListener self
+          }
+        }
+
+        ChannelManager attachListener listener
+        UITask(me doSendOffChain partRD).run
+      }
     }
   }
 
@@ -643,7 +669,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val Some(_ \ extraHops) = channelAndHop(toChan)
       val finalAmount = MilliSatoshi(deltaAmountToSend min amountCanRebalance)
       val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, ByteVector(random getBytes 32), REBALANCING)
-      // Further rebalancing should always be halted if new off-chain payment is detected since rebalancing has started
+      // Further rebalancing attempts should always be halted if new off-chain payment is detected since rebalancing has started
       val inFlightHashesSnapshot = ChannelManager.activeInFlightHashes :+ rbRD.pr.paymentHash
 
       val listener = new ChannelListener { self =>
@@ -656,7 +682,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       ChannelManager attachListener listener
-      PaymentInfoWrap addPendingPayment rbRD
+      UITask(me doSendOffChain rbRD).run
     }
   }
 

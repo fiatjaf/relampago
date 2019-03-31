@@ -35,7 +35,7 @@ object PaymentInfo {
   var errors = Map.empty[ByteVector, FailureTryVec] withDefaultValue Vector.empty
   private[this] var replacedChans = Set.empty[Long]
 
-  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int = 0) = {
+  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
       lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache, airLeft, airAskUser = true)

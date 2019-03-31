@@ -15,6 +15,7 @@ import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
 import com.lightning.walletapp.helper.ThrottledWork
+import com.lightning.walletapp.LNUrlData.PayReqVec
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
 import scodec.bits.ByteVector
@@ -143,6 +144,7 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 // LNURL response types
 
 object LNUrlData {
+  type PayReqVec = Vector[PaymentRequest]
   def guardResponse(raw: String): Unit = {
     val validJson = Try(raw.parseJson.asJsObject.fields)
     val hasError = validJson.map(_ apply "reason").map(json2String)
@@ -164,8 +166,10 @@ case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, 
   require(callback contains "https://", "Not an HTTPS callback")
 }
 
-case class MultipartPayment(requests: Vector[String], paymentId: String) extends LNUrlData {
-  val parsedPaymentRequests = requests.map(raw => PaymentRequest read raw).filter(_.amount.isEmpty)
-  require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size)
-  require(parsedPaymentRequests.size > 1)
+case class MultipartPayment(requests: StringVec, paymentId: String) extends LNUrlData {
+  val parsedPaymentRequests: PayReqVec = requests.take(5).map(raw => PaymentRequest read raw).filter(_.amount.isEmpty)
+  require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size, "Same invoices contain the same hash")
+  require(parsedPaymentRequests.forall(_.description contains paymentId), s"Some invoice descriptions do not contain $paymentId")
+  require(parsedPaymentRequests.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which are not allowed")
+  require(parsedPaymentRequests.size > 1, "Not enough additional invoices were found")
 }

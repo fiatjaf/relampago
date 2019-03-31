@@ -112,6 +112,6 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def snapshot = CloudSnapshot(data.tokens, connector.url)
   def retryFreshRequest(failedPayReq: PaymentRequest): Unit = {
     val isOk = ChannelManager.mostFundedChanOpt.exists(chan => estimateCanSend(chan) >= failedPayReq.unsafeMsat)
-    if (isOk) PaymentInfoWrap addPendingPayment emptyRD(failedPayReq, failedPayReq.unsafeMsat, useCache = true)
+    if (isOk) PaymentInfoWrap addPendingPayment emptyRD(failedPayReq, failedPayReq.unsafeMsat, useCache = true, airLeft = 0)
   }
 }
