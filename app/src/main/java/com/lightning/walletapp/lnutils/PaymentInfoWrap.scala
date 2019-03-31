@@ -125,7 +125,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     def finalizeFail(rd: RoutingData) = {
       // UI will be updated a bit later here
       updStatus(FAILURE, rd.pr.paymentHash)
-      chan process CMDPaymentFailed(rd)
+      chan process CMDPaymentGiveUp(rd)
     }
 
     def newRoutes(rd: RoutingData) = {

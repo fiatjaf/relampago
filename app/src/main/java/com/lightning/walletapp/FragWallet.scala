@@ -124,7 +124,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val msg = host getString err_ln_peer_incompatible format chan.data.announce.alias
         informOfferClose(chan, msg).run
 
-      case (chan, _: NormalData, cmd: CMDPaymentFailed)
+      case (chan, _: NormalData, cmd: CMDPaymentGiveUp)
         if cmd.rd.pr.lnUrlOpt.exists(_.isMultipartPayment) =>
         offerMultipart(cmd.rd)
     }
@@ -640,7 +640,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           }
 
           override def onProcessSuccess = {
-            case (chan, _: NormalData, cmd: CMDPaymentFailed)
+            case (chan, _: NormalData, cmd: CMDPaymentGiveUp)
               if cmd.rd.pr.paymentHash == partRD.pr.paymentHash =>
               // Smaller payment has also failed, halt everything
               ChannelManager detachListener self
