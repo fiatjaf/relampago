@@ -108,10 +108,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       mkCheckFormNeutral(_.dismiss, none, close, bld, dialog_ok, -1, ln_chan_close)
     }
 
-    override def onSettled(chan: Channel, cs: Commitments) = {
-      val canClearNotification = cs.localCommit.spec.fulfilled.nonEmpty
-      if (canClearNotification) host stopService host.awaitForegroundServiceIntent
-    }
+    override def onSettled(chan: Channel, cs: Commitments) =
+      if (cs.localCommit.spec.fulfilledIncoming.nonEmpty)
+        host stopService host.foregroundServiceIntent
 
     override def onProcessSuccess = {
       case (chan, _: HasCommitments, remoteError: wire.Error) if errorLimit > 0 =>
@@ -625,25 +624,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def startMultipart(multipartPayment: MultipartPayment) = {
       // Remove an old payment from db so user can't re-send it
       LNParams.db.change(PaymentTable.killSql, rd.pr.paymentHash)
-      sendNextPart(multipartPayment.parsedPaymentRequests)
+      sendNextPartialPayment(multipartPayment.parsedPaymentRequests)
 
-      def sendNextPart(paymentReqsLeft: PayReqVec): Unit = {
+      def sendNextPartialPayment(paymentRequestsLeft: PayReqVec): Unit = {
         // Add one MilliSatoshi because when Long is divided a sum of parts may be smaller
         val partAmountMsat = (rd.firstMsat / multipartPayment.parsedPaymentRequests.size) + 1
-        val partRD = emptyRD(paymentReqsLeft.head, partAmountMsat, useCache = true, airLeft = 0)
+        val partRD = emptyRD(paymentRequestsLeft.head, partAmountMsat, useCache = true, airLeft = 0)
 
         val listener = new ChannelListener { self =>
           override def onSettled(chan: Channel, cs: Commitments) = {
-            val isOK = cs.localCommit.spec.fulfilled.exists { case htlc \ _ => htlc.add.paymentHash == partRD.pr.paymentHash }
-            if (isOK && paymentReqsLeft.nonEmpty) sendNextPart(paymentReqsLeft = paymentReqsLeft.tail)
+            val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == partRD.pr.paymentHash)
+            if (isOK && paymentRequestsLeft.nonEmpty) sendNextPartialPayment(paymentRequestsLeft.tail)
             if (isOK) ChannelManager detachListener self
-          }
-
-          override def onProcessSuccess = {
-            case (chan, _: NormalData, cmd: CMDPaymentGiveUp)
-              if cmd.rd.pr.paymentHash == partRD.pr.paymentHash =>
-              // Smaller payment has also failed, halt everything
-              ChannelManager detachListener self
           }
         }
 
@@ -653,15 +645,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  def offerAir(toChan: Channel, originalEmptyRD: RoutingData) = {
-    val amount = denom parsedWithSign MilliSatoshi(originalEmptyRD.firstMsat)
+  def offerAir(toChan: Channel, origEmptyRD: RoutingData) = {
+    val amount = denom parsedWithSign MilliSatoshi(origEmptyRD.firstMsat)
     val bld = baseBuilder(app.getString(err_ln_rebalance).format(s"<strong>$amount</strong>").html, null)
-    if (originalEmptyRD.airAskUser) mkCheckForm(alert => rm(alert)(start), none, bld, dialog_ok, dialog_cancel) else start
+    if (origEmptyRD.airAskUser) mkCheckForm(alert => rm(alert)(start), none, bld, dialog_ok, dialog_cancel) else start
     def start = <(rebalance, onFail)(none)
 
     def rebalance = {
-      val originalEmptyRD1 = originalEmptyRD.copy(airLeft = originalEmptyRD.airLeft - 1, airAskUser = false)
-      val deltaAmountToSend = originalEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
+      val origEmptyRD1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1, airAskUser = false)
+      val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
       val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
       require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
       require(deltaAmountToSend > 0, "Accumulator already has enough money")
@@ -674,10 +666,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val listener = new ChannelListener { self =>
         override def onSettled(chan: Channel, cs: Commitments) = {
-          val isOK = cs.localCommit.spec.fulfilled.exists { case htlc \ _ => !htlc.incoming && htlc.add.paymentHash == rbRD.pr.paymentHash }
-          if (isOK || ChannelManager.activeInFlightHashes.distinct.diff(inFlightHashesSnapshot).nonEmpty) ChannelManager detachListener self
-          // Won't happen if this listener has been detached due to new payments appearing some time ago
-          if (isOK) UITask(me doSendOffChain originalEmptyRD1).run
+          val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)
+          val newPayments = ChannelManager.activeInFlightHashes.distinct.diff(inFlightHashesSnapshot)
+          if (isOK || newPayments.nonEmpty) ChannelManager detachListener self
+          if (isOK) UITask(me doSendOffChain origEmptyRD1).run
         }
       }
 

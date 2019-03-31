@@ -97,7 +97,7 @@ trait HumanTimeDisplay {
 }
 
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
-  lazy val awaitForegroundServiceIntent = new Intent(me, AwaitService.classof)
+  lazy val foregroundServiceIntent = new Intent(me, AwaitService.classof)
   lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
   lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
     def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
@@ -324,8 +324,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         def offChain = rm(alert) {
           if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
           else FragWallet.worker.receive(channelsWithRoutes, maxCanReceiveCapped, app.getString(ln_receive_title).html, new String) { rd =>
-            awaitForegroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
-            ContextCompat.startForegroundService(me, awaitForegroundServiceIntent)
+            foregroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
+            ContextCompat.startForegroundService(me, foregroundServiceIntent)
             me PRQR rd.pr
           }
         }

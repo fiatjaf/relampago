@@ -202,7 +202,11 @@ case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig],
 case class Htlc(incoming: Boolean, add: UpdateAddHtlc)
 case class CommitmentSpec(feeratePerKw: Long, toLocalMsat: Long, toRemoteMsat: Long,
                           htlcs: Set[Htlc] = Set.empty, fulfilled: Set[HtlcAndFulfill] = Set.empty,
-                          failed: Set[HtlcAndFail] = Set.empty, malformed: Set[Htlc] = Set.empty)
+                          failed: Set[HtlcAndFail] = Set.empty, malformed: Set[Htlc] = Set.empty) {
+
+  lazy val fulfilledIncoming = fulfilled collect { case Htlc(true, add) \ _ => add }
+  lazy val fulfilledOutgoing = fulfilled collect { case Htlc(false, add) \ _ => add }
+}
 
 object CommitmentSpec {
   def findHtlcById(cs: CommitmentSpec, id: Long, isIncoming: Boolean): Option[Htlc] =

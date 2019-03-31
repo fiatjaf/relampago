@@ -119,8 +119,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onSettled(chan: Channel, cs: Commitments) = {
-    val okHtlcs \ _ = cs.localCommit.spec.fulfilled.unzip
-    val inOK \ outOK = okHtlcs.partition(_.incoming)
 
     def finalizeFail(rd: RoutingData) = {
       // UI will be updated a bit later here
@@ -129,14 +127,14 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     def newRoutes(rd: RoutingData) = {
-      // when considering whether payment is still sendable we don't use AIR here
+      // We don't care about AIR or multipart payments here
       val stillCanReSend = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
       if (stillCanReSend) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
       else finalizeFail(rd)
     }
 
     db txWrap {
-      for (htlc <- inOK) updOkIncoming(htlc.add)
+      cs.localCommit.spec.fulfilledIncoming foreach updOkIncoming
       // Malformed payments are returned by our direct peer and should never be retried again
       for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
@@ -159,9 +157,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     uiNotify
-    if (inOK.nonEmpty || outOK.nonEmpty) com.lightning.walletapp.Vibrator.vibrate
-    if (inOK.nonEmpty) getCerberusActs(getVulnerableRevMap) foreach app.olympus.tellClouds
-    if (outOK.nonEmpty) app.olympus tellClouds OlympusWrap.CMDStart
+    if (cs.localCommit.spec.fulfilled.nonEmpty) com.lightning.walletapp.Vibrator.vibrate
+    if (cs.localCommit.spec.fulfilledOutgoing.nonEmpty) app.olympus.tellClouds(OlympusWrap.CMDStart)
+    if (cs.localCommit.spec.fulfilledIncoming.nonEmpty) getCerberusActs(getVulnerableRevMap) foreach app.olympus.tellClouds
   }
 
   def getVulnerableRevMap =
