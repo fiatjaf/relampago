@@ -584,7 +584,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def onUserAcceptSend(rd: RoutingData) =
       ChannelManager checkIfSendable rd match {
-        // We proceed if it's sendable right away or via AIR
+        // Proceed if it's sendable as is or via AIR/multipart
         case Left(notSendable \ false) => onFail(notSendable)
         case _ => sendLinkingRequest(rd)
       }
@@ -611,6 +611,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
+  def doSendOffChainOnUI(rd: RoutingData) =
+    UITask(me doSendOffChain rd).run
+
   def offerMultipart(rd: RoutingData) = {
     val amount = denom parsedWithSign MilliSatoshi(rd.firstMsat)
     val title = app.getString(err_ln_multipart).format(s"<strong>$amount</strong>").html
@@ -628,20 +631,20 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       sendNextPartialPayment(multipartPayment.parsedPaymentRequests)
 
       def sendNextPartialPayment(paymentRequestsLeft: PayReqVec): Unit = {
-        // Add one MilliSatoshi because when Long is divided a sum of parts may be smaller
         val partAmountMsat = (rd.firstMsat / multipartPayment.parsedPaymentRequests.size) + 1
         val partRD = emptyRD(paymentRequestsLeft.head, partAmountMsat, useCache = true, airLeft = 0)
+        val partRDAIR = partRD.copy(airLeft = ChannelManager.all.count(isOperational), airAskUser = false)
 
         val listener = new ChannelListener { self =>
           override def onSettled(chan: Channel, cs: Commitments) = {
-            val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == partRD.pr.paymentHash)
+            val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == partRDAIR.pr.paymentHash)
             if (isOK && paymentRequestsLeft.nonEmpty) sendNextPartialPayment(paymentRequestsLeft.tail)
             if (isOK) ChannelManager detachListener self
           }
         }
 
         ChannelManager attachListener listener
-        UITask(me doSendOffChain partRD).run
+        me doSendOffChainOnUI partRDAIR
       }
     }
   }
@@ -667,7 +670,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val listener = new ChannelListener { self =>
         override def onSettled(chan: Channel, cs: Commitments) = {
           val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)
-          if (isOK) runAnd(ChannelManager detachListener self)(UITask(me doSendOffChain origEmptyRD1).run)
+          if (isOK) runAnd(ChannelManager detachListener self)(me doSendOffChainOnUI origEmptyRD1)
         }
 
         override def outPaymentAccepted(rd: RoutingData) =
@@ -676,7 +679,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       ChannelManager attachListener listener
-      UITask(me doSendOffChain rbRD).run
+      me doSendOffChainOnUI rbRD
     }
   }
 
