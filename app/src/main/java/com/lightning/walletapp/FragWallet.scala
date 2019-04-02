@@ -211,12 +211,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // DISPLAYING ITEMS LIST
 
-  val minLinesNum = 4
+  var fundTxIds: Set[String] = Set.empty[String]
+  var lnItems: Vector[LNWrap] = Vector.empty[LNWrap]
+  var btcItems: Vector[BTCWrap] = Vector.empty[BTCWrap]
+  var allItems: Vector[ItemWrap] = Vector.empty[ItemWrap]
+  val minLinesNum = 4 max IconGetter.scrHeight.ceil.toInt
   var currentCut = minLinesNum
-  var lnItems = Vector.empty[LNWrap]
-  var btcItems = Vector.empty[BTCWrap]
-  var allItems = Vector.empty[ItemWrap]
-  var fundTxIds = Set.empty[String]
 
   def updPaymentList = UITask {
     TransitionManager beginDelayedTransition mainWrap
