@@ -23,6 +23,10 @@ object PaymentInfo {
   final val FAILURE = 3
   final val FROZEN = 4
 
+  final val NOT_SENDABLE = 0
+  final val SENDABLE_AIR = 1
+  final val SENDABLE_MULTIPART = 2
+
   final val NOIMAGE = ByteVector.fromValidHex("3030303030303030")
   final val NOCHANID = ByteVector.fromValidHex("3131313131313131")
   final val REBALANCING = "Rebalancing"

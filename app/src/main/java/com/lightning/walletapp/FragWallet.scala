@@ -517,10 +517,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   abstract class OffChainSender(pr: PaymentRequest) {
-    val requestedCappedAmountOpt = pr.amount.map(_.amount * 2 min maxHtlcValueMsat)
-    val maxCappedSend = MilliSatoshi(requestedCappedAmountOpt getOrElse maxHtlcValueMsat min ChannelManager.estimateAIRCanSend)
-    val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false).asInstanceOf[LinearLayout]
-    val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCappedSend)
+    val maxCappedNormal = ChannelManager.estimateAIRCanSend min maxHtlcValueMsat
+    val rd = emptyRD(pr, firstMsat = pr.amount.map(_.amount * 2) getOrElse 0L, useCache = true, airLeft = 0)
+    val maxCappedFinal = if (rd.isValidMultipart) ChannelManager.airCanSendInto(null).sum else maxCappedNormal
+    val maxCanSendFinal = MilliSatoshi(rd.firstMsat min maxCappedFinal)
+
+    val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
+    val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCanSendFinal)
     val rateManager = new RateManager(baseContent) hint baseHint
 
     def getTitle: View
@@ -528,25 +531,25 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def onUserAcceptSend(rd: RoutingData): Unit
 
     def sendAttempt(alert: AlertDialog) = rateManager.result match {
+      case Success(ms) if maxCanSendFinal < ms => app toast dialog_sum_big
       case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
       case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
-      case Success(ms) if maxCappedSend < ms => app toast dialog_sum_big
       case Failure(emptyAmount) => app toast dialog_sum_small
 
       case Success(ms) => rm(alert) {
-        val airLeft = ChannelManager.all.count(isOperational)
-        val rd = emptyRD(pr, ms.amount, useCache = true, airLeft)
-        onUserAcceptSend(rd)
+        val attempts = ChannelManager.all.count(isOperational)
+        val rd1 = rd.copy(firstMsat = ms.amount, airLeft = attempts)
+        onUserAcceptSend(rd1)
       }
     }
 
     pr.fallbackAddress -> pr.amount match {
-      case Some(adr) \ Some(amount) if amount > maxCappedSend && amount < app.kit.conf0Balance =>
+      case Some(adr) \ Some(amount) if amount > maxCanSendFinal && amount < app.kit.conf0Balance =>
         val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
         // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback option
         mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
 
-      case _ \ Some(amount) if amount > maxCappedSend =>
+      case _ \ Some(amount) if amount > maxCanSendFinal =>
         val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
         // Either this payment request contains no fallback address or we don't have enough funds on-chain at all
         showForm(negBuilder(dialog_ok, getTitle, failureMessage.html).create)
@@ -585,7 +588,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def onUserAcceptSend(rd: RoutingData) =
       ChannelManager checkIfSendable rd match {
         // Proceed if it's sendable as is or via AIR/multipart
-        case Left(notSendable \ false) => onFail(notSendable)
+        case Left(noWayLeft \ NOT_SENDABLE) => app toast noWayLeft
         case _ => sendLinkingRequest(rd)
       }
 
@@ -604,9 +607,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val accChanOpt = ChannelManager.accumulatorChanOpt(rd)
 
     sendableEither -> accChanOpt match {
-      case Left(_ \ true) \ _ if rd.isValidMultipart => offerMultipart(rd)
-      case Left(_ \ true) \ Some(acc) if rd.airLeft > 1 => offerAir(acc, rd)
-      case Left(notSendable \ _) \ _ => onFail(notSendable)
+      case Left(_ \ SENDABLE_MULTIPART) \ _ => offerMultipart(rd)
+      case Left(_ \ SENDABLE_AIR) \ Some(acc) => offerAir(acc, rd)
+      case Left(noWayLeft \ _) \ _ => app toast noWayLeft
       case _ => PaymentInfoWrap addPendingPayment rd
     }
   }
@@ -618,31 +621,36 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val amount = denom parsedWithSign MilliSatoshi(rd.firstMsat)
     val title = app.getString(err_ln_multipart).format(s"<strong>$amount</strong>").html
     mkCheckForm(alert => rm(alert)(start), none, baseBuilder(title, null), dialog_ok, dialog_cancel)
-    def start = for (url <- rd.pr.lnUrlOpt if url.isMultipartPayment) host.fetch1stLevelUrl(url, guard)
 
-    def guard(mayBeMultipart: LNUrlData): Unit = mayBeMultipart match {
-      case multipart: MultipartPayment => <(startMultipart(multipart), onFail)(none)
+    def start = for (lnUrl <- rd.pr.lnUrlOpt if lnUrl.isMultipartPayment) host.fetch1stLevelUrl(lnUrl) {
+      case multipartPayment: MultipartPayment => <(startMultipart(multipartPayment), onFail)(none)
       case _ => app toast err_no_data
     }
 
     def startMultipart(multipartPayment: MultipartPayment) = {
-      // Remove an old payment from db so user can't re-send it
-      LNParams.db.change(PaymentTable.killSql, rd.pr.paymentHash)
-      sendNextPartialPayment(multipartPayment.parsedPaymentRequests)
+      val parsedPaymentRequests = multipartPayment.requests.take(12).map(PaymentRequest.read).filter(_.amount.isEmpty)
+      require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size, "Same invoices contain the same hash")
+      require(parsedPaymentRequests.forall(_.description contains multipartPayment.paymentId), "Some invoices do not contain a payment id")
+      require(parsedPaymentRequests.forall(_.nodeId == rd.pr.nodeId), "Additional invoices must have the same nodeId as the original")
+      require(parsedPaymentRequests.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which is not allowed")
+      require(parsedPaymentRequests.size > 1, "Not enough additional invoices are found")
+      val partAmountMsat = rd.firstMsat / parsedPaymentRequests.size
 
       def sendNextPartialPayment(paymentRequestsLeft: PayReqVec): Unit = {
-        val partAmountMsat = (rd.firstMsat / multipartPayment.parsedPaymentRequests.size) + 1
         val partRD = emptyRD(paymentRequestsLeft.head, partAmountMsat, useCache = true, airLeft = 0)
         val partRDAIR = partRD.copy(airLeft = ChannelManager.all.count(isOperational), airAskUser = false)
 
         val listener = new ChannelListener { self =>
           override def onSettled(chan: Channel, cs: Commitments) = {
             val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == partRDAIR.pr.paymentHash)
-            if (isOK && paymentRequestsLeft.nonEmpty) sendNextPartialPayment(paymentRequestsLeft.tail)
+            if (isOK && paymentRequestsLeft.size > 1) sendNextPartialPayment(paymentRequestsLeft.tail)
             if (isOK) ChannelManager detachListener self
           }
         }
 
+        // Remove an old payment from db so user can't re-send it
+        LNParams.db.change(PaymentTable.killSql, rd.pr.paymentHash)
+        sendNextPartialPayment(parsedPaymentRequests)
         ChannelManager attachListener listener
         me doSendOffChainOnUI partRDAIR
       }
