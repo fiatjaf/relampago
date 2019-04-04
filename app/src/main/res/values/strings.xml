@@ -253,7 +253,7 @@
     <string name="ln_info_close_remote">Force-closed by remote peer</string>
     <string name="ln_info_coop_attempt">Closing may take some time&#8230;</string>
 
-    <string name="ln_info_high_fee">Incoming payment fee is too high: %1$s</string>
+    <string name="ln_info_high_fee">Receiving fees are too high: %1$s</string>
     <string name="ln_info_no_receive">Receiving is still not enabled</string>
     <string name="ln_info_funding_lost">Funding was lost on-chain!</string>
     <string name="ln_info_unknown_spend">Unknown spend detected!</string>

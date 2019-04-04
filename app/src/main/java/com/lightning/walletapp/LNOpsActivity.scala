@@ -131,8 +131,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       chan.data match {
         case norm: NormalData if isOperational(chan) =>
-          // Order matters: NormalData should always come before WaitData
-          // we only can display one item so sort them by increasing importance
+          // We only can display one item so sort by increasing importance
 
           channelAndHop(chan) match {
             case Some(_ \ vec) if isHighFee(vec) => setExtraInfo(me getString ln_info_high_fee format vec.head.feeBreakdown)
@@ -153,7 +152,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
             R.id.canReceive, R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
 
-        case wait: WaitData =>
+        case _: WaitBroadcastRemoteData | _: WaitFundingDoneData =>
           if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
           // Should catch WaitBroadcastRemoteData and WaitFundingDoneData, not NormalData
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,

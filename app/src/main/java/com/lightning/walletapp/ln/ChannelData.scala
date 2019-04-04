@@ -70,17 +70,14 @@ case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSi
 
 // ALL THE DATA BELOW WILL BE STORED
 
-sealed trait WaitData extends HasCommitments {
+case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore, commitments: Commitments,
+                                   their: Option[FundingLocked] = None) extends HasCommitments {
+
   def isLost = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 21 * 1000L
 }
 
-case class WaitBroadcastRemoteData(announce: NodeAnnouncement,
-                                   core: WaitFundingSignedCore, commitments: Commitments,
-                                   their: Option[FundingLocked] = None) extends WaitData
-
-case class WaitFundingDoneData(announce: NodeAnnouncement,
-                               our: Option[FundingLocked], their: Option[FundingLocked],
-                               fundingTx: Transaction, commitments: Commitments) extends WaitData {
+case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked], their: Option[FundingLocked],
+                               fundingTx: Transaction, commitments: Commitments) extends HasCommitments {
 
   def doubleSpendsFunding(that: Transaction) = {
     val thatInputOutPoints = that.txIn.map(_.outPoint)
@@ -91,7 +88,7 @@ case class WaitFundingDoneData(announce: NodeAnnouncement,
 }
 
 case class NormalData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Option[Shutdown] = None,
-                      remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends WaitData
+                      remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends HasCommitments
 
 case class ClosingTxProposed(unsignedTx: ClosingTx, localClosingSigned: ClosingSigned)
 case class NegotiationsData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Shutdown, remoteShutdown: Shutdown,
@@ -121,7 +118,7 @@ case class ClosingData(announce: NodeAnnouncement,
     }
   }
 
-  def canBeRemoved: Boolean = if (System.currentTimeMillis > closedAt + 1000L * 3600 * 24 * 21) true else bestClosing match {
+  def canBeRemoved: Boolean = if (System.currentTimeMillis > closedAt + 1000L * 3600 * 24 * 28) true else bestClosing match {
     case MutualCommitPublished(closingTx) => getStatus(closingTx.txid) match { case confs \ isDead => confs > minDepth || isDead }
     case info => info.getState.map(_.txn.txid).map(getStatus) forall { case confs \ isDead => confs > minDepth || isDead }
   }
