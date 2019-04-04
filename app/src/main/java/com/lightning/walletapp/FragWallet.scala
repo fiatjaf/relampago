@@ -627,14 +627,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case _ => app toast err_no_data
     }
 
-    def startMultipart(multipartPayment: MultipartPayment) = {
-      val parsedPaymentRequests = multipartPayment.requests.take(12).map(PaymentRequest.read).filter(_.amount.isEmpty)
+    def startMultipart(multipart: MultipartPayment) = {
+      val parsedPaymentRequests = multipart.requests.take(12).map(PaymentRequest.read).filter(_.amount.isEmpty)
+      val allInvoicesAreConnected = (rd.pr +: parsedPaymentRequests).forall(_.description contains multipart.paymentId)
+      val partAmountMsat = rd.firstMsat / parsedPaymentRequests.size
+
       require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size, "Same invoices contain the same hash")
-      require(parsedPaymentRequests.forall(_.description contains multipartPayment.paymentId), "Some invoices do not contain a payment id")
       require(parsedPaymentRequests.forall(_.nodeId == rd.pr.nodeId), "Additional invoices must have the same nodeId as the original")
       require(parsedPaymentRequests.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which is not allowed")
+      require(allInvoicesAreConnected, s"Some invoices do not contain a paymentId ${multipart.paymentId}")
       require(parsedPaymentRequests.size > 1, "Not enough additional invoices are found")
-      val partAmountMsat = rd.firstMsat / parsedPaymentRequests.size
 
       def sendNextPartialPayment(paymentRequestsLeft: PayReqVec): Unit = {
         val partRD = emptyRD(paymentRequestsLeft.head, partAmountMsat, useCache = true, airLeft = 0)
