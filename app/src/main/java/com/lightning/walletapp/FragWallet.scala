@@ -635,7 +635,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size, "Same invoices contain the same hash")
       require(parsedPaymentRequests.forall(_.nodeId == rd.pr.nodeId), "Additional invoices must have the same nodeId as the original")
       require(parsedPaymentRequests.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which is not allowed")
-      require(allInvoicesAreConnected, s"Some invoices do not contain a paymentId ${multipart.paymentId}")
+      require(allInvoicesAreConnected, s"Some invoices do not contain a paymentId #${multipart.paymentId}")
       require(parsedPaymentRequests.size > 1, "Not enough additional invoices are found")
 
       def sendNextPartialPayment(paymentRequestsLeft: PayReqVec): Unit = {
@@ -650,12 +650,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           }
         }
 
-        // Remove an old payment from db so user can't re-send it
-        LNParams.db.change(PaymentTable.killSql, rd.pr.paymentHash)
-        sendNextPartialPayment(parsedPaymentRequests)
         ChannelManager attachListener listener
         me doSendOffChainOnUI partRDAIR
       }
+
+      // Remove an old payment from db so user can't re-send it
+      LNParams.db.change(PaymentTable.killSql, rd.pr.paymentHash)
+      sendNextPartialPayment(parsedPaymentRequests)
     }
   }
 
