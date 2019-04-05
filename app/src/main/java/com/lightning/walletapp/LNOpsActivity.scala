@@ -121,7 +121,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       startedAtText setText started.html
       totalPaymentsText setText getStat(cs.channelId).toString
-      fundingDepthText setText getString(ln_info_funding).format(fundingDepth, threshold).html
+      fundingDepthText setText getString(ln_mofn).format(fundingDepth, threshold).html
       refundableAmountText setText denom.parsedWithSign(Satoshi(refundable) / 1000L).html
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(canSendMsat) / 1000L).html

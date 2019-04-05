@@ -628,19 +628,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def startMultipart(multipart: MultipartPayment) = {
-      val parsedPaymentRequests = multipart.requests.take(12).map(PaymentRequest.read).filter(_.amount.isEmpty)
-      val allInvoicesAreConnected = (rd.pr +: parsedPaymentRequests).forall(_.description contains multipart.paymentId)
-      val partAmountMsat = rd.firstMsat / parsedPaymentRequests.size
+      val parsedPrs = multipart.requests.take(12).map(PaymentRequest.read).filter(_.amount.isEmpty)
+      val allInvoicesAreConnected = (rd.pr +: parsedPrs).forall(_.description contains multipart.paymentId)
+      val partAmountMsat = rd.firstMsat / parsedPrs.size
 
-      require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size, "Same invoices contain the same hash")
-      require(parsedPaymentRequests.forall(_.nodeId == rd.pr.nodeId), "Additional invoices must have the same nodeId as the original")
-      require(parsedPaymentRequests.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which is not allowed")
+      require(parsedPrs.map(_.paymentHash).distinct.size == parsedPrs.size, "Same invoices contain the same hash")
+      require(parsedPrs.forall(_.nodeId == rd.pr.nodeId), "Additional invoices must have the same nodeId as the original")
+      require(parsedPrs.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which is not allowed")
       require(allInvoicesAreConnected, s"Some invoices do not contain a paymentId #${multipart.paymentId}")
-      require(parsedPaymentRequests.size > 1, "Not enough additional invoices are found")
+      require(parsedPrs.size > 1, "Not enough additional invoices are found")
 
       def sendNextPartialPayment(paymentRequestsLeft: PayReqVec): Unit = {
         val partRD = emptyRD(paymentRequestsLeft.head, partAmountMsat, useCache = true, airLeft = 0)
         val partRDAIR = partRD.copy(airLeft = ChannelManager.all.count(isOperational), airAskUser = false)
+        val note = host.getString(ln_mofn).format(parsedPrs.size - paymentRequestsLeft.size + 1, parsedPrs.size)
+        app toast note
 
         val listener = new ChannelListener { self =>
           override def onSettled(chan: Channel, cs: Commitments) = {
@@ -656,7 +658,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       // Remove an old payment from db so user can't re-send it
       LNParams.db.change(PaymentTable.killSql, rd.pr.paymentHash)
-      sendNextPartialPayment(parsedPaymentRequests)
+      sendNextPartialPayment(parsedPrs)
     }
   }
 

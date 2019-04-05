@@ -247,7 +247,7 @@
     <string name="ln_info_started">started</string>
     <string name="ln_info_closed">closed</string>
 
-    <string name="ln_info_funding">%1$s of %2$s</string>
+    <string name="ln_mofn">%1$s of %2$s</string>
     <string name="ln_info_close_coop">Closed cooperatively</string>
     <string name="ln_info_close_local">Force-closed by your wallet</string>
     <string name="ln_info_close_remote">Force-closed by remote peer</string>

@@ -70,7 +70,7 @@ class WalletApp extends Application { me =>
   // Various utilities
 
   def toast(code: Int): Unit = toast(me getString code)
-  def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
+  def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_SHORT).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def plur1OrZero(opts: Array[String], num: Long) = if (num > 0) plur(opts, num).format(num) else opts(0)
   def getBufferUnsafe = clipboardManager.getPrimaryClip.getItemAt(0).getText.toString
