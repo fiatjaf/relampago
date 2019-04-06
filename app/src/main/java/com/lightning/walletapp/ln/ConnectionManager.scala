@@ -18,7 +18,6 @@ import java.net.Socket
 
 
 object ConnectionManager {
-  var lastOpenChannelOffer = 0L
   var listeners = Set.empty[ConnectionListener]
   val connections = new ConcurrentHashMap[PublicKey, Worker].asScala
 

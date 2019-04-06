@@ -65,13 +65,11 @@ class LNStartFundActivity extends TimerActivity { me =>
         case _ => // We only listen to setup messages here to avoid conflicts
       }
 
-      override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) =
-        if (System.currentTimeMillis > ConnectionManager.lastOpenChannelOffer + 7500L) {
-          val hnv = HardcodedNodeView(ann, app getString ln_ops_start_fund_incoming_channel)
-          ConnectionManager.lastOpenChannelOffer = System.currentTimeMillis
-          app.TransData.value = IncomingChannelParams(hnv, open)
-          runAnd(finish)(me startActivity getIntent)
-        }
+      override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) = if (openOpt.isEmpty) {
+        val hnv = HardcodedNodeView(ann, tip = app getString ln_ops_start_fund_incoming_channel)
+        app.TransData.value = IncomingChannelParams(hnv, open)
+        runAnd(finish)(me startActivity getIntent)
+      }
 
       override def onException = {
         case _ \ errorWhileOpening =>

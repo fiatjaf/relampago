@@ -111,28 +111,16 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) =
-      if (System.currentTimeMillis > ConnectionManager.lastOpenChannelOffer + 7500L)
-        ConnectionManager.connections get nodeId foreach { existingWorkerConnection =>
-          val startFundIncomingChannel = app getString ln_ops_start_fund_incoming_channel
-          val hnv = HardcodedNodeView(existingWorkerConnection.ann, startFundIncomingChannel)
-          ConnectionManager.lastOpenChannelOffer = System.currentTimeMillis
-          app.TransData.value = IncomingChannelParams(hnv, open)
-          me goTo classOf[LNStartFundActivity]
-        }
-  }
-
-  override def onStop = wrap(super.onStop) {
-    // We need to remove this listener on leaving activity
-    // so it does not interfere with listener on another page
-    ConnectionManager.listeners -= connectionListener
-  }
-
-  override def onResume = wrap(super.onResume) {
-    ConnectionManager.listeners += connectionListener
-    me returnToBase null
+      ConnectionManager.connections get nodeId foreach { existingWorkerConnection =>
+        val startFundIncomingChannel = app getString ln_ops_start_fund_incoming_channel
+        val hnv = HardcodedNodeView(existingWorkerConnection.ann, startFundIncomingChannel)
+        app.TransData.value = IncomingChannelParams(hnv, open)
+        me goTo classOf[LNStartFundActivity]
+      }
   }
 
   override def onDestroy = wrap(super.onDestroy)(stopDetecting)
+  override def onResume = wrap(super.onResume)(me returnToBase null)
   override def onOptionsItemSelected(m: MenuItem): Boolean = runAnd(true) {
     if (m.getItemId == R.id.actionSettings) me goTo classOf[SettingsActivity]
   }
@@ -158,6 +146,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def INIT(state: Bundle) = if (app.isAlive) {
     wrap(me setDetecting true)(me initNfc state)
+    ConnectionManager.listeners += connectionListener
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
 
