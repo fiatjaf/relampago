@@ -175,8 +175,9 @@
 
     <string name="ln_send_howto"><![CDATA[
         You are trying to fulfill a Lightning payment request but there are currently no open
-        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channels</a> in this wallet.
-        <br><br>How to fix this? First, receive bitcoins into this wallet and then use them to open a new channel.
+        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channels</a> in this wallet.<br><br>How to fix this?<br><br>
+        - Open an outgoing channel with a peer of your choice, this requires some bitcoins to be present in this wallet as they will be used for funding.<br><br>
+        - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Purchase an incoming channel</a> with an immediately spendable balance on your side.
     ]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>

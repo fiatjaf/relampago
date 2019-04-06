@@ -172,9 +172,11 @@
 
     <string name="ln_send_howto"><![CDATA[
         Ви намагаєтеся оплатити запит-Блискавку, але в цьому гаманці зараз немає відкритих
-        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платіжних каналів</a>.
-        <br><br>Спочатку заведіть біткоїни в гаманець, потім використайте їх для відкриття нового каналу.
+        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платіжних каналів</a>.<br><br>Що з цим робити?<br><br>
+        - Відкрийте канал з вузлом на ваш вибір, для наповнення каналу в гаманці мають бути біткоіни.<br><br>
+        - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Купіть вхiдний канал</a> з миттєво доступним витратним балансом.
     ]]></string>
+
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Створити запит-Блискавку</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запит-Блискавка</font><small><br><br>%1$s</small>]]></string>

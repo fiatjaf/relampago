@@ -172,8 +172,9 @@
 
     <string name="ln_send_howto"><![CDATA[
         Вы пытаетесь оплатить запрос-Молнию, но в кошельке сейчас нет открытых
-        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платежных каналов</a>
-        <br><br>Сначала заведите биткоины в кошелек, потом используйте их для открытия нового канала.
+        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платежных каналов</a><br><br>Что с этим делать?<br><br>
+        - Откройте платежный канал с узлом на ваш выбор, для наполнения канала в кошельке должны быть биткоины.<br><br>
+        - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Купите входящий канал</a> с мгновенно доступным расходным балансом.
     ]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>
