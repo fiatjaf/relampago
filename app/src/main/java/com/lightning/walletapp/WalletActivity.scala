@@ -114,6 +114,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       ConnectionManager.connections get nodeId foreach { existingWorkerConnection =>
         val startFundIncomingChannel = app getString ln_ops_start_fund_incoming_channel
         val hnv = HardcodedNodeView(existingWorkerConnection.ann, startFundIncomingChannel)
+        // This will only work once if user is not on LNStartFundActivity already
         app.TransData.value = IncomingChannelParams(hnv, open)
         me goTo classOf[LNStartFundActivity]
       }
