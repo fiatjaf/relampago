@@ -42,7 +42,7 @@ object PaymentInfo {
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int) = {
     val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
-      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache, airLeft, airAskUser = true)
+      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache, airLeft)
   }
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: ByteVector): SecretsAndPacket = {
@@ -190,7 +190,7 @@ case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv:
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
                        onion: SecretsAndPacket, firstMsat: Long /* amount without off-chain fee */,
                        lastMsat: Long /* amount with off-chain fee */, lastExpiry: Long, callsLeft: Int,
-                       useCache: Boolean, airLeft: Int, airAskUser: Boolean) {
+                       useCache: Boolean, airLeft: Int) {
 
   lazy val isValidMultipart = pr.lnUrlOpt.exists(_.isMultipartPayment) && firstMsat > LNParams.minMultipartMsat
   lazy val withMaxOffChainFeeAdded = firstMsat + LNParams.maxAcceptableFee(firstMsat, hops = 3)

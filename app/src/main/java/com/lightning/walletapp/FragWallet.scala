@@ -588,7 +588,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def onUserAcceptSend(rd: RoutingData) =
       ChannelManager checkIfSendable rd match {
         // Proceed if it's sendable as is or via AIR/multipart
-        case Left(noWayLeft \ NOT_SENDABLE) => app toast noWayLeft
+        case Left(noOptions \ NOT_SENDABLE) => app toast noOptions
         case _ => sendLinkingRequest(rd)
       }
 
@@ -608,8 +608,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     sendableEither -> accChanOpt match {
       case Left(_ \ SENDABLE_MULTIPART) \ _ => offerMultipart(rd)
-      case Left(_ \ SENDABLE_AIR) \ Some(acc) => offerAir(acc, rd)
-      case Left(noWayLeft \ _) \ _ => app toast noWayLeft
+      case Left(_ \ SENDABLE_AIR) \ Some(acc) => <(offerAir(acc, rd), onFail)(none)
+      case Left(unsendableAirNotPossible \ _) \ _ => app toast unsendableAirNotPossible
       case _ => PaymentInfoWrap addPendingPayment rd
     }
   }
@@ -628,72 +628,64 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def startMultipart(multipart: MultipartPayment) = {
-      val parsedPrs = multipart.requests.take(12).map(PaymentRequest.read).filter(_.amount.isEmpty)
-      val allInvoicesAreConnected = (rd.pr +: parsedPrs).forall(_.description contains multipart.paymentId)
-      val partAmountMsat = rd.firstMsat / parsedPrs.size
+      val parsedPaymentRequests = multipart.requests.take(12).map(PaymentRequest.read).filter(_.amount.isEmpty)
+      val allInvoicesAreConnected = (rd.pr +: parsedPaymentRequests).forall(_.description contains multipart.paymentId)
+      val partAmountMsat = rd.firstMsat / parsedPaymentRequests.size
 
-      require(parsedPrs.map(_.paymentHash).distinct.size == parsedPrs.size, "Same invoices contain the same hash")
-      require(parsedPrs.forall(_.nodeId == rd.pr.nodeId), "Additional invoices must have the same nodeId as the original")
-      require(parsedPrs.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which is not allowed")
+      require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size, "Same invoices contain the same hash")
+      require(parsedPaymentRequests.forall(_.nodeId == rd.pr.nodeId), "Additional invoices must have the same nodeId as the original")
+      require(parsedPaymentRequests.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which is not allowed")
       require(allInvoicesAreConnected, s"Some invoices do not contain a paymentId #${multipart.paymentId}")
-      require(parsedPrs.size > 1, "Not enough additional invoices are found")
+      require(parsedPaymentRequests.size > 1, "Not enough additional invoices are found")
 
       def sendNextPartialPayment(paymentRequestsLeft: PayReqVec): Unit = {
-        val partRD = emptyRD(paymentRequestsLeft.head, partAmountMsat, useCache = true, airLeft = 0)
-        val partRDAIR = partRD.copy(airLeft = ChannelManager.all.count(isOperational), airAskUser = false)
-        val note = host.getString(ln_mofn).format(parsedPrs.size - paymentRequestsLeft.size + 1, parsedPrs.size)
-        app toast note
+        val partRD = emptyRD(paymentRequestsLeft.head, partAmountMsat, airLeft = ChannelManager.all.count(isOperational), useCache = true)
+        val note = host.getString(ln_mofn).format(parsedPaymentRequests.size - paymentRequestsLeft.size + 1, parsedPaymentRequests.size)
 
         val listener = new ChannelListener { self =>
           override def onSettled(chan: Channel, cs: Commitments) = {
-            val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == partRDAIR.pr.paymentHash)
+            val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == partRD.pr.paymentHash)
             if (isOK && paymentRequestsLeft.size > 1) sendNextPartialPayment(paymentRequestsLeft.tail)
             if (isOK) ChannelManager detachListener self
           }
         }
 
         ChannelManager attachListener listener
-        me doSendOffChainOnUI partRDAIR
+        me doSendOffChainOnUI partRD
+        app toast note
       }
 
       // Remove an old payment from db so user can't re-send it
       LNParams.db.change(PaymentTable.killSql, rd.pr.paymentHash)
-      sendNextPartialPayment(parsedPrs)
+      sendNextPartialPayment(parsedPaymentRequests)
     }
   }
 
   def offerAir(toChan: Channel, origEmptyRD: RoutingData) = {
-    val amount = denom parsedWithSign MilliSatoshi(origEmptyRD.firstMsat)
-    val bld = baseBuilder(app.getString(err_ln_rebalance).format(s"<strong>$amount</strong>").html, null)
-    if (origEmptyRD.airAskUser) mkCheckForm(alert => rm(alert)(start), none, bld, dialog_ok, dialog_cancel) else start
-    def start = <(rebalance, onFail)(none)
+    val origEmptyRD1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1)
+    val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
+    val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
+    require(deltaAmountToSend > 0, "Accumulator already has enough money for a final payment")
+    require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
 
-    def rebalance = {
-      val origEmptyRD1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1, airAskUser = false)
-      val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
-      val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
-      require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
-      require(deltaAmountToSend > 0, "Accumulator already has enough money")
+    val Some(_ \ extraHops) = channelAndHop(toChan)
+    val finalAmount = MilliSatoshi(deltaAmountToSend min amountCanRebalance)
+    // Further rebalancing attempts should always be halted if new off-chain payment is detected since rebalancing has started
+    val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, ByteVector(random getBytes 32), REBALANCING)
 
-      val Some(_ \ extraHops) = channelAndHop(toChan)
-      val finalAmount = MilliSatoshi(deltaAmountToSend min amountCanRebalance)
-      // Further rebalancing attempts should always be halted if new off-chain payment is detected since rebalancing has started
-      val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, ByteVector(random getBytes 32), REBALANCING)
-
-      val listener = new ChannelListener { self =>
-        override def onSettled(chan: Channel, cs: Commitments) = {
-          val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)
-          if (isOK) runAnd(ChannelManager detachListener self)(me doSendOffChainOnUI origEmptyRD1)
-        }
-
-        override def outPaymentAccepted(rd: RoutingData) =
-          if (rd.pr.paymentHash != rbRD.pr.paymentHash)
-            ChannelManager detachListener self
+    val listener = new ChannelListener { self =>
+      override def onSettled(chan: Channel, cs: Commitments) = {
+        val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)
+        if (isOK) runAnd(ChannelManager detachListener self)(me doSendOffChainOnUI origEmptyRD1)
       }
 
-      ChannelManager attachListener listener
-      me doSendOffChainOnUI rbRD
+      override def outPaymentAccepted(rd: RoutingData) =
+        if (rd.pr.paymentHash != rbRD.pr.paymentHash)
+          ChannelManager detachListener self
     }
+
+    ChannelManager attachListener listener
+    me doSendOffChainOnUI rbRD
   }
 
   // BTC SEND / BOOST
