@@ -639,20 +639,20 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       require(parsedPaymentRequests.size > 1, "Not enough additional invoices are found")
 
       def sendNextPartialPayment(paymentRequestsLeft: PayReqVec): Unit = {
-        val partRD = emptyRD(paymentRequestsLeft.head, partAmountMsat, airLeft = ChannelManager.all.count(isOperational), useCache = true)
+        val partRDAIR = emptyRD(paymentRequestsLeft.head, partAmountMsat, airLeft = ChannelManager.all.count(isOperational), useCache = true)
         val note = host.getString(ln_mofn).format(parsedPaymentRequests.size - paymentRequestsLeft.size + 1, parsedPaymentRequests.size)
 
         val listener = new ChannelListener { self =>
           override def onSettled(chan: Channel, cs: Commitments) = {
-            val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == partRD.pr.paymentHash)
+            val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == partRDAIR.pr.paymentHash)
             if (isOK && paymentRequestsLeft.size > 1) sendNextPartialPayment(paymentRequestsLeft.tail)
             if (isOK) ChannelManager detachListener self
           }
         }
 
         ChannelManager attachListener listener
-        me doSendOffChainOnUI partRD
-        app toast note
+        me doSendOffChainOnUI partRDAIR
+        UITask(app toast note).run
       }
 
       // Remove an old payment from db so user can't re-send it
