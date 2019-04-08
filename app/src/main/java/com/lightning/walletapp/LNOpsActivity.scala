@@ -13,7 +13,6 @@ import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
-import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor

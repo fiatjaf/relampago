@@ -517,11 +517,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   abstract class OffChainSender(pr: PaymentRequest) {
-    val maxCappedNormal = ChannelManager.estimateAIRCanSend min maxHtlcValueMsat
-    val rd = emptyRD(pr, firstMsat = pr.amount.map(_.amount * 2) getOrElse 0L, useCache = true, airLeft = 0)
-    val maxCappedFinal = if (rd.isValidMultipart) ChannelManager.airCanSendInto(null).sum else maxCappedNormal
-    val maxCanSendFinal = MilliSatoshi(rd.firstMsat min maxCappedFinal)
-
+    lazy val maxMultipart = ChannelManager.airCanSendInto(null).sum
+    lazy val maxNormal = ChannelManager.estimateAIRCanSend min maxHtlcValueMsat
+    val rd = emptyRD(pr, firstMsat = pr.msatOrMin.amount, useCache = true, airLeft = 0)
+    val maxCanSendFinal = MilliSatoshi { if (rd.isValidMultipart) maxMultipart else maxNormal }
     val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCanSendFinal)
     val rateManager = new RateManager(baseContent) hint baseHint

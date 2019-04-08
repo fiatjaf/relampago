@@ -38,7 +38,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
       for {
         pr \ memo <- send1
-        if data.info.isEmpty && pr.unsafeMsat < maxMsat && memo.clears.size > 20
+        if data.info.isEmpty && pr.msatOrMin.amount < maxMsat && memo.clears.size > 20
         memoSaved = me BECOME CloudData(Some(pr, memo), clearTokens, actions)
       } retryFreshRequest(pr)
 
@@ -111,7 +111,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def isAuthEnabled = 1 == auth
   def snapshot = CloudSnapshot(data.tokens, connector.url)
   def retryFreshRequest(failedPayReq: PaymentRequest): Unit = {
-    val isOk = ChannelManager.mostFundedChanOpt.exists(chan => estimateCanSend(chan) >= failedPayReq.unsafeMsat)
-    if (isOk) PaymentInfoWrap addPendingPayment emptyRD(failedPayReq, failedPayReq.unsafeMsat, useCache = true, airLeft = 0)
+    val isOk = ChannelManager.mostFundedChanOpt.exists(chan => estimateCanSend(chan) >= failedPayReq.msatOrMin.amount)
+    if (isOk) PaymentInfoWrap addPendingPayment emptyRD(failedPayReq, failedPayReq.msatOrMin.amount, useCache = true, airLeft = 0)
   }
 }
