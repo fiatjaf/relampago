@@ -131,15 +131,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       chan.data match {
         case norm: NormalData if isOperational(chan) =>
-          // We only can display one item so sort by increasing importance
-
-          channelAndHop(chan) match {
-            case Some(_ \ vec) if isHighFee(vec) => setExtraInfo(me getString ln_info_high_fee format vec.head.feeBreakdown)
-            case None if fundingDepth > 6 => setExtraInfo(resource = ln_info_no_receive)
-            case _ => // We may not have it until 6 confs, do nothing
-          }
-
-          // In Turbo channels we will have an OPEN state with NormalData and zeroconf
+          // We only can display one item so sort them by increasing importance
+          val extraRoute = channelAndHop(chan) map { case _ \ route => route } getOrElse Vector.empty
+          val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, msat = 1000000000L)
+          if (isIncomingFeeTooHigh) setExtraInfo(me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
+          // In Turbo channels we will often have an OPEN state with NormalData and zeroconf
           if (norm.unknownSpend.isDefined) setExtraInfo(resource = ln_info_unknown_spend)
           if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
 
@@ -285,7 +281,6 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def urlIntent(txid: String) = host startActivity new Intent(Intent.ACTION_VIEW, Uri parse s"https://smartbit.com.au/tx/$txid")
   def canDisplay(some: ChannelData) = some match { case ref: RefundingData => ref.remoteLatestPoint.isDefined case _ => true }
   def sumOrNothing(sats: Satoshi) = if (0L == sats.toLong) getString(ln_info_nothing) else denom parsedWithSign sats
-  def isHighFee(route: PaymentRoute) = LNParams.isFeeBreach(route, msat = 1000000000L)
 
   def getStat(chanId: ByteVector) = {
     val cursor = LNParams.db.select(PaymentTable.selectPaymentNumSql, chanId)
