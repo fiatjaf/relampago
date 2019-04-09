@@ -178,15 +178,14 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       view setOnClickListener onButtonTap {
         val contextualChannelMenu = chan.data match {
-          // Unknown spend may be a future commit so we should not allow force-closing
-          case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(2, Nil, 2)
-          // This likely means they have not broadcasted a tx, wait for it instead of closing
-          case _: WaitBroadcastRemoteData => chanActions take 2
-          case _: ClosingData => chanActions.patch(2, Nil, 1)
-          // Should not allow force-closing with old commit
-          case _: RefundingData => chanActions take 2
+          // Unknown spend may be a future commit, don't allow force-closing in this state
+          case norm: NormalData if norm.unknownSpend.isDefined => chanActions.patch(1, Nil, 1)
+          // This likely means they have not broadcasted a tx, wait for it
+          case _: WaitBroadcastRemoteData => chanActions take 1
+          case _: ClosingData => chanActions.patch(1, Nil, 1)
+          case _: RefundingData => chanActions take 1
           // Cut out refunding tx option
-          case _ => chanActions take 3
+          case _ => chanActions take 2
         }
 
         val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
@@ -202,10 +201,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
           def defineAction = chan.data match {
             case _ if 0 == pos => urlIntent(txid = chan.fundTxId.toHex)
-            case _ if 1 == pos => share(chan.data.asInstanceOf[HasCommitments].toJson.toString)
-            // In the following two cases channel menu is reduced by 2 so we need to show an appropriate closing tx here
-            case norm: NormalData if 2 == pos && norm.unknownSpend.isDefined => urlIntent(txid = norm.unknownSpend.get.txid.toString)
-            case closing: ClosingData if 2 == pos => urlIntent(txid = closing.bestClosing.commitTx.txid.toHex)
+            // In the following two cases channel menu is reduced so we need to show an appropriate closing tx in all cases here
+            case norm: NormalData if 1 == pos && norm.unknownSpend.isDefined => urlIntent(txid = norm.unknownSpend.get.txid.toString)
+            case closing: ClosingData if 1 == pos => urlIntent(txid = closing.bestClosing.commitTx.txid.toHex)
             case _ =>
               val canCoopClose = isOpeningOrOperational(chan)
               val isBlockerPresent = inFlightHtlcs(chan).nonEmpty

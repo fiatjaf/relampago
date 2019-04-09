@@ -272,8 +272,7 @@
 
     <array name="ln_chan_actions_list">
         <item>View funding transaction</item>
-        <item>Зберегти снапшот каналу</item>
-        <item>Закрити канал</item>
+        <item>Закрити канал до гаманця</item>
         <item>Зворотня транзакція</item>
     </array>
 

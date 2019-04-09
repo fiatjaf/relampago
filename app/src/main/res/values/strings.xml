@@ -274,8 +274,7 @@
 
     <array name="ln_chan_actions_list">
         <item>View funding transaction</item>
-        <item>Export channel snapshot</item>
-        <item>Close channel</item>
+        <item>Close channel to this wallet</item>
         <item>View refunding transaction</item>
     </array>
 
