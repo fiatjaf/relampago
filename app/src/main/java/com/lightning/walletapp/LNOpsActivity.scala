@@ -1,18 +1,16 @@
 package com.lightning.walletapp
 
-import spray.json._
 import android.widget._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-
+import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
+import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import android.view.{Menu, MenuItem, View, ViewGroup}
-import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
-import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
+
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
