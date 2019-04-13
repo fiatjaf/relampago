@@ -153,11 +153,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         val localKey \ remoteKey = wait.core.localParams.fundingPrivKey.publicKey -> wait.core.remoteParams.fundingPubkey
         val signedLocalCommitTx = Scripts.addSigs(wait.localCommitTx, localKey, remoteKey, localSignature, remote.signature)
         val wait1 = WaitFundingDoneData(wait.announce, None, None, wait.fundingTx, wait.core makeCommitments signedLocalCommitTx)
-
-        Scripts checkValid signedLocalCommitTx match {
-          case Success(_) => BECOME(wait1, WAIT_FUNDING_DONE)
-          case _ => throw new LightningException
-        }
+        if (Scripts.checkValid(signedLocalCommitTx).isSuccess) BECOME(wait1, WAIT_FUNDING_DONE) else throw new LightningException
 
 
       // BECOMING OPEN
@@ -546,7 +542,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
           Scripts.addSigs(closing, commitments.localParams.fundingPrivKey.publicKey,
             commitments.remoteParams.fundingPubkey, closingSigned.signature, remoteClosingSig)
 
-        Scripts checkValid signedClose match {
+        Scripts.checkValid(txWithInputInfo = signedClose) match {
           case Success(okClose) if remoteClosingFee == lastLocalFee =>
             // Our current and their proposed fees are equal for this tx
             startMutualClose(neg, okClose.tx)
