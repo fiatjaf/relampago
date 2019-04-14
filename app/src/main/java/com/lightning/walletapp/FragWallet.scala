@@ -284,13 +284,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def generatePopup = {
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
-      val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
-      val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
-      viewShareBody setOnClickListener onButtonTap(host share stat.txn.bin.toHex)
-
-      viewTxOutside setOnClickListener onButtonTap {
-        val uri = Uri parse s"https://smartbit.com.au/tx/$txid"
-        host startActivity new Intent(Intent.ACTION_VIEW, uri)
+      detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button] setOnClickListener onButtonTap {
+        host startActivity new Intent(Intent.ACTION_VIEW, Uri parse s"https://smartbit.com.au/tx/$txid")
       }
 
       val inFiat = msatInFiatHuman(stat.amount)
@@ -419,9 +414,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def generatePopup = {
       val confs = app.plur1OrZero(txsConfs, txDepth)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
-      val viewTxOutside = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
-      val viewShareBody = detailsWrapper.findViewById(R.id.viewShareBody).asInstanceOf[Button]
-
       val humanValues = wrap.directedScriptPubKeysWithValueTry(wrap.visibleValue.isPositive) collect {
         case Success(channelFunding \ value) if channelFunding.isSentToP2WSH => P2WSHData(value, channelFunding)
         case Success(pks \ value) if !ScriptPattern.isOpReturn(pks) => AddrData(value, pks getToAddress app.params)
@@ -431,12 +423,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case outgoingPayment: AddrData => outgoingPayment destination denom.coloredOut(outgoingPayment.cn, denom.sign)
       }
 
-      viewTxOutside setOnClickListener onButtonTap {
-        val uri = Uri parse s"https://smartbit.com.au/tx/$txid"
-        host startActivity new Intent(Intent.ACTION_VIEW, uri)
+      detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button] setOnClickListener onButtonTap {
+        host startActivity new Intent(Intent.ACTION_VIEW, Uri parse s"https://smartbit.com.au/tx/$txid")
       }
 
-      viewShareBody setOnClickListener onButtonTap { host share ByteVector(wrap.tx.unsafeBitcoinSerialize).toHex }
       val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, humanValues.map(_.html).toArray)
       val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
       lst setHeaderDividersEnabled false
