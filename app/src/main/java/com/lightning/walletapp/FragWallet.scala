@@ -622,7 +622,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val partAmountMsat = rd.firstMsat / parsedPaymentRequests.size
 
       require(parsedPaymentRequests.map(_.paymentHash).distinct.size == parsedPaymentRequests.size, "Same invoices contain the same hash")
-      require(parsedPaymentRequests.forall(_.nodeId == rd.pr.nodeId), "Additional invoices must have the same nodeId as the original")
       require(parsedPaymentRequests.forall(_.lnUrlOpt.isEmpty), "Some invoices contain nested LNUrls which is not allowed")
       require(allInvoicesAreConnected, s"Some invoices do not contain a paymentId #${multipart.paymentId}")
       require(parsedPaymentRequests.size > 1, "Not enough additional invoices are found")
