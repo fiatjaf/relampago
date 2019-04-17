@@ -556,8 +556,9 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
             }
 
           case _ =>
-            // Sig check has failed
             startLocalClose(neg)
+            // Nothing left to do here so at least inform user
+            throw new LightningException("Remote shutdown signature check failed")
         }
 
 
