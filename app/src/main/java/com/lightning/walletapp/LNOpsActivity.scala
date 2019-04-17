@@ -263,7 +263,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def connectivityStatusColor(c: Channel) =
     ConnectionManager.connections get c.data.announce.nodeId match {
-      case Some(w) if w.socket.isConnected => me getString ln_info_state_online
+      case Some(w) if w.sock.isConnected => me getString ln_info_state_online
       case _ => me getString ln_info_state_offline
     }
 

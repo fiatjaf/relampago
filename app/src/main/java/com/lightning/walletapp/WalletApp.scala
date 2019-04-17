@@ -211,8 +211,8 @@ object ChannelManager extends Broadcaster {
   var currentBlocksLeft = Int.MaxValue
 
   val socketEventsListener = new ConnectionListener {
-    override def onTerminalError(nodeId: PublicKey) = fromNode(notClosing, nodeId).foreach(_ process CMDLocalShutdown)
-    override def onOperational(nodeId: PublicKey, isCompat: Boolean) = fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
+    override def onOperational(nodeId: PublicKey, isCompat: Boolean) =
+      fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
 
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
       case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)

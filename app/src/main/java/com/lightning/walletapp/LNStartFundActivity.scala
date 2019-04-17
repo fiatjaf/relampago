@@ -55,7 +55,6 @@ class LNStartFundActivity extends TimerActivity { me =>
     lnStartFundDetails setText asString.html
 
     class OpenListener extends ConnectionListener with ChannelListener { self =>
-      override def onTerminalError(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChannel -> peerOffline)
       override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChannel -> peerOffline)
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {

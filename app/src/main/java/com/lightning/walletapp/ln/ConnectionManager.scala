@@ -24,7 +24,6 @@ object ConnectionManager {
   protected[this] val events = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = for (lst <- listeners) lst.onMessage(nodeId, msg)
     override def onOperational(nodeId: PublicKey, isCompat: Boolean) = for (lst <- listeners) lst.onOperational(nodeId, isCompat)
-    override def onTerminalError(nodeId: PublicKey) = for (lst <- listeners) lst.onTerminalError(nodeId)
     override def onDisconnect(nodeId: PublicKey) = for (lst <- listeners) lst.onDisconnect(nodeId)
   }
 
@@ -34,27 +33,26 @@ object ConnectionManager {
     else if (notify) events.onOperational(ann.nodeId, isCompat = true)
   }
 
-  class Worker(val ann: NodeAnnouncement) {
-    implicit val context = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
+  class Worker(val ann: NodeAnnouncement, buffer: Bytes = new Bytes(1024), val sock: Socket = new Socket) {
+    implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
     private val keyPair = KeyPair(nodePublicKey.toBin, nodePrivateKey.toBin)
-    private val buffer = new Bytes(1024)
-    val socket = new Socket
+    var lastMsg = System.currentTimeMillis
 
     val handler: TransportHandler = new TransportHandler(keyPair, ann.nodeId) {
-      def handleDecryptedIncomingData(data: ByteVector) = intercept(LightningMessageCodecs deserialize data)
       def handleEnterOperationalState = handler process Init(LNParams.globalFeatures, LNParams.localFeatures)
-      def handleEncryptedOutgoingData(data: ByteVector) = try socket.getOutputStream write data.toArray catch none
-      def handleError = { case _ => events onTerminalError ann.nodeId }
+      def handleEncryptedOutgoingData(data: ByteVector) = try sock.getOutputStream write data.toArray catch none
+      def handleDecryptedIncomingData(data: ByteVector) = intercept(LightningMessageCodecs deserialize data)
+      def handleError = { case _ => disconnect }
     }
 
     val thread = Future {
       // Node may have many addresses but we use the first valid for simplicity
       val theOne = ann.addresses.collectFirst(NodeAddress.toInetSocketAddress)
-      socket.connect(theOne.get, 7500)
+      sock.connect(theOne.get, 7500)
       handler.init
 
       while (true) {
-        val length = socket.getInputStream.read(buffer, 0, buffer.length)
+        val length = sock.getInputStream.read(buffer, 0, buffer.length)
         if (length < 0) throw new RuntimeException("Connection droppped")
         else handler process ByteVector.view(buffer take length)
       }
@@ -65,8 +63,7 @@ object ConnectionManager {
       events onDisconnect ann.nodeId
     }
 
-    var lastMsg = System.currentTimeMillis
-    def disconnect = try socket.close catch none
+    def disconnect = try sock.close catch none
     def intercept(message: LightningMessage) = {
       // Update liveness on each incoming message
       lastMsg = System.currentTimeMillis
@@ -91,6 +88,5 @@ class ConnectionListener {
   def onOpenOffer(nodeId: PublicKey, msg: OpenChannel): Unit = none
   def onMessage(nodeId: PublicKey, msg: LightningMessage): Unit = none
   def onOperational(nodeId: PublicKey, isCompat: Boolean): Unit = none
-  def onTerminalError(nodeId: PublicKey): Unit = none
   def onDisconnect(nodeId: PublicKey): Unit = none
 }
