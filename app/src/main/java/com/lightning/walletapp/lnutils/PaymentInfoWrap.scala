@@ -61,8 +61,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def getPaymentInfo(hash: ByteVector) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
   def updStatus(status: Int, hash: ByteVector) = db.change(PaymentTable.updStatusSql, status, hash)
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
-  def byQuery(query: String) = db.select(PaymentTable.searchSql, s"$query*")
   def byRecent = db select PaymentTable.selectRecentSql
+
+  def byQuery(rawQuery: String) = {
+    val refinedQuery = rawQuery.replaceAll("[^ a-zA-Z0-9]", "")
+    db.select(PaymentTable.searchSql, s"$refinedQuery*")
+  }
 
   def toPaymentInfo(rc: RichCursor) =
     PaymentInfo(rawPr = rc string PaymentTable.pr, preimage = ByteVector.fromValidHex(rc string PaymentTable.preimage),
