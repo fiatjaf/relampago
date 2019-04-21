@@ -197,8 +197,9 @@ trait TimerActivity extends AppCompatActivity { me =>
     def futureProcess(req: SendRequest)
     val pay: PayData
 
+    def onTxFail(err: Throwable): Unit = mkCheckForm(alert => rm(alert)(finish), none, txMakeErrorBuilder(err), dialog_ok, -1)
     def start(coloredAmount: String) = <(app.kit sign plainRequest(RatesSaver.rates.feeSix), onTxFail) { estimate =>
-      // Estimate a real fee this tx will have in order to be confirmed within next 6 blocks, then propose chaper one
+      // Estimate a fee this tx will have in order to be confirmed within next 6 blocks, then propose chaper one
       val livePerTxFee: MilliSatoshi = estimate.tx.getFee
       val riskyPerTxFee: MilliSatoshi = livePerTxFee / 2
 
@@ -232,23 +233,21 @@ trait TimerActivity extends AppCompatActivity { me =>
       unsignedRequestWithFee
     }
 
-    def txMakeError: PartialFunction[Throwable, CharSequence] = {
-      case _: ExceededMaxTransactionSize => app getString err_tx_too_large
-      case _: CouldNotAdjustDownwards => app getString err_empty_shrunk
+    def txMakeErrorBuilder: PartialFunction[Throwable, Builder] = {
+      case _: ExceededMaxTransactionSize => baseBuilder(app getString err_tx_too_large, null)
+      case _: CouldNotAdjustDownwards => baseBuilder(app getString err_empty_shrunk, null)
 
       case notEnough: InsufficientMoneyException =>
         val sending = denom.coloredOut(pay.cn, denom.sign)
         val missing = denom.coloredOut(notEnough.missing, denom.sign)
         val canSend = denom.coloredIn(app.kit.conf0Balance, denom.sign)
-        getString(err_not_enough_funds).format(canSend, sending, missing).html
+        val info = getString(err_not_enough_funds).format(canSend, sending, missing)
+        baseBuilder(info.html, null)
 
-      case _: Throwable =>
-        app getString err_no_data
+      case other: Throwable =>
+        val info = UncaughtHandler toText other
+        negTextBuilder(dialog_ok, info)
     }
-
-    def onTxFail(err: Throwable): Unit =
-      mkCheckForm(alert => rm(alert)(finish), no = none,
-        baseBuilder(txMakeError(err), null), dialog_ok, -1)
   }
 }
 
