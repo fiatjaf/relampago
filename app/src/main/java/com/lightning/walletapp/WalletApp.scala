@@ -446,8 +446,7 @@ object ChannelManager extends Broadcaster {
   def checkIfSendable(rd: RoutingData) = {
     val isFulfilledAlready = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS)
     if (isFulfilledAlready.isSuccess) Left(err_ln_fulfilled, NOT_SENDABLE) else mostFundedChanOpt map estimateCanSend match {
-      // May happen such that we had enough while were deciding whether to pay, but do not have enough funds at this point, also check extended options
-      case Some(max) if max < rd.firstMsat && rd.isValidMultipart && airCanSendInto(null).sum >= rd.firstMsat => Left(dialog_sum_big, SENDABLE_MULTIPART)
+      // May happen such that we had enough while were deciding whether to pay, but do not have enough funds now, also check extended options
       case Some(max) if max < rd.firstMsat && rd.airLeft > 1 && estimateAIRCanSend >= rd.firstMsat => Left(dialog_sum_big, SENDABLE_AIR)
       case Some(max) if max < rd.firstMsat => Left(dialog_sum_big, NOT_SENDABLE)
       case None => Left(err_no_data, NOT_SENDABLE)

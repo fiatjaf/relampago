@@ -24,7 +24,6 @@ object LNParams { me =>
 
   val minDepth = 1
   val minCapacitySat = 300000L
-  val minMultipartMsat = 2400000L
   val channelReserveToFundingRatio = 100
 
   final val dust = Satoshi(2730L)

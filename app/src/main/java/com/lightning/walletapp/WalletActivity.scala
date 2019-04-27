@@ -191,7 +191,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     case lnUrl: LNUrl =>
       if (lnUrl.isLogin) showLoginForm(lnUrl)
-      else fetch1stLevelUrl(lnUrl)(resolve1stLevelUrl)
+      else fetch1stLevelUrl(lnUrl)
       me returnToBase null
 
     case pr: PaymentRequest if PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix =>
@@ -215,13 +215,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case pr: PaymentRequest =>
-      pr.lnUrlOpt.filter(_.isLinkablePayment) match {
-        case Some(lnUrl) => FragWallet.worker.linkedOffChainSend(pr, lnUrl)
-        case None => FragWallet.worker.standardOffChainSend(pr)
-      }
-
+      FragWallet.worker.standardOffChainSend(pr)
       // We have operational channels at this point
-      // check if we also have an embedded lnurl
       me returnToBase null
 
     case _ =>
@@ -229,16 +224,16 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // LNURL
 
-  def fetch1stLevelUrl(lNUrl: LNUrl)(next: LNUrlData => Unit) = {
-    val initialRequest = get(lNUrl.uri.toString, true).trustAllCerts.trustAllHosts
-    <(to[LNUrlData](initialRequest.connectTimeout(5000).body), onFail)(next)
+  def fetch1stLevelUrl(lNUrl: LNUrl) = {
+    val awaitRequest = get(lNUrl.uri.toString, true).connectTimeout(5000)
+    val sslAwareRequest = awaitRequest.trustAllCerts.trustAllHosts
     app toast ln_url_resolving
-  }
 
-  def resolve1stLevelUrl(data: LNUrlData): Unit = data match {
-    case incomingChan: IncomingChannelRequest => initConnection(incomingChan)
-    case withdrawal: WithdrawRequest => doReceivePayment(withdrawal :: Nil)
-    case _ => app toast err_no_data
+    <(to[LNUrlData](sslAwareRequest.body), onFail) {
+      case incomingChan: IncomingChannelRequest => initConnection(incomingChan)
+      case withdrawal: WithdrawRequest => doReceivePayment(withdrawal :: Nil)
+      case _ => app toast err_no_data
+    }
   }
 
   def initConnection(incoming: IncomingChannelRequest) = {

@@ -192,7 +192,6 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        lastMsat: Long /* amount with off-chain fee */, lastExpiry: Long, callsLeft: Int,
                        useCache: Boolean, airLeft: Int) {
 
-  lazy val isValidMultipart = pr.lnUrlOpt.exists(_.isMultipartPayment) && firstMsat > LNParams.minMultipartMsat
   lazy val withMaxOffChainFeeAdded = firstMsat + LNParams.maxAcceptableFee(firstMsat, hops = 3)
   lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toHex}"
   lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey

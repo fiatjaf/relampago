@@ -165,7 +165,6 @@
     <string name="send_scan_qr">Сканировать QR-код</string>
     <string name="send_paste_payment_request"><![CDATA[<strong>Вставить запрос-Молнию<br><font color=#999999><small>или Биткоин-адрес</small></font></strong>]]></string>
     <string name="send_hivemind_deposit"><![CDATA[Послать в Hivemind<br><font color=#999999><small>сайдчейн для рынка предсказаний</small></font>]]></string>
-    <string name="ln_send_linkable_title"><![CDATA[<strong>Послать платеж-Молнию</strong><br><small>привязан к <i>%1$s</i><br><br>%2$s</small>]]></string>
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послать Биткоин-транзакцию</strong></font><br><br>%1$s]]></string>
 
@@ -204,7 +203,6 @@
     <string name="err_ln_too_many">Не получилось потому что слишком много платежей уже в пути</string>
 
     <string name="err_ln_still_opening">Не получилось потому что платежный канал еще не открыт\n\nПополняющая канал Биткоин-транзакция должна получить до 6 подтверждений перед тем как его можно будет использовать для отправки платежей</string>
-    <string name="err_ln_multipart"><![CDATA[Не получилось доставить %1$s получателю одним куском.<br><br>Но этот платеж можно разбить на несколько частей меньшего размера, хотите отправить его таким способом?]]></string>
     <string name="err_ln_expired"><![CDATA[Есть застрявший платеж<br><br>Вы можете принудительно закрыть канал или связаться с пиром, чтобы он исправил проблему<br><br>Хэш платежа<br>%1$s]]></string>
     <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии. Вы можете добавить денег в кошелек и попробовать еше раз</string>
     <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой. Попробуйте разбить ее на несколько более мелких транзакций</string>
@@ -319,12 +317,6 @@
     <string name="ln_url_info_login"><![CDATA[
         Логин-ключ для <i>%1$s</i>, сгенерированный вашим кошельком:<br><br><strong>%2$s</strong><br><br>
         Этот ключ можно раскрыть, но его рекомендуется передавать только <i>%3$s</i>
-    ]]></string>
-
-    <string name="ln_url_info_link"><![CDATA[
-        Благодаря Связанным Платежам <i>%1$s</i> знает что все ваши переводы принадлежат именно вам, даже без логина и регистрации.<br><br>
-        В то же время <i>%1$s</i> не известны ваши персональные данные, поэтому вы можете пользоваться сервисом анонимно.<br><br>
-        Вы можете отказаться от cвязанного платежа и тогда это будет обычный платеж-Молния.
     ]]></string>
 
     <!-- Olympus log messages and notification -->

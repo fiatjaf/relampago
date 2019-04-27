@@ -178,13 +178,5 @@ class PaymentRequestSpec {
       assert(pr.tags.size == 4)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
-
-    {
-      println("On testnet, with lnurl")
-      val ref = "lntb5m1pwx9ysvrzjqges6y6c0dn6shq2xm4qq8zdhg2te4ydm2yc3aesxf6mqs9lld4t6936ugqqqsqqqyqqqfcsqqqq86qqjqfppqs45ntpt6d9h8aeattk08ur2fqydwwp4jv9qdp68gurn8ghj7ctsdyhxy6t5wfjkv6tvdshxxmmd9amrztm5dphhy0m385ekvcenxc6r2c35xvukxefcv5mkvv34x5ekzd3ev56nyd3hxqurzepexejxxepnxscrvwfnv9nxzcn9xq6xyefhvgcxxcmyxymnserxdqqxqy9gcqpp50lu08vae3wf04pm8kly4qddqd62vpcnrmvlt2qg428y2df2awz4s4jy9nxrexsz97ws693hr5pyj7vh94hgdm0vczkv8wyg027cgxvk4fe23a5uux7tzmd3vdfea2aptnfjl5znyyx2e3yy5hmf5rvyjhgcq7349dz"
-      val pr = PaymentRequest.read(ref)
-      assert(pr.prefix == "lntb")
-      assert(pr.lnUrlOpt.map(_.uri.toString).contains("https://api.bitrefill.com/v1/thor?q=3fc3645b439ce8e7f2553a69e5267081d96dcd340693afabe04be7b0ccd178df"))
-    }
   }
 }

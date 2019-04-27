@@ -32,10 +32,6 @@ case class DescriptionTag(description: String) extends Tag {
   def toInt5s = encode(Bech32 eight2five description.getBytes, 'd')
 }
 
-case class LNUrlTag(contents: LNUrl) extends Tag {
-  def toInt5s = encode(Bech32 eight2five contents.uri.toString.getBytes, 'v')
-}
-
 object LNUrl {
   def fromBech32(bech32url: String) = {
     val _ \ data = Bech32.decode(bech32url)
@@ -49,9 +45,6 @@ case class LNUrl(request: String) {
   require(uri.toString contains "https://", "Not an HTTPS endpoint")
   lazy val challenge = Try(ByteVector.fromValidHex(uri getQueryParameter "c") take 64)
   lazy val tags = Try(uri getQueryParameter "tag" split ",").map(_.toSet).getOrElse(Set.empty)
-
-  def isMultipartPayment = tags contains "multipart"
-  def isLinkablePayment = tags contains "link"
   def isLogin = tags contains "login"
 }
 
@@ -126,7 +119,6 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
   lazy val description = tags.collectFirst { case DescriptionTag(info) => info }.getOrElse(new String)
   lazy val minFinalCltvExpiry = tags.collectFirst { case m: MinFinalCltvExpiryTag => m.expiryDelta }
   lazy val paymentHash = tags.collectFirst { case payHash: PaymentHashTag => payHash.hash }.get
-  lazy val lnUrlOpt = tags.collectFirst { case lnURL: LNUrlTag => lnURL.contents }
   lazy val routingInfo = tags.collect { case r: RoutingInfoTag => r }
 
   lazy val fallbackAddress = tags.collectFirst {
@@ -175,11 +167,10 @@ object PaymentRequest {
 
   def apply(chain: ByteVector, amount: Option[MilliSatoshi], paymentHash: ByteVector,
             privKey: PrivateKey, description: String, fallbackAddress: Option[String],
-            routes: PaymentRouteVec, lnUrl: Option[LNUrl] = None): PaymentRequest = {
+            routes: PaymentRouteVec): PaymentRequest = {
 
-    val lnUrlTag = lnUrl.map(LNUrlTag.apply).toVector
     val baseTags = Vector(DescriptionTag(description), MinFinalCltvExpiryTag(72), PaymentHashTag(paymentHash), expiryTag)
-    val completeTags = routes.map(RoutingInfoTag.apply) ++ fallbackAddress.map(FallbackAddressTag.apply).toVector ++ baseTags ++ lnUrlTag
+    val completeTags = routes.map(RoutingInfoTag.apply) ++ fallbackAddress.map(FallbackAddressTag.apply).toVector ++ baseTags
     PaymentRequest(prefixes(chain), amount, System.currentTimeMillis / 1000L, privKey.publicKey, completeTags, ByteVector.empty) sign privKey
   }
 
@@ -266,11 +257,6 @@ object PaymentRequest {
           val ints: Bytes = input.slice(3, len + 3)
           val expiry = readUnsignedLong(len, ints)
           MinFinalCltvExpiryTag(expiry)
-
-        case vTag if vTag == Bech32.map('v') =>
-          val contents = Bech32 five2eight input.slice(3, len + 3)
-          val lnUrl = LNUrl(Tools bin2readable contents)
-          LNUrlTag(lnUrl)
 
         case _ =>
           val unknown = input.slice(3, len + 3)
