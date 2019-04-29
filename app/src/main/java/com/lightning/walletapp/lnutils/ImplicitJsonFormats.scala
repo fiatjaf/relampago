@@ -14,7 +14,7 @@ import fr.acinq.eclair.UInt64
 import java.math.BigInteger
 import scodec.Codec
 
-import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData, MultipartPayment, WithdrawRequest}
+import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData, WithdrawRequest}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import fr.acinq.bitcoin.{MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
@@ -106,13 +106,11 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit object LNUrlDataFmt extends JsonFormat[LNUrlData] {
     def write(unserialized: LNUrlData): JsValue = unserialized match {
       case unserialiedMessage: IncomingChannelRequest => unserialiedMessage.toJson
-      case unserialiedMessage: MultipartPayment => unserialiedMessage.toJson
       case unserialiedMessage: WithdrawRequest => unserialiedMessage.toJson
     }
 
     def read(serialized: JsValue): LNUrlData = serialized.asJsObject fields "tag" match {
       case JsString("channelRequest") => serialized.convertTo[IncomingChannelRequest]
-      case JsString("multipartPayment") => serialized.convertTo[MultipartPayment]
       case JsString("withdrawRequest") => serialized.convertTo[WithdrawRequest]
       case _ => throw new RuntimeException
     }
@@ -125,10 +123,6 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val withdrawRequestFmt = taggedJsonFmt(jsonFormat[String, String, Long, String,
     WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxWithdrawable", "defaultDescription"),
     tag = "withdrawRequest")
-
-  implicit val multipartPaymentFmt = taggedJsonFmt(jsonFormat[Vector[String], String,
-    MultipartPayment](MultipartPayment.apply, "requests", "paymentId"),
-    tag = "multipartPayment")
 
   // Channel data
 

@@ -43,9 +43,8 @@ object LNUrl {
 case class LNUrl(request: String) {
   val uri = android.net.Uri parse request
   require(uri.toString contains "https://", "Not an HTTPS endpoint")
-  lazy val challenge = Try(ByteVector.fromValidHex(uri getQueryParameter "c") take 64)
-  lazy val tags = Try(uri getQueryParameter "tag" split ",").map(_.toSet).getOrElse(Set.empty)
-  def isLogin = tags contains "login"
+  lazy val k1: Try[Bytes] = Try(new String(uri getQueryParameter "k1").getBytes)
+  lazy val isLogin: Boolean = Try(uri getQueryParameter "tag" contains "login") getOrElse false
 }
 
 case class FallbackAddressTag(version: Byte, hash: ByteVector) extends Tag {

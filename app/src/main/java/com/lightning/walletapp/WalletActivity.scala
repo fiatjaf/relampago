@@ -29,6 +29,7 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+import scodec.bits.ByteVector
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
@@ -215,8 +216,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       me returnToBase null
 
     case pr: PaymentRequest =>
-      FragWallet.worker.standardOffChainSend(pr)
       // We have operational channels at this point
+      FragWallet.worker.standardOffChainSend(pr)
       me returnToBase null
 
     case _ =>
@@ -224,14 +225,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // LNURL
 
-  def fetch1stLevelUrl(lNUrl: LNUrl) = {
-    val awaitRequest = get(lNUrl.uri.toString, true).connectTimeout(5000)
+  def fetch1stLevelUrl(lnUrl: LNUrl) = {
+    val awaitRequest = get(lnUrl.uri.toString, true).connectTimeout(5000)
     val sslAwareRequest = awaitRequest.trustAllCerts.trustAllHosts
     app toast ln_url_resolving
 
     <(to[LNUrlData](sslAwareRequest.body), onFail) {
-      case incomingChan: IncomingChannelRequest => initConnection(incomingChan)
-      case withdrawal: WithdrawRequest => doReceivePayment(withdrawal :: Nil)
+      case incomingChan: IncomingChannelRequest => me initConnection incomingChan
+      case withdrawal: WithdrawRequest => me doReceivePayment Some(withdrawal, lnUrl)
       case _ => app toast err_no_data
     }
   }
@@ -250,8 +251,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
   }
 
-  def showLoginForm(lnUrl: LNUrl) = lnUrl.challenge map { challenge =>
-    lazy val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
+  def showLoginForm(lnUrl: LNUrl) = lnUrl.k1 map { k1 =>
+    lazy val linkingPrivKey = LNParams getLinkingKey lnUrl.uri.getHost
     lazy val linkingPubKey = linkingPrivKey.publicKey.toString
 
     def wut(alert: AlertDialog): Unit = {
@@ -260,9 +261,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def doLogin(alert: AlertDialog) = rm(alert) {
-      val sig = Crypto encodeSignature Crypto.sign(challenge, linkingPrivKey)
-      val secondLevelCallback = get(s"${lnUrl.request}&key=$linkingPubKey&sig=${sig.toHex}", true)
-      val secondLevelRequest = secondLevelCallback.connectTimeout(5000).trustAllCerts.trustAllHosts
+      val sig = Crypto encodeSignature Crypto.sign(k1, linkingPrivKey)
+      val secondLevelCallback = get(s"${lnUrl.request}?k1=$k1&sig=${sig.toHex}&key=$linkingPubKey", true)
+      val secondLevelRequest = secondLevelCallback.connectTimeout(7500).trustAllCerts.trustAllHosts
       queue.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
       app.toast(ln_url_resolving)
     }
@@ -273,7 +274,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   // BUTTONS REACTIONS
 
-  def doReceivePayment(wrOpt: List[WithdrawRequest] = Nil) = {
+  type RequestAndLNUrl = (WithdrawRequest, LNUrl)
+  def doReceivePayment(extra: Option[RequestAndLNUrl] = None) = {
     val viableChannels = ChannelManager.all.filter(isOpeningOrOperational)
     val channelsWithRoutes = ChannelManager.all.filter(isOperational).flatMap(channelAndHop).toMap
     val maxCanReceive = if (channelsWithRoutes.isEmpty) 0L else channelsWithRoutes.keys.map(estimateCanReceive).max
@@ -281,25 +283,27 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     // maxCanReceive may be negative, show a warning to user in this case
     val maxCanReceiveCapped = MilliSatoshi(maxCanReceive min LNParams.maxHtlcValueMsat)
     val humanShouldSpend = s"<strong>${denom parsedWithSign -maxCanReceiveCapped}</strong>"
-    val reserveUnspent = getString(ln_receive_reserve) format humanShouldSpend
+    val reserveUnspentWarning = getString(ln_receive_reserve) format humanShouldSpend
 
-    wrOpt match {
-      case wr :: Nil =>
+    extra match {
+      case Some(wr \ lnUrl) =>
         val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
         val finalMaxCanReceiveCapped = MilliSatoshi(wr.maxWithdrawable min maxCanReceiveCapped.amount)
         if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_howto).html).create)
         else if (channelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
-        else if (maxCanReceive < 0L) showForm(alertDialog = negTextBuilder(neg = dialog_ok, msg = reserveUnspent.html).create)
+        else if (maxCanReceive < 0L) showForm(alertDialog = negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
         else FragWallet.worker.receive(channelsWithRoutes, finalMaxCanReceiveCapped, title, wr.defaultDescription) { rd =>
+          def sig = Crypto encodeSignature Crypto.sign(new String(wr.k1).getBytes, LNParams getLinkingKey lnUrl.uri.getHost)
+          def requestWithdraw = wr.unsafe(s"${wr.callback}?k1=${wr.k1}&sig=${sig.toHex}&pr=${PaymentRequest write rd.pr}")
           def onRequestFailed(responseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail responseFail)
-          queue.map(_ => wr requestWithdraw rd.pr).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
+          queue.map(_ => requestWithdraw).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
         }
 
-      case _ =>
+      case None =>
         val alertLNHint =
           if (viableChannels.isEmpty) getString(ln_receive_suggestion)
           else if (channelsWithRoutes.isEmpty) getString(ln_receive_6conf)
-          else if (maxCanReceive < 0L) reserveUnspent
+          else if (maxCanReceive < 0L) reserveUnspentWarning
           else getString(ln_receive_ok)
 
         val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
@@ -360,7 +364,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def goStart = me goTo classOf[LNStartActivity]
   def goOps(top: View) = me goTo classOf[LNOpsActivity]
-  def goReceivePayment(top: View) = doReceivePayment(wrOpt = Nil)
+  def goReceivePayment(top: View) = doReceivePayment(extra = Option.empty)
   def goAddChannel(top: View) = if (app.olympus.backupExhausted) warnAboutTokens else goStart
 
   def warnAboutTokens = {

@@ -19,6 +19,8 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
 import scodec.bits.ByteVector
 import android.os.Bundle
+import fr.acinq.bitcoin.Crypto
+
 import scala.util.Try
 
 
@@ -152,15 +154,15 @@ object LNUrlData {
   }
 }
 
-sealed trait LNUrlData { def unsafe(request: String) = get(request, true).trustAllCerts.trustAllHosts.body }
+sealed trait LNUrlData {
+  def unsafe(request: String) = get(request, true).trustAllCerts.trustAllHosts.body
+  require(callback contains "https://", "Callback does not have HTTPS prefix")
+  val callback: String
+}
+
+case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, defaultDescription: String) extends LNUrlData
 case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long) extends LNUrlData {
   def resolveAnnounce = app.mkNodeAnnouncement(PublicKey(ByteVector fromValidHex key), NodeAddress.fromParts(host, port.toInt), host)
   def requestChannel = unsafe(s"$callback?k1=$k1&remoteid=${LNParams.nodePublicKey.toString}&private=1")
-  require(callback contains "https://", "Not an HTTPS callback")
   val nodeLink(key, host, port) = uri
-}
-
-case class MultipartPayment(requests: StringVec, paymentId: String) extends LNUrlData
-case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, defaultDescription: String) extends LNUrlData {
-  def requestWithdraw(paymentRequest: PaymentRequest) = unsafe(s"$callback?k1=$k1&pr=${PaymentRequest write paymentRequest}")
 }
