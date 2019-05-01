@@ -29,7 +29,6 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-import scodec.bits.ByteVector
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
@@ -226,7 +225,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   // LNURL
 
   def fetch1stLevelUrl(lnUrl: LNUrl) = {
-    val awaitRequest = get(lnUrl.uri.toString, true).connectTimeout(5000)
+    val awaitRequest = get(lnUrl.uri.toString, true).connectTimeout(7500)
     val sslAwareRequest = awaitRequest.trustAllCerts.trustAllHosts
     app toast ln_url_resolving
 

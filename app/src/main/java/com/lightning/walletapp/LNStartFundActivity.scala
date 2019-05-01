@@ -10,7 +10,7 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import android.widget.{ImageButton, TextView}
+import android.widget.{ImageButton, TextView, Toast}
 import scala.util.{Success, Try}
 
 import com.lightning.walletapp.lnutils.olympus.ChannelUploadAct
@@ -36,7 +36,6 @@ class LNStartFundActivity extends TimerActivity { me =>
   def INIT(s: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_ln_start_fund)
     defineFurtherActionBasedOnTransDataValue
-    // Or go to main if app is not alive
   } else me exitTo classOf[MainActivity]
 
   def defineFurtherActionBasedOnTransDataValue = app.TransData checkAndMaybeErase {
@@ -77,8 +76,8 @@ class LNStartFundActivity extends TimerActivity { me =>
 
       override def onException = {
         case _ \ errorWhileOpening =>
-          // Inform user, disconnect this channel, go back
-          UITask(app toast errorWhileOpening.getMessage).run
+          // Inform user about error, disconnect this channel, go back to channel list
+          UITask(Toast.makeText(me, errorWhileOpening.getMessage, Toast.LENGTH_LONG).show).run
           whenBackPressed.run
       }
     }
