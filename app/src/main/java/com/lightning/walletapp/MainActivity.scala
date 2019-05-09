@@ -86,7 +86,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
       mainFingerprint setVisibility View.VISIBLE
       def onError(fpError: FPError) = fpError match {
         case FPError.LOCKOUT => mainFingerprintImage.setAlpha(0.25F)
-        case FPError.CANCELED => onSuccess(cipherText = null)
+        case FPError.CANCELED => mainFingerprintImage.setAlpha(0.25F)
         case _ => app toast fpError.toString
       }
 
