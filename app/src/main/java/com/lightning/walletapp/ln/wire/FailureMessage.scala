@@ -12,12 +12,12 @@ case object ExpiryTooFar extends FailureMessage
 sealed trait Perm extends FailureMessage
 sealed trait Node extends FailureMessage
 case object UnknownNextPeer extends Perm
-case object UnknownPaymentHash extends Perm
 case object IncorrectPaymentAmount extends Perm
 case object PermanentChannelFailure extends Perm
 case object RequiredChannelFeatureMissing extends Perm
 case class FinalIncorrectCltvExpiry(expiry: Long) extends Perm
 case class FinalIncorrectHtlcAmount(amountMsat: Long) extends Perm
+case class IncorrectOrUnknownPaymentDetails(amountMsat: Long) extends Perm
 case object FinalExpiryTooSoon extends Perm
 case object InvalidRealm extends Perm
 
@@ -43,8 +43,9 @@ object FailureMessageCodecs {
   private val channelUpdateCodecWithType = lightningMessageCodec.narrow[ChannelUpdate](Attempt successful _.asInstanceOf[ChannelUpdate], identity)
   private val channelUpdateWithLengthCodec = variableSizeBytes(value = choice(channelUpdateCodecWithType, channelUpdateCodec), size = uint16)
   private val disabled = (byte withContext "messageFlags") :: (byte withContext "channelFlags") :: channelUpdateWithLengthCodec
-  private val amount = (uint64 withContext "amountMsat") :: channelUpdateWithLengthCodec
-  private val expiry = (uint32 withContext "expiry") :: channelUpdateWithLengthCodec
+  private val unknownPayment = withDefaultValue(optional(bitsRemaining, uint64), 0L) withContext "amountMsat"
+  private val wrongAmount = (uint64 withContext "amountMsat") :: channelUpdateWithLengthCodec
+  private val wrongExpiry = (uint32 withContext "expiry") :: channelUpdateWithLengthCodec
 
   val BADONION = 0x8000
   val UPDATE = 0x1000
@@ -63,11 +64,11 @@ object FailureMessageCodecs {
     .typecase(cr = provide(PermanentChannelFailure), tag = PERM | 8)
     .typecase(cr = provide(RequiredChannelFeatureMissing), tag = PERM | 9)
     .typecase(cr = provide(UnknownNextPeer), tag = PERM | 10)
-    .typecase(cr = amount.as[AmountBelowMinimum], tag = UPDATE | 11)
-    .typecase(cr = amount.as[FeeInsufficient], tag = UPDATE | 12)
-    .typecase(cr = expiry.as[IncorrectCltvExpiry], tag = UPDATE | 13)
+    .typecase(cr = wrongAmount.as[AmountBelowMinimum], tag = UPDATE | 11)
+    .typecase(cr = wrongAmount.as[FeeInsufficient], tag = UPDATE | 12)
+    .typecase(cr = wrongExpiry.as[IncorrectCltvExpiry], tag = UPDATE | 13)
     .typecase(cr = channelUpdateWithLengthCodec.as[ExpiryTooSoon], tag = UPDATE | 14)
-    .typecase(cr = provide(UnknownPaymentHash), tag = PERM | 15)
+    .typecase(cr = unknownPayment.as[IncorrectOrUnknownPaymentDetails], tag = PERM | 15)
     .typecase(cr = provide(IncorrectPaymentAmount), tag = PERM | 16)
     .typecase(cr = provide(FinalExpiryTooSoon), tag = 17)
     .typecase(cr = (uint32 withContext "expiry").as[FinalIncorrectCltvExpiry], tag = 18)
