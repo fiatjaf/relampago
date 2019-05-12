@@ -123,19 +123,17 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onSettled(chan: Channel, cs: Commitments) = {
+    // We have got their commit sig and may have settled payments
 
-    def finalizeFail(rd: RoutingData) = {
-      // UI will be updated a bit later here
-      updStatus(FAILURE, rd.pr.paymentHash)
-      chan process CMDPaymentGiveUp(rd)
-    }
-
-    def newRoutes(rd: RoutingData) = {
-      // We don't care about AIR or multipart payments here
-      val stillCanReSend = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
-      if (stillCanReSend) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-      else finalizeFail(rd)
-    }
+    def newRoutesOrGiveUp(rd: RoutingData) =
+      if (rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight) {
+        // We don't care about AIR or multipart here, supposedly it's one of them
+        me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
+      } else {
+        // UI will be updated a bit later here
+        updStatus(FAILURE, rd.pr.paymentHash)
+        chan process CMDPaymentGiveUp(rd)
+      }
 
     db txWrap {
       cs.localCommit.spec.fulfilledIncoming foreach updOkIncoming
@@ -145,12 +143,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
         val rdOpt = acceptedPayments get add.paymentHash
         rdOpt map parseFailureCutRoutes(failReason) match {
-          // Try to use the routes left or fetch new ones if empty
+          // Try to use reamining routes or fetch new ones if empty
           // but account for possibility of rd not being in place
 
           case Some(Some(rd1) \ excludes) =>
             for (badEntity <- excludes) BadEntityWrap.putEntity.tupled(badEntity)
-            ChannelManager.sendEither(useFirstRoute(rd1.routes, rd1), newRoutes)
+            ChannelManager.sendEither(useFirstRoute(rd1.routes, rd1), newRoutesOrGiveUp)
 
           case _ =>
             // May happen after app restart
