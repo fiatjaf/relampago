@@ -151,8 +151,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
 
-    val shouldCheck = app.prefs.getLong(AbstractKit.GDRIVE_LAST_SAVE, 0L) <= 0L // Unknown or failed
-    val needsCheck = !GDrive.isMissing(app) && app.prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true) && shouldCheck
+    val backupUnknownOrFailed = app.prefs.getLong(AbstractKit.GDRIVE_LAST_SAVE, 0L) <= 0L
+    val needsCheck = !GDrive.isMissing(app) && app.prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true) && backupUnknownOrFailed
     if (needsCheck) queue.map(_ => GDrive signInAccount me).foreach(accountOpt => if (accountOpt.isEmpty) askGDriveSignIn)
   } else me exitTo classOf[MainActivity]
 
@@ -260,8 +260,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def doLogin(alert: AlertDialog) = rm(alert) {
-      val sig = Crypto encodeSignature Crypto.sign(k1, linkingPrivKey)
-      val secondLevelCallback = get(s"${lnUrl.request}?k1=$k1&sig=${sig.toHex}&key=$linkingPubKey", true)
+      val signature = app.sign(data = k1, pk = linkingPrivKey).toHex
+      val secondLevelCallback = get(s"${lnUrl.request}?k1=$k1&sig=$signature&key=$linkingPubKey", true)
       val secondLevelRequest = secondLevelCallback.connectTimeout(7500).trustAllCerts.trustAllHosts
       queue.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
       app.toast(ln_url_resolving)
@@ -292,9 +292,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else if (channelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive < 0L) showForm(alertDialog = negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
         else FragWallet.worker.receive(channelsWithRoutes, finalMaxCanReceiveCapped, title, wr.defaultDescription) { rd =>
-          def sig = Crypto encodeSignature Crypto.sign(new String(wr.k1).getBytes, LNParams getLinkingKey lnUrl.uri.getHost)
-          def requestWithdraw = wr.unsafe(s"${wr.callback}?k1=${wr.k1}&sig=${sig.toHex}&pr=${PaymentRequest write rd.pr}")
+          def requestWithdraw = wr.unsafe(s"${wr.callback}?k1=${wr.k1}&sig=$signature&pr=${PaymentRequest write rd.pr}")
           def onRequestFailed(responseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail responseFail)
+          def signature = app.sign(data = wr.k1.getBytes, pk = LNParams getLinkingKey lnUrl.uri.getHost).toHex
           queue.map(_ => requestWithdraw).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
         }
 

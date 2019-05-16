@@ -21,9 +21,9 @@ import scala.util.{Success, Try}
 import rx.lang.scala.{Observable => Obs}
 import scodec.bits.{BitVector, ByteVector}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
-import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import androidx.work.{ExistingWorkPolicy, WorkManager}
 import android.content.{ClipData, ClipboardManager, Context}
+import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{pickInc, repeat}
 import com.lightning.walletapp.lnutils.olympus.{OlympusWrap, TxUploadAct}
@@ -99,10 +99,13 @@ class WalletApp extends Application { me =>
     clipboardManager setPrimaryClip bufferContent
   }
 
-  def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) = {
-    val dummySig = Crypto encodeSignature Crypto.sign(random getBytes 32, randomPrivKey)
-    NodeAnnouncement(dummySig, ByteVector.empty, 0L, id, (-128, -128, -128), alias take 16, na :: Nil)
-  }
+  def sign(data: Bytes, pk: PrivateKey) = Try {
+    Crypto encodeSignature Crypto.sign(data, pk)
+  } getOrElse ByteVector.empty
+
+  def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) =
+    NodeAnnouncement(signature = sign(random getBytes 32, randomPrivKey), features = ByteVector.empty,
+      timestamp = 0L, nodeId = id, rgbColor = (-128, -128, -128), alias take 16, addresses = na :: Nil)
 
   object TransData {
     var value: Any = new String
