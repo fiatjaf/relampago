@@ -609,8 +609,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case Success(ms) =>
         val txProcessor = new TxProcessor {
           val pay = AddrData(ms, uri.getAddress)
-          def futureProcess(unsigned: SendRequest) =
-            app.kit blockSend app.kit.sign(unsigned).tx
+          def futureProcess(unsignedRequest: SendRequest) = app.kit blockSend app.kit.sign(unsignedRequest).tx
+          def onTxFail(err: Throwable): Unit = mkCheckForm(_.dismiss, none, txMakeErrorBuilder(err), dialog_ok, -1)
         }
 
         val coloredAmount = denom.coloredOut(txProcessor.pay.cn, denom.sign)

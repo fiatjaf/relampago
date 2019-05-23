@@ -13,7 +13,6 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import android.app.{Activity, AlertDialog}
-import fr.acinq.bitcoin.{Crypto, MilliSatoshi}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
@@ -27,6 +26,7 @@ import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
 import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
+import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
 import android.content.Intent

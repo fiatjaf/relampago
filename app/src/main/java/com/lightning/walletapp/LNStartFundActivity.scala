@@ -146,8 +146,12 @@ class LNStartFundActivity extends TimerActivity { me =>
               val dummyScript = pubKeyScript(dummyKey, dummyKey)
               val pay = P2WSHData(ms, pay2wsh = dummyScript)
 
-              def futureProcess(unsigned: SendRequest) = {
-                val batch = Batch(unsigned, dummyScript, null)
+              def onTxFail(error: Throwable): Unit =
+                mkCheckForm(alert => rm(alert)(finish), none,
+                  txMakeErrorBuilder(error), dialog_ok, -1)
+
+              def futureProcess(unsignedRequest: SendRequest) = {
+                val batch = Batch(unsignedRequest, dummyScript, null)
                 val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
                 val finalPubKeyScript = ByteVector(ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram)
                 val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
