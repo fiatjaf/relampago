@@ -75,9 +75,9 @@
     </array>
 
     <!-- GDrive backups -->
+    <string name="gdrive_last_saved">Обновлен %1$s</string>
     <string name="gdrive_disabled">Бекапы в GDrive отключены</string>
     <string name="gdrive_not_present">Бекап пока отсутствует</string>
-    <string name="gdrive_last_saved">Последнее сохранение %1$s</string>
     <string name="gdrive_failed">Не получилось сохранить бекап</string>
     <string name="sets_gdrive">Бекапы каналов в GDrive</string>
 
