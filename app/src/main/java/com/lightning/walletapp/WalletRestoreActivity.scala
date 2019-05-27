@@ -122,9 +122,8 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
     case _ => restoreAnyChannel(some)
   }
 
-  def useGDriveBackup(googleDriveBackup: GDriveBackup) = {
-    for (cloudSnapshot <- googleDriveBackup.clouds) app.olympus tellClouds cloudSnapshot
-    ChannelManager.all = for (data <- googleDriveBackup.chans) yield restoreChannel(data)
+  def useGDriveBackup(gDriveBackup: GDriveBackup) = {
+    ChannelManager.all = for (data <- gDriveBackup.chans) yield restoreChannel(data)
     app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, true).commit
     me prepareFreshWallet app.kit
   }

@@ -135,7 +135,6 @@ trait CloudAct {
   val path: String
 }
 
-case class CloudSnapshot(tokens: Vector[ClearToken], url: String)
 case class CloudData(info: Option[RequestAndMemo], tokens: Vector[ClearToken], acts: CloudActVec)
 case class LegacyAct(data: ByteVector, plus: Seq[HttpParam], path: String) extends CloudAct { def onDone = none }
 case class CerberusAct(data: ByteVector, plus: Seq[HttpParam], path: String, txids: StringVec) extends CloudAct {

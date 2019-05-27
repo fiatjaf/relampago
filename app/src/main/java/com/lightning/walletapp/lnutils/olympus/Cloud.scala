@@ -87,10 +87,6 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
       me BECOME data.copy(acts = data.acts :+ act take 25)
       me doProcess CMDStart
 
-    case (_, cs: CloudSnapshot) if cs.url == connector.url =>
-      // We may get new tokens off-band after restoring from GDrive
-      me BECOME data.copy(tokens = (data.tokens ++ cs.tokens).distinct)
-
     case _ =>
   }
 
@@ -109,7 +105,6 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
     }
 
   def isAuthEnabled = 1 == auth
-  def snapshot = CloudSnapshot(data.tokens, connector.url)
   def retryFreshRequest(failedPayReq: PaymentRequest): Unit = {
     val isOk = ChannelManager.mostFundedChanOpt.exists(chan => estimateCanSend(chan) >= failedPayReq.msatOrMin.amount)
     if (isOk) PaymentInfoWrap addPendingPayment emptyRD(failedPayReq, failedPayReq.msatOrMin.amount, useCache = true, airLeft = 0)

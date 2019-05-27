@@ -8,7 +8,6 @@ import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
-import com.lightning.walletapp.lnutils.olympus.CloudSnapshot
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 
@@ -186,7 +185,7 @@ case object NodeAddress {
 
 // Not in a spec
 case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)
-case class GDriveBackup(chans: Vector[HasCommitments], clouds: Vector[CloudSnapshot], v: Int)
 case class WalletZygote(v: Int, db: ByteVector, wallet: ByteVector, chain: ByteVector)
 case class CerberusPayload(payloads: Vector[AESZygote], halfTxIds: StringVec)
 case class AESZygote(v: Int, iv: ByteVector, ciphertext: ByteVector)
+case class GDriveBackup(chans: Vector[HasCommitments], v: Int)
