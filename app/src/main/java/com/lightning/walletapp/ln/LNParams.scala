@@ -23,16 +23,15 @@ object LNParams { me =>
   val chainHash = Block.LivenetGenesisBlock.hash
 
   val minDepth = 1
-  val minCapacitySat = 300000L
+  val minCapacityMsat = 300000000L
   val channelReserveToFundingRatio = 100
 
   final val dust = Satoshi(2730L)
   final val maxToSelfDelay = 2016
   final val minFeeratePerKw = 253
   final val maxCltvDelta = 7 * 144L
-  final val maxHtlcValueMsat = 4150000000L
-  final val maxCapacity = Satoshi(16777215L)
   final val minHtlcValue = MilliSatoshi(1000L)
+  final val maxCapacity = MilliSatoshi(16777215000L)
 
   var db: LNOpenHelper = _
   private[this] var master: ExtendedPrivateKey = _
@@ -79,14 +78,13 @@ object LNParams { me =>
   def updateFeerate = for (chan <- ChannelManager.notClosing) chan process CMDFeerate(broadcaster.perKwThreeSat)
   def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: ByteVector, idx: Long, isFunder: Boolean) = {
     val Seq(fund, rev, pay, delay, htlc, sha) = for (order <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: order :: Nil)
-    LocalParams(UInt64(maxHtlcValueMsat * 3), theirReserve, toSelfDelay = 2016, maxAcceptedHtlcs = 25, fund.privateKey, rev.privateKey,
+    LocalParams(UInt64(maxCapacity.amount), theirReserve, toSelfDelay = 2016, maxAcceptedHtlcs = 25, fund.privateKey, rev.privateKey,
       pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey, dust, sha256(sha.privateKey.toBin), isFunder)
   }
 }
 
 object AddErrorCodes {
   import com.lightning.walletapp.R.string._
-  val ERR_AMOUNT_OVERFLOW = err_ln_amount_overflow
   val ERR_REMOTE_AMOUNT_HIGH = err_ln_remote_amount_high
   val ERR_REMOTE_AMOUNT_LOW = err_ln_remote_amount_low
   val ERR_TOO_MANY_HTLC = err_ln_too_many

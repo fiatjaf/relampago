@@ -65,7 +65,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (InitData(announce), Tuple2(localParams: LocalParams, open: OpenChannel), WAIT_FOR_INIT) =>
         if (LNParams.chainHash != open.chainHash) throw new LightningException("They have provided a wrong chain hash")
-        if (open.fundingSatoshis < LNParams.minCapacitySat) throw new LightningException("Their proposed capacity is too small")
+        if (open.fundingSatoshis * 1000L < LNParams.minCapacityMsat) throw new LightningException("Their proposed capacity is too small")
         if (open.channelFlags.isPublic) throw new LightningException("They are offering a public channel and we only support private ones")
         if (open.pushMsat > 1000L * open.fundingSatoshis) throw new LightningException("They are trying to push more than proposed capacity")
         if (open.dustLimitSatoshis > open.channelReserveSatoshis) throw new LightningException("Their dust limit exceeds their channel reserve")
@@ -704,9 +704,9 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  private[this] val nextDummyHtlc = UpdateAddHtlc(Zeroes, -1, LNParams.maxHtlcValueMsat, One, 144 * 3, ByteVector.empty)
+  private[this] val nextDummyHtlc = UpdateAddHtlc(Zeroes, -1, LNParams.minCapacityMsat, One, 144 * 3, ByteVector.empty)
   def nextReducedRemoteState(commitments: Commitments) = Commitments.addLocalProposal(commitments, nextDummyHtlc).reducedRemoteState
-  def estimateCanSend(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.maxHtlcValueMsat, 0L)
+  def estimateCanSend(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.minCapacityMsat, 0L)
   def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat, 0L)
   def estimateNextUsefulCapacity(chan: Channel) = estimateCanSend(chan) + estimateCanReceive(chan)
 

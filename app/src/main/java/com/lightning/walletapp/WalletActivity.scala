@@ -276,22 +276,22 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   type RequestAndLNUrl = (WithdrawRequest, LNUrl)
   def doReceivePayment(extra: Option[RequestAndLNUrl] = None) = {
     val viableChannels = ChannelManager.all.filter(isOpeningOrOperational)
-    val channelsWithRoutes = ChannelManager.all.filter(isOperational).flatMap(channelAndHop).toMap
-    val maxCanReceive = if (channelsWithRoutes.isEmpty) 0L else channelsWithRoutes.keys.map(estimateCanReceive).max
+    val withRoutes = ChannelManager.all.filter(isOperational).flatMap(channelAndHop).toMap
+    val maxOneChanReceivable = if (withRoutes.isEmpty) 0L else withRoutes.keys.map(estimateCanReceive).max
+    val maxCanReceive = MilliSatoshi(maxOneChanReceivable)
 
     // maxCanReceive may be negative, show a warning to user in this case
-    val maxCanReceiveCapped = MilliSatoshi(maxCanReceive min LNParams.maxHtlcValueMsat)
-    val humanShouldSpend = s"<strong>${denom parsedWithSign -maxCanReceiveCapped}</strong>"
+    val humanShouldSpend = s"<strong>${denom parsedWithSign -maxCanReceive}</strong>"
     val reserveUnspentWarning = getString(ln_receive_reserve) format humanShouldSpend
 
     extra match {
       case Some(wr \ lnUrl) =>
         val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
-        val finalMaxCanReceiveCapped = MilliSatoshi(wr.maxWithdrawable min maxCanReceiveCapped.amount)
+        val finalMaxCanReceiveCapped = MilliSatoshi(wr.maxWithdrawable min maxCanReceive.amount)
         if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_howto).html).create)
-        else if (channelsWithRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
-        else if (maxCanReceive < 0L) showForm(alertDialog = negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
-        else FragWallet.worker.receive(channelsWithRoutes, finalMaxCanReceiveCapped, title, wr.defaultDescription) { rd =>
+        else if (withRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
+        else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
+        else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, title, wr.defaultDescription) { rd =>
           def requestWithdraw = wr.unsafe(s"${wr.callback}?k1=${wr.k1}&sig=$signature&pr=${PaymentRequest write rd.pr}")
           def onRequestFailed(responseFail: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail responseFail)
           def signature = app.sign(data = wr.k1.getBytes, pk = LNParams getLinkingKey lnUrl.uri.getHost).toHex
@@ -301,8 +301,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case None =>
         val alertLNHint =
           if (viableChannels.isEmpty) getString(ln_receive_suggestion)
-          else if (channelsWithRoutes.isEmpty) getString(ln_receive_6conf)
-          else if (maxCanReceive < 0L) reserveUnspentWarning
+          else if (withRoutes.isEmpty) getString(ln_receive_6conf)
+          else if (maxCanReceive.amount < 0L) reserveUnspentWarning
           else getString(ln_receive_ok)
 
         val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
@@ -311,7 +311,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
         def offChain = rm(alert) {
           if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
-          else FragWallet.worker.receive(channelsWithRoutes, maxCanReceiveCapped, app.getString(ln_receive_title).html, new String) { rd =>
+          else FragWallet.worker.receive(withRoutes, maxCanReceive, app.getString(ln_receive_title).html, new String) { rd =>
             foregroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
             ContextCompat.startForegroundService(me, foregroundServiceIntent)
             me PRQR rd.pr

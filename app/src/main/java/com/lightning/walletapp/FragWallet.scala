@@ -500,8 +500,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   abstract class OffChainSender(pr: PaymentRequest) {
+    val maxCanSend = MilliSatoshi(ChannelManager.estimateAIRCanSend)
     val rd = emptyRD(pr, firstMsat = pr.msatOrMin.amount, useCache = true, airLeft = 0)
-    val maxCanSend = MilliSatoshi(ChannelManager.estimateAIRCanSend min maxHtlcValueMsat)
     val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCanSend)
     val rateManager = new RateManager(baseContent) hint baseHint

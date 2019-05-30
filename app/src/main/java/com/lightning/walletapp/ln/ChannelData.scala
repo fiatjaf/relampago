@@ -338,42 +338,37 @@ object Commitments {
     c1
   }
 
-  def sendAdd(c: Commitments, rd: RoutingData) =
+  def sendAdd(c: Commitments, rd: RoutingData) = {
+    val orp = ByteVector view rd.onion.packet.serialize
+    // Let's compute the current commitment *as seen by remote peer* with this change taken into account
+    val add = UpdateAddHtlc(c.channelId, c.localNextHtlcId, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, orp)
+    val c1 = addLocalProposal(c, add).modify(_.localNextHtlcId).using(current => 1 + current)
+    // This is their point of view so our outgoing HTLCs are their incoming
+    val outgoingHtlcs = c1.reducedRemoteState.htlcs.filter(_.incoming)
+    val inFlight = outgoingHtlcs.map(_.add.amountMsat).sum
+
+    // We should both check if we can send another HTLC and if PEER can accept another HTLC
     if (rd.firstMsat < c.remoteParams.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
-    else if (rd.firstMsat > maxHtlcValueMsat) throw CMDAddImpossible(rd, ERR_AMOUNT_OVERFLOW)
-    else {
+    if (UInt64(inFlight) > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
+    if (outgoingHtlcs.size > c.remoteParams.maxAcceptedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
+    if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
+    c1 -> add
+  }
 
-      val orp = ByteVector view rd.onion.packet.serialize
-      // Let's compute the current commitment *as seen by them* with this change taken into account
-      val add = UpdateAddHtlc(c.channelId, c.localNextHtlcId, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, orp)
-      val c1 = addLocalProposal(c, add).modify(_.localNextHtlcId).using(current => 1 + current)
-      // This is their point of view so our outgoing HTLCs are their incoming
-      val outgoingHtlcs = c1.reducedRemoteState.htlcs.filter(_.incoming)
-      val inFlight = outgoingHtlcs.map(_.add.amountMsat).sum
+  def receiveAdd(c: Commitments, add: UpdateAddHtlc) = {
+    // We should both check if WE can accept another HTLC and if PEER can send another HTLC
+    // let's compute the current commitment *as seen by us* with this change taken into account
+    val c1 = addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(current => 1 + current)
+    val c2 \ reduced = Commitments ifSenderCanAffordFees c1
 
-      // We should both check if we can send another HTLC and if PEER can accept another HTLC
-      if (UInt64(inFlight) > c.remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
-      if (outgoingHtlcs.size > c.remoteParams.maxAcceptedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
-      if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
-      c1 -> add
-    }
-
-  def receiveAdd(c: Commitments, add: UpdateAddHtlc) =
+    val incomingHtlcs = reduced.htlcs.filter(_.incoming)
+    val inFlight = incomingHtlcs.map(_.add.amountMsat).sum
+    if (add.id != c.remoteNextHtlcId) throw new LightningException
     if (add.amountMsat < minHtlcValue.amount) throw new LightningException
-    else if (add.id != c.remoteNextHtlcId) throw new LightningException
-    else {
-
-      // We should both check if WE can accept another HTLC and if PEER can send another HTLC
-      // let's compute the current commitment *as seen by us* with this change taken into account
-      val c1 = addRemoteProposal(c, add).modify(_.remoteNextHtlcId).using(current => 1 + current)
-      val c2 \ reduced = Commitments ifSenderCanAffordFees c1
-
-      val incomingHtlcs = reduced.htlcs.filter(_.incoming)
-      val inFlight = incomingHtlcs.map(_.add.amountMsat).sum
-      if (UInt64(inFlight) > c.localParams.maxHtlcValueInFlightMsat) throw new LightningException
-      if (incomingHtlcs.size > c.localParams.maxAcceptedHtlcs) throw new LightningException
-      c2
-    }
+    if (UInt64(inFlight) > c.localParams.maxHtlcValueInFlightMsat) throw new LightningException
+    if (incomingHtlcs.size > c.localParams.maxAcceptedHtlcs) throw new LightningException
+    c2
+  }
 
   def receiveFulfill(c: Commitments, fulfill: UpdateFulfillHtlc) =
     getHtlcCrossSigned(commitments = c, incomingRelativeToLocal = false, fulfill.id) match {
