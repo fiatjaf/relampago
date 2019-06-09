@@ -1,7 +1,5 @@
 <resources>
 
-    <!-- page layouts -->
-
     <style name="StandardLinearLayout">
         <item name="android:layout_height">fill_parent</item>
         <item name="android:layout_width">fill_parent</item>
@@ -10,7 +8,7 @@
     </style>
 
     <style name="StandardLinearLayoutPage" parent="StandardLinearLayout">
-        <item name="android:background">#F5F5F5</item>
+        <item name="android:background">@color/bgmain</item>
     </style>
 
     <style name="LineLinearLayout">
@@ -104,11 +102,11 @@
     </style>
 
     <style name="NoBar" parent="Theme.AppCompat.NoActionBar">
-        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:windowBackground">@color/bgload</item>
         <item name="colorAccent">#34B4E3</item>
     </style>
 
-    <style name="CustomBar" parent="Theme.AppCompat.Light.NoActionBar">
+    <style name="CustomBar" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="colorPrimaryDark">#FF000000</item>
         <item name="colorAccent">#34B4E3</item>
     </style>

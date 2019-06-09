@@ -1,8 +1,8 @@
 <resources>
     <item name="bgload" type="color">#282B30</item>
-    <item name="bgmain" type="color">#F5F5F5</item>
-    <item name="bgfiat" type="color">#2AA3A3</item>
-    <item name="bgbar" type="color">#000000</item>
+    <item name="bgmain" type="color">#282B30</item>
+    <item name="bgfiat" type="color">#174E54</item>
+    <item name="bgbar" type="color">#FFFFFF</item>
     <item name="btc" type="color">#E68A00</item>
     <item name="ln" type="color">#0099FE</item>
 </resources>

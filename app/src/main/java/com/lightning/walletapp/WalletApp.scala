@@ -31,6 +31,7 @@ import android.app.{Application, NotificationChannel, NotificationManager}
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
+import android.support.v7.app.AppCompatDelegate
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
@@ -85,6 +86,7 @@ class WalletApp extends Application { me =>
     // These cannot be lazy vals because values may change
     Utils.fiatCode = prefs.getString(AbstractKit.FIAT_TYPE, "usd")
     Utils.denom = Utils denoms prefs.getInt(AbstractKit.DENOM_TYPE, 0)
+    AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
 
     if (Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1) {
       val importanceLevel = NotificationManager.IMPORTANCE_DEFAULT

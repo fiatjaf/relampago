@@ -65,7 +65,7 @@
 
             <TextView
                 style="@style/CardBaseText"
-                android:textColor="@color/bg"
+                android:textColor="@color/bgbar"
                 android:id="@+id/totalCapacityText"
                 android:gravity="end"/>
 
@@ -194,7 +194,6 @@
 
             <TextView
                 style="@style/BaseText"
-                android:textColor="@color/bg"
                 android:layout_width="wrap_content"
                 android:id="@+id/extraInfoText"/>
 

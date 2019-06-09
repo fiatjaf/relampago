@@ -4,7 +4,7 @@
 
     <LinearLayout
         style="@style/StandardLinearLayout"
-        android:background="@color/bg"
+        android:background="@color/bgload"
         android:id="@+id/mainChoice"
         android:visibility="gone">
 
@@ -38,7 +38,7 @@
     <LinearLayout
         style="@style/StandardLinearLayout"
         android:id="@+id/mainFingerprint"
-        android:background="@color/bg"
+        android:background="@color/bgload"
         android:visibility="gone">
 
         <ImageView
