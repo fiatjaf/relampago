@@ -116,7 +116,7 @@
 
             <TextView
                 style="@style/CardBaseText"
-                android:textColor="#E31300"
+                android:textColor="#DB582C"
                 android:id="@+id/refundFeeText"
                 android:gravity="end"/>
 

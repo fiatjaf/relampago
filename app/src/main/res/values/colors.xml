@@ -5,4 +5,9 @@
     <item name="bgbar" type="color">#000000</item>
     <item name="btc" type="color">#E68A00</item>
     <item name="ln" type="color">#0099FE</item>
+
+    <item name="fabtext" type="color">#FFFFFF</item>
+    <item name="fabbgnormal" type="color">#333333</item>
+    <item name="fabbgpressed" type="color">#444444</item>
+    <item name="fabbgripple" type="color">#66FFFFFF</item>
 </resources>

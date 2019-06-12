@@ -29,7 +29,7 @@
             style="@style/LineLinearLayout"
             android:layout_width="fill_parent"
             android:orientation="vertical"
-            android:background="#1E2b4A"
+            android:background="#1C2939"
             android:id="@+id/lnDetails"
             android:paddingTop="8dp">
 
