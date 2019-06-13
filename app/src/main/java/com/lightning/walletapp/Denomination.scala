@@ -38,7 +38,7 @@ trait Denomination { me =>
     s"$start$content$end"
   }
 
-  def coloredOut(msat: MilliSatoshi, suffix: String) = s"<font color=#DB582C><tt>-</tt>${me parsed msat}</font>$suffix"
+  def coloredOut(msat: MilliSatoshi, suffix: String) = s"<font color=#DB3F34><tt>-</tt>${me parsed msat}</font>$suffix"
   def coloredIn(msat: MilliSatoshi, suffix: String) = s"<font color=#6AAB38><tt>+</tt>${me parsed msat}</font>$suffix"
 
   val amountInTxt: String

@@ -70,7 +70,7 @@ object ConnectionManager {
 
       message match {
         case their: Init => events.onOperational(isCompat = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures), nodeId = ann.nodeId)
-        case Ping(resposeLength, _) if resposeLength > 0 && resposeLength <= 65532 => handler process Pong(ByteVector fromValidHex "00" * resposeLength)
+        case Ping(replyLength, _) if replyLength > 0 && replyLength <= 65532 => handler process Pong(ByteVector fromValidHex "00" * replyLength)
         case internalMessage => events.onMessage(ann.nodeId, internalMessage)
       }
     }
