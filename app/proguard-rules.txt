@@ -6,7 +6,6 @@
 -dontwarn okio.**
 -dontwarn scala.**
 -dontwarn org.slf4j.**
--dontwarn net.sqlcipher.**
 -dontwarn org.spongycastle.**
 -dontwarn org.bitcoinj.store.**
 -dontwarn com.google.common.cache.**
@@ -19,6 +18,6 @@
 -keep class scala.collection.SeqLike { public protected *; }
 
 -keep public enum * {
-	public static **[] values();
-	public static ** valueOf(java.lang.String);
+  public static **[] values();
+  public static ** valueOf(java.lang.String);
 }
