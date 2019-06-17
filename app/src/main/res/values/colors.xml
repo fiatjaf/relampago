@@ -10,4 +10,5 @@
     <item name="fabbgnormal" type="color">#333333</item>
     <item name="fabbgpressed" type="color">#444444</item>
     <item name="fabbgripple" type="color">#66FFFFFF</item>
+    <item name="reddish" type="color">#E31300</item>
 </resources>

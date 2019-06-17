@@ -4,7 +4,9 @@ import R.string._
 import java.text._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Denomination._
+import com.lightning.walletapp.Denomination.reddish
 import com.lightning.walletapp.Utils.app
+import android.content.res.Configuration
 import fr.acinq.bitcoin.MilliSatoshi
 import language.implicitConversions
 import org.bitcoinj.core.Coin
@@ -12,11 +14,14 @@ import language.postfixOps
 
 
 object Denomination {
-  val locale = new java.util.Locale("en", "US")
+  private[this] val locale = new java.util.Locale("en", "US")
   val symbols = new DecimalFormatSymbols(locale)
   symbols.setGroupingSeparator('\u00A0')
   symbols.setDecimalSeparator('.')
 
+  // TODO: remove this hack once themed color can be appropriately fetched
+  val mode = app.getResources.getConfiguration.uiMode & Configuration.UI_MODE_NIGHT_MASK
+  val reddish = if (mode == Configuration.UI_MODE_NIGHT_YES) "#E35646" else "#E31300"
   val formatFiat = new DecimalFormat("#,###,###.##")
   formatFiat setDecimalFormatSymbols symbols
 
@@ -38,7 +43,7 @@ trait Denomination { me =>
     s"$start$content$end"
   }
 
-  def coloredOut(msat: MilliSatoshi, suffix: String) = s"<font color=#DB3F34><tt>-</tt>${me parsed msat}</font>$suffix"
+  def coloredOut(msat: MilliSatoshi, suffix: String) = s"<font color=$reddish><tt>-</tt>${me parsed msat}</font>$suffix"
   def coloredIn(msat: MilliSatoshi, suffix: String) = s"<font color=#6AAB38><tt>+</tt>${me parsed msat}</font>$suffix"
 
   val amountInTxt: String
