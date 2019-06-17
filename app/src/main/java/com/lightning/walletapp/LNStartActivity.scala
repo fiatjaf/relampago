@@ -67,7 +67,7 @@ object FragLNStart {
 class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_ln_start, vg, false)
   val bitrefillKey = PublicKey.fromValidHex("030c3f19d742ca294a55c00376b3b355c3c90d61c6b6b39554dbc7ac19b141c14f")
-  val liteGoKey = PublicKey.fromValidHex("02c12b5459cf107ee0440cae41902f1189db50fa003a077f3a6fbe6b5760218695")
+  val liteGoKey = PublicKey.fromValidHex("029aee02904d4e419770b93c1b07aae2814a79032e23cafb4024cbea6fb71be106")
   val acinqKey = PublicKey.fromValidHex("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
 
   val bitrefillNa = app.mkNodeAnnouncement(bitrefillKey, NodeAddress.fromParts("52.50.244.44", 9735), "Bitrefill")
