@@ -11,7 +11,7 @@ android {
         multiDexEnabled true
         targetSdkVersion 28
         minSdkVersion 21
-        versionCode 126
+        versionCode 128
     }
 
     buildTypes {
@@ -32,34 +32,34 @@ android {
 
 dependencies {
     // Bitcoin and crypto
-    implementation files('libs/bitcoinj-core-0.15-SNAPSHOT-bundled.jar')
-    implementation 'com.google.code.ndef-tools-for-android:ndeftools:1.2.4'
-    implementation 'com.journeyapps:zxing-android-embedded:3.5.0@aar'
-    implementation 'com.softwaremill.quicklens:quicklens_2.11:1.4.11'
-    implementation 'org.scodec:scodec-core_2.11:1.11.3'
-    implementation 'io.spray:spray-json_2.11:1.3.5'
-    implementation 'com.google.zxing:core:3.3.3'
+    compile files('libs/bitcoinj-core-0.15-SNAPSHOT-bundled.jar')
+    compile 'com.google.code.ndef-tools-for-android:ndeftools:1.2.4'
+    compile 'com.journeyapps:zxing-android-embedded:3.5.0@aar'
+    compile 'com.softwaremill.quicklens:quicklens_2.11:1.4.11'
+    compile 'org.scodec:scodec-core_2.11:1.11.3'
+    compile 'io.spray:spray-json_2.11:1.3.5'
+    compile 'com.google.zxing:core:3.3.3'
 
-    implementation('android.arch.work:work-runtime:1.0.0-alpha11') {
+    compile('android.arch.work:work-runtime:1.0.0-alpha11') {
         exclude group: 'com.google.guava', module: 'listenablefuture'
     }
 
     // Misc
-    implementation 'com.android.support:support-v4:28.0.0'
-    implementation 'com.android.support:cardview-v7:28.0.0'
-    implementation 'com.android.support:appcompat-v7:28.0.0'
-    implementation 'com.android.support:recyclerview-v7:28.0.0'
-    implementation 'com.android.support:support-media-compat:28.0.0'
-    implementation 'com.google.android.gms:play-services-drive:15.0.1'
-    implementation 'com.google.android.gms:play-services-auth:15.0.1'
-    implementation 'com.github.kevinsawicki:http-request:6.0'
-    implementation 'org.scala-lang:scala-library:2.11.12'
-    implementation 'com.hootsuite.android:nachos:1.1.1'
-    implementation 'io.reactivex:rxscala_2.11:0.26.5'
-    implementation 'commons-codec:commons-codec:1.9'
-    implementation 'com.github.clans:fab:1.6.4'
+    compile 'com.android.support:support-v4:28.0.0'
+    compile 'com.android.support:cardview-v7:28.0.0'
+    compile 'com.android.support:appcompat-v7:28.0.0'
+    compile 'com.android.support:recyclerview-v7:28.0.0'
+    compile 'com.android.support:support-media-compat:28.0.0'
+    compile 'com.google.android.gms:play-services-drive:15.0.1'
+    compile 'com.google.android.gms:play-services-auth:15.0.1'
+    compile 'com.github.kevinsawicki:http-request:6.0'
+    compile 'org.scala-lang:scala-library:2.11.12'
+    compile 'com.hootsuite.android:nachos:1.1.1'
+    compile 'io.reactivex:rxscala_2.11:0.26.5'
+    compile 'commons-codec:commons-codec:1.9'
+    compile 'com.github.clans:fab:1.6.4'
 
-//    implementation ('eu.lp0.slf4j:slf4j-android:1.7.25-0') {
+//    compile ('eu.lp0.slf4j:slf4j-android:1.7.25-0') {
 //        exclude module: 'slf4j-api'
 //    }
 }
