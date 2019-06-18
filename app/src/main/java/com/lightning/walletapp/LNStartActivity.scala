@@ -71,7 +71,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   val acinqKey = PublicKey.fromValidHex("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
 
   val bitrefillNa = app.mkNodeAnnouncement(bitrefillKey, NodeAddress.fromParts("52.50.244.44", 9735), "Bitrefill")
-  val liteGoNa = app.mkNodeAnnouncement(liteGoKey, NodeAddress.fromParts("141.101.8.36", 9735), "LiteGo")
+  val liteGoNa = app.mkNodeAnnouncement(liteGoKey, NodeAddress.fromParts("195.154.169.49", 9735), "LiteGo")
   val acinqNa = app.mkNodeAnnouncement(acinqKey, NodeAddress.fromParts("34.239.230.56", 9735), "ACINQ")
 
   val bitrefill = HardcodedNodeView(bitrefillNa, "<i>bitrefill.com</i>")
