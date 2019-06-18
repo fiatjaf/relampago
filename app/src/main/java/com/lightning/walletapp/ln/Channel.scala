@@ -645,7 +645,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
 
     ChannelReestablish(some.commitments.channelId, nextLocalCommitmentNumber, some.commitments.remoteCommit.index,
-      yourLastPerCommitmentSecret = Some apply Scalar(yourLastPerCommitmentSecret getOrElse Zeroes),
+      yourLastPerCommitmentSecret = yourLastPerCommitmentSecret.map(Scalar.apply) orElse Some(Zeroes),
       myCurrentPerCommitmentPoint = Some apply myCurrentPerCommitmentPoint)
   }
 
@@ -667,7 +667,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
   }
 
   def startLocalClose(some: HasCommitments): Unit =
-  // Something went wrong and we decided to spend our CURRENT commit transaction
+    // Something went wrong and we decided to spend our CURRENT commit transaction
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
       case (_, neg: NegotiationsData) if neg.lastSignedTx.isDefined => startMutualClose(neg, neg.lastSignedTx.get.tx)
       case (localClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(localCommit = localClaim :: Nil)
@@ -675,14 +675,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     }
 
   private def startRemoteCurrentClose(some: HasCommitments) =
-  // They've decided to spend their CURRENT commit tx, we need to take what's ours
+    // They've decided to spend their CURRENT commit tx, we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, some.commitments.remoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(remoteCommit = remoteClaim :: Nil)
       case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, remoteCommit = remoteClaim :: Nil)
     }
 
   private def startRemoteNextClose(some: HasCommitments, nextRemoteCommit: RemoteCommit) =
-  // They've decided to spend their NEXT commit tx, once again we need to take what's ours
+    // They've decided to spend their NEXT commit tx, once again we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, nextRemoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(nextRemoteCommit = remoteClaim :: Nil)
       case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, nextRemoteCommit = remoteClaim :: Nil)

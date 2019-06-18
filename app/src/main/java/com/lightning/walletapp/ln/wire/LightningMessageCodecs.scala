@@ -76,18 +76,10 @@ object LightningMessageCodecs { me =>
     decoder = (wire: BitVector) => bytes(33).decode(wire).map(_ map Point.apply)
   )
 
-  private def pk(toPubkey: ByteVector => PublicKey) = Codec[PublicKey] (
+  val publicKey = Codec[PublicKey] (
     encoder = (publicKey: PublicKey) => bytes(33).encode(publicKey.value toBin true),
-    decoder = (wire: BitVector) => bytes(33).decode(wire).map(_ map toPubkey)
+    decoder = (wire: BitVector) => bytes(33).decode(wire).map(_ map PublicKey.apply)
   )
-
-  val publicKey = pk(PublicKey.apply)
-  val checkedPublicKey = pk { byteVector =>
-    val checkedPublicKey = PublicKey(byteVector)
-    val okPoint = checkedPublicKey.value.isInstanceOf[Point]
-    require(okPoint, "Not a valid pubkey")
-    checkedPublicKey
-  }
 
   val ipv6address: Codec[Inet6Address] = bytes(16).exmap(
     bv => me attemptFromTry Inet6Address.getByAddress(null, bv.toArray, null),
@@ -150,7 +142,7 @@ object LightningMessageCodecs { me =>
       (uint32 withContext "feeratePerKw") ::
       (uint16 withContext "toSelfDelay") ::
       (uint16 withContext "maxAcceptedHtlcs") ::
-      (checkedPublicKey withContext "fundingPubkey") ::
+      (publicKey withContext "fundingPubkey") ::
       (point withContext "revocationBasepoint") ::
       (point withContext "paymentBasepoint") ::
       (point withContext "delayedPaymentBasepoint") ::
@@ -167,7 +159,7 @@ object LightningMessageCodecs { me =>
       (uint32 withContext "minimumDepth") ::
       (uint16 withContext "toSelfDelay") ::
       (uint16 withContext "maxAcceptedHtlcs") ::
-      (checkedPublicKey withContext "fundingPubkey") ::
+      (publicKey withContext "fundingPubkey") ::
       (point withContext "revocationBasepoint") ::
       (point withContext "paymentBasepoint") ::
       (point withContext "delayedPaymentBasepoint") ::

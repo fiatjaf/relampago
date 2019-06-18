@@ -8,7 +8,7 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.Features._
 
 import rx.lang.scala.{Observable => Obs}
-import com.lightning.walletapp.ln.Tools.{Bytes, none, random}
+import com.lightning.walletapp.ln.Tools.{Bytes, none}
 import com.lightning.walletapp.ln.crypto.Noise.KeyPair
 import java.util.concurrent.ConcurrentHashMap
 import fr.acinq.bitcoin.Crypto.PublicKey
@@ -40,7 +40,7 @@ object ConnectionManager {
 
     val handler: TransportHandler = new TransportHandler(keyPair, ann.nodeId) {
       def handleEnterOperationalState = handler process Init(LNParams.globalFeatures, LNParams.localFeatures)
-      def handleEncryptedOutgoingData(data: ByteVector) = try sock.getOutputStream write data.toArray catch none
+      def handleEncryptedOutgoingData(data: ByteVector) = try sock.getOutputStream write data.toArray catch handleError
       def handleDecryptedIncomingData(data: ByteVector) = intercept(LightningMessageCodecs deserialize data)
       def handleError = { case _ => disconnect }
     }
@@ -76,11 +76,9 @@ object ConnectionManager {
     }
   }
 
-  Obs interval 20.seconds foreach { _ =>
-    val randomData = random.getBytes(random.nextInt(15) + 1)
-    val dead \ stale = connections.values.partition(_.lastMsg < System.currentTimeMillis - 1000L * 40)
-    for (work <- stale) work.handler process Ping(random.nextInt(15) + 1, ByteVector view randomData)
-    for (work <- dead) work.disconnect
+  Obs interval 30.seconds foreach { _ =>
+    val tooLongAgo = System.currentTimeMillis - 1000L * 30
+    connections.values.filter(_.lastMsg < tooLongAgo).foreach(_.disconnect)
   }
 }
 
