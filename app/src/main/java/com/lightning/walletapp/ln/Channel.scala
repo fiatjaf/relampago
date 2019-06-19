@@ -717,8 +717,7 @@ object Channel {
 
   def channelAndHop(chan: Channel) = for {
     upd <- chan.hasCsOr(_.commitments.updateOpt, None)
-    hop = upd.toHop(chan.data.announce.nodeId)
-  } yield chan -> Vector(hop)
+  } yield chan -> Vector(upd toHop chan.data.announce.nodeId)
 }
 
 trait ChannelListener {

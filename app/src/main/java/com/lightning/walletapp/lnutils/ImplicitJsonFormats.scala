@@ -23,17 +23,21 @@ import scodec.bits.{BitVector, ByteVector}
 
 
 object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
+  val json2String = (_: JsValue).convertTo[String]
+  private val TAG = "tag"
+
   def json2BitVec(json: JsValue): Option[BitVector] = BitVector fromHex json2String(json)
   def sCodecJsonFmt[T](codec: Codec[T] /* Json <-> sCodec bridge */) = new JsonFormat[T] {
     def read(serialized: JsValue) = codec.decode(json2BitVec(serialized).get).require.value
     def write(unserialized: T) = codec.encode(unserialized).require.toHex.toJson
   }
 
-  val json2String = (_: JsValue).convertTo[String]
-  def taggedJsonFmt[T](base: JsonFormat[T], tag: String): JsonFormat[T] = new JsonFormat[T] {
-    def write(unserialized: T) = JsObject(base.write(unserialized).asJsObject.fields + extension)
+  def writeExt[T](ext: (String, JsValue), base: JsValue) =
+    JsObject(base.asJsObject.fields + ext)
+
+  def taggedJsonFmt[T](base: JsonFormat[T], tag: String) = new JsonFormat[T] {
+    def write(unserialized: T) = writeExt(TAG -> JsString(tag), base write unserialized)
     def read(serialized: JsValue) = base read serialized
-    private val extension = "tag" -> JsString(tag)
   }
 
   implicit object BigIntegerFmt extends JsonFormat[BigInteger] {
@@ -109,7 +113,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case unserialiedMessage: WithdrawRequest => unserialiedMessage.toJson
     }
 
-    def read(serialized: JsValue): LNUrlData = serialized.asJsObject fields "tag" match {
+    def read(serialized: JsValue): LNUrlData = serialized.asJsObject fields TAG match {
       case JsString("channelRequest") => serialized.convertTo[IncomingChannelRequest]
       case JsString("withdrawRequest") => serialized.convertTo[WithdrawRequest]
       case _ => throw new RuntimeException
@@ -134,7 +138,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   extends JsonFormat[TransactionWithInputInfo] {
 
     def read(json: JsValue) =
-      json.asJsObject fields "tag" match {
+      json.asJsObject fields TAG match {
         case JsString("CommitTx") => json.convertTo[CommitTx]
         case JsString("HtlcSuccessTx") => json.convertTo[HtlcSuccessTx]
         case JsString("HtlcTimeoutTx") => json.convertTo[HtlcTimeoutTx]
@@ -245,7 +249,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit object HasCommitmentsFmt
   extends JsonFormat[HasCommitments] {
-    def read(json: JsValue) = json.asJsObject fields "tag" match {
+    def read(json: JsValue) = json.asJsObject fields TAG match {
       case JsString("WaitBroadcastRemoteData") => json.convertTo[WaitBroadcastRemoteData]
       case JsString("WaitFundingDoneData") => json.convertTo[WaitFundingDoneData]
       case JsString("NegotiationsData") => json.convertTo[NegotiationsData]
@@ -324,7 +328,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case unserialiedMessage: LegacyAct => unserialiedMessage.toJson
     }
 
-    def read(serialized: JsValue): CloudAct = serialized.asJsObject.fields get "tag" match {
+    def read(serialized: JsValue): CloudAct = serialized.asJsObject.fields get TAG match {
       case Some(s: JsString) if s.value == "ChannelUploadAct" => serialized.convertTo[ChannelUploadAct]
       case Some(s: JsString) if s.value == "TxUploadAct" => serialized.convertTo[TxUploadAct]
       case Some(s: JsString) if s.value == "CerberusAct" => serialized.convertTo[CerberusAct]
