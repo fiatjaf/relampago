@@ -65,7 +65,6 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (InitData(announce), Tuple2(localParams: LocalParams, open: OpenChannel), WAIT_FOR_INIT) =>
         if (LNParams.chainHash != open.chainHash) throw new LightningException("They have provided a wrong chain hash")
-        if (open.fundingSatoshis * 1000L < LNParams.minCapacityMsat) throw new LightningException("Their proposed capacity is too small")
         if (open.channelFlags.isPublic) throw new LightningException("They are offering a public channel and we only support private ones")
         if (open.pushMsat > 1000L * open.fundingSatoshis) throw new LightningException("They are trying to push more than proposed capacity")
         if (open.dustLimitSatoshis > open.channelReserveSatoshis) throw new LightningException("Their dust limit exceeds their channel reserve")
