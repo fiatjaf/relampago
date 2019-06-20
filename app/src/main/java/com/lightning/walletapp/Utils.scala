@@ -45,7 +45,7 @@ object Utils {
   var denom: Denomination = _
   var fiatCode: String = _
 
-  final val fileName = "SegwitMainnet"
+  final val fileName = "SegwitTestnet4"
   final val dbFileName = s"$fileName.db"
   final val walletFileName = s"$fileName.wallet"
   final val chainFileName = s"$fileName.spvchain"

@@ -23,11 +23,11 @@
         android:icon="@mipmap/ic_launcher"
         android:fullBackupContent="false"
         android:allowBackup="false"
-        android:label="Bitcoin">
+        android:label="Testnet">
 
         <provider
             android:name="android.support.v4.content.FileProvider"
-            android:authorities="com.lightning.walletapp"
+            android:authorities="com.lightning.wallet"
             android:grantUriPermissions="true"
             android:exported="false">
 

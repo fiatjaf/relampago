@@ -151,10 +151,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     ConnectionManager.listeners += connectionListener
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
-
-    val backupUnknownOrFailed = app.prefs.getLong(AbstractKit.GDRIVE_LAST_SAVE, 0L) <= 0L
-    val needsCheck = !GDrive.isMissing(app) && app.prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true) && backupUnknownOrFailed
-    if (needsCheck) queue.map(_ => GDrive signInAccount me).foreach(accountOpt => if (accountOpt.isEmpty) askGDriveSignIn)
   } else me exitTo classOf[MainActivity]
 
   override def onActivityResult(reqCode: Int, resultCode: Int, results: Intent) = {

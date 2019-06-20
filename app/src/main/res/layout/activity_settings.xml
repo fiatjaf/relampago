@@ -33,20 +33,6 @@
 
             <CheckBox
                 style="@style/RightCheckBox"
-                android:id="@+id/gDriveBackups"
-                android:text="@string/sets_gdrive"
-                android:onClick="onGDriveTap"/>
-
-            <TextView
-                style="@style/BaseText"
-                android:layout_marginBottom="15dp"
-                android:id="@+id/gDriveBackupState"
-                android:layout_width="match_parent"/>
-
-            <View style="@style/GrayDivider"/>
-
-            <CheckBox
-                style="@style/RightCheckBox"
                 android:id="@+id/fpAuthentication"
                 android:layout_marginBottom="15dp"
                 android:text="@string/sets_fp"

@@ -38,10 +38,8 @@ import java.io.File
 
 
 class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  lazy val gDriveBackups = findViewById(R.id.gDriveBackups).asInstanceOf[CheckBox]
   lazy val useTrustedNode = findViewById(R.id.useTrustedNode).asInstanceOf[CheckBox]
   lazy val fpAuthentication = findViewById(R.id.fpAuthentication).asInstanceOf[CheckBox]
-  lazy val gDriveBackupState = findViewById(R.id.gDriveBackupState).asInstanceOf[TextView]
   lazy val useTrustedNodeState = findViewById(R.id.useTrustedNodeState).asInstanceOf[TextView]
   lazy val exportWalletSnapshot = findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
   lazy val chooseBitcoinUnit = findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
@@ -53,13 +51,6 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val gf = new Goldfinger.Builder(me).build
   lazy val host = me
 
-  override def onActivityResult(reqCode: Int, resultCode: Int, result: Intent) = {
-    val isGDriveSignInSuccessful = reqCode == 102 && resultCode == Activity.RESULT_OK
-    app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, isGDriveSignInSuccessful).commit
-    if (isGDriveSignInSuccessful) checkBackup(GoogleSignIn.getSignedInAccountFromIntent(result).getResult)
-    updateBackupView
-  }
-
   override def onCreateOptionsMenu(menu: Menu) = {
     getMenuInflater.inflate(R.menu.status, menu)
     true
@@ -69,55 +60,6 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     val walletManual = Uri parse "http://lightning-wallet.com"
     me startActivity new Intent(Intent.ACTION_VIEW, walletManual)
     true
-  }
-
-  def checkBackup(signInAcc: GoogleSignInAccount) = {
-    val syncTask = GDrive.syncClientTask(app)(signInAcc)
-    val driveResClient = GDrive.driveResClient(app)(signInAcc)
-
-    val onMedaData = TaskWrap.onSuccess[MetadataBuffer] { buf =>
-      // Update values right away and upload backup since it may be stale at this point
-      // for example: user turned backups off a long time ago and now has changed his mind
-      GDrive.updateLastSaved(app, if (buf.getCount < 1) 0L else System.currentTimeMillis)
-      UITask(updateBackupView).run
-      ChannelManager.backUp
-    }
-
-    val updateInterface = TaskWrap.onFailure { exc =>
-      // At this point we know it does not work so update UI and settings
-      app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, false).commit
-      UITask(updateBackupView).run
-    }
-
-    val maybeAskSignIn = TaskWrap.onFailure {
-      case api: ApiException if api.getStatusCode == SIGN_IN_REQUIRED =>
-        val onDGriveAccessRevoked = TaskWrap.onSuccess[Void] { _ => askGDriveSignIn }
-        GDrive.signInAttemptClient(me).revokeAccess.addOnSuccessListener(onDGriveAccessRevoked)
-
-      case exc =>
-        // At least let user know
-        app toast exc.getMessage
-    }
-
-    new TaskWrap[Void, MetadataBuffer] sContinueWithTask syncTask apply { _ =>
-      GDrive.getMetaTask(driveResClient.getAppFolder, driveResClient, backupFileName)
-        .addOnFailureListener(updateInterface).addOnFailureListener(maybeAskSignIn)
-        .addOnSuccessListener(onMedaData)
-    }
-  }
-
-  def onGDriveTap(cb: View) = {
-    def proceed = queue.map(_ => GDrive signInAccount me) foreach {
-      case Some(gDriveAccountMaybe) => checkBackup(gDriveAccountMaybe)
-      case _ => askGDriveSignIn
-    }
-
-    if (gDriveBackups.isChecked) proceed else {
-      // User has opted out of GDrive backups, revoke access immediately
-      app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, false).commit
-      GDrive.signInAttemptClient(me).revokeAccess
-      updateBackupView
-    }
   }
 
   def onFpTap(cb: View) = fpAuthentication.isChecked match {
@@ -156,7 +98,6 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     getSupportActionBar setSubtitle "App version 0.3-133"
     getSupportActionBar setTitle wallet_settings
     updateTrustedView
-    updateBackupView
     updateFpView
 
     setFiatCurrency setOnClickListener onButtonTap {
@@ -241,13 +182,13 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         val zygote = WalletZygote(1, dbByteVec, walletByteVec, chainByteVec)
         val encoded = walletZygoteCodec.encode(zygote).require.toByteArray
 
-        val name = s"BLW Snapshot ${new Date}.txt"
+        val name = s"Testnet BLW Snapshot ${new Date}.txt"
         val walletSnapshotFilePath = new File(getCacheDir, "images")
         if (!walletSnapshotFilePath.isFile) walletSnapshotFilePath.mkdirs
         val savedFile = new File(walletSnapshotFilePath, name)
         Files.write(encoded, savedFile)
 
-        val fileURI = FileProvider.getUriForFile(me, "com.lightning.walletapp", savedFile)
+        val fileURI = FileProvider.getUriForFile(me, "com.lightning.wallet", savedFile)
         val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
         share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
         me startActivity Intent.createChooser(share, "Choose an app")
@@ -288,21 +229,6 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     // Wallet may not notice incoming tx until synchronized
     recoverFunds.setEnabled(ChannelManager.blockDaysLeft <= 1)
   } else me exitTo classOf[MainActivity]
-
-  def updateBackupView = {
-    val isUserEnabled = app.prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true)
-    val lastStamp = app.prefs.getLong(AbstractKit.GDRIVE_LAST_SAVE, 0L)
-    val state = time apply new java.util.Date(lastStamp)
-    val gDriveMissing = GDrive isMissing app
-
-    if (gDriveMissing) gDriveBackupState setText gdrive_not_present
-    else if (!isUserEnabled) gDriveBackupState setText gdrive_disabled
-    else if (lastStamp == -1L) gDriveBackupState setText gdrive_failed
-    else if (lastStamp == 0L) gDriveBackupState setText gdrive_not_present
-    else gDriveBackupState setText getString(gdrive_last_saved).format(state).html
-    gDriveBackups.setChecked(!gDriveMissing && isUserEnabled)
-    gDriveBackups.setEnabled(!gDriveMissing)
-  }
 
   def updateFpView = {
     val isOperational = FingerPrint isOperational gf
