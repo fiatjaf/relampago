@@ -170,7 +170,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   def getVulnerableRevVec(chan: Channel) = chan.hasCsOr(some => {
     // Find previous channel states which peer might be now tempted to spend
-    val threshold = some.commitments.remoteCommit.spec.toRemoteMsat - dust.amount * 4 * 1000L
+    val threshold = some.commitments.remoteCommit.spec.toRemoteMsat - dust.amount * 20 * 1000L
     def toTxidAndInfo(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
     RichCursor apply db.select(RevokedInfoTable.selectLocalSql, some.commitments.channelId, threshold) vec toTxidAndInfo
   }, Vector.empty)
