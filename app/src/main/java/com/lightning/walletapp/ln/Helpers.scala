@@ -338,7 +338,7 @@ object Helpers {
       if (!localParams.isFunder) {
         val fees = Scripts.commitTxFee(remoteParams.dustLimitSat, remoteSpec).amount
         val missing = remoteSpec.toLocalMsat / 1000L - localParams.channelReserveSat - fees
-        if (missing < 0) throw new LightningException("They are funder and can not afford fees")
+        if (missing < 0) throw new LightningException(s"Remote funder misses $missing SAT for fees")
       }
 
       val localPerCommitmentPoint = perCommitPoint(localParams.shaSeed, 0L)

@@ -229,7 +229,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val sslAwareRequest = awaitRequest.trustAllCerts.trustAllHosts
     app toast ln_url_resolving
 
-    <(to[LNUrlData](sslAwareRequest.body), onFail) {
+    <(to[LNUrlData](LNUrlData guardResponse sslAwareRequest.body), onFail) {
       case incomingChan: IncomingChannelRequest => me initConnection incomingChan
       case withdrawal: WithdrawRequest => me doReceivePayment Some(withdrawal, lnUrl)
       case _ => app toast err_no_data

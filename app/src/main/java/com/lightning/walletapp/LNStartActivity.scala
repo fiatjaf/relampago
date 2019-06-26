@@ -144,11 +144,12 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 
 object LNUrlData {
   type PayReqVec = Vector[PaymentRequest]
-  def guardResponse(raw: String): Unit = {
+  def guardResponse(raw: String): String = {
     val validJson = Try(raw.parseJson.asJsObject.fields)
     val hasError = validJson.map(_ apply "reason").map(json2String)
     if (validJson.isFailure) throw new Exception(s"Invalid response $raw")
     if (hasError.isSuccess) throw new Exception(hasError.get)
+    raw
   }
 }
 
