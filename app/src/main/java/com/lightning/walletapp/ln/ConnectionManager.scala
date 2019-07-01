@@ -76,10 +76,11 @@ object ConnectionManager {
     }
   }
 
-  Obs interval 30.seconds foreach { _ =>
-    val tooLongAgo = System.currentTimeMillis - 1000L * 30
-    connections.values.filter(_.lastMsg < tooLongAgo).foreach(_.disconnect)
-  }
+  for {
+    _ <- Obs interval 30.seconds
+    tooLongAgo = System.currentTimeMillis - 1000L * 60
+    worker <- connections.values if worker.lastMsg < tooLongAgo
+  } worker.disconnect
 }
 
 class ConnectionListener {
