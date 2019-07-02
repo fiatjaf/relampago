@@ -488,9 +488,7 @@ object ChannelManager extends Broadcaster {
       cheapestRoutes <- paymentRoutesObs
       busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => inFlightHtlcs(chan).size)
       openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1)
-      lessBusyRoutes = cheapestRoutes.sortBy(route => if (route.isEmpty) busyMap apply rd.pr.nodeId else busyMap apply route.head.nodeId)
-      openRoutes = lessBusyRoutes.sortBy(route => if (route.isEmpty) openMap apply rd.pr.nodeId else openMap apply route.head.nodeId)
-    } yield useFirstRoute(openRoutes, rd)
+    } yield useFirstRoute(cheapestRoutes.sortBy(rd.nextNodeId andThen busyMap).sortBy(rd.nextNodeId andThen openMap), rd)
   }
 
   def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
@@ -504,10 +502,8 @@ object ChannelManager extends Broadcaster {
         // Reflexive payment may happen through two chans belonging to the same peer
         // here we must make sure we don't accidently use terminal channel as source one
         val excludeChan = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
-        // Empty used route means we're sending to peer and its nodeId should be our targetId
-        val targetNodeId = if (rd.usedRoute.isEmpty) rd.pr.nodeId else rd.usedRoute.head.nodeId
         val isLoop = chan.hasCsOr(_.commitments.updateOpt.exists(_.shortChannelId == excludeChan), false)
-        !isLoop && chan.data.announce.nodeId == targetNodeId && estimateCanSend(chan) >= rd.firstMsat
+        !isLoop && chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) && estimateCanSend(chan) >= rd.firstMsat
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)
         case Some(targetGoodChannel) => targetGoodChannel process rd
