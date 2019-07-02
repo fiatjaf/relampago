@@ -193,7 +193,7 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        useCache: Boolean, airLeft: Int) {
 
   // Empty used route means we're sending to peer and its nodeId should be our targetId
-  val nextNodeId: PaymentRoute => PublicKey = _.headOption.map(_.nodeId) getOrElse pr.nodeId
+  def nextNodeId(route: PaymentRoute) = route.headOption.map(_.nodeId) getOrElse pr.nodeId
   lazy val withMaxOffChainFeeAdded = firstMsat + LNParams.maxAcceptableFee(firstMsat, hops = 3)
   lazy val queryText = s"${pr.description} ${pr.nodeId.toString} ${pr.paymentHash.toHex}"
   lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
