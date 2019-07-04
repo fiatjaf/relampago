@@ -58,10 +58,10 @@ object LNParams { me =>
   def maxAcceptableFee(msat: Long, hops: Int, percent: Long = 100L) = 25000 * (hops + 1) + msat / percent
 
   def isFeeBreach(route: PaymentRoute, msat: Long, divider: Long = 100L) =
-    getCompundFee(route, msat) > maxAcceptableFee(msat, route.size, divider)
+    getCompoundFee(route, msat) > maxAcceptableFee(msat, route.size, divider)
 
-  def getCompundFee(route: PaymentRoute, msat: Long) = route.reverse.foldLeft(msat) {
-    case sum \ hop => sum + hopFee(sum, hop.feeBaseMsat, hop.feeProportionalMillionths)
+  def getCompoundFee(route: PaymentRoute, msat: Long = 10000000L) = route.reverse.foldLeft(msat) {
+    case amount \ hop => amount + hopFee(amount, hop.feeBaseMsat, hop.feeProportionalMillionths)
   } - msat
 
   def shouldUpdateFee(network: Long, commit: Long) = {

@@ -485,10 +485,11 @@ object ChannelManager extends Broadcaster {
       else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
 
     for {
-      cheapestRoutes <- paymentRoutesObs
+      cheapestUnorderedRoutes <- paymentRoutesObs
       busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => inFlightHtlcs(chan).size)
       openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1)
-    } yield useFirstRoute(cheapestRoutes.sortBy(busyMap compose rd.nextNodeId).sortBy(openMap compose rd.nextNodeId), rd)
+      cheapestOrderedRoutes = cheapestUnorderedRoutes.sortBy(cheapestRouteCandidate => LNParams getCompoundFee cheapestRouteCandidate)
+    } yield useFirstRoute(cheapestOrderedRoutes.sortBy(busyMap compose rd.nextNodeId).sortBy(openMap compose rd.nextNodeId), rd)
   }
 
   def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
