@@ -31,7 +31,7 @@ class WireSpec {
   def randomSignature: ByteVector = {
     val priv = randomBytes(32)
     val data = randomBytes(32)
-    val (r, s) = Crypto.sign(data, PrivateKey(priv, true))
+    val (r, s) = Crypto.sign(data, PrivateKey(priv, compressed = true))
     Crypto.encodeSignature(r, s) :+ fr.acinq.bitcoin.SIGHASH_ALL.toByte
   }
 
@@ -178,6 +178,125 @@ class WireSpec {
       {
         val alias = "this-alias-is-far-too-long-because-we-are-limited-to-32-bytes"
         assert(c.encode(alias).isFailure)
+      }
+    }
+
+    {
+      println("encode/decode with uint64 codec")
+
+      val expected = Map(
+        UInt64(0) -> ByteVector.fromValidHex("0000000000000000"),
+        UInt64(42) -> ByteVector.fromValidHex("000000000000002a"),
+        UInt64(6211610197754262546L) -> ByteVector.fromValidHex("5634129078563412"),
+        UInt64(ByteVector.fromValidHex("ffffffffffffffff")) -> ByteVector.fromValidHex("ffffffffffffffff")
+      ).mapValues(_.toBitVector)
+
+      for ((uint, ref) <- expected) {
+        val encoded = uint64.encode(uint).require
+        assert(ref == encoded)
+        val decoded = uint64.decode(encoded).require.value
+        assert(uint == decoded)
+      }
+    }
+
+    {
+      println("encode/decode with uint64L codec")
+
+      val expected = Map(
+        UInt64(0) -> ByteVector.fromValidHex("0000000000000000"),
+        UInt64(42) -> ByteVector.fromValidHex("2a00000000000000"),
+        UInt64(6211610197754262546L) -> ByteVector.fromValidHex("1234567890123456"),
+        UInt64(ByteVector.fromValidHex("ffffffffffffffff")) -> ByteVector.fromValidHex("ffffffffffffffff")
+      ).mapValues(_.toBitVector)
+
+      for ((uint, ref) <- expected) {
+        val encoded = uint64L.encode(uint).require
+        assert(ref == encoded)
+        val decoded = uint64L.decode(encoded).require.value
+        assert(uint == decoded)
+      }
+    }
+
+    {
+      println("encode/decode with varint codec")
+
+      val expected = Map(
+        UInt64(0L) -> ByteVector.fromValidHex("00"),
+        UInt64(42L) -> ByteVector.fromValidHex("2a"),
+        UInt64(253L) -> ByteVector.fromValidHex("fdfd00"),
+        UInt64(254L) -> ByteVector.fromValidHex("fdfe00"),
+        UInt64(255L) -> ByteVector.fromValidHex("fdff00"),
+        UInt64(550L) -> ByteVector.fromValidHex("fd2602"),
+        UInt64(998000L) -> ByteVector.fromValidHex("fe703a0f00"),
+        UInt64(6211610197754262546L) -> ByteVector.fromValidHex("ff1234567890123456"),
+        UInt64.MaxValue -> ByteVector.fromValidHex("ffffffffffffffffff")
+      ).mapValues(_.toBitVector)
+
+      for ((uint, ref) <- expected) {
+        val encoded = varint.encode(uint).require
+        assert(ref == encoded, ref)
+        val decoded = varint.decode(encoded).require.value
+        assert(uint == decoded, uint)
+      }
+    }
+
+    {
+      println("decode invalid varint")
+
+      val testCases = Seq(
+        ByteVector.fromValidHex("fd"), // truncated
+        ByteVector.fromValidHex("fe 01"), // truncated
+        ByteVector.fromValidHex("fe"), // truncated
+        ByteVector.fromValidHex("fe 12 34"), // truncated
+        ByteVector.fromValidHex("ff"), // truncated
+        ByteVector.fromValidHex("ff 12 34 56 78"), // truncated
+        ByteVector.fromValidHex("fd 00 00"), // not minimally-encoded
+        ByteVector.fromValidHex("fd fc 00"), // not minimally-encoded
+        ByteVector.fromValidHex("fe 00 00 00 00"), // not minimally-encoded
+        ByteVector.fromValidHex("fe ff ff 00 00"), // not minimally-encoded
+        ByteVector.fromValidHex("ff 00 00 00 00 00 00 00 00"), // not minimally-encoded
+        ByteVector.fromValidHex("ff ff ff ff 01 00 00 00 00"), // not minimally-encoded
+        ByteVector.fromValidHex("ff ff ff ff ff 00 00 00 00") // not minimally-encoded
+      ).map(_.toBitVector)
+
+      for (testCase <- testCases) {
+        assert(varint.decode(testCase).isFailure)
+      }
+    }
+
+    {
+      println("encode/decode with varlong codec")
+
+      val expected = Map(
+        0L -> ByteVector.fromValidHex("00"),
+        42L -> ByteVector.fromValidHex("2a"),
+        253L -> ByteVector.fromValidHex("fd fd 00"),
+        254L -> ByteVector.fromValidHex("fd fe 00"),
+        255L -> ByteVector.fromValidHex("fd ff 00"),
+        550L -> ByteVector.fromValidHex("fd 26 02"),
+        998000L -> ByteVector.fromValidHex("fe 70 3a 0f 00"),
+        6211610197754262546L -> ByteVector.fromValidHex("ff 12 34 56 78 90 12 34 56"),
+        Long.MaxValue -> ByteVector.fromValidHex("ff ff ff ff ff ff ff ff 7f")
+      ).mapValues(_.toBitVector)
+
+      for ((long, ref) <- expected) {
+        val encoded = varintoverflow.encode(long).require
+        assert(ref == encoded, ref)
+        val decoded = varintoverflow.decode(encoded).require.value
+        assert(long == decoded, long)
+      }
+    }
+
+    {
+      println("decode invalid varlong")
+
+      val testCases = Seq(
+        ByteVector.fromValidHex("ff 00 00 00 00 00 00 00 80"),
+        ByteVector.fromValidHex("ff ff ff ff ff ff ff ff ff")
+      ).map(_.toBitVector)
+
+      for (testCase <- testCases) {
+        assert(varintoverflow.decode(testCase).isFailure, testCase.toByteVector)
       }
     }
 

@@ -88,7 +88,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val byteVectorFmt = sCodecJsonFmt(scodec.codecs.bytes)
   implicit val commitSigFmt = sCodecJsonFmt(commitSigCodec)
   implicit val shutdownFmt = sCodecJsonFmt(shutdownCodec)
-  implicit val uint64exFmt = sCodecJsonFmt(uint64ex)
+  implicit val uint64Fmt = sCodecJsonFmt(uint64)
   implicit val hopFmt = sCodecJsonFmt(hopCodec)
   implicit val pointFmt = sCodecJsonFmt(point)
 

@@ -39,12 +39,11 @@ case class TemporaryChannelFailure(update: ChannelUpdate) extends Update
 case class ExpiryTooSoon(update: ChannelUpdate) extends Update
 
 object FailureMessageCodecs {
-  private val sha256Codec = bytes32 withContext "sha256Codec"
   private val channelUpdateCodecWithType = lightningMessageCodec.narrow[ChannelUpdate](Attempt successful _.asInstanceOf[ChannelUpdate], identity)
   private val channelUpdateWithLengthCodec = variableSizeBytes(value = choice(channelUpdateCodecWithType, channelUpdateCodec), size = uint16)
   private val disabled = (byte withContext "messageFlags") :: (byte withContext "channelFlags") :: channelUpdateWithLengthCodec
-  private val unknownPayment = withDefaultValue(optional(bitsRemaining, uint64), 0L) withContext "amountMsat"
-  private val wrongAmount = (uint64 withContext "amountMsat") :: channelUpdateWithLengthCodec
+  private val unknownPayment = withDefaultValue(optional(bitsRemaining, uint64Overflow), 0L) withContext "amountMsat"
+  private val wrongAmount = (uint64Overflow withContext "amountMsat") :: channelUpdateWithLengthCodec
   private val wrongExpiry = (uint32 withContext "expiry") :: channelUpdateWithLengthCodec
 
   val BADONION = 0x8000
@@ -57,9 +56,9 @@ object FailureMessageCodecs {
     .typecase(cr = provide(TemporaryNodeFailure), tag = NODE | 2)
     .typecase(cr = provide(PermanentNodeFailure), tag = PERM | 2)
     .typecase(cr = provide(RequiredNodeFeatureMissing), tag = PERM | NODE | 3)
-    .typecase(cr = sha256Codec.as[InvalidOnionVersion], tag = BADONION | PERM | 4)
-    .typecase(cr = sha256Codec.as[InvalidOnionHmac], tag = BADONION | PERM | 5)
-    .typecase(cr = sha256Codec.as[InvalidOnionKey], tag = BADONION | PERM | 6)
+    .typecase(cr = bytes32.as[InvalidOnionVersion], tag = BADONION | PERM | 4)
+    .typecase(cr = bytes32.as[InvalidOnionHmac], tag = BADONION | PERM | 5)
+    .typecase(cr = bytes32.as[InvalidOnionKey], tag = BADONION | PERM | 6)
     .typecase(cr = channelUpdateWithLengthCodec.as[TemporaryChannelFailure], tag = UPDATE | 7)
     .typecase(cr = provide(PermanentChannelFailure), tag = PERM | 8)
     .typecase(cr = provide(RequiredChannelFeatureMissing), tag = PERM | 9)
@@ -72,7 +71,7 @@ object FailureMessageCodecs {
     .typecase(cr = provide(IncorrectPaymentAmount), tag = PERM | 16)
     .typecase(cr = provide(FinalExpiryTooSoon), tag = 17)
     .typecase(cr = (uint32 withContext "expiry").as[FinalIncorrectCltvExpiry], tag = 18)
-    .typecase(cr = (uint64 withContext "amountMsat").as[FinalIncorrectHtlcAmount], tag = 19)
+    .typecase(cr = (uint64Overflow withContext "amountMsat").as[FinalIncorrectHtlcAmount], tag = 19)
     .typecase(cr = disabled.as[ChannelDisabled], tag = UPDATE | 20)
     .typecase(cr = provide(ExpiryTooFar), tag = 21)
 }

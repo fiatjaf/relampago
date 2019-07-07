@@ -2,16 +2,19 @@ package com.lightning.walletapp.ln.wire
 
 import java.net._
 import scodec.codecs._
-import java.math.BigInteger
-import fr.acinq.eclair.UInt64
-import fr.acinq.bitcoin.Crypto
-import org.apache.commons.codec.binary.Base32
-import com.lightning.walletapp.ln.crypto.Sphinx
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.ln.{LightningException, PerHopPayload, RevocationInfo}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import scodec.bits.{BitVector, ByteVector}
-import scala.util.{Failure, Success, Try}
 import scodec.{Attempt, Codec, Err}
+
+import com.lightning.walletapp.ln.wire.Tlv.TlvSeq
+import com.lightning.walletapp.ln.crypto.Sphinx
+import org.apache.commons.codec.binary.Base32
+import fr.acinq.bitcoin.Crypto
+import fr.acinq.eclair.UInt64
+import java.math.BigInteger
+import scala.util.Try
 
 
 object LightningMessageCodecs { me =>
@@ -21,7 +24,7 @@ object LightningMessageCodecs { me =>
   type RedeemScriptAndSig = (ByteVector, ByteVector)
   type RGB = (Byte, Byte, Byte)
 
-  def serialize(attempt: BitVectorAttempt) = attempt match {
+  def serialize(attempt: BitVectorAttempt): ByteVector = attempt match {
     case Attempt.Successful(binary) => ByteVector.view(binary.toByteArray)
     case Attempt.Failure(err) => throw new LightningException(err.message)
   }
@@ -32,9 +35,13 @@ object LightningMessageCodecs { me =>
       case Attempt.Failure(err) => throw new LightningException(err.message)
     }
 
-  def attemptFromTry[T](run: => T): Attempt[T] = Try(run) match {
-    case Failure(reason) => Attempt failure Err(reason.getMessage)
-    case Success(result) => Attempt successful result
+  def discriminatorWithDefault[A](discriminator: Codec[A], fallback: Codec[A]) = new Codec[A] {
+    def encode(element: A) = discriminator encode element recoverWith { case _ => fallback encode element }
+    def sizeBound = discriminator.sizeBound | fallback.sizeBound
+
+    def decode(bv: BitVector) = discriminator decode bv recoverWith {
+      case _: KnownDiscriminatorType[_]#UnknownDiscriminator => fallback decode bv
+    }
   }
 
   // RGB <-> ByteVector
@@ -59,7 +66,7 @@ object LightningMessageCodecs { me =>
     Crypto.encodeSignature(r, s) :+ 1.toByte
   }
 
-  // Codecs
+  // Generic codecs
 
   val signature = Codec[ByteVector] (
     encoder = (der: ByteVector) => bytes(64).encode(me der2wire der),
@@ -82,8 +89,8 @@ object LightningMessageCodecs { me =>
   )
 
   val ipv6address: Codec[Inet6Address] = bytes(16).exmap(
-    bv => me attemptFromTry Inet6Address.getByAddress(null, bv.toArray, null),
-    inet6Address => me attemptFromTry ByteVector.view(inet6Address.getAddress)
+    bv => Attempt fromTry Try(Inet6Address.getByAddress(null, bv.toArray, null)),
+    inet6Address => Attempt fromTry Try(ByteVector view inet6Address.getAddress)
   )
 
   private val ipv4address: Codec[Inet4Address] = bytes(4).xmap(
@@ -96,10 +103,40 @@ object LightningMessageCodecs { me =>
     address => ByteVector.view(new Base32 decode address.toUpperCase)
   )
 
-  val uint64: Codec[Long] = int64.narrow(ln => if (ln < 0) Attempt failure Err(s"Overflow $ln") else Attempt successful ln, identity)
+  def uint64min(codec: Codec[UInt64], min: Long): Codec[UInt64] = codec.exmap(f = {
+    case value if value < UInt64(min) => Attempt failure Err("Not minimally encoded")
+    case value => Attempt successful value
+  }, Attempt.successful)
+
+  val uint64Overflow: Codec[Long] = int64.narrow(f = {
+    case value if value < 0 => Attempt failure Err(s"Overflow $value")
+    case value => Attempt successful value
+  }, identity)
+
+  val uint64L: Codec[UInt64] = bytes(8).xmap(bv => UInt64(bv.reverse), _.toByteVector.padLeft(8).reverse)
+  val uint64: Codec[UInt64] = bytes(8).xmap(UInt64.apply, _.toByteVector padLeft 8)
+
+  val varint: Codec[UInt64] = {
+    val largeCodec = uint64min(uint64L, 0x100000000L)
+    val middleCodec = uint64min(uint32L.xmap(long => UInt64(long), _.toBigInt.toLong), 0x10000)
+    val smallCodec = uint64min(uint16L.xmap(int => UInt64(int), _.toBigInt.toInt), 0xFD)
+
+    discriminatorWithDefault(
+      discriminated[UInt64].by(uint8L)
+        .\(0xFF) { case i if i >= UInt64(0x100000000L) => i } (largeCodec)
+        .\(0xFE) { case i if i >= UInt64(0x10000) => i } (middleCodec)
+        .\(0xFD) { case i if i >= UInt64(0xFD) => i } (smallCodec),
+      uint8L.xmap(int => UInt64(int), _.toBigInt.toInt)
+    )
+  }
+
+  val varintoverflow: Codec[Long] = varint.narrow(f = {
+    case value if value > UInt64(Long.MaxValue) => Attempt failure Err(s"Overflow $value")
+    case value => Attempt successful value.toBigInt.toLong
+  }, UInt64.apply)
+
   val bytes32: Codec[ByteVector] = limitedSizeBytes(codec = bytesStrict(32).xmap(identity, identity), limit = 32)
   val zeropaddedstring: Codec[String] = fixedSizeBytes(32, utf8).xmap(_.takeWhile(_ != '\u0000'), identity)
-  val uint64ex: Codec[UInt64] = bytes(8).xmap(UInt64.apply, _.toByteVector padLeft 8)
   val varsizebinarydataLong: Codec[ByteVector] = variableSizeBytesLong(uint32, bytes)
   val varsizebinarydata: Codec[ByteVector] = variableSizeBytes(uint16, bytes)
   val rgb: Codec[RGB] = bytes(3).xmap(bv2Rgb, rgb2Bv)
@@ -122,8 +159,8 @@ object LightningMessageCodecs { me =>
 
   val channelReestablish =
     (bytes32 withContext "channelId") ::
-      (uint64 withContext "nextLocalCommitmentNumber") ::
-      (uint64 withContext "nextRemoteRevocationNumber") ::
+      (uint64Overflow withContext "nextLocalCommitmentNumber") ::
+      (uint64Overflow withContext "nextRemoteRevocationNumber") ::
       (optional(bitsRemaining, scalar) withContext "yourLastPerCommitmentSecret") ::
       (optional(bitsRemaining, point) withContext "myCurrentPerCommitmentPoint")
 
@@ -133,12 +170,12 @@ object LightningMessageCodecs { me =>
   private val openChannel =
     (bytes32 withContext "chainHash") ::
       (bytes32 withContext "temporaryChannelId") ::
-      (uint64 withContext "fundingSatoshis") ::
-      (uint64 withContext "pushMsat") ::
-      (uint64 withContext "dustLimitSatoshis") ::
-      (uint64ex withContext "maxHtlcValueInFlightMsat") ::
-      (uint64 withContext "channelReserveSatoshis") ::
-      (uint64 withContext "htlcMinimumMsat") ::
+      (uint64Overflow withContext "fundingSatoshis") ::
+      (uint64Overflow withContext "pushMsat") ::
+      (uint64Overflow withContext "dustLimitSatoshis") ::
+      (uint64 withContext "maxHtlcValueInFlightMsat") ::
+      (uint64Overflow withContext "channelReserveSatoshis") ::
+      (uint64Overflow withContext "htlcMinimumMsat") ::
       (uint32 withContext "feeratePerKw") ::
       (uint16 withContext "toSelfDelay") ::
       (uint16 withContext "maxAcceptedHtlcs") ::
@@ -152,10 +189,10 @@ object LightningMessageCodecs { me =>
 
   private val acceptChannel =
     (bytes32 withContext "temporaryChannelId") ::
-      (uint64 withContext "dustLimitSatoshis") ::
-      (uint64ex withContext "maxHtlcValueInFlightMsat") ::
-      (uint64 withContext "channelReserveSatoshis") ::
-      (uint64 withContext "htlcMinimumMsat") ::
+      (uint64Overflow withContext "dustLimitSatoshis") ::
+      (uint64 withContext "maxHtlcValueInFlightMsat") ::
+      (uint64Overflow withContext "channelReserveSatoshis") ::
+      (uint64Overflow withContext "htlcMinimumMsat") ::
       (uint32 withContext "minimumDepth") ::
       (uint16 withContext "toSelfDelay") ::
       (uint16 withContext "maxAcceptedHtlcs") ::
@@ -195,7 +232,7 @@ object LightningMessageCodecs { me =>
 
   private val closingSigned =
     (bytes32 withContext "channelId") ::
-      (uint64 withContext "feeSatoshis") ::
+      (uint64Overflow withContext "feeSatoshis") ::
       (signature withContext "signature")
 
   val closingSignedCodec =
@@ -203,8 +240,8 @@ object LightningMessageCodecs { me =>
 
   private val updateAddHtlc =
     (bytes32 withContext "channelId") ::
-      (uint64 withContext "id") ::
-      (uint64 withContext "amountMsat") ::
+      (uint64Overflow withContext "id") ::
+      (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry") ::
       (bytes(Sphinx.PacketLength) withContext "onionRoutingPacket")
@@ -214,7 +251,7 @@ object LightningMessageCodecs { me =>
 
   private val updateFulfillHtlc =
     (bytes32 withContext "channelId") ::
-      (uint64 withContext "id") ::
+      (uint64Overflow withContext "id") ::
       (bytes32 withContext "paymentPreimage")
 
   val updateFulfillHtlcCodec =
@@ -222,7 +259,7 @@ object LightningMessageCodecs { me =>
 
   private val updateFailHtlc =
     (bytes32 withContext "channelId") ::
-      (uint64 withContext "id") ::
+      (uint64Overflow withContext "id") ::
       (varsizebinarydata withContext "reason")
 
   val updateFailHtlcCodec =
@@ -230,7 +267,7 @@ object LightningMessageCodecs { me =>
 
   private val updateFailMalformedHtlc =
     (bytes32 withContext "channelId") ::
-      (uint64 withContext "id") ::
+      (uint64Overflow withContext "id") ::
       (bytes32 withContext "onionHash") ::
       (uint16 withContext "failureCode")
 
@@ -288,10 +325,10 @@ object LightningMessageCodecs { me =>
       (byte withContext "messageFlags").flatPrepend { messageFlags =>
         (byte withContext "channelFlags" ) ::
           (uint16 withContext "cltvExpiryDelta") ::
-          (uint64 withContext "htlcMinimumMsat") ::
+          (uint64Overflow withContext "htlcMinimumMsat") ::
           (uint32 withContext "feeBaseMsat") ::
           (uint32 withContext "feeProportionalMillionths" ) ::
-          (conditional(included = (messageFlags & 1) != 0, uint64) withContext "htlcMaximumMsat")
+          (conditional(included = (messageFlags & 1) != 0, uint64Overflow) withContext "htlcMaximumMsat")
       }
 
   val nodeAnnouncementCodec = (signature.withContext("signature") :: nodeAnnouncementWitness).as[NodeAnnouncement]
@@ -329,15 +366,15 @@ object LightningMessageCodecs { me =>
     (publicKey withContext "nodeId") ::
       (int64 withContext "shortChannelId") ::
       (uint16 withContext "cltvExpiryDelta") ::
-      (uint64 withContext "htlcMinimumMsat") ::
+      (uint64Overflow withContext "htlcMinimumMsat") ::
       (uint32 withContext "feeBaseMsat") ::
       (uint32 withContext "feeProportionalMillionths")
   }.as[Hop]
 
   val perHopPayloadCodec = {
     (constant(ByteVector fromByte 0) withContext "realm") ::
-      (uint64 withContext "shortChannelId") ::
-      (uint64 withContext "amtToForward") ::
+      (uint64Overflow withContext "shortChannelId") ::
+      (uint64Overflow withContext "amtToForward") ::
       (uint32 withContext "outgoingCltv") ::
       (ignore(8 * 12) withContext "unusedWithV0VersionOnHeader")
   }.as[PerHopPayload]
@@ -346,8 +383,8 @@ object LightningMessageCodecs { me =>
     (listOfN(uint16, varsizebinarydata ~ signature) withContext "redeemScriptsToSigs") ::
       (optional(bool, signature) withContext "claimMainTxSig") ::
       (optional(bool, signature) withContext "claimPenaltyTxSig") ::
-      (uint64 withContext "feeRate") ::
-      (uint64 withContext "dustLimit") ::
+      (uint64Overflow withContext "feeRate") ::
+      (uint64Overflow withContext "dustLimit") ::
       (varsizebinarydata withContext "finalScriptPubKey") ::
       (uint16 withContext "toSelfDelay") ::
       (publicKey withContext "localPubKey") ::
@@ -373,3 +410,56 @@ object LightningMessageCodecs { me =>
       (vectorOfN(uint16, zeropaddedstring) withContext "halfTxIds")
   }.as[CerberusPayload]
 }
+
+trait Tlv { val tag: UInt64 }
+sealed trait OnionTlv extends Tlv
+// Generic Tlv type we fallback to if we don't understand the tag
+case class GenericTlv(tag: UInt64, value: ByteVector) extends Tlv
+
+object Tlv {
+  type TlvSeq = Seq[Tlv]
+  type TlvCodec = Codec[Tlv]
+  type KnownOrGenericTlv = Either[GenericTlv, Tlv]
+
+  def tlvStream(codec: TlvCodec): Codec[TlvStream] = list(codec).exmap(
+    decodedRecords => Attempt fromTry Try(TlvStream apply decodedRecords),
+    rawStream => Attempt.successful(rawStream.records.toList)
+  )
+
+  def unpack(data: KnownOrGenericTlv) = data match {
+    case Left(genericTlvRecord) => genericTlvRecord
+    case Right(knownTlvRecord) => knownTlvRecord
+  }
+
+  def pack(data: Tlv) = data match {
+    case generic: GenericTlv => Left(generic)
+    case knownTlvRecord => Right(knownTlvRecord)
+  }
+
+  def tlvFallback(codec: TlvCodec): TlvCodec =
+    discriminatorFallback(genericTlv, codec)
+      .xmap(unpack, pack)
+
+  val genericTlv: Codec[GenericTlv] = {
+    (varint withContext "tag") ::
+      variableSizeBytesLong(varintoverflow, bytes)
+  }.as[GenericTlv]
+}
+
+case class TlvStream(records: TlvSeq) {
+  private def checkUnknownEven(record: Tlv) = {
+    val knownOrOdd = !record.isInstanceOf[GenericTlv] || record.tag.toBigInt % 2 != 0
+    require(knownOrOdd, "Tlv streams must not contain unknown even tlv types")
+    Some(record)
+  }
+
+  (Option.empty[Tlv] /: records) {
+    case (Some(previousRecord), record) =>
+      require(record.tag > previousRecord.tag, "Tlv records must be ordered by monotonically-increasing types")
+      require(record.tag != previousRecord.tag, "Tlv streams must not contain duplicate records")
+      checkUnknownEven(record)
+
+    case (None, record) =>
+      checkUnknownEven(record)
+  }
+} 
