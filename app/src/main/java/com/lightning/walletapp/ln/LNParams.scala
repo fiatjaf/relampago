@@ -18,7 +18,7 @@ import scodec.bits.ByteVector
 
 object LNParams { me =>
   type DepthAndDead = (Int, Boolean)
-  val localFeatures = ByteVector.fromValidHex("02")
+  val localFeatures = ByteVector.fromValidHex("8a")
   val globalFeatures = ByteVector.fromValidHex("")
   val chainHash = Block.LivenetGenesisBlock.hash
 

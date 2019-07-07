@@ -2,11 +2,11 @@ package com.lightning.walletapp.ln.wire
 
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-import com.lightning.walletapp.ln.{Features, HasCommitments, LightningException}
-import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
 
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
+import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
+import com.lightning.walletapp.ln.{Features, HasCommitments, LightningException}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
