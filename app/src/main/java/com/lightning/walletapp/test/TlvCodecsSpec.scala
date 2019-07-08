@@ -21,16 +21,14 @@ class TlvCodecsSpec {
 
       val testCases = Seq(
         (ByteVector.fromValidHex("01 08 000000000000002a"), TestType1(42)),
-        (ByteVector.fromValidHex("02 08 0000000000000226"), TestType2(550L)),
-        (ByteVector.fromValidHex("03 31 02eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f283686619 0000000000000231 0000000000000451"), TestType3(PublicKey.fromValidHex("02eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f283686619"), 561, 1105)),
-        (ByteVector.fromValidHex("ff1234567890123456 fd0001 10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010010101010101"),
-          GenericTlv(6211610197754262546L, ByteVector.fromValidHex("10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010010101010101")))
+        (ByteVector.fromValidHex("02 08 0000000000000226"), TestType2(550)),
+        (ByteVector.fromValidHex("03 31 02eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f283686619 0000000000000231 0000000000000451"), TestType3(PublicKey.fromValidHex("02eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f283686619"), 561, 1105))
       )
 
       for ((bin, expected) <- testCases) {
-        val decoded = testTlvCodec.decode(bin.toBitVector).require.value.asInstanceOf[Tlv]
+        val decoded = testTlvCodec.decode(bin.bits).require.value.asInstanceOf[Tlv]
         assert(decoded == expected)
-        val encoded = testTlvCodec.encode(expected).require.toByteVector
+        val encoded = testTlvCodec.encode(expected).require.bytes
         assert(encoded == bin)
       }
     }
@@ -117,6 +115,41 @@ class TlvCodecsSpec {
       assert(encoded == bin)
     }
 
+    {
+      println("encoded/decode empty tlv stream")
+
+      assert(tlvStream(testTlvCodec).decode(ByteVector.empty.bits).require.value == TlvStream(Nil))
+      assert(tlvStream(testTlvCodec).encode(TlvStream(Nil)).require.bytes == ByteVector.empty)
+    }
+
+    {
+      println("encode/decode length-prefixed tlv stream")
+
+      val codec = lengthPrefixedTlvStream(testTlvCodec)
+      val testCases = Seq(
+        ByteVector.fromValidHex("47 01080000000000000231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451"),
+        ByteVector.fromValidHex("fd5301 01080000000000000231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451 ff6543210987654321 fd0001 10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010010101010101")
+      )
+
+      for (testCase <- testCases) {
+        assert(codec.encode(codec.decode(testCase.bits).require.value).require.bytes == testCase)
+      }
+    }
+
+    {
+      println("decode invalid length-prefixed tlv stream")
+
+      val testCases = Seq(
+        ByteVector.fromValidHex("48 01080000000000000231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451"),
+        ByteVector.fromValidHex("46 01080000000000000231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451"),
+        ByteVector.fromValidHex("01080000000000000231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451")
+      )
+
+      for (testCase <- testCases) {
+        assert(lengthPrefixedTlvStream(testTlvCodec).decode(testCase.bits).isFailure)
+      }
+    }
+
   }
 }
 
@@ -131,12 +164,7 @@ object TlvCodecsSpec {
   val testCodec2: Codec[TestType2] = (("length" | constant(ByteVector.fromValidHex("08"))) :: ("short_channel_id" | int64)).as[TestType2]
   val testCodec3: Codec[TestType3] = (("length" | constant(ByteVector.fromValidHex("31"))) :: ("node_id" | publicKey) :: ("value_1" | uint64) :: ("value_2" | uint64)).as[TestType3]
   val testCodec13: Codec[TestType13] = (("length" | constant(ByteVector.fromValidHex("02"))) :: ("value" | uint16)).as[TestType13]
-  val testTlvCodec = tlvFallback(discriminated[Tlv].by(varint)
-    .typecase(UInt64(1L), testCodec1)
-    .typecase(UInt64(2L), testCodec2)
-    .typecase(UInt64(3L), testCodec3)
-    .typecase(UInt64(13L), testCodec13)
-  )
+  val testTlvCodec = discriminated[Tlv].by(varint).typecase(UInt64(1L), testCodec1).typecase(UInt64(2L), testCodec2).typecase(UInt64(3L), testCodec3).typecase(UInt64(13L), testCodec13)
 
   sealed trait OtherTlv extends Tlv
   case class OtherType1(uintValue: UInt64) extends OtherTlv { override val tag = UInt64(10) }
@@ -144,8 +172,5 @@ object TlvCodecsSpec {
 
   val otherCodec1: Codec[OtherType1] = (("length" | constant(ByteVector.fromValidHex("08"))) :: ("value" | uint64)).as[OtherType1]
   val otherCodec2: Codec[OtherType2] = (("length" | constant(ByteVector.fromValidHex("04"))) :: ("value" | uint32)).as[OtherType2]
-  val otherTlvCodec = tlvFallback(discriminated[Tlv].by(varint)
-    .typecase(10, otherCodec1)
-    .typecase(11, otherCodec2)
-  )
+  val otherTlvCodec = discriminated[Tlv].by(varint).typecase(10, otherCodec1).typecase(11, otherCodec2)
 }

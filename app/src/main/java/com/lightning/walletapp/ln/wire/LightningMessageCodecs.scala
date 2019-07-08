@@ -416,34 +416,33 @@ sealed trait OnionTlv extends Tlv
 // Generic Tlv type we fallback to if we don't understand the tag
 case class GenericTlv(tag: UInt64, value: ByteVector) extends Tlv
 
-object Tlv {
+object Tlv { me =>
   type TlvSeq = Seq[Tlv]
   type TlvCodec = Codec[Tlv]
-  type KnownOrGenericTlv = Either[GenericTlv, Tlv]
+  type EitherTlv = Either[GenericTlv, Tlv]
 
-  def tlvStream(codec: TlvCodec): Codec[TlvStream] = list(codec).exmap(
-    decodedRecords => Attempt fromTry Try(TlvStream apply decodedRecords),
-    rawStream => Attempt.successful(rawStream.records.toList)
-  )
+  def tlvStream(codec: TlvCodec) =
+    list(me tlvFallback codec).exmap(
+      parsed => Attempt fromTry Try(TlvStream apply parsed),
+      rawStream => Attempt.successful(rawStream.records.toList)
+    ): Codec[TlvStream]
 
-  def unpack(data: KnownOrGenericTlv) = data match {
+  def lengthPrefixedTlvStream(codec: TlvCodec): Codec[TlvStream] =
+    variableSizeBytesLong(value = tlvStream(codec), size = varintoverflow)
+
+  private def unpack(data: EitherTlv) = data match {
     case Left(genericTlvRecord) => genericTlvRecord
     case Right(knownTlvRecord) => knownTlvRecord
   }
 
-  def pack(data: Tlv) = data match {
-    case generic: GenericTlv => Left(generic)
+  private def pack(data: Tlv) = data match {
+    case genericTlv: GenericTlv => Left(genericTlv)
     case knownTlvRecord => Right(knownTlvRecord)
   }
 
-  def tlvFallback(codec: TlvCodec): TlvCodec =
-    discriminatorFallback(genericTlv, codec)
-      .xmap(unpack, pack)
-
-  val genericTlv: Codec[GenericTlv] = {
-    (varint withContext "tag") ::
-      variableSizeBytesLong(varintoverflow, bytes)
-  }.as[GenericTlv]
+  private def tlvFallback(codec: TlvCodec) = discriminatorFallback(genericTlvCodec, codec).xmap(unpack, pack)
+  private val genericTlv = (varint withContext "tag") :: variableSizeBytesLong(varintoverflow, bytes)
+  private val genericTlvCodec: Codec[GenericTlv] = genericTlv.as[GenericTlv]
 }
 
 case class TlvStream(records: TlvSeq) {
