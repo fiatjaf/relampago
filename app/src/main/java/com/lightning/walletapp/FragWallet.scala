@@ -596,12 +596,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def sendBtcPopup(uri: BitcoinURI): RateManager = {
-    val minMsatAmountTry = Try(uri.getAmount).filter(_.value > 0L) map coin2MSat
+    val minMsatAmountTry = Try(uri.getAmount).filter(_.value > 0L).map(coin2MSat)
     val minMsatAmount = minMsatAmountTry getOrElse coin2MSat(org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT)
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign app.kit.conf0Balance)
     val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
     val rateManager = new RateManager(content) hint baseHint
 
+    val maxCanSend = MilliSatoshi(app.kit.conf0Balance.value * 1000L)
+    def useMax(alert: AlertDialog) = rateManager setSum Try(maxCanSend)
     def sendAttempt(alert: AlertDialog): Unit = rateManager.result match {
       case Success(small) if small < minMsatAmount => app toast dialog_sum_small
       case Failure(probablyEmptySum) => app toast dialog_sum_small
@@ -624,7 +626,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     val title = app getString btc_send_title format humanSix(uri.getAddress.toString)
-    if (uri.getLightningRequest == null) mkCheckForm(sendAttempt, none, baseBuilder(title.html, content), dialog_next, dialog_cancel)
+    if (uri.getLightningRequest == null) mkCheckFormNeutral(sendAttempt, none, useMax, baseBuilder(title.html, content), dialog_next, dialog_cancel, dialog_max)
     else mkCheckFormNeutral(sendAttempt, none, sendOffChainAttempt, baseBuilder(title.html, content), dialog_next, dialog_cancel, dialog_pay_offchain)
     rateManager setSum minMsatAmountTry
     rateManager
