@@ -2,13 +2,13 @@ package com.lightning.walletapp.ln.wire
 
 import java.net._
 import scodec.codecs._
+import fr.acinq.eclair.UInt64.Conversions._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.ln.{LightningException, PerHopPayload, RevocationInfo}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import scodec.bits.{BitVector, ByteVector}
 import scodec.{Attempt, Codec, Err}
 
-import com.lightning.walletapp.ln.wire.Tlv.TlvSeq
 import com.lightning.walletapp.ln.crypto.Sphinx
 import org.apache.commons.codec.binary.Base32
 import fr.acinq.bitcoin.Crypto
@@ -103,8 +103,8 @@ object LightningMessageCodecs { me =>
     address => ByteVector.view(new Base32 decode address.toUpperCase)
   )
 
-  def uint64min(codec: Codec[UInt64], min: Long): Codec[UInt64] = codec.exmap(f = {
-    case value if value < UInt64(min) => Attempt failure Err("Not minimally encoded")
+  def minimalValue(codec: Codec[UInt64], min: UInt64): Codec[UInt64] = codec.exmap(f = {
+    case value if value < min => Attempt failure Err("Value is not minimally encoded")
     case value => Attempt successful value
   }, Attempt.successful)
 
@@ -117,17 +117,16 @@ object LightningMessageCodecs { me =>
   val uint64: Codec[UInt64] = bytes(8).xmap(UInt64.apply, _.toByteVector padLeft 8)
 
   val varint: Codec[UInt64] = {
-    val largeCodec = uint64min(uint64L, 0x100000000L)
-    val middleCodec = uint64min(uint32L.xmap(long => UInt64(long), _.toBigInt.toLong), 0x10000)
-    val smallCodec = uint64min(uint16L.xmap(int => UInt64(int), _.toBigInt.toInt), 0xFD)
+    val large = minimalValue(uint64L, 0x100000000L)
+    val medium = minimalValue(uint32L.xmap(UInt64.apply, _.toBigInt.toLong), 0x10000)
+    val small = minimalValue(uint16L.xmap(int => UInt64(int), _.toBigInt.toInt), 0xFD)
+    val default: Codec[UInt64] = uint8L.xmap(int => UInt64(int), _.toBigInt.toInt)
 
-    discriminatorWithDefault(
-      discriminated[UInt64].by(uint8L)
-        .\(0xFF) { case i if i >= UInt64(0x100000000L) => i } (largeCodec)
-        .\(0xFE) { case i if i >= UInt64(0x10000) => i } (middleCodec)
-        .\(0xFD) { case i if i >= UInt64(0xFD) => i } (smallCodec),
-      uint8L.xmap(int => UInt64(int), _.toBigInt.toInt)
-    )
+    discriminatorWithDefault(discriminated[UInt64].by(uint8L)
+      .\(0xFF) { case value if value >= UInt64(0x100000000L) => value } (large)
+      .\(0xFE) { case value if value >= UInt64(0x10000) => value } (medium)
+      .\(0xFD) { case value if value >= UInt64(0xFD) => value } (small),
+      default)
   }
 
   val varintoverflow: Codec[Long] = varint.narrow(f = {
@@ -411,54 +410,92 @@ object LightningMessageCodecs { me =>
   }.as[CerberusPayload]
 }
 
-trait Tlv { val tag: UInt64 }
+trait Tlv
 sealed trait OnionTlv extends Tlv
 // Generic Tlv type we fallback to if we don't understand the tag
 case class GenericTlv(tag: UInt64, value: ByteVector) extends Tlv
 
 object Tlv { me =>
-  type TlvSeq = Seq[Tlv]
-  type TlvCodec = Codec[Tlv]
+  type TlvUint64Disc = DiscriminatorCodec[Tlv, UInt64]
   type EitherTlv = Either[GenericTlv, Tlv]
+  type EitherTlvList = List[EitherTlv]
 
-  def tlvStream(codec: TlvCodec) =
-    list(me tlvFallback codec).exmap(
-      parsed => Attempt fromTry Try(TlvStream apply parsed),
-      rawStream => Attempt.successful(rawStream.records.toList)
-    ): Codec[TlvStream]
-
-  def lengthPrefixedTlvStream(codec: TlvCodec): Codec[TlvStream] =
-    variableSizeBytesLong(value = tlvStream(codec), size = varintoverflow)
-
-  private def unpack(data: EitherTlv) = data match {
-    case Left(genericTlvRecord) => genericTlvRecord
-    case Right(knownTlvRecord) => knownTlvRecord
-  }
-
-  private def pack(data: Tlv) = data match {
-    case genericTlv: GenericTlv => Left(genericTlv)
-    case knownTlvRecord => Right(knownTlvRecord)
-  }
-
-  private def tlvFallback(codec: TlvCodec) = discriminatorFallback(genericTlvCodec, codec).xmap(unpack, pack)
   private val genericTlv = (varint withContext "tag") :: variableSizeBytesLong(varintoverflow, bytes)
-  private val genericTlvCodec: Codec[GenericTlv] = genericTlv.as[GenericTlv]
+  private val genericTlvCodec = genericTlv.as[GenericTlv].exmap(validateGenericTlv, validateGenericTlv)
+
+  private def validateGenericTlv(generic: GenericTlv): Attempt[GenericTlv] =
+    if (generic.tag.toBigInt % 2 == 0) Attempt Failure Err("Unknown even tlv type")
+    else Attempt Successful generic
+
+  private def variableSizeUInt64(size: Int, min: Long): Codec[UInt64] =
+    minimalValue(bytes(size).xmap(UInt64.apply, _.toByteVector takeRight size), min)
+
+  private def tag(codec: TlvUint64Disc, record: EitherTlv): UInt64 = record match {
+    case Right(knownTlvR) => codec.encode(knownTlvR).flatMap(varint.decode).require.value
+    case Left(unknownTlv) => unknownTlv.tag
+  }
+
+  val tu64: Codec[UInt64] = discriminated[UInt64].by(uint8)
+    .\(0x00) { case value if value < 0x01 => value } (variableSizeUInt64(0, 0x00))
+    .\(0x01) { case value if value < 0x0100 => value } (variableSizeUInt64(1, 0x01))
+    .\(0x02) { case value if value < 0x010000 => value } (variableSizeUInt64(2, 0x0100))
+    .\(0x03) { case value if value < 0x01000000 => value } (variableSizeUInt64(3, 0x010000))
+    .\(0x04) { case value if value < 0x0100000000L => value } (variableSizeUInt64(4, 0x01000000))
+    .\(0x05) { case value if value < 0x010000000000L => value } (variableSizeUInt64(5, 0x0100000000L))
+    .\(0x06) { case value if value < 0x01000000000000L => value } (variableSizeUInt64(6, 0x010000000000L))
+    .\(0x07) { case value if value < 0x0100000000000000L => value } (variableSizeUInt64(7, 0x01000000000000L))
+    .\(0x08) { case value if value <= UInt64.MaxValue => value } (variableSizeUInt64(8, 0x0100000000000000L))
+
+  val tu32: Codec[Long] = tu64.exmap(f = {
+    case value if value > 0xFFFFFFFFL => Attempt Failure Err("tu32 overflow")
+    case value => Attempt Successful value.toBigInt.toLong
+  }, long => Attempt Successful long)
+
+  val tu16: Codec[Int] = tu32.exmap(f = {
+    case value if value > 0xFFFF => Attempt Failure Err("tu16 overflow")
+    case value => Attempt Successful value.toBigInt.toInt
+  }, long => Attempt Successful long)
+
+  private def validateRecords(codec: TlvUint64Disc, records: EitherTlvList): Attempt[TlvStream] = {
+
+    val tags = for (record <- records) yield tag(codec, record)
+    val knownTags = records.collect { case Right(known) => known }
+    val unknownTags = records.collect { case Left(generic) => generic }
+
+    if (tags.length != tags.distinct.length) Attempt Failure Err("Tlv streams must not contain duplicate records")
+    else if (tags != tags.sorted) Attempt Failure Err("Tlv records must be ordered by monotonically-increasing types")
+    else Attempt Successful TlvStream(knownTags, unknownTags)
+  }
+
+  private def validateStream(codec: TlvUint64Disc, stream: TlvStream): Attempt[EitherTlvList] = {
+
+    val records = TlvStream.asList(stream)
+    val tags = for (record <- records) yield tag(codec, record)
+    if (tags.length != tags.distinct.length) Attempt Failure Err("Tlv streams must not contain duplicate records")
+    else Attempt Successful tags.zip(records).sortBy { case (tag, _) => tag }.map { case (_, record) => record }
+  }
+
+  def tlvStream(codec: TlvUint64Disc): Codec[TlvStream] = {
+    val withFallback = discriminatorFallback(genericTlvCodec, codec)
+
+    list(withFallback).exmap(
+      records => validateRecords(codec, records),
+      stream => validateStream(codec, stream)
+    )
+  }
+
+  def lengthPrefixedTlvStream(codec: TlvUint64Disc): Codec[TlvStream] =
+    variableSizeBytesLong(value = tlvStream(codec), size = varintoverflow)
 }
 
-case class TlvStream(records: TlvSeq) {
-  private def checkUnknownEven(record: Tlv) = {
-    val knownOrOdd = !record.isInstanceOf[GenericTlv] || record.tag.toBigInt % 2 != 0
-    require(knownOrOdd, "Tlv streams must not contain unknown even tlv types")
-    Some(record)
-  }
+case class TlvStream(records: Traversable[Tlv], unknown: Traversable[GenericTlv] = Nil)
 
-  (Option.empty[Tlv] /: records) {
-    case (Some(previousRecord), record) =>
-      require(record.tag > previousRecord.tag, "Tlv records must be ordered by monotonically-increasing types")
-      require(record.tag != previousRecord.tag, "Tlv streams must not contain duplicate records")
-      checkUnknownEven(record)
+object TlvStream {
+  def apply(records: Tlv*): TlvStream = TlvStream(records, Nil)
 
-    case (None, record) =>
-      checkUnknownEven(record)
+  def asList(stream: TlvStream) = {
+    val knownRecords = stream.records map Right.apply
+    val unknownRecords = stream.unknown map Left.apply
+    (knownRecords ++ unknownRecords).toList
   }
-} 
+}
