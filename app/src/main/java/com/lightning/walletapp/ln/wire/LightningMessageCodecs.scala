@@ -431,7 +431,7 @@ object Tlv { me =>
     minimalValue(bytes(size).xmap(UInt64.apply, _.toByteVector takeRight size), min)
 
   private def tag(codec: TlvUint64Disc, record: EitherTlv): UInt64 = record match {
-    case Right(knownTlvR) => codec.encode(knownTlvR).flatMap(varint.decode).require.value
+    case Right(knownTlv) => codec.encode(knownTlv).flatMap(varint.decode).require.value
     case Left(unknownTlv) => unknownTlv.tag
   }
 
