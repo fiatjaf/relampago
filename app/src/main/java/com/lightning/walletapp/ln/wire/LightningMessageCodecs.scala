@@ -300,7 +300,8 @@ object LightningMessageCodecs { me =>
       (publicKey withContext "nodeId1") ::
       (publicKey withContext "nodeId2") ::
       (publicKey withContext "bitcoinKey1") ::
-      (publicKey withContext "bitcoinKey2")
+      (publicKey withContext "bitcoinKey2") ::
+      (bytes withContext "unknownFields")
 
   private val channelAnnouncement =
     (signature withContext "nodeSignature1") ::
@@ -315,7 +316,8 @@ object LightningMessageCodecs { me =>
       (publicKey withContext "nodeId") ::
       (rgb withContext "rgbColor") ::
       (zeropaddedstring withContext "alias") ::
-      (variableSizeBytes(value = list(nodeaddress), size = uint16) withContext "addresses")
+      (variableSizeBytes(value = list(nodeaddress), size = uint16) withContext "addresses") ::
+      (bytes withContext "unknownFields")
 
   val channelUpdateWitness =
     (bytes32 withContext "chainHash") ::
@@ -327,7 +329,8 @@ object LightningMessageCodecs { me =>
           (uint64Overflow withContext "htlcMinimumMsat") ::
           (uint32 withContext "feeBaseMsat") ::
           (uint32 withContext "feeProportionalMillionths" ) ::
-          (conditional(included = (messageFlags & 1) != 0, uint64Overflow) withContext "htlcMaximumMsat")
+          (conditional(included = (messageFlags & 1) != 0, uint64Overflow) withContext "htlcMaximumMsat") ::
+          (bytes withContext "unknownFields")
       }
 
   val nodeAnnouncementCodec = (signature.withContext("signature") :: nodeAnnouncementWitness).as[NodeAnnouncement]

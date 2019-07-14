@@ -83,14 +83,14 @@ case class ChannelReestablish(channelId: ByteVector, nextLocalCommitmentNumber: 
 
 // ROUTING MESSAGES: open channels never get these except for ChannelUpdate
 
-case class AnnouncementSignatures(channelId: ByteVector, shortChannelId: Long, nodeSignature: ByteVector,
+case class AnnouncementSignatures(channelId: ByteVector,
+                                  shortChannelId: Long, nodeSignature: ByteVector,
                                   bitcoinSignature: ByteVector) extends RoutingMessage
 
-case class ChannelAnnouncement(nodeSignature1: ByteVector, nodeSignature2: ByteVector,
-                               bitcoinSignature1: ByteVector, bitcoinSignature2: ByteVector,
-                               features: ByteVector, chainHash: ByteVector, shortChannelId: Long,
-                               nodeId1: PublicKey, nodeId2: PublicKey, bitcoinKey1: PublicKey,
-                               bitcoinKey2: PublicKey) extends RoutingMessage {
+case class ChannelAnnouncement(nodeSignature1: ByteVector, nodeSignature2: ByteVector, bitcoinSignature1: ByteVector,
+                               bitcoinSignature2: ByteVector, features: ByteVector, chainHash: ByteVector, shortChannelId: Long,
+                               nodeId1: PublicKey, nodeId2: PublicKey, bitcoinKey1: PublicKey, bitcoinKey2: PublicKey,
+                               unknownFields: ByteVector = ByteVector.empty) extends RoutingMessage {
 
   val (blockHeight, txIndex, outputIndex) = fromShortId(shortChannelId)
   lazy val nodes = Set(nodeId1, nodeId2)
@@ -98,10 +98,10 @@ case class ChannelAnnouncement(nodeSignature1: ByteVector, nodeSignature2: ByteV
 
 // PAYMENT ROUTE INFO
 
-case class ChannelUpdate(signature: ByteVector, chainHash: ByteVector, shortChannelId: Long,
-                         timestamp: Long, messageFlags: Byte, channelFlags: Byte, cltvExpiryDelta: Int,
-                         htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long,
-                         htlcMaximumMsat: Option[Long] = None) extends RoutingMessage {
+case class ChannelUpdate(signature: ByteVector, chainHash: ByteVector, shortChannelId: Long, timestamp: Long,
+                         messageFlags: Byte, channelFlags: Byte, cltvExpiryDelta: Int, htlcMinimumMsat: Long,
+                         feeBaseMsat: Long, feeProportionalMillionths: Long, htlcMaximumMsat: Option[Long],
+                         unknownFields: ByteVector = ByteVector.empty) extends RoutingMessage {
 
   require(requirement = (messageFlags & 1) != 0 == htlcMaximumMsat.isDefined, "htlcMaximumMsat is not consistent with messageFlags")
   def toHop(nodeId: PublicKey) = Hop(nodeId, shortChannelId, cltvExpiryDelta, htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
@@ -118,8 +118,9 @@ case class Hop(nodeId: PublicKey, shortChannelId: Long,
 
 // NODE ADDRESS HANDLING
 
-case class NodeAnnouncement(signature: ByteVector, features: ByteVector, timestamp: Long, nodeId: PublicKey,
-                            rgbColor: RGB, alias: String, addresses: NodeAddressList) extends RoutingMessage {
+case class NodeAnnouncement(signature: ByteVector, features: ByteVector, timestamp: Long,
+                            nodeId: PublicKey, rgbColor: RGB, alias: String, addresses: NodeAddressList,
+                            unknownFields: ByteVector = ByteVector.empty) extends RoutingMessage {
 
   val pretty = addresses collectFirst {
     case _: IPv4 | _: IPv6 => nodeId.toString take 15 grouped 3 mkString "\u0020"

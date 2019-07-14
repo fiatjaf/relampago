@@ -10,21 +10,21 @@ import shapeless.HNil
 
 object Announcements { me =>
   private def hashTwice(attempt: BitVectorAttempt) = Crypto hash256 serialize(attempt)
-  private def channelAnnouncementWitnessEncode(chainHash: ByteVector, shortChannelId: Long, nodeId1: PublicKey, nodeId2: PublicKey, bitcoinKey1: PublicKey, bitcoinKey2: PublicKey, features: ByteVector) =
-    me hashTwice LightningMessageCodecs.channelAnnouncementWitness.encode(features :: chainHash :: shortChannelId :: nodeId1 :: nodeId2 :: bitcoinKey1 :: bitcoinKey2 :: HNil)
+  private def channelAnnouncementWitnessEncode(chainHash: ByteVector, shortChannelId: Long, nodeId1: PublicKey, nodeId2: PublicKey, bitcoinKey1: PublicKey, bitcoinKey2: PublicKey, features: ByteVector, unknownFields: ByteVector) =
+    me hashTwice LightningMessageCodecs.channelAnnouncementWitness.encode(features :: chainHash :: shortChannelId :: nodeId1 :: nodeId2 :: bitcoinKey1 :: bitcoinKey2 :: unknownFields :: HNil)
 
-  private def nodeAnnouncementWitnessEncode(timestamp: Long, nodeId: PublicKey, rgbColor: RGB, alias: String, features: ByteVector, addresses: NodeAddressList) =
-    me hashTwice LightningMessageCodecs.nodeAnnouncementWitness.encode(features :: timestamp :: nodeId :: rgbColor :: alias :: addresses :: HNil)
+  private def nodeAnnouncementWitnessEncode(timestamp: Long, nodeId: PublicKey, rgbColor: RGB, alias: String, features: ByteVector, addresses: NodeAddressList, unknownFields: ByteVector) =
+    me hashTwice LightningMessageCodecs.nodeAnnouncementWitness.encode(features :: timestamp :: nodeId :: rgbColor :: alias :: addresses :: unknownFields :: HNil)
 
-  private def channelUpdateWitnessEncode(chainHash: ByteVector, shortChannelId: Long, timestamp: Long, messageFlags: Byte, channelFlags: Byte, cltvExpiryDelta: Int, htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long, htlcMaximumMsat: Option[Long] = None) =
-    me hashTwice LightningMessageCodecs.channelUpdateWitness.encode(chainHash :: shortChannelId :: timestamp :: messageFlags :: channelFlags :: cltvExpiryDelta :: htlcMinimumMsat :: feeBaseMsat :: feeProportionalMillionths :: htlcMaximumMsat :: HNil)
+  private def channelUpdateWitnessEncode(chainHash: ByteVector, shortChannelId: Long, timestamp: Long, messageFlags: Byte, channelFlags: Byte, cltvExpiryDelta: Int, htlcMinimumMsat: Long, feeBaseMsat: Long, feeProportionalMillionths: Long, htlcMaximumMsat: Option[Long], unknownFields: ByteVector) =
+    me hashTwice LightningMessageCodecs.channelUpdateWitness.encode(chainHash :: shortChannelId :: timestamp :: messageFlags :: channelFlags :: cltvExpiryDelta :: htlcMinimumMsat :: feeBaseMsat :: feeProportionalMillionths :: htlcMaximumMsat :: unknownFields :: HNil)
 
   def signChannelAnnouncement(chainHash: ByteVector, shortChannelId: Long, localNodeSecret: PrivateKey, remoteNodeId: PublicKey,
                               localFundingPrivKey: PrivateKey, remoteFundingKey: PublicKey, features: ByteVector) = {
 
     val witness = isNode1(localNodeSecret.publicKey, remoteNodeId) match {
-      case true => channelAnnouncementWitnessEncode(chainHash, shortChannelId, localNodeSecret.publicKey, remoteNodeId, localFundingPrivKey.publicKey, remoteFundingKey, features)
-      case false => channelAnnouncementWitnessEncode(chainHash, shortChannelId, remoteNodeId, localNodeSecret.publicKey, remoteFundingKey, localFundingPrivKey.publicKey, features)
+      case true => channelAnnouncementWitnessEncode(chainHash, shortChannelId, localNodeSecret.publicKey, remoteNodeId, localFundingPrivKey.publicKey, remoteFundingKey, features, unknownFields = ByteVector.empty)
+      case false => channelAnnouncementWitnessEncode(chainHash, shortChannelId, remoteNodeId, localNodeSecret.publicKey, remoteFundingKey, localFundingPrivKey.publicKey, features, unknownFields = ByteVector.empty)
     }
 
     val nodeSig = Crypto encodeSignature Crypto.sign(witness, localNodeSecret)
@@ -63,7 +63,7 @@ object Announcements { me =>
     val messageFlags = makeMessageFlags(hasOptionChannelHtlcMax = true)
     val channelFlags = makeChannelFlags(isNode1 = isNode1(nodeSecret.publicKey, remoteNodeId), enable = enable)
     val witness = channelUpdateWitnessEncode(chainHash, shortChannelId, timestamp, messageFlags, channelFlags, cltvExpiryDelta,
-      htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths, htlcMaximumMsatOpt)
+      htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths, htlcMaximumMsatOpt, unknownFields = ByteVector.empty)
 
     val sig = Crypto.sign(witness, nodeSecret)
     ChannelUpdate(signature = Crypto.encodeSignature(sig) :+ 1.toByte, chainHash = chainHash, shortChannelId = shortChannelId, timestamp = timestamp,
@@ -72,8 +72,8 @@ object Announcements { me =>
   }
 
   def checkSigs(ann: ChannelAnnouncement): Boolean = {
-    val witness = channelAnnouncementWitnessEncode(ann.chainHash, ann.shortChannelId,
-      ann.nodeId1, ann.nodeId2, ann.bitcoinKey1, ann.bitcoinKey2, ann.features)
+    val witness = channelAnnouncementWitnessEncode(ann.chainHash, ann.shortChannelId, ann.nodeId1,
+      ann.nodeId2, ann.bitcoinKey1, ann.bitcoinKey2, ann.features, unknownFields = ByteVector.empty)
 
     verifySignature(witness, ann.nodeSignature1, ann.nodeId1) &&
       verifySignature(witness, ann.nodeSignature2, ann.nodeId2) &&
@@ -82,11 +82,11 @@ object Announcements { me =>
   }
 
   def checkSig(ann: NodeAnnouncement): Boolean =
-    verifySignature(nodeAnnouncementWitnessEncode(ann.timestamp, ann.nodeId, ann.rgbColor,
-      ann.alias, ann.features, ann.addresses), ann.signature, ann.nodeId)
+    verifySignature(nodeAnnouncementWitnessEncode(ann.timestamp, ann.nodeId, ann.rgbColor, ann.alias,
+      ann.features, ann.addresses, unknownFields = ByteVector.empty), ann.signature, ann.nodeId)
 
   def checkSig(upd: ChannelUpdate, nodeId: PublicKey): Boolean =
     verifySignature(channelUpdateWitnessEncode(upd.chainHash, upd.shortChannelId, upd.timestamp, upd.messageFlags,
       upd.channelFlags, upd.cltvExpiryDelta, upd.htlcMinimumMsat, upd.feeBaseMsat, upd.feeProportionalMillionths,
-      upd.htlcMaximumMsat), upd.signature, nodeId)
+      upd.htlcMaximumMsat, unknownFields = ByteVector.empty), upd.signature, nodeId)
 }
