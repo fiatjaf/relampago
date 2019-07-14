@@ -326,13 +326,13 @@ class WireSpec {
 
       val invoke_hosted_channel = InvokeHostedChannel(randomBytes(32), bin(47, 0))
       val init_hosted_channel = InitHostedChannel(UInt64(6), 10, 20, 500000000L, 5000, 1000000, 1000000)
-      val last_cross_signed_state = LastCrossSignedState(bin(47, 0), init_hosted_channel, 500000000L, 500000, 10, 20, randomSignature, randomSignature)
       val state_override = StateOverride(500000000L, 500000, 70000, 700000, randomSignature)
       val in_flight_htlc = InFlightHtlc(600000000, bin(32, 0), 1000)
       val state_update1 = StateUpdate(state_override, List(in_flight_htlc, in_flight_htlc), List(in_flight_htlc, in_flight_htlc, in_flight_htlc))
       val state_update2 = StateUpdate(state_override, Nil, List(in_flight_htlc, in_flight_htlc, in_flight_htlc))
       val state_update3 = StateUpdate(state_override, List(in_flight_htlc, in_flight_htlc), Nil)
       val state_update4 = StateUpdate(state_override, Nil, Nil)
+      val last_cross_signed_state = LastCrossSignedState(bin(47, 0), init_hosted_channel, state_update1, state_update2)
 
       val msgs: List[LightningMessage] =
         open :: accept :: funding_created :: funding_signed :: funding_locked :: update_fee :: shutdown :: closing_signed ::

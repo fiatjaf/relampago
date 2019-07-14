@@ -195,9 +195,8 @@ case class InitHostedChannel(maxHtlcValueInFlightMsat: UInt64,
                              minimalOnchainRefundAmountSatoshis: Long, initialClientBalanceSatoshis: Long) extends HostedChannelMessage
 
 case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
-                                initHostedChannel: InitHostedChannel, lastClientBalanceSatoshis: Long, blockDay: Long,
-                                clientUpdateCounter: Long, hostUpdateCounter: Long, clientNodeSignature: ByteVector,
-                                hostNodeSignature: ByteVector) extends HostedChannelMessage
+                                initHostedChannel: InitHostedChannel, lastClientStateUpdate: StateUpdate,
+                                lastHostStateUpdate: StateUpdate) extends HostedChannelMessage
 
 case class StateOverride(updatedClientBalanceSatoshis: Long, blockDay: Long, clientUpdateCounter: Long,
                          hostUpdateCounter: Long, nodeSignature: ByteVector) extends HostedChannelMessage
