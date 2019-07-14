@@ -163,8 +163,7 @@ object LightningMessageCodecs { me =>
       (optional(bitsRemaining, scalar) withContext "yourLastPerCommitmentSecret") ::
       (optional(bitsRemaining, point) withContext "myCurrentPerCommitmentPoint")
 
-  val channelFlagsCodec =
-    (byte withContext "flags").as[ChannelFlags]
+  val channelFlagsCodec = (byte withContext "flags").as[ChannelFlags]
 
   private val openChannel =
     (bytes32 withContext "chainHash") ::
@@ -186,7 +185,7 @@ object LightningMessageCodecs { me =>
       (point withContext "firstPerCommitmentPoint") ::
       (channelFlagsCodec withContext "channelFlags")
 
-  private val acceptChannel =
+  val acceptChannelCodec = {
     (bytes32 withContext "temporaryChannelId") ::
       (uint64Overflow withContext "dustLimitSatoshis") ::
       (uint64 withContext "maxHtlcValueInFlightMsat") ::
@@ -201,9 +200,7 @@ object LightningMessageCodecs { me =>
       (point withContext "delayedPaymentBasepoint") ::
       (point withContext "htlcBasepoint") ::
       (point withContext "firstPerCommitmentPoint")
-
-  val acceptChannelCodec =
-    acceptChannel.as[AcceptChannel]
+  }.as[AcceptChannel]
 
   private val fundingCreated =
     (bytes32 withContext "temporaryChannelId") ::
@@ -215,54 +212,42 @@ object LightningMessageCodecs { me =>
     (bytes32 withContext "channelId") ::
       (signature withContext "signature")
 
-  private val fundingLocked =
-    (bytes32 withContext "channelId" ) ::
+  val fundingLockedCodec = {
+    (bytes32 withContext "channelId") ::
       (point withContext "nextPerCommitmentPoint")
+  }.as[FundingLocked]
 
-  val fundingLockedCodec =
-    fundingLocked.as[FundingLocked]
-
-  private val shutdown =
+  val shutdownCodec = {
     (bytes32 withContext "channelId") ::
       (varsizebinarydata withContext "scriptPubKey")
+  }.as[Shutdown]
 
-  val shutdownCodec =
-    shutdown.as[Shutdown]
-
-  private val closingSigned =
+  val closingSignedCodec = {
     (bytes32 withContext "channelId") ::
       (uint64Overflow withContext "feeSatoshis") ::
       (signature withContext "signature")
+  }.as[ClosingSigned]
 
-  val closingSignedCodec =
-    closingSigned.as[ClosingSigned]
-
-  private val updateAddHtlc =
+  val updateAddHtlcCodec = {
     (bytes32 withContext "channelId") ::
       (uint64Overflow withContext "id") ::
       (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry") ::
       (bytes(Sphinx.PacketLength) withContext "onionRoutingPacket")
+  }.as[UpdateAddHtlc]
 
-  val updateAddHtlcCodec =
-    updateAddHtlc.as[UpdateAddHtlc]
-
-  private val updateFulfillHtlc =
+  val updateFulfillHtlcCodec = {
     (bytes32 withContext "channelId") ::
       (uint64Overflow withContext "id") ::
       (bytes32 withContext "paymentPreimage")
+  }.as[UpdateFulfillHtlc]
 
-  val updateFulfillHtlcCodec =
-    updateFulfillHtlc.as[UpdateFulfillHtlc]
-
-  private val updateFailHtlc =
+  val updateFailHtlcCodec = {
     (bytes32 withContext "channelId") ::
       (uint64Overflow withContext "id") ::
       (varsizebinarydata withContext "reason")
-
-  val updateFailHtlcCodec =
-    updateFailHtlc.as[UpdateFailHtlc]
+  }.as[UpdateFailHtlc]
 
   private val updateFailMalformedHtlc =
     (bytes32 withContext "channelId") ::
@@ -270,13 +255,11 @@ object LightningMessageCodecs { me =>
       (bytes32 withContext "onionHash") ::
       (uint16 withContext "failureCode")
 
-  private val commitSig =
+  val commitSigCodec = {
     (bytes32 withContext "channelId") ::
       (signature withContext "signature") ::
       (listOfN(uint16, signature) withContext "htlcSignatures")
-
-  val commitSigCodec =
-    commitSig.as[CommitSig]
+  }.as[CommitSig]
 
   private val revokeAndAck =
     (bytes32 withContext "channelId") ::
@@ -328,13 +311,61 @@ object LightningMessageCodecs { me =>
           (uint16 withContext "cltvExpiryDelta") ::
           (uint64Overflow withContext "htlcMinimumMsat") ::
           (uint32 withContext "feeBaseMsat") ::
-          (uint32 withContext "feeProportionalMillionths" ) ::
+          (uint32 withContext "feeProportionalMillionths") ::
           (conditional(included = (messageFlags & 1) != 0, uint64Overflow) withContext "htlcMaximumMsat") ::
           (bytes withContext "unknownFields")
       }
 
   val nodeAnnouncementCodec = (signature.withContext("signature") :: nodeAnnouncementWitness).as[NodeAnnouncement]
   val channelUpdateCodec = (signature.withContext("signature") :: channelUpdateWitness).as[ChannelUpdate]
+
+  // Hosted messages codecs
+
+  val invokeHostedChannelCodec = {
+    (bytes32 withContext "chainHash") ::
+      (varsizebinarydata withContext "scriptPubKey")
+  }.as[InvokeHostedChannel]
+
+  val initHostedChannelCodec = {
+    (uint64 withContext "maxHtlcValueInFlightMsat") ::
+      (uint64Overflow withContext "htlcMinimumMsat") ::
+      (uint16 withContext "maxAcceptedHtlcs") ::
+      (uint64Overflow withContext "channelCapacitySatoshis") ::
+      (uint16 withContext "liabilityDeadlineBlockdays") ::
+      (uint64Overflow withContext "minimalOnchainRefundAmountSatoshis") ::
+      (uint64Overflow withContext "initialClientBalanceSatoshis")
+  }.as[InitHostedChannel]
+
+  val lastCrossSignedStateCodec = {
+    (varsizebinarydata withContext "lastRefundScriptPubKey") ::
+      (initHostedChannelCodec withContext "initHostedChannel") ::
+      (uint64Overflow withContext "lastClientBalanceSatoshis") ::
+      (uint32 withContext "blockDay") ::
+      (uint64Overflow withContext "clientUpdateCounter") ::
+      (uint64Overflow withContext "hostUpdateCounter") ::
+      (signature withContext "clientNodeSignature") ::
+      (signature withContext "hostNodeSignature")
+  }.as[LastCrossSignedState]
+
+  val stateOverrideCodec = {
+    (uint64Overflow withContext "updatedClientBalanceSatoshis") ::
+      (uint32 withContext "blockDay") ::
+      (uint64Overflow withContext "clientUpdateCounter") ::
+      (uint64Overflow withContext "hostUpdateCounter") ::
+      (signature withContext "nodeSignature")
+  }.as[StateOverride]
+
+  val inFlightHtlcCodec = {
+    (uint64Overflow withContext "amountMsat") ::
+      (bytes32 withContext "paymentHash") ::
+      (uint32 withContext "expiry")
+  }.as[InFlightHtlc]
+
+  val stateUpdateCodec = {
+    (stateOverrideCodec withContext "stateOverride") ::
+      (listOfN(uint16, inFlightHtlcCodec) withContext "clientOutgoingHtlcs") ::
+      (listOfN(uint16, inFlightHtlcCodec) withContext "hostOutgoingHtlcs")
+  }.as[StateUpdate]
 
   val lightningMessageCodec =
     discriminated[LightningMessage].by(uint16)
@@ -361,6 +392,11 @@ object LightningMessageCodecs { me =>
       .typecase(cr = nodeAnnouncementCodec, tag = 257)
       .typecase(cr = channelUpdateCodec, tag = 258)
       .typecase(cr = announcementSignatures.as[AnnouncementSignatures], tag = 259)
+      .typecase(cr = invokeHostedChannelCodec, tag = 65535)
+      .typecase(cr = initHostedChannelCodec, tag = 65534)
+      .typecase(cr = lastCrossSignedStateCodec, tag = 65533)
+      .typecase(cr = stateUpdateCodec, tag = 65532)
+      .typecase(cr = stateOverrideCodec, tag = 65531)
 
   // Not in a spec
 

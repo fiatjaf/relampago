@@ -184,6 +184,28 @@ case object NodeAddress {
   }
 }
 
+// Hosted channel messages
+
+trait HostedChannelMessage extends LightningMessage
+
+case class InvokeHostedChannel(chainHash: ByteVector, scriptPubKey: ByteVector) extends HostedChannelMessage
+
+case class InitHostedChannel(maxHtlcValueInFlightMsat: UInt64,
+                             htlcMinimumMsat: Long, maxAcceptedHtlcs: Int, channelCapacitySatoshis: Long, liabilityDeadlineBlockdays: Int,
+                             minimalOnchainRefundAmountSatoshis: Long, initialClientBalanceSatoshis: Long) extends HostedChannelMessage
+
+case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
+                                initHostedChannel: InitHostedChannel, lastClientBalanceSatoshis: Long, blockDay: Long,
+                                clientUpdateCounter: Long, hostUpdateCounter: Long, clientNodeSignature: ByteVector,
+                                hostNodeSignature: ByteVector) extends HostedChannelMessage
+
+case class StateOverride(updatedClientBalanceSatoshis: Long, blockDay: Long, clientUpdateCounter: Long,
+                         hostUpdateCounter: Long, nodeSignature: ByteVector) extends HostedChannelMessage
+
+case class InFlightHtlc(amountMsat: Long, paymentHash: ByteVector, expiry: Long) extends HostedChannelMessage
+case class StateUpdate(stateOverride: StateOverride, clientOutgoingHtlcs: List[InFlightHtlc] = Nil,
+                       hostOutgoingHtlcs: List[InFlightHtlc] = Nil) extends HostedChannelMessage
+
 // Not in a spec
 case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)
 case class WalletZygote(v: Int, db: ByteVector, wallet: ByteVector, chain: ByteVector)
