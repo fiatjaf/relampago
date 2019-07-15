@@ -138,11 +138,11 @@ class TlvCodecsSpec {
       val testCases = Seq(
         (ByteVector.fromValidHex(""), TlvStream()),
         (ByteVector.fromValidHex("21 00"), TlvStream(Nil, Seq(GenericTlv(33, ByteVector.fromValidHex(""))))),
-        (ByteVector.fromValidHex("fd0102 00"), TlvStream(Nil, Seq(GenericTlv(513, ByteVector.fromValidHex(""))))),
-        (ByteVector.fromValidHex("fdfd00 00"), TlvStream(Nil, Seq(GenericTlv(253, ByteVector.fromValidHex(""))))),
-        (ByteVector.fromValidHex("fdff00 00"), TlvStream(Nil, Seq(GenericTlv(255, ByteVector.fromValidHex(""))))),
-        (ByteVector.fromValidHex("fe01000002 00"), TlvStream(Nil, Seq(GenericTlv(33554433, ByteVector.fromValidHex(""))))),
-        (ByteVector.fromValidHex("ff0100000000000002 00"), TlvStream(Nil, Seq(GenericTlv(144115188075855873L, ByteVector.fromValidHex(""))))),
+        (ByteVector.fromValidHex("fd0201 00"), TlvStream(Nil, Seq(GenericTlv(513, ByteVector.fromValidHex(""))))),
+        (ByteVector.fromValidHex("fd00fd 00"), TlvStream(Nil, Seq(GenericTlv(253, ByteVector.fromValidHex(""))))),
+        (ByteVector.fromValidHex("fd00ff 00"), TlvStream(Nil, Seq(GenericTlv(255, ByteVector.fromValidHex(""))))),
+        (ByteVector.fromValidHex("fe02000001 00"), TlvStream(Nil, Seq(GenericTlv(33554433, ByteVector.fromValidHex(""))))),
+        (ByteVector.fromValidHex("ff0200000000000001 00"), TlvStream(Nil, Seq(GenericTlv(144115188075855873L, ByteVector.fromValidHex(""))))),
         (ByteVector.fromValidHex("01 00"), TlvStream(TestType1(0))),
         (ByteVector.fromValidHex("01 01 01"), TlvStream(TestType1(1))),
         (ByteVector.fromValidHex("01 01 2a"), TlvStream(TestType1(42))),
@@ -155,9 +155,9 @@ class TlvCodecsSpec {
         (ByteVector.fromValidHex("01 08 0100000000000000"), TlvStream(TestType1(72057594037927936L))),
         (ByteVector.fromValidHex("02 08 0000000000000226"), TlvStream(TestType2(550L))),
         (ByteVector.fromValidHex("03 31 023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb 0000000000000231 0000000000000451"), TlvStream(TestType3(PublicKey.fromValidHex("023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb"), 561, 1105))),
-        (ByteVector.fromValidHex("fdfe00 02 0226"), TlvStream(TestType254(550))),
+        (ByteVector.fromValidHex("fd00fe 02 0226"), TlvStream(TestType254(550))),
         (ByteVector.fromValidHex("01020231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451"), TlvStream(TestType1(561), TestType2(1105L), TestType3(PublicKey.fromValidHex("02eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f283686619"), 561, 1105))),
-        (ByteVector.fromValidHex("01020231 0b020451 fdfe0002002a"), TlvStream(Seq(TestType1(561), TestType254(42)), Seq(GenericTlv(11, ByteVector.fromValidHex("0451")))))
+        (ByteVector.fromValidHex("01020231 0b020451 fd00fe02002a"), TlvStream(Seq(TestType1(561), TestType254(42)), Seq(GenericTlv(11, ByteVector.fromValidHex("0451")))))
       )
 
       for ((bin, expected) <- testCases) {
@@ -176,26 +176,26 @@ class TlvCodecsSpec {
         ByteVector.fromValidHex("fd"),
         ByteVector.fromValidHex("fd01"),
         // Not minimally encoded type.
-        ByteVector.fromValidHex("fd0100 00"),
+        ByteVector.fromValidHex("fd0001 00"),
         // Missing length.
         ByteVector.fromValidHex("fd0101"),
         // Length truncated.
         ByteVector.fromValidHex("0f fd"),
         ByteVector.fromValidHex("0f fd02"),
         // Not minimally encoded length.
-        ByteVector.fromValidHex("0f fd0100 00"),
-        ByteVector.fromValidHex("0f fe01000000 00"),
+        ByteVector.fromValidHex("0f fd0001 00"),
+        ByteVector.fromValidHex("0f fe00000001 00"),
         // Missing value.
-        ByteVector.fromValidHex("0f fd0226"),
+        ByteVector.fromValidHex("0f fd2602"),
         // Value truncated.
-        ByteVector.fromValidHex("0f fd0102 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
+        ByteVector.fromValidHex("0f fd0201 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
         // Unknown even type.
         ByteVector.fromValidHex("12 00"),
         ByteVector.fromValidHex("0a 00"),
-        ByteVector.fromValidHex("fd0201 00"),
-        ByteVector.fromValidHex("fe02000001 00"),
+        ByteVector.fromValidHex("fd0102 00"),
+        ByteVector.fromValidHex("fe01000002 00"),
         ByteVector.fromValidHex("01020101 0a0101"),
-        ByteVector.fromValidHex("ff0200000000000001 00"),
+        ByteVector.fromValidHex("ff0100000000000002 00"),
         // Invalid TestTlv1.
         ByteVector.fromValidHex("01 01 00"), // not minimally-encoded
         ByteVector.fromValidHex("01 02 0001"), // not minimally-encoded
@@ -214,9 +214,9 @@ class TlvCodecsSpec {
         ByteVector.fromValidHex("03 30 023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb000000000000000100000000000001"), // invalid length
         ByteVector.fromValidHex("03 32 023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb0000000000000001000000000000000001"), // invalid length
         // Invalid TestTlv254.
-        ByteVector.fromValidHex("fdfe00 00"), // invalid length
-        ByteVector.fromValidHex("fdfe00 01 01"), // invalid length
-        ByteVector.fromValidHex("fdfe00 03 010101"), // invalid length
+        ByteVector.fromValidHex("fd00fe 00"), // invalid length
+        ByteVector.fromValidHex("fd00fe 01 01"), // invalid length
+        ByteVector.fromValidHex("fd00fe 03 010101"), // invalid length
         // Invalid multi-record streams.
         ByteVector.fromValidHex("01012a 02"), // valid tlv record followed by invalid tlv record (length missing)
         ByteVector.fromValidHex("01012a 0208"), // valid tlv record followed by invalid tlv record (value missing)
@@ -239,7 +239,7 @@ class TlvCodecsSpec {
       
       val testCases = Seq(
         ByteVector.fromValidHex("41 01020231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451"),
-        ByteVector.fromValidHex("fd4d01 01020231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451 ff6543210987654321 fd0001 10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010010101010101")
+        ByteVector.fromValidHex("fd014d 01020231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451 ff6543210987654321 fd0100 10101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010101010010101010101")
       )
 
       for (testCase <- testCases) {
@@ -274,8 +274,8 @@ class TlvCodecsSpec {
       println("encode unordered tlv stream (codec should sort appropriately)")
       
       val stream = TlvStream(Seq(TestType254(42), TestType1(42)), Seq(GenericTlv(13, ByteVector.fromValidHex("2a")), GenericTlv(11, ByteVector.fromValidHex("2b"))))
-      assert(testTlvStreamCodec.encode(stream).require.toByteVector == ByteVector.fromValidHex("01012a 0b012b 0d012a fdfe0002002a"))
-      assert(lengthPrefixedTestTlvStreamCodec.encode(stream).require.toByteVector == ByteVector.fromValidHex("0f 01012a 0b012b 0d012a fdfe0002002a"))
+      assert(testTlvStreamCodec.encode(stream).require.toByteVector == ByteVector.fromValidHex("01012a 0b012b 0d012a fd00fe02002a"))
+      assert(lengthPrefixedTestTlvStreamCodec.encode(stream).require.toByteVector == ByteVector.fromValidHex("0f 01012a 0b012b 0d012a fd00fe02002a"))
     }
 
     {

@@ -113,13 +113,12 @@ object LightningMessageCodecs { me =>
     case value => Attempt successful value
   }, identity)
 
-  val uint64L: Codec[UInt64] = bytes(8).xmap(bv => UInt64(bv.reverse), _.toByteVector.padLeft(8).reverse)
   val uint64: Codec[UInt64] = bytes(8).xmap(UInt64.apply, _.toByteVector padLeft 8)
 
   val varint: Codec[UInt64] = {
-    val large = minimalValue(uint64L, 0x100000000L)
-    val medium = minimalValue(uint32L.xmap(UInt64.apply, _.toBigInt.toLong), 0x10000)
-    val small = minimalValue(uint16L.xmap(int => UInt64(int), _.toBigInt.toInt), 0xFD)
+    val large = minimalValue(uint64, 0x100000000L)
+    val medium = minimalValue(uint32.xmap(UInt64.apply, _.toBigInt.toLong), 0x10000)
+    val small = minimalValue(uint16.xmap(int => UInt64(int), _.toBigInt.toInt), 0xFD)
     val default: Codec[UInt64] = uint8L.xmap(int => UInt64(int), _.toBigInt.toInt)
 
     discriminatorWithDefault(discriminated[UInt64].by(uint8L)

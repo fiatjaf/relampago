@@ -162,7 +162,7 @@ class WireSpec {
       {
         val alias = "IRATEMONK"
         val bin = c.encode(alias).toOption.get
-        assert(bin == BitVector(alias.getBytes("UTF-8") ++ Array.fill[Byte](32 - alias.size)(0)))
+        assert(bin == BitVector(alias.getBytes("UTF-8") ++ Array.fill[Byte](32 - alias.length)(0)))
         val alias2 = c.decode(bin).toOption.get.value
         assert(alias == alias2)
       }
@@ -170,7 +170,7 @@ class WireSpec {
       {
         val alias = "this-alias-is-exactly-32-B-long."
         val bin = c.encode(alias).toOption.get
-        assert(bin == BitVector(alias.getBytes("UTF-8") ++ Array.fill[Byte](32 - alias.size)(0)))
+        assert(bin == BitVector(alias.getBytes("UTF-8") ++ Array.fill[Byte](32 - alias.length)(0)))
         val alias2 = c.decode(bin).toOption.get.value
         assert(alias == alias2)
       }
@@ -200,36 +200,18 @@ class WireSpec {
     }
 
     {
-      println("encode/decode with uint64L codec")
-
-      val expected = Map(
-        UInt64(0) -> ByteVector.fromValidHex("0000000000000000"),
-        UInt64(42) -> ByteVector.fromValidHex("2a00000000000000"),
-        UInt64(6211610197754262546L) -> ByteVector.fromValidHex("1234567890123456"),
-        UInt64(ByteVector.fromValidHex("ffffffffffffffff")) -> ByteVector.fromValidHex("ffffffffffffffff")
-      ).mapValues(_.toBitVector)
-
-      for ((uint, ref) <- expected) {
-        val encoded = uint64L.encode(uint).require
-        assert(ref == encoded)
-        val decoded = uint64L.decode(encoded).require.value
-        assert(uint == decoded)
-      }
-    }
-
-    {
       println("encode/decode with varint codec")
 
       val expected = Map(
         UInt64(0L) -> ByteVector.fromValidHex("00"),
         UInt64(42L) -> ByteVector.fromValidHex("2a"),
-        UInt64(253L) -> ByteVector.fromValidHex("fdfd00"),
-        UInt64(254L) -> ByteVector.fromValidHex("fdfe00"),
-        UInt64(255L) -> ByteVector.fromValidHex("fdff00"),
-        UInt64(550L) -> ByteVector.fromValidHex("fd2602"),
-        UInt64(998000L) -> ByteVector.fromValidHex("fe703a0f00"),
-        UInt64(6211610197754262546L) -> ByteVector.fromValidHex("ff1234567890123456"),
-        UInt64.MaxValue -> ByteVector.fromValidHex("ffffffffffffffffff")
+        UInt64(253L) -> ByteVector.fromValidHex("fd 00 fd"),
+        UInt64(254L) -> ByteVector.fromValidHex("fd 00 fe"),
+        UInt64(255L) -> ByteVector.fromValidHex("fd 00 ff"),
+        UInt64(550L) -> ByteVector.fromValidHex("fd 02 26"),
+        UInt64(998000L) -> ByteVector.fromValidHex("fe 00 0f 3a 70"),
+        UInt64(1311768467284833366L) -> ByteVector.fromValidHex("ff 12 34 56 78 90 12 34 56"),
+        UInt64.MaxValue -> ByteVector.fromValidHex("ff ff ff ff ff ff ff ff ff")
       ).mapValues(_.toBitVector)
 
       for ((uint, ref) <- expected) {
@@ -251,32 +233,32 @@ class WireSpec {
         ByteVector.fromValidHex("ff"), // truncated
         ByteVector.fromValidHex("ff 12 34 56 78"), // truncated
         ByteVector.fromValidHex("fd 00 00"), // not minimally-encoded
-        ByteVector.fromValidHex("fd fc 00"), // not minimally-encoded
+        ByteVector.fromValidHex("fd 00 fc"), // not minimally-encoded
         ByteVector.fromValidHex("fe 00 00 00 00"), // not minimally-encoded
-        ByteVector.fromValidHex("fe ff ff 00 00"), // not minimally-encoded
+        ByteVector.fromValidHex("fe 00 00 ff ff"), // not minimally-encoded
         ByteVector.fromValidHex("ff 00 00 00 00 00 00 00 00"), // not minimally-encoded
-        ByteVector.fromValidHex("ff ff ff ff 01 00 00 00 00"), // not minimally-encoded
-        ByteVector.fromValidHex("ff ff ff ff ff 00 00 00 00") // not minimally-encoded
+        ByteVector.fromValidHex("ff 00 00 00 00 01 ff ff ff"), // not minimally-encoded
+        ByteVector.fromValidHex("ff 00 00 00 00 ff ff ff ff") // not minimally-encoded
       ).map(_.toBitVector)
 
       for (testCase <- testCases) {
-        assert(varint.decode(testCase).isFailure)
+        assert(varint.decode(testCase).isFailure, testCase.toByteVector)
       }
     }
 
     {
-      println("encode/decode with varlong codec")
+      println("encode/decode with varintoverflow codec")
 
       val expected = Map(
         0L -> ByteVector.fromValidHex("00"),
         42L -> ByteVector.fromValidHex("2a"),
-        253L -> ByteVector.fromValidHex("fd fd 00"),
-        254L -> ByteVector.fromValidHex("fd fe 00"),
-        255L -> ByteVector.fromValidHex("fd ff 00"),
-        550L -> ByteVector.fromValidHex("fd 26 02"),
-        998000L -> ByteVector.fromValidHex("fe 70 3a 0f 00"),
-        6211610197754262546L -> ByteVector.fromValidHex("ff 12 34 56 78 90 12 34 56"),
-        Long.MaxValue -> ByteVector.fromValidHex("ff ff ff ff ff ff ff ff 7f")
+        253L -> ByteVector.fromValidHex("fd 00 fd"),
+        254L -> ByteVector.fromValidHex("fd 00 fe"),
+        255L -> ByteVector.fromValidHex("fd 00 ff"),
+        550L -> ByteVector.fromValidHex("fd 02 26"),
+        998000L -> ByteVector.fromValidHex("fe 00 0f 3a 70"),
+        1311768467284833366L -> ByteVector.fromValidHex("ff 12 34 56 78 90 12 34 56"),
+        Long.MaxValue -> ByteVector.fromValidHex("ff 7f ff ff ff ff ff ff ff")
       ).mapValues(_.toBitVector)
 
       for ((long, ref) <- expected) {
@@ -288,10 +270,10 @@ class WireSpec {
     }
 
     {
-      println("decode invalid varlong")
+      println("decode invalid varintoverflow")
 
       val testCases = Seq(
-        ByteVector.fromValidHex("ff 00 00 00 00 00 00 00 80"),
+        ByteVector.fromValidHex("ff 80 00 00 00 00 00 00 00"),
         ByteVector.fromValidHex("ff ff ff ff ff ff ff ff ff")
       ).map(_.toBitVector)
 

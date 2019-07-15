@@ -16,7 +16,7 @@ import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 
 
-object LNParams { me =>
+object LNParams {
   type DepthAndDead = (Int, Boolean)
   val localFeatures = ByteVector.fromValidHex("8a")
   val globalFeatures = ByteVector.fromValidHex("")
