@@ -130,8 +130,8 @@ object PaymentInfo {
         else rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
           // A node along a payment route may choose a different channel than the one we have requested
           // if that happens it means our requested channel has not been used so we put it back here and retry it once again
-          val rd1 = if (payHop.shortChannelId == u.update.shortChannelId) rd else rd.copy(routes = rd.usedRoute +: rd.routes)
-          withoutChan(payHop.shortChannelId, rd1, 180 * 1000, rd.firstMsat)
+          if (payHop.shortChannelId == u.update.shortChannelId) withoutChan(payHop.shortChannelId, rd, 180 * 1000, rd.firstMsat)
+          else withoutChan(u.update.shortChannelId, rd.copy(routes = rd.usedRoute +: rd.routes), 180 * 1000, rd.firstMsat)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
