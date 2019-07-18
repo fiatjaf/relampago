@@ -176,6 +176,7 @@
         <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channels</a> in this wallet.<br><br>How to fix this?<br><br>
         - Open an outgoing channel with a peer of your choice, this requires some bitcoins to be present in this wallet as they will be used for funding.<br><br>
         - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Purchase an incoming channel</a> with an immediately spendable balance on your side.
+        - <a href=https://lnbig.com/#/open-channel/>Get a free incoming channel</a> from LNBIG.COM service.
     ]]></string>
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>

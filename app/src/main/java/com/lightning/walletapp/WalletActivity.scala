@@ -225,7 +225,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   // LNURL
 
   def fetch1stLevelUrl(lnUrl: LNUrl) = {
-    val awaitRequest = get(lnUrl.uri.toString, true).connectTimeout(7500)
+    val awaitRequest = get(lnUrl.uri.toString, true).connectTimeout(15000)
     val sslAwareRequest = awaitRequest.trustAllCerts.trustAllHosts
     app toast ln_url_resolving
 

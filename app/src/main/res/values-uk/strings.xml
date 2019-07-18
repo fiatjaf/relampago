@@ -173,8 +173,8 @@
         <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платіжних каналів</a>.<br><br>Що з цим робити?<br><br>
         - Відкрийте канал з вузлом на ваш вибір, для наповнення каналу в гаманці мають бути біткоіни.<br><br>
         - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Купіть вхiдний канал</a> з миттєво доступним витратним балансом.
+        - <a href=https://lnbig.com/#/open-channel/>Отримайте безкоштовний вхідний канал</a> вiд сервicу LNBIG.COM.
     ]]></string>
-
 
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Створити запит-Блискавку</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запит-Блискавка</font><small><br><br>%1$s</small>]]></string>
