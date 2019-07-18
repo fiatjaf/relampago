@@ -71,7 +71,8 @@ case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSi
 
 // ALL THE DATA BELOW WILL BE STORED
 
-case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore, commitments: Commitments,
+case class WaitBroadcastRemoteData(announce: NodeAnnouncement,
+                                   core: WaitFundingSignedCore, commitments: Commitments,
                                    their: Option[FundingLocked] = None) extends HasCommitments {
 
   def isLost = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 21 * 1000L

@@ -27,6 +27,7 @@ object LNParams {
   val minCapacityMsat = 300000000L
   val channelReserveToFundingRatio = 100
 
+  val minHostedLiabilityBlockdays = 1000
   val maxHostedBlockHeight = 100000L
   val minHostedCltvDelta = 144 * 3
 

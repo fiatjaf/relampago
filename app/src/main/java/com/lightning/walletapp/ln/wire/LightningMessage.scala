@@ -191,8 +191,9 @@ trait HostedChannelMessage extends LightningMessage
 case class InvokeHostedChannel(chainHash: ByteVector, scriptPubKey: ByteVector) extends HostedChannelMessage
 
 case class InitHostedChannel(maxHtlcValueInFlightMsat: UInt64,
-                             htlcMinimumMsat: Long, maxAcceptedHtlcs: Int, channelCapacitySatoshis: Long, liabilityDeadlineBlockdays: Int,
-                             minimalOnchainRefundAmountSatoshis: Long, initialClientBalanceSatoshis: Long) extends HostedChannelMessage
+                             htlcMinimumMsat: Long, maxAcceptedHtlcs: Int, channelCapacitySatoshis: Long,
+                             liabilityDeadlineBlockdays: Int, minimalOnchainRefundAmountSatoshis: Long,
+                             initialClientBalanceSatoshis: Long) extends HostedChannelMessage
 
 case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
                                 initHostedChannel: InitHostedChannel, lastClientStateUpdate: StateUpdate,
