@@ -81,7 +81,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val blocksTitleListener = new BlocksListener {
     def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) =
-      if (left % broadcaster.blocksPerDay == 0) updTitleTask.run
+      if (left % blocksPerDay == 0) updTitleTask.run
   }
 
   val peersListener = new PeerConnectedEventListener with PeerDisconnectedEventListener {
@@ -186,8 +186,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     val btcSubtitleText =
       if (app.kit.peerGroup.numConnectedPeers < 1) btcStatusConnecting
-      else if (ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay) btcStatusOperational
-      else app.plur1OrZero(btcSyncInfo, ChannelManager.currentBlocksLeft / broadcaster.blocksPerDay)
+      else if (ChannelManager.currentBlocksLeft < blocksPerDay) btcStatusOperational
+      else app.plur1OrZero(btcSyncInfo, ChannelManager.currentBlocksLeft / blocksPerDay)
 
     val lnSubtitleText =
       if (delta == 0 && viable.size == 1) lnStatusOperationalOne

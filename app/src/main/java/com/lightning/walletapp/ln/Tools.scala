@@ -1,5 +1,6 @@
 package com.lightning.walletapp.ln
 
+import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering}
 import com.lightning.walletapp.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import language.implicitConversions
@@ -46,6 +47,11 @@ object Tools {
     val part2 = txid(30).^(fundingOutputIndex >> 8).toByte
     val part3 = txid(31).^(fundingOutputIndex).toByte
     txid.take(30) :+ part2 :+ part3
+  }
+
+  def custodialChanId(pubkey1: ByteVector, pubkey2: ByteVector) = {
+    val pubkey1First: Boolean = LexicographicalOrdering.isLessThan(pubkey1, pubkey2)
+    if (pubkey1First) Crypto.sha256(pubkey1 ++ pubkey2) else Crypto.sha256(pubkey2 ++ pubkey1)
   }
 }
 

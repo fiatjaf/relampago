@@ -265,7 +265,7 @@ object ChannelManager extends Broadcaster {
       if (currentBlocksLeft < 1) {
         // Send this once rescan is done to spare resources
         val cmd = CMDBestHeight(currentHeight, initialChainHeight)
-        for (channel <- all) channel process cmd
+        for (channelToUpdate <- all) channelToUpdate process cmd
         initialChainHeight = currentHeight
       }
     }
@@ -279,13 +279,15 @@ object ChannelManager extends Broadcaster {
 
   // BROADCASTER IMPLEMENTATION
 
+  def currentHeight: Int = {
+    // We may still be syncing but chain height can still be obtained by adding peding blocks
+    val blocksToDownload = if (currentBlocksLeft == Int.MaxValue) 0 else currentBlocksLeft
+    app.kit.wallet.getLastBlockSeenHeight + blocksToDownload
+  }
+
+  def currentBlockDay = currentHeight / blocksPerDay
   def perKwSixSat = RatesSaver.rates.feeSix.value / 4
   def perKwThreeSat = RatesSaver.rates.feeThree.value / 4
-
-  def currentHeight: Int =
-    // We may still be syncing but anyway a final chain height is known here
-    if (currentBlocksLeft == Int.MaxValue) app.kit.wallet.getLastBlockSeenHeight
-    else app.kit.wallet.getLastBlockSeenHeight + currentBlocksLeft
 
   def getTx(txid: ByteVector) = {
     val wrapped = Sha256Hash wrap txid.toArray

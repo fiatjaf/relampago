@@ -286,8 +286,8 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
       mkCheckForm(alert => rm(alert)(go), none, bld, dialog_next, dialog_cancel)
     }
 
-    // Wallet may not see incoming txs immediately if channel gets broken while not synched
-    recoverFunds.setEnabled(ChannelManager.currentBlocksLeft < broadcaster.blocksPerDay)
+    // Wallet may not see incoming tx immediately if channel gets broken while not synched
+    recoverFunds.setEnabled(ChannelManager.currentBlocksLeft < blocksPerDay)
   } else me exitTo classOf[MainActivity]
 
   def updateBackupView = {

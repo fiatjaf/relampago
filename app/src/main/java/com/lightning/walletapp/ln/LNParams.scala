@@ -23,8 +23,12 @@ object LNParams {
   val chainHash = Block.LivenetGenesisBlock.hash
 
   val minDepth = 1
+  val blocksPerDay = 144
   val minCapacityMsat = 300000000L
   val channelReserveToFundingRatio = 100
+
+  val maxHostedBlockHeight = 100000L
+  val minHostedCltvDelta = 144 * 3
 
   final val dust = Satoshi(546)
   final val maxToSelfDelay = 2016
@@ -132,7 +136,6 @@ trait Broadcaster extends ChannelListener {
     parentDepth -> parentIsDead -> (cltvDelay + csvDelay)
   }
 
-  val blocksPerDay: Int = 144
   def csvShowDelayed(t1: TransactionWithInputInfo, t2: TransactionWithInputInfo, commitTx: Transaction) =
     ShowDelayed(parent = csv(t1.tx, t2.tx), t2.tx, commitTx, fee = t1 -- t2, t2.tx.allOutputsAmount)
 }

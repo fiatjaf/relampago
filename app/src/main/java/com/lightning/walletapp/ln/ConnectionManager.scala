@@ -4,11 +4,11 @@ import scala.concurrent._
 import scala.concurrent.duration._
 import scala.collection.JavaConverters._
 import com.lightning.walletapp.ln.wire._
+import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.Features._
 
 import rx.lang.scala.{Observable => Obs}
-import com.lightning.walletapp.ln.Tools.{Bytes, none}
 import com.lightning.walletapp.ln.crypto.Noise.KeyPair
 import java.util.concurrent.ConcurrentHashMap
 import fr.acinq.bitcoin.Crypto.PublicKey
@@ -20,9 +20,11 @@ import java.net.Socket
 object ConnectionManager {
   var listeners = Set.empty[ConnectionListener]
   val connections = new ConcurrentHashMap[PublicKey, Worker].asScala
+  val keyPair = KeyPair(nodePublicKey.toBin, nodePrivateKey.toBin)
 
   protected[this] val events = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = for (lst <- listeners) lst.onMessage(nodeId, msg)
+    override def onHostedMessage(chanId: ByteVector, msg: HostedChannelMessage) = for (lst <- listeners) lst.onHostedMessage(chanId, msg)
     override def onOperational(nodeId: PublicKey, isCompat: Boolean) = for (lst <- listeners) lst.onOperational(nodeId, isCompat)
     override def onDisconnect(nodeId: PublicKey) = for (lst <- listeners) lst.onDisconnect(nodeId)
   }
@@ -35,7 +37,7 @@ object ConnectionManager {
 
   class Worker(val ann: NodeAnnouncement, buffer: Bytes = new Bytes(1024), val sock: Socket = new Socket) {
     implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-    private val keyPair = KeyPair(nodePublicKey.toBin, nodePrivateKey.toBin)
+    lazy val hostedChanId = Tools.custodialChanId(keyPair.pub, ann.nodeId.toBin)
     var lastMsg = System.currentTimeMillis
 
     val handler: TransportHandler = new TransportHandler(keyPair, ann.nodeId) {
@@ -71,7 +73,8 @@ object ConnectionManager {
       message match {
         case their: Init => events.onOperational(isCompat = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures), nodeId = ann.nodeId)
         case Ping(replyLength, _) if replyLength > 0 && replyLength <= 65532 => handler process Pong(ByteVector fromValidHex "00" * replyLength)
-        case internalMessage => events.onMessage(ann.nodeId, internalMessage)
+        case hostedChanMessage: HostedChannelMessage => events.onHostedMessage(hostedChanId, hostedChanMessage)
+        case _ => events.onMessage(ann.nodeId, message)
       }
     }
   }
@@ -86,6 +89,7 @@ object ConnectionManager {
 class ConnectionListener {
   def onOpenOffer(nodeId: PublicKey, msg: OpenChannel): Unit = none
   def onMessage(nodeId: PublicKey, msg: LightningMessage): Unit = none
+  def onHostedMessage(chanId: ByteVector, msg: HostedChannelMessage): Unit = none
   def onOperational(nodeId: PublicKey, isCompat: Boolean): Unit = none
   def onDisconnect(nodeId: PublicKey): Unit = none
 }
