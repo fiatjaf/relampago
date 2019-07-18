@@ -175,8 +175,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val delta = viable.size - online
 
     val lnTotalSum = MilliSatoshi(viable.map { chan =>
-      // Here we seek for total refundable amount which is not affected by on-chain fee changes
-      chan.hasCsOr(data => Commitments.latestRemoteCommit(data.commitments).spec.toRemoteMsat, 0L)
+      // Here we seek for total refundable amount not affected by fee changes
+      chan.hasCsOr(_.commitments.latestRemoteCommit.spec.toRemoteMsat, 0L)
     }.sum)
 
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)

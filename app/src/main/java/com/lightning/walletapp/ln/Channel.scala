@@ -216,33 +216,30 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm: NormalData, add: UpdateAddHtlc, OPEN) =>
-        // Got new incoming HTLC so put it to changes for now
-        val c1 = Commitments.receiveAdd(norm.commitments, add)
-        me UPDATA norm.copy(commitments = c1)
+        // Got new incoming HTLC, put it to changes without storing for now
+        me UPDATA norm.copy(commitments = norm.commitments receiveAdd add)
 
 
       case (norm: NormalData, fulfill: UpdateFulfillHtlc, OPEN) =>
-        // Got a fulfill for an outgoing HTLC we have sent them earlier
-        val c1 = Commitments.receiveFulfill(norm.commitments, fulfill)
-        me UPDATA norm.copy(commitments = c1)
+        // Got a fulfill for an outgoing HTLC we have sent to them earlier
+        me UPDATA norm.copy(commitments = norm.commitments receiveFulfill fulfill)
         events fulfillReceived fulfill
 
 
       case (norm: NormalData, fail: UpdateFailHtlc, OPEN) =>
-        // Got a failure for an outgoing HTLC we sent earlier
-        val c1 = Commitments.receiveFail(norm.commitments, fail)
-        me UPDATA norm.copy(commitments = c1)
+        // Got a failure for an outgoing HTLC we have sent to them earlier
+        me UPDATA norm.copy(commitments = norm.commitments receiveFail fail)
 
 
       case (norm: NormalData, fail: UpdateFailMalformedHtlc, OPEN) =>
-        // Got 'malformed' failure for an outgoing HTLC we sent earlier
-        val c1 = Commitments.receiveFailMalformed(norm.commitments, fail)
-        me UPDATA norm.copy(commitments = c1)
+        // Got 'malformed' failure for an outgoing HTLC we have sent to them earlier
+        me UPDATA norm.copy(commitments = norm.commitments receiveFailMalformed fail)
 
 
-      // We can send a new HTLC when channel is both operational and online
       case (norm: NormalData, rd: RoutingData, OPEN) if isOperational(me) =>
-        val c1 \ updateAddHtlc = Commitments.sendAdd(norm.commitments, rd)
+        // We can send a new HTLC when channel is both operational and online
+
+        val c1 \ updateAddHtlc = norm.commitments sendAdd rd
         me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
         events outPaymentAccepted rd
         doProcess(CMDProceed)
@@ -253,23 +250,23 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         for {
           // this is a special case where we don't throw if cross signed HTLC is not found
+          add <- norm.commitments.getHtlcCrossSigned(incomingRelativeToLocal = true, cmd.id)
           // such a case may happen when we have already fulfilled it just before connection got lost
-          add <- Commitments.getHtlcCrossSigned(norm.commitments, incomingRelativeToLocal = true, cmd.id)
           updateFulfillHtlc = UpdateFulfillHtlc(norm.commitments.channelId, cmd.id, cmd.preimage)
 
           if updateFulfillHtlc.paymentHash == add.paymentHash
-          c1 = Commitments.addLocalProposal(norm.commitments, updateFulfillHtlc)
+          c1 = norm.commitments addLocalProposal updateFulfillHtlc
         } me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
 
 
       // Failing an HTLC we got earlier
       case (norm: NormalData, cmd: CMDFailHtlc, OPEN) =>
-        val c1 \ updateFailHtlc = Commitments.sendFail(norm.commitments, cmd)
+        val c1 \ updateFailHtlc = norm.commitments sendFail cmd
         me UPDATA norm.copy(commitments = c1) SEND updateFailHtlc
 
 
       case (norm: NormalData, cmd: CMDFailMalformedHtlc, OPEN) =>
-        val c1 \ updateFailMalformedHtlс = Commitments.sendFailMalformed(norm.commitments, cmd)
+        val c1 \ updateFailMalformedHtlс = norm.commitments sendFailMalformed cmd
         me UPDATA norm.copy(commitments = c1) SEND updateFailMalformedHtlс
 
 
@@ -294,14 +291,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
         // Propose new remote commit via commit tx sig
         val nextRemotePoint = norm.commitments.remoteNextCommitInfo.right.get
-        val c1 \ commitSig = Commitments.sendCommit(norm.commitments, nextRemotePoint)
+        val c1 \ commitSig = norm.commitments sendCommit nextRemotePoint
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 SEND commitSig
 
 
       case (norm: NormalData, sig: CommitSig, OPEN) =>
-        // We received a commit sig from them, now we can update our local commit
-        val c1 \ revokeAndAck = Commitments.receiveCommit(norm.commitments, sig)
+        // We received a commit sig from them, can update local commit
+        val c1 \ revokeAndAck =norm.commitments receiveCommit sig
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 SEND revokeAndAck
 
@@ -312,7 +309,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
         // We received a revocation because we sent a commit sig
-        val c1 = Commitments.receiveRevocation(norm.commitments, rev)
+        val c1 = norm.commitments receiveRevocation rev
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 doProcess CMDHTLCProcess
         // We should use an old commit here
@@ -320,13 +317,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm: NormalData, fee: UpdateFee, OPEN) if !norm.commitments.localParams.isFunder =>
-        val d1 = norm.modify(_.commitments) setTo Commitments.receiveFee(norm.commitments, fee)
+        // It is their duty to update fees when we are a fundee, this will be persisted later
+        val d1 = norm.copy(commitments = norm.commitments receiveFee fee)
         me UPDATA d1
 
 
       case (norm: NormalData, CMDFeerate(satPerKw), OPEN) if norm.commitments.localParams.isFunder =>
         val shouldUpdate = LNParams.shouldUpdateFee(satPerKw, norm.commitments.localCommit.spec.feeratePerKw)
-        if (shouldUpdate) Commitments.sendFee(norm.commitments, satPerKw) foreach { case c1 \ feeUpdateMessage =>
+        if (shouldUpdate) norm.commitments sendFee satPerKw foreach { case c1 \ feeUpdateMessage =>
           // We send a fee update if current chan unspendable reserve + commitTx fee can afford it
           // otherwise we fail silently in hope that fee will drop or we will receive a payment
           me UPDATA norm.copy(commitments = c1) SEND feeUpdateMessage
@@ -335,8 +333,8 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm: NormalData, cmd: CMDBestHeight, OPEN | SLEEPING) =>
-        val expiredPayment = Commitments.findExpiredHtlc(norm.commitments, cmd)
-        if (expiredPayment.nonEmpty) throw HTLCHasExpired(norm, expiredPayment.get)
+        for (expiredHtlc <- norm.commitments findExpiredHtlc cmd)
+          throw HTLCHasExpired(norm, expiredHtlc)
 
 
       // SHUTDOWN in WAIT_FUNDING_DONE
@@ -367,10 +365,10 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
 
       case (norm @ NormalData(announce, commitments, our, their, txOpt), CMDShutdown(scriptPubKey), OPEN | SLEEPING) =>
-        if (Commitments.localHasUnsignedOutgoing(commitments) || our.isDefined || their.isDefined) startLocalClose(norm) else {
-          val localShutdown = Shutdown(commitments.channelId, scriptPubKey getOrElse commitments.localParams.defaultFinalScriptPubKey)
-          val norm1 = me STORE NormalData(announce, commitments, Some(localShutdown), their, txOpt)
-          me UPDATA norm1 SEND localShutdown
+        if (commitments.localHasUnsignedOutgoing || our.isDefined || their.isDefined) startLocalClose(some = norm) else {
+          val shutdown = Shutdown(commitments.channelId, scriptPubKey getOrElse commitments.localParams.defaultFinalScriptPubKey)
+          val norm1 = me STORE NormalData(announce, commitments, Some(shutdown), their, txOpt)
+          me UPDATA norm1 SEND shutdown
         }
 
 
@@ -378,7 +376,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // should sign our unsigned outgoing HTLCs if present and then proceed with shutdown
       case (NormalData(announce, commitments, our, None, txOpt), remote: Shutdown, OPEN) =>
         val norm = NormalData(announce, commitments, our, remoteShutdown = Some(remote), txOpt)
-        if (Commitments remoteHasUnsignedOutgoing commitments) startLocalClose(norm)
+        if (commitments.remoteHasUnsignedOutgoing) startLocalClose(norm)
         else me UPDATA norm doProcess CMDProceed
 
 
@@ -700,11 +698,12 @@ object Channel {
   val OPEN = "OPEN"
 
   // No tears, only dreams now
+  val SUSPENDED = "SUSPENDED"
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
   private[this] val nextDummyHtlc = UpdateAddHtlc(Zeroes, -1, LNParams.minCapacityMsat, One, 144 * 3, ByteVector.empty)
-  def nextReducedRemoteState(commitments: Commitments) = Commitments.addLocalProposal(commitments, nextDummyHtlc).reducedRemoteState
+  def nextReducedRemoteState(currentCommitments: Commitments) = currentCommitments.addLocalProposal(nextDummyHtlc).reducedRemoteState
   def estimateCanSend(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.minCapacityMsat, 0L)
   def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat, 0L)
   def estimateNextUsefulCapacity(chan: Channel) = estimateCanSend(chan) + estimateCanReceive(chan)
