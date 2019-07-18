@@ -145,13 +145,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val loaderCallbacks = new LoaderCallbacks[Cursor] {
     def onCreateLoader(id: Int, bn: Bundle) = new ReactLoader[PaymentInfo](host) {
-      val consume = (vec: InfoVec) => runAnd(lnItems = vec map LNWrap)(updPaymentList.run)
-      def getCursor = if (lastQuery.isEmpty) bag.byRecent else bag byQuery lastQuery
-      def createItem(rc: RichCursor) = bag toPaymentInfo rc
+      val consume = (vec: PaymentInfoVec) => runAnd(lnItems = vec map LNWrap)(updPaymentList.run)
+      def getCursor = if (lastQuery.isEmpty) PaymentInfoWrap.byRecent else PaymentInfoWrap.byQuery(lastQuery)
+      def createItem(rc: RichCursor) = PaymentInfoWrap.toPaymentInfo(rc)
     }
 
     type LoaderCursor = Loader[Cursor]
-    type InfoVec = Vector[PaymentInfo]
+    type PaymentInfoVec = Vector[PaymentInfo]
     def onLoaderReset(loaderCursor: LoaderCursor) = none
     def onLoadFinished(loaderCursor: LoaderCursor, c: Cursor) = none
   }

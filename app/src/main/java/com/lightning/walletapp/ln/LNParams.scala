@@ -33,7 +33,7 @@ object LNParams {
   final val dust = Satoshi(546)
   final val maxToSelfDelay = 2016
   final val minFeeratePerKw = 253
-  final val maxCltvDelta = 7 * 144L
+  final val maxCltvDelta = 144L * 7
   final val minHtlcValue = MilliSatoshi(1000L)
   final val maxCapacity = MilliSatoshi(16777215000L)
 
@@ -47,8 +47,8 @@ object LNParams {
   lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin)
   lazy val cloudId = sha256(cloudSecret)
 
-  lazy val bag = PaymentInfoWrap
   lazy val broadcaster: Broadcaster = ChannelManager
+  lazy val bag: PaymentInfoBag with ChannelListener = PaymentInfoWrap
   lazy val nodePrivateKey: PrivateKey = extendedNodeKey.privateKey
   lazy val nodePublicKey: PublicKey = nodePrivateKey.publicKey
 

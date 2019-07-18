@@ -280,7 +280,7 @@ object ChannelManager extends Broadcaster {
   // BROADCASTER IMPLEMENTATION
 
   def currentHeight: Int = {
-    // We may still be syncing but chain height can still be obtained by adding peding blocks
+    // We may be syncing but chain height can still be obtained by adding peding blocks
     val blocksToDownload = if (currentBlocksLeft == Int.MaxValue) 0 else currentBlocksLeft
     app.kit.wallet.getLastBlockSeenHeight + blocksToDownload
   }
