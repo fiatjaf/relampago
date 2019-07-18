@@ -318,8 +318,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
 
       case (norm: NormalData, fee: UpdateFee, OPEN) if !norm.commitments.localParams.isFunder =>
         // It is their duty to update fees when we are a fundee, this will be persisted later
-        val d1 = norm.copy(commitments = norm.commitments receiveFee fee)
-        me UPDATA d1
+        me UPDATA norm.copy(commitments = norm.commitments receiveFee fee)
 
 
       case (norm: NormalData, CMDFeerate(satPerKw), OPEN) if norm.commitments.localParams.isFunder =>

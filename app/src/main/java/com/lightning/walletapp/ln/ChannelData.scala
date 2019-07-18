@@ -314,7 +314,7 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
     htlcOut <- CommitmentSpec.findHtlcById(localCommit.spec, htlcId, incomingRelativeToLocal)
   } yield htlcOut.add
 
-  def ifSenderCanAffordFees = {
+  def ensureSenderCanAffordFees = {
     val reduced = CommitmentSpec.reduce(localCommit.spec, localChanges.acked, remoteChanges.proposed)
     val feesSat = if (localParams.isFunder) 0L else Scripts.commitTxFee(localParams.dustLimit, reduced).amount
     if (reduced.toRemoteMsat - (feesSat + localParams.channelReserveSat) * 1000L < 0L) throw new LightningException
@@ -332,7 +332,7 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
   def receiveFee(fee: UpdateFee) = {
     if (localParams.isFunder) throw new LightningException
     if (fee.feeratePerKw < minFeeratePerKw) throw new LightningException
-    val c1 \ _ = addRemoteProposal(fee).ifSenderCanAffordFees
+    val c1 \ _ = addRemoteProposal(fee).ensureSenderCanAffordFees
     c1
   }
 
@@ -356,7 +356,7 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
   def receiveAdd(add: UpdateAddHtlc) = {
     // We should both check if WE can accept another HTLC and if PEER can send another HTLC
     // let's compute the current commitment *as seen by us* with this payment change taken into account
-    val c1 \ reduced = addRemoteProposal(add).modify(_.remoteNextHtlcId).using(_ + 1).ifSenderCanAffordFees
+    val c1 \ reduced = addRemoteProposal(add).modify(_.remoteNextHtlcId).using(_ + 1).ensureSenderCanAffordFees
 
     val incomingHtlcs = reduced.htlcs.filter(_.incoming)
     val inFlight = incomingHtlcs.map(_.add.amountMsat).sum
