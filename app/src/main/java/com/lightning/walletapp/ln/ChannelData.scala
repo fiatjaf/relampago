@@ -294,7 +294,7 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
     val myFeeSat = if (localParams.isFunder) commitFeeSat else 0L
 
     val canSendMsat = reduced.toRemoteMsat - (myFeeSat + remoteParams.channelReserveSatoshis) * 1000L
-    val canReceiveMsat = localCommit.spec.toRemoteMsat - (theirFeeSat + localParams.channelReserveSat) * 1000L
+    val canReceiveMsat = reduced.toLocalMsat - (theirFeeSat + localParams.channelReserveSat) * 1000L
     ReducedState(reduced.htlcs, canSendMsat, canReceiveMsat, myFeeSat)
   }
 
@@ -345,11 +345,11 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
     val outgoingHtlcs = c1.reducedRemoteState.htlcs.filter(_.incoming)
     val inFlight = outgoingHtlcs.map(_.add.amountMsat).sum
 
-    // We should both check if we can send another HTLC and if PEER can accept another HTLC
-    if (rd.firstMsat < remoteParams.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
+    // We should check if we can send another HTLC and if PEER can accept another HTLC, including if we both can handle an updated commit tx fee
+    if (c1.reducedRemoteState.canSendMsat < 0L || c1.reducedRemoteState.canReceiveMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
     if (UInt64(inFlight) > remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
     if (outgoingHtlcs.size > remoteParams.maxAcceptedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
-    if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
+    if (rd.firstMsat < remoteParams.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
     c1 -> add
   }
 
