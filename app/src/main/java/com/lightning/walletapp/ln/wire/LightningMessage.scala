@@ -1,12 +1,12 @@
 package com.lightning.walletapp.ln.wire
 
+import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
-import com.lightning.walletapp.ln.{Features, HasCommitments, LightningException}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
@@ -130,6 +130,7 @@ case class NodeAnnouncement(signature: ByteVector, features: ByteVector, timesta
 
   val identifier = (alias + nodeId.toString).toLowerCase
   val asString = s"<strong>${alias take 16}</strong><br><small>$pretty</small>"
+  lazy val hostedChanId = Tools.custodialChanId(LNParams.nodePublicKey.toBin, nodeId.toBin)
 }
 
 sealed trait NodeAddress { def canBeUpdatedIfOffline: Boolean }

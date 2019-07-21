@@ -37,7 +37,6 @@ object ConnectionManager {
 
   class Worker(val ann: NodeAnnouncement, buffer: Bytes = new Bytes(1024), val sock: Socket = new Socket) {
     implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-    lazy val hostedChanId = Tools.custodialChanId(keyPair.pub, ann.nodeId.toBin)
     var lastMsg = System.currentTimeMillis
 
     val handler: TransportHandler = new TransportHandler(keyPair, ann.nodeId) {
@@ -73,7 +72,7 @@ object ConnectionManager {
       message match {
         case their: Init => events.onOperational(isCompat = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures), nodeId = ann.nodeId)
         case Ping(replyLength, _) if replyLength > 0 && replyLength <= 65532 => handler process Pong(ByteVector fromValidHex "00" * replyLength)
-        case hostedChanMessage: HostedChannelMessage => events.onHostedMessage(hostedChanId, hostedChanMessage)
+        case hostedChanMessage: HostedChannelMessage => events.onHostedMessage(ann.hostedChanId, hostedChanMessage)
         case _ => events.onMessage(ann.nodeId, message)
       }
     }
