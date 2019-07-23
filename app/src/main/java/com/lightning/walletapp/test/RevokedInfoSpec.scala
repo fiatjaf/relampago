@@ -40,7 +40,7 @@ class RevokedInfoSpec {
     db.change(RevokedInfoTable.newSql, txid4, chanId1, 900000000L, serialized1)
 
 
-    val c1 = Commitments(
+    val c1 = NormalCommits(
       localParams = LocalParams(null, 0, 0, 0, null, null, null, null, null, null, null, null, isFunder = true),
       remoteParams = null,
       LocalCommit(index = 0L, spec = CommitmentSpec(0L, toLocalMsat = 900000000L, toRemoteMsat = 0L), null, null),
@@ -52,17 +52,19 @@ class RevokedInfoSpec {
       remoteNextCommitInfo = null,
       commitInput = InputInfo(null, TxOut(Satoshi(100000L), Seq.empty), null),
       remotePerCommitmentSecrets = null,
-      channelId = chanId1)
+      channelId = chanId1,
+      channelFlags = None,
+      startedAt = 0L)
 
-    val chan1 = new Channel {
-      override def REV(cs: Commitments, rev: RevokeAndAck): Unit = none
+    val chan1 = new NormalChannel {
+      override def REV(cs: NormalCommits, rev: RevokeAndAck): Unit = none
       override def SEND(msg: LightningMessage): Unit = none
       override def ASKREFUNDTX(ref: RefundingData): Unit = none
-      override def STORE(content: HasCommitments): HasCommitments = content
-      override def ASKREFUNDPEER(some: HasCommitments, point: Point): Unit = none
+      override def STORE(content: HasNormalCommits): HasNormalCommits = content
+      override def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit = none
       override def CLOSEANDWATCH(close: ClosingData): Unit = none
       override def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit = none
-      override def GETREV(cs: Commitments, tx: Transaction): Option[RevokedCommitPublished] = None
+      override def GETREV(cs: NormalCommits, tx: Transaction): Option[RevokedCommitPublished] = None
       data = NormalData(announce = null, commitments = c1)
     }
 
@@ -76,7 +78,7 @@ class RevokedInfoSpec {
     db.change(RevokedInfoTable.newSql, txid8, chanId2, 1000000000L, serialized1)
 
 
-    val c2 = Commitments(
+    val c2 = NormalCommits(
       localParams = LocalParams(null, 0, 0, 0, null, null, null, null, null, null, null, null, isFunder = false),
       remoteParams = null,
       LocalCommit(index = 0L, spec = CommitmentSpec(0L, toLocalMsat = 1000000000L, toRemoteMsat = 0L), null, null),
@@ -88,17 +90,19 @@ class RevokedInfoSpec {
       remoteNextCommitInfo = null,
       commitInput = InputInfo(null, TxOut(Satoshi(100000L), Seq.empty), null),
       remotePerCommitmentSecrets = null,
-      channelId = chanId2)
+      channelId = chanId2,
+      channelFlags = None,
+      startedAt = 0L)
 
-    val chan2 = new Channel {
-      override def REV(cs: Commitments, rev: RevokeAndAck): Unit = none
+    val chan2 = new NormalChannel {
+      override def REV(cs: NormalCommits, rev: RevokeAndAck): Unit = none
       override def SEND(msg: LightningMessage): Unit = none
       override def ASKREFUNDTX(ref: RefundingData): Unit = none
-      override def STORE(content: HasCommitments): HasCommitments = content
-      override def ASKREFUNDPEER(some: HasCommitments, point: Point): Unit = none
+      override def STORE(content: HasNormalCommits): HasNormalCommits = content
+      override def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit = none
       override def CLOSEANDWATCH(close: ClosingData): Unit = none
       override def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit = none
-      override def GETREV(cs: Commitments, tx: Transaction): Option[RevokedCommitPublished] = None
+      override def GETREV(cs: NormalCommits, tx: Transaction): Option[RevokedCommitPublished] = None
       data = NormalData(announce = null, commitments = c2)
     }
 

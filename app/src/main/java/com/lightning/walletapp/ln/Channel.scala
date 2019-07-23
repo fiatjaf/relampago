@@ -2,8 +2,8 @@ package com.lightning.walletapp.ln
 
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
-import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
+import com.lightning.walletapp.ln.NormalChannel._
 import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
@@ -18,10 +18,11 @@ import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.Protocol.{Zeroes, One}
 
 
-abstract class Channel extends StateMachine[ChannelData] { me =>
+trait Channel extends StateMachine[ChannelData]
+abstract class NormalChannel extends Channel { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def hasCsOr[T](fun: HasCommitments => T, noCommitments: T) = data match { case some: HasCommitments => fun(some) case _ => noCommitments }
-  def fundTxId = data match { case some: HasCommitments => some.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
+  def hasCsOr[T](fun: HasNormalCommits => T, noCommitments: T) = data match { case some: HasNormalCommits => fun(some) case _ => noCommitments }
+  def fundTxId = data match { case some: HasNormalCommits => some.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
   def process(change: Any): Unit = Future(me doProcess change) onFailure { case err => events onException me -> err }
   var listeners: Set[ChannelListener] = _
 
@@ -30,21 +31,21 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
     override def fulfillReceived(updateFulfill: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived updateFulfill
-    override def onSettled(chan: Channel, cs: Commitments) = for (lst <- listeners) lst.onSettled(chan, cs)
+    override def onSettled(chan: NormalChannel, cs: NormalCommits) = for (lst <- listeners) lst.onSettled(chan, cs)
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
   }
 
   def ASKREFUNDTX(ref: RefundingData): Unit
-  def ASKREFUNDPEER(some: HasCommitments, point: Point)
+  def ASKREFUNDPEER(some: HasNormalCommits, point: Point)
 
   def SEND(msg: LightningMessage): Unit
   def CLOSEANDWATCH(close: ClosingData): Unit
   def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit
-  def STORE(channelDataWithCommitments: HasCommitments): HasCommitments
-  def GETREV(cs: Commitments, tx: Transaction): Option[RevokedCommitPublished]
-  def REV(cs: Commitments, rev: RevokeAndAck): Unit
+  def STORE(channelDataWithCommitments: HasNormalCommits): HasNormalCommits
+  def GETREV(cs: NormalCommits, tx: Transaction): Option[RevokedCommitPublished]
+  def REV(cs: NormalCommits, rev: RevokeAndAck): Unit
 
-  def UPDATA(d1: ChannelData): Channel = BECOME(d1, state)
+  def UPDATA(d1: ChannelData): NormalChannel = BECOME(d1, state)
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
     // Transition should always be defined before vars are updated
     val trans = Tuple4(me, data1, state, state1)
@@ -420,7 +421,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         }
 
 
-      case (some: HasCommitments, cr: ChannelReestablish, SLEEPING)
+      case (some: HasNormalCommits, cr: ChannelReestablish, SLEEPING)
         // GUARD: their nextRemoteRevocationNumber is unexpectedly too far away
         if some.commitments.localCommit.index < cr.nextRemoteRevocationNumber && cr.myCurrentPerCommitmentPoint.isDefined =>
         val secret = Generators.perCommitSecret(some.commitments.localParams.shaSeed, cr.nextRemoteRevocationNumber - 1)
@@ -493,19 +494,19 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       // SYNC: ONLINE/SLEEPING
 
 
-      case (some: HasCommitments, CMDOnline, SLEEPING) =>
+      case (some: HasNormalCommits, CMDOnline, SLEEPING) =>
         // According to BOLD a first message on connection should be reestablish
         // will specifically NOT work in REFUNDING to not let them know beforehand
         me SEND makeReestablish(some, some.commitments.localCommit.index + 1)
 
 
-      case (some: HasCommitments, newAnn: NodeAnnouncement, SLEEPING)
+      case (some: HasNormalCommits, newAnn: NodeAnnouncement, SLEEPING)
         if some.announce.nodeId == newAnn.nodeId && Announcements.checkSig(newAnn) =>
         // Node was SLEEPING for a long time so we have initiated a new announcement search
         data = me STORE some.modify(_.announce).setTo(newAnn)
 
 
-      case (some: HasCommitments, newAnn: NodeAnnouncement, REFUNDING)
+      case (some: HasNormalCommits, newAnn: NodeAnnouncement, REFUNDING)
         if some.announce.nodeId == newAnn.nodeId && Announcements.checkSig(newAnn) =>
         // Remote peer's address may have changed since a channel backup has been made
         // we need to update data for next reconnect attempt to use it, but not save it
@@ -587,7 +588,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
         } com.lightning.walletapp.Utils.app.kit blockSend punishTxj
 
 
-      case (some: HasCommitments, CMDSpent(tx), _)
+      case (some: HasNormalCommits, CMDSpent(tx), _)
         // GUARD: tx which spends our funding is broadcasted, must react
         if tx.txIn.exists(input => some.commitments.commitInput.outPoint == input.outPoint) =>
         val nextRemoteCommitLeft = some.commitments.remoteNextCommitInfo.left.map(_.nextRemoteCommit)
@@ -635,7 +636,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     events onProcessSuccess Tuple3(me, data, change)
   }
 
-  def makeReestablish(some: HasCommitments, nextLocalCommitmentNumber: Long) = {
+  def makeReestablish(some: HasNormalCommits, nextLocalCommitmentNumber: Long) = {
     val ShaHashesWithIndex(hashes, lastIndex) = some.commitments.remotePerCommitmentSecrets
     val yourLastPerCommitmentSecret = lastIndex.map(ShaChain.moves).flatMap(ShaChain getHash hashes).map(ByteVector.view)
     val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
@@ -645,7 +646,7 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       myCurrentPerCommitmentPoint = Some apply myCurrentPerCommitmentPoint)
   }
 
-  private def makeFirstFundingLocked(some: HasCommitments) = {
+  private def makeFirstFundingLocked(some: HasNormalCommits) = {
     val first = Generators.perCommitPoint(some.commitments.localParams.shaSeed, 1L)
     FundingLocked(some.commitments.channelId, nextPerCommitmentPoint = first)
   }
@@ -656,13 +657,13 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     BECOME(me STORE NormalData(wait.announce, c1), OPEN)
   }
 
-  private def startMutualClose(some: HasCommitments, tx: Transaction) = some match {
+  private def startMutualClose(some: HasNormalCommits, tx: Transaction) = some match {
     case closingData: ClosingData => BECOME(me STORE closingData.copy(mutualClose = tx +: closingData.mutualClose), CLOSING)
     case neg: NegotiationsData => BECOME(me STORE ClosingData(neg.announce, neg.commitments, neg.localProposals, tx :: Nil), CLOSING)
     case _ => BECOME(me STORE ClosingData(some.announce, some.commitments, Nil, tx :: Nil), CLOSING)
   }
 
-  def startLocalClose(some: HasCommitments): Unit =
+  def startLocalClose(some: HasNormalCommits): Unit =
     // Something went wrong and we decided to spend our CURRENT commit transaction
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
       case (_, neg: NegotiationsData) if neg.lastSignedTx.isDefined => startMutualClose(neg, neg.lastSignedTx.get.tx)
@@ -670,14 +671,14 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
       case (localClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, localCommit = localClaim :: Nil)
     }
 
-  private def startRemoteCurrentClose(some: HasCommitments) =
+  private def startRemoteCurrentClose(some: HasNormalCommits) =
     // They've decided to spend their CURRENT commit tx, we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, some.commitments.remoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(remoteCommit = remoteClaim :: Nil)
       case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, remoteCommit = remoteClaim :: Nil)
     }
 
-  private def startRemoteNextClose(some: HasCommitments, nextRemoteCommit: RemoteCommit) =
+  private def startRemoteNextClose(some: HasNormalCommits, nextRemoteCommit: RemoteCommit) =
     // They've decided to spend their NEXT commit tx, once again we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, nextRemoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(nextRemoteCommit = remoteClaim :: Nil)
@@ -685,7 +686,11 @@ abstract class Channel extends StateMachine[ChannelData] { me =>
     }
 }
 
-object Channel {
+abstract class HostedChannel extends Channel { me =>
+
+}
+
+object NormalChannel {
   val WAIT_FOR_INIT = "WAIT-FOR-INIT"
   val WAIT_FOR_ACCEPT = "WAIT-FOR-ACCEPT"
   val WAIT_FOR_FUNDING = "WAIT-FOR-FUNDING"
@@ -701,36 +706,36 @@ object Channel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  private[this] val nextDummyHtlc = UpdateAddHtlc(Zeroes, -1, LNParams.minCapacityMsat, One, 144 * 3, ByteVector.empty)
-  def nextReducedRemoteState(currentCommitments: Commitments) = currentCommitments.addLocalProposal(nextDummyHtlc).reducedRemoteState
-  def estimateCanSend(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.minCapacityMsat, 0L)
-  def estimateCanReceive(chan: Channel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat, 0L)
-  def estimateNextUsefulCapacity(chan: Channel) = estimateCanSend(chan) + estimateCanReceive(chan)
+  val nextDummyHtlc = UpdateAddHtlc(Zeroes, -1, LNParams.minCapacityMsat, One, 144 * 3, ByteVector.empty)
+  def nextReducedRemoteState(currentCommitments: NormalCommits) = currentCommitments.addLocalProposal(nextDummyHtlc).reducedRemoteState
+  def estimateCanSend(chan: NormalChannel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.minCapacityMsat, 0L)
+  def estimateCanReceive(chan: NormalChannel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat, 0L)
+  def estimateNextUsefulCapacity(chan: NormalChannel) = estimateCanSend(chan) + estimateCanReceive(chan)
 
-  def inFlightHtlcs(chan: Channel): Set[Htlc] = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
-  def isOperational(chan: Channel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }
-  def isOpening(chan: Channel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
-  def isOpeningOrOperational(chan: Channel) = isOperational(chan) || isOpening(chan)
+  def inFlightHtlcs(chan: NormalChannel): Set[Htlc] = chan.hasCsOr(_.commitments.reducedRemoteState.htlcs, Set.empty)
+  def isOperational(chan: NormalChannel) = chan.data match { case NormalData(_, _, None, None, _) => true case _ => false }
+  def isOpening(chan: NormalChannel) = chan.data match { case _: WaitFundingDoneData => true case _ => false }
+  def isOpeningOrOperational(chan: NormalChannel) = isOperational(chan) || isOpening(chan)
 
-  def channelAndHop(chan: Channel) = for {
+  def channelAndHop(chan: NormalChannel) = for {
     upd <- chan.hasCsOr(_.commitments.updateOpt, None)
   } yield chan -> Vector(upd toHop chan.data.announce.nodeId)
 }
 
 trait ChannelListener {
-  def nullOnBecome(chan: Channel) = {
+  def nullOnBecome(chan: NormalChannel) = {
     val nullTransition = Tuple4(chan, chan.data, null, chan.state)
     if (onBecome isDefinedAt nullTransition) onBecome(nullTransition)
   }
 
-  type Malfunction = (Channel, Throwable)
-  type Incoming = (Channel, ChannelData, Any)
-  type Transition = (Channel, ChannelData, String, String)
+  type Malfunction = (NormalChannel, Throwable)
+  type Incoming = (NormalChannel, ChannelData, Any)
+  type Transition = (NormalChannel, ChannelData, String, String)
   def onProcessSuccess: PartialFunction[Incoming, Unit] = none
   def onException: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
 
   def fulfillReceived(updateFulfill: UpdateFulfillHtlc): Unit = none
-  def onSettled(chan: Channel, cs: Commitments): Unit = none
+  def onSettled(chan: NormalChannel, cs: NormalCommits): Unit = none
   def outPaymentAccepted(rd: RoutingData): Unit = none
 }

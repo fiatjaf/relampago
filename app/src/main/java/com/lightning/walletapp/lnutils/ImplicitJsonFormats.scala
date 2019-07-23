@@ -74,6 +74,10 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     type IndexBytesSeq = Seq[IndexBytes]
   }
 
+  implicit val stateUpdateFmt = sCodecJsonFmt(stateUpdateCodec)
+  implicit val initHostedChannelFmt = sCodecJsonFmt(initHostedChannelCodec)
+  implicit val lastCrossSignedStateFmt = sCodecJsonFmt(lastCrossSignedStateCodec)
+
   implicit val lightningMessageFmt = sCodecJsonFmt(lightningMessageCodec)
   implicit val nodeAnnouncementFmt = sCodecJsonFmt(nodeAnnouncementCodec)
   implicit val updateFulfillHtlcFmt = sCodecJsonFmt(updateFulfillHtlcCodec)
@@ -227,10 +231,14 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     jsonFormat[LNMessageVector, LNMessageVector, LNMessageVector,
       Changes](Changes.apply, "proposed", "signed", "acked")
 
-  implicit val commitmentsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes, Changes, Long, Long,
+  implicit val hostedCommitsFmt = jsonFormat[InitHostedChannel, LastCrossSignedState, Option[StateUpdate], NodeAnnouncement, Option[ChannelUpdate], Long,
+    HostedCommits](HostedCommits.apply, "params", "lastCrossSignedState", "nextLocalStateUpdateOpt", "announce", "updateOpt", "startedAt")
+
+  implicit val normalCommitsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes, Changes, Long, Long,
     Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, ByteVector, Option[ChannelUpdate], Option[ChannelFlags], Long,
-    Commitments](Commitments.apply, "localParams", "remoteParams", "localCommit", "remoteCommit", "localChanges", "remoteChanges", "localNextHtlcId",
-    "remoteNextHtlcId", "remoteNextCommitInfo", "commitInput", "remotePerCommitmentSecrets", "channelId", "updateOpt", "channelFlags", "startedAt")
+    NormalCommits](NormalCommits.apply, "localParams", "remoteParams", "localCommit", "remoteCommit", "localChanges", "remoteChanges",
+    "localNextHtlcId", "remoteNextHtlcId", "remoteNextCommitInfo", "commitInput", "remotePerCommitmentSecrets", "channelId",
+    "updateOpt", "channelFlags", "startedAt")
 
   implicit val localCommitPublishedFmt =
     jsonFormat[Seq[ClaimDelayedOutputTx], Seq[SuccessAndClaim], Seq[TimeoutAndClaim], Transaction,
@@ -247,8 +255,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       RevokedCommitPublished](RevokedCommitPublished.apply, "claimMain", "claimTheirMainPenalty",
       "htlcPenalty", "commitTx")
 
-  implicit object HasCommitmentsFmt
-  extends JsonFormat[HasCommitments] {
+  implicit object HasNormalCommitsFmt
+  extends JsonFormat[HasNormalCommits] {
     def read(json: JsValue) = json.asJsObject fields TAG match {
       case JsString("WaitBroadcastRemoteData") => json.convertTo[WaitBroadcastRemoteData]
       case JsString("WaitFundingDoneData") => json.convertTo[WaitFundingDoneData]
@@ -259,7 +267,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case _ => throw new RuntimeException
     }
 
-    def write(internal: HasCommitments) = internal match {
+    def write(internal: HasNormalCommits) = internal match {
       case hasCommitments: WaitBroadcastRemoteData => hasCommitments.toJson
       case hasCommitments: WaitFundingDoneData => hasCommitments.toJson
       case hasCommitments: NegotiationsData => hasCommitments.toJson
@@ -272,27 +280,27 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val closingTxProposedFmt = jsonFormat[ClosingTx, ClosingSigned,
     ClosingTxProposed](ClosingTxProposed.apply, "unsignedTx", "localClosingSigned")
 
-  implicit val refundingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Option[Point], Commitments,
+  implicit val refundingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement, Option[Point], NormalCommits,
     RefundingData](RefundingData.apply, "announce", "remoteLatestPoint", "commitments"), tag = "RefundingData")
 
   implicit val closingDataFmt = taggedJsonFmt(jsonFormat[NodeAnnouncement,
-    Commitments, Seq[ClosingTxProposed], Seq[Transaction], Seq[LocalCommitPublished],
+    NormalCommits, Seq[ClosingTxProposed], Seq[Transaction], Seq[LocalCommitPublished],
     Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RemoteCommitPublished], Seq[RevokedCommitPublished], Long,
     ClosingData](ClosingData.apply, "announce", "commitments", "localProposals", "mutualClose", "localCommit", "remoteCommit",
     "nextRemoteCommit", "refundRemoteCommit", "revokedCommit", "closedAt"), tag = "ClosingData")
 
   implicit val negotiationsDataFmt =
-    taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Shutdown, Shutdown, Seq[ClosingTxProposed], Option[ClosingTx],
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, NormalCommits, Shutdown, Shutdown, Seq[ClosingTxProposed], Option[ClosingTx],
       NegotiationsData](NegotiationsData.apply, "announce", "commitments", "localShutdown", "remoteShutdown", "localProposals", "lastSignedTx"),
       tag = "NegotiationsData")
 
   implicit val normalDataFmt =
-    taggedJsonFmt(jsonFormat[NodeAnnouncement, Commitments, Option[Shutdown], Option[Shutdown], Option[Transaction],
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, NormalCommits, Option[Shutdown], Option[Shutdown], Option[Transaction],
       NormalData](NormalData.apply, "announce", "commitments", "localShutdown", "remoteShutdown", "unknownSpend"),
       tag = "NormalData")
 
   implicit val waitFundingDoneDataFmt =
-    taggedJsonFmt(jsonFormat[NodeAnnouncement, Option[FundingLocked], Option[FundingLocked], Transaction, Commitments,
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, Option[FundingLocked], Option[FundingLocked], Transaction, NormalCommits,
       WaitFundingDoneData](WaitFundingDoneData.apply, "announce", "our", "their", "fundingTx", "commitments"),
       tag = "WaitFundingDoneData")
 
@@ -302,7 +310,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       "remoteParams", "localSpec", "remoteCommit")
 
   implicit val waitBroadcastRemoteDataFmt =
-    taggedJsonFmt(jsonFormat[NodeAnnouncement, WaitFundingSignedCore, Commitments, Option[FundingLocked],
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, WaitFundingSignedCore, NormalCommits, Option[FundingLocked],
       WaitBroadcastRemoteData](WaitBroadcastRemoteData.apply, "announce", "core", "commitments", "their"),
       tag = "WaitBroadcastRemoteData")
 
@@ -349,7 +357,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val channelUploadActFmt = taggedJsonFmt(jsonFormat[ByteVector, Seq[HttpParam], String, String,
     ChannelUploadAct](ChannelUploadAct.apply, "data", "plus", "path", "alias"), tag = "ChannelUploadAct")
 
-  implicit val gDriveBackup = jsonFormat[Vector[HasCommitments], Int, GDriveBackup](GDriveBackup.apply, "chans", "v")
+  implicit val gDriveBackup = jsonFormat[Vector[HasNormalCommits], Int, GDriveBackup](GDriveBackup.apply, "chans", "v")
   implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
   implicit val ratesFmt = jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
   implicit val topNodesFmt = jsonFormat[StringVec, Long, TopNodes](TopNodes.apply, "nodes", "stamp")

@@ -10,10 +10,10 @@ import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.FragWallet._
 import com.lightning.walletapp.R.drawable._
-import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
+import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
@@ -99,18 +99,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // To fight spamming
   private[this] var errorLimit = 5
   val chanListener = new ChannelListener {
-    def informOfferClose(chan: Channel, message: String) = UITask {
+    def informOfferClose(chan: NormalChannel, message: String) = UITask {
       val bld = baseBuilder(chan.data.announce.asString.html, message)
       def close(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
       mkCheckFormNeutral(_.dismiss, none, close, bld, dialog_ok, -1, ln_chan_close)
     }
 
-    override def onSettled(chan: Channel, cs: Commitments) =
+    override def onSettled(chan: NormalChannel, cs: NormalCommits) =
       if (cs.localCommit.spec.fulfilledIncoming.nonEmpty)
         host stopService host.foregroundServiceIntent
 
     override def onProcessSuccess = {
-      case (chan, _: HasCommitments, remoteError: wire.Error) if errorLimit > 0 =>
+      case (chan, _: HasNormalCommits, remoteError: wire.Error) if errorLimit > 0 =>
         // Peer has sent us an error, display details to user and offer force-close
         informOfferClose(chan, remoteError.exception.getMessage).run
         errorLimit -= 1
@@ -468,7 +468,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // LN SEND / RECEIVE
 
-  def receive(chansWithRoutes: Map[Channel, PaymentRoute], maxCanReceive: MilliSatoshi,
+  def receive(chansWithRoutes: Map[NormalChannel, PaymentRoute], maxCanReceive: MilliSatoshi,
               title: View, defDescr: String)(onDone: RoutingData => Unit) = {
 
     val baseHint = app.getString(amount_hint_can_receive).format(denom parsedWithSign maxCanReceive)
@@ -561,7 +561,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def doSendOffChainOnUI(rd: RoutingData) =
     UITask(me doSendOffChain rd).run
 
-  def offerAir(toChan: Channel, origEmptyRD: RoutingData) = {
+  def offerAir(toChan: NormalChannel, origEmptyRD: RoutingData) = {
     val origEmptyRD1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1)
     val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
     val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
@@ -574,7 +574,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, ByteVector(random getBytes 32), REBALANCING)
 
     val listener = new ChannelListener { self =>
-      override def onSettled(chan: Channel, cs: Commitments) = {
+      override def onSettled(chan: NormalChannel, cs: NormalCommits) = {
         val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)
         if (isOK) runAnd(ChannelManager detachListener self)(me doSendOffChainOnUI origEmptyRD1)
       }

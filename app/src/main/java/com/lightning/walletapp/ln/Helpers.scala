@@ -68,7 +68,7 @@ object Helpers {
       case _ => false
     }
 
-    def makeFirstClosing(commitments: Commitments, localScriptPubkey: ByteVector, remoteScriptPubkey: ByteVector) = {
+    def makeFirstClosing(commitments: NormalCommits, localScriptPubkey: ByteVector, remoteScriptPubkey: ByteVector) = {
       val closingTx = Scripts.addSigs(makeClosingTx(commitments.commitInput, localScriptPubkey, remoteScriptPubkey, Satoshi(0),
         Satoshi(0), commitments.localCommit.spec, commitments.localParams.isFunder), commitments.localParams.fundingPrivKey.publicKey,
         commitments.remoteParams.fundingPubkey, ByteVector fromValidHex "aa" * 71, ByteVector fromValidHex "bb" * 71)
@@ -80,7 +80,7 @@ object Helpers {
       makeClosing(commitments, closingFee, localScriptPubkey, remoteScriptPubkey)
     }
 
-    def makeClosing(commitments: Commitments, closingFee: Satoshi, local: ByteVector, remote: ByteVector) = {
+    def makeClosing(commitments: NormalCommits, closingFee: Satoshi, local: ByteVector, remote: ByteVector) = {
       val theirDustIsHigherThanOurs: Boolean = commitments.localParams.dustLimit < commitments.remoteParams.dustLimitSat
       val dustLimit = if (theirDustIsHigherThanOurs) commitments.remoteParams.dustLimitSat else commitments.localParams.dustLimit
 
@@ -108,7 +108,7 @@ object Helpers {
       ClosingTx(commitTxInput, LexicographicalOrdering sort tx)
     }
 
-    def claimCurrentLocalCommitTxOutputs(commitments: Commitments, bag: PaymentInfoBag) = {
+    def claimCurrentLocalCommitTxOutputs(commitments: NormalCommits, bag: PaymentInfoBag) = {
       val localPerCommitmentPoint = perCommitPoint(commitments.localParams.shaSeed, commitments.localCommit.index.toInt)
       val localRevocationPubkey = revocationPubKey(commitments.remoteParams.revocationBasepoint, localPerCommitmentPoint)
       val localDelayedPrivkey = derivePrivKey(commitments.localParams.delayedPaymentKey, localPerCommitmentPoint)
@@ -143,7 +143,7 @@ object Helpers {
     }
 
     // remoteCommit may refer to their current or next RemoteCommit, hence it is a separate parameter
-    def claimRemoteCommitTxOutputs(commitments: Commitments, remoteCommit: RemoteCommit, bag: PaymentInfoBag) = {
+    def claimRemoteCommitTxOutputs(commitments: NormalCommits, remoteCommit: RemoteCommit, bag: PaymentInfoBag) = {
       val localHtlcPrivkey = derivePrivKey(commitments.localParams.htlcKey, remoteCommit.remotePerCommitmentPoint)
       val localHtlcPubkey = localHtlcPrivkey.publicKey
 
@@ -181,7 +181,7 @@ object Helpers {
       main.copy(claimHtlcSuccess = claimSuccessTxs, claimHtlcTimeout = claimTimeoutTxs)
     }
 
-    def claimRemoteMainOutput(commitments: Commitments, remotePerCommitmentPoint: Point, commitTx: Transaction) = {
+    def claimRemoteMainOutput(commitments: NormalCommits, remotePerCommitmentPoint: Point, commitTx: Transaction) = {
       val localPaymentPrivateKey = derivePrivKey(secret = commitments.localParams.paymentKey, remotePerCommitmentPoint)
       val ri = RevocationInfo(Nil, None, None, LNParams.broadcaster.perKwSixSat, commitments.localParams.dustLimit.amount,
         commitments.localParams.defaultFinalScriptPubKey, 0, localPaymentPrivateKey.publicKey, null, null)
@@ -199,7 +199,7 @@ object Helpers {
 
     // CONTRACT BREACH HANDLING
 
-    def makeRevocationInfo(commitments: Commitments, tx: Transaction,
+    def makeRevocationInfo(commitments: NormalCommits, tx: Transaction,
                            perCommitSecret: Scalar, feeRate: Long) = {
 
       val remotePerCommitmentPoint = perCommitSecret.toPoint
@@ -236,7 +236,7 @@ object Helpers {
     }
 
     // Here we have an existing RevocationInfo with updated fee rate
-    def reMakeRevocationInfo(ri: RevocationInfo, commitments: Commitments,
+    def reMakeRevocationInfo(ri: RevocationInfo, commitments: NormalCommits,
                              tx: Transaction, perCommitSecret: Scalar) = {
 
       val finder = new PubKeyScriptIndexFinder(tx)
@@ -286,7 +286,7 @@ object Helpers {
         claimPenaltyTx.toSeq, htlcPenaltyTxs, tx)
     }
 
-    def extractCommitmentSecret(commitments: Commitments, commitTx: Transaction) = {
+    def extractCommitmentSecret(commitments: NormalCommits, commitTx: Transaction) = {
       val txNumber = Scripts.obscuredCommitTxNumber(Scripts.decodeTxNumber(commitTx.txIn.head.sequence, commitTx.lockTime),
         !commitments.localParams.isFunder, commitments.remoteParams.paymentBasepoint, commitments.localParams.paymentBasepoint)
 
@@ -295,7 +295,7 @@ object Helpers {
       getHash(hashes)(index).map(ByteVector.view).map(Scalar.apply)
     }
 
-    def claimRevokedHtlcTxOutputs(commitments: Commitments, htlcTx: Transaction,
+    def claimRevokedHtlcTxOutputs(commitments: NormalCommits, htlcTx: Transaction,
                                   perCommitSecret: Scalar): Option[Transaction] = {
 
       val remotePerCommitmentPoint = perCommitSecret.toPoint

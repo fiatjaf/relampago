@@ -9,9 +9,9 @@ import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.ln.wire._
 import scala.collection.JavaConverters._
 import com.lightning.walletapp.ln.Tools._
-import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
+import com.lightning.walletapp.ln.NormalChannel._
 import com.google.common.util.concurrent.Service.State._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
@@ -151,7 +151,7 @@ class WalletApp extends Application { me =>
     def shutDown = none
 
     def trustedNodeTry = Try(nodeaddress.decode(BitVector fromValidHex wallet.getDescription).require.value)
-    def fundingPubScript(some: HasCommitments) = singletonList(some.commitments.commitInput.txOut.publicKeyScript: org.bitcoinj.script.Script)
+    def fundingPubScript(some: HasNormalCommits) = singletonList(some.commitments.commitInput.txOut.publicKeyScript: org.bitcoinj.script.Script)
     def closingPubKeyScripts(cd: ClosingData) = cd.commitTxs.flatMap(_.txOut).map(_.publicKeyScript: org.bitcoinj.script.Script).asJava
     def useCheckPoints(time: Long) = CheckpointManager.checkpoint(params, getAssets open "checkpoints.txt", store, time)
 
@@ -334,9 +334,9 @@ object ChannelManager extends Broadcaster {
 
   val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
   // All stored channels which would receive CMDSpent, CMDBestHeight and nothing else
-  var all: Vector[Channel] = for (chanState <- ChannelWrap doGet db) yield createChannel(operationalListeners, chanState)
+  var all: Vector[NormalChannel] = for (chanState <- ChannelWrap doGet db) yield createChannel(operationalListeners, chanState)
   def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
-  def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
+  def fromNode(of: Vector[NormalChannel], nodeId: PublicKey) = for (c <- of if c.data.announce.nodeId == nodeId) yield c
   def notClosing = for (c <- all if c.state != CLOSING) yield c
 
   def delayedPublishes = {
@@ -347,7 +347,7 @@ object ChannelManager extends Broadcaster {
 
   // AIR
 
-  def airCanSendInto(targetChan: Channel) = for {
+  def airCanSendInto(targetChan: NormalChannel) = for {
     canSend <- all.filter(isOperational) diff Vector(targetChan) map estimateCanSend
     // While rebalancing, payments from other channels will lose some off-chain fee
     canSendFeeIncluded = canSend - maxAcceptableFee(canSend, hops = 3)
@@ -376,17 +376,17 @@ object ChannelManager extends Broadcaster {
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
-  def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData): Channel = new Channel { self =>
+  def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel { self =>
     def SEND(m: LightningMessage) = for (work <- ConnectionManager.connections get data.announce.nodeId) work.handler process m
 
-    def STORE(data: HasCommitments) = runAnd(data) {
+    def STORE(data: HasNormalCommits) = runAnd(data) {
       // Put updated data into db, schedule gdrive upload,
       // replace if upload already is pending, return data
       ChannelWrap put data
       backUp
     }
 
-    def REV(cs: Commitments, rev: RevokeAndAck) = for {
+    def REV(cs: NormalCommits, rev: RevokeAndAck) = for {
       tx <- cs.remoteCommit.txOpt // We use old commitments to save a punishment for remote commit before it gets dropped
       myBalance = cs.remoteCommit.spec.toRemoteMsat // Local commit is cleared by now, remote still has relevant balance
       watchtowerFee = broadcaster.perKwThreeSat * 3 // Scorched earth policy becuase watchtower can't regenerate tx
@@ -394,7 +394,7 @@ object ChannelManager extends Broadcaster {
       serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
     } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
 
-    def GETREV(cs: Commitments, tx: fr.acinq.bitcoin.Transaction) = {
+    def GETREV(cs: NormalCommits, tx: fr.acinq.bitcoin.Transaction) = {
       val dbCursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
       val rc = RichCursor(dbCursor).headTry(_ string RevokedInfoTable.info)
 
@@ -431,7 +431,7 @@ object ChannelManager extends Broadcaster {
       txsObs.foreach(_ map CMDSpent foreach process, none)
     }
 
-    def ASKREFUNDPEER(some: HasCommitments, point: Point) = {
+    def ASKREFUNDPEER(some: HasNormalCommits, point: Point) = {
       val msg = ByteVector.fromValidHex("please publish your local commitment".hex)
       val ref = RefundingData(some.announce, Some(point), some.commitments)
       val error = Error(some.commitments.channelId, msg)
@@ -488,8 +488,8 @@ object ChannelManager extends Broadcaster {
 
     for {
       cheapestUnorderedRoutes <- paymentRoutesObs
-      busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => inFlightHtlcs(chan).size)
-      openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1)
+      busyMap = Tools.toMap[NormalChannel, PublicKey, Int](all, _.data.announce.nodeId, chan => inFlightHtlcs(chan).size)
+      openMap = Tools.toMap[NormalChannel, PublicKey, Int](all, _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1)
       cheapestOrderedRoutes = cheapestUnorderedRoutes.sortBy(cheapestRouteCandidate => LNParams getCompoundFee cheapestRouteCandidate)
     } yield useFirstRoute(cheapestOrderedRoutes.sortBy(busyMap compose rd.nextNodeId).sortBy(openMap compose rd.nextNodeId), rd)
   }

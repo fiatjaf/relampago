@@ -7,7 +7,7 @@ import android.text.format.DateUtils._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
-import com.lightning.walletapp.ln.Channel._
+import com.lightning.walletapp.ln.NormalChannel._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._

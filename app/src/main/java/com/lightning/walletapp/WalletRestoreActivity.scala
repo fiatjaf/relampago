@@ -103,7 +103,7 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
       }
     }
 
-  def restoreAnyChannel(some: HasCommitments) = {
+  def restoreAnyChannel(some: HasNormalCommits) = {
     val chan = ChannelManager.createChannel(ChannelManager.operationalListeners, some)
     app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
     // Do not use STORE because it invokes a backup upload
@@ -117,7 +117,7 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
     restoreAnyChannel(closing)
   }
 
-  def restoreChannel(some: HasCommitments) = some match {
+  def restoreChannel(some: HasNormalCommits) = some match {
     case closing: ClosingData => restoreClosedChannel(closing)
     case _ => restoreAnyChannel(some)
   }

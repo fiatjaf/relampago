@@ -42,7 +42,7 @@ case class CMDPaymentGiveUp(rd: RoutingData) extends Command
 // CHANNEL DATA
 
 sealed trait ChannelData { val announce: NodeAnnouncement }
-sealed trait HasCommitments extends ChannelData { val commitments: Commitments }
+sealed trait HasNormalCommits extends ChannelData { val commitments: NormalCommits }
 case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 // INCOMING CHANNEL
@@ -60,7 +60,7 @@ case class WaitFundingSignedCore(localParams: LocalParams, channelId: ByteVector
                                  remoteParams: AcceptChannel, localSpec: CommitmentSpec, remoteCommit: RemoteCommit) {
 
   def makeCommitments(signedLocalCommitTx: CommitTx) =
-    Commitments(localParams, remoteParams, LocalCommit(index = 0L, localSpec, Nil, signedLocalCommitTx), remoteCommit,
+    NormalCommits(localParams, remoteParams, LocalCommit(index = 0L, localSpec, Nil, signedLocalCommitTx), remoteCommit,
       localChanges = Changes(Vector.empty, Vector.empty, Vector.empty), remoteChanges = Changes(Vector.empty, Vector.empty, Vector.empty),
       localNextHtlcId = 0L, remoteNextHtlcId = 0L, remoteNextCommitInfo = Right(Tools.randomPrivKey.toPoint), signedLocalCommitTx.input,
       ShaHashesWithIndex(Map.empty, None), channelId, updateOpt = None, channelFlags, startedAt = System.currentTimeMillis)
@@ -72,14 +72,14 @@ case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSi
 // ALL THE DATA BELOW WILL BE STORED
 
 case class WaitBroadcastRemoteData(announce: NodeAnnouncement,
-                                   core: WaitFundingSignedCore, commitments: Commitments,
-                                   their: Option[FundingLocked] = None) extends HasCommitments {
+                                   core: WaitFundingSignedCore, commitments: NormalCommits,
+                                   their: Option[FundingLocked] = None) extends HasNormalCommits {
 
   def isLost = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 21 * 1000L
 }
 
 case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked], their: Option[FundingLocked],
-                               fundingTx: Transaction, commitments: Commitments) extends HasCommitments {
+                               fundingTx: Transaction, commitments: NormalCommits) extends HasNormalCommits {
 
   def doubleSpendsFunding(that: Transaction) = {
     val thatInputOutPoints = that.txIn.map(_.outPoint)
@@ -89,22 +89,22 @@ case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLo
   }
 }
 
-case class NormalData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Option[Shutdown] = None,
-                      remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends HasCommitments
+case class NormalData(announce: NodeAnnouncement, commitments: NormalCommits, localShutdown: Option[Shutdown] = None,
+                      remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends HasNormalCommits
 
 case class ClosingTxProposed(unsignedTx: ClosingTx, localClosingSigned: ClosingSigned)
-case class NegotiationsData(announce: NodeAnnouncement, commitments: Commitments, localShutdown: Shutdown, remoteShutdown: Shutdown,
-                            localProposals: Seq[ClosingTxProposed], lastSignedTx: Option[ClosingTx] = None) extends HasCommitments
+case class NegotiationsData(announce: NodeAnnouncement, commitments: NormalCommits, localShutdown: Shutdown, remoteShutdown: Shutdown,
+                            localProposals: Seq[ClosingTxProposed], lastSignedTx: Option[ClosingTx] = None) extends HasNormalCommits
 
 case class RefundingData(announce: NodeAnnouncement, remoteLatestPoint: Option[Point],
-                         commitments: Commitments) extends HasCommitments
+                         commitments: NormalCommits) extends HasNormalCommits
 
 case class ClosingData(announce: NodeAnnouncement,
-                       commitments: Commitments, localProposals: Seq[ClosingTxProposed] = Nil,
+                       commitments: NormalCommits, localProposals: Seq[ClosingTxProposed] = Nil,
                        mutualClose: Seq[Transaction] = Nil, localCommit: Seq[LocalCommitPublished] = Nil,
                        remoteCommit: Seq[RemoteCommitPublished] = Nil, nextRemoteCommit: Seq[RemoteCommitPublished] = Nil,
                        refundRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
-                       closedAt: Long = System.currentTimeMillis) extends HasCommitments {
+                       closedAt: Long = System.currentTimeMillis) extends HasNormalCommits {
 
   def tier12States = realTier12Closings.flatMap(_.getState) // Not a lazy val because results depend on blockchain state
   private lazy val realTier12Closings = revokedCommit ++ localCommit ++ remoteCommit ++ nextRemoteCommit ++ refundRemoteCommit
@@ -280,12 +280,19 @@ case class RemoteCommit(index: Long, spec: CommitmentSpec, txOpt: Option[Transac
 case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: ByteVector, remoteSig: ByteVector)
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 
+sealed trait Commitments {
+  val reducedRemoteState: ReducedState
+  val updateOpt: Option[ChannelUpdate]
+  val channelId: ByteVector
+  val startedAt: Long
+}
+
 case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long)
-case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
-                       remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
-                       remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point], commitInput: InputInfo,
-                       remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: ByteVector, updateOpt: Option[ChannelUpdate] = None,
-                       channelFlags: Option[ChannelFlags] = None, startedAt: Long = System.currentTimeMillis) { me =>
+case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
+                         remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
+                         remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point], commitInput: InputInfo,
+                         remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: ByteVector, updateOpt: Option[ChannelUpdate] = None,
+                         channelFlags: Option[ChannelFlags], startedAt: Long) extends Commitments { me =>
 
   lazy val reducedRemoteState: ReducedState = {
     val reduced = CommitmentSpec.reduce(latestRemoteCommit.spec, remoteChanges.acked, localChanges.proposed)
@@ -472,4 +479,14 @@ case class Commitments(localParams: LocalParams, remoteParams: AcceptChannel, lo
     // Unexpected revocation when we have Point
     case _ => throw new LightningException
   }
+}
+
+case class HostedCommits(params: InitHostedChannel,
+                         lastCrossSignedState: LastCrossSignedState,
+                         nextLocalStateUpdateOpt: Option[StateUpdate],
+                         announce: NodeAnnouncement, updateOpt: Option[ChannelUpdate],
+                         startedAt: Long) extends Commitments with ChannelData {
+
+  val reducedRemoteState: ReducedState = ReducedState(Set.empty, 0L, 0L, 0L)
+  val channelId: ByteVector = announce.hostedChanId
 }

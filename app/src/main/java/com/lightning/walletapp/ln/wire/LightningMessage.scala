@@ -212,4 +212,4 @@ case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], fro
 case class WalletZygote(v: Int, db: ByteVector, wallet: ByteVector, chain: ByteVector)
 case class CerberusPayload(payloads: Vector[AESZygote], halfTxIds: StringVec)
 case class AESZygote(v: Int, iv: ByteVector, ciphertext: ByteVector)
-case class GDriveBackup(chans: Vector[HasCommitments], v: Int)
+case class GDriveBackup(chans: Vector[HasNormalCommits], v: Int)

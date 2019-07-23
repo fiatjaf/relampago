@@ -4,9 +4,10 @@ import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Tools._
-import com.lightning.walletapp.ln.Channel._
+
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
+import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
@@ -122,7 +123,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
   }
 
-  override def onSettled(chan: Channel, cs: Commitments) = {
+  override def onSettled(chan: NormalChannel, cs: NormalCommits) = {
     // We have got their commit sig and may have settled payments
 
     def newRoutesOrGiveUp(rd: RoutingData) =
@@ -168,7 +169,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     ChannelManager.all.filter(isOperational)
       .flatMap(getVulnerableRevVec).toMap
 
-  def getVulnerableRevVec(chan: Channel) = chan.hasCsOr(some => {
+  def getVulnerableRevVec(chan: NormalChannel) = chan.hasCsOr(some => {
     // Find previous channel states which peer might be now tempted to spend
     val threshold = some.commitments.remoteCommit.spec.toRemoteMsat - dust.amount * 20 * 1000L
     def toTxidAndInfo(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
@@ -223,15 +224,18 @@ object ChannelWrap {
     db.change(ChannelTable.updSql, data, chanId)
   }
 
-  def put(data: HasCommitments) = {
-    val raw = "1" + data.toJson.toString
-    doPut(data.commitments.channelId, raw)
+  def put(data: ChannelData) = data match {
+    case hasNorm: HasNormalCommits => doPut(hasNorm.commitments.channelId, "1" + hasNorm.toJson.toString)
+    case hostedCommits: HostedCommits => doPut(hostedCommits.channelId, "2" + hostedCommits.toJson.toString)
+    case otherwise => throw new RuntimeException(s"Can not presist this channel data type: $otherwise")
   }
 
-  def doGet(database: LNOpenHelper) = {
-    val rc = RichCursor(database select ChannelTable.selectAllSql)
-    rc.vec(_ string ChannelTable.data substring 1) map to[HasCommitments]
-  }
+  def doGet(database: LNOpenHelper) =
+    RichCursor(database select ChannelTable.selectAllSql).vec(_ string ChannelTable.data) map {
+      case rawChanData if '1' == rawChanData.head => to[HasNormalCommits](rawChanData substring 1)
+      case rawChanData if '2' == rawChanData.head => to[HostedCommits](rawChanData substring 1)
+      case otherwise => throw new RuntimeException(s"Can not deserialize: $otherwise")
+    }
 }
 
 object RouteWrap {

@@ -4,9 +4,9 @@ import android.widget._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
-import com.lightning.walletapp.ln.Channel._
+import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-import com.lightning.walletapp.ln.{Channel, ChannelData, RefundingData}
+import com.lightning.walletapp.ln.{ChannelData, RefundingData}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import android.view.{Menu, MenuItem, View, ViewGroup}
@@ -91,7 +91,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         textWrapper setVisibility viewMap(!isGone)
       }
 
-    def showDetails(chan: Channel, cs: Commitments) = {
+    def showDetails(chan: NormalChannel, cs: NormalCommits) = {
       // Attempt to display relevant details based on state
       // fallback to generic details if state is not known
 
@@ -213,7 +213,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       }
     }
 
-    def fillView(chan: Channel) = {
+    def fillView(chan: NormalChannel) = {
       val state = stateStatusColor(chan)
       val connect = connectivityStatusColor(chan)
 
@@ -253,7 +253,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   // UTILS
 
-  def stateStatusColor(c: Channel) = (c.data, c.state) match {
+  def stateStatusColor(c: NormalChannel) = (c.data, c.state) match {
     case (_: NormalData, OPEN) if isOperational(c) => me getString ln_info_status_open
     case (_: NormalData, _) if !isOperational(c) => me getString ln_info_status_shutdown
     case (_, WAIT_FUNDING_DONE) => me getString ln_info_status_opening
@@ -261,7 +261,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case _ => me getString ln_info_status_other format c.state
   }
 
-  def connectivityStatusColor(c: Channel) =
+  def connectivityStatusColor(c: NormalChannel) =
     ConnectionManager.connections get c.data.announce.nodeId match {
       case Some(w) if w.sock.isConnected => me getString ln_info_state_online
       case _ => me getString ln_info_state_offline
