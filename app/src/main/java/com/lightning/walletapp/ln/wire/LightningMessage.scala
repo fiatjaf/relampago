@@ -116,8 +116,8 @@ case class Hop(nodeId: PublicKey, shortChannelId: Long,
   lazy val humanDetails = s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry: $cltvExpiryDelta blocks, Routing fees: $feeBreakdown"
 }
 
-case class QueryChannelRange(chainHash: ByteVector, firstBlockNum: Long,
-                             numberOfBlocks: Long) extends RoutingMessage
+case class QueryChannelRange(chainHash: ByteVector, firstBlockNum: Long, numberOfBlocks: Long) extends RoutingMessage
+case class GossipTimestampFilter(chainHash: ByteVector, firstTimestamp: Long, timestampRange: Long) extends RoutingMessage
 
 // NODE ADDRESS HANDLING
 

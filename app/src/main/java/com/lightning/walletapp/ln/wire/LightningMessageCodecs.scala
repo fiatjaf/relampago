@@ -331,6 +331,12 @@ object LightningMessageCodecs { me =>
       ("numberOfBlocks" | uint32)
   }.as[QueryChannelRange]
 
+  val gossipTimestampFilterCodec = {
+    ("chainHash" | bytes32) ::
+      ("firstTimestamp" | uint32) ::
+      ("timestampRange" | uint32)
+  }.as[GossipTimestampFilter]
+
   // Hosted messages codecs
 
   val stateOverrideCodec = {
@@ -400,6 +406,7 @@ object LightningMessageCodecs { me =>
       .typecase(cr = nodeAnnouncementCodec, tag = 257)
       .typecase(cr = channelUpdateCodec, tag = 258)
       .typecase(cr = queryChannelRangeCodec, tag = 263)
+      .typecase(cr = gossipTimestampFilterCodec, tag = 265)
       .typecase(cr = announcementSignatures.as[AnnouncementSignatures], tag = 259)
       .typecase(cr = invokeHostedChannelCodec, tag = 65535)
       .typecase(cr = initHostedChannelCodec, tag = 65534)
@@ -504,31 +511,27 @@ object Tlv { me =>
     case value => Attempt Successful value.toBigInt.toInt
   }, long => Attempt Successful long)
 
-  private def validateRecords(codec: TlvUint64Disc, records: EitherTlvList): Attempt[TlvStream] = {
-
-    val tags = for (record <- records) yield tag(codec, record)
-    val knownTags = records.collect { case Right(known) => known }
-    val unknownTags = records.collect { case Left(generic) => generic }
-
-    if (tags.length != tags.distinct.length) Attempt Failure Err("Tlv streams must not contain duplicate records")
-    else if (tags != tags.sorted) Attempt Failure Err("Tlv records must be ordered by monotonically-increasing types")
-    else Attempt Successful TlvStream(knownTags, unknownTags)
-  }
-
-  private def validateStream(codec: TlvUint64Disc, stream: TlvStream): Attempt[EitherTlvList] = {
-
-    val records = TlvStream.asList(stream)
-    val tags = for (record <- records) yield tag(codec, record)
-    if (tags.length != tags.distinct.length) Attempt Failure Err("Tlv streams must not contain duplicate records")
-    else Attempt Successful tags.zip(records).sortBy { case (tag, _) => tag }.map { case (_, record) => record }
-  }
-
   def tlvStream(codec: TlvUint64Disc): Codec[TlvStream] = {
     val withFallback = discriminatorFallback(genericTlvCodec, codec)
 
     list(withFallback).exmap(
-      records => validateRecords(codec, records),
-      stream => validateStream(codec, stream)
+      recordsEitherTlvList => {
+        val tags = for (record <- recordsEitherTlvList) yield tag(codec, record)
+        val knownTags = recordsEitherTlvList.collect { case Right(known) => known }
+        val unknownTags = recordsEitherTlvList.collect { case Left(generic) => generic }
+        if (tags.length != tags.distinct.length) Attempt Failure Err("Tlv streams must not contain duplicate records")
+        else if (tags != tags.sorted) Attempt Failure Err("Tlv records must be ordered by monotonically-increasing types")
+        else Attempt Successful TlvStream(knownTags, unknownTags)
+      },
+
+      stream => {
+        val knownRecords = stream.records map Right.apply
+        val unknownRecords = stream.unknown map Left.apply
+        val records = (knownRecords ++ unknownRecords).toList
+        val tags = for (record <- records) yield tag(codec, record)
+        if (tags.length != tags.distinct.length) Attempt Failure Err("Tlv streams must not contain duplicate records")
+        else Attempt Successful tags.zip(records).sortBy { case (tag, _) => tag }.map { case (_, record) => record }
+      }
     )
   }
 
@@ -540,10 +543,4 @@ case class TlvStream(records: Traversable[Tlv], unknown: Traversable[GenericTlv]
 
 object TlvStream {
   def apply(records: Tlv*): TlvStream = TlvStream(records, Nil)
-
-  def asList(stream: TlvStream) = {
-    val knownRecords = stream.records map Right.apply
-    val unknownRecords = stream.unknown map Left.apply
-    (knownRecords ++ unknownRecords).toList
-  }
 }

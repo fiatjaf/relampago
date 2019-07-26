@@ -43,7 +43,9 @@ object ConnectionManager {
       def handleEnterOperationalState = handler process Init(LNParams.globalFeatures, LNParams.localFeatures)
       def handleEncryptedOutgoingData(data: ByteVector) = try sock.getOutputStream write data.toArray catch handleError
       def handleDecryptedIncomingData(data: ByteVector) = intercept(LightningMessageCodecs deserialize data)
-      def handleError = { case _ => disconnect }
+      def handleError = { case error =>
+        error.printStackTrace()
+        disconnect }
     }
 
     val thread = Future {
