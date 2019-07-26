@@ -314,6 +314,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           else FragWallet.worker.receive(withRoutes, maxCanReceive, app.getString(ln_receive_title).html, new String) { rd =>
             foregroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
             ContextCompat.startForegroundService(me, foregroundServiceIntent)
+            timer.schedule(me stopService foregroundServiceIntent, 1800000)
             me PRQR rd.pr
           }
         }

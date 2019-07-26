@@ -56,8 +56,8 @@ class FragWallet extends Fragment {
 }
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
-  import host.{TxProcessor, mkCheckForm, <, mkCheckFormNeutral, updateView2Blue, baseTextBuilder, getSupportActionBar}
   import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail, rm}
+  import host.{TxProcessor, mkCheckForm, <, mkCheckFormNeutral, getSupportActionBar}
 
   val lnStatus = frag.findViewById(R.id.lnStatus).asInstanceOf[TextView]
   val lnBalance = frag.findViewById(R.id.lnBalance).asInstanceOf[TextView]
@@ -99,10 +99,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // To fight spamming
   private[this] var errorLimit = 5
   val chanListener = new ChannelListener {
-    def informOfferClose(chan: NormalChannel, message: String) = UITask {
-      val builder = baseBuilder(chan.data.announce.asString.html, message)
-      def close(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
-      mkCheckFormNeutral(_.dismiss, none, close, builder, dialog_ok, -1, ln_chan_close)
+    def informOfferClose(chan: NormalChannel, msg: String) = UITask {
+      mkCheckFormNeutral(_.dismiss, none, alert => rm(alert)(chan process ChannelManager.CMDLocalShutdown),
+        baseBuilder(chan.data.announce.asString.html, msg), dialog_ok, noResource = -1, ln_chan_close)
     }
 
     override def onSettled(chan: NormalChannel, cs: NormalCommits) =

@@ -167,7 +167,7 @@ trait TimerActivity extends AppCompatActivity { me =>
     view
   }
 
-  implicit def UITask(exec: => Unit): TimerTask = {
+  implicit def UITask(exec: => Any): TimerTask = {
     val runnableExec = new Runnable { override def run = exec }
     new TimerTask { def run = me runOnUiThread runnableExec }
   }

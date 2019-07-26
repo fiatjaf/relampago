@@ -18,7 +18,12 @@ object AwaitService {
 
 class AwaitService extends Service { me =>
   override def onBind(intent: Intent) = null
-  override def onDestroy = runAnd(super.onDestroy)(removeNotification)
+
+  override def onDestroy = runAnd(super.onDestroy){
+    val service = getSystemService(Context.NOTIFICATION_SERVICE)
+    service.asInstanceOf[NotificationManager] cancel AwaitService.NOTIFICATION_ID
+  }
+
   override def onStartCommand(serviceIntent: Intent, flags: Int, id: Int) = {
     if (serviceIntent.getAction != AwaitService.CANCEL) start(serviceIntent)
     else runAnd(me stopForeground true)(stopSelf)
@@ -33,10 +38,5 @@ class AwaitService extends Service { me =>
       .addAction(android.R.drawable.ic_menu_close_clear_cancel, getResources getString R.string.dialog_cancel, cancelIntent)
       .setSmallIcon(R.drawable.ic_info_outline_white_18dp).setContentTitle(getResources getString R.string.notify_title)
       .setContentText(getResources getString R.string.notify_body format awaitedPaymentSum).build)
-  }
-
-  def removeNotification = {
-    val service = getSystemService(Context.NOTIFICATION_SERVICE)
-    service.asInstanceOf[NotificationManager] cancel AwaitService.NOTIFICATION_ID
   }
 }
