@@ -325,6 +325,12 @@ object LightningMessageCodecs { me =>
       channelUpdateWitness
   }.as[ChannelUpdate]
 
+  val queryChannelRangeCodec = {
+    ("chainHash" | bytes32) ::
+      ("firstBlockNum" | uint32) ::
+      ("numberOfBlocks" | uint32)
+  }.as[QueryChannelRange]
+
   // Hosted messages codecs
 
   val stateOverrideCodec = {
@@ -393,6 +399,7 @@ object LightningMessageCodecs { me =>
       .typecase(cr = channelAnnouncement.as[ChannelAnnouncement], tag = 256)
       .typecase(cr = nodeAnnouncementCodec, tag = 257)
       .typecase(cr = channelUpdateCodec, tag = 258)
+      .typecase(cr = queryChannelRangeCodec, tag = 263)
       .typecase(cr = announcementSignatures.as[AnnouncementSignatures], tag = 259)
       .typecase(cr = invokeHostedChannelCodec, tag = 65535)
       .typecase(cr = initHostedChannelCodec, tag = 65534)

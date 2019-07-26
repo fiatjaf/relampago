@@ -100,9 +100,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   private[this] var errorLimit = 5
   val chanListener = new ChannelListener {
     def informOfferClose(chan: NormalChannel, message: String) = UITask {
-      val bld = baseBuilder(chan.data.announce.asString.html, message)
+      val builder = baseBuilder(chan.data.announce.asString.html, message)
       def close(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
-      mkCheckFormNeutral(_.dismiss, none, close, bld, dialog_ok, -1, ln_chan_close)
+      mkCheckFormNeutral(_.dismiss, none, close, builder, dialog_ok, -1, ln_chan_close)
     }
 
     override def onSettled(chan: NormalChannel, cs: NormalCommits) =
