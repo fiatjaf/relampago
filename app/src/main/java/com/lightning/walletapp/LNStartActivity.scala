@@ -164,7 +164,12 @@ sealed trait LNUrlData {
 
 case class WithdrawRequest(callback: String, k1: String,
                            maxWithdrawable: Long, defaultDescription: String,
-                           minWithdrawable: Option[Long] = None) extends LNUrlData
+                           minWithdrawable: Option[Long] = None) extends LNUrlData {
+
+  val minCanReceive = minWithdrawable getOrElse 1L
+  require(minCanReceive >= 1L, "minCanReceive is too low")
+  require(minCanReceive <= maxWithdrawable, "minCanReceive is too high")
+}
 
 case class IncomingChannelRequest(uri: String, callback: String, k1: String, capacity: Long, push: Long) extends LNUrlData {
   def resolveAnnounce = app.mkNodeAnnouncement(PublicKey(ByteVector fromValidHex key), NodeAddress.fromParts(host, port.toInt), host)
