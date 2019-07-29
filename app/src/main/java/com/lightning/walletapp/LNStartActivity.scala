@@ -19,8 +19,6 @@ import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
 import scodec.bits.ByteVector
 import android.os.Bundle
-import fr.acinq.bitcoin.MilliSatoshi
-
 import scala.util.Try
 
 

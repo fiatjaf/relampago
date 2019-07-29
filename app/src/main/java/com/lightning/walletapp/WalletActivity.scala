@@ -288,7 +288,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       case Some(wr \ lnUrl) =>
         val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
         val finalMaxCanReceiveCapped = MilliSatoshi(wr.maxWithdrawable min maxCanReceive.amount)
-        val minCanReceive = wr.minWithdrawable.map(MilliSatoshi.apply) getOrElse LNParams.minHtlcValue
+        val minCanReceive = MilliSatoshi(wr.minWithdrawable getOrElse 0L max LNParams.minHtlcValue.amount)
 
         if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_howto).html).create)
         else if (withRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
