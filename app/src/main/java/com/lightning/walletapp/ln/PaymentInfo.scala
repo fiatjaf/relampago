@@ -1,20 +1,17 @@
 package com.lightning.walletapp.ln
 
+import scala.util.{Success, Try}
+import fr.acinq.bitcoin.{MilliSatoshi, Transaction}
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+
 import com.lightning.walletapp.ln.wire._
-import com.lightning.walletapp.ln.crypto._
 import com.lightning.walletapp.ln.crypto.Sphinx._
 import com.lightning.walletapp.ln.RoutingInfoTag._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import com.lightning.walletapp.ln.wire.FailureMessageCodecs._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.lnutils.JsonHttpUtils.to
+import scodec.bits.ByteVector
 import scodec.Attempt
-
-import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Transaction}
-import com.lightning.walletapp.ln.Tools.{Bytes, random}
-import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
-import scodec.bits.{BitVector, ByteVector}
-import scala.util.{Success, Try}
 
 
 object PaymentInfo {
@@ -31,25 +28,22 @@ object PaymentInfo {
   final val NOCHANID = ByteVector.fromValidHex("3131313131313131")
   final val REBALANCING = "Rebalancing"
 
-  type FailureTry = Try[ErrorPacket]
-  type FailureTryVec = Vector[FailureTry]
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
+  type FailureTry = Try[DecryptedFailurePacket]
+  type FailureTryVec = Vector[FailureTry]
 
   // Stores a history of error responses from peers per each outgoing payment request
   var errors = Map.empty[ByteVector, FailureTryVec] withDefaultValue Vector.empty
   private[this] var replacedChans = Set.empty[Long]
 
-  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int) = {
-    val emptyPacket = Packet(Array(Version), random getBytes 33, random getBytes DataLength, random getBytes MacLength)
-    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, SecretsAndPacket(Vector.empty, emptyPacket), firstMsat,
-      lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache, airLeft)
-  }
+  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int) =
+    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, PacketAndSecrets(emptyOnionPacket, Vector.empty),
+      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache = useCache, airLeft = airLeft)
 
-  def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: ByteVector): SecretsAndPacket = {
+  def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: ByteVector): PacketAndSecrets = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
-    val encodedPayloads = for (rawPayload <- payloads) yield serialize(perHopPayloadCodec encode rawPayload).toArray
-    val privateKey = PrivateKey(ByteVector.view(random getBytes 32), compressed = false)
-    makePacket(privateKey, keys, encodedPayloads, assoc.toArray)
+    val encodedPayloads = for (rawPayload <- payloads) yield serialize(OnionCodecs.perHopPayloadCodec encode rawPayload)
+    PaymentPacket.create(Tools.randomPrivKey, keys, encodedPayloads, assoc)
   }
 
   def useFirstRoute(rest: PaymentRouteVec, rd: RoutingData) = rest match {
@@ -80,9 +74,9 @@ object PaymentInfo {
     }
   }
 
-  def without(rs: PaymentRouteVec, fun: Hop => Boolean) = rs.filterNot(_ exists fun)
-  def failHtlc(sharedSecret: Bytes, failure: FailureMessage, add: UpdateAddHtlc): CMDFailHtlc =
-    CMDFailHtlc(reason = ByteVector view createErrorPacket(sharedSecret, failure), id = add.id)
+  def without(routes: PaymentRouteVec, fun: Hop => Boolean) = routes.filterNot(routeOfHops => routeOfHops exists fun)
+  def failIncorrectDetails(pkt: DecryptedPacket, msat: MilliSatoshi, add: UpdateAddHtlc) = failHtlc(pkt, IncorrectOrUnknownPaymentDetails(msat.amount), add)
+  def failHtlc(pkt: DecryptedPacket, msg: FailureMessage, add: UpdateAddHtlc) = CMDFailHtlc(reason = FailurePacket.create(pkt.sharedSecret, msg), id = add.id)
 
   def withoutChan(shortId: Long, rd: RoutingData, span: Long, msat: Long) = {
     val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == shortId)
@@ -113,18 +107,17 @@ object PaymentInfo {
   }
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
-    // Try to reduce remaining routes and also remember bad nodes and channels
-    val parsed = Try apply parseErrorPacket(rd.onion.sharedSecrets, fail.reason.toArray)
+    val parsed = FailurePacket.decrypt(fail.reason, rd.onion.sharedSecrets)
     errors = errors.updated(rd.pr.paymentHash, errors(rd.pr.paymentHash) :+ parsed)
 
     parsed map {
-      case ErrorPacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
-      case ErrorPacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
-      case ErrorPacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
-      case ErrorPacket(_, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
-      case ErrorPacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case DecryptedFailurePacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
+      case DecryptedFailurePacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
+      case DecryptedFailurePacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case DecryptedFailurePacket(_, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case DecryptedFailurePacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
 
-      case ErrorPacket(nodeKey, u: Update) =>
+      case DecryptedFailurePacket(nodeKey, u: Update) =>
         val isHonest = Announcements.checkSig(u.update, nodeKey)
         if (!isHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
         else rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
@@ -134,16 +127,16 @@ object PaymentInfo {
           else withoutChan(u.update.shortChannelId, rd.copy(routes = rd.usedRoute +: rd.routes), 180 * 1000, rd.firstMsat)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
-      case ErrorPacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
-      case ErrorPacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
-      case ErrorPacket(nodeKey, _: BadOnion) => withoutNodes(Vector(nodeKey), rd, 180 * 1000)
+      case DecryptedFailurePacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
+      case DecryptedFailurePacket(nodeKey, RequiredNodeFeatureMissing) => withoutNodes(Vector(nodeKey), rd, 86400 * 1000)
+      case DecryptedFailurePacket(nodeKey, _: BadOnion) => withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
-      case ErrorPacket(nodeKey, UnknownNextPeer | PermanentChannelFailure) =>
+      case DecryptedFailurePacket(nodeKey, UnknownNextPeer | PermanentChannelFailure) =>
         rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
           withoutChan(payHop.shortChannelId, rd, 86400 * 7 * 1000, 0L)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
-      case ErrorPacket(nodeKey, _) =>
+      case DecryptedFailurePacket(nodeKey, _) =>
         rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
           withoutChan(payHop.shortChannelId, rd, 180 * 1000, rd.firstMsat)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
@@ -154,41 +147,26 @@ object PaymentInfo {
     }
   }
 
-  // After mutually signed HTLCs are present we need to parse and fail/fulfill them
-  def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag, isLoop: Boolean) = Try {
-    val packet = parsePacket(privateKey = nodeSecret, add.paymentHash.toArray, add.onionRoutingPacket.toArray)
-    Tuple3(perHopPayloadCodec decode BitVector(packet.payload), packet.nextPacket, packet.sharedSecret)
-  } map {
-    // We are the final HTLC recipient, sanity checks first
-    case (Attempt.Successful(decoded), nextPacket, sharedSecret)
-      if nextPacket.isLast && decoded.value.outgoingCltv != add.expiry =>
-      failHtlc(sharedSecret, FinalIncorrectCltvExpiry(add.expiry), add)
-
-    case (Attempt.Successful(_), nextPacket, ss) if nextPacket.isLast => bag getPaymentInfo add.paymentHash match {
-      // Payment request may not have a zero final sum which means it's a donation and should not be checked for overflow
-      case Success(info) if !isLoop && info.pr.amount.exists(add.amountMsat > _.amount * 2) => failHtlc(ss, IncorrectPaymentAmount, add)
-      case Success(info) if !isLoop && info.pr.amount.exists(add.amountMsat < _.amount) => failHtlc(ss, IncorrectPaymentAmount, add)
-      case Success(info) if !isLoop && info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
-      case _ => failHtlc(ss, IncorrectOrUnknownPaymentDetails(add.amountMsat), add)
+  // Once mutually signed HTLCs are present we need to parse and fail/fulfill them
+  def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag, loop: Boolean) =
+    PaymentPacket.peel(nodeSecret, associatedData = add.paymentHash, add.onionRoutingPacket) match {
+      case Left(badOnion) => CMDFailMalformedHtlc(add.id, badOnion.onionHash, FailureMessageCodecs failureCode badOnion)
+      case Right(packet) => if (packet.isLastPacket) doResolve(packet, add, bag, loop) else failHtlc(packet, UnknownNextPeer, add)
     }
 
-    case (Attempt.Successful(_), _, sharedSecret) =>
-      // We don't route so can't find the next node
-      failHtlc(sharedSecret, UnknownNextPeer, add)
-
-    case (Attempt.Failure(_), _, sharedSecret) =>
-      // Payload could not be parsed at all so fail it
-      failHtlc(sharedSecret, PermanentNodeFailure, add)
-
-  } getOrElse {
-    val hash = Crypto sha256 add.onionRoutingPacket
-    CMDFailMalformedHtlc(add.id, hash, BADONION)
-  }
+  def doResolve(pkt: DecryptedPacket, add: UpdateAddHtlc, bag: PaymentInfoBag, loop: Boolean) =
+    Tuple2(OnionCodecs.perHopPayloadCodec decode pkt.payload.bits, bag getPaymentInfo add.paymentHash) match {
+      case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin > add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
+      case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin * 2 < add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
+      case Attempt.Successful(payload) \ _ if payload.value.outgoingCltvValue != add.expiry => failHtlc(pkt, FinalIncorrectCltvExpiry(add.expiry), add)
+      case attempt \ Success(info) if attempt.isSuccessful && !loop && info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
+      case attempt \ _ if attempt.isSuccessful => failIncorrectDetails(pkt, add.amount, add)
+      case _ => InvalidOnionPayload(PaymentPacket hash add.onionRoutingPacket)
+    }
 }
 
-case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltv: Long)
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
-                       onion: SecretsAndPacket, firstMsat: Long /* amount without off-chain fee */,
+                       onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */,
                        lastMsat: Long /* amount with off-chain fee */, lastExpiry: Long, callsLeft: Int,
                        useCache: Boolean, airLeft: Int) {
 

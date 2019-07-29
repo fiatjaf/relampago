@@ -2,6 +2,7 @@ package com.lightning.walletapp.ln.wire
 
 import scodec.codecs._
 import LightningMessageCodecs._
+import com.lightning.walletapp.ln.crypto.Mac32
 import scodec.bits.ByteVector
 import scodec.Attempt
 
@@ -27,6 +28,7 @@ case object RequiredNodeFeatureMissing extends Perm with Node
 
 sealed trait BadOnion extends FailureMessage { def onionHash: ByteVector }
 case class InvalidOnionVersion(onionHash: ByteVector) extends BadOnion with Perm
+case class InvalidOnionPayload(onionHash: ByteVector) extends BadOnion with Perm
 case class InvalidOnionHmac(onionHash: ByteVector) extends BadOnion with Perm
 case class InvalidOnionKey(onionHash: ByteVector) extends BadOnion with Perm
 
@@ -56,6 +58,7 @@ object FailureMessageCodecs {
     .typecase(cr = provide(TemporaryNodeFailure), tag = NODE | 2)
     .typecase(cr = provide(PermanentNodeFailure), tag = PERM | 2)
     .typecase(cr = provide(RequiredNodeFeatureMissing), tag = PERM | NODE | 3)
+    .typecase(cr = bytes32.as[InvalidOnionPayload], tag = BADONION | PERM)
     .typecase(cr = bytes32.as[InvalidOnionVersion], tag = BADONION | PERM | 4)
     .typecase(cr = bytes32.as[InvalidOnionHmac], tag = BADONION | PERM | 5)
     .typecase(cr = bytes32.as[InvalidOnionKey], tag = BADONION | PERM | 6)
@@ -74,4 +77,19 @@ object FailureMessageCodecs {
     .typecase(cr = (uint64Overflow withContext "amountMsat").as[FinalIncorrectHtlcAmount], tag = 19)
     .typecase(cr = disabled.as[ChannelDisabled], tag = UPDATE | 20)
     .typecase(cr = provide(ExpiryTooFar), tag = 21)
+
+  def failureCode(failure: FailureMessage): Int = failureMessageCodec.encode(failure).flatMap(uint16.decode).require.value
+
+  /**
+    * An onion-encrypted failure from an intermediate node:
+    * +----------------+----------------------------------+-----------------+----------------------+-----+
+    * | HMAC(32 bytes) | failure message length (2 bytes) | failure message | pad length (2 bytes) | pad |
+    * +----------------+----------------------------------+-----------------+----------------------+-----+
+    * with failure message length + pad length = 256
+    */
+
+  def failureOnionCodec(mac: Mac32) = prependmac(paddedFixedSizeBytesDependent(260,
+    variableSizeBytes(value = failureMessageCodec, size = uint16) withContext "failureMessage",
+    nBits => variableSizeBytes(value = ignore(nBits - 2 * 8), size = uint16) withContext "padding"
+  ).as[FailureMessage], mac)
 }

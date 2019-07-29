@@ -74,9 +74,9 @@ object LNParams {
     mismatch < -0.25 || mismatch > 0.25
   }
 
-  def getLinkingKey(domainName: String) = {
-    val prefix = crypto.Digests.hmacSha256(hashingKey.toArray, domainName getBytes "UTF-8") take 8
-    derivePrivateKey(master, hardened(138L) :: 0L :: BigInt(prefix).toLong :: Nil).privateKey
+  def getLinkingKey(domain: String) = {
+    val prefix = crypto.Mac32.hmac256(hashingKey, domain).take(8).toLong(signed = true)
+    derivePrivateKey(master, hardened(138L) :: 0L :: prefix :: Nil).privateKey
   }
 
   def backupFileName = s"blw${chainHash.toHex}-${cloudId.toHex}.bkup"

@@ -7,8 +7,9 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.Helpers.Funding
 import com.lightning.walletapp.ln.Scripts._
 import com.lightning.walletapp.ln.crypto.Generators._
+import com.lightning.walletapp.ln.crypto.Sphinx
 import com.lightning.walletapp.ln.wire.UpdateAddHtlc
-import fr.acinq.bitcoin.Protocol.{Zeroes, One}
+import fr.acinq.bitcoin.Protocol.{One, Zeroes}
 import fr.acinq.bitcoin._
 import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.Script._
@@ -71,10 +72,10 @@ class TransactionsSpec {
       println("compute fees")
       // see BOLT #3 specs
       val htlcs = Set(
-        Htlc(incoming = false, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, MilliSatoshi(5000000).amount, Zeroes, 552, ByteVector.empty)),
-        Htlc(incoming = false, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, MilliSatoshi(1000000).amount, Zeroes, 553, ByteVector.empty)),
-        Htlc(incoming = true, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, MilliSatoshi(7000000).amount, Zeroes, 550, ByteVector.empty)),
-        Htlc(incoming = true, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, MilliSatoshi(800000).amount, Zeroes, 551, ByteVector.empty))
+        Htlc(incoming = false, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, MilliSatoshi(5000000).amount, Zeroes, 552, Sphinx.emptyOnionPacket)),
+        Htlc(incoming = false, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, MilliSatoshi(1000000).amount, Zeroes, 553, Sphinx.emptyOnionPacket)),
+        Htlc(incoming = true, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, MilliSatoshi(7000000).amount, Zeroes, 550, Sphinx.emptyOnionPacket)),
+        Htlc(incoming = true, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, MilliSatoshi(800000).amount, Zeroes, 551, Sphinx.emptyOnionPacket))
       )
 
       val spec = CommitmentSpec(feeratePerKw = 5000, toLocalMsat = 0, toRemoteMsat = 0, htlcs)
@@ -130,7 +131,7 @@ class TransactionsSpec {
         // HtlcPenaltyTx
         // first we create a fake commitTx tx, containing only the output that will be spent by the ClaimHtlcSuccessTx
         val paymentPreimage = ByteVector.fromValidHex("42" * 32)
-        val htlc = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, Satoshi(20000).amount * 1000, sha256(paymentPreimage), expiry = 400144, ByteVector.empty)
+        val htlc = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, Satoshi(20000).amount * 1000, sha256(paymentPreimage), expiry = 400144, Sphinx.emptyOnionPacket)
         val redeemScript = htlcReceived(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, ripemd160(htlc.paymentHash), htlc.expiry)
         val pubKeyScript = write(pay2wsh(redeemScript))
         val commitTx = Transaction(version = 0, txIn = Nil, txOut = TxOut(Satoshi(htlc.amountMsat / 1000), pubKeyScript) :: Nil, lockTime = 0)
@@ -144,7 +145,7 @@ class TransactionsSpec {
         // ClaimHtlcSuccessTx
         // first we create a fake commitTx tx, containing only the output that will be spent by the ClaimHtlcSuccessTx
         val paymentPreimage = ByteVector.fromValidHex("42" * 32)
-        val htlc = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, Satoshi(20000).amount * 1000, sha256(paymentPreimage), expiry = 400144, ByteVector.empty)
+        val htlc = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, Satoshi(20000).amount * 1000, sha256(paymentPreimage), expiry = 400144, Sphinx.emptyOnionPacket)
         val pubKeyScript = write(pay2wsh(htlcOffered(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, ripemd160(htlc.paymentHash))))
         val commitTx = Transaction(version = 0, txIn = Nil, txOut = TxOut(Satoshi(htlc.amountMsat / 1000), pubKeyScript) :: Nil, lockTime = 0)
         val claimHtlcSuccessTx = makeClaimHtlcSuccessTx(new PubKeyScriptIndexFinder(commitTx), remoteHtlcPriv.publicKey, localHtlcPriv.publicKey, localRevocationPriv.publicKey, finalPubKeyScript, htlc, feeratePerKw, localDustLimit)
@@ -157,7 +158,7 @@ class TransactionsSpec {
         // ClaimHtlcTimeoutTx
         // first we create a fake commitTx tx, containing only the output that will be spent by the ClaimHtlcSuccessTx
         val paymentPreimage = ByteVector.fromValidHex("42" * 32)
-        val htlc = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, Satoshi(20000).amount * 1000, sha256(paymentPreimage), expiry = 400144, ByteVector.empty)
+        val htlc = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, Satoshi(20000).amount * 1000, sha256(paymentPreimage), expiry = 400144, Sphinx.emptyOnionPacket)
         val pubKeyScript = write(pay2wsh(htlcReceived(localHtlcPriv.publicKey, remoteHtlcPriv.publicKey, localRevocationPriv.publicKey, ripemd160(htlc.paymentHash), htlc.expiry)))
         val commitTx = Transaction(version = 0, txIn = Nil, txOut = TxOut(Satoshi(htlc.amountMsat / 1000), pubKeyScript) :: Nil, lockTime = 0)
         val claimClaimHtlcTimeoutTx = makeClaimHtlcTimeoutTx(new PubKeyScriptIndexFinder(commitTx), remoteHtlcPriv.publicKey, localHtlcPriv.publicKey, localRevocationPriv.publicKey, finalPubKeyScript, htlc, feeratePerKw, localDustLimit)
@@ -186,14 +187,14 @@ class TransactionsSpec {
 
       // htlc1 and htlc2 are regular IN/OUT htlcs
       val paymentPreimage1 = ByteVector.fromValidHex("11" * 32)
-      val htlc1 = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, millibtc2satoshi(MilliBtc(100)).amount * 1000, sha256(paymentPreimage1), 300, ByteVector.empty)
+      val htlc1 = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, millibtc2satoshi(MilliBtc(100)).amount * 1000, sha256(paymentPreimage1), 300, Sphinx.emptyOnionPacket)
       val paymentPreimage2 = ByteVector.fromValidHex("22" * 32)
-      val htlc2 = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 1, millibtc2satoshi(MilliBtc(200)).amount * 1000, sha256(paymentPreimage2), 300, ByteVector.empty)
+      val htlc2 = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 1, millibtc2satoshi(MilliBtc(200)).amount * 1000, sha256(paymentPreimage2), 300, Sphinx.emptyOnionPacket)
       // htlc3 and htlc4 are dust htlcs IN/OUT htlcs, with an amount large enough to be included in the commit tx, but too small to be claimed at 2nd stage
       val paymentPreimage3 = ByteVector.fromValidHex("33" * 32)
-      val htlc3 = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 2, (localDustLimit + weight2fee(feeratePerKw, htlcTimeoutWeight)).amount * 1000, sha256(paymentPreimage3), 300, ByteVector.empty)
+      val htlc3 = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 2, (localDustLimit + weight2fee(feeratePerKw, htlcTimeoutWeight)).amount * 1000, sha256(paymentPreimage3), 300, Sphinx.emptyOnionPacket)
       val paymentPreimage4 = ByteVector.fromValidHex("44" * 32)
-      val htlc4 = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 3, (localDustLimit + weight2fee(feeratePerKw, htlcSuccessWeight)).amount * 1000, sha256(paymentPreimage4), 300, ByteVector.empty)
+      val htlc4 = UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 3, (localDustLimit + weight2fee(feeratePerKw, htlcSuccessWeight)).amount * 1000, sha256(paymentPreimage4), 300, Sphinx.emptyOnionPacket)
       val spec = CommitmentSpec(
         feeratePerKw = feeratePerKw,
         toLocalMsat = millibtc2satoshi(MilliBtc(400)).amount * 1000,
@@ -293,9 +294,8 @@ class TransactionsSpec {
 
     }
 
-
     def htlc(incoming: Boolean, amount: Satoshi): Htlc =
-      Htlc(incoming, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, amount.amount * 1000, ByteVector.fromValidHex("00" * 32), 144, ByteVector.empty))
+      Htlc(incoming, UpdateAddHtlc(ByteVector.fromValidHex("00" * 32), 0, amount.amount * 1000, ByteVector.fromValidHex("00" * 32), 144, Sphinx.emptyOnionPacket))
 
     Future {
       println("BOLT 2 fee tests")

@@ -59,8 +59,12 @@ object Features {
   val OPTION_DATA_LOSS_PROTECT_MANDATORY = 0
   val OPTION_DATA_LOSS_PROTECT_OPTIONAL = 1
 
+  val VARIABLE_LENGTH_ONION_MANDATORY = 8
+  val VARIABLE_LENGTH_ONION_OPTIONAL = 9
+
   implicit def binData2BitSet(featuresBinaryData: ByteVector): util.BitSet = util.BitSet.valueOf(featuresBinaryData.reverse.toArray)
   def dataLossProtect(bitset: util.BitSet) = bitset.get(OPTION_DATA_LOSS_PROTECT_OPTIONAL) || bitset.get(OPTION_DATA_LOSS_PROTECT_MANDATORY)
+  def variableLengthOnion(bitset: util.BitSet) = bitset.get(VARIABLE_LENGTH_ONION_OPTIONAL) || bitset.get(VARIABLE_LENGTH_ONION_MANDATORY)
   def isBitSet(position: Int, bitField: Byte): Boolean = bitField.&(1 << position) == (1 << position)
 
   def areSupported(bitset: util.BitSet): Boolean = {

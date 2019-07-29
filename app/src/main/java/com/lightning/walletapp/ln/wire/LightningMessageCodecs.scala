@@ -1,19 +1,20 @@
 package com.lightning.walletapp.ln.wire
 
 import java.net._
+
 import scodec.codecs._
 import fr.acinq.eclair.UInt64.Conversions._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-import com.lightning.walletapp.ln.{LightningException, PerHopPayload, RevocationInfo}
+import com.lightning.walletapp.ln.{LightningException, RevocationInfo}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
+import com.lightning.walletapp.ln.crypto.{Mac32, Sphinx}
 import scodec.bits.{BitVector, ByteVector}
-import scodec.{Attempt, Codec, Err}
-
-import com.lightning.walletapp.ln.crypto.Sphinx
+import scodec.{Attempt, Codec, DecodeResult, Decoder, Err}
 import org.apache.commons.codec.binary.Base32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
 import java.math.BigInteger
+
 import scala.util.Try
 
 
@@ -148,6 +149,15 @@ object LightningMessageCodecs { me =>
       .typecase(cr = (base32(35) :: uint16).as[Tor3], tag = 4)
       .typecase(cr = (zeropaddedstring :: uint16).as[Domain], tag = 5)
 
+  def prependmac[A](codec: Codec[A], mac32: Mac32) = Codec[A] (
+    (a: A) => codec.encode(a).map(bits1 => mac32.mac(bits1.toByteVector).bits ++ bits1),
+    (encodedMacBits: BitVector) => (bytes32 withContext "mac").decode(encodedMacBits) match {
+      case Attempt.Successful(dr) if mac32.verify(dr.value, dr.remainder.toByteVector) => codec.decode(dr.remainder)
+      case Attempt.Successful(invalidDr) => Attempt Failure scodec.Err(s"Invalid mac detected: $invalidDr")
+      case Attempt.Failure(err) => Attempt Failure err
+    }
+  )
+
   // Data formats
 
   private val init = (varsizebinarydata withContext "globalFeatures") :: (varsizebinarydata withContext "localFeatures")
@@ -233,7 +243,7 @@ object LightningMessageCodecs { me =>
       (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry") ::
-      (bytes(Sphinx.PacketLength) withContext "onionRoutingPacket")
+      (OnionCodecs.paymentOnionPacketCodec withContext "onionRoutingPacket")
   }.as[UpdateAddHtlc]
 
   val updateFulfillHtlcCodec = {
@@ -425,14 +435,6 @@ object LightningMessageCodecs { me =>
       (uint32 withContext "feeProportionalMillionths")
   }.as[Hop]
 
-  val perHopPayloadCodec = {
-    (constant(ByteVector fromByte 0) withContext "realm") ::
-      (uint64Overflow withContext "shortChannelId") ::
-      (uint64Overflow withContext "amtToForward") ::
-      (uint32 withContext "outgoingCltv") ::
-      (ignore(8 * 12) withContext "unusedWithV0VersionOnHeader")
-  }.as[PerHopPayload]
-
   val revocationInfoCodec = {
     (listOfN(uint16, varsizebinarydata ~ signature) withContext "redeemScriptsToSigs") ::
       (optional(bool, signature) withContext "claimMainTxSig") ::
@@ -464,6 +466,8 @@ object LightningMessageCodecs { me =>
       (vectorOfN(uint16, zeropaddedstring) withContext "halfTxIds")
   }.as[CerberusPayload]
 }
+
+// TLV
 
 trait Tlv
 sealed trait OnionTlv extends Tlv
@@ -543,4 +547,43 @@ case class TlvStream(records: Traversable[Tlv], unknown: Traversable[GenericTlv]
 
 object TlvStream {
   def apply(records: Tlv*): TlvStream = TlvStream(records, Nil)
+}
+
+// ONION
+
+case class OnionRoutingPacket(version: Int, publicKey: ByteVector, payload: ByteVector, hmac: ByteVector)
+case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltvValue: Long)
+
+object OnionCodecs {
+  def onionRoutingPacketCodec(payloadLength: Int) = {
+    (uint8 withContext "version") ::
+      (bytes(33) withContext "publicKey") ::
+      (bytes(payloadLength) withContext "onionPayload") ::
+      (bytes32 withContext "hmac")
+  }.as[OnionRoutingPacket]
+
+  val paymentOnionPacketCodec: Codec[OnionRoutingPacket] =
+    onionRoutingPacketCodec(Sphinx.PaymentPacket.PayloadLength)
+
+  val perHopPayloadCodec: Codec[PerHopPayload] = {
+    (constant(ByteVector fromByte 0) withContext "realm") ::
+      (uint64Overflow withContext "short_channel_id") ::
+      (uint64Overflow withContext "amt_to_forward") ::
+      (uint32 withContext "outgoing_cltv_value") ::
+      (ignore(8 * 12) withContext "unused_with_v0_version_on_header")
+  }.as[PerHopPayload]
+
+  /**
+    * The 1.1 BOLT spec changed the onion frame format to use variable-length per-hop payloads.
+    * The first bytes contain a varint encoding the length of the payload data (not including the trailing mac).
+    * That varint is considered to be part of the payload, so the payload length includes the number of bytes used by
+    * the varint prefix.
+    */
+
+  val payloadLengthDecoder = Decoder[Long] { bits: BitVector =>
+    varintoverflow.decode(bits) map { decResult: DecodeResult[Long] =>
+      val payload = decResult.value + (bits.length - decResult.remainder.length) / 8
+      DecodeResult(payload, decResult.remainder)
+    }
+  }
 }

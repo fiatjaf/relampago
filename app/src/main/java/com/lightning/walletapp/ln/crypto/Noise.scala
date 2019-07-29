@@ -94,13 +94,8 @@ object Noise {
   }
 
   object SHA256HashFunctions extends HashFunctions {
-    def hmacHash(key: ByteVector, data: ByteVector) = {
-      val hash = Digests.hmacSha256(key.toArray, data.toArray)
-      ByteVector.view(hash)
-    }
-
-    def hash(hashingSource: ByteVector) =
-      Crypto sha256 hashingSource
+    def hmacHash(key: ByteVector, data: ByteVector) = Mac32.hmac256(key, data)
+    def hash(hashingSource: ByteVector) = Crypto.sha256(hashingSource)
 
     val name = "SHA256"
     val blockLen = 64

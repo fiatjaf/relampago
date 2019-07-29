@@ -1,205 +1,337 @@
 package com.lightning.walletapp.ln.crypto
 
-import com.lightning.walletapp.ln.crypto.Sphinx._
-import com.lightning.walletapp.ln.crypto.MultiStreamUtils._
-import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, Scalar}
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
-import scodec.bits.{BitVector, ByteVector}
-import fr.acinq.bitcoin.{Crypto, Protocol}
-
-import com.lightning.walletapp.ln.wire.FailureMessageCodecs.failureMessageCodec
-import com.lightning.walletapp.ln.wire.FailureMessage
+import scala.util.{Failure, Success, Try}
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
+import com.lightning.walletapp.ln.wire.{FailureMessage, FailureMessageCodecs}
 import com.lightning.walletapp.ln.LightningException
-import com.lightning.walletapp.ln.Tools.Bytes
-import org.bitcoinj.core.Sha256Hash
-import java.math.BigInteger
-import java.nio.ByteOrder
+import fr.acinq.bitcoin.Protocol.Zeroes
+import com.lightning.walletapp.ln.wire
+import scala.annotation.tailrec
+import fr.acinq.bitcoin.Crypto
+import scodec.bits.ByteVector
+import scodec.Attempt
 
 
-case class Packet(v: Bytes, publicKey: Bytes, routingInfo: Bytes, hmac: Bytes) { me =>
-  require(hmac.length == MacLength, s"Onion header hmac length should be exactly $MacLength bytes")
-  require(publicKey.length == 33, "Onion header public key length should be exactly 33 bytes")
-  require(routingInfo.length == DataLength, "Invalid routing info length")
-  lazy val pubKey = PublicKey(ByteVector view publicKey)
-  def isLast = hmac sameElements zeroes(MacLength)
-  def serialize = Packet write me
-}
-
-object Packet { me =>
-  def read(in: Bytes): Packet = me read new ByteArrayInputStream(in)
-  def write(packet: Packet): Bytes = write(out = new ByteArrayOutputStream(PacketLength), header = packet)
-  def write(out: ByteArrayOutputStream, header: Packet): Bytes = awrite(out, header.v, header.publicKey, header.routingInfo, header.hmac).toByteArray
-
-  private def read(stream: ByteArrayInputStream) = {
-    val res = aread(stream, 1, 33, DataLength, MacLength)
-    val Seq(version, publicKey, routingInfo, hmac) = res
-    Packet(version, publicKey, routingInfo, hmac)
-  }
-}
-
-case class ParsedPacket(payload: Bytes, nextPacket: Packet, sharedSecret: Bytes)
-case class SecretsAndPacket(sharedSecrets: Vector[BytesAndKey], packet: Packet)
-case class ErrorPacket(originNode: PublicKey, failureMessage: FailureMessage)
-
-object Sphinx { me =>
-  type BytesVec = Vector[Bytes]
+object Sphinx {
   type PublicKeyVec = Vector[PublicKey]
-  type BytesAndKey = (Bytes, PublicKey)
 
-  val Version = 0.toByte
-  val PayloadLength = 33
+  // We use HMAC-SHA256 which returns 32-bytes message authentication codes.
   val MacLength = 32
-  val MaxHops = 20
 
-  /*
-    error packet format:
-    +----------------+----------------------------------+-----------------+----------------------+-----+
-    | HMAC(32 bytes) | failure message length (2 bytes) | failure message | pad length (2 bytes) | pad |
-    +----------------+----------------------------------+-----------------+----------------------+-----+
-    with failure message length + pad length = 256
-  */
+  def mac(key: ByteVector, message: ByteVector): ByteVector = Mac32.hmac256(key, message)
 
-  val MaxErrorPayloadLength = 256
-  val ErrorPacketLength = MacLength + MaxErrorPayloadLength + 2 + 2
-  val DataLength = (PayloadLength + MacLength) * MaxHops
-  val PacketLength = 1 + 33 + MacLength + DataLength
+  def generateKey(keyType: ByteVector, secret: ByteVector): ByteVector = Mac32.hmac256(keyType, secret)
 
-  val LAST_ADDRESS = zeroes(PayloadLength)
-  val LAST_PACKET = Packet(Array(Version), zeroes(33), me zeroes DataLength, me zeroes MacLength)
-  def mac(key: Bytes, message: Bytes): Bytes = Digests.hmacSha256(key, message) take MacLength
-  def xor(a: Bytes, b: Bytes): Bytes = a zip b map { case (x, y) => x.^(y).&(0xFF).toByte }
-  def zeroes(length: Int): Bytes = Array.fill[Byte](length)(0)
+  def generateKey(keyType: String, secret: ByteVector): ByteVector = generateKey(ByteVector.view(keyType.getBytes("UTF-8")), secret)
 
-  def generateKey(keyType: Bytes, secret: Bytes): Bytes = Digests.hmacSha256(keyType, secret)
-  def generateKey(keyType: String, secret: Bytes): Bytes = generateKey(keyType getBytes "UTF-8", secret)
-  def computeBlindingFactor(pub: PublicKey, secret: Bytes): Bytes = Sha256Hash hash aconcat(pub.toBin.toArray, secret)
-  def blind(pub: PublicKey, blindingFactors: BytesVec): PublicKey = blindingFactors.foldLeft(pub)(blind)
+  def zeroes(length: Int): ByteVector = ByteVector.fill(length)(0)
 
-  def blind(pub: PublicKey, blindingFactor: Bytes): PublicKey = {
-    val scalar = Scalar apply new BigInteger(1, blindingFactor)
-    PublicKey(pub.multiply(scalar).normalize)
+  def generateStream(key: ByteVector, length: Int): ByteVector = ByteVector(ChaCha20.process(zeroes(length).toArray, key.toArray, zeroes(12).toArray, encrypt = true, skipBlock = false))
+
+  def computeSharedSecret(pub: PublicKey, secret: PrivateKey): ByteVector = Crypto.sha256(pub.multiply(secret).toBin(true))
+
+  def computeBlindingFactor(pub: PublicKey, secret: ByteVector): ByteVector = Crypto.sha256(pub.value.toBin(true) ++ secret)
+
+  def blind(pub: PublicKey, blindingFactor: ByteVector): PublicKey = PublicKey(pub.multiply(PrivateKey(blindingFactor)))
+
+  def blind(pub: PublicKey, blindingFactors: Seq[ByteVector]): PublicKey = blindingFactors.foldLeft(pub)(blind)
+
+  /**
+    * Compute the ephemeral public keys and shared secrets for all nodes on the route.
+    *
+    * @param sessionKey this node's session key.
+    * @param publicKeys public keys of each node on the route.
+    * @return a tuple (ephemeral public keys, shared secrets).
+    */
+  def computeEphemeralPublicKeysAndSharedSecrets(sessionKey: PrivateKey, publicKeys: Seq[PublicKey]): (Seq[PublicKey], Seq[ByteVector]) = {
+    val ephemeralPublicKey0 = blind(PublicKey(Crypto.curve.getG), sessionKey.value)
+    val secret0 = computeSharedSecret(publicKeys.head, sessionKey)
+    val blindingFactor0 = computeBlindingFactor(ephemeralPublicKey0, secret0)
+    computeEphemeralPublicKeysAndSharedSecrets(sessionKey, publicKeys.tail, Seq(ephemeralPublicKey0), Seq(blindingFactor0), Seq(secret0))
   }
 
-  def computeSharedSecret(pub: PublicKey, secret: PrivateKey): Bytes = Sha256Hash.hash(pub.multiply(secret).normalize getEncoded true)
-  def generateStream(key: Bytes, length: Int): Bytes = ChaCha20.process(zeroes(length), key, zeroes(12), encrypt = true, skipBlock = false)
-
-  def computeEphemerealPublicKeysAndSharedSecrets(publicKeys: PublicKeyVec, sessionKey: PrivateKey): (PublicKeyVec, BytesVec) = {
-    val firstEphemerealPublicKey = blind(PublicKey(Crypto.curve.getG, compressed = true), sessionKey.value.toByteArray)
-    val firstSecret: Bytes = computeSharedSecret(pub = publicKeys.head, secret = sessionKey)
-    val firstBlindingFactor = computeBlindingFactor(firstEphemerealPublicKey, firstSecret)
-
-    computeEphemerealPublicKeysAndSharedSecrets(publicKeys.tail,
-      Vector(firstEphemerealPublicKey), Vector(firstBlindingFactor),
-      Vector(firstSecret), sessionKey)
+  @tailrec
+  private def computeEphemeralPublicKeysAndSharedSecrets(sessionKey: PrivateKey, publicKeys: Seq[PublicKey], ephemeralPublicKeys: Seq[PublicKey], blindingFactors: Seq[ByteVector], sharedSecrets: Seq[ByteVector]): (Seq[PublicKey], Seq[ByteVector]) = {
+    if (publicKeys.isEmpty)
+      (ephemeralPublicKeys, sharedSecrets)
+    else {
+      val ephemeralPublicKey = blind(ephemeralPublicKeys.last, blindingFactors.last)
+      val secret = computeSharedSecret(blind(publicKeys.head, blindingFactors), sessionKey)
+      val blindingFactor = computeBlindingFactor(ephemeralPublicKey, secret)
+      computeEphemeralPublicKeysAndSharedSecrets(sessionKey, publicKeys.tail, ephemeralPublicKeys :+ ephemeralPublicKey, blindingFactors :+ blindingFactor, sharedSecrets :+ secret)
+    }
   }
 
-  def computeEphemerealPublicKeysAndSharedSecrets(publicKeys: PublicKeyVec, ephemeralPublicKeys: PublicKeyVec,
-                                                  blindingFactors: BytesVec, sharedSecrets: BytesVec,
-                                                  sessionKey: PrivateKey): (PublicKeyVec, BytesVec) =
+  /**
+    * Peek at the first bytes of the per-hop payload to extract its length.
+    */
+  def peekPayloadLength(payload: ByteVector): Int = {
+    payload.head match {
+      case 0 =>
+        // The 1.0 BOLT spec used 65-bytes frames inside the onion payload.
+        // The first byte of the frame (called `realm`) is set to 0x00, followed by 32 bytes of per-hop data, followed by a 32-bytes mac.
+        65
+      case _ =>
+        // The 1.1 BOLT spec changed the frame format to use variable-length per-hop payloads.
+        // The first bytes contain a varint encoding the length of the payload data (not including the trailing mac).
+        // Since messages are always smaller than 65535 bytes, this varint will either be 1 or 3 bytes long.
+        MacLength + wire.OnionCodecs.payloadLengthDecoder.decode(payload.bits).require.value.toInt
+    }
+  }
 
-    if (publicKeys.isEmpty) (ephemeralPublicKeys, sharedSecrets) else {
-      val nextEphemerealPublicKey = blind(ephemeralPublicKeys.last, blindingFactors.last)
-      val nextSecret = computeSharedSecret(blind(publicKeys.head, blindingFactors), sessionKey)
-      computeEphemerealPublicKeysAndSharedSecrets(publicKeys.tail, ephemeralPublicKeys :+ nextEphemerealPublicKey,
-        blindingFactors :+ computeBlindingFactor(nextEphemerealPublicKey, nextSecret), sharedSecrets :+ nextSecret, sessionKey)
+  /**
+    * Decrypting an onion packet yields a payload for the current node and the encrypted packet for the next node.
+    *
+    * @param payload      decrypted payload for this node.
+    * @param nextPacket   packet for the next node.
+    * @param sharedSecret shared secret for the sending node, which we will need to return failure messages.
+    */
+  case class DecryptedPacket(payload: ByteVector, nextPacket: wire.OnionRoutingPacket, sharedSecret: ByteVector) {
+
+    val isLastPacket: Boolean = nextPacket.hmac == Zeroes
+
+  }
+
+  val emptyOnionPacket = wire.OnionRoutingPacket(0, ByteVector.fill(33)(0), ByteVector.fill(PaymentPacket.PayloadLength)(0), Zeroes)
+
+  /**
+    * A encrypted onion packet with all the associated shared secrets.
+    *
+    * @param packet        encrypted onion packet.
+    * @param sharedSecrets shared secrets (one per node in the route). Known (and needed) only if you're creating the
+    *                      packet. Empty if you're just forwarding the packet to the next node.
+    */
+  case class PacketAndSecrets(packet: wire.OnionRoutingPacket, sharedSecrets: Seq[(ByteVector, PublicKey)])
+
+  sealed trait OnionRoutingPacket {
+
+    /**
+      * Supported packet version. Note that since this value is outside of the onion encrypted payload, intermediate
+      * nodes may or may not use this value when forwarding the packet to the next node.
+      */
+    def Version = 0
+
+    /**
+      * Length of the encrypted onion payload.
+      */
+    def PayloadLength: Int
+
+    /**
+      * Generate a deterministic filler to prevent intermediate nodes from knowing their position in the route.
+      * See https://github.com/lightningnetwork/lightning-rfc/blob/master/04-onion-routing.md#filler-generation
+      *
+      * @param keyType       type of key used (depends on the onion we're building).
+      * @param sharedSecrets shared secrets for all the hops.
+      * @param payloads      payloads for all the hops.
+      * @return filler bytes.
+      */
+    def generateFiller(keyType: String, sharedSecrets: Seq[ByteVector], payloads: Seq[ByteVector]): ByteVector = {
+      require(sharedSecrets.length == payloads.length, "the number of secrets should equal the number of payloads")
+
+      (sharedSecrets zip payloads).foldLeft(ByteVector.empty)((padding, secretAndPayload) => {
+        val (secret, perHopPayload) = secretAndPayload
+        val perHopPayloadLength = peekPayloadLength(perHopPayload)
+        require(perHopPayloadLength == perHopPayload.length + MacLength, s"invalid payload: length isn't correctly encoded: $perHopPayload")
+        val key = generateKey(keyType, secret)
+        val padding1 = padding ++ ByteVector.fill(perHopPayloadLength)(0)
+        val stream = generateStream(key, PayloadLength + perHopPayloadLength).takeRight(padding1.length)
+        padding1.xor(stream)
+      })
     }
 
-  def generateFiller(keyType: String, sharedSecrets: BytesVec, hopSize: Int, maxHops: Int): Bytes =
-    sharedSecrets.foldLeft(Array.emptyByteArray) { case (paddingAccumulator: Bytes, secret: Bytes) =>
-      val stream = generateStream(generateKey(keyType, secret), (maxHops + 1) * hopSize)
-      val pad: Bytes = aconcat(paddingAccumulator, me zeroes hopSize)
-      xor(pad, stream takeRight pad.length)
+    /**
+      * Decrypt the incoming packet, extract the per-hop payload and build the packet for the next node.
+      *
+      * @param privateKey     this node's private key.
+      * @param associatedData associated data.
+      * @param packet         packet received by this node.
+      * @return a DecryptedPacket(payload, packet, shared secret) object where:
+      *         - payload is the per-hop payload for this node.
+      *         - packet is the next packet, to be forwarded using the info that is given in the payload.
+      *         - shared secret is the secret we share with the node that sent the packet. We need it to propagate
+      *         failure messages upstream.
+      *         or a BadOnion error containing the hash of the invalid onion.
+      */
+    def peel(privateKey: PrivateKey, associatedData: ByteVector, packet: wire.OnionRoutingPacket): Either[wire.BadOnion, DecryptedPacket] = packet.version match {
+      case 0 => Try(PublicKey(packet.publicKey)) match {
+        case Success(packetEphKey) =>
+          val sharedSecret = computeSharedSecret(packetEphKey, privateKey)
+          val mu = generateKey("mu", sharedSecret)
+          val check = mac(mu, packet.payload ++ associatedData)
+          if (check == packet.hmac) {
+            val rho = generateKey("rho", sharedSecret)
+            // Since we don't know the length of the per-hop payload (we will learn it once we decode the first bytes),
+            // we have to pessimistically generate a long cipher stream.
+            val stream = generateStream(rho, 2 * PayloadLength)
+            val bin = (packet.payload ++ ByteVector.fill(PayloadLength)(0)) xor stream
+
+            val perHopPayloadLength = peekPayloadLength(bin)
+            val perHopPayload = bin.take(perHopPayloadLength - MacLength)
+
+            val hmac = bin.slice(perHopPayloadLength - MacLength, perHopPayloadLength)
+            val nextOnionPayload = bin.drop(perHopPayloadLength).take(PayloadLength)
+            val nextPubKey = blind(packetEphKey, computeBlindingFactor(packetEphKey, sharedSecret))
+
+            Right(DecryptedPacket(perHopPayload, wire.OnionRoutingPacket(Version, nextPubKey.value.toBin(true), nextOnionPayload, hmac), sharedSecret))
+          } else {
+            Left(wire.InvalidOnionHmac(hash(packet)))
+          }
+        case Failure(_) => Left(wire.InvalidOnionKey(hash(packet)))
+      }
+      case _ => Left(wire.InvalidOnionVersion(hash(packet)))
     }
 
-  def parsePacket(privateKey: PrivateKey, associatedData: Bytes, rawPacket: Bytes): ParsedPacket = {
-    require(rawPacket.length == PacketLength, s"Onion packet length is ${rawPacket.length}, it should be $PacketLength")
+    /**
+      * Wrap the given packet in an additional layer of onion encryption, adding an encrypted payload for a specific
+      * node.
+      *
+      * Packets are constructed in reverse order:
+      * - you first create the packet for the final recipient
+      * - then you call wrap(...) until you've built the final onion packet that will be sent to the first node in the
+      * route
+      *
+      * @param payload            per-hop payload for the target node.
+      * @param associatedData     associated data.
+      * @param ephemeralPublicKey ephemeral key shared with the target node.
+      * @param sharedSecret       shared secret with this hop.
+      * @param packet             current packet (None if the packet hasn't been initialized).
+      * @param onionPayloadFiller optional onion payload filler, needed only when you're constructing the last packet.
+      * @return the next packet.
+      */
+    def wrap(payload: ByteVector, associatedData: ByteVector, ephemeralPublicKey: PublicKey, sharedSecret: ByteVector, packet: Option[wire.OnionRoutingPacket], onionPayloadFiller: ByteVector = ByteVector.empty): wire.OnionRoutingPacket = {
+      require(payload.length <= PayloadLength - MacLength, s"packet payload cannot exceed ${PayloadLength - MacLength} bytes")
 
-    val packet = Packet read rawPacket
-    val message = aconcat(packet.routingInfo, associatedData)
-    val sharedSecret = computeSharedSecret(packet.pubKey, privateKey)
-    require(mac(generateKey("mu", sharedSecret), message) sameElements packet.hmac, "Invalid header mac")
-    val stream1 = generateStream(generateKey("rho", sharedSecret), PayloadLength + MacLength + DataLength)
-    val bin = xor(aconcat(packet.routingInfo, me zeroes PayloadLength + MacLength), stream1)
-    val hmac = bin.slice(PayloadLength, PayloadLength + MacLength)
-    val nextRoutinfo = bin.drop(PayloadLength + MacLength)
+      val (currentMac, currentPayload): (ByteVector, ByteVector) = packet match {
+        // Packet construction starts with an empty mac and payload.
+        case None => (Zeroes, ByteVector.fill(PayloadLength)(0))
+        case Some(p) => (p.hmac, p.payload)
+      }
 
-    val factor = computeBlindingFactor(packet.pubKey, sharedSecret)
-    val blindedPublicKey = blind(packet.pubKey, factor).toBin.toArray
-    val nextPacket = Packet(Array(Version), blindedPublicKey, nextRoutinfo, hmac)
-    ParsedPacket(bin take PayloadLength, nextPacket, sharedSecret)
-  }
+      val nextOnionPayload = {
+        val onionPayload1 = payload ++ currentMac ++ currentPayload.dropRight(payload.length + MacLength)
+        val onionPayload2 = onionPayload1 xor generateStream(generateKey("rho", sharedSecret), PayloadLength)
+        onionPayload2.dropRight(onionPayloadFiller.length) ++ onionPayloadFiller
+      }
 
-
-  def makeNextPacket(payload: Bytes, associatedData: Bytes, ephemeralPublicKey: Bytes,
-                     sharedSecret: Bytes, packet: Packet, routingInfoFiller: Bytes) = {
-
-    val nextRoutingInfo = {
-      val stream1 = generateStream(generateKey("rho", sharedSecret), DataLength)
-      val routingInfo1 = aconcat(payload, packet.hmac, packet.routingInfo dropRight PayloadLength + MacLength)
-      aconcat(xor(routingInfo1, stream1).dropRight(routingInfoFiller.length), routingInfoFiller)
+      val nextHmac = mac(generateKey("mu", sharedSecret), nextOnionPayload ++ associatedData)
+      val nextPacket = wire.OnionRoutingPacket(Version, ephemeralPublicKey.value.toBin(true), nextOnionPayload, nextHmac)
+      nextPacket
     }
 
-    require(payload.length == PayloadLength)
-    val message = aconcat(nextRoutingInfo, associatedData)
-    val nextHmac = mac(generateKey("mu", sharedSecret), message)
-    Packet(Array(Version), ephemeralPublicKey, nextRoutingInfo, nextHmac)
-  }
+    /**
+      * Create an encrypted onion packet that contains payloads for all nodes in the list.
+      *
+      * @param sessionKey     session key.
+      * @param publicKeys     node public keys (one per node).
+      * @param payloads       payloads (one per node).
+      * @param associatedData associated data.
+      * @return An onion packet with all shared secrets. The onion packet can be sent to the first node in the list, and
+      *         the shared secrets (one per node) can be used to parse returned failure messages if needed.
+      */
+    def create(sessionKey: PrivateKey, publicKeys: Seq[PublicKey], payloads: Seq[ByteVector], associatedData: ByteVector): PacketAndSecrets = {
+      val (ephemeralPublicKeys, sharedsecrets) = computeEphemeralPublicKeysAndSharedSecrets(sessionKey, publicKeys)
+      val filler = generateFiller("rho", sharedsecrets.dropRight(1), payloads.dropRight(1))
 
-  // Builds an encrypted onion packet that contains payloads and routing information for all nodes
-  // Returns an onion packet that can be sent to the first node in the list
+      val lastPacket = wrap(payloads.last, associatedData, ephemeralPublicKeys.last, sharedsecrets.last, None, filler)
 
-  def makePacket(seskey: PrivateKey, pubKeys: PublicKeyVec, payloads: BytesVec, assocData: Bytes) = {
-    def loop(packet: Packet, hopPayloads: BytesVec, ephemeralKeys: PublicKeyVec, sharedSecrets: BytesVec): Packet =
-      if (hopPayloads.isEmpty) packet else loop(makeNextPacket(hopPayloads.last, assocData, ephemeralKeys.last.toBin.toArray,
-        sharedSecrets.last, packet, Array.emptyByteArray), hopPayloads dropRight 1, ephemeralKeys dropRight 1,
-        sharedSecrets dropRight 1)
+      @tailrec
+      def loop(hopPayloads: Seq[ByteVector], ephKeys: Seq[PublicKey], sharedSecrets: Seq[ByteVector], packet: wire.OnionRoutingPacket): wire.OnionRoutingPacket = {
+        if (hopPayloads.isEmpty) packet else {
+          val nextPacket = wrap(hopPayloads.last, associatedData, ephKeys.last, sharedSecrets.last, Some(packet))
+          loop(hopPayloads.dropRight(1), ephKeys.dropRight(1), sharedSecrets.dropRight(1), nextPacket)
+        }
+      }
 
-    val (ephemeralPublicKeys, sharedsecrets) = computeEphemerealPublicKeysAndSharedSecrets(pubKeys, seskey)
-    val filler = generateFiller(keyType = "rho", sharedsecrets dropRight 1, hopSize = PayloadLength + MacLength, maxHops = MaxHops)
-    val lastPacket = makeNextPacket(payloads.last, assocData, ephemeralPublicKeys.last.toBin.toArray, sharedsecrets.last, LAST_PACKET, filler)
-    val packet = loop(lastPacket, payloads dropRight 1, ephemeralPublicKeys dropRight 1, sharedsecrets dropRight 1)
-    SecretsAndPacket(sharedsecrets zip pubKeys, packet)
-  }
-
-  // Error packets
-
-  def createErrorPacket(sharedSecret: Bytes, failure: FailureMessage) = {
-    val message: Bytes = failureMessageCodec.encode(failure).require.toByteArray
-    if (message.length > MaxErrorPayloadLength) throw new LightningException
-
-    val payload =
-      aconcat(Protocol.writeUInt16Array(message.length, ByteOrder.BIG_ENDIAN), message,
-        Protocol.writeUInt16Array(MaxErrorPayloadLength - message.length, ByteOrder.BIG_ENDIAN),
-        me zeroes MaxErrorPayloadLength - message.length)
-
-    val mac1 = mac(generateKey("um", sharedSecret), payload)
-    forwardErrorPacket(aconcat(mac1, payload), sharedSecret)
-  }
-
-  def extractFailureMessage(packet: Bytes) =
-    packet drop MacLength match { case payload =>
-      if (packet.length != ErrorPacketLength) throw new LightningException
-      val msg = payload.slice(2, Protocol.uint16(payload, ByteOrder.BIG_ENDIAN) + 2)
-      failureMessageCodec.decode(BitVector apply msg).require.value
+      val packet = loop(payloads.dropRight(1), ephemeralPublicKeys.dropRight(1), sharedsecrets.dropRight(1), lastPacket)
+      PacketAndSecrets(packet, sharedsecrets.zip(publicKeys))
     }
 
-  def forwardErrorPacket(packet: Bytes, sharedSecret: Bytes) = {
-    if (packet.length != ErrorPacketLength) throw new LightningException
-    val stream = generateStream(generateKey("ammag", sharedSecret), ErrorPacketLength)
-    xor(packet, stream)
+    /**
+      * When an invalid onion is received, its hash should be included in the failure message.
+      */
+    def hash(onion: wire.OnionRoutingPacket): ByteVector =
+    Crypto.sha256(wire.OnionCodecs.onionRoutingPacketCodec(onion.payload.length.toInt).encode(onion).require.toByteVector)
+
   }
 
-  // May throw if shared secrets is empty, should always be enclosed in Try block
-  def parseErrorPacket(secrets: Vector[BytesAndKey], packet: Bytes): ErrorPacket = {
+  /**
+    * A payment onion packet is used when offering an HTLC to a remote node.
+    */
+  object PaymentPacket extends OnionRoutingPacket {
 
-    val (secret, pubkey) = secrets.head
-    val packet1 = forwardErrorPacket(packet, secret)
-    val (providedMac, payload) = packet1 splitAt MacLength
-    val macCheck = mac(generateKey("um", secret), payload)
+    override val PayloadLength = 1300
 
-    if (providedMac sameElements macCheck) {
-      val failureMessage = extractFailureMessage(packet1)
-      ErrorPacket(originNode = pubkey, failureMessage)
-    } else parseErrorPacket(secrets.tail, packet1)
+  }
+
+  /**
+    * A properly decrypted failure from a node in the route.
+    *
+    * @param originNode     public key of the node that generated the failure.
+    * @param failureMessage friendly failure message.
+    */
+  case class DecryptedFailurePacket(originNode: PublicKey, failureMessage: FailureMessage)
+
+  object FailurePacket {
+
+    val MaxPayloadLength = 256
+    val PacketLength = MacLength + MaxPayloadLength + 2 + 2
+
+    /**
+      * Create a failure packet that will be returned to the sender.
+      * Each intermediate hop will add a layer of encryption and forward to the previous hop.
+      * Note that malicious intermediate hops may drop the packet or alter it (which breaks the mac).
+      *
+      * @param sharedSecret destination node's shared secret that was computed when the original onion for the HTLC
+      *                     was created or forwarded: see OnionPacket.create() and OnionPacket.wrap().
+      * @param failure      failure message.
+      * @return a failure packet that can be sent to the destination node.
+      */
+    def create(sharedSecret: ByteVector, failure: FailureMessage): ByteVector = {
+      val um = generateKey("um", sharedSecret)
+      val packet = FailureMessageCodecs.failureOnionCodec(Hmac256(um)).encode(failure).require.toByteVector
+      wrap(packet, sharedSecret)
+    }
+
+    /**
+      * Wrap the given packet in an additional layer of onion encryption for the previous hop.
+      *
+      * @param packet       failure packet.
+      * @param sharedSecret destination node's shared secret.
+      * @return an encrypted failure packet that can be sent to the destination node.
+      */
+    def wrap(packet: ByteVector, sharedSecret: ByteVector): ByteVector = {
+      require(packet.length == PacketLength, s"invalid error packet length ${packet.length}, must be $PacketLength")
+      val key = generateKey("ammag", sharedSecret)
+      val stream = generateStream(key, PacketLength)
+      packet xor stream
+    }
+
+    /**
+      * Decrypt a failure packet. Node shared secrets are applied until the packet's MAC becomes valid, which means that
+      * it was sent by the corresponding node.
+      * Note that malicious nodes in the route may have altered the packet, triggering a decryption failure.
+      *
+      * @param packet        failure packet.
+      * @param sharedSecrets nodes shared secrets.
+      * @return Success(secret, failure message) if the origin of the packet could be identified and the packet
+      *         decrypted, Failure otherwise.
+      */
+    def decrypt(packet: ByteVector, sharedSecrets: Seq[(ByteVector, PublicKey)]): Try[DecryptedFailurePacket] = Try {
+      require(packet.length == PacketLength, s"invalid error packet length ${packet.length}, must be $PacketLength")
+
+      @tailrec
+      def loop(packet: ByteVector, sharedSecrets: Seq[(ByteVector, PublicKey)]): DecryptedFailurePacket = sharedSecrets match {
+        case Nil => throw new LightningException(s"couldn't parse error packet=$packet with sharedSecrets=$sharedSecrets")
+        case (secret, pubkey) :: tail =>
+          val packet1 = wrap(packet, secret)
+          val um = generateKey("um", secret)
+          FailureMessageCodecs.failureOnionCodec(Hmac256(um)).decode(packet1.toBitVector) match {
+            case Attempt.Successful(value) => DecryptedFailurePacket(pubkey, value.value)
+            case _ => loop(packet1, tail)
+          }
+      }
+
+      loop(packet, sharedSecrets)
+    }
   }
 }

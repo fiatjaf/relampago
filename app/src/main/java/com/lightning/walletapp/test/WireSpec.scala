@@ -3,14 +3,15 @@ package com.lightning.walletapp.test
 import java.net.{Inet4Address, Inet6Address, InetAddress}
 
 import com.google.common.net.InetAddresses
-import com.lightning.walletapp.ln.{Announcements, PerHopPayload}
-import com.lightning.walletapp.ln.crypto.Sphinx
+import com.lightning.walletapp.ln.Announcements
+import com.lightning.walletapp.ln.crypto.{Hmac256, Sphinx}
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import scodec.bits.{BitVector, ByteVector}
-import fr.acinq.bitcoin.{Block, Crypto}
+import fr.acinq.bitcoin.{Block, Crypto, Protocol}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, Scalar}
 import fr.acinq.eclair.UInt64
+import org.bitcoinj.core.NetworkParameters.ProtocolVersion
 
 import scala.util.Random
 
@@ -201,7 +202,6 @@ class WireSpec {
 
     {
       println("encode/decode with varint codec")
-
       val expected = Map(
         UInt64(0L) -> ByteVector.fromValidHex("00"),
         UInt64(42L) -> ByteVector.fromValidHex("2a"),
@@ -224,7 +224,6 @@ class WireSpec {
 
     {
       println("decode invalid varint")
-
       val testCases = Seq(
         ByteVector.fromValidHex("fd"), // truncated
         ByteVector.fromValidHex("fe 01"), // truncated
@@ -248,7 +247,6 @@ class WireSpec {
 
     {
       println("encode/decode with varintoverflow codec")
-
       val expected = Map(
         0L -> ByteVector.fromValidHex("00"),
         42L -> ByteVector.fromValidHex("2a"),
@@ -271,7 +269,6 @@ class WireSpec {
 
     {
       println("decode invalid varintoverflow")
-
       val testCases = Seq(
         ByteVector.fromValidHex("ff 80 00 00 00 00 00 00 00"),
         ByteVector.fromValidHex("ff ff ff ff ff ff ff ff ff")
@@ -279,6 +276,35 @@ class WireSpec {
 
       for (testCase <- testCases) {
         assert(varintoverflow.decode(testCase).isFailure, testCase.toByteVector)
+      }
+    }
+
+    {
+      println("encode/decode UInt64")
+      val refs = Seq(
+        UInt64(ByteVector.fromValidHex("ffffffffffffffff")),
+        UInt64(ByteVector.fromValidHex("fffffffffffffffe")),
+        UInt64(ByteVector.fromValidHex("efffffffffffffff")),
+        UInt64(ByteVector.fromValidHex("effffffffffffffe"))
+      )
+      assert(refs.forall(value => uint64.decode(uint64.encode(value).require).require.value == value))
+    }
+
+    {
+      println("encode/decode with prependmac codec")
+      val mac = Hmac256(Protocol.Zeroes)
+      val testCases = Seq(
+        (uint64, UInt64(561), ByteVector.fromValidHex("d5b500b8843e19a34d8ab54740db76a7ea597e4ff2ada3827420f87c7e60b7c6 0000000000000231")),
+        (varint, UInt64(65535), ByteVector.fromValidHex("71e17e5b97deb6916f7ad97a53650769d4e4f0b1e580ff35ca332200d61e765c fdffff"))
+      )
+
+      for ((codec, expected, bin) <- testCases) {
+        val macCodec = prependmac(codec, mac)
+        val decoded = macCodec.decode(bin.toBitVector).require.value
+        assert(decoded == expected)
+
+        val encoded = macCodec.encode(expected).require.toByteVector
+        assert(encoded == bin)
       }
     }
 
@@ -292,14 +318,14 @@ class WireSpec {
       val update_fee = UpdateFee(randomBytes(32), 2)
       val shutdown = Shutdown(randomBytes(32), bin(47, 0))
       val closing_signed = ClosingSigned(randomBytes(32), 2, randomSignature)
-      val update_add_htlc = UpdateAddHtlc(randomBytes(32), 2, 3, bin(32, 0), 4, bin(Sphinx.PacketLength, 0))
+      val update_add_htlc = UpdateAddHtlc(randomBytes(32), 2, 3, bin(32, 0), 4, Sphinx.emptyOnionPacket)
       val update_fulfill_htlc = UpdateFulfillHtlc(randomBytes(32), 2, bin(32, 0))
       val update_fail_htlc = UpdateFailHtlc(randomBytes(32), 2, bin(154, 0))
       val update_fail_malformed_htlc = UpdateFailMalformedHtlc(randomBytes(32), 2, randomBytes(32), 1111)
       val commit_sig = CommitSig(randomBytes(32), randomSignature, randomSignature :: randomSignature :: randomSignature :: Nil)
       val revoke_and_ack = RevokeAndAck(randomBytes(32), scalar(0), point(1))
       val channel_announcement = ChannelAnnouncement(randomSignature, randomSignature, randomSignature, randomSignature, bin(7, 9), Block.RegtestGenesisBlock.hash, 1, randomKey.publicKey, randomKey.publicKey, randomKey.publicKey, randomKey.publicKey)
-      val node_announcement = NodeAnnouncement(randomSignature, bin(0, 0), 1, randomKey.publicKey, (100.toByte, 200.toByte, 300.toByte), "node-alias", IPv4(InetAddress.getByAddress(Array[Byte](192.toByte, 168.toByte, 1.toByte, 42.toByte)).asInstanceOf[Inet4Address], 42000) :: Nil)
+      val node_announcement = NodeAnnouncement(randomSignature, bin(1, 2), 1, randomKey.publicKey, (100.toByte, 200.toByte, 300.toByte), "node-alias", IPv4(InetAddress.getByAddress(Array[Byte](192.toByte, 168.toByte, 1.toByte, 42.toByte)).asInstanceOf[Inet4Address], 42000) :: Nil)
       val channel_update = ChannelUpdate(randomSignature, Block.RegtestGenesisBlock.hash, 1, 2, 42, 0, 3, 4, 5, 6, None)
       val announcement_signatures = AnnouncementSignatures(randomBytes(32), 42, randomSignature, randomSignature)
       val ping = Ping(100, ByteVector.fromValidHex("01" * 10))
@@ -327,24 +353,6 @@ class WireSpec {
         val encoded = lightningMessageCodec.encode(msg).require
         val decoded = lightningMessageCodec.decode(encoded).require
         assert(msg == decoded.value)
-      }
-    }
-
-    {
-      println("encode/decode per-hop payload")
-      val payload = PerHopPayload(shortChannelId = 42, amtToForward = 142000, outgoingCltv = 500000)
-      val bin = LightningMessageCodecs.perHopPayloadCodec.encode(payload).require
-      assert(bin.toByteVector.size == 33)
-      val payload1 = LightningMessageCodecs.perHopPayloadCodec.decode(bin).require.value
-      assert(payload == payload1)
-
-      // realm (the first byte) should be 0
-      val bin1 = bin.toByteVector.update(0, 1)
-      try {
-        val payload2 = LightningMessageCodecs.perHopPayloadCodec.decode(bin1.toBitVector).require.value
-        assert(payload2 == payload1)
-      } catch {
-        case e: Throwable => assert(true)
       }
     }
 

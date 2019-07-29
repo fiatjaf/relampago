@@ -344,9 +344,8 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 
   def sendAdd(rd: RoutingData) = {
-    val orp = ByteVector view rd.onion.packet.serialize
-    // Let's compute the current commitment *as seen by remote peer* with this change taken into account
-    val add = UpdateAddHtlc(channelId, localNextHtlcId, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, orp)
+    // Let's compute the current commitment transaction *as seen by remote peer* with this change taken into account
+    val add = UpdateAddHtlc(channelId, localNextHtlcId, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet)
     val c1 = addLocalProposal(add).modify(_.localNextHtlcId).using(current => 1 + current)
     // This is their point of view so our outgoing HTLCs are their incoming
     val outgoingHtlcs = c1.reducedRemoteState.htlcs.filter(_.incoming)

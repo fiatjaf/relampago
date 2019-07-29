@@ -53,9 +53,9 @@ case class FundingLocked(channelId: ByteVector, nextPerCommitmentPoint: Point) e
 case class ClosingSigned(channelId: ByteVector, feeSatoshis: Long, signature: ByteVector) extends ChannelMessage
 case class Shutdown(channelId: ByteVector, scriptPubKey: ByteVector) extends ChannelMessage
 
-case class UpdateAddHtlc(channelId: ByteVector, id: Long,
-                         amountMsat: Long, paymentHash: ByteVector, expiry: Long,
-                         onionRoutingPacket: ByteVector) extends ChannelMessage {
+case class UpdateAddHtlc(channelId: ByteVector,
+                         id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long,
+                         onionRoutingPacket: OnionRoutingPacket) extends ChannelMessage {
 
   lazy val hash160: ByteVector = Crypto ripemd160 paymentHash
   lazy val amount: MilliSatoshi = MilliSatoshi(amountMsat)

@@ -9,7 +9,7 @@ import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 import scala.util.Success
 
-import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
+import com.lightning.walletapp.ln.crypto.{Generators, Sphinx, ShaChain, ShaHashesWithIndex}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
@@ -706,7 +706,7 @@ object NormalChannel {
   val REFUNDING = "REFUNDING"
   val CLOSING = "CLOSING"
 
-  val nextDummyHtlc = UpdateAddHtlc(Zeroes, -1, LNParams.minCapacityMsat, One, 144 * 3, ByteVector.empty)
+  val nextDummyHtlc = UpdateAddHtlc(Zeroes, -1, LNParams.minCapacityMsat, One, 144 * 3, Sphinx.emptyOnionPacket)
   def nextReducedRemoteState(currentCommitments: NormalCommits) = currentCommitments.addLocalProposal(nextDummyHtlc).reducedRemoteState
   def estimateCanSend(chan: NormalChannel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canSendMsat + LNParams.minCapacityMsat, 0L)
   def estimateCanReceive(chan: NormalChannel) = chan.hasCsOr(some => nextReducedRemoteState(some.commitments).canReceiveMsat, 0L)
