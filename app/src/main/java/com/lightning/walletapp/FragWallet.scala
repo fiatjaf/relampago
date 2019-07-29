@@ -116,8 +116,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       case (chan, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
         // Peer was OK but now has incompatible features, display details to user and offer force-close
-        val msg = host getString err_ln_peer_incompatible format chan.data.announce.alias
-        informOfferClose(chan, msg).run
+        informOfferClose(chan, host getString err_ln_peer_incompatible format chan.data.announce.alias).run
     }
 
     override def onBecome = {
@@ -467,8 +466,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // LN SEND / RECEIVE
 
-  def receive(chansWithRoutes: Map[NormalChannel, PaymentRoute], maxCanReceive: MilliSatoshi,
-              title: View, defDescr: String)(onDone: RoutingData => Unit) = {
+  def receive(chansWithRoutes: Map[NormalChannel, PaymentRoute],
+              maxCanReceive: MilliSatoshi, minCanReceive: MilliSatoshi,
+              title: View, desc: String)(onDone: RoutingData => Unit) = {
 
     val baseHint = app.getString(amount_hint_can_receive).format(denom parsedWithSign maxCanReceive)
     val content = host.getLayoutInflater.inflate(R.layout.frag_ln_input_receive, null, false)
@@ -483,7 +483,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
       case Success(ms) if maxCanReceive < ms => app toast dialog_sum_big
-      case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+      case Success(ms) if minCanReceive > ms => app toast dialog_sum_small
       case Failure(reason) => app toast dialog_sum_small
 
       case Success(ms) => rm(alert) {
@@ -495,7 +495,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def setMax(alert: AlertDialog) = rateManager setSum Try(maxCanReceive)
     mkCheckFormNeutral(recAttempt, none, setMax, bld, dialog_ok, dialog_cancel, dialog_max)
-    inputDescription setText defDescr
+    inputDescription setText desc
+    setMax(null)
   }
 
   abstract class OffChainSender(pr: PaymentRequest) {
@@ -595,7 +596,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def sendBtcPopup(uri: BitcoinURI): RateManager = {
-    val minMsatAmountTry = Try(uri.getAmount).filter(_.value > 0L).map(coin2MSat)
+    val minMsatAmountTry = Try(uri.getAmount).filter(org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT.isLessThan).map(coin2MSat)
     val minMsatAmount = minMsatAmountTry getOrElse coin2MSat(org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT)
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign app.kit.conf0Balance)
     val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)

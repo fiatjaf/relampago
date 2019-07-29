@@ -136,27 +136,27 @@ class TlvCodecsSpec {
       println("encode/decode tlv stream")
       
       val testCases = Seq(
-        (ByteVector.fromValidHex(""), TlvStream()),
+        (ByteVector.fromValidHex(""), TlvStream(Nil, Nil)),
         (ByteVector.fromValidHex("21 00"), TlvStream(Nil, Seq(GenericTlv(33, ByteVector.fromValidHex(""))))),
         (ByteVector.fromValidHex("fd0201 00"), TlvStream(Nil, Seq(GenericTlv(513, ByteVector.fromValidHex(""))))),
         (ByteVector.fromValidHex("fd00fd 00"), TlvStream(Nil, Seq(GenericTlv(253, ByteVector.fromValidHex(""))))),
         (ByteVector.fromValidHex("fd00ff 00"), TlvStream(Nil, Seq(GenericTlv(255, ByteVector.fromValidHex(""))))),
         (ByteVector.fromValidHex("fe02000001 00"), TlvStream(Nil, Seq(GenericTlv(33554433, ByteVector.fromValidHex(""))))),
         (ByteVector.fromValidHex("ff0200000000000001 00"), TlvStream(Nil, Seq(GenericTlv(144115188075855873L, ByteVector.fromValidHex(""))))),
-        (ByteVector.fromValidHex("01 00"), TlvStream(TestType1(0))),
-        (ByteVector.fromValidHex("01 01 01"), TlvStream(TestType1(1))),
-        (ByteVector.fromValidHex("01 01 2a"), TlvStream(TestType1(42))),
-        (ByteVector.fromValidHex("01 02 0100"), TlvStream(TestType1(256))),
-        (ByteVector.fromValidHex("01 03 010000"), TlvStream(TestType1(65536))),
-        (ByteVector.fromValidHex("01 04 01000000"), TlvStream(TestType1(16777216))),
-        (ByteVector.fromValidHex("01 05 0100000000"), TlvStream(TestType1(4294967296L))),
-        (ByteVector.fromValidHex("01 06 010000000000"), TlvStream(TestType1(1099511627776L))),
-        (ByteVector.fromValidHex("01 07 01000000000000"), TlvStream(TestType1(281474976710656L))),
-        (ByteVector.fromValidHex("01 08 0100000000000000"), TlvStream(TestType1(72057594037927936L))),
-        (ByteVector.fromValidHex("02 08 0000000000000226"), TlvStream(TestType2(550L))),
-        (ByteVector.fromValidHex("03 31 023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb 0000000000000231 0000000000000451"), TlvStream(TestType3(PublicKey.fromValidHex("023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb"), 561, 1105))),
-        (ByteVector.fromValidHex("fd00fe 02 0226"), TlvStream(TestType254(550))),
-        (ByteVector.fromValidHex("01020231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451"), TlvStream(TestType1(561), TestType2(1105L), TestType3(PublicKey.fromValidHex("02eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f283686619"), 561, 1105))),
+        (ByteVector.fromValidHex("01 00"), TlvStream(TestType1(0) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01 01 01"), TlvStream(TestType1(1) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01 01 2a"), TlvStream(TestType1(42) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01 02 0100"), TlvStream(TestType1(256) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01 03 010000"), TlvStream(TestType1(65536) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01 04 01000000"), TlvStream(TestType1(16777216) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01 05 0100000000"), TlvStream(TestType1(4294967296L) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01 06 010000000000"), TlvStream(TestType1(1099511627776L) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01 07 01000000000000"), TlvStream(TestType1(281474976710656L) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01 08 0100000000000000"), TlvStream(TestType1(72057594037927936L) :: Nil, Nil)),
+        (ByteVector.fromValidHex("02 08 0000000000000226"), TlvStream(TestType2(550L) :: Nil, Nil)),
+        (ByteVector.fromValidHex("03 31 023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb 0000000000000231 0000000000000451"), TlvStream(TestType3(PublicKey.fromValidHex("023da092f6980e58d2c037173180e9a465476026ee50f96695963e8efe436f54eb"), 561, 1105) :: Nil, Nil)),
+        (ByteVector.fromValidHex("fd00fe 02 0226"), TlvStream(TestType254(550) :: Nil, Nil)),
+        (ByteVector.fromValidHex("01020231 02080000000000000451 033102eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f28368661900000000000002310000000000000451"), TlvStream(TestType1(561) :: TestType2(1105L) :: TestType3(PublicKey.fromValidHex("02eec7245d6b7d2ccb30380bfbe2a3648cd7a942653f5aa340edcea1f283686619"), 561, 1105) :: Nil, Nil)),
         (ByteVector.fromValidHex("01020231 0b020451 fd00fe02002a"), TlvStream(Seq(TestType1(561), TestType254(42)), Seq(GenericTlv(11, ByteVector.fromValidHex("0451")))))
       )
 
@@ -286,7 +286,7 @@ class TlvCodecsSpec {
         TlvStream(Nil, Seq(GenericTlv(42, ByteVector.fromValidHex("2a")))),
         TlvStream(Seq(TestType1(561), TestType2(1105L)), Seq(GenericTlv(42, ByteVector.fromValidHex("2a")))),
         // Duplicate type.
-        TlvStream(TestType1(561), TestType1(1105)),
+        TlvStream(TestType1(561) :: TestType1(1105) :: Nil, Nil),
         TlvStream(Seq(TestType1(561)), Seq(GenericTlv(1, ByteVector.fromValidHex("0451"))))
       )
 

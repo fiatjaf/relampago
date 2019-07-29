@@ -1,20 +1,19 @@
 package com.lightning.walletapp.ln.wire
 
 import java.net._
-
 import scodec.codecs._
 import fr.acinq.eclair.UInt64.Conversions._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.ln.{LightningException, RevocationInfo}
+import scodec.{Attempt, Codec, DecodeResult, Decoder, Err}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import com.lightning.walletapp.ln.crypto.{Mac32, Sphinx}
 import scodec.bits.{BitVector, ByteVector}
-import scodec.{Attempt, Codec, DecodeResult, Decoder, Err}
+
 import org.apache.commons.codec.binary.Base32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
 import java.math.BigInteger
-
 import scala.util.Try
 
 
@@ -471,8 +470,8 @@ object LightningMessageCodecs { me =>
 
 trait Tlv
 sealed trait OnionTlv extends Tlv
-// Generic Tlv type we fallback to if we don't understand the tag
 case class GenericTlv(tag: UInt64, value: ByteVector) extends Tlv
+case class TlvStream(records: Traversable[Tlv], unknown: Traversable[GenericTlv] = Nil)
 
 object Tlv { me =>
   type TlvUint64Disc = DiscriminatorCodec[Tlv, UInt64]
@@ -541,12 +540,6 @@ object Tlv { me =>
 
   def lengthPrefixedTlvStream(codec: TlvUint64Disc): Codec[TlvStream] =
     variableSizeBytesLong(value = tlvStream(codec), size = varintoverflow)
-}
-
-case class TlvStream(records: Traversable[Tlv], unknown: Traversable[GenericTlv] = Nil)
-
-object TlvStream {
-  def apply(records: Tlv*): TlvStream = TlvStream(records, Nil)
 }
 
 // ONION

@@ -82,7 +82,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def recordRoutingDataWithPr(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: ByteVector, description: String): RoutingData = {
-    val pr = PaymentRequest(chainHash, Some(sum), Crypto sha256 preimage, nodePrivateKey, description, Some(app.kit.currentAddress.toString), extraRoutes)
+    val pr = PaymentRequest(chainHash, amount = Some(sum), Crypto sha256 preimage, nodePrivateKey, description, fallbackAddress = None, extraRoutes)
     val rd = emptyRD(pr, sum.amount, useCache = true, airLeft = 0)
 
     db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
