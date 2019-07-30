@@ -3,10 +3,14 @@ package com.lightning.walletapp.ln
 import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering}
 import com.lightning.walletapp.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PrivateKey
+
 import language.implicitConversions
-import crypto.RandomGenerator
+import crypto.{RandomGenerator, Sphinx}
 import scodec.bits.ByteVector
 import java.util
+
+import com.lightning.walletapp.ln.wire.UpdateAddHtlc
+import fr.acinq.bitcoin.Protocol._
 
 
 object \ {
@@ -17,6 +21,10 @@ object \ {
 object Tools {
   type Bytes = Array[Byte]
   val random = new RandomGenerator
+
+  val nextDummyHtlc =
+    UpdateAddHtlc(Zeroes, id = -1, LNParams.minCapacityMsat,
+      One, expiry = 144 * 3, Sphinx.emptyOnionPacket)
 
   def runAnd[T](result: T)(action: Any): T = result
   def bin2readable(bin: Bytes) = new String(bin, "UTF-8")

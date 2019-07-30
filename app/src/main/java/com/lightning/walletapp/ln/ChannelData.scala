@@ -30,14 +30,12 @@ case object CMDProceed extends Command
 case object CMDOffline extends Command
 case object CMDOnline extends Command
 
-case class CMDOpenChannel(localParams: LocalParams,
-                          tempChanId: ByteVector, initialFeeratePerKw: Long, batch: Batch, fundingSat: Long,
-                          channelFlags: ChannelFlags = ChannelFlags(0), pushMsat: Long = 0L) extends Command
+case class CMDOpenChannel(localParams: LocalParams, tempChanId: ByteVector, initialFeeratePerKw: Long, batch: Batch,
+                          fundingSat: Long, channelFlags: ChannelFlags = ChannelFlags(0), pushMsat: Long = 0L) extends Command
 
 case class CMDFailMalformedHtlc(id: Long, onionHash: ByteVector, code: Int) extends Command
 case class CMDFulfillHtlc(id: Long, preimage: ByteVector) extends Command
 case class CMDFailHtlc(id: Long, reason: ByteVector) extends Command
-case class CMDPaymentGiveUp(rd: RoutingData) extends Command
 
 // CHANNEL DATA
 
@@ -281,20 +279,26 @@ case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: ByteVector,
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 
 sealed trait Commitments {
+  val localSpec: CommitmentSpec
   val reducedRemoteState: ReducedState
   val updateOpt: Option[ChannelUpdate]
   val channelId: ByteVector
   val startedAt: Long
+
+  def shouldRenewUpdate(update: ChannelUpdate): Boolean =
+    updateOpt.exists(old => old.timestamp < update.timestamp &&
+      old.shortChannelId == update.shortChannelId)
 }
 
-case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long)
+case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long, inChanMsat: Long)
+
 case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
                          remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
                          remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point], commitInput: InputInfo,
-                         remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: ByteVector, updateOpt: Option[ChannelUpdate] = None,
+                         remotePerCommitmentSecrets: ShaHashesWithIndex, channelId: ByteVector, updateOpt: Option[ChannelUpdate],
                          channelFlags: Option[ChannelFlags], startedAt: Long) extends Commitments { me =>
 
-  lazy val reducedRemoteState: ReducedState = {
+  lazy val reducedRemoteState = {
     val reduced = CommitmentSpec.reduce(latestRemoteCommit.spec, remoteChanges.acked, localChanges.proposed)
     val commitFeeSat = Scripts.commitTxFee(remoteParams.dustLimitSat, reduced).amount
     val theirFeeSat = if (localParams.isFunder) 0L else commitFeeSat
@@ -302,27 +306,29 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 
     val canSendMsat = reduced.toRemoteMsat - (myFeeSat + remoteParams.channelReserveSatoshis) * 1000L
     val canReceiveMsat = reduced.toLocalMsat - (theirFeeSat + localParams.channelReserveSat) * 1000L
-    ReducedState(reduced.htlcs, canSendMsat, canReceiveMsat, myFeeSat)
+    ReducedState(reduced.htlcs, canSendMsat, canReceiveMsat, myFeeSat, reduced.toRemoteMsat)
   }
 
+  lazy val localSpec = localCommit.spec
   def latestRemoteCommit = remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse remoteCommit
   def localHasUnsignedOutgoing = localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def remoteHasUnsignedOutgoing = remoteChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def addRemoteProposal(proposal: LightningMessage) = me.modify(_.remoteChanges.proposed).using(_ :+ proposal)
   def addLocalProposal(proposal: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ proposal)
+  def nextDummyReduced = addLocalProposal(Tools.nextDummyHtlc).reducedRemoteState
 
   def findExpiredHtlc(cmd: CMDBestHeight) =
-    localCommit.spec.htlcs.find(htlc => !htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry) orElse
+    localSpec.htlcs.find(htlc => !htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry) orElse
       remoteCommit.spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry) orElse
       latestRemoteCommit.spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry)
 
   def getHtlcCrossSigned(incomingRelativeToLocal: Boolean, htlcId: Long) = for {
     _ <- CommitmentSpec.findHtlcById(latestRemoteCommit.spec, htlcId, !incomingRelativeToLocal)
-    htlcOut <- CommitmentSpec.findHtlcById(localCommit.spec, htlcId, incomingRelativeToLocal)
+    htlcOut <- CommitmentSpec.findHtlcById(localSpec, htlcId, incomingRelativeToLocal)
   } yield htlcOut.add
 
   def ensureSenderCanAffordFees = {
-    val reduced = CommitmentSpec.reduce(localCommit.spec, localChanges.acked, remoteChanges.proposed)
+    val reduced = CommitmentSpec.reduce(localSpec, localChanges.acked, remoteChanges.proposed)
     val feesSat = if (localParams.isFunder) 0L else Scripts.commitTxFee(localParams.dustLimit, reduced).amount
     if (reduced.toRemoteMsat - (feesSat + localParams.channelReserveSat) * 1000L < 0L) throw new LightningException
     me -> reduced
@@ -424,7 +430,7 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 
   def receiveCommit(commit: CommitSig) = {
-    val spec = CommitmentSpec.reduce(localCommit.spec, localChanges.acked, remoteChanges.proposed)
+    val spec = CommitmentSpec.reduce(localSpec, localChanges.acked, remoteChanges.proposed)
     val localPerCommitmentSecret = Generators.perCommitSecret(localParams.shaSeed, localCommit.index)
     val localPerCommitmentPoint = Generators.perCommitPoint(localParams.shaSeed, localCommit.index + 1)
     val localNextPerCommitmentPoint = Generators.perCommitPoint(localParams.shaSeed, localCommit.index + 2)
@@ -480,12 +486,10 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 }
 
-case class HostedCommits(params: InitHostedChannel,
-                         lastCrossSignedState: LastCrossSignedState,
-                         nextLocalStateUpdateOpt: Option[StateUpdate],
-                         announce: NodeAnnouncement, updateOpt: Option[ChannelUpdate],
-                         startedAt: Long) extends Commitments with ChannelData {
+case class HostedCommits(announce: NodeAnnouncement, params: InitHostedChannel, lastCrossSignedState: LastCrossSignedState,
+                         nextLocalStateUpdateOpt: Option[StateUpdate], localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate],
+                         localError: Option[Error], remoteError: Option[Error], startedAt: Long) extends Commitments with ChannelData {
 
-  val reducedRemoteState: ReducedState = ReducedState(Set.empty, 0L, 0L, 0L)
+  val reducedRemoteState: ReducedState = ReducedState(Set.empty, 0L, 0L, 0L, 0L)
   val channelId: ByteVector = announce.hostedChanId
 }

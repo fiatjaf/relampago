@@ -91,6 +91,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val byteVectorFmt = sCodecJsonFmt(scodec.codecs.bytes)
   implicit val commitSigFmt = sCodecJsonFmt(commitSigCodec)
   implicit val shutdownFmt = sCodecJsonFmt(shutdownCodec)
+  implicit val errorFmt = sCodecJsonFmt(errorCodec)
   implicit val uint64Fmt = sCodecJsonFmt(uint64)
   implicit val hopFmt = sCodecJsonFmt(hopCodec)
   implicit val pointFmt = sCodecJsonFmt(point)
@@ -230,8 +231,10 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     jsonFormat[LNMessageVector, LNMessageVector, LNMessageVector,
       Changes](Changes.apply, "proposed", "signed", "acked")
 
-  implicit val hostedCommitsFmt = jsonFormat[InitHostedChannel, LastCrossSignedState, Option[StateUpdate], NodeAnnouncement, Option[ChannelUpdate], Long,
-    HostedCommits](HostedCommits.apply, "params", "lastCrossSignedState", "nextLocalStateUpdateOpt", "announce", "updateOpt", "startedAt")
+  implicit val hostedCommitsFmt = jsonFormat[NodeAnnouncement, InitHostedChannel,
+    LastCrossSignedState, Option[StateUpdate], CommitmentSpec, Option[ChannelUpdate], Option[Error], Option[Error], Long,
+    HostedCommits](HostedCommits.apply, "announce", "params", "lastCrossSignedState", "nextLocalStateUpdateOpt", "localSpec",
+    "updateOpt", "localError", "remoteError", "startedAt")
 
   implicit val normalCommitsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes, Changes, Long, Long,
     Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, ByteVector, Option[ChannelUpdate], Option[ChannelFlags], Long,

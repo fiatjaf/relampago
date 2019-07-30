@@ -54,13 +54,16 @@ class LNStartFundActivity extends TimerActivity { me =>
     lnStartFundDetails setText asString.html
 
     class OpenListener extends ConnectionListener with ChannelListener { self =>
-      override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) onException(freshChannel -> peerOffline)
-
-      override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+      override def onMessage(nodeId: PublicKey, message: LightningMessage) = message match {
         case open: OpenChannel if nodeId == ann.nodeId && !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
         case remoteError: Error if nodeId == ann.nodeId => onException(freshChannel -> remoteError.exception)
-        case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChannel process msg
+        case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChannel process message
         case _ => // We only listen to setup messages here to avoid conflicts
+      }
+
+      override def onDisconnect(nodeId: PublicKey) = if (nodeId == ann.nodeId) {
+        // Whenever anythig goes wrong we just disconnect since we risk nothing
+        onException(freshChannel -> peerOffline)
       }
 
       override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) = if (openOpt.isEmpty) {
@@ -75,7 +78,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       override def onException = {
-        case _ \ errorWhileOpening =>
+        case (_: NormalChannel, errorWhileOpening) =>
           // Inform user about error, disconnect this channel, go back to channel list
           UITask(Toast.makeText(me, errorWhileOpening.getMessage, Toast.LENGTH_LONG).show).run
           whenBackPressed.run
@@ -89,14 +92,13 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       override def onBecome = {
-        case (_, WaitFundingData(_, cmd, accept), WAIT_FOR_ACCEPT, WAIT_FOR_FUNDING) =>
-          // Peer has agreed to open a channel so now we create a real funding transaction
+        case (_: NormalChannel, WaitFundingData(_, cmd, accept), WAIT_FOR_ACCEPT, WAIT_FOR_FUNDING) =>
           // We create a funding transaction by replacing an output with a real one in a saved dummy funding transaction
           val req = cmd.batch replaceDummy pubKeyScript(cmd.localParams.fundingPrivKey.publicKey, accept.fundingPubkey)
           freshChannel process CMDFunding(app.kit.sign(req).tx)
 
-        case (_, wait: WaitFundingDoneData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
-          // Preliminary negotiations are complete, save channel and broadcast a fund tx
+        case (_: NormalChannel, wait: WaitFundingDoneData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
+          // Preliminary negotiations are complete, save channel and broadcast our local funding tx
           saveChan(wait)
 
           // Broadcast a funding transaction
@@ -181,8 +183,8 @@ class LNStartFundActivity extends TimerActivity { me =>
       freshChannel process Tuple2(params, open)
 
       override def onBecome = {
-        case (_, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>
-          // Preliminary negotiations are complete, save channel and wait for their tx
+        case (_: NormalChannel, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>
+          // Preliminary negotiations are complete, save channel and wait for their funding tx
           saveChan(wait)
 
           // Tell wallet activity to redirect to ops

@@ -276,9 +276,12 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   type RequestAndLNUrl = (WithdrawRequest, LNUrl)
   def doReceivePayment(extra: Option[RequestAndLNUrl] = None) = {
     val viableChannels = ChannelManager.all.filter(isOpeningOrOperational)
-    val withRoutes = ChannelManager.all.filter(isOperational).flatMap(channelAndHop).toMap
-    val maxOneChanReceivable = if (withRoutes.isEmpty) 0L else withRoutes.keys.map(estimateCanReceive).max
-    val maxCanReceive = MilliSatoshi(maxOneChanReceivable)
+    val withRoutes = viableChannels.filter(isOperational).flatMap(channelAndHop).toMap
+
+    // For now we a bounded to single largest channel
+    val receivables = withRoutes.keys.map(_.estimateCanReceive)
+    val largestOne = if (receivables.isEmpty) 0L else receivables.max
+    val maxCanReceive = MilliSatoshi(largestOne)
 
     // maxCanReceive may be negative, show a warning to user in this case
     val humanShouldSpend = s"<strong>${denom parsedWithSign -maxCanReceive}</strong>"

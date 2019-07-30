@@ -263,6 +263,7 @@
     <string name="ln_info_status_opening"><![CDATA[<font color=#E68A00>ВІДЧИНЯЄТЬСЯ</font>]]></string>
     <string name="ln_info_status_shutdown"><![CDATA[<font color=#E68A00>ЗАЧИНЯЄТЬСЯ</font>]]></string>
     <string name="ln_info_status_negotiations"><![CDATA[<font color=#E68A00>ПЕРЕГОВОРИ</font>]]></string>
+    <string name="ln_info_status_suspended"><![CDATA[<font color=#E68A00>ЗАМОРОЖЕНИЙ</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В каналі є завислі платежі</font> тому кооперативне закриття буде відкладено поки вони не зникнуть<br><br>Рекомендується не закривати канал прямо зараз, а замість цього дати завислим платежам деякий час, все ще хочете продовжити?]]></string>
@@ -270,10 +271,9 @@
     <string name="ln_chan_close_confirm_local">Хочете закрити канал і відправити зворотню Біткоїн-транзакцію назад в цей гаманець?</string>
     <string name="ln_chan_close">Зачинити канал</string>
 
-    <array name="ln_chan_actions_list">
+    <array name="ln_normal_chan_actions">
         <item>View funding transaction</item>
         <item>Закрити канал до гаманця</item>
-        <item>Зворотня транзакція</item>
     </array>
 
     <string name="btc_empty">Немає монет он-чейн</string>
@@ -283,7 +283,7 @@
     <string name="ln_status_operational_many">Усi канали працюють</string>
     <string name="ln_status_operational_one">Канал працює</string>
 
-    <array name="ln_chan_present">
+    <array name="ln_chan_ops_status">
         <item><![CDATA[Каналів немає]]></item>
         <item><![CDATA[Усього %1$s канал]]></item>
         <item><![CDATA[Усього %1$s канала]]></item>

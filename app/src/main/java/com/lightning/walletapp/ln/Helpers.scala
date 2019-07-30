@@ -70,7 +70,7 @@ object Helpers {
 
     def makeFirstClosing(commitments: NormalCommits, localScriptPubkey: ByteVector, remoteScriptPubkey: ByteVector) = {
       val closingTx = Scripts.addSigs(makeClosingTx(commitments.commitInput, localScriptPubkey, remoteScriptPubkey, Satoshi(0),
-        Satoshi(0), commitments.localCommit.spec, commitments.localParams.isFunder), commitments.localParams.fundingPrivKey.publicKey,
+        Satoshi(0), commitments.localSpec, commitments.localParams.isFunder), commitments.localParams.fundingPrivKey.publicKey,
         commitments.remoteParams.fundingPubkey, ByteVector fromValidHex "aa" * 71, ByteVector fromValidHex "bb" * 71)
 
       // There is no need for a high fee in a mutual closing tx AND mutual fee can't be bigger than last commit tx fee
@@ -86,7 +86,7 @@ object Helpers {
 
       val closing: ClosingTx =
         makeClosingTx(commitments.commitInput, local, remote, dustLimit,
-          closingFee, commitments.localCommit.spec, commitments.localParams.isFunder)
+          closingFee, commitments.localSpec, commitments.localParams.isFunder)
 
       val localClosingSig = Scripts.sign(commitments.localParams.fundingPrivKey)(closing)
       val closingSigned = ClosingSigned(commitments.channelId, closingFee.amount, localClosingSig)

@@ -104,18 +104,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         baseBuilder(chan.data.announce.asString.html, msg), dialog_ok, noResource = -1, ln_chan_close)
     }
 
-    override def onSettled(chan: NormalChannel, cs: NormalCommits) =
-      if (cs.localCommit.spec.fulfilledIncoming.nonEmpty)
+    override def onSettled(cs: Commitments) =
+      if (cs.localSpec.fulfilledIncoming.nonEmpty)
         host stopService host.foregroundServiceIntent
 
     override def onProcessSuccess = {
-      case (chan, _: HasNormalCommits, remoteError: wire.Error) if errorLimit > 0 =>
-        // Peer has sent us an error, display details to user and offer force-close
+      case (chan: NormalChannel, _: HasNormalCommits, remoteError: wire.Error) if errorLimit > 0 =>
+        // Peer has sent us an error, display details to user and offer to force-close a channel
         informOfferClose(chan, remoteError.exception.getMessage).run
         errorLimit -= 1
 
-      case (chan, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
-        // Peer was OK but now has incompatible features, display details to user and offer force-close
+      case (chan: NormalChannel, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
+        // Peer now has some incompatible features, display details to user and offer to force-close a channel
         informOfferClose(chan, host getString err_ln_peer_incompatible format chan.data.announce.alias).run
     }
 
@@ -172,13 +172,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val online = viable.count(chan => OPEN == chan.state)
     val delta = viable.size - online
 
-    val lnTotalSum = MilliSatoshi(viable.map { chan =>
-      // Here we seek for total refundable amount not affected by fee changes
-      chan.hasCsOr(_.commitments.latestRemoteCommit.spec.toRemoteMsat, 0L)
-    }.sum)
-
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
-    val btcFunds = if (btcTotalSum.isZero) btcEmpty else denom parsedWithSign btcTotalSum
+    val btcFunds = if (btcTotalSum.amount == 0L) btcEmpty else denom parsedWithSign btcTotalSum
+    val lnTotalSum = MilliSatoshi(viable.flatMap(_.getCommits).map(_.reducedRemoteState.inChanMsat).sum)
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
     val perOneBtcRate = formatFiat.format(msatInFiat(oneBtc) getOrElse 0L)
 
@@ -212,9 +208,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def updPaymentList = UITask {
     TransitionManager beginDelayedTransition mainWrap
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
-    val tempItems = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
-    allItems = tempItems.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
-    fundTxIds = ChannelManager.all.map(_.fundTxId.toHex).toSet
+    val tempItemWraps = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
+    fundTxIds = ChannelManager.all.collect { case nc: NormalChannel => nc.fundTxId.toHex }.toSet
+    allItems = tempItemWraps.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
     adapter.notifyDataSetChanged
     updTitleTask.run
 
@@ -466,7 +462,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // LN SEND / RECEIVE
 
-  def receive(chansWithRoutes: Map[NormalChannel, PaymentRoute],
+  def receive(chansWithRoutes: Map[Channel, PaymentRoute],
               maxCanReceive: MilliSatoshi, minCanReceive: MilliSatoshi,
               title: View, desc: String)(onDone: RoutingData => Unit) = {
 
@@ -477,8 +473,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val bld = baseBuilder(title, content)
 
     def makeNormalRequest(sum: MilliSatoshi) = {
-      val goodChans = chansWithRoutes.keys.toVector.filter(channel => estimateCanReceive(channel) >= sum.amount).sortBy(estimateCanReceive) take 4
-      PaymentInfoWrap.recordRoutingDataWithPr(goodChans map chansWithRoutes, sum, ByteVector(random getBytes 32), inputDescription.getText.toString.trim)
+      val mostViableChannels = chansWithRoutes.keys.toVector
+        .filter(chan => chan.estimateCanReceive >= sum.amount) // In principle can receive an amount
+        .sortBy(chan => if (chan.isHosted) 1 else 0) // Hosted channels are pushed to the back of the queue
+        .sortBy(_.estimateCanReceive) // First use channels with the smallest balance but still able to receive
+        .take(4) // Limit number of channels to ensure QR code is always readable
+
+      val preimage = ByteVector.view(random getBytes 32)
+      val extraRoutes = mostViableChannels map chansWithRoutes
+      val description = inputDescription.getText.toString.take(72).trim
+      PaymentInfoWrap.recordRoutingDataWithPr(extraRoutes, sum, preimage, description)
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
@@ -495,8 +499,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def setMax(alert: AlertDialog) = rateManager setSum Try(maxCanReceive)
     mkCheckFormNeutral(recAttempt, none, setMax, bld, dialog_ok, dialog_cancel, dialog_max)
+    if (maxCanReceive == minCanReceive) setMax(null) // Since user can't set anything else
     inputDescription setText desc
-    setMax(null)
   }
 
   abstract class OffChainSender(pr: PaymentRequest) {
@@ -558,34 +562,31 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
-  def doSendOffChainOnUI(rd: RoutingData) =
-    UITask(me doSendOffChain rd).run
-
-  def offerAir(toChan: NormalChannel, origEmptyRD: RoutingData) = {
+  def offerAir(toChan: Channel, origEmptyRD: RoutingData) = {
     val origEmptyRD1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1)
-    val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(estimateCanSend(toChan), 0L)
+    val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(toChan.estimateCanSend, 0L)
     val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
     require(deltaAmountToSend > 0, "Accumulator already has enough money for a final payment")
     require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
 
     val Some(_ \ extraHops) = channelAndHop(toChan)
     val finalAmount = MilliSatoshi(deltaAmountToSend min amountCanRebalance)
-    // Further rebalancing attempts should always be halted if new off-chain payment is detected since rebalancing has started
-    val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops), finalAmount, ByteVector(random getBytes 32), REBALANCING)
+    val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops),
+      finalAmount, ByteVector(random getBytes 32), REBALANCING)
 
     val listener = new ChannelListener { self =>
-      override def onSettled(chan: NormalChannel, cs: NormalCommits) = {
-        val isOK = cs.localCommit.spec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)
-        if (isOK) runAnd(ChannelManager detachListener self)(me doSendOffChainOnUI origEmptyRD1)
-      }
-
       override def outPaymentAccepted(rd: RoutingData) =
         if (rd.pr.paymentHash != rbRD.pr.paymentHash)
           ChannelManager detachListener self
+
+      override def onSettled(cs: Commitments) = {
+        val isOK = cs.localSpec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)
+        if (isOK) runAnd(ChannelManager detachListener self) { UITask(me doSendOffChain origEmptyRD1).run }
+      }
     }
 
     ChannelManager attachListener listener
-    me doSendOffChainOnUI rbRD
+    UITask(me doSendOffChain rbRD).run
   }
 
   // BTC SEND / BOOST

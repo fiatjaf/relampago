@@ -4,7 +4,6 @@ import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Tools._
-
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.NormalChannel._
@@ -123,24 +122,18 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
   }
 
-  override def onSettled(chan: NormalChannel, cs: NormalCommits) = {
-    // We have got their commit sig and may have settled payments
-
-    def newRoutesOrGiveUp(rd: RoutingData) =
+  override def onSettled(cs: Commitments) = {
+    def newRoutesOrGiveUp(rd: RoutingData): Unit =
       if (rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight) {
         // We don't care about AIR or multipart here, supposedly it's one of them
         me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-      } else {
-        // UI will be updated a bit later here
-        updStatus(FAILURE, rd.pr.paymentHash)
-        chan process CMDPaymentGiveUp(rd)
-      }
+      } else updStatus(FAILURE, rd.pr.paymentHash)
 
     db txWrap {
-      cs.localCommit.spec.fulfilledIncoming foreach updOkIncoming
+      cs.localSpec.fulfilledIncoming foreach updOkIncoming
       // Malformed payments are returned by our direct peer and should never be retried again
-      for (Htlc(false, add) <- cs.localCommit.spec.malformed) updStatus(FAILURE, add.paymentHash)
-      for (Htlc(false, add) \ failReason <- cs.localCommit.spec.failed) {
+      for (Htlc(false, add) <- cs.localSpec.malformed) updStatus(FAILURE, add.paymentHash)
+      for (Htlc(false, add) \ failReason <- cs.localSpec.failed) {
 
         val rdOpt = acceptedPayments get add.paymentHash
         rdOpt map parseFailureCutRoutes(failReason) match {
@@ -160,21 +153,23 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     uiNotify
-    if (cs.localCommit.spec.fulfilled.nonEmpty) com.lightning.walletapp.Vibrator.vibrate
-    if (cs.localCommit.spec.fulfilledOutgoing.nonEmpty) app.olympus.tellClouds(OlympusWrap.CMDStart)
-    if (cs.localCommit.spec.fulfilledIncoming.nonEmpty) getCerberusActs(getVulnerableRevMap) foreach app.olympus.tellClouds
+    if (cs.localSpec.fulfilled.nonEmpty) com.lightning.walletapp.Vibrator.vibrate
+    if (cs.localSpec.fulfilledOutgoing.nonEmpty) app.olympus.tellClouds(OlympusWrap.CMDStart)
+    if (cs.localSpec.fulfilledIncoming.nonEmpty) getVulnerableRevActs.foreach(app.olympus.tellClouds)
   }
 
-  def getVulnerableRevMap =
-    ChannelManager.all.filter(isOperational)
-      .flatMap(getVulnerableRevVec).toMap
+  def getVulnerableRevActs = {
+    val operational = ChannelManager.all.filter(isOperational)
+    getCerberusActs(operational.flatMap(getVulnerableRevVec).toMap)
+  }
 
-  def getVulnerableRevVec(chan: NormalChannel) = chan.hasCsOr(some => {
-    // Find previous channel states which peer might be now tempted to spend
-    val threshold = some.commitments.remoteCommit.spec.toRemoteMsat - dust.amount * 20 * 1000L
-    def toTxidAndInfo(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
-    RichCursor apply db.select(RevokedInfoTable.selectLocalSql, some.commitments.channelId, threshold) vec toTxidAndInfo
-  }, Vector.empty)
+  def getVulnerableRevVec(chan: Channel) =
+    chan.getCommits collect { case nc: NormalCommits =>
+      // Find previous channel states which peer might now be tempted to spend
+      val threshold = nc.remoteCommit.spec.toRemoteMsat - dust.amount * 20 * 1000L
+      def toTxidAndInfo(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
+      RichCursor apply db.select(RevokedInfoTable.selectLocalSql, nc.channelId, threshold) vec toTxidAndInfo
+    } getOrElse Vector.empty
 
   type TxIdAndRevInfoMap = Map[String, String]
   def getCerberusActs(infos: TxIdAndRevInfoMap) = {
@@ -198,12 +193,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onProcessSuccess = {
-    // We don't allow manual deletion here as funding may not be on a blockchain
-    case (_, wbr: WaitBroadcastRemoteData, _: CMDBestHeight) if wbr.isLost =>
+    case (_: NormalChannel, wbr: WaitBroadcastRemoteData, _: CMDBestHeight) if wbr.isLost =>
+      // We don't allow manual deletion here as funding may just not be locally visible yet
       app.kit.wallet.removeWatchedScripts(app.kit fundingPubScript wbr)
       db.change(ChannelTable.killSql, wbr.commitments.channelId)
 
-    case (_, close: ClosingData, _: CMDBestHeight) if close.canBeRemoved =>
+    case (_: NormalChannel, close: ClosingData, _: CMDBestHeight) if close.canBeRemoved =>
+      // Either a lot of time has passed or ALL closing transactions have enough confirmations
       app.kit.wallet.removeWatchedScripts(app.kit closingPubKeyScripts close)
       app.kit.wallet.removeWatchedScripts(app.kit fundingPubScript close)
       db.change(RevokedInfoTable.killSql, close.commitments.channelId)

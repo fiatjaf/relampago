@@ -266,6 +266,7 @@
     <string name="ln_info_status_opening"><![CDATA[<font color=#E68A00>OPENING</font>]]></string>
     <string name="ln_info_status_shutdown"><![CDATA[<font color=#E68A00>SHUTDOWN</font>]]></string>
     <string name="ln_info_status_negotiations"><![CDATA[<font color=#E68A00>NEGOTIATION</font>]]></string>
+    <string name="ln_info_status_suspended"><![CDATA[<font color=#E68A00>SUSPENDED</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved<br><br>It it not recommended to close a channel right now and let those stuck payments to eventually become failed or fulfilled, would you still like to proceed?]]></string>
@@ -273,10 +274,9 @@
     <string name="ln_chan_close_confirm_local">Do you want to close this channel and send a refunding transaction back to this wallet?</string>
     <string name="ln_chan_close">Close channel</string>
 
-    <array name="ln_chan_actions_list">
+    <array name="ln_normal_chan_actions">
         <item>View funding transaction</item>
         <item>Close channel to wallet</item>
-        <item>View refunding transaction</item>
     </array>
 
     <string name="btc_status_operational">Bitcoin wallet is online</string>
@@ -286,7 +286,7 @@
     <string name="ln_status_operational_many">All channels are online</string>
     <string name="ln_status_operational_one">Channel is online</string>
 
-    <array name="ln_chan_present">
+    <array name="ln_chan_ops_status">
         <item><![CDATA[No channels are present]]></item>
         <item><![CDATA[%1$s channel in total]]></item>
         <item><![CDATA[%1$s channels in total]]></item>

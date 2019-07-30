@@ -264,7 +264,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
           encryptedHexBackup <- backups
           encryptedBackupBytes = ByteVector.fromValidHex(encryptedHexBackup).toArray
           ref <- AES.decBytes(encryptedBackupBytes, cloudSecret.toArray) map bin2readable map to[RefundingData]
-          if ChannelManager.all.forall(_.hasCsOr(_.commitments.channelId, null) != ref.commitments.channelId)
+          if !ChannelManager.all.exists(_.getCommits.map(_.channelId) contains ref.commitments.channelId)
         } ChannelManager.all +:= ChannelManager.createChannel(ChannelManager.operationalListeners, ref)
 
         for {

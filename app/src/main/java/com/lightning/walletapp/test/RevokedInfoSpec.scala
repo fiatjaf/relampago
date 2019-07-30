@@ -53,14 +53,14 @@ class RevokedInfoSpec {
       commitInput = InputInfo(null, TxOut(Satoshi(100000L), Seq.empty), null),
       remotePerCommitmentSecrets = null,
       channelId = chanId1,
+      updateOpt = None,
       channelFlags = None,
       startedAt = 0L)
 
-    val chan1 = new NormalChannel {
+    val chan1 = new NormalChannel(isHosted = false) {
       override def REV(cs: NormalCommits, rev: RevokeAndAck): Unit = none
       override def SEND(msg: LightningMessage): Unit = none
-      override def ASKREFUNDTX(ref: RefundingData): Unit = none
-      override def STORE(content: HasNormalCommits): HasNormalCommits = content
+      override def STORE(data: ChannelData): ChannelData = data
       override def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit = none
       override def CLOSEANDWATCH(close: ClosingData): Unit = none
       override def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit = none
@@ -91,14 +91,14 @@ class RevokedInfoSpec {
       commitInput = InputInfo(null, TxOut(Satoshi(100000L), Seq.empty), null),
       remotePerCommitmentSecrets = null,
       channelId = chanId2,
+      updateOpt = None,
       channelFlags = None,
       startedAt = 0L)
 
-    val chan2 = new NormalChannel {
+    val chan2 = new NormalChannel(isHosted = false) {
       override def REV(cs: NormalCommits, rev: RevokeAndAck): Unit = none
       override def SEND(msg: LightningMessage): Unit = none
-      override def ASKREFUNDTX(ref: RefundingData): Unit = none
-      override def STORE(content: HasNormalCommits): HasNormalCommits = content
+      override def STORE(data: ChannelData): ChannelData = data
       override def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit = none
       override def CLOSEANDWATCH(close: ClosingData): Unit = none
       override def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit = none

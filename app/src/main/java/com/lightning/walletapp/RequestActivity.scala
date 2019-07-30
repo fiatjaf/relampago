@@ -65,16 +65,16 @@ class RequestActivity extends TimerActivity { me =>
 
   def INIT(state: Bundle) = if (app.isAlive) {
     setContentView(R.layout.activity_qr_request)
-    // Snapshot target hash, data will be erased soon
-    val targetPayHash = app.TransData.value match {
+    // Snapshot hash here, data will be erased soon
+    val targetHash = app.TransData.value match {
       case pr: PaymentRequest => pr.paymentHash
       case _ => ByteVector.empty
     }
 
     val receivedListener = new ChannelListener {
-      override def onSettled(chan: NormalChannel, cs: NormalCommits) = for {
-        updateAddHtlc <- cs.localCommit.spec.fulfilledIncoming
-        if updateAddHtlc.paymentHash == targetPayHash
+      override def onSettled(cs: Commitments) = for {
+        updateAddHtlc <- cs.localSpec.fulfilledIncoming
+        if updateAddHtlc.paymentHash == targetHash
       } showPaid.run
     }
 

@@ -160,7 +160,6 @@ object LightningMessageCodecs { me =>
   // Data formats
 
   private val init = (varsizebinarydata withContext "globalFeatures") :: (varsizebinarydata withContext "localFeatures")
-  private val error = (bytes32 withContext "channelId") :: (varsizebinarydata withContext "data")
   private val ping = (uint16 withContext "pongLength") :: (varsizebinarydata withContext "data")
   private val pong = varsizebinarydata withContext "data"
 
@@ -172,6 +171,11 @@ object LightningMessageCodecs { me =>
       (optional(bitsRemaining, point) withContext "myCurrentPerCommitmentPoint")
 
   val channelFlagsCodec = (byte withContext "flags").as[ChannelFlags]
+
+  val errorCodec = {
+    (bytes32 withContext "channelId") ::
+      (varsizebinarydata withContext "data")
+  }.as[Error]
 
   private val openChannel =
     (bytes32 withContext "chainHash") ::
@@ -393,7 +397,7 @@ object LightningMessageCodecs { me =>
   val lightningMessageCodec =
     discriminated[LightningMessage].by(uint16)
       .typecase(cr = init.as[Init], tag = 16)
-      .typecase(cr = error.as[Error], tag = 17)
+      .typecase(cr = errorCodec, tag = 17)
       .typecase(cr = ping.as[Ping], tag = 18)
       .typecase(cr = pong.as[Pong], tag = 19)
       .typecase(cr = openChannel.as[OpenChannel], tag = 32)
