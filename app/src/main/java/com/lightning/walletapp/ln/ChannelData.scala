@@ -26,9 +26,9 @@ case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
 case class CMDFeerate(sat: Long) extends Command
 case object CMDHTLCProcess extends Command
+case object CMDChanOffline extends Command
+case object CMDChanOnline extends Command
 case object CMDProceed extends Command
-case object CMDOffline extends Command
-case object CMDOnline extends Command
 
 case class CMDOpenChannel(localParams: LocalParams, tempChanId: ByteVector, initialFeeratePerKw: Long, batch: Batch,
                           fundingSat: Long, channelFlags: ChannelFlags = ChannelFlags(0), pushMsat: Long = 0L) extends Command
@@ -284,13 +284,11 @@ sealed trait Commitments {
   val updateOpt: Option[ChannelUpdate]
   val channelId: ByteVector
   val startedAt: Long
-
-  def shouldRenewUpdate(update: ChannelUpdate): Boolean =
-    updateOpt.exists(old => old.timestamp < update.timestamp &&
-      old.shortChannelId == update.shortChannelId)
 }
 
-case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long, inChanMsat: Long)
+case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long,
+                        canReceiveMsat: Long, myFeeSat: Long,
+                        inChanMsat: Long)
 
 case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
                          remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
@@ -490,6 +488,6 @@ case class HostedCommits(announce: NodeAnnouncement, params: InitHostedChannel, 
                          nextLocalStateUpdateOpt: Option[StateUpdate], localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate],
                          localError: Option[Error], remoteError: Option[Error], startedAt: Long) extends Commitments with ChannelData {
 
-  val reducedRemoteState: ReducedState = ReducedState(Set.empty, 0L, 0L, 0L, 0L)
+  val reducedRemoteState: ReducedState = ???
   val channelId: ByteVector = announce.hostedChanId
 }

@@ -202,7 +202,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       freshChannel.listeners -= openListener
       ConnectionManager.listeners -= openListener
       // Worker may have already been removed on some connection failure
-      ConnectionManager.connections.get(ann.nodeId).foreach(_.disconnect)
+      ConnectionManager.workers.get(ann.nodeId).foreach(_.disconnect)
       finish
     }
 

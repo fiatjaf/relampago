@@ -36,6 +36,9 @@ trait Channel extends StateMachine[ChannelData] { me =>
     case _ => None
   }
 
+  def shouldRenewUpdate(update: ChannelUpdate): Boolean = getCommits.flatMap(_.updateOpt)
+    .exists(old => old.shortChannelId == update.shortChannelId && old.timestamp < update.timestamp)
+
   def estimateCanSend: Long
   def estimateCanReceive: Long
   def estimateNextUsefulCapacity: Long
@@ -510,7 +513,7 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
       // SYNC: ONLINE/SLEEPING
 
 
-      case (some: HasNormalCommits, CMDOnline, SLEEPING) =>
+      case (some: HasNormalCommits, CMDChanOnline, SLEEPING) =>
         // According to BOLD a first message on connection should be reestablish
         // will specifically NOT work in REFUNDING to not let them know beforehand
         me SEND makeReestablish(some, some.commitments.localCommit.index + 1)
@@ -529,10 +532,10 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
         data = some.modify(_.announce).setTo(newAnn)
 
 
-      case (wait: WaitBroadcastRemoteData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
-      case (wait: WaitFundingDoneData, CMDOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
-      case (negs: NegotiationsData, CMDOffline, NEGOTIATIONS) => BECOME(negs, SLEEPING)
-      case (norm: NormalData, CMDOffline, OPEN) => BECOME(norm, SLEEPING)
+      case (wait: WaitBroadcastRemoteData, CMDChanOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
+      case (wait: WaitFundingDoneData, CMDChanOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
+      case (negs: NegotiationsData, CMDChanOffline, NEGOTIATIONS) => BECOME(negs, SLEEPING)
+      case (norm: NormalData, CMDChanOffline, OPEN) => BECOME(norm, SLEEPING)
 
 
       // NEGOTIATIONS MODE

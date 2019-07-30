@@ -191,7 +191,7 @@ class WalletApp extends Application { me =>
 
       for {
         _ <- Obs just null subscribeOn IOScheduler.apply delay 20.seconds
-        offlineChan <- ChannelManager.notClosing if offlineChan.state == SLEEPING
+        offlineChan <- ChannelManager.all if offlineChan.state == SLEEPING
         if offlineChan.data.announce.addresses.headOption.forall(_.canBeUpdatedIfOffline)
         // Call findNodes without `retry` wrapper because it gives harmless `Obs.empty` on error
         Vector(ann1 \ _, _*) <- app.olympus findNodes offlineChan.data.announce.nodeId.toString
@@ -218,20 +218,23 @@ object ChannelManager extends Broadcaster {
 
   val socketEventsListener = new ConnectionListener {
     override def onOperational(nodeId: PublicKey, isCompat: Boolean) =
-      fromNode(notClosing, nodeId).foreach(_ process CMDOnline)
+      fromNode(nodeId).foreach(_ process CMDChanOnline)
 
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-      case update: ChannelUpdate => fromNode(notClosing, nodeId).foreach(_ process update)
-      case errAll: Error if errAll.channelId == Zeroes => fromNode(notClosing, nodeId).foreach(_ process errAll)
-      case cm: ChannelMessage => notClosing.find(_.getCommits.map(_.channelId) contains cm.channelId).foreach(_ process cm)
+      case channelUpdate: ChannelUpdate => fromNode(nodeId).foreach(_ process channelUpdate)
+      case nodeLevelError: Error if nodeLevelError.channelId == Zeroes => fromNode(nodeId).foreach(_ process nodeLevelError)
+      case cm: ChannelMessage => fromNode(nodeId).find(_.getCommits.map(_.channelId) contains cm.channelId).foreach(_ process cm)
       case _ =>
     }
 
-    override def onDisconnect(nodeId: PublicKey) = for {
-      affectedChans <- Obs just fromNode(notClosing, nodeId) if affectedChans.nonEmpty
-      _ = affectedChans.foreach(affectedChan => affectedChan process CMDOffline)
-      announce <- Obs just affectedChans.head.data.announce delay 5.seconds
-    } ConnectionManager.connectTo(announce, notify = false)
+    override def onHostedMessage(ann: NodeAnnouncement, msg: HostedChannelMessage) =
+      fromNode(ann.nodeId).find(_.getCommits.map(_.channelId) contains ann.hostedChanId)
+        .foreach(_ process msg)
+
+    override def onDisconnect(nodeId: PublicKey) = {
+      fromNode(nodeId).foreach(_ process CMDChanOffline)
+      Obs.just(null).delay(5.seconds).foreach(_ => initConnect)
+    }
   }
 
   val chainEventsListener = new TxTracker with BlocksListener with PeerDisconnectedEventListener {
@@ -239,7 +242,7 @@ object ChannelManager extends Broadcaster {
     def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = onBlock(left)
     override def onChainDownloadStarted(peer: Peer, left: Int) = onBlock(left)
 
-    override def txConfirmed(txj: Transaction) = for (c <- notClosing) c process CMDConfirmed(txj)
+    override def txConfirmed(txj: Transaction) = for (c <- all) c process CMDConfirmed(txj)
     def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
     def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
 
@@ -319,8 +322,8 @@ object ChannelManager extends Broadcaster {
         dummy = Announcements.makeChannelUpdate(chainHash, nodePrivateKey, chan.data.announce.nodeId, shortChannelId)
       } chan process CMDChannelUpdate(dummy)
 
-    case (chan: NormalChannel, norm: NormalData, real: ChannelUpdate) if norm.commitments.shouldRenewUpdate(real) =>
-      // We have an old/dummy update, replace it with a new one IF it updates parameters and is a more recent one
+    case (chan: Channel, _, real: ChannelUpdate) if chan.shouldRenewUpdate(real) =>
+      // We have a dummy or outdated update and now they supply a new one
       chan process CMDChannelUpdate(real)
   }
 
@@ -332,16 +335,11 @@ object ChannelManager extends Broadcaster {
 
   // CHANNEL CREATION AND MANAGEMENT
 
-  // These will getCMDSpent, CMDBestHeight messages
   var all: Vector[Channel] = ChannelWrap doGet db collect {
     case normal: HasNormalCommits => createChannel(operationalListeners, normal)
     case hosted: HostedCommits => createHostedChannel(operationalListeners, hosted)
-    case other => throw new RuntimeException(s"Can not create channel with $other")
+    case other => throw new RuntimeException(s"Can't create channel with $other")
   }
-
-  def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
-  def fromNode(of: Vector[Channel], nodeId: PublicKey) = for (chan <- of if chan.data.announce.nodeId == nodeId) yield chan
-  def notClosing = for (chan <- all if chan.state != CLOSING) yield chan
 
   def delayedPublishes = {
     val statuses = all.map(_.data).collect { case cd: ClosingData => cd.bestClosing.getState }
@@ -376,17 +374,20 @@ object ChannelManager extends Broadcaster {
   def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estimateCanSend).lastOption
   def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
   def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
-  def initConnect = for (chan <- notClosing) ConnectionManager.connectTo(chan.data.announce, notify = false)
+  // We need to connect the rest of channels including special cases like REFUNDING normal channel and SUSPENDED hosted channel
+  def initConnect = for (chan <- all if chan.state != CLOSING) ConnectionManager.connectTo(chan.data.announce, notify = false)
+  def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
+  def fromNode(nodeId: PublicKey) = for (chan <- all if chan.data.announce.nodeId == nodeId) yield chan
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
   def createHostedChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel(isHosted = true) { self =>
-    def SEND(msg: LightningMessage) = for (work <- ConnectionManager.connections get data.announce.nodeId) work.handler process msg
+    def SEND(message: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process message
     def STORE(data: ChannelData) = runAnd(data)(ChannelWrap put data)
   }
 
   def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel(isHosted = false) { self =>
-    def SEND(msg: LightningMessage) = for (work <- ConnectionManager.connections get data.announce.nodeId) work.handler process msg
+    def SEND(message: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process message
 
     def STORE(data: ChannelData) = runAnd(data) {
       // Put updated data into db, schedule gdrive upload,

@@ -19,19 +19,18 @@ import java.net.Socket
 
 object ConnectionManager {
   var listeners = Set.empty[ConnectionListener]
-  val connections = new ConcurrentHashMap[PublicKey, Worker].asScala
+  val workers = new ConcurrentHashMap[PublicKey, Worker].asScala
   val keyPair = KeyPair(nodePublicKey.toBin, nodePrivateKey.toBin)
 
   protected[this] val events = new ConnectionListener {
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = for (lst <- listeners) lst.onMessage(nodeId, msg)
-    override def onHostedMessage(chanId: ByteVector, msg: HostedChannelMessage) = for (lst <- listeners) lst.onHostedMessage(chanId, msg)
+    override def onHostedMessage(ann: NodeAnnouncement, msg: HostedChannelMessage) = for (lst <- listeners) lst.onHostedMessage(ann, msg)
     override def onOperational(nodeId: PublicKey, isCompat: Boolean) = for (lst <- listeners) lst.onOperational(nodeId, isCompat)
     override def onDisconnect(nodeId: PublicKey) = for (lst <- listeners) lst.onDisconnect(nodeId)
   }
 
-  def connectTo(ann: NodeAnnouncement, notify: Boolean) = {
-    val noWorkerPresent = connections.get(ann.nodeId).isEmpty
-    if (noWorkerPresent) connections += ann.nodeId -> new Worker(ann)
+  def connectTo(ann: NodeAnnouncement, notify: Boolean) = synchronized {
+    if (workers.get(ann.nodeId).isEmpty) workers(ann.nodeId) = new Worker(ann)
     else if (notify) events.onOperational(ann.nodeId, isCompat = true)
   }
 
@@ -60,7 +59,7 @@ object ConnectionManager {
     }
 
     thread onComplete { _ =>
-      connections -= ann.nodeId
+      workers.remove(ann.nodeId)
       events onDisconnect ann.nodeId
     }
 
@@ -72,7 +71,7 @@ object ConnectionManager {
       message match {
         case their: Init => events.onOperational(isCompat = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures), nodeId = ann.nodeId)
         case Ping(replyLength, _) if replyLength > 0 && replyLength <= 65532 => handler process Pong(ByteVector fromValidHex "00" * replyLength)
-        case hostedChanMessage: HostedChannelMessage => events.onHostedMessage(ann.hostedChanId, hostedChanMessage)
+        case hostedChanMessage: HostedChannelMessage => events.onHostedMessage(ann, hostedChanMessage)
         case _ => events.onMessage(ann.nodeId, message)
       }
     }
@@ -81,14 +80,14 @@ object ConnectionManager {
   for {
     _ <- Obs interval 30.seconds
     tooLongAgo = System.currentTimeMillis - 1000L * 60
-    worker <- connections.values if worker.lastMsg < tooLongAgo
+    worker <- workers.values if worker.lastMsg < tooLongAgo
   } worker.disconnect
 }
 
 class ConnectionListener {
   def onOpenOffer(nodeId: PublicKey, msg: OpenChannel): Unit = none
   def onMessage(nodeId: PublicKey, msg: LightningMessage): Unit = none
-  def onHostedMessage(chanId: ByteVector, msg: HostedChannelMessage): Unit = none
+  def onHostedMessage(ann: NodeAnnouncement, msg: HostedChannelMessage): Unit = none
   def onOperational(nodeId: PublicKey, isCompat: Boolean): Unit = none
   def onDisconnect(nodeId: PublicKey): Unit = none
 }

@@ -262,9 +262,16 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case _ => false
   }
 
-  def sumOrNothing(sats: Satoshi) = if (0L == sats.amount) getString(ln_info_nothing) else denom parsedWithSign sats
-  def connectivityStatusColor(c: Channel) = ConnectionManager.connections.get(c.data.announce.nodeId).filter(_.sock.isConnected)
-    .map(_ => me getString ln_info_state_online).getOrElse(me getString ln_info_state_offline)
+  def sumOrNothing(amt: Satoshi) = amt match {
+    case Satoshi(0L) => getString(ln_info_nothing)
+    case _ => denom parsedWithSign amt
+  }
+
+  def connectivityStatusColor(chan: Channel) =
+    ConnectionManager.workers get chan.data.announce.nodeId match {
+      case Some(w) if w.sock.isConnected => me getString ln_info_state_online
+      case _ => me getString ln_info_state_offline
+    }
 
   def closedBy(cd: ClosingData) =
     if (cd.remoteCommit.nonEmpty) me getString ln_info_close_remote
