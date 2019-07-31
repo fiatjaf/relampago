@@ -56,17 +56,17 @@ object Helpers {
       remoteHtlcPubkey, remoteRevocationPubkey)
   }
 
+  def isValidFinalScriptPubkey(raw: ByteVector) = Try(Script parse raw) match {
+    case Success(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pkh, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) => pkh.size == 20
+    case Success(OP_HASH160 :: OP_PUSHDATA(scriptHash, _) :: OP_EQUAL :: Nil) => scriptHash.size == 20
+    case Success(OP_0 :: OP_PUSHDATA(pubkeyHash, _) :: Nil) if pubkeyHash.length == 20 => true
+    case Success(OP_0 :: OP_PUSHDATA(scriptHash, _) :: Nil) if scriptHash.length == 32 => true
+    case _ => false
+  }
+
   object Closing {
     type SuccessAndClaim = (HtlcSuccessTx, ClaimDelayedOutputTx)
     type TimeoutAndClaim = (HtlcTimeoutTx, ClaimDelayedOutputTx)
-
-    def isValidFinalScriptPubkey(raw: ByteVector) = Try(Script parse raw) match {
-      case Success(OP_DUP :: OP_HASH160 :: OP_PUSHDATA(pkh, _) :: OP_EQUALVERIFY :: OP_CHECKSIG :: Nil) => pkh.size == 20
-      case Success(OP_HASH160 :: OP_PUSHDATA(scriptHash, _) :: OP_EQUAL :: Nil) => scriptHash.size == 20
-      case Success(OP_0 :: OP_PUSHDATA(pubkeyHash, _) :: Nil) if pubkeyHash.length == 20 => true
-      case Success(OP_0 :: OP_PUSHDATA(scriptHash, _) :: Nil) if scriptHash.length == 32 => true
-      case _ => false
-    }
 
     def makeFirstClosing(commitments: NormalCommits, localScriptPubkey: ByteVector, remoteScriptPubkey: ByteVector) = {
       val closingTx = Scripts.addSigs(makeClosingTx(commitments.commitInput, localScriptPubkey, remoteScriptPubkey, Satoshi(0),

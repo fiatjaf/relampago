@@ -19,6 +19,16 @@ import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 
 
 trait Channel extends StateMachine[ChannelData] { me =>
+  implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
+  def process(change: Any) = Future(me doProcess change) onFailure { case runtimeFailure => events onException me -> runtimeFailure }
+  def shouldRenew(u: ChannelUpdate) = getCommits.flatMap(_.updateOpt).exists(u0 => u0.shortChannelId == u.shortChannelId && u0.timestamp < u.timestamp)
+
+  def getCommits: Option[Commitments] = data match {
+    case normal: HasNormalCommits => Some(normal.commitments)
+    case hosted: HostedCommits => Some(hosted)
+    case _ => None
+  }
+
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
     // Transition must always be defined before vars are updated
     val trans = Tuple4(me, data1, state, state1)
@@ -30,35 +40,12 @@ trait Channel extends StateMachine[ChannelData] { me =>
   def STORE(data: ChannelData): ChannelData
   def SEND(msg: LightningMessage): Unit
 
-  def getCommits: Option[Commitments] = data match {
-    case normal: HasNormalCommits => Some(normal.commitments)
-    case hosted: HostedCommits => Some(hosted)
-    case _ => None
-  }
-
-  def shouldRenewUpdate(update: ChannelUpdate): Boolean = getCommits.flatMap(_.updateOpt)
-    .exists(old => old.shortChannelId == update.shortChannelId && old.timestamp < update.timestamp)
-
   def estimateCanSend: Long
   def estimateCanReceive: Long
   def estimateNextUsefulCapacity: Long
-  def process(change: Any): Unit
   def inFlightHtlcs: Set[Htlc]
 
-  var listeners: Set[ChannelListener]
-  val events: ChannelListener
   val isHosted: Boolean
-}
-
-abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
-  implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def fundTxId = data match {case some: HasNormalCommits => some.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
-  def process(change: Any): Unit = Future(me doProcess change) onFailure { case runtimeFailure => events onException me -> runtimeFailure }
-  def estimateCanSend = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat } getOrElse 0L
-  def estimateCanReceive = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canReceiveMsat } getOrElse 0L
-  def inFlightHtlcs = getCommits map (_.reducedRemoteState.htlcs) getOrElse Set.empty[Htlc]
-  def estimateNextUsefulCapacity = estimateCanSend + estimateCanReceive
-
   var listeners: Set[ChannelListener] = _
   val events: ChannelListener = new ChannelListener {
     override def onProcessSuccess = { case ps => for (lst <- listeners if lst.onProcessSuccess isDefinedAt ps) lst onProcessSuccess ps }
@@ -68,6 +55,14 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
     override def onSettled(cs: Commitments) = for (lst <- listeners) lst.onSettled(cs)
   }
+}
+
+abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
+  def fundTxId = data match {case hasSome: HasNormalCommits => hasSome.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
+  def estimateCanSend = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat } getOrElse 0L
+  def estimateCanReceive = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canReceiveMsat } getOrElse 0L
+  def inFlightHtlcs = getCommits map (_.reducedRemoteState.htlcs) getOrElse Set.empty[Htlc]
+  def estimateNextUsefulCapacity = estimateCanSend + estimateCanReceive
 
   def CLOSEANDWATCH(close: ClosingData): Unit
   def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit
@@ -121,7 +116,7 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
 
       case (WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>
         if (accept.dustLimitSatoshis > cmd.localParams.channelReserveSat) throw new LightningException("Our channel reserve is less than their dust")
-        if (UInt64(10000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
+        if (UInt64(100000000L) > accept.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
         if (accept.channelReserveSatoshis > cmd.fundingSat / 10) throw new LightningException("Their proposed reserve is too high")
         if (accept.toSelfDelay > LNParams.maxToSelfDelay) throw new LightningException("Their toSelfDelay is too high")
         if (accept.dustLimitSatoshis < 546L) throw new LightningException("Their on-chain dust limit is too low")
@@ -513,7 +508,7 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
       // SYNC: ONLINE/SLEEPING
 
 
-      case (some: HasNormalCommits, CMDChanOnline, SLEEPING) =>
+      case (some: HasNormalCommits, CMDSocketOnline, SLEEPING) =>
         // According to BOLD a first message on connection should be reestablish
         // will specifically NOT work in REFUNDING to not let them know beforehand
         me SEND makeReestablish(some, some.commitments.localCommit.index + 1)
@@ -532,10 +527,10 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
         data = some.modify(_.announce).setTo(newAnn)
 
 
-      case (wait: WaitBroadcastRemoteData, CMDChanOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
-      case (wait: WaitFundingDoneData, CMDChanOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
-      case (negs: NegotiationsData, CMDChanOffline, NEGOTIATIONS) => BECOME(negs, SLEEPING)
-      case (norm: NormalData, CMDChanOffline, OPEN) => BECOME(norm, SLEEPING)
+      case (wait: WaitBroadcastRemoteData, CMDSocketOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
+      case (wait: WaitFundingDoneData, CMDSocketOffline, WAIT_FUNDING_DONE) => BECOME(wait, SLEEPING)
+      case (negs: NegotiationsData, CMDSocketOffline, NEGOTIATIONS) => BECOME(negs, SLEEPING)
+      case (norm: NormalData, CMDSocketOffline, OPEN) => BECOME(norm, SLEEPING)
 
 
       // NEGOTIATIONS MODE
@@ -706,12 +701,51 @@ abstract class HostedChannel(val isHosted: Boolean) extends Channel { me =>
   def estimateCanSend: Long = ???
   def estimateCanReceive: Long = ???
   def estimateNextUsefulCapacity: Long = ???
-  def doProcess(change: Any): Unit = ???
-  def process(change: Any): Unit = ???
   def inFlightHtlcs: Set[Htlc] = ???
 
-  var listeners: Set[ChannelListener] = ???
-  val events: ChannelListener = ???
+  private var isChainHeightKnown = false
+  private var isSocketConnected = false
+
+  def doProcess(change: Any) =
+    Tuple3(data, change, state) match {
+      case (wait: WaitTheirHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
+        val msg = InvokeHostedChannel(LNParams.chainHash, wait.refundScriptPubKey)
+        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND msg
+        isSocketConnected = true
+
+
+      case (wait: WaitTheirHostedReply, _: CMDBestHeight, WAIT_FOR_INIT) =>
+        val msg = InvokeHostedChannel(LNParams.chainHash, wait.refundScriptPubKey)
+        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND msg
+        isChainHeightKnown = true
+
+
+      case (WaitTheirHostedReply(announce, refundScriptPubKey), their: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
+
+
+      case (WaitTheirHostedReply(announce, refundScriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
+        if (init.liabilityDeadlineBlockdays < LNParams.minHostedLiabilityBlockdays) throw new LightningException("Their liability deadline is too low")
+        if (init.channelCapacitySatoshis < LNParams.minCapacityMsat / 1000L) throw new LightningException("Their proposed channel capacity is too low")
+        if (init.minimalOnchainRefundAmountSatoshis > 100000L) throw new LightningException("Their minimal on-chain refund amount is too low")
+        if (UInt64(100000000L) > init.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
+        if (init.htlcMinimumMsat > 100000L) throw new LightningException("Their htlcMinimumMsat is too high")
+        if (init.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
+
+        val firstStateOverride =
+          StateOverride(init.initialClientBalanceSatoshis, LNParams.broadcaster.currentHeight,
+            clientUpdateCounter = 1L, hostUpdateCounter = 0L, nodeSignature = ByteVector.empty)
+
+        val firstUpdate = StateUpdate(firstStateOverride)
+        val sigHash = Tools.hostedSigHash(refundScriptPubKey, firstUpdate, init)
+        val firstSignature = Tools.sign(sigHash.toArray, LNParams.nodePrivateKey)
+        val update1 = firstUpdate.modify(_.stateOverride.nodeSignature) setTo firstSignature
+        me UPDATA WaitTheirStateUpdate(announce, refundScriptPubKey, init, update1) SEND update1
+
+
+      case (wait: WaitTheirStateUpdate, their: StateUpdate, WAIT_FOR_ACCEPT) =>
+
+
+    }
 }
 
 object NormalChannel {

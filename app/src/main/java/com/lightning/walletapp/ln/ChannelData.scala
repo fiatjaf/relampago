@@ -1,7 +1,5 @@
 package com.lightning.walletapp.ln
 
-import java.io.ByteArrayOutputStream
-
 import fr.acinq.bitcoin.Crypto._
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
@@ -10,10 +8,10 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.AddErrorCodes._
 import com.lightning.walletapp.ln.LNParams.broadcaster._
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
-import com.lightning.walletapp.ln.crypto.{Generators, MultiStreamUtils, ShaChain, ShaHashesWithIndex}
+import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{LNMessageVector, RedeemScriptAndSig}
-import fr.acinq.bitcoin.{Protocol, Satoshi, Transaction}
+import fr.acinq.bitcoin.{Satoshi, Transaction}
 import org.bitcoinj.core.Batch
 import scodec.bits.ByteVector
 import fr.acinq.eclair.UInt64
@@ -27,9 +25,9 @@ case class CMDConfirmed(tx: Transaction) extends Command
 case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
 case class CMDFeerate(sat: Long) extends Command
+case object CMDSocketOffline extends Command
+case object CMDSocketOnline extends Command
 case object CMDHTLCProcess extends Command
-case object CMDChanOffline extends Command
-case object CMDChanOnline extends Command
 case object CMDProceed extends Command
 
 case class CMDOpenChannel(localParams: LocalParams, tempChanId: ByteVector, initialFeeratePerKw: Long, batch: Batch,
@@ -44,6 +42,15 @@ case class CMDFailHtlc(id: Long, reason: ByteVector) extends Command
 sealed trait ChannelData { val announce: NodeAnnouncement }
 sealed trait HasNormalCommits extends ChannelData { val commitments: NormalCommits }
 case class InitData(announce: NodeAnnouncement) extends ChannelData
+
+// HOSTED CHANNEL
+
+case class WaitTheirHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector) extends ChannelData {
+  require(Helpers isValidFinalScriptPubkey refundScriptPubKey, "Invalid refundScriptPubKey when opening a hosted channel")
+}
+
+case class WaitTheirStateUpdate(announce: NodeAnnouncement, refundScriptPubKey: ByteVector,
+                                init: InitHostedChannel, ourFirstUpdate: StateUpdate) extends ChannelData
 
 // INCOMING CHANNEL
 
@@ -492,6 +499,4 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
 
   val reducedRemoteState: ReducedState = ???
   val channelId: ByteVector = announce.hostedChanId
-
-
 }

@@ -207,13 +207,13 @@ class WalletApp extends Application { me =>
 object ChannelManager extends Broadcaster {
   val operationalListeners = Set(ChannelManager, bag)
   val CMDLocalShutdown = CMDShutdown(scriptPubKey = None)
-  val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
-  var initialChainHeight = app.kit.wallet.getLastBlockSeenHeight
+  private val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
+  private var initialChainHeight = app.kit.wallet.getLastBlockSeenHeight
   var currentBlocksLeft = Option.empty[Int]
 
   val socketEventsListener = new ConnectionListener {
     override def onOperational(nodeId: PublicKey, isCompat: Boolean) =
-      fromNode(nodeId).foreach(_ process CMDChanOnline)
+      fromNode(nodeId).foreach(_ process CMDSocketOnline)
 
     override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
       case channelUpdate: ChannelUpdate => fromNode(nodeId).foreach(_ process channelUpdate)
@@ -227,7 +227,7 @@ object ChannelManager extends Broadcaster {
         .foreach(_ process msg)
 
     override def onDisconnect(nodeId: PublicKey) = {
-      fromNode(nodeId).foreach(_ process CMDChanOffline)
+      fromNode(nodeId).foreach(_ process CMDSocketOffline)
       Obs.just(null).delay(5.seconds).foreach(_ => initConnect)
     }
   }
@@ -304,7 +304,7 @@ object ChannelManager extends Broadcaster {
         dummy = Announcements.makeChannelUpdate(chainHash, nodePrivateKey, chan.data.announce.nodeId, shortChannelId)
       } chan process CMDChannelUpdate(dummy)
 
-    case (chan: Channel, _, real: ChannelUpdate) if chan.shouldRenewUpdate(real) =>
+    case (chan: Channel, _, real: ChannelUpdate) if chan.shouldRenew(real) =>
       // We have a dummy or outdated update and now they supply a new one
       chan process CMDChannelUpdate(real)
   }
@@ -366,6 +366,8 @@ object ChannelManager extends Broadcaster {
   def createHostedChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel(isHosted = true) { self =>
     def SEND(message: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process message
     def STORE(data: ChannelData) = runAnd(data)(ChannelWrap put data)
+    listeners = initialListeners
+    doProcess(bootstrap)
   }
 
   def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel(isHosted = false) { self =>
@@ -428,8 +430,6 @@ object ChannelManager extends Broadcaster {
       SEND(error)
     }
 
-    // First add listeners, then call
-    // doProcess on current thread
     listeners = initialListeners
     doProcess(bootstrap)
   }
@@ -473,11 +473,10 @@ object ChannelManager extends Broadcaster {
       else Obs.zip(getRoutes(rd.pr.nodeId) +: withHints).map(_.flatten.toVector)
 
     for {
-      cheapestUnorderedRoutes <- paymentRoutesObs
-      busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => chan.inFlightHtlcs.size)
-      openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1)
-      cheapestOrderedRoutes = cheapestUnorderedRoutes.sortBy(cheapestRouteCandidate => LNParams getCompoundFee cheapestRouteCandidate)
-    } yield useFirstRoute(cheapestOrderedRoutes.sortBy(busyMap compose rd.nextNodeId).sortBy(openMap compose rd.nextNodeId), rd)
+      rs <- paymentRoutesObs
+      busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, channel => channel.inFlightHtlcs.size)
+      openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, channel => if (channel.state == OPEN) 0 else 1)
+    } yield useFirstRoute(rs.sortBy(estimateCompoundFee).sortBy(busyMap compose rd.nextNodeId).sortBy(openMap compose rd.nextNodeId), rd)
   }
 
   def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
