@@ -101,10 +101,6 @@ class WalletApp extends Application { me =>
     clipboardManager setPrimaryClip bufferContent
   }
 
-  def sign(data: Bytes, pk: PrivateKey) = Try {
-    Crypto encodeSignature Crypto.sign(data, pk)
-  } getOrElse ByteVector.empty
-
   def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) =
     NodeAnnouncement(signature = sign(random getBytes 32, randomPrivKey), features = ByteVector.empty,
       timestamp = 0L, nodeId = id, rgbColor = (-128, -128, -128), alias take 16, addresses = na :: Nil)
@@ -352,8 +348,8 @@ object ChannelManager extends Broadcaster {
 
   def accumulatorChanOpt(rd: RoutingData) =
     all.filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty)
-      .filter(chan => chan.estimateNextUsefulCapacity >= rd.withMaxOffChainFeeAdded)
-      .sortBy(_.estimateCanReceive).headOption // Chan with a smallest fitting balance
+      .filter(_.estimateNextUsefulCapacity >= rd.withMaxOffChainFeeAdded)
+      .sortBy(_.estimateCanReceive).headOption // Smallest receivable
 
   // CHANNEL
 

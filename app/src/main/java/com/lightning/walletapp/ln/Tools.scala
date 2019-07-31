@@ -1,16 +1,16 @@
 package com.lightning.walletapp.ln
 
-import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering}
+import crypto.{RandomGenerator, Sphinx}
+import fr.acinq.bitcoin.Protocol.{One, Zeroes}
+import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering, Protocol}
+import com.lightning.walletapp.ln.wire.{InFlightHtlc, InitHostedChannel, StateUpdate, UpdateAddHtlc}
 import com.lightning.walletapp.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PrivateKey
-
+import java.nio.ByteOrder.LITTLE_ENDIAN
 import language.implicitConversions
-import crypto.{RandomGenerator, Sphinx}
 import scodec.bits.ByteVector
+import scala.util.Try
 import java.util
-
-import com.lightning.walletapp.ln.wire.UpdateAddHtlc
-import fr.acinq.bitcoin.Protocol._
 
 
 object \ {
@@ -38,6 +38,10 @@ object Tools {
     premap.toMap
   }
 
+  def sign(data: Bytes, pk: PrivateKey) = Try {
+    Crypto encodeSignature Crypto.sign(data, pk)
+  } getOrElse ByteVector.empty
+
   def fromShortId(id: Long) = {
     val blockHeight = id.>>(40).&(0xFFFFFF).toInt
     val txIndex = id.>>(16).&(0xFFFFFF).toInt
@@ -57,10 +61,32 @@ object Tools {
     txid.take(30) :+ part2 :+ part3
   }
 
-  def custodialChanId(pubkey1: ByteVector, pubkey2: ByteVector) = {
+  def hostedChanId(pubkey1: ByteVector, pubkey2: ByteVector) = {
     val pubkey1First: Boolean = LexicographicalOrdering.isLessThan(pubkey1, pubkey2)
     if (pubkey1First) Crypto.sha256(pubkey1 ++ pubkey2) else Crypto.sha256(pubkey2 ++ pubkey1)
   }
+
+  def hostedSigHash(refundScriptPubKey: ByteVector, update: StateUpdate, init: InitHostedChannel) = Crypto sha256 {
+    val clientHtlcs = update.clientOutgoingHtlcs.map(htlcSerialize).sortWith(LexicographicalOrdering.isLessThan)
+    val hostHtlcs = update.hostOutgoingHtlcs.map(htlcSerialize).sortWith(LexicographicalOrdering.isLessThan)
+
+    refundScriptPubKey ++
+      Protocol.writeUInt16(init.liabilityDeadlineBlockdays, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(init.minimalOnchainRefundAmountSatoshis, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(init.channelCapacitySatoshis, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(init.initialClientBalanceSatoshis, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(update.stateOverride.updatedClientBalanceSatoshis, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(update.stateOverride.blockDay, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(update.stateOverride.clientUpdateCounter, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(update.stateOverride.hostUpdateCounter, LITTLE_ENDIAN) ++
+      clientHtlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc } ++
+      hostHtlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
+  }
+
+  def htlcSerialize(htlc: InFlightHtlc) =
+    Protocol.writeUInt64(htlc.amountMsat, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(htlc.expiry, LITTLE_ENDIAN) ++
+      htlc.paymentHash
 }
 
 object Features {

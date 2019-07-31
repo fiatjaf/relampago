@@ -1,5 +1,7 @@
 package com.lightning.walletapp.ln
 
+import java.io.ByteArrayOutputStream
+
 import fr.acinq.bitcoin.Crypto._
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
@@ -8,10 +10,10 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.AddErrorCodes._
 import com.lightning.walletapp.ln.LNParams.broadcaster._
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
-import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
+import com.lightning.walletapp.ln.crypto.{Generators, MultiStreamUtils, ShaChain, ShaHashesWithIndex}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{LNMessageVector, RedeemScriptAndSig}
-import fr.acinq.bitcoin.{Satoshi, Transaction}
+import fr.acinq.bitcoin.{Protocol, Satoshi, Transaction}
 import org.bitcoinj.core.Batch
 import scodec.bits.ByteVector
 import fr.acinq.eclair.UInt64
@@ -484,10 +486,12 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 }
 
-case class HostedCommits(announce: NodeAnnouncement, params: InitHostedChannel, lastCrossSignedState: LastCrossSignedState,
+case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState,
                          nextLocalStateUpdateOpt: Option[StateUpdate], localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate],
                          localError: Option[Error], remoteError: Option[Error], startedAt: Long) extends Commitments with ChannelData {
 
   val reducedRemoteState: ReducedState = ???
   val channelId: ByteVector = announce.hostedChanId
+
+
 }

@@ -32,11 +32,6 @@ object MultiStreamUtils {
     inputStream.close
   }
 
-  def awrite(stream: ByteArrayOutputStream, arrs: Bytes*) = {
-    for (arrayDataToWrite <- arrs) stream write arrayDataToWrite
-    stream
-  }
-
   def aconcat(arrays: Bytes*): Bytes = {
     val output = new ByteArrayOutputStream(8)
     for (array <- arrays) output write array

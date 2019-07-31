@@ -133,7 +133,7 @@ case class NodeAnnouncement(signature: ByteVector, features: ByteVector, timesta
 
   val identifier = (alias + nodeId.toString).toLowerCase
   val asString = s"<strong>${alias take 16}</strong><br><small>$pretty</small>"
-  lazy val hostedChanId = Tools.custodialChanId(LNParams.nodePublicKey.toBin, nodeId.toBin)
+  lazy val hostedChanId = Tools.hostedChanId(LNParams.nodePublicKey.toBin, nodeId.toBin)
 }
 
 sealed trait NodeAddress { def canBeUpdatedIfOffline: Boolean }

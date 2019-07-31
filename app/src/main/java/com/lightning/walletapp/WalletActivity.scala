@@ -260,7 +260,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def doLogin(alert: AlertDialog) = rm(alert) {
-      val signature = app.sign(data = k1, pk = linkingPrivKey).toHex
+      val signature = Tools.sign(data = k1, pk = linkingPrivKey).toHex
       val secondLevelCallback = get(s"${lnUrl.request}?k1=$k1&sig=$signature&key=$linkingPubKey", true)
       val secondLevelRequest = secondLevelCallback.connectTimeout(7500).trustAllCerts.trustAllHosts
       queue.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
@@ -298,7 +298,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
         else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, minCanReceive, title, wr.defaultDescription) { rd =>
           def requestWithdraw = wr.unsafe(s"${wr.callback}?k1=${wr.k1}&sig=$makeSignature&pr=${PaymentRequest write rd.pr}")
-          def makeSignature = app.sign(data = wr.k1.getBytes, pk = LNParams getLinkingKey lnUrl.uri.getHost).toHex
+          def makeSignature = Tools.sign(data = wr.k1.getBytes, pk = LNParams getLinkingKey lnUrl.uri.getHost).toHex
           def onRequestFailed(response: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail response)
           queue.map(_ => requestWithdraw).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
         }
