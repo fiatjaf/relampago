@@ -212,9 +212,8 @@ object ChannelManager extends Broadcaster {
   val operationalListeners = Set(ChannelManager, bag)
   val CMDLocalShutdown = CMDShutdown(scriptPubKey = None)
   val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
-  private[this] var initialChainHeight = app.kit.wallet.getLastBlockSeenHeight
-  // Blocks download has not started yet and we don't know how many is left
-  var currentBlocksLeft = Int.MaxValue
+  var initialChainHeight = app.kit.wallet.getLastBlockSeenHeight
+  var currentBlocksLeft = Option.empty[Int]
 
   val socketEventsListener = new ConnectionListener {
     override def onOperational(nodeId: PublicKey, isCompat: Boolean) =
@@ -238,60 +237,47 @@ object ChannelManager extends Broadcaster {
   }
 
   val chainEventsListener = new TxTracker with BlocksListener with PeerDisconnectedEventListener {
-    def onPeerDisconnected(connectedPeer: Peer, numPeers: Int) = if (numPeers < 1) onBlock = oneTimeRun
-    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = onBlock(left)
+    def onPeerDisconnected(offPeer: Peer, numPeers: Int) = if (numPeers < 1) currentBlocksLeft = None
+    def onBlocksDownloaded(peer: Peer, b: Block, fb: FilteredBlock, left: Int) = onBlock(left)
     override def onChainDownloadStarted(peer: Peer, left: Int) = onBlock(left)
 
-    override def txConfirmed(txj: Transaction) = for (c <- all) c process CMDConfirmed(txj)
-    def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
-    def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
+    override def txConfirmed(txj: Transaction) = for (chan <- all) chan process CMDConfirmed(txj)
+    def onCoinsReceived(wallet: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
+    def onCoinsSent(wallet: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
 
-    var onBlock: Int => Unit = oneTimeRun
-    lazy val oneTimeRun: Int => Unit = left => {
-      // Set standardRun to be executed on new blocks
-      // then set `currentBlocksLeft` less than MaxValue
-      onBlock = standardRun
-      standardRun(left)
+    def onBlock(blocksLeft: Int) = {
+      val firstCall = currentBlocksLeft.isEmpty
+      currentBlocksLeft = Some(blocksLeft)
 
-      // Can already send payments at this point
-      // because `currentBlocksLeft` is updated
-      PaymentInfoWrap.resolvePending
-    }
-
-    lazy val standardRun: Int => Unit = left => {
-      // LN payment before BTC peers on app start: tried in `oneTimeRun`
-      // LN payment before BTC peers on app restart: tried in `oneTimeRun`
-      // LN payment after BTC peers on app start: tried immediately since `currentBlocksLeft` < `Int.MacValue`
-      // LN payment after BTC peers on app restart: tried immediately since `currentBlocksLeft` < `Int.MacValue`
-      // LN payment after BTC peers disconnected: tried in `oneTimeRun` because `onPeerDisconnected` resets `onBlock`
-
-      currentBlocksLeft = left
-      if (currentBlocksLeft < 1) {
-        // Send this once rescan is done to spare resources
+      if (firstCall || blocksLeft < 1) {
+        // Let channels know immediately, important for hosted ones
+        // then also repeat on each next last block to save resouces
         val cmd = CMDBestHeight(currentHeight, initialChainHeight)
-        for (channelToUpdate <- all) channelToUpdate process cmd
+        // Update to not have repeated warnings for the same HTLC
         initialChainHeight = currentHeight
+        all.foreach(_ process cmd)
+      }
+
+      if (firstCall) {
+        // Don't call this on each new block
+        PaymentInfoWrap.resolvePending
       }
     }
 
     def onChainTx(txj: Transaction) = {
       val cmdOnChainSpent = CMDSpent(txj)
-      for (c <- all) c process cmdOnChainSpent
+      all.foreach(_ process cmdOnChainSpent)
       bag.extractPreimage(cmdOnChainSpent.tx)
     }
   }
 
   // BROADCASTER IMPLEMENTATION
 
-  def currentHeight: Int = {
-    // We may be syncing but chain height can still be obtained by adding peding blocks
-    val blocksToDownload = if (currentBlocksLeft == Int.MaxValue) 0 else currentBlocksLeft
-    app.kit.wallet.getLastBlockSeenHeight + blocksToDownload
-  }
-
-  def currentBlockDay = currentHeight / blocksPerDay
   def perKwSixSat = RatesSaver.rates.feeSix.value / 4
   def perKwThreeSat = RatesSaver.rates.feeThree.value / 4
+  def currentHeight: Int = app.kit.wallet.getLastBlockSeenHeight + currentBlocksLeft.getOrElse(0)
+  def blockDaysLeft: Int = currentBlocksLeft.map(_ / blocksPerDay).getOrElse(Int.MaxValue)
+  def currentBlockDay = currentHeight / blocksPerDay
 
   def getTx(txid: ByteVector) = {
     val wrapped = Sha256Hash wrap txid.toArray
