@@ -11,13 +11,11 @@ import com.lightning.walletapp.ln.NormalChannel._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import android.app.{Activity, AlertDialog}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{LightningMessage, NodeAnnouncement, OpenChannel}
-
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
@@ -29,10 +27,13 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
+
+import scodec.bits.ByteVector
 
 
 trait SearchBar { me =>
@@ -260,7 +261,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def doLogin(alert: AlertDialog) = rm(alert) {
-      val signature = Tools.sign(data = k1, pk = linkingPrivKey).toHex
+      val signature = Tools.sign(ByteVector fromValidHex k1, linkingPrivKey).toHex
       val secondLevelCallback = get(s"${lnUrl.request}?k1=$k1&sig=$signature&key=$linkingPubKey", true)
       val secondLevelRequest = secondLevelCallback.connectTimeout(7500).trustAllCerts.trustAllHosts
       queue.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
@@ -298,7 +299,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
         else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, minCanReceive, title, wr.defaultDescription) { rd =>
           def requestWithdraw = wr.unsafe(s"${wr.callback}?k1=${wr.k1}&sig=$makeSignature&pr=${PaymentRequest write rd.pr}")
-          def makeSignature = Tools.sign(data = wr.k1.getBytes, pk = LNParams getLinkingKey lnUrl.uri.getHost).toHex
+          def makeSignature = Tools.sign(ByteVector fromValidHex wr.k1, LNParams getLinkingKey lnUrl.uri.getHost).toHex
           def onRequestFailed(response: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail response)
           queue.map(_ => requestWithdraw).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
         }

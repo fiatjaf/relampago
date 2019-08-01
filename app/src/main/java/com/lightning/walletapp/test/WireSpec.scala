@@ -335,7 +335,7 @@ class WireSpec {
       val invoke_hosted_channel = InvokeHostedChannel(randomBytes(32), bin(47, 0))
       val init_hosted_channel = InitHostedChannel(UInt64(6), 10, 20, 500000000L, 5000, 1000000, 1000000)
       val state_override = StateOverride(500000000L, 500000, 70000, 700000, randomSignature)
-      val in_flight_htlc = InFlightHtlc(600000000, bin(32, 0), 1000)
+      val in_flight_htlc = (1L, 600000000L, bin(32, 0), 1000L)
       val state_update1 = StateUpdate(state_override, List(in_flight_htlc, in_flight_htlc), List(in_flight_htlc, in_flight_htlc, in_flight_htlc))
       val state_update2 = StateUpdate(state_override, Nil, List(in_flight_htlc, in_flight_htlc, in_flight_htlc))
       val state_update3 = StateUpdate(state_override, List(in_flight_htlc, in_flight_htlc), Nil)

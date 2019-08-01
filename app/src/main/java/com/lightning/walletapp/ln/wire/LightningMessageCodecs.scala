@@ -22,6 +22,7 @@ object LightningMessageCodecs { me =>
   type BitVectorAttempt = Attempt[BitVector]
   type LNMessageVector = Vector[LightningMessage]
   type RedeemScriptAndSig = (ByteVector, ByteVector)
+  type HTLCTuple = (Long, Long, ByteVector, Long)
   type RGB = (Byte, Byte, Byte)
 
   def serialize(attempt: BitVectorAttempt): ByteVector = attempt match {
@@ -360,16 +361,17 @@ object LightningMessageCodecs { me =>
       (signature withContext "nodeSignature")
   }.as[StateOverride]
 
-  val inFlightHtlcCodec = {
-    (uint64Overflow withContext "amountMsat") ::
+  val htlcTupleCodec = {
+    (uint64Overflow withContext "id") ::
+      (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry")
-  }.as[InFlightHtlc]
+  }.as[HTLCTuple]
 
   val stateUpdateCodec = {
     (stateOverrideCodec withContext "stateOverride") ::
-      (listOfN(uint16, inFlightHtlcCodec) withContext "clientOutgoingHtlcs") ::
-      (listOfN(uint16, inFlightHtlcCodec) withContext "hostOutgoingHtlcs")
+      (listOfN(uint16, htlcTupleCodec) withContext "clientOutgoingHtlcs") ::
+      (listOfN(uint16, htlcTupleCodec) withContext "hostOutgoingHtlcs")
   }.as[StateUpdate]
 
   val invokeHostedChannelCodec = {

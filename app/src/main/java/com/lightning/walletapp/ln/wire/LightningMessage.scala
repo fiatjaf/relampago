@@ -57,6 +57,7 @@ case class UpdateAddHtlc(channelId: ByteVector,
                          id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long,
                          onionRoutingPacket: OnionRoutingPacket) extends ChannelMessage {
 
+  lazy val tuple: HTLCTuple = (id, amountMsat, paymentHash, expiry)
   lazy val hash160: ByteVector = Crypto ripemd160 paymentHash
   lazy val amount: MilliSatoshi = MilliSatoshi(amountMsat)
 }
@@ -206,9 +207,8 @@ case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
 case class StateOverride(updatedClientBalanceSatoshis: Long, blockDay: Long, clientUpdateCounter: Long,
                          hostUpdateCounter: Long, nodeSignature: ByteVector) extends HostedChannelMessage
 
-case class InFlightHtlc(amountMsat: Long, paymentHash: ByteVector, expiry: Long) extends HostedChannelMessage
-case class StateUpdate(stateOverride: StateOverride, clientOutgoingHtlcs: List[InFlightHtlc] = Nil,
-                       hostOutgoingHtlcs: List[InFlightHtlc] = Nil) extends HostedChannelMessage
+case class StateUpdate(stateOverride: StateOverride, clientOutgoingHtlcs: List[HTLCTuple] = Nil,
+                       hostOutgoingHtlcs: List[HTLCTuple] = Nil) extends HostedChannelMessage
 
 // Not in a spec
 case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)

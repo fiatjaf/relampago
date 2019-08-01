@@ -493,9 +493,9 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 }
 
-case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState,
-                         nextLocalStateUpdateOpt: Option[StateUpdate], localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate],
-                         localError: Option[Error], remoteError: Option[Error], startedAt: Long) extends Commitments with ChannelData {
+case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState, nextLocalStateUpdateOpt: Option[StateUpdate],
+                         localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
+                         startedAt: Long) extends Commitments with ChannelData {
 
   val reducedRemoteState: ReducedState = ???
   val channelId: ByteVector = announce.hostedChanId

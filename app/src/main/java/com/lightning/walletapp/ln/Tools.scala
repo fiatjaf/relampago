@@ -3,7 +3,8 @@ package com.lightning.walletapp.ln
 import crypto.{RandomGenerator, Sphinx}
 import fr.acinq.bitcoin.Protocol.{One, Zeroes}
 import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering, Protocol}
-import com.lightning.walletapp.ln.wire.{InFlightHtlc, InitHostedChannel, StateUpdate, UpdateAddHtlc}
+import com.lightning.walletapp.ln.wire.{InitHostedChannel, StateUpdate, UpdateAddHtlc}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.htlcTupleCodec
 import com.lightning.walletapp.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import java.nio.ByteOrder.LITTLE_ENDIAN
@@ -38,7 +39,7 @@ object Tools {
     premap.toMap
   }
 
-  def sign(data: Bytes, pk: PrivateKey) = Try {
+  def sign(data: ByteVector, pk: PrivateKey) = Try {
     Crypto encodeSignature Crypto.sign(data, pk)
   } getOrElse ByteVector.empty
 
@@ -67,8 +68,8 @@ object Tools {
   }
 
   def hostedSigHash(refundScriptPubKey: ByteVector, update: StateUpdate, init: InitHostedChannel) = Crypto sha256 {
-    val clientHtlcs = update.clientOutgoingHtlcs.map(htlcSerialize).sortWith(LexicographicalOrdering.isLessThan)
-    val hostHtlcs = update.hostOutgoingHtlcs.map(htlcSerialize).sortWith(LexicographicalOrdering.isLessThan)
+    val clientHtlcs = update.clientOutgoingHtlcs.map(htlcTupleCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
+    val hostHtlcs = update.hostOutgoingHtlcs.map(htlcTupleCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
 
     refundScriptPubKey ++
       Protocol.writeUInt16(init.liabilityDeadlineBlockdays, LITTLE_ENDIAN) ++
@@ -82,11 +83,6 @@ object Tools {
       clientHtlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc } ++
       hostHtlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
   }
-
-  def htlcSerialize(htlc: InFlightHtlc) =
-    Protocol.writeUInt64(htlc.amountMsat, LITTLE_ENDIAN) ++
-      Protocol.writeUInt32(htlc.expiry, LITTLE_ENDIAN) ++
-      htlc.paymentHash
 }
 
 object Features {

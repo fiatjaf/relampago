@@ -737,7 +737,8 @@ abstract class HostedChannel(val isHosted: Boolean) extends Channel { me =>
 
         val firstUpdate = StateUpdate(firstStateOverride)
         val sigHash = Tools.hostedSigHash(refundScriptPubKey, firstUpdate, init)
-        val firstSignature = Tools.sign(sigHash.toArray, LNParams.nodePrivateKey)
+        val firstSignature = Tools.sign(sigHash, LNParams.nodePrivateKey)
+
         val update1 = firstUpdate.modify(_.stateOverride.nodeSignature) setTo firstSignature
         me UPDATA WaitTheirStateUpdate(announce, refundScriptPubKey, init, update1) SEND update1
 
