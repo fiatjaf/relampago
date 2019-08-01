@@ -22,7 +22,7 @@ object LightningMessageCodecs { me =>
   type BitVectorAttempt = Attempt[BitVector]
   type LNMessageVector = Vector[LightningMessage]
   type RedeemScriptAndSig = (ByteVector, ByteVector)
-  type HTLCTuple = (Long, Long, ByteVector, Long)
+  type HTLCTuple = (Boolean, Long, Long, ByteVector, Long)
   type RGB = (Byte, Byte, Byte)
 
   def serialize(attempt: BitVectorAttempt): ByteVector = attempt match {
@@ -362,7 +362,8 @@ object LightningMessageCodecs { me =>
   }.as[StateOverride]
 
   val htlcTupleCodec = {
-    (uint64Overflow withContext "id") ::
+    (bool withContext "fromHost") ::
+      (uint64Overflow withContext "id") ::
       (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry")
@@ -370,8 +371,7 @@ object LightningMessageCodecs { me =>
 
   val stateUpdateCodec = {
     (stateOverrideCodec withContext "stateOverride") ::
-      (listOfN(uint16, htlcTupleCodec) withContext "clientOutgoingHtlcs") ::
-      (listOfN(uint16, htlcTupleCodec) withContext "hostOutgoingHtlcs")
+      (listOfN(uint16, htlcTupleCodec) withContext "clientOutgoingHtlcs")
   }.as[StateUpdate]
 
   val invokeHostedChannelCodec = {
@@ -571,13 +571,6 @@ object OnionCodecs {
       (uint32 withContext "outgoing_cltv_value") ::
       (ignore(8 * 12) withContext "unused_with_v0_version_on_header")
   }.as[PerHopPayload]
-
-  /**
-    * The 1.1 BOLT spec changed the onion frame format to use variable-length per-hop payloads.
-    * The first bytes contain a varint encoding the length of the payload data (not including the trailing mac).
-    * That varint is considered to be part of the payload, so the payload length includes the number of bytes used by
-    * the varint prefix.
-    */
 
   val payloadLengthDecoder = Decoder[Long] { bits: BitVector =>
     varintoverflow.decode(bits) map { decResult: DecodeResult[Long] =>

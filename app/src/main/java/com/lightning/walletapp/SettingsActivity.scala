@@ -122,7 +122,6 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def onFpTap(cb: View) = fpAuthentication.isChecked match {
     case true if VERSION.SDK_INT < VERSION_CODES.M => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
-    case true if !FingerPrint.isPermissionGranted => runAnd(fpAuthentication setChecked false)(FingerPrint askPermission me)
     case true if !gf.hasFingerprintHardware => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
     case true if !gf.hasEnrolledFingerprint => runAnd(fpAuthentication setChecked false)(app toast fp_add_print)
     case mode => FingerPrint switch mode

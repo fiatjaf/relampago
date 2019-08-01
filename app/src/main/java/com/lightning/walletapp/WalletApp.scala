@@ -362,14 +362,14 @@ object ChannelManager extends Broadcaster {
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
-  def createHostedChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel(isHosted = true) { self =>
+  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannelClient(isHosted = true) { self =>
     def SEND(message: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process message
     def STORE(data: ChannelData) = runAnd(data)(ChannelWrap put data)
-    listeners = initialListeners
+    listeners = initListeners
     doProcess(bootstrap)
   }
 
-  def createChannel(initialListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel(isHosted = false) { self =>
+  def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel(isHosted = false) { self =>
     def SEND(message: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process message
 
     def STORE(data: ChannelData) = runAnd(data) {
@@ -429,7 +429,7 @@ object ChannelManager extends Broadcaster {
       SEND(error)
     }
 
-    listeners = initialListeners
+    listeners = initListeners
     doProcess(bootstrap)
   }
 

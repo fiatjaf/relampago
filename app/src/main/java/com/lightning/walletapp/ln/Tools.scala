@@ -68,8 +68,7 @@ object Tools {
   }
 
   def hostedSigHash(refundScriptPubKey: ByteVector, update: StateUpdate, init: InitHostedChannel) = Crypto sha256 {
-    val clientHtlcs = update.clientOutgoingHtlcs.map(htlcTupleCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
-    val hostHtlcs = update.hostOutgoingHtlcs.map(htlcTupleCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
+    val htlcs = update.inFlightHtlcs.map(htlcTupleCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
 
     refundScriptPubKey ++
       Protocol.writeUInt16(init.liabilityDeadlineBlockdays, LITTLE_ENDIAN) ++
@@ -80,8 +79,7 @@ object Tools {
       Protocol.writeUInt32(update.stateOverride.blockDay, LITTLE_ENDIAN) ++
       Protocol.writeUInt32(update.stateOverride.clientUpdateCounter, LITTLE_ENDIAN) ++
       Protocol.writeUInt32(update.stateOverride.hostUpdateCounter, LITTLE_ENDIAN) ++
-      clientHtlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc } ++
-      hostHtlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
+      htlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
   }
 }
 

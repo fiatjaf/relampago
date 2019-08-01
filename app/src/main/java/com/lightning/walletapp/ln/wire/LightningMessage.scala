@@ -1,11 +1,12 @@
 package com.lightning.walletapp.ln.wire
 
 import com.lightning.walletapp.ln._
+import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 
 import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
-import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
+import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
 import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import fr.acinq.eclair.UInt64
@@ -57,7 +58,6 @@ case class UpdateAddHtlc(channelId: ByteVector,
                          id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long,
                          onionRoutingPacket: OnionRoutingPacket) extends ChannelMessage {
 
-  lazy val tuple: HTLCTuple = (id, amountMsat, paymentHash, expiry)
   lazy val hash160: ByteVector = Crypto ripemd160 paymentHash
   lazy val amount: MilliSatoshi = MilliSatoshi(amountMsat)
 }
@@ -204,11 +204,20 @@ case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
                                 initHostedChannel: InitHostedChannel, lastClientStateUpdate: StateUpdate,
                                 lastHostStateUpdate: StateUpdate) extends HostedChannelMessage
 
-case class StateOverride(updatedClientBalanceSatoshis: Long, blockDay: Long, clientUpdateCounter: Long,
-                         hostUpdateCounter: Long, nodeSignature: ByteVector) extends HostedChannelMessage
+case class StateOverride(updatedClientBalanceSatoshis: Long,
+                         blockDay: Long, clientUpdateCounter: Long, hostUpdateCounter: Long,
+                         nodeSignature: ByteVector) extends HostedChannelMessage {
 
-case class StateUpdate(stateOverride: StateOverride, clientOutgoingHtlcs: List[HTLCTuple] = Nil,
-                       hostOutgoingHtlcs: List[HTLCTuple] = Nil) extends HostedChannelMessage
+  def hasConverged(that: StateOverride) =
+    that.clientUpdateCounter == clientUpdateCounter &&
+      that.hostUpdateCounter == hostUpdateCounter &&
+      math.abs(that.blockDay - blockDay) <= 1
+}
+
+case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[HTLCTuple] = Nil) extends HostedChannelMessage { me =>
+  def signed(sigHash: ByteVector, priv: PrivateKey) = me.modify(_.stateOverride.nodeSignature) setTo Tools.sign(sigHash, priv)
+  def verify(sigHash: ByteVector, pub: PublicKey) = Crypto.verifySignature(sigHash, stateOverride.nodeSignature, pub)
+}
 
 // Not in a spec
 case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)

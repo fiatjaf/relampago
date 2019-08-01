@@ -10,7 +10,7 @@ import com.lightning.walletapp.ln.LNParams.broadcaster._
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{LNMessageVector, RedeemScriptAndSig}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{HTLCTuple, LNMessageVector, RedeemScriptAndSig}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
 import org.bitcoinj.core.Batch
 import scodec.bits.ByteVector
@@ -50,7 +50,7 @@ case class WaitTheirHostedReply(announce: NodeAnnouncement, refundScriptPubKey: 
 }
 
 case class WaitTheirStateUpdate(announce: NodeAnnouncement, refundScriptPubKey: ByteVector,
-                                init: InitHostedChannel, ourFirstUpdate: StateUpdate) extends ChannelData
+                                init: InitHostedChannel) extends ChannelData
 
 // INCOMING CHANNEL
 
@@ -113,10 +113,10 @@ case class ClosingData(announce: NodeAnnouncement,
                        refundRemoteCommit: Seq[RemoteCommitPublished] = Nil, revokedCommit: Seq[RevokedCommitPublished] = Nil,
                        closedAt: Long = System.currentTimeMillis) extends HasNormalCommits {
 
-  def tier12States = realTier12Closings.flatMap(_.getState) // Not a lazy val because results depend on blockchain state
-  private lazy val realTier12Closings = revokedCommit ++ localCommit ++ remoteCommit ++ nextRemoteCommit ++ refundRemoteCommit
-  lazy val frozenPublishedHashes = realTier12Closings.flatMap(_.frozenHashes)
   lazy val commitTxs = realTier12Closings.map(_.commitTx)
+  lazy val frozenPublishedHashes = realTier12Closings.flatMap(_.frozenHashes)
+  private lazy val realTier12Closings = revokedCommit ++ localCommit ++
+    remoteCommit ++ nextRemoteCommit ++ refundRemoteCommit
 
   def bestClosing: CommitPublished = {
     // At least one closing is guaranteed to be here
@@ -131,6 +131,9 @@ case class ClosingData(announce: NodeAnnouncement,
     case MutualCommitPublished(closingTx) => getStatus(closingTx.txid) match { case confs \ isDead => confs > minDepth || isDead }
     case info => info.getState.map(_.txn.txid).map(getStatus) forall { case confs \ isDead => confs > minDepth || isDead }
   }
+
+  // Not a lazy val because results depend on blockchain state
+  def tier12States = realTier12Closings.flatMap(_.getState)
 }
 
 sealed trait CommitPublished {
@@ -205,7 +208,10 @@ case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig],
 
 // COMMITMENTS
 
-case class Htlc(incoming: Boolean, add: UpdateAddHtlc)
+case class Htlc(incoming: Boolean, add: UpdateAddHtlc) {
+  lazy val tuple: HTLCTuple = (incoming, add.id, add.amountMsat, add.paymentHash, add.expiry)
+}
+
 case class CommitmentSpec(feeratePerKw: Long, toLocalMsat: Long, toRemoteMsat: Long,
                           htlcs: Set[Htlc] = Set.empty, fulfilled: Set[HtlcAndFulfill] = Set.empty,
                           failed: Set[HtlcAndFail] = Set.empty, malformed: Set[Htlc] = Set.empty) {
@@ -488,14 +494,15 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
       copy(localChanges = localChanges1, remoteChanges = remoteChanges1, remoteCommit = wait.nextRemoteCommit,
         remoteNextCommitInfo = Right(rev.nextPerCommitmentPoint), remotePerCommitmentSecrets = secrets1)
 
-    // Unexpected revocation when we have Point
-    case _ => throw new LightningException
+    case _ =>
+      // Unexpected revocation
+      throw new LightningException
   }
 }
 
-case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState, nextLocalStateUpdateOpt: Option[StateUpdate],
-                         localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
-                         startedAt: Long) extends Commitments with ChannelData {
+case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState,
+                         clientNextHtlcId: Long, hostNextHtlcId: Long, localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate],
+                         localError: Option[Error], remoteError: Option[Error], startedAt: Long) extends Commitments with ChannelData {
 
   val reducedRemoteState: ReducedState = ???
   val channelId: ByteVector = announce.hostedChanId

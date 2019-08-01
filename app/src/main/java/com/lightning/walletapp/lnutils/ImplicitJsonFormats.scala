@@ -232,9 +232,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       Changes](Changes.apply, "proposed", "signed", "acked")
 
   implicit val hostedCommitsFmt = jsonFormat[NodeAnnouncement, LastCrossSignedState,
-    Option[StateUpdate], CommitmentSpec, Option[ChannelUpdate], Option[Error], Option[Error], Long,
-    HostedCommits](HostedCommits.apply, "announce", "lastCrossSignedState", "nextLocalStateUpdateOpt",
-    "localSpec", "updateOpt", "localError", "remoteError", "startedAt")
+    Long, Long, CommitmentSpec, Option[ChannelUpdate], Option[Error], Option[Error], Long,
+    HostedCommits](HostedCommits.apply, "announce", "lastCrossSignedState", "clientNextHtlcId",
+    "hostNextHtlcId", "localSpec", "updateOpt", "localError", "remoteError", "startedAt")
 
   implicit val normalCommitsFmt = jsonFormat[LocalParams, AcceptChannel, LocalCommit, RemoteCommit, Changes, Changes, Long, Long,
     Either[WaitingForRevocation, Point], InputInfo, ShaHashesWithIndex, ByteVector, Option[ChannelUpdate], Option[ChannelFlags], Long,

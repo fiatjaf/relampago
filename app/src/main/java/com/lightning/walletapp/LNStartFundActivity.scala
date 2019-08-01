@@ -47,7 +47,7 @@ class LNStartFundActivity extends TimerActivity { me =>
   }
 
   def proceed(openOpt: Option[OpenChannel], asString: String, ann: NodeAnnouncement): Unit = {
-    val freshChannel = ChannelManager.createChannel(bootstrap = InitData(ann), initialListeners = Set.empty)
+    val freshChannel = ChannelManager.createChannel(bootstrap = InitData(ann), initListeners = Set.empty)
     val peerIncompatible = new LightningException(me getString err_ln_peer_incompatible format ann.alias)
     val peerOffline = new LightningException(me getString err_ln_peer_offline format ann.alias)
     lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)

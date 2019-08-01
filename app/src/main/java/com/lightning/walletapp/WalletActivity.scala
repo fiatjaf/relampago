@@ -11,11 +11,13 @@ import com.lightning.walletapp.ln.NormalChannel._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+
 import android.app.{Activity, AlertDialog}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{LightningMessage, NodeAnnouncement, OpenChannel}
+
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
@@ -27,13 +29,11 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
-
+import scodec.bits.ByteVector
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
-
-import scodec.bits.ByteVector
 
 
 trait SearchBar { me =>
