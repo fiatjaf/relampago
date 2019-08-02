@@ -186,11 +186,11 @@ class WalletApp extends Application { me =>
 
       for {
         _ <- Obs just null subscribeOn IOScheduler.apply delay 20.seconds
-        offlineChan <- ChannelManager.all if offlineChan.state == SLEEPING
-        if offlineChan.data.announce.addresses.headOption.forall(_.canBeUpdatedIfOffline)
+        offlineChannel <- ChannelManager.all if offlineChannel.permanentOffline
+        if offlineChannel.data.announce.addresses.headOption.forall(_.canBeUpdatedIfOffline)
         // Call findNodes without `retry` wrapper because it gives harmless `Obs.empty` on error
-        Vector(ann1 \ _, _*) <- app.olympus findNodes offlineChan.data.announce.nodeId.toString
-      } offlineChan process ann1
+        Vector(ann1 \ _, _*) <- app.olympus findNodes offlineChannel.data.announce.nodeId.toString
+      } offlineChannel process ann1
 
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
@@ -303,9 +303,13 @@ object ChannelManager extends Broadcaster {
         dummy = Announcements.makeChannelUpdate(chainHash, nodePrivateKey, chan.data.announce.nodeId, shortChannelId)
       } chan process CMDChannelUpdate(dummy)
 
-    case (chan: Channel, _, real: ChannelUpdate) if chan.shouldRenew(real) =>
-      // We have a dummy or outdated update and now they supply a new one
+    case (chan: Channel, _, real: ChannelUpdate) if chan shouldRenew real =>
+      // We had an old or dummy channel update and now they have sent a new one
       chan process CMDChannelUpdate(real)
+
+    case (chan: Channel, _, CMDSocketOnline) =>
+      // Memo that channel was online at least once
+      chan.permanentOffline = false
   }
 
   override def onBecome = {

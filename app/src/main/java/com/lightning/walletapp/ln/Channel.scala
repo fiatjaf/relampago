@@ -50,6 +50,7 @@ trait Channel extends StateMachine[ChannelData] { me =>
     estimateCanSend + estimateCanReceive
 
   val isHosted: Boolean
+  var permanentOffline: Boolean = true
   var listeners: Set[ChannelListener] = _
   val events: ChannelListener = new ChannelListener {
     override def onProcessSuccess = { case ps => for (lst <- listeners if lst.onProcessSuccess isDefinedAt ps) lst onProcessSuccess ps }
