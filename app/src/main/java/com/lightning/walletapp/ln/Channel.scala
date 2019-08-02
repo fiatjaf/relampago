@@ -4,6 +4,7 @@ import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.NormalChannel._
+import com.lightning.walletapp.ln.ChanErrorCodes._
 import fr.acinq.bitcoin.Protocol.Zeroes
 import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
@@ -40,10 +41,13 @@ trait Channel extends StateMachine[ChannelData] { me =>
   def STORE(data: ChannelData): ChannelData
   def SEND(msg: LightningMessage): Unit
 
-  def estimateCanSend: Long
-  def estimateCanReceive: Long
-  def estimateNextUsefulCapacity: Long
   def inFlightHtlcs: Set[Htlc]
+  def estimateCanReceive: Long
+  def estimateCanSend: Long
+
+  def estimateNextUsefulCapacity =
+    // In-flight HTLCs are subtracted here
+    estimateCanSend + estimateCanReceive
 
   val isHosted: Boolean
   var listeners: Set[ChannelListener] = _
@@ -60,9 +64,8 @@ trait Channel extends StateMachine[ChannelData] { me =>
 abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
   def fundTxId = data match {case hasSome: HasNormalCommits => hasSome.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
   def estimateCanSend = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat } getOrElse 0L
+  def inFlightHtlcs = getCommits collect { case nc: NormalCommits => nc.reducedRemoteState.spec.htlcs } getOrElse Set.empty[Htlc]
   def estimateCanReceive = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canReceiveMsat } getOrElse 0L
-  def inFlightHtlcs = getCommits map (_.reducedRemoteState.htlcs) getOrElse Set.empty[Htlc]
-  def estimateNextUsefulCapacity = estimateCanSend + estimateCanReceive
 
   def CLOSEANDWATCH(close: ClosingData): Unit
   def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit
@@ -698,10 +701,9 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
 }
 
 abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =>
-  def estimateCanSend: Long = ???
-  def estimateCanReceive: Long = ???
-  def estimateNextUsefulCapacity: Long = ???
-  def inFlightHtlcs: Set[Htlc] = ???
+  def estimateCanSend = getCommits collect { case nc: HostedCommits => nc.localSpec.toLocalMsat } getOrElse 0L
+  def estimateCanReceive = getCommits collect { case nc: HostedCommits => nc.localSpec.toRemoteMsat } getOrElse 0L
+  def inFlightHtlcs = getCommits collect { case nc: HostedCommits => nc.localSpec.htlcs } getOrElse Set.empty[Htlc]
 
   private var lastLocalStateUpdate = Option.empty[StateUpdate]
   private var isChainHeightKnown: Boolean = false
@@ -710,23 +712,43 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
   def doProcess(change: Any) = {
     Tuple4(lastLocalStateUpdate, data, change, state) match {
       case (None, wait: WaitTheirHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
-        val msg = InvokeHostedChannel(LNParams.chainHash, wait.refundScriptPubKey)
-        if (isChainHeightKnown) BECOME(wait, state1 = WAIT_FOR_ACCEPT) SEND msg
+        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initHostedChanMsg
         isSocketConnected = true
 
 
       case (None, wait: WaitTheirHostedReply, _: CMDBestHeight, WAIT_FOR_INIT) =>
-        val msg = InvokeHostedChannel(LNParams.chainHash, wait.refundScriptPubKey)
-        if (isSocketConnected) BECOME(wait, state1 = WAIT_FOR_ACCEPT) SEND msg
+        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initHostedChanMsg
         isChainHeightKnown = true
 
 
-      case (None, WaitTheirHostedReply(announce, refundScriptPubKey), their: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
+      case (None, WaitTheirHostedReply(announce, refundScriptPubKey), lcss: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
+        val hostSigHash = Tools.hostedSigHash(lcss.lastRefundScriptPubKey, lcss.lastHostStateUpdate, lcss.initHostedChannel)
+        val clientSigHash = Tools.hostedSigHash(lcss.lastRefundScriptPubKey, lcss.lastClientStateUpdate, lcss.initHostedChannel)
+        val hostBalance = lcss.initHostedChannel.channelCapacitySatoshis - lcss.initHostedChannel.initialClientBalanceSatoshis
+        val localSpec = CommitmentSpec(feeratePerKw = 0L, lcss.initHostedChannel.initialClientBalanceSatoshis, hostBalance)
+        val commits = HostedCommits(announce, lcss, localNextHtlcId = 1L, localSpec, updateOpt = None, localError = None,
+          remoteError = None, startedAt = System.currentTimeMillis)
+
+        val isSameBalance = lcss.lastClientStateUpdate.sameBalance(lcss.lastHostStateUpdate)
+        val isSameInFlight = lcss.lastClientStateUpdate.sameInFlight(lcss.lastHostStateUpdate)
+        val isBlockdayAcceptable = lcss.lastClientStateUpdate.stateOverride.isBlockdayAcceptable(lcss.lastHostStateUpdate.stateOverride)
+        val hasConverged = lcss.lastClientStateUpdate.stateOverride.hasConverged(lcss.lastClientStateUpdate.stateOverride)
+        val clientSigOk = lcss.lastClientStateUpdate.verify(clientSigHash, LNParams.nodePublicKey)
+        val hostSigOk = lcss.lastHostStateUpdate.verify(hostSigHash, announce.nodeId)
+
+        if (!isSameBalance) localSuspend(commits, ERR_HOSTED_WRONG_BALANCE)
+        else if (!isSameInFlight) localSuspend(commits, ERR_HOSTED_WRONG_IN_FLIGHT)
+        else if (!isBlockdayAcceptable) localSuspend(commits, ERR_HOSTED_WRONG_BLOCKDAY)
+        else if (!hasConverged) localSuspend(commits, ERR_HOSTED_DID_NOT_CONVERGE)
+        else if (!clientSigOk) localSuspend(commits, ERR_HOSTED_WRONG_CLIENT_SIG)
+        else if (!hostSigOk) localSuspend(commits, ERR_HOSTED_WRONG_HOST_SIG)
+        else BECOME(me STORE commits, OPEN)
 
 
       case (None, WaitTheirHostedReply(announce, refundScriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
         if (init.liabilityDeadlineBlockdays < LNParams.minHostedLiabilityBlockdays) throw new LightningException("Their liability deadline is too low")
         if (init.channelCapacitySatoshis < LNParams.minCapacityMsat / 1000L) throw new LightningException("Their proposed channel capacity is too low")
+        if (init.initialClientBalanceSatoshis > init.channelCapacitySatoshis) throw new LightningException("Client init balance is larger than capacity")
         if (init.minimalOnchainRefundAmountSatoshis > 100000L) throw new LightningException("Their minimal on-chain refund amount is too low")
         if (UInt64(100000000L) > init.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
         if (init.htlcMinimumMsat > 100000L) throw new LightningException("Their htlcMinimumMsat is too high")
@@ -744,45 +766,66 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
 
       case (Some(stateUpdate), WaitTheirStateUpdate(announce, refundScriptPubKey, init), their: StateUpdate, WAIT_FOR_ACCEPT) =>
         val theirSigOk = their.verify(Tools.hostedSigHash(refundScriptPubKey, update = their, init), announce.nodeId)
+        val isBlockdayAcceptable = stateUpdate.stateOverride.isBlockdayAcceptable(their.stateOverride)
         val hasConverged = stateUpdate.stateOverride.hasConverged(their.stateOverride)
 
-        if (!hasConverged) throw new LightningException("Their first update has not converged")
         if (!theirSigOk) throw new LightningException("Their first update signature is wrong")
+        if (!isBlockdayAcceptable) throw new LightningException("Their blockday is not acceptable")
+        if (!hasConverged) throw new LightningException("Their first update has not converged")
 
         val hostBalance = init.channelCapacitySatoshis - init.initialClientBalanceSatoshis
-        val localSpec = CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceSatoshis, hostBalance)
         BECOME(me STORE HostedCommits(announce, LastCrossSignedState(refundScriptPubKey, init, stateUpdate, their),
-          clientNextHtlcId = 0L, hostNextHtlcId = 0L, localSpec, updateOpt = None, localError = None, remoteError = None,
-          startedAt = System.currentTimeMillis), OPEN)
+          localNextHtlcId = 1L, CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceSatoshis, hostBalance),
+          updateOpt = None, localError = None, remoteError = None, startedAt = System.currentTimeMillis), OPEN)
+
+
+      // OPEN MODE
 
 
       case (_, cs: HostedCommits, CMDSocketOffline, OPEN) =>
-        BECOME(cs, state1 = SLEEPING)
         isSocketConnected = false
+        BECOME(cs, SLEEPING)
 
 
       case (_, cs: HostedCommits, CMDSocketOnline, SLEEPING) =>
-        if (isChainHeightKnown) BECOME(cs, state1 = OPEN)
+        if (isChainHeightKnown) me SEND cs.initHostedChanMsg
         isSocketConnected = true
 
 
       case (_, cs: HostedCommits, _: CMDBestHeight, SLEEPING) =>
-        if (isSocketConnected) BECOME(cs, state1 = OPEN)
+        if (isSocketConnected) me SEND cs.initHostedChanMsg
         isChainHeightKnown = true
 
 
+      case (_, cs: HostedCommits, lcss: LastCrossSignedState, SLEEPING) =>
+        // If their message equals ours: enter normal state
+        // If they are provably ahead: enter normal state with their parameters
+        // If they are provably behind: send our last cross signed message to them
+        // if something is wrong: enter SUSPENDED state
+
+
+      case (_, hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING)
+        if hc.announce.nodeId == newAnn.nodeId && Announcements.checkSig(newAnn) =>
+        // Node was SLEEPING for a long time so we have initiated a new announcement search
+        data = me STORE hc.modify(_.announce).setTo(newAnn)
+
+
       case (_, cs: HostedCommits, CMDChannelUpdate(upd), OPEN | SLEEPING) =>
-        val Tuple3(blockHeight, _, _) = Tools.fromShortId(id = upd.shortChannelId)
-        if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) throw new LightningException
-        if (blockHeight < LNParams.maxHostedBlockHeight) throw new LightningException
+        val Tuple3(blockHeight, _, _) = Tools.fromShortId(upd.shortChannelId)
+        if (blockHeight > LNParams.maxHostedBlockHeight) localSuspend(cs, ERR_HOSTED_UPDATE_BLOCK_HEIGHT_TOO_HIGH)
+        if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(cs, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
         val d1 = cs.modify(_.updateOpt) setTo Some(upd)
         data = me STORE d1
 
 
-      case (_, null, cs: HostedCommits, null) =>
-        val isErrorState = cs.localError.isDefined || cs.remoteError.isDefined
-        if (isErrorState) super.become(cs, SUSPENDED) else super.become(cs, SLEEPING)
+      case (_, cs: HostedCommits, remoteError: Error, OPEN | SLEEPING) =>
+        val cs1 = cs.modify(_.remoteError) setTo Some(remoteError)
+        BECOME(me STORE cs1, SUSPENDED)
 
+
+      case (_, null, wait: WaitTheirHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
+      case (_, null, cs: HostedCommits, null) if cs.isInErrorState => super.become(cs, SUSPENDED)
+      case (_, null, cs: HostedCommits, null) => super.become(cs, SLEEPING)
       case _ =>
     }
 
@@ -792,6 +835,12 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
 
   def makeStateUpdate(htlcs: Set[Htlc], so: StateOverride) =
     StateUpdate(so, for (htlc <- htlcs.toList) yield htlc.tuple)
+
+  def localSuspend(commits: HostedCommits, errCode: ByteVector) = {
+    val localError = Error(data = errCode, channelId = commits.channelId)
+    val commits1 = commits.modify(_.localError) setTo Some(localError)
+    BECOME(me STORE commits1, SUSPENDED) SEND localError
+  }
 }
 
 object NormalChannel {

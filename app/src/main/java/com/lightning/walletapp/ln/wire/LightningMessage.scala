@@ -75,7 +75,9 @@ case class RevokeAndAck(channelId: ByteVector, perCommitmentSecret: Scalar, next
 
 case class Error(channelId: ByteVector, data: ByteVector) extends ChannelMessage {
   def exception = new LightningException(reason = s"Remote channel message\n\n$text")
+  lazy val taggedText = bin2readable(data.drop(2).toArray)
   lazy val text = bin2readable(data.toArray)
+  lazy val tag = data.take(2)
 }
 
 case class ChannelReestablish(channelId: ByteVector, nextLocalCommitmentNumber: Long,
@@ -208,15 +210,19 @@ case class StateOverride(updatedClientBalanceSatoshis: Long,
                          blockDay: Long, clientUpdateCounter: Long, hostUpdateCounter: Long,
                          nodeSignature: ByteVector) extends HostedChannelMessage {
 
+  def isBlockdayAcceptable(that: StateOverride) =
+    math.abs(that.blockDay - blockDay) <= 1
+
   def hasConverged(that: StateOverride) =
     that.clientUpdateCounter == clientUpdateCounter &&
-      that.hostUpdateCounter == hostUpdateCounter &&
-      math.abs(that.blockDay - blockDay) <= 1
+      that.hostUpdateCounter == hostUpdateCounter
 }
 
 case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[HTLCTuple] = Nil) extends HostedChannelMessage { me =>
+  def sameBalance(that: StateUpdate) = that.stateOverride.updatedClientBalanceSatoshis == stateOverride.updatedClientBalanceSatoshis
   def signed(sigHash: ByteVector, priv: PrivateKey) = me.modify(_.stateOverride.nodeSignature) setTo Tools.sign(sigHash, priv)
   def verify(sigHash: ByteVector, pub: PublicKey) = Crypto.verifySignature(sigHash, stateOverride.nodeSignature, pub)
+  def sameInFlight(that: StateUpdate) = that.inFlightHtlcs.toSet == inFlightHtlcs.toSet
 }
 
 // Not in a spec

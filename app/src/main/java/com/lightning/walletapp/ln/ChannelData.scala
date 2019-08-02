@@ -5,7 +5,7 @@ import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Scripts._
 import com.lightning.walletapp.ln.LNParams._
-import com.lightning.walletapp.ln.AddErrorCodes._
+import com.lightning.walletapp.ln.ChanErrorCodes._
 import com.lightning.walletapp.ln.LNParams.broadcaster._
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
@@ -47,6 +47,7 @@ case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 case class WaitTheirHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector) extends ChannelData {
   require(Helpers isValidFinalScriptPubkey refundScriptPubKey, "Invalid refundScriptPubKey when opening a hosted channel")
+  lazy val initHostedChanMsg = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey)
 }
 
 case class WaitTheirStateUpdate(announce: NodeAnnouncement, refundScriptPubKey: ByteVector,
@@ -294,17 +295,14 @@ case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: ByteVector,
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 
 sealed trait Commitments {
+  val myFullBalanceMsat: Long
   val localSpec: CommitmentSpec
-  val reducedRemoteState: ReducedState
   val updateOpt: Option[ChannelUpdate]
   val channelId: ByteVector
   val startedAt: Long
 }
 
-case class ReducedState(htlcs: Set[Htlc], canSendMsat: Long,
-                        canReceiveMsat: Long, myFeeSat: Long,
-                        inChanMsat: Long)
-
+case class ReducedState(spec: CommitmentSpec, canSendMsat: Long, canReceiveMsat: Long, myFeeSat: Long)
 case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, localCommit: LocalCommit,
                          remoteCommit: RemoteCommit, localChanges: Changes, remoteChanges: Changes, localNextHtlcId: Long,
                          remoteNextHtlcId: Long, remoteNextCommitInfo: Either[WaitingForRevocation, Point], commitInput: InputInfo,
@@ -319,10 +317,11 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 
     val canSendMsat = reduced.toRemoteMsat - (myFeeSat + remoteParams.channelReserveSatoshis) * 1000L
     val canReceiveMsat = reduced.toLocalMsat - (theirFeeSat + localParams.channelReserveSat) * 1000L
-    ReducedState(reduced.htlcs, canSendMsat, canReceiveMsat, myFeeSat, reduced.toRemoteMsat)
+    ReducedState(reduced, canSendMsat, canReceiveMsat, myFeeSat)
   }
 
   lazy val localSpec = localCommit.spec
+  lazy val myFullBalanceMsat = reducedRemoteState.spec.toRemoteMsat
   def latestRemoteCommit = remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse remoteCommit
   def localHasUnsignedOutgoing = localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def remoteHasUnsignedOutgoing = remoteChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
@@ -367,7 +366,7 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
     val add = UpdateAddHtlc(channelId, localNextHtlcId, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet)
     val c1 = addLocalProposal(add).modify(_.localNextHtlcId).using(current => 1 + current)
     // This is their point of view so our outgoing HTLCs are their incoming
-    val outgoingHtlcs = c1.reducedRemoteState.htlcs.filter(_.incoming)
+    val outgoingHtlcs = c1.reducedRemoteState.spec.htlcs.filter(_.incoming)
     val inFlight = outgoingHtlcs.map(_.add.amountMsat).sum
 
     // We should check if we can send another HTLC and if PEER can accept another HTLC, including if we both can handle an updated commit tx fee
@@ -500,10 +499,15 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 }
 
-case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState,
-                         clientNextHtlcId: Long, hostNextHtlcId: Long, localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate],
-                         localError: Option[Error], remoteError: Option[Error], startedAt: Long) extends Commitments with ChannelData {
+case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState, localNextHtlcId: Long,
+                         localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error],
+                         remoteError: Option[Error], startedAt: Long) extends Commitments with ChannelData {
 
-  val reducedRemoteState: ReducedState = ???
-  val channelId: ByteVector = announce.hostedChanId
+  lazy val initHostedChanMsg =
+    InvokeHostedChannel(LNParams.chainHash,
+      lastCrossSignedState.lastRefundScriptPubKey)
+
+  def isInErrorState = localError.isDefined || remoteError.isDefined
+  val myFullBalanceMsat = localSpec.toLocalMsat
+  val channelId = announce.hostedChanId
 }

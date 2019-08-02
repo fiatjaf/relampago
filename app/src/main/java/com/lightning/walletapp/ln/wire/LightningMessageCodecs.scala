@@ -371,7 +371,7 @@ object LightningMessageCodecs { me =>
 
   val stateUpdateCodec = {
     (stateOverrideCodec withContext "stateOverride") ::
-      (listOfN(uint16, htlcTupleCodec) withContext "clientOutgoingHtlcs")
+      (listOfN(uint16, htlcTupleCodec) withContext "inFlightHtlcs")
   }.as[StateUpdate]
 
   val invokeHostedChannelCodec = {
