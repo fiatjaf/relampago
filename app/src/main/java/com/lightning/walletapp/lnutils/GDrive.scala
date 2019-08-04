@@ -117,12 +117,12 @@ class BackupWorker(ctxt: Context, params: WorkerParameters) extends Worker(ctxt,
 
     val secretHex = getInputData.getString(BackupWorker.SECRET)
     val backupFileName = getInputData.getString(BackupWorker.BACKUP_FILE_NAME)
-    val hasCommitmentsBackup = ChannelManager.all.map(_.data).collect { case nc: HasNormalCommits => nc }
-    if (null == secretHex || null == backupFileName || hasCommitmentsBackup.isEmpty) return Result.SUCCESS
+    val backups = ChannelManager.all.map(_.data).collect { case nc: HasNormalCommits => nc }
+    if (null == secretHex || null == backupFileName || backups.isEmpty) return Result.SUCCESS
 
     // Convert hex to byte array
     GDrive.signInAccount(ctxt) map GDrive.driveResClient(ctxt) map { drc =>
-      val plainBackup = GDriveBackup(hasCommitmentsBackup, v = 1).toJson.toString
+      val plainBackup = GDriveBackup(chans = backups, v = 1).toJson.toString
       val cipher = AES.encReadable(plainBackup, ByteVector.fromValidHex(secretHex).toArray)
       val res = GDrive.createOrUpdateBackup(backup = cipher.toByteArray, backupFileName, drc)
       GDrive.updateLastSaved(ctxt, if (res.isSuccess) System.currentTimeMillis else -1L)
