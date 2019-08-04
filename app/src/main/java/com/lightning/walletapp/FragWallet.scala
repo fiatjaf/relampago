@@ -74,7 +74,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
   val txsConfs = app.getResources getStringArray R.array.txs_confs
-  val imageMap = Array(await, await, conf1, dead, frozen)
+  // 0 is unsent payment, 4 is former frozen payment, now waiting
+  val iconDict = Array(await, await, conf1, dead, await)
 
   // LISTENERS
 
@@ -291,7 +292,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         else if (info.incoming == 1) denom.coloredIn(info.firstSum, new String)
         else denom.coloredOut(info.firstSum, new String)
 
-      holder.transactCircle setImageResource imageMap(info.status)
+      holder.transactCircle setImageResource iconDict(info.status)
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
       holder.transactWhat setText getDescription(info.description).html
@@ -300,7 +301,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def generatePopup = {
       val humanStatus = info.incoming -> info.status match {
-        case _ \ FROZEN => s"<strong>${app getString ln_state_frozen}</strong>"
         case 0 \ FAILURE => s"<strong>${app getString ln_state_fail_out}</strong>"
         case 1 \ FAILURE => s"<strong>${app getString ln_state_fail_in}</strong>"
         case _ \ SUCCESS => s"<strong>${app getString ln_state_success}</strong>"

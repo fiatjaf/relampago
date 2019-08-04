@@ -92,10 +92,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     rd
   }
 
-  def markFailedAndFrozen = db txWrap {
-    db.change(PaymentTable.updFailWaitingAndFrozenSql, System.currentTimeMillis - PaymentRequest.expiryTag.seconds * 1000L)
-    for (activeInFlightPaymentHash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, activeInFlightPaymentHash)
-    for (frozenPaymentHash <- ChannelManager.frozenInFlightHashes) updStatus(FROZEN, frozenPaymentHash)
+  def markFailedPayments = db txWrap {
+    db.change(PaymentTable.updFailWaitingSql, System.currentTimeMillis - PaymentRequest.expiryTag.seconds * 1000L)
+    for (activeInFlightHash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, activeInFlightHash)
   }
 
   def failOnUI(rd: RoutingData) = {
@@ -207,8 +206,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onBecome = {
     case (_, _, SLEEPING, OPEN) => resolvePending
+    case (_, _, fromState, CLOSING) if fromState != CLOSING => uiNotify
     case (_, _, WAIT_FUNDING_DONE, OPEN) => app.olympus tellClouds OlympusWrap.CMDStart
-    case (_, _, from, CLOSING) if from != CLOSING => runAnd(markFailedAndFrozen)(uiNotify)
   }
 }
 

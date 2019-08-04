@@ -196,7 +196,7 @@ class WalletApp extends Application { me =>
       startBlocksDownload(ChannelManager.chainEventsListener)
       // Try to clear act leftovers if no channels are left
       app.olympus tellClouds OlympusWrap.CMDStart
-      PaymentInfoWrap.markFailedAndFrozen
+      PaymentInfoWrap.markFailedPayments
       ChannelManager.initConnect
       RatesSaver.subscription
     }
@@ -358,7 +358,6 @@ object ChannelManager extends Broadcaster {
 
   def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estimateCanSend).lastOption
   def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
-  def frozenInFlightHashes = all.map(_.data).collect { case cd: ClosingData => cd.frozenPublishedHashes }.flatten
   // We need to connect the rest of channels including special cases like REFUNDING normal channel and SUSPENDED hosted channel
   def initConnect = for (chan <- all if chan.state != CLOSING) ConnectionManager.connectTo(chan.data.announce, notify = false)
   def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
@@ -484,7 +483,6 @@ object ChannelManager extends Broadcaster {
 
   def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
     // Find a channel which can send an amount and belongs to a correct peer, not necessairly online
-    case Right(rd) if frozenInFlightHashes contains rd.pr.paymentHash =>
     case Right(rd) if activeInFlightHashes contains rd.pr.paymentHash =>
     case Left(emptyRD) => noRoutes(emptyRD)
 

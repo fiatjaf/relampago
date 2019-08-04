@@ -232,7 +232,6 @@
     <string name="ln_state_success">успешно оплачен</string>
     <string name="ln_state_fail_in">срок годности истек</string>
     <string name="ln_state_fail_out">возвращен назад</string>
-    <string name="ln_state_frozen">ожидаем возмещение</string>
 
     <string name="ln_info_total_payments">total payments</string>
     <string name="ln_info_in_flight">value in-flight</string>
