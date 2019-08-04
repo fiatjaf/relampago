@@ -73,7 +73,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
-  val expiryLeft = app.getResources getStringArray R.array.ln_status_expiry
   val txsConfs = app.getResources getStringArray R.array.txs_confs
   val imageMap = Array(await, await, conf1, dead, frozen)
 
@@ -343,9 +342,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val fee = MilliSatoshi(info.lastMsat - info.firstMsat)
         val paidFeePercent = fee.amount / (info.firstMsat / 100D)
         val sentHuman = if (info.isLooper) denom.coloredP2WSH(info.firstSum, denom.sign) else denom.coloredOut(info.firstSum, denom.sign)
-        val title = app.getString(ln_outgoing_title).format(humanStatus, sentHuman, inFiat, denom.coloredOut(fee, denom.sign), paidFeePercent)
-        val expiryBlocksLeftPart = app.plur1OrZero(expiryLeft, info.lastExpiry - broadcaster.currentHeight)
-        if (info.status == WAITING) s"$expiryBlocksLeftPart<br>$title" else title
+        app.getString(ln_outgoing_title).format(humanStatus, sentHuman, inFiat, denom.coloredOut(fee, denom.sign), paidFeePercent)
       }
 
       info.incoming -> rd.pr.fallbackAddress -> rd.pr.amount match {

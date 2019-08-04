@@ -297,13 +297,6 @@
         <item><![CDATA[<font color=#E68A00>Вмикається %1$s каналiв</font>]]></item>
     </array>
 
-    <array name="ln_status_expiry">
-        <item><![CDATA[застряглий платіж]]></item>
-        <item><![CDATA[залишився %1$s блок]]></item>
-        <item><![CDATA[залишилось %1$s блока]]></item>
-        <item><![CDATA[залишилось %1$s блоків]]></item>
-    </array>
-
     <!-- opening a new channel -->
     <array name="ln_ops_start_node_channels">
         <item><![CDATA[Немає відчинених каналів]]></item>

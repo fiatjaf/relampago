@@ -298,12 +298,6 @@
         <item><![CDATA[<font color=#E68A00>Getting %1$s channels up</font>]]></item>
     </array>
 
-    <array name="ln_status_expiry">
-        <item><![CDATA[expired, got stuck]]></item>
-        <item><![CDATA[expires in %1$s block]]></item>
-        <item><![CDATA[expires in %1$s blocks]]></item>
-    </array>
-
     <!-- opening a new channel -->
     <array name="ln_ops_start_node_channels">
         <item><![CDATA[No public channels]]></item>
