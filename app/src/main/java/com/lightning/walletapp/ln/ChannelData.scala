@@ -499,15 +499,17 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 }
 
-case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState, localNextHtlcId: Long,
-                         localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error],
-                         remoteError: Option[Error], startedAt: Long) extends Commitments with ChannelData {
-
-  lazy val initHostedChanMsg =
-    InvokeHostedChannel(LNParams.chainHash,
-      lastCrossSignedState.lastRefundScriptPubKey)
+case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState,
+                         clientNextUpdateNumber: Long, hostNextUpdateNumber: Long, localSpec: CommitmentSpec,
+                         updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
+                         startedAt: Long) extends Commitments with ChannelData {
 
   def isInErrorState = localError.isDefined || remoteError.isDefined
   val myFullBalanceMsat = localSpec.toLocalMsat
   val channelId = announce.hostedChanId
+
+  val initHostedChanMsg = {
+    val scriptPubKey = lastCrossSignedState.lastRefundScriptPubKey
+    InvokeHostedChannel(LNParams.chainHash, scriptPubKey)
+  }
 }

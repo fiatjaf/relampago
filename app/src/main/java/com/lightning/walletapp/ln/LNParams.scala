@@ -100,11 +100,10 @@ object ChanErrorCodes {
   final val ERR_HOSTED_WRONG_HOST_SIG = ByteVector.fromValidHex("0003")
   final val ERR_HOSTED_WRONG_IN_FLIGHT = ByteVector.fromValidHex("0004")
   final val ERR_HOSTED_WRONG_CLIENT_SIG = ByteVector.fromValidHex("0005")
-  final val ERR_HOSTED_WRONG_LOCAL_COUNTER_INCREASE = ByteVector.fromValidHex("0006")
-  final val ERR_HOSTED_WRONG_REMOTE_COUNTER_INCREASE = ByteVector.fromValidHex("0007")
-  final val ERR_HOSTED_UPDATE_BLOCK_HEIGHT_TOO_HIGH = ByteVector.fromValidHex("0008")
+  final val ERR_HOSTED_WRONG_HOST_NUMBER = ByteVector.fromValidHex("0006")
+  final val ERR_HOSTED_WRONG_CLIENT_NUMBER = ByteVector.fromValidHex("0007")
+  final val ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH = ByteVector.fromValidHex("0008")
   final val ERR_HOSTED_UPDATE_CLTV_TOO_LOW = ByteVector.fromValidHex("0009")
-  final val ERR_HOSTED_DID_NOT_CONVERGE = ByteVector.fromValidHex("0010")
 
   val hostedErrors = Map (
     ERR_HOSTED_WRONG_BALANCE -> "err_ln_hosted_wrong_balance",
@@ -112,11 +111,10 @@ object ChanErrorCodes {
     ERR_HOSTED_WRONG_HOST_SIG -> "err_ln_hosted_wrong_host_sig",
     ERR_HOSTED_WRONG_IN_FLIGHT -> "err_ln_hosted_wrong_in_flight",
     ERR_HOSTED_WRONG_CLIENT_SIG -> "err_ln_hosted_wrong_client_sig",
-    ERR_HOSTED_WRONG_LOCAL_COUNTER_INCREASE -> "err_ln_hosted_wrong_local_counter_increase",
-    ERR_HOSTED_WRONG_REMOTE_COUNTER_INCREASE -> "err_ln_hosted_wrong_remote_counter_increase",
-    ERR_HOSTED_UPDATE_BLOCK_HEIGHT_TOO_HIGH -> "err_ln_hosted_update_block_height_too_high",
-    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> "err_ln_hosted_update_cltv_too_low",
-    ERR_HOSTED_DID_NOT_CONVERGE -> "err_ln_hosted_did_not_converge"
+    ERR_HOSTED_WRONG_HOST_NUMBER -> "err_ln_hosted_wrong_host_number",
+    ERR_HOSTED_WRONG_CLIENT_NUMBER -> "err_ln_hosted_wrong_client_number",
+    ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH -> "err_ln_hosted_update_block_too_high",
+    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> "err_ln_hosted_update_cltv_too_low"
   )
 }
 

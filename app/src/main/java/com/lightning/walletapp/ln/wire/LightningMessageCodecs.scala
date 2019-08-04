@@ -356,8 +356,8 @@ object LightningMessageCodecs { me =>
   val stateOverrideCodec = {
     (uint64Overflow withContext "updatedClientBalanceSatoshis") ::
       (uint32 withContext "blockDay") ::
-      (uint32 withContext "clientUpdateCounter") ::
-      (uint32 withContext "hostUpdateCounter") ::
+      (uint32 withContext "clientUpdateNumber") ::
+      (uint32 withContext "hostUpdateNumber") ::
       (signature withContext "nodeSignature")
   }.as[StateOverride]
 

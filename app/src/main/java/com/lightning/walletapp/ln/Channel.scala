@@ -722,25 +722,31 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         isChainHeightKnown = true
 
 
-      case (None, WaitTheirHostedReply(announce, refundScriptPubKey), lcss: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
+      case (None, WaitTheirHostedReply(ann, refundScriptPubKey), lcss: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
         val hostSigHash = Tools.hostedSigHash(lcss.lastRefundScriptPubKey, lcss.lastHostStateUpdate, lcss.initHostedChannel)
         val clientSigHash = Tools.hostedSigHash(lcss.lastRefundScriptPubKey, lcss.lastClientStateUpdate, lcss.initHostedChannel)
         val hostBalance = lcss.initHostedChannel.channelCapacitySatoshis - lcss.initHostedChannel.initialClientBalanceSatoshis
         val localSpec = CommitmentSpec(feeratePerKw = 0L, lcss.initHostedChannel.initialClientBalanceSatoshis, hostBalance)
-        val commits = HostedCommits(announce, lcss, localNextHtlcId = 1L, localSpec, updateOpt = None, localError = None,
-          remoteError = None, startedAt = System.currentTimeMillis)
 
-        val isSameBalance = lcss.lastClientStateUpdate.sameBalance(lcss.lastHostStateUpdate)
+        val commits = HostedCommits(announce = ann, lastCrossSignedState = lcss,
+          clientNextUpdateNumber = lcss.lastClientStateUpdate.stateOverride.clientUpdateNumber,
+          hostNextUpdateNumber = lcss.lastClientStateUpdate.stateOverride.hostUpdateNumber,
+          localSpec, updateOpt = None, localError = None, remoteError = None,
+          startedAt = System.currentTimeMillis)
+
         val isSameInFlight = lcss.lastClientStateUpdate.sameInFlight(lcss.lastHostStateUpdate)
+        val isSameBalance = lcss.lastClientStateUpdate.stateOverride.isSameBalance(lcss.lastHostStateUpdate.stateOverride)
         val isBlockdayAcceptable = lcss.lastClientStateUpdate.stateOverride.isBlockdayAcceptable(lcss.lastHostStateUpdate.stateOverride)
-        val hasConverged = lcss.lastClientStateUpdate.stateOverride.hasConverged(lcss.lastClientStateUpdate.stateOverride)
+        val isSameClientNumber = lcss.lastClientStateUpdate.stateOverride.clientUpdateNumber == lcss.lastHostStateUpdate.stateOverride.clientUpdateNumber
+        val isSameHostNumber = lcss.lastClientStateUpdate.stateOverride.hostUpdateNumber == lcss.lastHostStateUpdate.stateOverride.hostUpdateNumber
         val clientSigOk = lcss.lastClientStateUpdate.verify(clientSigHash, LNParams.nodePublicKey)
-        val hostSigOk = lcss.lastHostStateUpdate.verify(hostSigHash, announce.nodeId)
+        val hostSigOk = lcss.lastHostStateUpdate.verify(hostSigHash, ann.nodeId)
 
         if (!isSameBalance) localSuspend(commits, ERR_HOSTED_WRONG_BALANCE)
         else if (!isSameInFlight) localSuspend(commits, ERR_HOSTED_WRONG_IN_FLIGHT)
         else if (!isBlockdayAcceptable) localSuspend(commits, ERR_HOSTED_WRONG_BLOCKDAY)
-        else if (!hasConverged) localSuspend(commits, ERR_HOSTED_DID_NOT_CONVERGE)
+        else if (!isSameClientNumber) localSuspend(commits, ERR_HOSTED_WRONG_CLIENT_NUMBER)
+        else if (!isSameHostNumber) localSuspend(commits, ERR_HOSTED_WRONG_HOST_NUMBER)
         else if (!clientSigOk) localSuspend(commits, ERR_HOSTED_WRONG_CLIENT_SIG)
         else if (!hostSigOk) localSuspend(commits, ERR_HOSTED_WRONG_HOST_SIG)
         else BECOME(me STORE commits, OPEN)
@@ -757,7 +763,7 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
 
         val unsignedUpdate: StateUpdate =
           makeStateUpdate(so = StateOverride(init.initialClientBalanceSatoshis, LNParams.broadcaster.currentHeight,
-            clientUpdateCounter = 0L, hostUpdateCounter = 0L, nodeSignature = ByteVector.empty), htlcs = Set.empty)
+            clientUpdateNumber = 0L, hostUpdateNumber = 0L, nodeSignature = ByteVector.empty), htlcs = Set.empty)
 
         val sigHash = Tools.hostedSigHash(refundScriptPubKey, unsignedUpdate, init)
         val signedUpdate = unsignedUpdate.signed(sigHash, priv = LNParams.nodePrivateKey)
@@ -768,16 +774,23 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
       case (Some(stateUpdate), WaitTheirStateUpdate(announce, refundScriptPubKey, init), their: StateUpdate, WAIT_FOR_ACCEPT) =>
         val theirSigOk = their.verify(Tools.hostedSigHash(refundScriptPubKey, update = their, init), announce.nodeId)
         val isBlockdayAcceptable = stateUpdate.stateOverride.isBlockdayAcceptable(their.stateOverride)
-        val hasConverged = stateUpdate.stateOverride.hasConverged(their.stateOverride)
+        val isSameBalance = their.stateOverride.isSameBalance(stateUpdate.stateOverride)
+        val isSameClientNumber = their.stateOverride.clientUpdateNumber == 0L
+        val isSameHostNumber = their.stateOverride.hostUpdateNumber == 0L
+        val isSameInFlight = their.sameInFlight(stateUpdate)
 
-        if (!theirSigOk) throw new LightningException("Their first update signature is wrong")
         if (!isBlockdayAcceptable) throw new LightningException("Their blockday is not acceptable")
-        if (!hasConverged) throw new LightningException("Their first update has not converged")
+        if (!isSameBalance) throw new LightningException("Their client balance is not the same as ours")
+        if (!isSameClientNumber) throw new LightningException("Their client first update number is not 0")
+        if (!isSameHostNumber) throw new LightningException("Their host first update number is not 0")
+        if (!isSameInFlight) throw new LightningException("They have in-flight payments at start")
+        if (!theirSigOk) throw new LightningException("Their first update signature is wrong")
 
         val hostBalance = init.channelCapacitySatoshis - init.initialClientBalanceSatoshis
+        val localSpec = CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceSatoshis, hostBalance)
         BECOME(me STORE HostedCommits(announce, LastCrossSignedState(refundScriptPubKey, init, stateUpdate, their),
-          localNextHtlcId = 1L, CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceSatoshis, hostBalance),
-          updateOpt = None, localError = None, remoteError = None, startedAt = System.currentTimeMillis), OPEN)
+          clientNextUpdateNumber = 0L, hostNextUpdateNumber = 0L, localSpec, updateOpt = None, localError = None,
+          remoteError = None, startedAt = System.currentTimeMillis), OPEN)
 
 
       // OPEN MODE
@@ -813,7 +826,7 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
 
       case (_, cs: HostedCommits, CMDChannelUpdate(upd), OPEN | SLEEPING) =>
         val Tuple3(blockHeight, _, _) = Tools.fromShortId(upd.shortChannelId)
-        if (blockHeight > LNParams.maxHostedBlockHeight) localSuspend(cs, ERR_HOSTED_UPDATE_BLOCK_HEIGHT_TOO_HIGH)
+        if (blockHeight > LNParams.maxHostedBlockHeight) localSuspend(cs, ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH)
         if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(cs, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
         val d1 = cs.modify(_.updateOpt) setTo Some(upd)
         data = me STORE d1

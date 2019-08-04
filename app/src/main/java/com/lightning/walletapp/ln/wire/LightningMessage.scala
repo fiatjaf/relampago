@@ -207,19 +207,14 @@ case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
                                 lastHostStateUpdate: StateUpdate) extends HostedChannelMessage
 
 case class StateOverride(updatedClientBalanceSatoshis: Long,
-                         blockDay: Long, clientUpdateCounter: Long, hostUpdateCounter: Long,
+                         blockDay: Long, clientUpdateNumber: Long, hostUpdateNumber: Long,
                          nodeSignature: ByteVector) extends HostedChannelMessage {
 
-  def isBlockdayAcceptable(that: StateOverride) =
-    math.abs(that.blockDay - blockDay) <= 1
-
-  def hasConverged(that: StateOverride) =
-    that.clientUpdateCounter == clientUpdateCounter &&
-      that.hostUpdateCounter == hostUpdateCounter
+  def isSameBalance(that: StateOverride) = that.updatedClientBalanceSatoshis == updatedClientBalanceSatoshis
+  def isBlockdayAcceptable(that: StateOverride) = math.abs(that.blockDay - blockDay) <= 1L
 }
 
 case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[HTLCTuple] = Nil) extends HostedChannelMessage { me =>
-  def sameBalance(that: StateUpdate) = that.stateOverride.updatedClientBalanceSatoshis == stateOverride.updatedClientBalanceSatoshis
   def signed(sigHash: ByteVector, priv: PrivateKey) = me.modify(_.stateOverride.nodeSignature) setTo Tools.sign(sigHash, priv)
   def verify(sigHash: ByteVector, pub: PublicKey) = Crypto.verifySignature(sigHash, stateOverride.nodeSignature, pub)
   def sameInFlight(that: StateUpdate) = that.inFlightHtlcs.toSet == inFlightHtlcs.toSet
