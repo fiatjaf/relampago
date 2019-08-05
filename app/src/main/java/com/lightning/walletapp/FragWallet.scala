@@ -120,6 +120,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     override def onBecome = {
+      case (_, _, fromState, CLOSING) if fromState != CLOSING => updPaymentList.run
+      case (_, _, fromState, SUSPENDED) if fromState != SUSPENDED => updTitleTask.run
       case (_, _, prev, SLEEPING) if prev != SLEEPING => updTitleTask.run
       case (_, _, prev, OPEN) if prev != OPEN => updTitleTask.run
     }
@@ -143,7 +145,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val loaderCallbacks = new LoaderCallbacks[Cursor] {
     def onCreateLoader(id: Int, bn: Bundle) = new ReactLoader[PaymentInfo](host) {
-      val consume = (vec: PaymentInfoVec) => runAnd(lnItems = vec map LNWrap)(updPaymentList.run)
+      val consume = (payments: PaymentInfoVec) => runAnd(lnItems = payments map LNWrap)(updPaymentList.run)
       def getCursor = if (lastQuery.isEmpty) PaymentInfoWrap.byRecent else PaymentInfoWrap.byQuery(lastQuery)
       def createItem(rc: RichCursor) = PaymentInfoWrap.toPaymentInfo(rc)
     }

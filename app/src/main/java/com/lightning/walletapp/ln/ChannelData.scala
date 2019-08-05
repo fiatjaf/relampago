@@ -21,6 +21,7 @@ sealed trait Command
 case class CMDShutdown(scriptPubKey: Option[ByteVector] = None) extends Command
 case class CMDBestHeight(heightNow: Long, heightInit: Long) extends Command
 case class CMDChannelUpdate(upd: ChannelUpdate) extends Command
+case class CMDStateOverride(so: StateOverride) extends Command
 case class CMDConfirmed(tx: Transaction) extends Command
 case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
@@ -47,11 +48,11 @@ case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 case class WaitTheirHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector) extends ChannelData {
   require(Helpers isValidFinalScriptPubkey refundScriptPubKey, "Invalid refundScriptPubKey when opening a hosted channel")
-  lazy val initHostedChanMsg = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey)
+  lazy val initMsg = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey)
 }
 
 case class WaitTheirStateUpdate(announce: NodeAnnouncement, refundScriptPubKey: ByteVector,
-                                init: InitHostedChannel) extends ChannelData
+                                clientFirstUpdate: StateUpdate, init: InitHostedChannel) extends ChannelData
 
 // INCOMING CHANNEL
 
@@ -487,7 +488,7 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 }
 
 case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState,
-                         clientNextUpdateNumber: Long, hostNextUpdateNumber: Long, localSpec: CommitmentSpec,
+                         clientUpdateNumber: Long, hostUpdateNumber: Long, localSpec: CommitmentSpec,
                          updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
                          startedAt: Long) extends Commitments with ChannelData {
 
@@ -495,7 +496,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   val myFullBalanceMsat = localSpec.toLocalMsat
   val channelId = announce.hostedChanId
 
-  val initHostedChanMsg = {
+  val initMsg = {
     val scriptPubKey = lastCrossSignedState.lastRefundScriptPubKey
     InvokeHostedChannel(LNParams.chainHash, scriptPubKey)
   }

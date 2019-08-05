@@ -208,16 +208,17 @@ case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
 
 case class StateOverride(updatedClientBalanceSatoshis: Long,
                          blockDay: Long, clientUpdateNumber: Long, hostUpdateNumber: Long,
-                         nodeSignature: ByteVector) extends HostedChannelMessage {
+                         nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage {
 
-  def isSameBalance(that: StateOverride) = that.updatedClientBalanceSatoshis == updatedClientBalanceSatoshis
-  def isBlockdayAcceptable(that: StateOverride) = math.abs(that.blockDay - blockDay) <= 1L
+  def isBehind(that: StateOverride) =
+    clientUpdateNumber < that.clientUpdateNumber ||
+      hostUpdateNumber < that.hostUpdateNumber
 }
 
 case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[HTLCTuple] = Nil) extends HostedChannelMessage { me =>
-  def signed(sigHash: ByteVector, priv: PrivateKey) = me.modify(_.stateOverride.nodeSignature) setTo Tools.sign(sigHash, priv)
-  def verify(sigHash: ByteVector, pub: PublicKey) = Crypto.verifySignature(sigHash, stateOverride.nodeSignature, pub)
-  def sameInFlight(that: StateUpdate) = that.inFlightHtlcs.toSet == inFlightHtlcs.toSet
+  def signed(script: ByteVector, init: InitHostedChannel, priv: PrivateKey) = me.modify(_.stateOverride.nodeSignature) setTo sign(sigHash(script, init), priv)
+  def verify(script: ByteVector, init: InitHostedChannel, pub: PublicKey) = Crypto.verifySignature(sigHash(script, init), stateOverride.nodeSignature, pub)
+  def sigHash(script: ByteVector, init: InitHostedChannel) = hostedSigHash(script, me, init)
 }
 
 // Not in a spec

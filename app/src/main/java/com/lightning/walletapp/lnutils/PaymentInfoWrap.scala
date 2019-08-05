@@ -3,7 +3,6 @@ package com.lightning.walletapp.lnutils
 import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire._
-import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.NormalChannel._
@@ -205,9 +204,13 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onBecome = {
-    case (_, _, SLEEPING, OPEN) => resolvePending
-    case (_, _, fromState, CLOSING) if fromState != CLOSING => uiNotify
-    case (_, _, WAIT_FUNDING_DONE, OPEN) => app.olympus tellClouds OlympusWrap.CMDStart
+    case (_, _, SLEEPING, OPEN) =>
+      // We may have some payments waiting
+      resolvePending
+
+    case (_, _, WAIT_FUNDING_DONE, OPEN) =>
+      // We may have a channel upload act waiting
+      app.olympus tellClouds OlympusWrap.CMDStart
   }
 }
 
@@ -219,8 +222,8 @@ object ChannelWrap {
   }
 
   def put(data: ChannelData) = data match {
-    case hasNorm: HasNormalCommits => doPut(hasNorm.commitments.channelId, "1" + hasNorm.toJson.toString)
-    case hostedCommits: HostedCommits => doPut(hostedCommits.channelId, "2" + hostedCommits.toJson.toString)
+    case hasNorm: HasNormalCommits => doPut(hasNorm.commitments.channelId, '1' + hasNorm.toJson.toString)
+    case hostedCommits: HostedCommits => doPut(hostedCommits.channelId, '2' + hostedCommits.toJson.toString)
     case otherwise => throw new RuntimeException(s"Can not presist this channel data type: $otherwise")
   }
 

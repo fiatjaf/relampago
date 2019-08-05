@@ -268,11 +268,11 @@ object ChannelManager extends Broadcaster {
 
   // BROADCASTER IMPLEMENTATION
 
-  def perKwSixSat = RatesSaver.rates.feeSix.value / 4
-  def perKwThreeSat = RatesSaver.rates.feeThree.value / 4
-  def currentHeight: Int = app.kit.wallet.getLastBlockSeenHeight + currentBlocksLeft.getOrElse(0)
+  def perKwSixSat: Long = RatesSaver.rates.feeSix.value / 4
+  def perKwThreeSat: Long = RatesSaver.rates.feeThree.value / 4
   def blockDaysLeft: Int = currentBlocksLeft.map(_ / blocksPerDay).getOrElse(Int.MaxValue)
-  def currentBlockDay = currentHeight / blocksPerDay
+  def currentHeight: Int = app.kit.wallet.getLastBlockSeenHeight + currentBlocksLeft.getOrElse(0)
+  def currentBlockDay: Int = currentHeight / blocksPerDay
 
   def getTx(txid: ByteVector) = {
     val wrapped = Sha256Hash wrap txid.toArray
@@ -404,17 +404,12 @@ object ChannelManager extends Broadcaster {
       } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri1, tx)
     }
 
-    def CLOSEANDWATCHREVHTLC(cd: ClosingData) = {
-      // After publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
-      // our job here is to watch every output of every revoked commit tx and re-spend it before their CSV delay runs out
-      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ map CMDSpent foreach process, none)
-      app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
-      BECOME(STORE(cd), CLOSING)
-    }
-
     def CLOSEANDWATCH(cd: ClosingData) = {
       val tier12txs = cd.tier12States.map(_.txn.bin).toVector
       if (tier12txs.nonEmpty) app.olympus tellClouds TxUploadAct(txvec.encode(tier12txs).require.toByteVector, Nil, "txs/schedule")
+      // In case of breach after publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
+      // our job here is to watch for every output of every revoked commit tx and re-spend it before their CSV delay runs out
+      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ map CMDSpent foreach process, none)
       repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
       // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
       app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)

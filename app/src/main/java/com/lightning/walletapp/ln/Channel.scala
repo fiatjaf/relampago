@@ -11,12 +11,12 @@ import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 import scala.util.Success
 
-import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
+import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
+import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
-import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 
 
 trait Channel extends StateMachine[ChannelData] { me =>
@@ -69,7 +69,6 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
   def estimateCanReceive = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canReceiveMsat } getOrElse 0L
 
   def CLOSEANDWATCH(close: ClosingData): Unit
-  def CLOSEANDWATCHREVHTLC(cd: ClosingData): Unit
   def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit
   def GETREV(cs: NormalCommits, tx: Transaction): Option[RevokedCommitPublished]
   def REV(cs: NormalCommits, rev: RevokeAndAck): Unit
@@ -234,6 +233,7 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
       case (norm: NormalData, CMDChannelUpdate(upd), OPEN | SLEEPING) =>
         // Got an empty ChannelUpdate with shortChannelId or a final one
         val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
+        // Do not trigger listeners for this update
         data = me STORE d1
 
 
@@ -617,8 +617,8 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
           case (_, _, close: ClosingData) if close.localCommit.exists(_.commitTx.txid == tx.txid) => Tools log s"Existing local $tx"
           case (_, _, close: ClosingData) if close.localProposals.exists(_.unsignedTx.tx.txid == tx.txid) => startMutualClose(close, tx)
           case (_, _, negs: NegotiationsData) if negs.localProposals.exists(_.unsignedTx.tx.txid == tx.txid) => startMutualClose(negs, tx)
-          case (Some(claim), _, closingData: ClosingData) => me CLOSEANDWATCHREVHTLC closingData.modify(_.revokedCommit).using(claim +: _)
-          case (Some(claim), _, _) => me CLOSEANDWATCHREVHTLC ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil)
+          case (Some(claim), _, closingData: ClosingData) => me CLOSEANDWATCH closingData.modify(_.revokedCommit).using(claim +: _)
+          case (Some(claim), _, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, revokedCommit = claim :: Nil)
           case (_, Left(nextRemote), _) if nextRemote.txOpt.exists(_.txid == tx.txid) => startRemoteNextClose(some, nextRemote)
           case _ if some.commitments.remoteCommit.txOpt.exists(_.txid == tx.txid) => startRemoteCurrentClose(some)
           case _ if some.commitments.localCommit.commitTx.tx.txid == tx.txid => startLocalClose(some)
@@ -706,53 +706,22 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
   def estimateCanReceive = getCommits collect { case nc: HostedCommits => nc.localSpec.toRemoteMsat } getOrElse 0L
   def inFlightHtlcs = getCommits collect { case nc: HostedCommits => nc.localSpec.htlcs } getOrElse Set.empty[Htlc]
 
-  private var lastLocalStateUpdate = Option.empty[StateUpdate]
   private var isChainHeightKnown: Boolean = false
   private var isSocketConnected: Boolean = false
 
   def doProcess(change: Any) = {
-    Tuple4(lastLocalStateUpdate, data, change, state) match {
-      case (None, wait: WaitTheirHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
-        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initHostedChanMsg
+    Tuple3(data, change, state) match {
+      case (wait: WaitTheirHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
+        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initMsg
         isSocketConnected = true
 
 
-      case (None, wait: WaitTheirHostedReply, _: CMDBestHeight, WAIT_FOR_INIT) =>
-        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initHostedChanMsg
+      case (wait: WaitTheirHostedReply, _: CMDBestHeight, WAIT_FOR_INIT) =>
+        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initMsg
         isChainHeightKnown = true
 
 
-      case (None, WaitTheirHostedReply(ann, refundScriptPubKey), lcss: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
-        val hostSigHash = Tools.hostedSigHash(lcss.lastRefundScriptPubKey, lcss.lastHostStateUpdate, lcss.initHostedChannel)
-        val clientSigHash = Tools.hostedSigHash(lcss.lastRefundScriptPubKey, lcss.lastClientStateUpdate, lcss.initHostedChannel)
-        val hostBalance = lcss.initHostedChannel.channelCapacitySatoshis - lcss.initHostedChannel.initialClientBalanceSatoshis
-        val localSpec = CommitmentSpec(feeratePerKw = 0L, lcss.initHostedChannel.initialClientBalanceSatoshis, hostBalance)
-
-        val commits = HostedCommits(announce = ann, lastCrossSignedState = lcss,
-          clientNextUpdateNumber = lcss.lastClientStateUpdate.stateOverride.clientUpdateNumber,
-          hostNextUpdateNumber = lcss.lastClientStateUpdate.stateOverride.hostUpdateNumber,
-          localSpec, updateOpt = None, localError = None, remoteError = None,
-          startedAt = System.currentTimeMillis)
-
-        val isSameInFlight = lcss.lastClientStateUpdate.sameInFlight(lcss.lastHostStateUpdate)
-        val isSameBalance = lcss.lastClientStateUpdate.stateOverride.isSameBalance(lcss.lastHostStateUpdate.stateOverride)
-        val isBlockdayAcceptable = lcss.lastClientStateUpdate.stateOverride.isBlockdayAcceptable(lcss.lastHostStateUpdate.stateOverride)
-        val isSameClientNumber = lcss.lastClientStateUpdate.stateOverride.clientUpdateNumber == lcss.lastHostStateUpdate.stateOverride.clientUpdateNumber
-        val isSameHostNumber = lcss.lastClientStateUpdate.stateOverride.hostUpdateNumber == lcss.lastHostStateUpdate.stateOverride.hostUpdateNumber
-        val clientSigOk = lcss.lastClientStateUpdate.verify(clientSigHash, LNParams.nodePublicKey)
-        val hostSigOk = lcss.lastHostStateUpdate.verify(hostSigHash, ann.nodeId)
-
-        if (!isSameBalance) localSuspend(commits, ERR_HOSTED_WRONG_BALANCE)
-        else if (!isSameInFlight) localSuspend(commits, ERR_HOSTED_WRONG_IN_FLIGHT)
-        else if (!isBlockdayAcceptable) localSuspend(commits, ERR_HOSTED_WRONG_BLOCKDAY)
-        else if (!isSameClientNumber) localSuspend(commits, ERR_HOSTED_WRONG_CLIENT_NUMBER)
-        else if (!isSameHostNumber) localSuspend(commits, ERR_HOSTED_WRONG_HOST_NUMBER)
-        else if (!clientSigOk) localSuspend(commits, ERR_HOSTED_WRONG_CLIENT_SIG)
-        else if (!hostSigOk) localSuspend(commits, ERR_HOSTED_WRONG_HOST_SIG)
-        else BECOME(me STORE commits, OPEN)
-
-
-      case (None, WaitTheirHostedReply(announce, refundScriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
+      case (WaitTheirHostedReply(announce, scriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
         if (init.liabilityDeadlineBlockdays < LNParams.minHostedLiabilityBlockdays) throw new LightningException("Their liability deadline is too low")
         if (init.channelCapacitySatoshis < LNParams.minCapacityMsat / 1000L) throw new LightningException("Their proposed channel capacity is too low")
         if (init.initialClientBalanceSatoshis > init.channelCapacitySatoshis) throw new LightningException("Client init balance is larger than capacity")
@@ -761,85 +730,94 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         if (init.htlcMinimumMsat > 100000L) throw new LightningException("Their htlcMinimumMsat is too high")
         if (init.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
 
-        val unsignedUpdate: StateUpdate =
-          makeStateUpdate(so = StateOverride(init.initialClientBalanceSatoshis, LNParams.broadcaster.currentHeight,
-            clientUpdateNumber = 0L, hostUpdateNumber = 0L, nodeSignature = ByteVector.empty), htlcs = Set.empty)
-
-        val sigHash = Tools.hostedSigHash(refundScriptPubKey, unsignedUpdate, init)
-        val signedUpdate = unsignedUpdate.signed(sigHash, priv = LNParams.nodePrivateKey)
-        me UPDATA WaitTheirStateUpdate(announce, refundScriptPubKey, init) SEND signedUpdate
-        lastLocalStateUpdate = Some(signedUpdate)
+        val so = StateOverride(init.initialClientBalanceSatoshis, LNParams.broadcaster.currentBlockDay, 0L, 0L)
+        val su = StateUpdate(so, Nil).signed(scriptPubKey, init, priv = LNParams.nodePrivateKey)
+        me UPDATA WaitTheirStateUpdate(announce, scriptPubKey, su, init) SEND su
 
 
-      case (Some(stateUpdate), WaitTheirStateUpdate(announce, refundScriptPubKey, init), their: StateUpdate, WAIT_FOR_ACCEPT) =>
-        val theirSigOk = their.verify(Tools.hostedSigHash(refundScriptPubKey, update = their, init), announce.nodeId)
-        val isBlockdayAcceptable = stateUpdate.stateOverride.isBlockdayAcceptable(their.stateOverride)
-        val isSameBalance = their.stateOverride.isSameBalance(stateUpdate.stateOverride)
-        val isSameClientNumber = their.stateOverride.clientUpdateNumber == 0L
-        val isSameHostNumber = their.stateOverride.hostUpdateNumber == 0L
-        val isSameInFlight = their.sameInFlight(stateUpdate)
-
-        if (!isBlockdayAcceptable) throw new LightningException("Their blockday is not acceptable")
-        if (!isSameBalance) throw new LightningException("Their client balance is not the same as ours")
-        if (!isSameClientNumber) throw new LightningException("Their client first update number is not 0")
-        if (!isSameHostNumber) throw new LightningException("Their host first update number is not 0")
-        if (!isSameInFlight) throw new LightningException("They have in-flight payments at start")
-        if (!theirSigOk) throw new LightningException("Their first update signature is wrong")
-
-        val hostBalance = init.channelCapacitySatoshis - init.initialClientBalanceSatoshis
-        val localSpec = CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceSatoshis, hostBalance)
-        BECOME(me STORE HostedCommits(announce, LastCrossSignedState(refundScriptPubKey, init, stateUpdate, their),
-          clientNextUpdateNumber = 0L, hostNextUpdateNumber = 0L, localSpec, updateOpt = None, localError = None,
-          remoteError = None, startedAt = System.currentTimeMillis), OPEN)
+      case (wait: WaitTheirHostedReply, lcss: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
+        validate(lcss.lastClientStateUpdate, lcss.lastHostStateUpdate, lcss.lastRefundScriptPubKey, lcss.initHostedChannel, wait.announce) match {
+          case Some(stateUpdateValidationErrorCode) => localSuspend(hcFromLastCrossSignedState(lcss, wait.announce), stateUpdateValidationErrorCode)
+          case None => BECOME(me STORE hcFromLastCrossSignedState(lcss, wait.announce), OPEN)
+        }
 
 
-      // OPEN MODE
+      case (WaitTheirStateUpdate(announce, refundScriptPubKey, client, init), host: StateUpdate, WAIT_FOR_ACCEPT) =>
+        val error = validate(client, host, refundScriptPubKey, init, announce).flatMap(ChanErrorCodes.hostedErrors.get)
+        for (errorMessage <- error) throw new LightningException(errorMessage)
+
+        val initHostBalance = init.channelCapacitySatoshis - init.initialClientBalanceSatoshis
+        BECOME(me STORE HostedCommits(announce, LastCrossSignedState(refundScriptPubKey, init, client, host),
+          0L, 0L, CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceSatoshis, initHostBalance),
+          updateOpt = None, localError = None, remoteError = None, System.currentTimeMillis), OPEN)
 
 
-      case (_, cs: HostedCommits, CMDSocketOffline, OPEN) =>
+      // CHANNEL IS ESTABLISHED
+
+
+      case (hc: HostedCommits, CMDSocketOffline, OPEN) =>
         isSocketConnected = false
-        BECOME(cs, SLEEPING)
+        BECOME(hc, SLEEPING)
 
 
-      case (_, cs: HostedCommits, CMDSocketOnline, SLEEPING) =>
-        if (isChainHeightKnown) me SEND cs.initHostedChanMsg
+      case (hc: HostedCommits, CMDSocketOnline, SLEEPING) =>
+        if (isChainHeightKnown) me SEND hc.initMsg
         isSocketConnected = true
 
 
-      case (_, cs: HostedCommits, _: CMDBestHeight, SLEEPING) =>
-        if (isSocketConnected) me SEND cs.initHostedChanMsg
+      case (hc: HostedCommits, _: CMDBestHeight, SLEEPING) =>
+        if (isSocketConnected) me SEND hc.initMsg
         isChainHeightKnown = true
 
 
-      case (_, cs: HostedCommits, lcss: LastCrossSignedState, SLEEPING) =>
-        // If their message equals ours: enter normal state
-        // If they are provably ahead: enter normal state with their parameters
-        // If they are provably behind: send our last cross signed message to them
-        // if something is wrong: enter SUSPENDED state
+      case (hc: HostedCommits, lcss: LastCrossSignedState, SLEEPING) =>
+        val hostLastStateOverride = lcss.lastHostStateUpdate.stateOverride
+        val clientLastStateOverride = hc.lastCrossSignedState.lastClientStateUpdate.stateOverride
+        validate(lcss.lastClientStateUpdate, lcss.lastHostStateUpdate, lcss.lastRefundScriptPubKey, lcss.initHostedChannel, hc.announce) match {
+          case None if clientLastStateOverride.isBehind(hostLastStateOverride) => BECOME(me STORE hcFromLastCrossSignedState(lcss, hc.announce), OPEN)
+          case Some(stateUpdateValidationErrorCode) => localSuspend(hc, stateUpdateValidationErrorCode)
+          case None => BECOME(hc, OPEN) SEND hc.lastCrossSignedState
+        }
 
 
-      case (_, hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING)
+      case (hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING)
         if hc.announce.nodeId == newAnn.nodeId && Announcements.checkSig(newAnn) =>
         // Node was SLEEPING for a long time so we have initiated a new announcement search
         data = me STORE hc.modify(_.announce).setTo(newAnn)
 
 
-      case (_, cs: HostedCommits, CMDChannelUpdate(upd), OPEN | SLEEPING) =>
+      case (hc: HostedCommits, CMDChannelUpdate(upd), OPEN | SLEEPING) =>
         val Tuple3(blockHeight, _, _) = Tools.fromShortId(upd.shortChannelId)
-        if (blockHeight > LNParams.maxHostedBlockHeight) localSuspend(cs, ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH)
-        if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(cs, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
-        val d1 = cs.modify(_.updateOpt) setTo Some(upd)
+        if (blockHeight > LNParams.maxHostedBlockHeight) localSuspend(hc, ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH)
+        if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(hc, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
+        val d1 = hc.modify(_.updateOpt) setTo Some(upd)
+        // Do not trigger listeners for this update
         data = me STORE d1
 
 
-      case (_, cs: HostedCommits, remoteError: Error, OPEN | SLEEPING) =>
-        val cs1 = cs.modify(_.remoteError) setTo Some(remoteError)
+      case (hc: HostedCommits, remoteError: Error, OPEN | SLEEPING) =>
+        val cs1 = hc.modify(_.remoteError) setTo Some(remoteError)
         BECOME(me STORE cs1, SUSPENDED)
 
 
-      case (_, null, wait: WaitTheirHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
-      case (_, null, cs: HostedCommits, null) if cs.isInErrorState => super.become(cs, SUSPENDED)
-      case (_, null, cs: HostedCommits, null) => super.become(cs, SLEEPING)
+      case (hc: HostedCommits, CMDStateOverride(so), OPEN | SLEEPING | SUSPENDED) =>
+        val LastCrossSignedState(scriptPubKey, initHostedChannel, lastClientStateUpdate, _) = hc.lastCrossSignedState
+        val isRightClientUpdateNumber = so.clientUpdateNumber == lastClientStateUpdate.stateOverride.clientUpdateNumber
+        val isRightHostUpdateNumber = so.hostUpdateNumber == lastClientStateUpdate.stateOverride.hostUpdateNumber
+        val overrideSigOk = StateUpdate(so, Nil).verify(scriptPubKey, initHostedChannel, hc.announce.nodeId)
+        val isBalanceOk = so.updatedClientBalanceSatoshis <= initHostedChannel.channelCapacitySatoshis
+        val isBlockdayAcceptable = math.abs(so.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
+
+        if (!isBlockdayAcceptable) throw new LightningException("Provided blockday from StateOverride is not acceptable")
+        if (!isRightClientUpdateNumber) throw new LightningException("Provided Client update number from StateOverride is wrong")
+        if (!isRightHostUpdateNumber) throw new LightningException("Provided Host update number from StateOverride is wrong")
+        if (!isBalanceOk) throw new LightningException("Provided Client updated balance is larger than capacity")
+        if (!overrideSigOk) throw new LightningException("Provided StateOverride signature is wrong")
+
+
+      case (null, wait: WaitTheirHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
+      case (null, hc: HostedCommits, null) if hc.isInErrorState => super.become(hc, SUSPENDED)
+      case (null, hc: HostedCommits, null) => super.become(hc, SLEEPING)
       case _ =>
     }
 
@@ -847,13 +825,51 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
     events onProcessSuccess Tuple3(me, data, change)
   }
 
-  def makeStateUpdate(htlcs: Set[Htlc], so: StateOverride) =
-    StateUpdate(so, for (htlc <- htlcs.toList) yield htlc.tuple)
+  def validate(client: StateUpdate, host: StateUpdate, scriptPubKey: ByteVector,
+               init: InitHostedChannel, ann: NodeAnnouncement): Option[ByteVector] = {
 
-  def localSuspend(commits: HostedCommits, errCode: ByteVector) = {
-    val localError = Error(data = errCode, channelId = commits.channelId)
-    val commits1 = commits.modify(_.localError) setTo Some(localError)
-    BECOME(me STORE commits1, SUSPENDED) SEND localError
+    val isSameHtlcsInFlight = client.inFlightHtlcs.toSet == host.inFlightHtlcs.toSet
+    val isBlockdayAcceptable = math.abs(client.stateOverride.blockDay - host.stateOverride.blockDay) <= 1
+    val isSameBalance = client.stateOverride.updatedClientBalanceSatoshis == host.stateOverride.updatedClientBalanceSatoshis
+    val isSameClientUpdateNumber = client.stateOverride.clientUpdateNumber == host.stateOverride.clientUpdateNumber
+    val isSameHostUpdateNumber = client.stateOverride.hostUpdateNumber == host.stateOverride.hostUpdateNumber
+    val clientSigOk = client.verify(scriptPubKey, init, LNParams.nodePublicKey)
+    val hostSigOk = host.verify(scriptPubKey, init, ann.nodeId)
+
+    if (!isSameBalance) Some(ERR_HOSTED_WRONG_BALANCE)
+    else if (!isSameHtlcsInFlight) Some(ERR_HOSTED_WRONG_IN_FLIGHT)
+    else if (!isBlockdayAcceptable) Some(ERR_HOSTED_WRONG_BLOCKDAY)
+    else if (!isSameClientUpdateNumber) Some(ERR_HOSTED_WRONG_CLIENT_NUMBER)
+    else if (!isSameHostUpdateNumber) Some(ERR_HOSTED_WRONG_HOST_NUMBER)
+    else if (!clientSigOk) Some(ERR_HOSTED_WRONG_CLIENT_SIG)
+    else if (!hostSigOk) Some(ERR_HOSTED_WRONG_HOST_SIG)
+    else None
+  }
+
+  def signedStateUpdateFromCommits(hc: HostedCommits) = {
+    val tuples = for (inFlightHtlc <- hc.localSpec.htlcs.toList) yield inFlightHtlc.tuple
+    val so = StateOverride(hc.localSpec.toLocalMsat, LNParams.broadcaster.currentBlockDay, hc.clientUpdateNumber, hc.hostUpdateNumber)
+    StateUpdate(so, tuples).signed(hc.lastCrossSignedState.lastRefundScriptPubKey, hc.lastCrossSignedState.initHostedChannel, LNParams.nodePrivateKey)
+  }
+
+  def hcFromLastCrossSignedState(lcss: LastCrossSignedState, announce: NodeAnnouncement): HostedCommits = {
+    val hostBalance = lcss.initHostedChannel.channelCapacitySatoshis - lcss.initHostedChannel.initialClientBalanceSatoshis
+    val inFlightHtlcs = for (Tuple5(incoming, id, amountMsat, paymentHash, expiry) <- lcss.lastClientStateUpdate.inFlightHtlcs) yield {
+      val addHtlc = UpdateAddHtlc(announce.hostedChanId, id, amountMsat, paymentHash, expiry, onionRoutingPacket = Sphinx.emptyOnionPacket)
+      Htlc(incoming, addHtlc)
+    }
+
+    val so = lcss.lastClientStateUpdate.stateOverride
+    val clientBalance = lcss.initHostedChannel.initialClientBalanceSatoshis
+    val localSpec = CommitmentSpec(feeratePerKw = 0L, clientBalance, hostBalance, inFlightHtlcs.toSet)
+    HostedCommits(announce, lcss, so.clientUpdateNumber, so.hostUpdateNumber, localSpec, updateOpt = None,
+      localError = None, remoteError = None, startedAt = System.currentTimeMillis)
+  }
+
+  def localSuspend(hc: HostedCommits, errCode: ByteVector) = {
+    val localError = Error(channelId = hc.channelId, data = errCode)
+    val hc1 = hc.modify(_.localError) setTo Some(localError)
+    BECOME(me STORE hc1, SUSPENDED) SEND localError
   }
 }
 
