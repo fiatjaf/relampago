@@ -207,12 +207,16 @@ case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
                                 lastHostStateUpdate: StateUpdate) extends HostedChannelMessage
 
 case class StateOverride(updatedClientBalanceSatoshis: Long,
-                         blockDay: Long, clientUpdateNumber: Long, hostUpdateNumber: Long,
+                         blockDay: Long, clientUpdatesSoFar: Long, hostUpdatesSoFar: Long,
                          nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage {
 
+  def rewind(hc: HostedCommits) =
+    hc.copy(clientChanges = Vector.empty, hostChanges = Vector.empty,
+      clientUpdatesSoFar = clientUpdatesSoFar, hostUpdatesSoFar = hostUpdatesSoFar)
+
   def isBehind(that: StateOverride) =
-    clientUpdateNumber < that.clientUpdateNumber ||
-      hostUpdateNumber < that.hostUpdateNumber
+    clientUpdatesSoFar < that.clientUpdatesSoFar ||
+      hostUpdatesSoFar < that.hostUpdatesSoFar
 }
 
 case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[HTLCTuple] = Nil) extends HostedChannelMessage { me =>

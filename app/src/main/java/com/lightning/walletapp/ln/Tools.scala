@@ -77,8 +77,8 @@ object Tools {
       Protocol.writeUInt64(init.initialClientBalanceSatoshis, LITTLE_ENDIAN) ++
       Protocol.writeUInt64(update.stateOverride.updatedClientBalanceSatoshis, LITTLE_ENDIAN) ++
       Protocol.writeUInt32(update.stateOverride.blockDay, LITTLE_ENDIAN) ++
-      Protocol.writeUInt32(update.stateOverride.clientUpdateNumber, LITTLE_ENDIAN) ++
-      Protocol.writeUInt32(update.stateOverride.hostUpdateNumber, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(update.stateOverride.clientUpdatesSoFar, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(update.stateOverride.hostUpdatesSoFar, LITTLE_ENDIAN) ++
       htlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
   }
 }
