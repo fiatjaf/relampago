@@ -246,8 +246,7 @@ object ChannelManager extends Broadcaster {
       if (firstCall || blocksLeft < 1) {
         // Let channels know immediately, important for hosted ones
         // then also repeat on each next last block to save resouces
-        val cmd = CMDBestHeight(currentHeight)
-        all.foreach(_ process cmd)
+        all.foreach(_ process CMDChainTipKnown)
       }
 
       if (firstCall) {
@@ -290,7 +289,7 @@ object ChannelManager extends Broadcaster {
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockSend tx catch none
 
-    case (chan: NormalChannel, norm: NormalData, _: CMDBestHeight) if norm.commitments.updateOpt.isEmpty =>
+    case (chan: NormalChannel, norm: NormalData, CMDChainTipKnown) if norm.commitments.updateOpt.isEmpty =>
       // Depth barrier is relevant for Turbo channels, we must restrict receiving until funding is confirmed
       val fundingDepth \ isFundingDead = broadcaster.getStatus(chan.fundTxId)
 

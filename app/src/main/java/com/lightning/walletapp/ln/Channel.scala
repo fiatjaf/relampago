@@ -711,7 +711,7 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         isSocketConnected = true
 
 
-      case (wait: WaitTheirHostedReply, _: CMDBestHeight, WAIT_FOR_INIT) =>
+      case (wait: WaitTheirHostedReply, CMDChainTipKnown, WAIT_FOR_INIT) =>
         if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initMsg
         isChainHeightKnown = true
 
@@ -755,22 +755,14 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         BECOME(hc, SLEEPING)
 
 
-      case (hc: HostedCommits, _: CMDBestHeight, SLEEPING) =>
-        if (isSocketConnected) me SEND hc.initMsg
-        isChainHeightKnown = true
-
-
       case (hc: HostedCommits, CMDSocketOnline, SLEEPING) =>
         if (isChainHeightKnown) me SEND hc.initMsg
         isSocketConnected = true
 
-        /*case (norm: NormalData, cmd: CMDBestHeight, OPEN | SLEEPING) =>
-        for (expiredHtlc <- norm.commitments findExpired cmd)
-          throw HTLCHasExpired(norm, expiredHtlc)
-          */
 
-
-
+      case (hc: HostedCommits, CMDChainTipKnown, SLEEPING) =>
+        if (isSocketConnected) me SEND hc.initMsg
+        isChainHeightKnown = true
 
 
       case (hc: HostedCommits, lcss: LastCrossSignedState, SLEEPING) =>
