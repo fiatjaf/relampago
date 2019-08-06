@@ -724,19 +724,9 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         if (init.htlcMinimumMsat > 100000L) throw new LightningException("Their htlcMinimumMsat is too high")
         if (init.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
 
-        val so = StateOverride(init.initialClientBalanceSatoshis, LNParams.broadcaster.currentBlockDay, 0L, 0L)
-        val su = StateUpdate(so, Nil).signed(scriptPubKey, init, priv = LNParams.nodePrivateKey)
+        val so = StateOverride(init.initialClientBalanceSatoshis, LNParams.broadcaster.currentBlockDay)
+        val su = StateUpdate(so, Nil).signed(scriptPubKey, init, LNParams.nodePrivateKey)
         me UPDATA WaitTheirStateUpdate(announce, scriptPubKey, su, init) SEND su
-
-
-      case (wait: WaitTheirHostedReply, lcss @ LastCrossSignedState(refund, init, client, host), WAIT_FOR_ACCEPT) =>
-        // We have expected StateUpdate but got LastCrossSignedState which means this channel exists already on host side
-        // make sure our signature and other parameters match and if so then become OPEN using host supplied state data
-
-        validate(client, host, refund, init, wait.announce) match {
-          case None => BECOME(me STORE hcFromLastCrossSignedState(lcss, wait.announce), OPEN)
-          case Some(errorCode) => localSuspend(hcFromLastCrossSignedState(lcss, wait.announce), errorCode)
-        }
 
 
       case (WaitTheirStateUpdate(announce, refundScriptPubKey, client, init), host: StateUpdate, WAIT_FOR_ACCEPT) =>
@@ -745,17 +735,24 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
 
         val initHostBalance = init.channelCapacitySatoshis - init.initialClientBalanceSatoshis
         val localSpec = CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceSatoshis, initHostBalance)
-        BECOME(me STORE HostedCommits(announce, LastCrossSignedState(refundScriptPubKey, init, client, host),
-          0L, 0L, Vector.empty, Vector.empty, localSpec, updateOpt = None, localError = None,
-          remoteError = None, System.currentTimeMillis), OPEN)
+        val lcss = LastCrossSignedState(refundScriptPubKey, init, client, host)
+
+        BECOME(me STORE HostedCommits(announce, lcss, clientUpdatesSoFar = 0L, hostUpdatesSoFar = 0L,
+          Vector.empty, Vector.empty, localSpec, updateOpt = None, localError = None, remoteError = None,
+          startedAt = System.currentTimeMillis), OPEN) SEND lcss
+
+
+      case (wait: WaitTheirHostedReply, lcss @ LastCrossSignedState(refund, init, client, host), WAIT_FOR_ACCEPT) =>
+        // We have expected StateUpdate but got LastCrossSignedState which means this channel exists already on host side
+        // make sure our signature and other parameters match and if so then become OPEN using host supplied state data
+
+        validate(client, host, refund, init, wait.announce) match {
+          case None => BECOME(me STORE hcFromLastCrossSignedState(lcss, wait.announce), OPEN)
+          case Some(errCode) => localSuspend(hcFromLastCrossSignedState(lcss, wait.announce), errCode)
+        }
 
 
       // CHANNEL IS ESTABLISHED
-
-
-      case (hc: HostedCommits, CMDSocketOffline, OPEN) =>
-        isSocketConnected = false
-        BECOME(hc, SLEEPING)
 
 
       case (hc: HostedCommits, add: UpdateAddHtlc, OPEN) =>
@@ -805,6 +802,11 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         if (notFound) throw new LightningException else me UPDATA hc.addClientProposal(fail) SEND fail
 
 
+      case (hc: HostedCommits, CMDSocketOffline, OPEN) =>
+        isSocketConnected = false
+        BECOME(hc, SLEEPING)
+
+
       case (hc: HostedCommits, CMDSocketOnline, SLEEPING) =>
         if (isChainHeightKnown) me SEND hc.initMsg
         isSocketConnected = true
@@ -815,13 +817,11 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         isChainHeightKnown = true
 
 
-      case (hc: HostedCommits, lcss: LastCrossSignedState, SLEEPING) =>
-        val hostLastStateOverride = lcss.lastHostStateUpdate.stateOverride
-        val clientLastStateOverride = hc.lastCrossSignedState.lastClientStateUpdate.stateOverride
-        validate(lcss.lastClientStateUpdate, lcss.lastHostStateUpdate, lcss.lastRefundScriptPubKey, lcss.initHostedChannel, hc.announce) match {
-          case None if clientLastStateOverride.isBehind(hostLastStateOverride) => BECOME(me STORE hcFromLastCrossSignedState(lcss, hc.announce), OPEN)
-          case None => BECOME(clientLastStateOverride.rewind(hc), OPEN) SEND hc.lastCrossSignedState
-          case Some(errorCode) => localSuspend(hc, errorCode)
+      case (hc: HostedCommits, lcss @ LastCrossSignedState(refund, init, client, host), SLEEPING) =>
+        validate(client, host, refund, init, hc.announce) -> hc.lastCrossSignedState.lastClientStateUpdate.stateOverride match {
+          case None \ so if so.isBehind(host.stateOverride) => BECOME(me STORE hcFromLastCrossSignedState(lcss, hc.announce), OPEN)
+          case None \ so => BECOME(so rewind hc, OPEN) SEND hc.lastCrossSignedState
+          case Some(errorCode) \ _ => localSuspend(hc, errorCode)
         }
 
 
@@ -862,7 +862,7 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         val hostStateUpdate = StateUpdate(so, inFlightHtlcs = Nil)
         val clientStateUpdate = StateUpdate(so, Nil).signed(scriptPubKey, initHostedChannel, LNParams.nodePrivateKey)
         val lcss = LastCrossSignedState(scriptPubKey, initHostedChannel, clientStateUpdate, hostStateUpdate)
-        BECOME(me STORE hcFromLastCrossSignedState(lcss, hc.announce), OPEN)
+        BECOME(me STORE hcFromLastCrossSignedState(lcss, hc.announce), OPEN) SEND lcss
 
 
       case (null, wait: WaitTheirHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
@@ -903,14 +903,15 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
   }
 
   def hcFromLastCrossSignedState(lcss: LastCrossSignedState, announce: NodeAnnouncement): HostedCommits = {
-    val hostBalance = lcss.initHostedChannel.channelCapacitySatoshis - lcss.initHostedChannel.initialClientBalanceSatoshis
     val inFlightHtlcs = for (Tuple5(incoming, id, amountMsat, paymentHash, expiry) <- lcss.lastClientStateUpdate.inFlightHtlcs) yield {
       val addHtlc = UpdateAddHtlc(announce.hostedChanId, id, amountMsat, paymentHash, expiry, onionRoutingPacket = Sphinx.emptyOnionPacket)
       Htlc(incoming, addHtlc)
     }
 
-    HostedCommits(announce, lcss, lcss.lastClientStateUpdate.stateOverride.clientUpdatesSoFar, lcss.lastClientStateUpdate.stateOverride.hostUpdatesSoFar,
-      Vector.empty, Vector.empty, CommitmentSpec(feeratePerKw = 0L, lcss.initHostedChannel.initialClientBalanceSatoshis, hostBalance, inFlightHtlcs.toSet),
+    val so = lcss.lastClientStateUpdate.stateOverride
+    val hostBalance = lcss.initHostedChannel.channelCapacitySatoshis - so.updatedClientBalanceSatoshis
+    HostedCommits(announce, lcss, so.clientUpdatesSoFar, so.hostUpdatesSoFar, Vector.empty, Vector.empty,
+      CommitmentSpec(feeratePerKw = 0L, so.updatedClientBalanceSatoshis, hostBalance, inFlightHtlcs.toSet),
       updateOpt = None, localError = None, remoteError = None, startedAt = System.currentTimeMillis)
   }
 

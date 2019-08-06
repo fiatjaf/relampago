@@ -207,7 +207,7 @@ case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
                                 lastHostStateUpdate: StateUpdate) extends HostedChannelMessage
 
 case class StateOverride(updatedClientBalanceSatoshis: Long,
-                         blockDay: Long, clientUpdatesSoFar: Long, hostUpdatesSoFar: Long,
+                         blockDay: Long, clientUpdatesSoFar: Long = 0L, hostUpdatesSoFar: Long = 0L,
                          nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage {
 
   def rewind(hc: HostedCommits) =

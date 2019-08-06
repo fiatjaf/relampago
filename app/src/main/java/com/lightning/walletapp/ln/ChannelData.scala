@@ -500,7 +500,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
 
   def sendAdd(rd: RoutingData) = {
     // Let's add this change and see if the new state violates any of the constraints including those imposed by host on us
-    val add = UpdateAddHtlc(channelId, clientUpdatesSoFar, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet)
+    val add = UpdateAddHtlc(channelId, clientUpdatesSoFar + 1, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet)
     val reduced = CommitmentSpec.reduce(localSpec, clientChanges :+ add, hostChanges)
     val inHtlcs \ inFlight = reduced.directedHtlcsAndSum(incoming = false)
 
