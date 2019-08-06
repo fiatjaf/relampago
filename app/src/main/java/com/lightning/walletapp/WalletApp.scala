@@ -207,7 +207,6 @@ object ChannelManager extends Broadcaster {
   val operationalListeners = Set(ChannelManager, bag)
   val CMDLocalShutdown = CMDShutdown(scriptPubKey = None)
   private val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
-  private var initialChainHeight = app.kit.wallet.getLastBlockSeenHeight
   var currentBlocksLeft = Option.empty[Int]
 
   val socketEventsListener = new ConnectionListener {
@@ -247,9 +246,7 @@ object ChannelManager extends Broadcaster {
       if (firstCall || blocksLeft < 1) {
         // Let channels know immediately, important for hosted ones
         // then also repeat on each next last block to save resouces
-        val cmd = CMDBestHeight(currentHeight, initialChainHeight)
-        // Update to not have repeated warnings for the same HTLC
-        initialChainHeight = currentHeight
+        val cmd = CMDBestHeight(currentHeight)
         all.foreach(_ process cmd)
       }
 

@@ -19,9 +19,9 @@ import fr.acinq.eclair.UInt64
 
 sealed trait Command
 case class CMDShutdown(scriptPubKey: Option[ByteVector] = None) extends Command
-case class CMDBestHeight(heightNow: Long, heightInit: Long) extends Command
 case class CMDChannelUpdate(upd: ChannelUpdate) extends Command
 case class CMDStateOverride(so: StateOverride) extends Command
+case class CMDBestHeight(heightNow: Long) extends Command
 case class CMDConfirmed(tx: Transaction) extends Command
 case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
@@ -283,9 +283,9 @@ case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: ByteVector,
 case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 
 sealed trait Commitments {
-  val myFullBalanceMsat: Long
-  val localSpec: CommitmentSpec
   val updateOpt: Option[ChannelUpdate]
+  val localSpec: CommitmentSpec
+  val myFullBalanceMsat: Long
   val channelId: ByteVector
   val startedAt: Long
 }
@@ -316,11 +316,6 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   def addRemoteProposal(proposal: LightningMessage) = me.modify(_.remoteChanges.proposed).using(_ :+ proposal)
   def addLocalProposal(proposal: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ proposal)
   def nextDummyReduced = addLocalProposal(Tools.nextDummyHtlc).reducedRemoteState
-
-  def findExpiredHtlc(cmd: CMDBestHeight) =
-    localSpec.htlcs.find(htlc => !htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry) orElse
-      remoteCommit.spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry) orElse
-      latestRemoteCommit.spec.htlcs.find(htlc => htlc.incoming && cmd.heightNow >= htlc.add.expiry && cmd.heightInit <= htlc.add.expiry)
 
   def getHtlcCrossSigned(incomingRelativeToLocal: Boolean, htlcId: Long) = for {
     _ <- CommitmentSpec.findHtlcById(latestRemoteCommit.spec, htlcId, !incomingRelativeToLocal)
@@ -493,11 +488,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
                          startedAt: Long) extends Commitments with ChannelData {
 
   def isInErrorState = localError.isDefined || remoteError.isDefined
+  lazy val initMsg = InvokeHostedChannel(LNParams.chainHash, lastCrossSignedState.lastRefundScriptPubKey)
   val myFullBalanceMsat = localSpec.toLocalMsat
   val channelId = announce.hostedChanId
-
-  val initMsg = {
-    val scriptPubKey = lastCrossSignedState.lastRefundScriptPubKey
-    InvokeHostedChannel(LNParams.chainHash, scriptPubKey)
-  }
 }

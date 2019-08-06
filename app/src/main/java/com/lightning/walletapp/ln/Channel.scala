@@ -14,8 +14,8 @@ import scala.util.Success
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
-import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
+import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
 
 
@@ -352,11 +352,6 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
         }
 
 
-      case (norm: NormalData, cmd: CMDBestHeight, OPEN | SLEEPING) =>
-        for (expiredHtlc <- norm.commitments findExpiredHtlc cmd)
-          throw HTLCHasExpired(norm, expiredHtlc)
-
-
       // SHUTDOWN in WAIT_FUNDING_DONE
 
 
@@ -655,10 +650,10 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
     val ShaHashesWithIndex(hashes, lastIndex) = some.commitments.remotePerCommitmentSecrets
     val yourLastPerCommitmentSecret = lastIndex.map(ShaChain.moves).flatMap(ShaChain getHash hashes).map(ByteVector.view)
     val myCurrentPerCommitmentPoint = Generators.perCommitPoint(some.commitments.localParams.shaSeed, some.commitments.localCommit.index)
+    val myCurrentPerCommitmentPointOpt = Some(myCurrentPerCommitmentPoint)
 
     ChannelReestablish(some.commitments.channelId, nextLocalCommitmentNumber, some.commitments.remoteCommit.index,
-      yourLastPerCommitmentSecret = yourLastPerCommitmentSecret.map(Scalar.apply) orElse Some(Zeroes),
-      myCurrentPerCommitmentPoint = Some apply myCurrentPerCommitmentPoint)
+      yourLastPerCommitmentSecret.map(Scalar.apply) orElse Some(Zeroes), myCurrentPerCommitmentPointOpt)
   }
 
   private def makeFirstFundingLocked(some: HasNormalCommits) = {
@@ -760,14 +755,22 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         BECOME(hc, SLEEPING)
 
 
+      case (hc: HostedCommits, _: CMDBestHeight, SLEEPING) =>
+        if (isSocketConnected) me SEND hc.initMsg
+        isChainHeightKnown = true
+
+
       case (hc: HostedCommits, CMDSocketOnline, SLEEPING) =>
         if (isChainHeightKnown) me SEND hc.initMsg
         isSocketConnected = true
 
+        /*case (norm: NormalData, cmd: CMDBestHeight, OPEN | SLEEPING) =>
+        for (expiredHtlc <- norm.commitments findExpired cmd)
+          throw HTLCHasExpired(norm, expiredHtlc)
+          */
 
-      case (hc: HostedCommits, _: CMDBestHeight, SLEEPING) =>
-        if (isSocketConnected) me SEND hc.initMsg
-        isChainHeightKnown = true
+
+
 
 
       case (hc: HostedCommits, lcss: LastCrossSignedState, SLEEPING) =>
@@ -814,6 +817,11 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         if (!isBalanceOk) throw new LightningException("Provided Client updated balance is larger than capacity")
         if (!overrideSigOk) throw new LightningException("Provided StateOverride signature is wrong")
 
+        val hostStateUpdate = StateUpdate(so, inFlightHtlcs = Nil)
+        val clientStateUpdate = StateUpdate(so, Nil).signed(scriptPubKey, initHostedChannel, LNParams.nodePrivateKey)
+        val lcss = LastCrossSignedState(scriptPubKey, initHostedChannel, clientStateUpdate, hostStateUpdate)
+        BECOME(me STORE hcFromLastCrossSignedState(lcss, hc.announce), OPEN)
+
 
       case (null, wait: WaitTheirHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
       case (null, hc: HostedCommits, null) if hc.isInErrorState => super.become(hc, SUSPENDED)
@@ -859,11 +867,10 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
       Htlc(incoming, addHtlc)
     }
 
-    val so = lcss.lastClientStateUpdate.stateOverride
-    val clientBalance = lcss.initHostedChannel.initialClientBalanceSatoshis
-    val localSpec = CommitmentSpec(feeratePerKw = 0L, clientBalance, hostBalance, inFlightHtlcs.toSet)
-    HostedCommits(announce, lcss, so.clientUpdateNumber, so.hostUpdateNumber, localSpec, updateOpt = None,
-      localError = None, remoteError = None, startedAt = System.currentTimeMillis)
+    HostedCommits(announce, lcss,
+      lcss.lastClientStateUpdate.stateOverride.clientUpdateNumber, lcss.lastClientStateUpdate.stateOverride.hostUpdateNumber,
+      CommitmentSpec(feeratePerKw = 0L, lcss.initHostedChannel.initialClientBalanceSatoshis, hostBalance, inFlightHtlcs.toSet),
+      updateOpt = None, localError = None, remoteError = None, startedAt = System.currentTimeMillis)
   }
 
   def localSuspend(hc: HostedCommits, errCode: ByteVector) = {

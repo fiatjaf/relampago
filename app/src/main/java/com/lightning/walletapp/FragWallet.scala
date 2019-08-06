@@ -132,11 +132,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         UITask(host showForm negTextBuilder(dialog_ok, app getString code).create).run
         PaymentInfoWrap failOnUI rd
 
-      case chan \ HTLCHasExpired(_, htlc) =>
-        val paymentHash = htlc.add.paymentHash.toHex
-        val bld = negTextBuilder(dialog_ok, app.getString(err_ln_expired).format(paymentHash).html)
-        UITask(host showForm bld.setCustomTitle(chan.data.announce.asString.html).create).run
-
       case chan \ internalException =>
         val bld = negTextBuilder(dialog_ok, UncaughtHandler toText internalException)
         UITask(host showForm bld.setCustomTitle(chan.data.announce.asString.html).create).run

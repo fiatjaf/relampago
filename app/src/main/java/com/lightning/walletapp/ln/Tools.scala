@@ -103,7 +103,6 @@ object Features {
 }
 
 class LightningException(reason: String = "Failure") extends RuntimeException(reason)
-case class HTLCHasExpired(norm: NormalData, htlc: Htlc) extends LightningException
 case class CMDAddImpossible(rd: RoutingData, code: Int) extends LightningException
 
 // STATE MACHINE
