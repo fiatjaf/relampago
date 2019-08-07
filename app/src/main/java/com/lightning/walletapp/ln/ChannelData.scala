@@ -487,13 +487,13 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 }
 
 case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState, clientUpdatesSoFar: Long,
-                         hostUpdatesSoFar: Long, sentUpdates: Int, clientChanges: LNMessageVector, hostChanges: LNMessageVector,
+                         hostUpdatesSoFar: Long, reSentUpdates: Int, clientChanges: LNMessageVector, hostChanges: LNMessageVector,
                          localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
                          startedAt: Long) extends Commitments with ChannelData { me =>
 
   def isInErrorState = localError.isDefined || remoteError.isDefined
-  def addHostProposal(lm: LightningMessage) = copy(hostChanges = hostChanges :+ lm, hostUpdatesSoFar = hostUpdatesSoFar + 1, sentUpdates = 0)
-  def addClientProposal(lm: LightningMessage) = copy(clientChanges = clientChanges :+ lm, clientUpdatesSoFar = clientUpdatesSoFar + 1, sentUpdates = 0)
+  def addHostProposal(lm: LightningMessage) = copy(hostChanges = hostChanges :+ lm, hostUpdatesSoFar = hostUpdatesSoFar + 1, reSentUpdates = 0)
+  def addClientProposal(lm: LightningMessage) = copy(clientChanges = clientChanges :+ lm, clientUpdatesSoFar = clientUpdatesSoFar + 1, reSentUpdates = 0)
   lazy val initMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.lastRefundScriptPubKey)
   val myFullBalanceMsat = localSpec.toLocalMsat
   val channelId = announce.hostedChanId

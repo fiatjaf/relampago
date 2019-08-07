@@ -738,7 +738,7 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         val lcss = LastCrossSignedState(refundScriptPubKey, init, client, host)
 
         BECOME(me STORE HostedCommits(announce, lcss, clientUpdatesSoFar = 0L, hostUpdatesSoFar = 0L,
-          sentUpdates = 0, Vector.empty, Vector.empty, localSpec, updateOpt = None, localError = None,
+          reSentUpdates = 0, Vector.empty, Vector.empty, localSpec, updateOpt = None, localError = None,
           remoteError = None, startedAt = System.currentTimeMillis), OPEN) SEND lcss
 
 
@@ -798,10 +798,10 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
             val lcss1 = hc.lastCrossSignedState.copy(lastClientStateUpdate = client1, lastHostStateUpdate = host1)
             val hc1 = client1.stateOverride rewind hc.copy(lastCrossSignedState = lcss1, localSpec = localSpec1)
             // This means they have sent a signature first or we have sent/received Add/Fail/Fulfill since then
-            if (hc.sentUpdates == 0) me SEND client1
+            if (hc.reSentUpdates == 0) me SEND client1
             // We have a new cross-signed state
             BECOME(me STORE hc1, OPEN)
-            events onSettled hc1
+            events.onSettled(hc1)
           }
         }
 
@@ -821,7 +821,7 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
         doProcess(CMDProceed)
 
 
-      case (hc: HostedCommits, CMDProceed, OPEN) if hc.sentUpdates > 20 =>
+      case (hc: HostedCommits, CMDProceed, OPEN) if hc.reSentUpdates > 20 =>
         // GUARD: prevent endless update exchange loop by suspending a channel
         localSuspend(hc, ERR_HOSTED_TOO_MANY_UPDATES)
 
@@ -829,7 +829,7 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
       case (hc: HostedCommits, CMDProceed, OPEN)
         // GUARD: only send update if we have unsigned changes
         if hc.clientChanges.nonEmpty || hc.hostChanges.nonEmpty =>
-        val hc1 = hc.copy(sentUpdates = hc.sentUpdates + 1)
+        val hc1 = hc.copy(reSentUpdates = hc.reSentUpdates + 1)
         me UPDATA hc1 SEND hc.makeSignedStateUpdate
 
 
