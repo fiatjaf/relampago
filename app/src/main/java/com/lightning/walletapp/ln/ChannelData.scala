@@ -402,8 +402,8 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 
   def receiveFailMalformed(fail: UpdateFailMalformedHtlc) = {
-    if (fail.failureCode.&(FailureMessageCodecs.BADONION) == 0) throw new LightningException
     val notFound = getHtlcCrossSigned(incomingRelativeToLocal = false, fail.id).isEmpty
+    if (fail.failureCode.&(FailureMessageCodecs.BADONION) == 0) throw new LightningException
     if (notFound) throw new LightningException else addRemoteProposal(fail)
   }
 
@@ -541,8 +541,8 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   }
 
   def receiveFailMalformed(fail: UpdateFailMalformedHtlc) = {
-    if (fail.failureCode.&(FailureMessageCodecs.BADONION) == 0) throw new LightningException
     val notFound = CommitmentSpec.findHtlcById(localSpec, fail.id, isIncoming = false).isEmpty
+    if (fail.failureCode.&(FailureMessageCodecs.BADONION) == 0) throw new LightningException
     if (notFound) throw new LightningException else addHostProposal(fail)
   }
 }

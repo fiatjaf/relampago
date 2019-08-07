@@ -107,16 +107,16 @@ object ChanErrorCodes {
   final val ERR_HOSTED_TOO_MANY_UPDATES = ByteVector.fromValidHex("0010")
 
   val hostedErrors = Map (
-    ERR_HOSTED_WRONG_BALANCE -> "err_ln_hosted_wrong_balance",
-    ERR_HOSTED_WRONG_BLOCKDAY -> "err_ln_hosted_wrong_blockday",
-    ERR_HOSTED_WRONG_HOST_SIG -> "err_ln_hosted_wrong_host_sig",
-    ERR_HOSTED_WRONG_IN_FLIGHT -> "err_ln_hosted_wrong_in_flight",
-    ERR_HOSTED_WRONG_CLIENT_SIG -> "err_ln_hosted_wrong_client_sig",
-    ERR_HOSTED_WRONG_HOST_NUMBER -> "err_ln_hosted_wrong_host_number",
-    ERR_HOSTED_WRONG_CLIENT_NUMBER -> "err_ln_hosted_wrong_client_number",
-    ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH -> "err_ln_hosted_update_block_too_high",
-    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> "err_ln_hosted_update_cltv_too_low",
-    ERR_HOSTED_TOO_MANY_UPDATES -> "err_ln_hosted_too_many_updates"
+    ERR_HOSTED_WRONG_BALANCE -> err_ln_hosted_wrong_balance,
+    ERR_HOSTED_WRONG_BLOCKDAY -> err_ln_hosted_wrong_blockday,
+    ERR_HOSTED_WRONG_HOST_SIG -> err_ln_hosted_wrong_host_sig,
+    ERR_HOSTED_WRONG_IN_FLIGHT -> err_ln_hosted_wrong_in_flight,
+    ERR_HOSTED_WRONG_CLIENT_SIG -> err_ln_hosted_wrong_client_sig,
+    ERR_HOSTED_WRONG_HOST_NUMBER -> err_ln_hosted_wrong_host_number,
+    ERR_HOSTED_WRONG_CLIENT_NUMBER -> err_ln_hosted_wrong_client_number,
+    ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH -> err_ln_hosted_update_block_too_high,
+    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low,
+    ERR_HOSTED_TOO_MANY_UPDATES -> err_ln_hosted_too_many_updates
   )
 }
 
