@@ -497,6 +497,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   lazy val initMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.lastRefundScriptPubKey)
   val myFullBalanceMsat = localSpec.toLocalMsat
   val channelId = announce.hostedChanId
+  val mustReply = reSentUpdates == 0
 
   def sendAdd(rd: RoutingData) = {
     // Let's add this change and see if the new state violates any of the constraints including those imposed by host on us

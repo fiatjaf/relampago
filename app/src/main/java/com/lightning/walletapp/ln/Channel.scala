@@ -798,8 +798,7 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
             val lcss1 = hc.lastCrossSignedState.copy(lastClientStateUpdate = client1, lastHostStateUpdate = host1)
             val hc1 = client1.stateOverride rewind hc.copy(lastCrossSignedState = lcss1, localSpec = localSpec1)
             // This means they have sent a signature first or we have sent/received Add/Fail/Fulfill since then
-            if (hc.reSentUpdates == 0) me SEND client1
-            // We have a new cross-signed state
+            if (hc.mustReply) me SEND client1
             BECOME(me STORE hc1, OPEN)
             events.onSettled(hc1)
           }
