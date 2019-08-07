@@ -731,7 +731,7 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
 
       case (WaitTheirStateUpdate(announce, refundScriptPubKey, client, init), host: StateUpdate, WAIT_FOR_ACCEPT) =>
         val validationError = validate(client, host, refundScriptPubKey, init, announce).flatMap(ChanErrorCodes.hostedErrors.get)
-        for (errorMessage <- validationError) throw new LightningException(errorMessage)
+        for (errorMessage <- validationError) throw new LightningException(com.lightning.walletapp.Utils.app getString errorMessage)
 
         val initHostBalance = init.channelCapacitySatoshis - init.initialClientBalanceSatoshis
         val localSpec = CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceSatoshis, initHostBalance)

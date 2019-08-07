@@ -111,7 +111,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     override def onProcessSuccess = {
       case (chan: NormalChannel, _: HasNormalCommits, remoteError: wire.Error) if errorLimit > 0 =>
         // Peer has sent us an error, display details to user and offer to force-close a channel
-        informOfferClose(chan, remoteError.exception.getMessage).run
+        informOfferClose(chan, remoteError.text).run
         errorLimit -= 1
 
       case (chan: NormalChannel, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
