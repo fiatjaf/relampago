@@ -35,7 +35,7 @@ case class CMDOpenChannel(localParams: LocalParams, tempChanId: ByteVector, init
                           fundingSat: Long, channelFlags: ChannelFlags = ChannelFlags(0), pushMsat: Long = 0L) extends Command
 
 case class CMDFailMalformedHtlc(id: Long, onionHash: ByteVector, code: Int) extends Command
-case class CMDFulfillHtlc(id: Long, preimage: ByteVector) extends Command
+case class CMDFulfillHtlc(add: UpdateAddHtlc, preimage: ByteVector) extends Command
 case class CMDFailHtlc(id: Long, reason: ByteVector) extends Command
 
 // CHANNEL DATA

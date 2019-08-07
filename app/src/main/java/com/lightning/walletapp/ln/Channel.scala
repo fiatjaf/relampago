@@ -272,9 +272,9 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
 
         for {
           // this is a special case where we don't throw if cross signed HTLC is not found
-          add <- norm.commitments.getHtlcCrossSigned(incomingRelativeToLocal = true, cmd.id)
+          add <- norm.commitments.getHtlcCrossSigned(incomingRelativeToLocal = true, cmd.add.id)
           // such a case may happen when we have already fulfilled it just before connection got lost
-          updateFulfillHtlc = UpdateFulfillHtlc(norm.commitments.channelId, cmd.id, cmd.preimage)
+          updateFulfillHtlc = UpdateFulfillHtlc(norm.commitments.channelId, cmd.add.id, cmd.preimage)
 
           if updateFulfillHtlc.paymentHash == add.paymentHash
           c1 = norm.commitments addLocalProposal updateFulfillHtlc
@@ -833,8 +833,8 @@ abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =
 
 
       case (hc: HostedCommits, cmd: CMDFulfillHtlc, OPEN) =>
-        val fulfillHtlc = UpdateFulfillHtlc(hc.channelId, cmd.id, cmd.preimage)
-        CommitmentSpec.findHtlcById(hc.localSpec, cmd.id, isIncoming = true) match {
+        val fulfillHtlc = UpdateFulfillHtlc(hc.channelId, cmd.add.id, cmd.preimage)
+        CommitmentSpec.findHtlcById(hc.localSpec, cmd.add.id, isIncoming = true) match {
           case Some(htlc) => me UPDATA hc.addClientProposal(fulfillHtlc) SEND fulfillHtlc
           case None => throw new LightningException
         }

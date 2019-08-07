@@ -158,7 +158,7 @@ object PaymentInfo {
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin > add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin * 2 < add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case Attempt.Successful(payload) \ _ if payload.value.outgoingCltvValue != add.expiry => failHtlc(pkt, FinalIncorrectCltvExpiry(add.expiry), add)
-      case attempt \ Success(info) if attempt.isSuccessful && !loop && info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add.id, info.preimage)
+      case attempt \ Success(info) if attempt.isSuccessful && !loop && info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add, info.preimage)
       case attempt \ _ if attempt.isSuccessful => failIncorrectDetails(pkt, add.amount, add)
       case _ => InvalidOnionPayload(PaymentPacket hash add.onionRoutingPacket)
     }

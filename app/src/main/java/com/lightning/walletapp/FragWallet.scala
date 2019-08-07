@@ -77,8 +77,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // 0 is unsent payment, 4 is former frozen payment, now waiting
   val iconDict = Array(await, await, conf1, dead, await)
 
-  // LISTENERS
-
   val blocksTitleListener = new BlocksListener {
     def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) =
       if (left % blocksPerDay == 0) updTitleTask.run
@@ -94,48 +92,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (a isGreaterThan b) updBtcItems
     def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (b isGreaterThan a) updBtcItems
     override def txConfirmed(txj: Transaction) = UITask(adapter.notifyDataSetChanged).run
-  }
-
-  // To fight spamming
-  private[this] var errorLimit = 5
-  val chanListener = new ChannelListener {
-    def informOfferClose(chan: NormalChannel, msg: String) = UITask {
-      mkCheckFormNeutral(_.dismiss, none, alert => rm(alert)(chan process ChannelManager.CMDLocalShutdown),
-        baseBuilder(chan.data.announce.asString.html, msg), dialog_ok, noResource = -1, ln_chan_close)
-    }
-
-    override def onSettled(cs: Commitments) =
-      if (cs.localSpec.fulfilledIncoming.nonEmpty)
-        host stopService host.foregroundServiceIntent
-
-    override def onProcessSuccess = {
-      case (chan: NormalChannel, _: HasNormalCommits, remoteError: wire.Error) if errorLimit > 0 =>
-        // Peer has sent us an error, display details to user and offer to force-close a channel
-        informOfferClose(chan, remoteError.text).run
-        errorLimit -= 1
-
-      case (chan: NormalChannel, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
-        // Peer now has some incompatible features, display details to user and offer to force-close a channel
-        informOfferClose(chan, host getString err_ln_peer_incompatible format chan.data.announce.alias).run
-    }
-
-    override def onBecome = {
-      case (_, _, fromState, CLOSING) if fromState != CLOSING => updPaymentList.run
-      case (_, _, fromState, SUSPENDED) if fromState != SUSPENDED => updTitleTask.run
-      case (_, _, prev, SLEEPING) if prev != SLEEPING => updTitleTask.run
-      case (_, _, prev, OPEN) if prev != OPEN => updTitleTask.run
-    }
-
-    override def onException = {
-      case _ \ CMDAddImpossible(rd, code) =>
-        // Remove this payment from unsent since it was not accepted by channel
-        UITask(host showForm negTextBuilder(dialog_ok, app getString code).create).run
-        PaymentInfoWrap failOnUI rd
-
-      case chan \ internalException =>
-        val bld = negTextBuilder(dialog_ok, UncaughtHandler toText internalException)
-        UITask(host showForm bld.setCustomTitle(chan.data.announce.asString.html).create).run
-    }
   }
 
   val loaderCallbacks = new LoaderCallbacks[Cursor] {
@@ -195,12 +151,59 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   // DISPLAYING ITEMS LIST
 
-  var fundTxIds: Set[String] = Set.empty[String]
-  var lnItems: Vector[LNWrap] = Vector.empty[LNWrap]
-  var btcItems: Vector[BTCWrap] = Vector.empty[BTCWrap]
-  var allItems: Vector[ItemWrap] = Vector.empty[ItemWrap]
+  var errorLimit = 5
+  var fundTxIds = Set.empty[String]
+  var lnItems = Vector.empty[LNWrap]
+  var btcItems = Vector.empty[BTCWrap]
+  var allItems = Vector.empty[ItemWrap]
+  var revealedPreimages = Set.empty[ByteVector]
   val minLinesNum = 4 max IconGetter.scrHeight.ceil.toInt
   var currentCut = minLinesNum
+
+  val chanListener = new ChannelListener {
+    def informOfferClose(chan: NormalChannel, msg: String) = UITask {
+      mkCheckFormNeutral(_.dismiss, none, alert => rm(alert)(chan process ChannelManager.CMDLocalShutdown),
+        baseBuilder(chan.data.announce.asString.html, msg), dialog_ok, noResource = -1, ln_chan_close)
+    }
+
+    override def onSettled(cs: Commitments) =
+      if (cs.localSpec.fulfilledIncoming.nonEmpty)
+        host stopService host.foregroundServiceIntent
+
+    override def onProcessSuccess = {
+      case (chan: NormalChannel, _: HasNormalCommits, remoteError: wire.Error) if errorLimit > 0 =>
+        // Peer has sent us an error, display details to user and offer to force-close a channel
+        informOfferClose(chan, remoteError.text).run
+        errorLimit -= 1
+
+      case (chan: NormalChannel, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
+        // Peer now has some incompatible features, display details to user and offer to force-close a channel
+        informOfferClose(chan, host getString err_ln_peer_incompatible format chan.data.announce.alias).run
+
+      case (_: HostedChannelClient, _: HostedCommits, cmd: CMDFulfillHtlc) =>
+        // For hosted channels it's important to let user know that preimage was revealed
+        // this gives user enough time to sort situation out if host does not cooperate
+        revealedPreimages += cmd.preimage
+    }
+
+    override def onBecome = {
+      case (_, _, fromState, CLOSING) if fromState != CLOSING => updPaymentList.run
+      case (_, _, fromState, SUSPENDED) if fromState != SUSPENDED => updTitleTask.run
+      case (_, _, prev, SLEEPING) if prev != SLEEPING => updTitleTask.run
+      case (_, _, prev, OPEN) if prev != OPEN => updTitleTask.run
+    }
+
+    override def onException = {
+      case _ \ CMDAddImpossible(rd, code) =>
+        // Remove this payment from unsent since it was not accepted by channel
+        UITask(host showForm negTextBuilder(dialog_ok, app getString code).create).run
+        PaymentInfoWrap failOnUI rd
+
+      case chan \ internalException =>
+        val bld = negTextBuilder(dialog_ok, UncaughtHandler toText internalException)
+        UITask(host showForm bld.setCustomTitle(chan.data.announce.asString.html).create).run
+    }
+  }
 
   def updPaymentList = UITask {
     TransitionManager beginDelayedTransition mainWrap
@@ -285,6 +288,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
+      // TODO: highlight this payment somehow when preimage is revealed
       val humanSum = if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
         else if (info.incoming == 1) denom.coloredIn(info.firstSum, new String)
         else denom.coloredOut(info.firstSum, new String)
