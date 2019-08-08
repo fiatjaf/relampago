@@ -57,7 +57,7 @@ class RevokedInfoSpec {
       channelFlags = None,
       startedAt = 0L)
 
-    val chan1 = new NormalChannel(isHosted = false) {
+    val chan1 = new NormalChannel {
       override def REV(cs: NormalCommits, rev: RevokeAndAck): Unit = none
       override def SEND(msg: LightningMessage): Unit = none
       override def STORE(data: ChannelData): ChannelData = data
@@ -94,7 +94,7 @@ class RevokedInfoSpec {
       channelFlags = None,
       startedAt = 0L)
 
-    val chan2 = new NormalChannel(isHosted = false) {
+    val chan2 = new NormalChannel {
       override def REV(cs: NormalCommits, rev: RevokeAndAck): Unit = none
       override def SEND(msg: LightningMessage): Unit = none
       override def STORE(data: ChannelData): ChannelData = data

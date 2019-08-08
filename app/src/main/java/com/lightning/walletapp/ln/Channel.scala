@@ -19,7 +19,7 @@ import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
 
 
-trait Channel extends StateMachine[ChannelData] { me =>
+abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
   def process(change: Any) = Future(me doProcess change) onFailure { case runtimeFailure => events onException me -> runtimeFailure }
   def shouldRenew(u: ChannelUpdate) = getCommits.flatMap(_.updateOpt).exists(u0 => u0.shortChannelId == u.shortChannelId && u0.timestamp < u.timestamp)
@@ -49,7 +49,6 @@ trait Channel extends StateMachine[ChannelData] { me =>
     // In-flight HTLCs are subtracted here
     estimateCanSend + estimateCanReceive
 
-  val isHosted: Boolean
   var permanentOffline: Boolean = true
   var listeners: Set[ChannelListener] = _
   val events: ChannelListener = new ChannelListener {
@@ -62,7 +61,7 @@ trait Channel extends StateMachine[ChannelData] { me =>
   }
 }
 
-abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
+abstract class NormalChannel extends Channel(isHosted = false) { me =>
   def fundTxId = data match {case hasSome: HasNormalCommits => hasSome.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
   def estimateCanSend = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat } getOrElse 0L
   def inFlightHtlcs = getCommits collect { case nc: NormalCommits => nc.reducedRemoteState.spec.htlcs } getOrElse Set.empty[Htlc]
@@ -695,7 +694,7 @@ abstract class NormalChannel(val isHosted: Boolean) extends Channel { me =>
     }
 }
 
-abstract class HostedChannelClient(val isHosted: Boolean) extends Channel { me =>
+abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
   def estimateCanSend = getCommits collect { case nc: HostedCommits => nc.localSpec.toLocalMsat } getOrElse 0L
   def estimateCanReceive = getCommits collect { case nc: HostedCommits => nc.localSpec.toRemoteMsat } getOrElse 0L
   def inFlightHtlcs = getCommits collect { case nc: HostedCommits => nc.localSpec.htlcs } getOrElse Set.empty[Htlc]

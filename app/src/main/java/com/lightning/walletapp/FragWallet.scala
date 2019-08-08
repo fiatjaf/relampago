@@ -287,7 +287,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
-      val humanAMount = if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
+      val humanAmount = if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
         else if (info.incoming == 1) denom.coloredIn(info.firstSum, new String)
         else denom.coloredOut(info.firstSum, new String)
 
@@ -299,7 +299,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
       holder.transactWhat setText getDescription(info.description).html
-      holder.transactSum setText s"<img src='ln'/>$humanAMount".html
+      holder.transactSum setText s"<img src='ln'/>$humanAmount".html
       holder.transactCircle setImageResource iconDict(info.status)
       holder.view setBackgroundColor bgColor
     }
@@ -386,13 +386,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = wrap.tx.getUpdateTime
 
     def fillView(holder: ViewHolder) = {
-      val humanSum = if (fundTxIds contains txid) denom.coloredP2WSH(-wrap.visibleValue, new String)
+      val humanAmount = if (fundTxIds contains txid) denom.coloredP2WSH(-wrap.visibleValue, new String)
         else if (wrap.visibleValue.isPositive) denom.coloredIn(wrap.visibleValue, new String)
         else denom.coloredOut(-wrap.visibleValue, new String)
 
       val status = if (txDead) dead else if (txDepth >= minDepth) conf1 else await
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
-      holder.transactSum setText s"<img src='btc'/>$humanSum".html
+      holder.transactSum setText s"<img src='btc'/>$humanAmount".html
       holder.transactWhat setVisibility viewMap(isTablet)
       holder.transactCircle setImageResource status
       holder.transactWhat setText txid
