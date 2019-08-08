@@ -180,10 +180,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         // Peer now has some incompatible features, display details to user and offer to force-close a channel
         informOfferClose(chan, host getString err_ln_peer_incompatible format chan.data.announce.alias).run
 
-      case (_: HostedChannelClient, _: HostedCommits, cmd: CMDFulfillHtlc) =>
-        // For hosted channels it's important to let user know that preimage was revealed
-        // this gives user enough time to sort situation out if host does not cooperate
+      case (_, _, cmd: CMDFulfillHtlc) =>
         revealedPreimages += cmd.preimage
+        updPaymentList.run
     }
 
     override def onBecome = {
@@ -229,13 +228,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def getView(position: Int, savedView: View, parent: ViewGroup) = {
       val resource = if (isTablet) R.layout.frag_tx_line_tablet else R.layout.frag_tx_line
       val view = if (null == savedView) host.getLayoutInflater.inflate(resource, null) else savedView
-      val holder = if (null == view.getTag) new ViewHolder(view) else view.getTag.asInstanceOf[ViewHolder]
+      val holder = if (null == view.getTag) ViewHolder(view) else view.getTag.asInstanceOf[ViewHolder]
       getItem(position) fillView holder
       view
     }
   }
 
-  class ViewHolder(view: View) {
+  case class ViewHolder(view: View) {
     val transactCircle = view.findViewById(R.id.transactCircle).asInstanceOf[ImageView]
     val transactWhen = view.findViewById(R.id.transactWhen).asInstanceOf[TextView]
     val transactWhat = view.findViewById(R.id.transactWhat).asInstanceOf[TextView]
@@ -288,23 +287,28 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
-      // TODO: highlight this payment somehow when preimage is revealed
-      val humanSum = if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
+      val humanAMount = if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
         else if (info.incoming == 1) denom.coloredIn(info.firstSum, new String)
         else denom.coloredOut(info.firstSum, new String)
 
-      holder.transactCircle setImageResource iconDict(info.status)
+      val bgColor = revealedPreimages contains info.preimage match {
+        case true if info.status == WAITING => Denomination.yellowHighlight
+        case _ => 0x00000000
+      }
+
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
       holder.transactWhat setText getDescription(info.description).html
-      holder.transactSum setText s"<img src='ln'/>$humanSum".html
+      holder.transactSum setText s"<img src='ln'/>$humanAMount".html
+      holder.transactCircle setImageResource iconDict(info.status)
+      holder.view setBackgroundColor bgColor
     }
 
     def generatePopup = {
-      val humanStatus = info.incoming -> info.status match {
-        case 0 \ FAILURE => s"<strong>${app getString ln_state_fail_out}</strong>"
-        case 1 \ FAILURE => s"<strong>${app getString ln_state_fail_in}</strong>"
-        case _ \ SUCCESS => s"<strong>${app getString ln_state_success}</strong>"
+      val humanStatus = info.status match {
+        case FAILURE if 0 == info.incoming => s"<strong>${app getString ln_state_fail_out}</strong>"
+        case FAILURE if 1 == info.incoming => s"<strong>${app getString ln_state_fail_in}</strong>"
+        case SUCCESS => s"<strong>${app getString ln_state_success}</strong>"
         case _ => s"<strong>${app getString ln_state_wait}</strong>"
       }
 
@@ -382,11 +386,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = wrap.tx.getUpdateTime
 
     def fillView(holder: ViewHolder) = {
-      val humanSum = wrap.visibleValue.isPositive match {
-        case _ if fundTxIds contains txid => denom.coloredP2WSH(-wrap.visibleValue, new String)
-        case false => denom.coloredOut(-wrap.visibleValue, new String)
-        case true => denom.coloredIn(wrap.visibleValue, new String)
-      }
+      val humanSum = if (fundTxIds contains txid) denom.coloredP2WSH(-wrap.visibleValue, new String)
+        else if (wrap.visibleValue.isPositive) denom.coloredIn(wrap.visibleValue, new String)
+        else denom.coloredOut(-wrap.visibleValue, new String)
 
       val status = if (txDead) dead else if (txDepth >= minDepth) conf1 else await
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html

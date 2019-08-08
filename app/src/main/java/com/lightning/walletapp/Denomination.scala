@@ -21,7 +21,9 @@ object Denomination {
 
   // TODO: remove this hack once themed color can be appropriately fetched
   val mode = app.getResources.getConfiguration.uiMode & Configuration.UI_MODE_NIGHT_MASK
+  val yellowHighlight = if (mode == Configuration.UI_MODE_NIGHT_YES) 0xFF444133 else 0xFFFFFAE4
   val reddish = if (mode == Configuration.UI_MODE_NIGHT_YES) "#E35646" else "#E31300"
+
   val formatFiat = new DecimalFormat("#,###,###.##")
   formatFiat setDecimalFormatSymbols symbols
 
