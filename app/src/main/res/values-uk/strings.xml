@@ -321,4 +321,18 @@
     <string name="olympus_log_refunding_tx">Збережена відкладена зворотня транзакція</string>
     <string name="notify_body">Додаток залишається відкритим, щоб отримати %1$s</string>
     <string name="notify_title">Очікується платіж-Блискавка</string>
+
+    <!-- hosted channels -->
+    <string name="err_ln_hosted_local">Local error: %1$s</string>
+    <string name="err_ln_hosted_remote">Remote error: %1$s</string>
+    <string name="err_ln_hosted_wrong_balance">incorrect updated balance</string>
+    <string name="err_ln_hosted_wrong_blockday">incorrect updated blockday</string>
+    <string name="err_ln_hosted_wrong_host_sig">incorrect remote signature</string>
+    <string name="err_ln_hosted_wrong_client_sig">incorrect local signature</string>
+    <string name="err_ln_hosted_wrong_host_number">incorrect host update number</string>
+    <string name="err_ln_hosted_wrong_client_number">incorrect client update number</string>
+    <string name="err_ln_hosted_update_block_too_high">incorrect channel update block number</string>
+    <string name="err_ln_hosted_update_cltv_too_low">incorrect channel update cltv expiry</string>
+    <string name="err_ln_hosted_wrong_in_flight">incorrect number of in-flight payments</string>
+    <string name="err_ln_hosted_too_many_updates">too many state updates</string>
 </resources>
