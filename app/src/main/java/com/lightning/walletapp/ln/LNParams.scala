@@ -24,7 +24,7 @@ object LNParams {
 
   val minDepth = 1
   val blocksPerDay = 144
-  val minCapacityMsat = 300000000L
+  val minCapacityMsat = 200000000L
   val channelReserveToFundingRatio = 100
 
   val minHostedLiabilityBlockdays = 1000

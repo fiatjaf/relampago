@@ -337,7 +337,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       PaymentInfoWrap.acceptedPayments get rd.pr.paymentHash foreach { rd1 =>
         val routingPath = for (usedHop <- rd1.usedRoute) yield usedHop.humanDetails
         val errors = PaymentInfo.errors.getOrElse(rd.pr.paymentHash, Vector.empty).reverse.map(_.toString) mkString "\n==\n"
-        val receiverInfo = s"Payee node: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
+        val receiverInfo = s"Payee node ID: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
         val debugInfo = ("Your wallet" +: routingPath :+ receiverInfo mkString "\n-->\n") + s"\n\n$errors"
         paymentDebug setOnClickListener onButtonTap(host share debugInfo)
         paymentDebug setVisibility View.VISIBLE

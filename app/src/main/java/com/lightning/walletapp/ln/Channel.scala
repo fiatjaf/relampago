@@ -724,7 +724,7 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
         if (init.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
 
         val so = StateOverride(init.initialClientBalanceSatoshis, LNParams.broadcaster.currentBlockDay)
-        val su = StateUpdate(so, Nil).signed(announce.hostedChanId, scriptPubKey, init, LNParams.nodePrivateKey)
+        val su = StateUpdate(so).signed(announce.hostedChanId, scriptPubKey, init, LNParams.nodePrivateKey)
         me UPDATA WaitTheirStateUpdate(announce, scriptPubKey, su, init) SEND su
 
 
