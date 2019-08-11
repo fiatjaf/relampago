@@ -198,7 +198,8 @@
     <string name="err_ln_peer_offline">Не удалось подключиться к %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s не поддерживает защиту от потери данных</string>
     <string name="err_ln_chain_disconnected">Создание канала отменено потому что он-чейн кошелек в оффлайне</string>
-    <string name="err_ln_remote_amount_high">Не получилось потому что сумма платежа слишком высока после добавления комиссии</string>
+    <string name="err_ln_local_amount_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для канала</string>
+    <string name="err_ln_remote_amount_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для вашего пира</string>
     <string name="err_ln_remote_amount_low">Не получилось потому что сумма платежа слишком низка для вашего пира</string>
     <string name="err_ln_fulfilled">Не получилось потому что этот платежный запрос уже оплачен</string>
     <string name="err_ln_too_many">Не получилось потому что слишком много платежей уже в пути</string>

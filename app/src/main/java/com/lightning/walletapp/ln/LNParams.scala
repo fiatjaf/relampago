@@ -91,6 +91,7 @@ object LNParams {
 
 object ChanErrorCodes {
   import com.lightning.walletapp.R.string._
+  val ERR_LOCAL_AMOUNT_HIGH = err_ln_local_amount_high
   val ERR_REMOTE_AMOUNT_HIGH = err_ln_remote_amount_high
   val ERR_REMOTE_AMOUNT_LOW = err_ln_remote_amount_low
   val ERR_TOO_MANY_HTLC = err_ln_too_many
