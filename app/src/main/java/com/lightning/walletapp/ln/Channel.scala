@@ -1000,11 +1000,6 @@ object NormalChannel {
 }
 
 trait ChannelListener {
-  def nullOnBecome(chan: Channel) = {
-    val nullTransition = Tuple4(chan, chan.data, null, chan.state)
-    if (onBecome isDefinedAt nullTransition) onBecome(nullTransition)
-  }
-
   type Malfunction = (Channel, Throwable)
   type Incoming = (Channel, ChannelData, Any)
   type Transition = (Channel, ChannelData, String, String)
