@@ -220,9 +220,11 @@ case class StateOverride(updatedClientBalanceSatoshis: Long,
 }
 
 case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[HTLCTuple] = Nil) extends HostedChannelMessage { me =>
-  def signed(script: ByteVector, init: InitHostedChannel, priv: PrivateKey) = me.modify(_.stateOverride.nodeSignature) setTo sign(sigHash(script, init), priv)
-  def verify(script: ByteVector, init: InitHostedChannel, pub: PublicKey) = Crypto.verifySignature(sigHash(script, init), stateOverride.nodeSignature, pub)
-  def sigHash(script: ByteVector, init: InitHostedChannel) = hostedSigHash(script, me, init)
+  def signed(channelId: ByteVector, refundScriptPubKey: ByteVector, init: InitHostedChannel, priv: PrivateKey): StateUpdate =
+    me.modify(_.stateOverride.nodeSignature) setTo sign(hostedSigHash(channelId, refundScriptPubKey, me, init), priv)
+
+  def verify(channelId: ByteVector, refundScriptPubKey: ByteVector, init: InitHostedChannel, pub: PublicKey): Boolean =
+    Crypto.verifySignature(hostedSigHash(channelId, refundScriptPubKey, me, init), stateOverride.nodeSignature, pub)
 }
 
 // Not in a spec

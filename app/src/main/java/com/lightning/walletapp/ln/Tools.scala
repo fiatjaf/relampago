@@ -67,10 +67,11 @@ object Tools {
     if (pubkey1First) Crypto.sha256(pubkey1 ++ pubkey2) else Crypto.sha256(pubkey2 ++ pubkey1)
   }
 
-  def hostedSigHash(refundScriptPubKey: ByteVector, update: StateUpdate, init: InitHostedChannel) = Crypto sha256 {
+  def hostedSigHash(chanId: ByteVector, refundScriptPubKey: ByteVector, update: StateUpdate, init: InitHostedChannel) = Crypto sha256 {
     val htlcs = update.inFlightHtlcs.map(htlcTupleCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
 
-    refundScriptPubKey ++
+    chanId ++
+      refundScriptPubKey ++
       Protocol.writeUInt16(init.liabilityDeadlineBlockdays, LITTLE_ENDIAN) ++
       Protocol.writeUInt64(init.minimalOnchainRefundAmountSatoshis, LITTLE_ENDIAN) ++
       Protocol.writeUInt64(init.channelCapacitySatoshis, LITTLE_ENDIAN) ++

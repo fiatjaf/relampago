@@ -724,7 +724,7 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
         if (init.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
 
         val so = StateOverride(init.initialClientBalanceSatoshis, LNParams.broadcaster.currentBlockDay)
-        val su = StateUpdate(so, Nil).signed(scriptPubKey, init, LNParams.nodePrivateKey)
+        val su = StateUpdate(so, Nil).signed(announce.hostedChanId, scriptPubKey, init, LNParams.nodePrivateKey)
         me UPDATA WaitTheirStateUpdate(announce, scriptPubKey, su, init) SEND su
 
 
@@ -899,20 +899,20 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
 
       case (hc: HostedCommits, CMDStateOverride(so), OPEN | SLEEPING | SUSPENDED) =>
         val LastCrossSignedState(scriptPubKey, initHostedChannel, lastClientStateUpdate, _) = hc.lastCrossSignedState
-        val isRightClientUpdateNumber = so.clientUpdatesSoFar == lastClientStateUpdate.stateOverride.clientUpdatesSoFar
-        val isRightHostUpdateNumber = so.hostUpdatesSoFar == lastClientStateUpdate.stateOverride.hostUpdatesSoFar
-        val overrideSigOk = StateUpdate(so, Nil).verify(scriptPubKey, initHostedChannel, hc.announce.nodeId)
-        val isBalanceOk = so.updatedClientBalanceSatoshis <= initHostedChannel.channelCapacitySatoshis
+        val isSigOk = StateUpdate(so).verify(hc.announce.hostedChanId, scriptPubKey, initHostedChannel, hc.announce.nodeId)
+        val isRightClientUpdateNumber = so.clientUpdatesSoFar > lastClientStateUpdate.stateOverride.clientUpdatesSoFar
+        val isRightHostUpdateNumber = so.hostUpdatesSoFar > lastClientStateUpdate.stateOverride.hostUpdatesSoFar
+        val isBalanceBounded = so.updatedClientBalanceSatoshis <= initHostedChannel.channelCapacitySatoshis
         val isBlockdayAcceptable = math.abs(so.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
 
         if (!isBlockdayAcceptable) throw new LightningException("Provided blockday from StateOverride is not acceptable")
         if (!isRightClientUpdateNumber) throw new LightningException("Provided Client update number from StateOverride is wrong")
         if (!isRightHostUpdateNumber) throw new LightningException("Provided Host update number from StateOverride is wrong")
-        if (!isBalanceOk) throw new LightningException("Provided Client updated balance is larger than capacity")
-        if (!overrideSigOk) throw new LightningException("Provided StateOverride signature is wrong")
+        if (!isBalanceBounded) throw new LightningException("Provided Client updated balance is larger than capacity")
+        if (!isSigOk) throw new LightningException("Provided StateOverride signature is wrong")
 
         val hostStateUpdate = StateUpdate(so, inFlightHtlcs = Nil)
-        val clientStateUpdate = StateUpdate(so, Nil).signed(scriptPubKey, initHostedChannel, LNParams.nodePrivateKey)
+        val clientStateUpdate = StateUpdate(so).signed(hc.announce.hostedChanId, scriptPubKey, initHostedChannel, LNParams.nodePrivateKey)
         val lcss = LastCrossSignedState(scriptPubKey, initHostedChannel, clientStateUpdate, hostStateUpdate)
         BECOME(me STORE commitsFromCrossSigned(lcss, hc.announce), OPEN) SEND lcss
 
@@ -935,8 +935,8 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
     val isSameBalance = client.stateOverride.updatedClientBalanceSatoshis == host.stateOverride.updatedClientBalanceSatoshis
     val isSameClientUpdatesSoFar = client.stateOverride.clientUpdatesSoFar == host.stateOverride.clientUpdatesSoFar
     val isSameHostUpdatesSoFar = client.stateOverride.hostUpdatesSoFar == host.stateOverride.hostUpdatesSoFar
-    val clientSigOk = client.verify(scriptPubKey, init, LNParams.nodePublicKey)
-    val hostSigOk = host.verify(scriptPubKey, init, ann.nodeId)
+    val clientSigOk = client.verify(ann.hostedChanId, scriptPubKey, init, LNParams.nodePublicKey)
+    val hostSigOk = host.verify(ann.hostedChanId, scriptPubKey, init, ann.nodeId)
 
     if (!isSameBalance) Some(ERR_HOSTED_WRONG_BALANCE)
     else if (!isSameHtlcsInFlight) Some(ERR_HOSTED_WRONG_IN_FLIGHT)
