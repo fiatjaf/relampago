@@ -185,7 +185,7 @@ extends SQLiteOpenHelper(context, name, null, 7) {
     dbs execSQL OlympusTable.createSql
 
     val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val dev: Array[AnyRef] = Array("test-server-1", "http://107.175.54.178:9003", emptyData, "1", "0", "0")
+    val dev: Array[AnyRef] = Array("test-server-1", "https://107.175.54.178:9003", emptyData, "1", "0", "0")
     dbs.execSQL(OlympusTable.newSql, dev)
   }
 
