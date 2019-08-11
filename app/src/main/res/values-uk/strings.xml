@@ -197,8 +197,9 @@
 
     <string name="err_ln_peer_offline">Помилка з\'єднання з %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s не підтримує захист від втрати даних</string>
-    <string name="err_ln_chain_disconnected">Створення каналу скасовано тому щл он-чейн гаманець в офлайні</string>
-    <string name="err_ln_remote_amount_high">Не вийшло тому що сума платежу занадто висока після додавання комісії</string>
+    <string name="err_ln_chain_disconnected">Створення каналу скасовано тому що он-чейн гаманець в офлайні</string>
+    <string name="err_ln_local_amount_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для каналу</string>
+    <string name="err_ln_remote_amount_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для вашого пiра</string>
     <string name="err_ln_remote_amount_low">Не вийшло тому що сума платежу занадто низька для вашого пiра</string>
     <string name="err_ln_fulfilled">Не вийшло тому що цей платіжний запит вже був оплачений</string>
     <string name="err_ln_too_many">Не вийшло тому що занадто багато платежів уже в дорозі</string>
