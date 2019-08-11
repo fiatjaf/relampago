@@ -526,8 +526,8 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   def makeSignedStateUpdate = {
     val reduced = CommitmentSpec.reduce(localSpec, clientChanges, hostChanges)
     val so = StateOverride(reduced.toLocalMsat, broadcaster.currentBlockDay, clientUpdatesSoFar, hostUpdatesSoFar)
-    val inFlight = for (Htlc(incoming, add) <- reduced.htlcs.toList) yield (incoming, add.id, add.amountMsat, add.paymentHash, add.expiry)
-    StateUpdate(so, inFlight).signed(lastCrossSignedState.lastRefundScriptPubKey, lastCrossSignedState.initHostedChannel, nodePrivateKey)
+    val htlcs: List[HTLCTuple] = for (Htlc(incoming, add) <- reduced.htlcs.toList) yield (incoming, add.id, add.amountMsat, add.paymentHash, add.expiry)
+    StateUpdate(so, htlcs).signed(announce.hostedChanId, lastCrossSignedState.lastRefundScriptPubKey, lastCrossSignedState.initHostedChannel, nodePrivateKey)
   }
 
   def receiveFulfill(fulfill: UpdateFulfillHtlc) =

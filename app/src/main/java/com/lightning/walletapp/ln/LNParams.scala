@@ -27,14 +27,14 @@ object LNParams {
   val minCapacityMsat = 200000000L
   val channelReserveToFundingRatio = 100
 
+  val minHostedCltvDelta = blocksPerDay * 3
   val minHostedLiabilityBlockdays = 1000
   val maxHostedBlockHeight = 100000L
-  val minHostedCltvDelta = 144 * 3
 
   final val dust = Satoshi(546)
   final val maxToSelfDelay = 2016
   final val minFeeratePerKw = 253
-  final val maxCltvDelta = 144L * 7
+  final val maxCltvDelta = blocksPerDay * 7L
   final val minHtlcValue = MilliSatoshi(1000L)
   final val maxCapacity = MilliSatoshi(16777215000L)
 
