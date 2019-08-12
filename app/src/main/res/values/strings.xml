@@ -200,12 +200,13 @@
 
     <string name="err_ln_peer_offline">Could not connect to %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s does not support data loss protection</string>
-    <string name="err_ln_chain_disconnected">Could not proceed because on-chain wallet is disconnected</string>
+    <string name="err_ln_chain_disconnected">Could not proceed because no on-chain wallet is disconnected</string>
     <string name="err_ln_local_amount_high">Failed because payment amount becomes too high to handle for your channel when off-chain fee is added</string>
     <string name="err_ln_remote_amount_high">Failed because payment amount becomes too high to handle for your peer when off-chain fee is added</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
     <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already</string>
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
+    <string name="err_ln_chain_wait">Waiting for on-chain wallet to connect</string>
 
     <string name="err_not_enough_funds"><![CDATA[
         At most %1$s can be sent on-chain right now with miner fees included while you were trying to send %2$s which exceeds current max amount by %3$s.<br><br><strong>

@@ -552,17 +552,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def doSendOffChain(rd: RoutingData): Unit = {
-    val sendableEither = ChannelManager.checkIfSendable(rd)
-    val accChanOpt = ChannelManager.accumulatorChanOpt(rd)
+    if (ChannelManager.currentBlocksLeft.isEmpty) app toast err_ln_chain_wait
+    val sendableOrAlternatives = ChannelManager.checkIfSendable(rd)
+    val accumulatorChanOpt = ChannelManager.accumulatorChanOpt(rd)
 
-    sendableEither -> accChanOpt match {
-      case Left(_ \ SENDABLE_AIR) \ Some(acc) => <(offerAir(acc, rd), onFail)(none)
+    sendableOrAlternatives -> accumulatorChanOpt match {
+      case Left(_ \ SENDABLE_AIR) \ Some(acc) => <(startAIR(acc, rd), onFail)(none)
       case Left(unsendableAirNotPossible \ _) \ _ => app toast unsendableAirNotPossible
       case _ => PaymentInfoWrap addPendingPayment rd
     }
   }
 
-  def offerAir(toChan: Channel, origEmptyRD: RoutingData) = {
+  def startAIR(toChan: Channel, origEmptyRD: RoutingData) = {
     val origEmptyRD1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1)
     val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(toChan.estimateCanSend, 0L)
     val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
