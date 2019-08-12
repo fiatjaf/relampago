@@ -243,16 +243,11 @@ object ChannelManager extends Broadcaster {
       val firstCall = currentBlocksLeft.isEmpty
       currentBlocksLeft = Some(blocksLeft)
 
-      if (firstCall || blocksLeft < 1) {
-        // Let channels know immediately, important for hosted ones
-        // then also repeat on each next last block to save resouces
-        all.foreach(_ process CMDChainTipKnown)
-      }
-
-      if (firstCall) {
-        // Don't call this on each new block
-        PaymentInfoWrap.resolvePending
-      }
+      // Let channels know immediately, important for hosted ones
+      // then also repeat on each next incoming last block to save resouces
+      if (firstCall || blocksLeft < 1) all.foreach(_ process CMDChainTipKnown)
+      // Don't call this on each new block but only on (re)connection
+      if (firstCall) PaymentInfoWrap.resolvePending
     }
 
     def onChainTx(txj: Transaction) = {
