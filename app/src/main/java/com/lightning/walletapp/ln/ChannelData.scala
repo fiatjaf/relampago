@@ -80,11 +80,14 @@ case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSi
 
 // ALL THE DATA BELOW WILL BE STORED
 
-case class WaitBroadcastRemoteData(announce: NodeAnnouncement,
-                                   core: WaitFundingSignedCore, commitments: NormalCommits,
-                                   their: Option[FundingLocked] = None) extends HasNormalCommits {
+case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFundingSignedCore,
+                                   commitments: NormalCommits, their: Option[FundingLocked] = None,
+                                   fundingError: Option[String] = None) extends HasNormalCommits {
 
-  def isLost = commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 21 * 1000L
+  def isLost: Boolean = fundingError match {
+    case None => commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 21 * 1000L
+    case _ => commitments.startedAt < System.currentTimeMillis - 3600 * 2 * 21 * 1000L
+  }
 }
 
 case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked], their: Option[FundingLocked],

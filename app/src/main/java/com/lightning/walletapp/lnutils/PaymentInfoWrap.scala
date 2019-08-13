@@ -169,8 +169,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       RichCursor apply db.select(RevokedInfoTable.selectLocalSql, nc.channelId, threshold) vec toTxidAndInfo
     } getOrElse Vector.empty
 
-  type TxIdAndRevInfoMap = Map[String, String]
-  def getCerberusActs(infos: TxIdAndRevInfoMap) = {
+  def getCerberusActs(infos: Map[String, String] = Map.empty) = {
     // Remove currently pending infos and limit max number of uploads
     val notPendingInfos = infos -- app.olympus.pendingWatchTxIds take 100
 

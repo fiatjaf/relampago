@@ -203,7 +203,7 @@
     <string name="err_ln_remote_amount_low">Не вийшло тому що сума платежу занадто низька для вашого пiра</string>
     <string name="err_ln_fulfilled">Не вийшло тому що цей платіжний запит вже був оплачений</string>
     <string name="err_ln_too_many">Не вийшло тому що занадто багато платежів вже в дорозі</string>
-    <string name="err_ln_chain_wait">Очiкуємо на пiдключення он-чейн гаманеця&#8230;</string>
+    <string name="err_ln_chain_wait">Очiкуємо на пiдключення он-чейн гаманця</string>
 
     <string name="err_not_enough_funds"><![CDATA[
         Наразi ви можете відправити до %1$s он-чейн, а сума вашого платежу дорівнює %2$s, що перевищує максимальний розмір на %3$s.

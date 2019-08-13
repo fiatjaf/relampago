@@ -5,11 +5,12 @@ import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.ln.ChanErrorCodes._
+
+import fr.acinq.bitcoin.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
 import fr.acinq.bitcoin.Protocol.Zeroes
 import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
-import scala.util.Success
 
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -17,6 +18,7 @@ import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
+import scala.util.{Failure, Success, Try}
 
 
 abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] { me =>
@@ -146,6 +148,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
           val rc = RemoteCommit(index = 0L, remoteSpec, Some(remoteCommitTx.tx), open.firstPerCommitmentPoint)
           val core = WaitFundingSignedCore(localParams, fundingSigned.channelId, Some(open.channelFlags), accept, localSpec, rc)
           BECOME(WaitBroadcastRemoteData(announce, core, core makeCommitments signedLocalCommitTx), WAIT_FUNDING_DONE) SEND fundingSigned
+          // Once this happens WaitBroadcastRemoteData will be saved in channel listener
         } else throw new LightningException
 
 
@@ -178,19 +181,22 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       // BECOMING OPEN
 
 
-      // We have agreed to proposed incoming channel and they have published a funding tx, we now wait for confirmation
-      case (wait: WaitBroadcastRemoteData, CMDSpent(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
-        val wait1 = me STORE WaitFundingDoneData(wait.announce, None, wait.their, fundTx, wait.commitments)
+      // We have agreed to proposed incoming channel and they have published a funding tx
+      case (wait: WaitBroadcastRemoteData, CMDSpent(fundTx), WAIT_FUNDING_DONE | SLEEPING)
+        // GUARD: this is actually a funding tx and we can correctly spend from it
+        if fundTxId == fundTx.txid && wait.fundingError.isEmpty =>
+
+        val data1 = me STORE decideOnFundeeTx(wait, fundTx)
         val isZeroConfSpendablePush = wait.commitments.channelFlags.exists(_.isZeroConfSpendablePush)
-        if (isZeroConfSpendablePush) me UPDATA wait1 doProcess CMDConfirmed(fundTx)
-        else me UPDATA wait1
+        if (isZeroConfSpendablePush) me UPDATA data1 doProcess CMDConfirmed(fundTx) else me UPDATA data1
 
 
-      // We have agreed to proposed incoming channel and they have published a funding tx, we see it included in a block right away
-      case (wait: WaitBroadcastRemoteData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
-        val wait1 = me STORE WaitFundingDoneData(wait.announce, None, wait.their, fundTx, wait.commitments)
-        // Send CMDConfirmed again so we can properly react in new state
-        me UPDATA wait1 doProcess CMDConfirmed(fundTx)
+      // We have agreed to proposed incoming channel and see a confirmed a funding tx right away
+      case (wait: WaitBroadcastRemoteData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE | SLEEPING)
+        // GUARD: this is actually a funding tx and we can correctly spend from it
+        if fundTxId == fundTx.txid && wait.fundingError.isEmpty =>
+        val data1 = me STORE decideOnFundeeTx(wait, fundTx)
+        me UPDATA data1 doProcess CMDConfirmed(fundTx)
 
 
       case (waitBroadcast: WaitBroadcastRemoteData, their: FundingLocked, WAIT_FUNDING_DONE) =>
@@ -207,8 +213,9 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
       case (wait: WaitFundingDoneData, CMDConfirmed(fundTx), SLEEPING) if fundTxId == fundTx.txid =>
         // We have got an idempotent on-chain event while peer is offline, store it for further broadcast
-        val ourFirstFundingLockedOpt = Some apply makeFirstFundingLocked(wait)
-        val wait1 = wait.copy(our = ourFirstFundingLockedOpt)
+
+        val ourFirstFundingLockedOpt = makeFirstFundingLocked(wait)
+        val wait1 = wait.copy(our = Some apply ourFirstFundingLockedOpt)
         me UPDATA STORE(wait1)
 
 
@@ -654,9 +661,17 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       yourLastPerCommitmentSecret.map(Scalar.apply) orElse Some(Zeroes), myCurrentPerCommitmentPointOpt)
   }
 
-  private def makeFirstFundingLocked(some: HasNormalCommits) = {
+  def makeFirstFundingLocked(some: HasNormalCommits) = {
     val first = Generators.perCommitPoint(some.commitments.localParams.shaSeed, 1L)
     FundingLocked(some.commitments.channelId, nextPerCommitmentPoint = first)
+  }
+
+  def decideOnFundeeTx(wait: WaitBroadcastRemoteData, fundTx: Transaction) = Try {
+    val ourFirstCommitmentTransaction: Transaction = wait.commitments.localCommit.commitTx.tx
+    Transaction.correctlySpends(ourFirstCommitmentTransaction, Seq(fundTx), STANDARD_SCRIPT_VERIFY_FLAGS)
+  } match {
+    case Failure(reason) => wait.copy(fundingError = Some apply reason.getMessage)
+    case _ => WaitFundingDoneData(wait.announce, None, wait.their, fundTx, wait.commitments)
   }
 
   private def becomeOpen(wait: WaitFundingDoneData, their: FundingLocked) = {
@@ -671,7 +686,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
     case _ => BECOME(me STORE ClosingData(some.announce, some.commitments, Nil, tx :: Nil), CLOSING)
   }
 
-  def startLocalClose(some: HasNormalCommits): Unit =
+  private def startLocalClose(some: HasNormalCommits): Unit =
     // Something went wrong and we decided to spend our CURRENT commit transaction
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
       case (_, neg: NegotiationsData) if neg.lastSignedTx.isDefined => startMutualClose(neg, neg.lastSignedTx.get.tx)
