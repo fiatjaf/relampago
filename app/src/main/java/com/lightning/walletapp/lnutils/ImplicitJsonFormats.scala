@@ -312,8 +312,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       "remoteParams", "localSpec", "remoteCommit")
 
   implicit val waitBroadcastRemoteDataFmt =
-    taggedJsonFmt(jsonFormat[NodeAnnouncement, WaitFundingSignedCore, NormalCommits, Option[FundingLocked],
-      WaitBroadcastRemoteData](WaitBroadcastRemoteData.apply, "announce", "core", "commitments", "their"),
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, WaitFundingSignedCore, NormalCommits, Option[FundingLocked], Option[String],
+      WaitBroadcastRemoteData](WaitBroadcastRemoteData.apply, "announce", "core", "commitments", "their", "fundingError"),
       tag = "WaitBroadcastRemoteData")
 
   implicit val outRequestFmt = jsonFormat[Long, Set[String], Set[Long], Set[String], String,

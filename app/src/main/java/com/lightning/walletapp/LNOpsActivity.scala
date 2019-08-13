@@ -127,7 +127,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       fundingDepthText setText getString(ln_mofn).format(fundingDepth, threshold).html
       // All amounts are in MilliSatoshi, but we convert them to Satoshi and / 1000 to erase trailing msat remainders
       paymentsInFlightText setText sumOrNothing(Satoshi(chan.inFlightHtlcs.toList.map(_.add.amountMsat).sum) / 1000L).html
-      refundableAmountText setText denom.parsedWithSign(Satoshi(cs.localSpec.toLocalMsat) / 1000L).html
+      refundableAmountText setText sumOrNothing(Satoshi(cs.localSpec.toLocalMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(chan.estimateCanSend) / 1000L).html
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       totalCapacityText setText denom.parsedWithSign(capacity).html
@@ -138,7 +138,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           // We only can display one item so sort them by increasing importance
           val extraRoute = channelAndHop(chan) map { case _ \ route => route } getOrElse Vector.empty
           val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, msat = 1000000000L)
-          if (isIncomingFeeTooHigh) setExtraInfo(me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
+          if (isIncomingFeeTooHigh) setExtraInfo(text = me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
           // In Turbo channels we will often have an OPEN state with NormalData and zeroconf
           if (norm.unknownSpend.isDefined) setExtraInfo(resource = ln_info_unknown_spend)
           if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
@@ -152,11 +152,18 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
             R.id.canReceive, R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
 
-        case _: WaitBroadcastRemoteData | _: WaitFundingDoneData =>
+        case wait: WaitBroadcastRemoteData =>
           if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
-          // Should catch WaitBroadcastRemoteData and WaitFundingDoneData, not NormalData
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
-            R.id.closedAt, R.id.paymentsInFlight, R.id.totalPayments)
+          if (wait.fundingError.isDefined) setExtraInfo(text = wait.fundingError.get)
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
+            R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
+            R.id.totalPayments)
+
+        case _: WaitFundingDoneData =>
+          if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
+            R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
+            R.id.totalPayments)
 
         case cd: ClosingData =>
           setExtraInfo(text = me closedBy cd)
