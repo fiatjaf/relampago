@@ -50,9 +50,14 @@ case class FundingSigned(channelId: ByteVector, signature: ByteVector) extends C
 
 // CHANNEL MESSAGES
 
-case class FundingLocked(channelId: ByteVector, nextPerCommitmentPoint: Point) extends ChannelMessage
 case class ClosingSigned(channelId: ByteVector, feeSatoshis: Long, signature: ByteVector) extends ChannelMessage
-case class Shutdown(channelId: ByteVector, scriptPubKey: ByteVector) extends ChannelMessage
+case class FundingLocked(channelId: ByteVector, nextPerCommitmentPoint: Point) extends ChannelMessage { me =>
+  def some = Some(me)
+}
+
+case class Shutdown(channelId: ByteVector, scriptPubKey: ByteVector) extends ChannelMessage { me =>
+  def some = Some(me)
+}
 
 case class UpdateAddHtlc(channelId: ByteVector,
                          id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long,

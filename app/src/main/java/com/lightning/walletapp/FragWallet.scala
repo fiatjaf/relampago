@@ -399,7 +399,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def generatePopup = {
-      val confs = app.plur1OrZero(txsConfs, txDepth)
+      val confs = if (txDead) txsConfs.last else app.plur1OrZero(txsConfs, txDepth)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
       val humanValues = wrap.directedScriptPubKeysWithValueTry(wrap.visibleValue.isPositive) collect {
         case Success(channelFunding \ value) if channelFunding.isSentToP2WSH => P2WSHData(value, channelFunding)

@@ -160,6 +160,7 @@
         <item><![CDATA[<strong>%1$s&#160;подтвреждення</strong>]]></item>
         <item><![CDATA[<strong>%1$s&#160;підтвердження</strong>]]></item>
         <item><![CDATA[<strong>%1$s&#160;підтверджень</strong>]]></item>
+        <item><![CDATA[<strong>ВІДМІНЕНА</strong>]]></item>
     </array>
 
     <string name="send_scan_qr">Сканувати QR-код</string>
@@ -250,7 +251,7 @@
     <string name="ln_info_close_remote">Закрито з того боку</string>
     <string name="ln_info_close_coop">Зачинений кооперативно</string>
     <string name="ln_info_close_local">Зачинений вашим гаманцем</string>
-    <string name="ln_info_coop_attempt">Канал зачиняється&#8230;</string>
+    <string name="ln_info_coop_attempt">Чекаємо на підпис від пiра&#8230;</string>
 
     <string name="ln_info_high_fee">Вхідна комісія занадто висока: %1$s</string>
     <string name="ln_info_unknown_spend">Виявлена невідома трата!</string>

@@ -7,8 +7,7 @@ import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.Features._
-
-import rx.lang.scala.{Observable => Obs}
+import rx.lang.scala.{Subscription, Observable => Obs}
 import com.lightning.walletapp.ln.crypto.Noise.KeyPair
 import java.util.concurrent.ConcurrentHashMap
 import fr.acinq.bitcoin.Crypto.PublicKey
@@ -36,12 +35,30 @@ object ConnectionManager {
 
   class Worker(val ann: NodeAnnouncement, buffer: Bytes = new Bytes(1024), val sock: Socket = new Socket) {
     implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-    var lastMsg = System.currentTimeMillis
+    private var ourLastPing = Option.empty[Ping]
+    private var pinging: Subscription = _
 
+    def disconnect: Unit = try sock.close catch none
     val handler: TransportHandler = new TransportHandler(keyPair, ann.nodeId) {
-      def handleEnterOperationalState = handler process Init(LNParams.globalFeatures, LNParams.localFeatures)
       def handleEncryptedOutgoingData(data: ByteVector) = try sock.getOutputStream write data.toArray catch handleError
-      def handleDecryptedIncomingData(data: ByteVector) = intercept(LightningMessageCodecs deserialize data)
+      def handleDecryptedIncomingData(data: ByteVector) = Tuple2(LightningMessageCodecs deserialize data, ourLastPing) match {
+        case (init: Init, _) => events.onOperational(isCompat = areSupported(init.localFeatures) && dataLossProtect(init.localFeatures), nodeId = ann.nodeId)
+        case Ping(replyLength, _) \ _ if replyLength > 0 && replyLength <= 65532 => handler process Pong(ByteVector fromValidHex "00" * replyLength)
+        case Pong(randomData) \ Some(ourPing) if randomData.size == ourPing.pongLength => ourLastPing = None
+        case (message: HostedChannelMessage, _) => events.onHostedMessage(ann, message)
+        case (message, _) => events.onMessage(ann.nodeId, message)
+      }
+
+      def handleEnterOperationalState = {
+        handler process Init(LNParams.globalFeatures, LNParams.localFeatures)
+        pinging = Obs.interval(10.seconds).map(_ => random nextInt 100) subscribe { length =>
+          val ourNextPing = Ping(data = ByteVector.view(random getBytes length), pongLength = length)
+          if (ourLastPing.isEmpty) handler process ourNextPing else disconnect
+          ourLastPing = Some(ourNextPing)
+        }
+      }
+
+      // Just disconnect immediately in all cases
       def handleError = { case _ => disconnect }
     }
 
@@ -60,28 +77,10 @@ object ConnectionManager {
 
     thread onComplete { _ =>
       workers.remove(ann.nodeId)
-      events onDisconnect ann.nodeId
-    }
-
-    def disconnect = try sock.close catch none
-    def intercept(message: LightningMessage) = {
-      // Update liveness on each incoming message
-      lastMsg = System.currentTimeMillis
-
-      message match {
-        case their: Init => events.onOperational(isCompat = areSupported(their.localFeatures) && dataLossProtect(their.localFeatures), nodeId = ann.nodeId)
-        case Ping(replyLength, _) if replyLength > 0 && replyLength <= 65532 => handler process Pong(ByteVector fromValidHex "00" * replyLength)
-        case hostedChanMessage: HostedChannelMessage => events.onHostedMessage(ann, hostedChanMessage)
-        case _ => events.onMessage(ann.nodeId, message)
-      }
+      events.onDisconnect(ann.nodeId)
+      try pinging.unsubscribe catch none
     }
   }
-
-  for {
-    _ <- Obs interval 30.seconds
-    tooLongAgo = System.currentTimeMillis - 1000L * 60
-    worker <- workers.values if worker.lastMsg < tooLongAgo
-  } worker.disconnect
 }
 
 class ConnectionListener {
