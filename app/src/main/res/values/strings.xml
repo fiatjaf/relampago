@@ -163,6 +163,7 @@
         <item><![CDATA[<strong>awaiting&#160;confirmation</strong>]]></item>
         <item><![CDATA[<strong>%1$s&#160;confirmation</strong>]]></item>
         <item><![CDATA[<strong>%1$s&#160;confirmations</strong>]]></item>
+        <item><![CDATA[<strong>CANCELLED</strong>]]></item>
     </array>
 
     <string name="send_scan_qr">Scan a QR code</string>
@@ -253,7 +254,7 @@
     <string name="ln_info_close_coop">Closed cooperatively</string>
     <string name="ln_info_close_local">Force-closed by your wallet</string>
     <string name="ln_info_close_remote">Force-closed by remote peer</string>
-    <string name="ln_info_coop_attempt">Closing may take some time&#8230;</string>
+    <string name="ln_info_coop_attempt">Awaiting for peer signature&#8230;</string>
 
     <string name="ln_info_high_fee">Receiving fees are too high: %1$s</string>
     <string name="ln_info_funding_lost">Funding was lost on-chain!</string>

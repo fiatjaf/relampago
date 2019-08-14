@@ -160,6 +160,7 @@
         <item><![CDATA[<strong>%1$s&#160;подтвреждение</strong>]]></item>
         <item><![CDATA[<strong>%1$s&#160;подтверждения</strong>]]></item>
         <item><![CDATA[<strong>%1$s&#160;подтверждений</strong>]]></item>
+        <item><![CDATA[<strong>ОТМЕНЕНА</strong>]]></item>
     </array>
 
     <string name="send_scan_qr">Сканировать QR-код</string>
@@ -249,8 +250,8 @@
     <string name="ln_mofn">%1$s из %2$s</string>
     <string name="ln_info_close_coop">Закрыт кооперативно</string>
     <string name="ln_info_close_local">Закрыт вашим кошельком</string>
-    <string name="ln_info_close_remote">Закрыт с той стороны</string>
-    <string name="ln_info_coop_attempt">Канал закрывается&#8230;</string>
+    <string name="ln_info_close_remote">Закрыт со стороны пира</string>
+    <string name="ln_info_coop_attempt">Ждем подпись от пира&#8230;</string>
 
     <string name="ln_info_high_fee">Входящая комиссия слишком высока: %1$s</string>
     <string name="ln_info_unknown_spend">Обнаружена неизвестная трата!</string>
