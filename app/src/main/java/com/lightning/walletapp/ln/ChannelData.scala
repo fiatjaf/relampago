@@ -359,7 +359,7 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 
     // This is their point of view so our outgoing HTLCs are their incoming
     val outHtlcs \ inFlight = c1.reducedRemoteState.spec.directedHtlcsAndSum(incoming = true)
-    if (c1.localParams.isFunder && c1.reducedRemoteState.canSendMsat < 0L) throw CMDAddImpossible(rd, ERR_LOCAL_AMOUNT_HIGH)
+    if (c1.reducedRemoteState.canSendMsat < 0L) throw CMDAddImpossible(rd, ERR_LOCAL_AMOUNT_HIGH)
     if (!c1.localParams.isFunder && c1.reducedRemoteState.canReceiveMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
     if (UInt64(inFlight) > remoteParams.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
     if (rd.firstMsat < remoteParams.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
