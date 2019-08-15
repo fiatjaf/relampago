@@ -51,7 +51,7 @@ object ConnectionManager {
 
       def handleEnterOperationalState = {
         handler process Init(LNParams.globalFeatures, LNParams.localFeatures)
-        pinging = Obs.interval(15.seconds).map(_ => random nextInt 100) subscribe { length =>
+        pinging = Obs.interval(15.seconds).map(_ => random.nextInt(10) + 1) subscribe { length =>
           val ourNextPing = Ping(data = ByteVector.view(random getBytes length), pongLength = length)
           if (ourLastPing.isEmpty) handler process ourNextPing else disconnect
           ourLastPing = Some(ourNextPing)
