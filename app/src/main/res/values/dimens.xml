@@ -2,6 +2,7 @@
     <dimen name="text_small">16sp</dimen>
     <dimen name="bitmap_qr_wrap_width">280dp</dimen>
     <dimen name="bitmap_qr_wrap_height">410dp</dimen>
+    <dimen name="simpletooltip_overlay_offset">16dp</dimen>
 
     <!-- 410 = 90 + 40 + 280 -->
     <dimen name="bitmap_text_bounds">230dp</dimen>
