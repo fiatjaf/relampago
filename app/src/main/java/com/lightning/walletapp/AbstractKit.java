@@ -24,7 +24,6 @@ public abstract class AbstractKit extends AbstractIdleService {
     public static final String FIAT_TYPE = "fiatType1";
     public static final String TOP_NODES = "topNodes";
 
-
     // Bitcoin wallet core pieces
     public volatile BlockChain blockChain;
     public volatile PeerGroup peerGroup;
