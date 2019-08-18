@@ -15,12 +15,14 @@ import javax.annotation.Nullable;
 
 public abstract class AbstractKit extends AbstractIdleService {
     public static final String GDRIVE_LAST_SAVE = "gDriveLastSave";
-    public static final String FINGERPRINT_ENABLED = "fpEnabled";
     public static final String GDRIVE_ENABLED = "gDriveEnabled";
+    public static final String FINGER_ENABLED = "fpEnabled";
+    public static final String SHOW_TOOLTIP = "showTooltip";
     public static final String ERROR_REPORT = "errorReport";
     public static final String DENOM_TYPE = "denomType1";
     public static final String RATES_DATA = "ratesData";
     public static final String FIAT_TYPE = "fiatType1";
+
 
     // Bitcoin wallet core pieces
     public volatile BlockChain blockChain;

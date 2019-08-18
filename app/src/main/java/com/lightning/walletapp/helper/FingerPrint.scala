@@ -6,7 +6,7 @@ import co.infinum.goldfinger.Goldfinger
 
 
 object FingerPrint {
-  def isEnabled = app.prefs.getBoolean(AbstractKit.FINGERPRINT_ENABLED, false)
-  def switch(mode: Boolean) = app.prefs.edit.putBoolean(AbstractKit.FINGERPRINT_ENABLED, mode).commit
+  def isEnabled = app.prefs.getBoolean(AbstractKit.FINGER_ENABLED, false)
+  def switch(mode: Boolean) = app.prefs.edit.putBoolean(AbstractKit.FINGER_ENABLED, mode).commit
   def isOperational(goldfinger: Goldfinger) = isEnabled && goldfinger.hasEnrolledFingerprint
 }

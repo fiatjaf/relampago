@@ -173,7 +173,7 @@
         Вы пытаетесь оплатить запрос-Молнию, но в кошельке сейчас нет открытых
         <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платежных каналов</a><br><br>Что с этим делать?<br><br>
         - Откройте платежный канал с узлом на ваш выбор, для наполнения канала в кошельке должны быть биткоины.<br><br>
-        - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Купите входящий канал</a> с мгновенно доступным расходным балансом.
+        - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Купите входящий канал</a> с мгновенно доступным расходным балансом.<br><br>
         - <a href=https://lnbig.com/#/open-channel/>Получите бесплатный входящий канал</a> от сервиса LNBIG.COM.
     ]]></string>
 
