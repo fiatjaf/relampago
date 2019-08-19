@@ -740,10 +740,10 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
 
         val so = StateOverride(init.initialClientBalanceSatoshis, LNParams.broadcaster.currentBlockDay)
         val su = StateUpdate(so).signed(announce.hostedChanId, scriptPubKey, init, LNParams.nodePrivateKey)
-        me UPDATA WaitTheirStateUpdate(announce, scriptPubKey, su, init) SEND su
+        me UPDATA WaitTheirHostedStateUpdate(announce, scriptPubKey, su, init) SEND su
 
 
-      case (WaitTheirStateUpdate(announce, refundScriptPubKey, client, init), host: StateUpdate, WAIT_FOR_ACCEPT) =>
+      case (WaitTheirHostedStateUpdate(announce, refundScriptPubKey, client, init), host: StateUpdate, WAIT_FOR_ACCEPT) =>
         val validationError = validate(client, host, refundScriptPubKey, init, announce).flatMap(ChanErrorCodes.hostedErrors.get)
         for (errorMessage <- validationError) throw new LightningException(com.lightning.walletapp.Utils.app getString errorMessage)
 
@@ -751,7 +751,7 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
         val localSpec = CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceSatoshis, initHostBalance)
         val lcss = LastCrossSignedState(refundScriptPubKey, init, client, host)
 
-        BECOME(me STORE HostedCommits(announce, lcss, clientUpdatesSoFar = 0L, hostUpdatesSoFar = 0L,
+        BECOME(me STORE HostedCommits(announce, lcss, localUpdatesSoFar = 0L, remoteUpdatesSoFar = 0L,
           reSentUpdates = 0, Vector.empty, Vector.empty, localSpec, updateOpt = None, localError = None,
           remoteError = None, startedAt = System.currentTimeMillis), OPEN) SEND lcss
 
@@ -808,9 +808,8 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
         if (mustResend) doProcess(CMDProceed) else {
           val validationResult = validate(client1, host1, refund, init, hc.announce)
           if (validationResult.isDefined) localSuspend(hc, validationResult.get) else {
-            val localSpec1 = CommitmentSpec.reduce(hc.localSpec, hc.clientChanges, hc.hostChanges)
             val lcss1 = hc.lastCrossSignedState.copy(lastClientStateUpdate = client1, lastHostStateUpdate = host1)
-            val hc1 = client1.stateOverride rewind hc.copy(lastCrossSignedState = lcss1, localSpec = localSpec1)
+            val hc1 = client1.stateOverride rewind hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalReduced)
             // This means they have sent a signature first or we have sent/received Add/Fail/Fulfill since then
             if (hc.mustReply) me SEND client1
             BECOME(me STORE hc1, OPEN)
@@ -841,7 +840,7 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
 
       case (hc: HostedCommits, CMDProceed, OPEN)
         // GUARD: only send update if we have unsigned changes
-        if hc.clientChanges.nonEmpty || hc.hostChanges.nonEmpty =>
+        if hc.localChanges.nonEmpty || hc.remoteChanges.nonEmpty =>
         val hc1 = hc.copy(reSentUpdates = hc.reSentUpdates + 1)
         me UPDATA hc1 SEND hc.makeSignedStateUpdate
 
@@ -849,7 +848,7 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
       case (hc: HostedCommits, cmd: CMDFulfillHtlc, OPEN) =>
         val fulfillHtlc = UpdateFulfillHtlc(hc.channelId, cmd.add.id, cmd.preimage)
         CommitmentSpec.findHtlcById(hc.localSpec, cmd.add.id, isIncoming = true) match {
-          case Some(htlc) => me UPDATA hc.addClientProposal(fulfillHtlc) SEND fulfillHtlc
+          case Some(htlc) => me UPDATA hc.addLocalProposal(fulfillHtlc) SEND fulfillHtlc
           case None => throw new LightningException
         }
 
@@ -857,13 +856,13 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
       case (hc: HostedCommits, cmd: CMDFailHtlc, OPEN) =>
         val fail = UpdateFailHtlc(hc.channelId, cmd.id, cmd.reason)
         val notFound = CommitmentSpec.findHtlcById(hc.localSpec, cmd.id, isIncoming = true).isEmpty
-        if (notFound) throw new LightningException else me UPDATA hc.addClientProposal(fail) SEND fail
+        if (notFound) throw new LightningException else me UPDATA hc.addLocalProposal(fail) SEND fail
 
 
       case (hc: HostedCommits, cmd: CMDFailMalformedHtlc, OPEN) =>
         val fail = UpdateFailMalformedHtlc(hc.channelId, cmd.id, cmd.onionHash, cmd.code)
         val notFound = CommitmentSpec.findHtlcById(hc.localSpec, cmd.id, isIncoming = true).isEmpty
-        if (notFound) throw new LightningException else me UPDATA hc.addClientProposal(fail) SEND fail
+        if (notFound) throw new LightningException else me UPDATA hc.addLocalProposal(fail) SEND fail
 
 
       case (hc: HostedCommits, CMDSocketOffline, OPEN) =>
@@ -914,9 +913,9 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
 
       case (hc: HostedCommits, CMDStateOverride(so), OPEN | SLEEPING | SUSPENDED) =>
         val LastCrossSignedState(scriptPubKey, initHostedChannel, lastClientStateUpdate, _) = hc.lastCrossSignedState
-        val isSigOk = StateUpdate(so).verify(hc.announce.hostedChanId, scriptPubKey, initHostedChannel, hc.announce.nodeId)
         val isRightClientUpdateNumber = so.clientUpdatesSoFar > lastClientStateUpdate.stateOverride.clientUpdatesSoFar
         val isRightHostUpdateNumber = so.hostUpdatesSoFar > lastClientStateUpdate.stateOverride.hostUpdatesSoFar
+        val isSigOk = StateUpdate(so).verify(hc.channelId, scriptPubKey, initHostedChannel, hc.announce.nodeId)
         val isBalanceBounded = so.updatedClientBalanceSatoshis <= initHostedChannel.channelCapacitySatoshis
         val isBlockdayAcceptable = math.abs(so.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
 
@@ -927,7 +926,7 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
         if (!isSigOk) throw new LightningException("Provided StateOverride signature is wrong")
 
         val hostStateUpdate = StateUpdate(so, inFlightHtlcs = Nil)
-        val clientStateUpdate = StateUpdate(so).signed(hc.announce.hostedChanId, scriptPubKey, initHostedChannel, LNParams.nodePrivateKey)
+        val clientStateUpdate = StateUpdate(so).signed(hc.channelId, scriptPubKey, initHostedChannel, LNParams.nodePrivateKey)
         val lcss = LastCrossSignedState(scriptPubKey, initHostedChannel, clientStateUpdate, hostStateUpdate)
         BECOME(me STORE commitsFromCrossSigned(lcss, hc.announce), OPEN) SEND lcss
 

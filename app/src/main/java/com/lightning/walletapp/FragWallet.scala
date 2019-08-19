@@ -56,8 +56,8 @@ class FragWallet extends Fragment {
 }
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
-  import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail, rm}
-  import host.{TxProcessor, mkCheckForm, <, mkCheckFormNeutral, getSupportActionBar}
+  import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail}
+  import host.{TxProcessor, mkCheckForm, <, mkCheckFormNeutral, getSupportActionBar, rm}
 
   val lnStatus = frag.findViewById(R.id.lnStatus).asInstanceOf[TextView]
   val lnBalance = frag.findViewById(R.id.lnBalance).asInstanceOf[TextView]
