@@ -216,8 +216,8 @@ case class StateOverride(updatedClientBalanceSatoshis: Long,
                          nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage {
 
   def rewind(hc: HostedCommits) =
-    hc.copy(clientChanges = Vector.empty, hostChanges = Vector.empty, reSentUpdates = 0,
-      clientUpdatesSoFar = clientUpdatesSoFar, hostUpdatesSoFar = hostUpdatesSoFar)
+    hc.copy(localChanges = Vector.empty, remoteChanges = Vector.empty, reSentUpdates = 0,
+      localUpdatesSoFar = clientUpdatesSoFar, remoteUpdatesSoFar = hostUpdatesSoFar)
 
   def isBehind(that: StateOverride) =
     clientUpdatesSoFar < that.clientUpdatesSoFar ||
