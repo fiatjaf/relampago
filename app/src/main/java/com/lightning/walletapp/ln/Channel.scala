@@ -12,7 +12,7 @@ import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 
-import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex, Sphinx}
+import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
