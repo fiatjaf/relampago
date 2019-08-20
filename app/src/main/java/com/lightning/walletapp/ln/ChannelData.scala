@@ -122,10 +122,8 @@ case class ClosingData(announce: NodeAnnouncement,
 
   lazy val commitTxs = realTier12Closings.map(_.commitTx)
   lazy val realTier12Closings = revokedCommit ++ localCommit ++ remoteCommit ++ nextRemoteCommit ++ refundRemoteCommit
-  def canBeRemoved: Boolean = if (System.currentTimeMillis > closedAt + 1000L * 3600 * 24 * 28) true else bestClosing match {
-    case MutualCommitPublished(closingTx) => getStatus(closingTx.txid) match { case confs \ isDead => confs > minDepth || isDead }
-    case info => info.getState.map(_.txn.txid).map(getStatus) forall { case confs \ isDead => confs > minDepth || isDead }
-  }
+  def canBeRemoved: Boolean = System.currentTimeMillis > closedAt + 1000L * 3600 * 24 * 28
+  def tier12States: Seq[PublishStatus] = realTier12Closings.flatMap(_.getState)
 
   def bestClosing: CommitPublished = {
     // At least one closing is guaranteed to be here
@@ -135,9 +133,6 @@ case class ClosingData(announce: NodeAnnouncement,
       if (isDead) -txDepth else txDepth
     }
   }
-
-  // Not a lazy val because results depend on blockchain state
-  def tier12States = realTier12Closings.flatMap(_.getState)
 }
 
 sealed trait CommitPublished {
