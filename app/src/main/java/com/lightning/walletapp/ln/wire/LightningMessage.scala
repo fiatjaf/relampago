@@ -9,6 +9,7 @@ import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
 import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
+import com.lightning.walletapp.ln.crypto.Sphinx
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 
@@ -203,28 +204,40 @@ trait HostedChannelMessage extends LightningMessage
 case class InvokeHostedChannel(chainHash: ByteVector, scriptPubKey: ByteVector) extends HostedChannelMessage
 
 case class InitHostedChannel(maxHtlcValueInFlightMsat: UInt64,
-                             htlcMinimumMsat: Long, maxAcceptedHtlcs: Int, channelCapacitySatoshis: Long,
+                             htlcMinimumMsat: Long, maxAcceptedHtlcs: Int, channelCapacityMsat: Long,
                              liabilityDeadlineBlockdays: Int, minimalOnchainRefundAmountSatoshis: Long,
-                             initialClientBalanceSatoshis: Long) extends HostedChannelMessage
+                             initialClientBalanceMsat: Long) extends HostedChannelMessage
 
 case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
-                                initHostedChannel: InitHostedChannel, lastClientStateUpdate: StateUpdate,
-                                lastHostStateUpdate: StateUpdate) extends HostedChannelMessage
+                                initHostedChannel: InitHostedChannel, lastLocalStateUpdate: StateUpdate,
+                                lastRemoteStateUpdate: StateUpdate) extends HostedChannelMessage {
 
-case class StateOverride(updatedClientBalanceSatoshis: Long,
-                         blockDay: Long, clientUpdatesSoFar: Long = 0L, hostUpdatesSoFar: Long = 0L,
-                         nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage {
+  def reverse =
+    copy(lastLocalStateUpdate = lastRemoteStateUpdate,
+      lastRemoteStateUpdate = lastLocalStateUpdate)
 
-  def rewind(hc: HostedCommits) =
-    hc.copy(localChanges = Vector.empty, remoteChanges = Vector.empty, reSentUpdates = 0,
-      localUpdatesSoFar = clientUpdatesSoFar, remoteUpdatesSoFar = hostUpdatesSoFar)
-
-  def isBehind(that: StateOverride) =
-    clientUpdatesSoFar < that.clientUpdatesSoFar ||
-      hostUpdatesSoFar < that.hostUpdatesSoFar
+  def isBehind(remoteThat: LastCrossSignedState) =
+    lastLocalStateUpdate.stateOverride.localUpdatesSoFar < remoteThat.lastRemoteStateUpdate.stateOverride.localUpdatesSoFar ||
+      lastRemoteStateUpdate.stateOverride.localUpdatesSoFar < remoteThat.lastLocalStateUpdate.stateOverride.localUpdatesSoFar
 }
 
-case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[HTLCTuple] = Nil) extends HostedChannelMessage { me =>
+case class StateOverride(updatedLocalBalanceMsat: Long,
+                         blockDay: Long, localUpdatesSoFar: Long = 0L, remoteUpdatesSoFar: Long = 0L,
+                         nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage {
+
+  def reverse(newBalanceMsat: Long) =
+    copy(updatedLocalBalanceMsat = newBalanceMsat,
+      localUpdatesSoFar = remoteUpdatesSoFar,
+      remoteUpdatesSoFar = localUpdatesSoFar)
+}
+
+case class InFlightHtlc(incoming: Boolean, id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long) { me =>
+  def toAdd(hostedChanId: ByteVector) = UpdateAddHtlc(hostedChanId, id, amountMsat, paymentHash, expiry, Sphinx.emptyOnionPacket)
+  def reverse = InFlightHtlc(incoming = !incoming, id, amountMsat, paymentHash, expiry)
+  def toHtlc(chanId: ByteVector) = Htlc(incoming, me toAdd chanId)
+}
+
+case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[InFlightHtlc] = Nil) extends HostedChannelMessage { me =>
   def signed(channelId: ByteVector, refundScriptPubKey: ByteVector, init: InitHostedChannel, priv: PrivateKey): StateUpdate =
     me.modify(_.stateOverride.nodeSignature) setTo sign(hostedSigHash(channelId, refundScriptPubKey, me, init), priv)
 

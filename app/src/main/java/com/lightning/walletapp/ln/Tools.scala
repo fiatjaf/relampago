@@ -4,7 +4,7 @@ import crypto.{RandomGenerator, Sphinx}
 import fr.acinq.bitcoin.Protocol.{One, Zeroes}
 import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering, Protocol}
 import com.lightning.walletapp.ln.wire.{InitHostedChannel, StateUpdate, UpdateAddHtlc}
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.htlcTupleCodec
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.inFlightHtlcCodec
 import com.lightning.walletapp.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import java.nio.ByteOrder.LITTLE_ENDIAN
@@ -68,18 +68,18 @@ object Tools {
   }
 
   def hostedSigHash(chanId: ByteVector, refundScriptPubKey: ByteVector, update: StateUpdate, init: InitHostedChannel) = Crypto sha256 {
-    val htlcs = update.inFlightHtlcs.map(htlcTupleCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
+    val htlcs = update.inFlightHtlcs.map(htlc => inFlightHtlcCodec.encode(htlc).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
 
     chanId ++
       refundScriptPubKey ++
       Protocol.writeUInt16(init.liabilityDeadlineBlockdays, LITTLE_ENDIAN) ++
       Protocol.writeUInt64(init.minimalOnchainRefundAmountSatoshis, LITTLE_ENDIAN) ++
-      Protocol.writeUInt64(init.channelCapacitySatoshis, LITTLE_ENDIAN) ++
-      Protocol.writeUInt64(init.initialClientBalanceSatoshis, LITTLE_ENDIAN) ++
-      Protocol.writeUInt64(update.stateOverride.updatedClientBalanceSatoshis, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(init.channelCapacityMsat, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(init.initialClientBalanceMsat, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(update.stateOverride.updatedLocalBalanceMsat, LITTLE_ENDIAN) ++
       Protocol.writeUInt32(update.stateOverride.blockDay, LITTLE_ENDIAN) ++
-      Protocol.writeUInt32(update.stateOverride.clientUpdatesSoFar, LITTLE_ENDIAN) ++
-      Protocol.writeUInt32(update.stateOverride.hostUpdatesSoFar, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(update.stateOverride.localUpdatesSoFar, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(update.stateOverride.remoteUpdatesSoFar, LITTLE_ENDIAN) ++
       htlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
   }
 }

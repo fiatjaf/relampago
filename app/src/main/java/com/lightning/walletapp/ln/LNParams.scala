@@ -96,25 +96,25 @@ object ChanErrorCodes {
   val ERR_REMOTE_AMOUNT_LOW = err_ln_remote_amount_low
   val ERR_TOO_MANY_HTLC = err_ln_too_many
 
-  final val ERR_HOSTED_WRONG_BALANCE = ByteVector.fromValidHex("0001")
-  final val ERR_HOSTED_WRONG_BLOCKDAY = ByteVector.fromValidHex("0002")
-  final val ERR_HOSTED_WRONG_HOST_SIG = ByteVector.fromValidHex("0003")
-  final val ERR_HOSTED_WRONG_IN_FLIGHT = ByteVector.fromValidHex("0004")
-  final val ERR_HOSTED_WRONG_CLIENT_SIG = ByteVector.fromValidHex("0005")
-  final val ERR_HOSTED_WRONG_HOST_NUMBER = ByteVector.fromValidHex("0006")
-  final val ERR_HOSTED_WRONG_CLIENT_NUMBER = ByteVector.fromValidHex("0007")
+  final val ERR_HOSTED_WRONG_BLOCKDAY = ByteVector.fromValidHex("0001")
+  final val ERR_HOSTED_WRONG_IN_FLIGHT = ByteVector.fromValidHex("0002")
+  final val ERR_HOSTED_WRONG_LOCAL_SIG = ByteVector.fromValidHex("0003")
+  final val ERR_HOSTED_WRONG_REMOTE_SIG = ByteVector.fromValidHex("0004")
+  final val ERR_HOSTED_WRONG_LOCAL_NUMBER = ByteVector.fromValidHex("0005")
+  final val ERR_HOSTED_WRONG_REMOTE_NUMBER = ByteVector.fromValidHex("0006")
+  final val ERR_HOSTED_WRONG_REMOTE_BALANCE = ByteVector.fromValidHex("0007")
   final val ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH = ByteVector.fromValidHex("0008")
   final val ERR_HOSTED_UPDATE_CLTV_TOO_LOW = ByteVector.fromValidHex("0009")
   final val ERR_HOSTED_TOO_MANY_UPDATES = ByteVector.fromValidHex("0010")
 
   val hostedErrors = Map (
-    ERR_HOSTED_WRONG_BALANCE -> err_ln_hosted_wrong_balance,
     ERR_HOSTED_WRONG_BLOCKDAY -> err_ln_hosted_wrong_blockday,
-    ERR_HOSTED_WRONG_HOST_SIG -> err_ln_hosted_wrong_host_sig,
     ERR_HOSTED_WRONG_IN_FLIGHT -> err_ln_hosted_wrong_in_flight,
-    ERR_HOSTED_WRONG_CLIENT_SIG -> err_ln_hosted_wrong_client_sig,
-    ERR_HOSTED_WRONG_HOST_NUMBER -> err_ln_hosted_wrong_host_number,
-    ERR_HOSTED_WRONG_CLIENT_NUMBER -> err_ln_hosted_wrong_client_number,
+    ERR_HOSTED_WRONG_LOCAL_SIG -> err_ln_hosted_wrong_local_sig,
+    ERR_HOSTED_WRONG_REMOTE_SIG -> err_ln_hosted_wrong_remote_sig,
+    ERR_HOSTED_WRONG_LOCAL_NUMBER -> err_ln_hosted_wrong_local_number,
+    ERR_HOSTED_WRONG_REMOTE_NUMBER -> err_ln_hosted_wrong_remote_number,
+    ERR_HOSTED_WRONG_REMOTE_BALANCE -> err_ln_hosted_wrong_remote_balance,
     ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH -> err_ln_hosted_update_block_too_high,
     ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low,
     ERR_HOSTED_TOO_MANY_UPDATES -> err_ln_hosted_too_many_updates
