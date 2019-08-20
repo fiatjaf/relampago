@@ -283,6 +283,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def closedBy(cd: ClosingData) =
     if (cd.remoteCommit.nonEmpty) me getString ln_info_close_remote
     else if (cd.nextRemoteCommit.nonEmpty) me getString ln_info_close_remote
+    else if (cd.refundRemoteCommit.nonEmpty) me getString ln_info_close_remote
     else if (cd.mutualClose.nonEmpty) me getString ln_info_close_coop
     else me getString ln_info_close_local
 

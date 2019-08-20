@@ -216,20 +216,14 @@ case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
     copy(lastLocalStateUpdate = lastRemoteStateUpdate,
       lastRemoteStateUpdate = lastLocalStateUpdate)
 
-  def isBehind(remoteThat: LastCrossSignedState) =
-    lastLocalStateUpdate.stateOverride.localUpdatesSoFar < remoteThat.lastRemoteStateUpdate.stateOverride.localUpdatesSoFar ||
-      lastRemoteStateUpdate.stateOverride.localUpdatesSoFar < remoteThat.lastLocalStateUpdate.stateOverride.localUpdatesSoFar
+  def isBehind(remoteLCSS: LastCrossSignedState) =
+    lastLocalStateUpdate.stateOverride.localUpdatesSoFar < remoteLCSS.lastRemoteStateUpdate.stateOverride.localUpdatesSoFar ||
+      lastRemoteStateUpdate.stateOverride.localUpdatesSoFar < remoteLCSS.lastLocalStateUpdate.stateOverride.localUpdatesSoFar
 }
 
 case class StateOverride(updatedLocalBalanceMsat: Long,
                          blockDay: Long, localUpdatesSoFar: Long = 0L, remoteUpdatesSoFar: Long = 0L,
-                         nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage {
-
-  def reverse(newBalanceMsat: Long) =
-    copy(updatedLocalBalanceMsat = newBalanceMsat,
-      localUpdatesSoFar = remoteUpdatesSoFar,
-      remoteUpdatesSoFar = localUpdatesSoFar)
-}
+                         nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage
 
 case class InFlightHtlc(incoming: Boolean, id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long) { me =>
   def toAdd(hostedChanId: ByteVector) = UpdateAddHtlc(hostedChanId, id, amountMsat, paymentHash, expiry, Sphinx.emptyOnionPacket)
