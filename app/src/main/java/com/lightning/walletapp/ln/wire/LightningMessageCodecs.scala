@@ -22,7 +22,6 @@ object LightningMessageCodecs { me =>
   type BitVectorAttempt = Attempt[BitVector]
   type LNMessageVector = Vector[LightningMessage]
   type RedeemScriptAndSig = (ByteVector, ByteVector)
-  type HTLCTuple = (Boolean, Long, Long, ByteVector, Long)
   type RGB = (Byte, Byte, Byte)
 
   def serialize(attempt: BitVectorAttempt): ByteVector = attempt match {
@@ -354,24 +353,24 @@ object LightningMessageCodecs { me =>
   // Hosted messages codecs
 
   val stateOverrideCodec = {
-    (uint64Overflow withContext "updatedClientBalanceSatoshis") ::
+    (uint64Overflow withContext "updatedLocalBalanceMsat") ::
       (uint32 withContext "blockDay") ::
-      (uint32 withContext "clientUpdatesSoFar") ::
-      (uint32 withContext "hostUpdatesSoFar") ::
+      (uint32 withContext "localUpdatesSoFar") ::
+      (uint32 withContext "remoteUpdatesSoFar") ::
       (signature withContext "nodeSignature")
   }.as[StateOverride]
 
-  val htlcTupleCodec = {
-    (bool withContext "fromHost") ::
+  val inFlightHtlcCodec = {
+    (bool withContext "incoming") ::
       (uint64Overflow withContext "id") ::
       (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry")
-  }.as[HTLCTuple]
+  }.as[InFlightHtlc]
 
   val stateUpdateCodec = {
     (stateOverrideCodec withContext "stateOverride") ::
-      (listOfN(uint16, htlcTupleCodec) withContext "inFlightHtlcs")
+      (listOfN(uint16, inFlightHtlcCodec) withContext "inFlightHtlcs")
   }.as[StateUpdate]
 
   val invokeHostedChannelCodec = {
@@ -383,17 +382,17 @@ object LightningMessageCodecs { me =>
     (uint64 withContext "maxHtlcValueInFlightMsat") ::
       (uint64Overflow withContext "htlcMinimumMsat") ::
       (uint16 withContext "maxAcceptedHtlcs") ::
-      (uint64Overflow withContext "channelCapacitySatoshis") ::
+      (uint64Overflow withContext "channelCapacityMsat") ::
       (uint16 withContext "liabilityDeadlineBlockdays") ::
       (uint64Overflow withContext "minimalOnchainRefundAmountSatoshis") ::
-      (uint64Overflow withContext "initialClientBalanceSatoshis")
+      (uint64Overflow withContext "initialClientBalanceMsat")
   }.as[InitHostedChannel]
 
   val lastCrossSignedStateCodec = {
     (varsizebinarydata withContext "lastRefundScriptPubKey") ::
       (initHostedChannelCodec withContext "initHostedChannel") ::
-      (stateUpdateCodec withContext "lastClientStateUpdate") ::
-      (stateUpdateCodec withContext "lastHostStateUpdate")
+      (stateUpdateCodec withContext "lastLocalStateUpdate") ::
+      (stateUpdateCodec withContext "lastRemoteStateUpdate")
   }.as[LastCrossSignedState]
 
   val lightningMessageCodec =
