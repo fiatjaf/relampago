@@ -51,8 +51,10 @@ case class WaitTheirHostedReply(announce: NodeAnnouncement, refundScriptPubKey: 
   lazy val initMsg = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey)
 }
 
-case class WaitTheirHostedStateUpdate(announce: NodeAnnouncement, refundScriptPubKey: ByteVector,
-                                      clientFirstUpdate: StateUpdate, init: InitHostedChannel) extends ChannelData
+case class WaitTheirHostedStateUpdate(announce: NodeAnnouncement,
+                                      refundScriptPubKey: ByteVector,
+                                      firstLocalStateUpdate: StateUpdate,
+                                      init: InitHostedChannel) extends ChannelData
 
 // INCOMING CHANNEL
 
@@ -489,7 +491,7 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 case class HostedCommits(announce: NodeAnnouncement, lastLocalCrossSignedState: LastCrossSignedState, allLocalUpdatesSoFar: Long,
                          allRemoteUpdatesSoFar: Long, reSentUpdates: Int, localChanges: LNMessageVector, remoteChanges: LNMessageVector,
                          localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
-                         startedAt: Long) extends Commitments with ChannelData { me =>
+                         startedAt: Long = System.currentTimeMillis) extends Commitments with ChannelData { me =>
 
   def isInErrorState = localError.isDefined || remoteError.isDefined
   def addRemoteProposal(lm: LightningMessage) = copy(remoteChanges = remoteChanges :+ lm, allRemoteUpdatesSoFar = allRemoteUpdatesSoFar + 1, reSentUpdates = 0)
