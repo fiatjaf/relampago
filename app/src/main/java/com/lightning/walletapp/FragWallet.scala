@@ -161,9 +161,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var currentCut = minLinesNum
 
   val chanListener = new ChannelListener {
-    def informOfferClose(chan: NormalChannel, msg: String) = UITask {
-      mkCheckFormNeutral(_.dismiss, none, alert => rm(alert)(chan process ChannelManager.CMDLocalShutdown),
-        baseBuilder(chan.data.announce.asString.html, msg), dialog_ok, noResource = -1, ln_chan_close)
+    def informOfferClose(chan: Channel, message: String, natRes: Int) = UITask {
+      val bld = baseBuilder(title = chan.data.announce.asString.html, body = message)
+      def onAccepted(alert: AlertDialog) = rm(alert)(chan process ChannelManager.CMDLocalShutdown)
+      if (errorLimit > 0) mkCheckFormNeutral(_.dismiss, none, onAccepted, bld, dialog_ok, noResource = -1, natRes)
+      errorLimit -= 1
     }
 
     override def onSettled(cs: Commitments) =
@@ -171,14 +173,20 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         host stopService host.foregroundServiceIntent
 
     override def onProcessSuccess = {
-      case (chan: NormalChannel, _: HasNormalCommits, remoteError: wire.Error) if errorLimit > 0 =>
-        // Peer has sent us an error, display details to user and offer to force-close a channel
-        informOfferClose(chan, remoteError.text).run
-        errorLimit -= 1
+      // Hosted channel provide sent an error, let user know
+      case (chan: HostedChannelClient, _: HostedCommits, remoteError: wire.Error) =>
+        ChanErrorCodes.hostedErrors.get(key = remoteError.tag).map(app.getString) match {
+          case Some(knownMessage) => informOfferClose(chan, knownMessage, natRes = -1).run
+          case None => informOfferClose(chan, remoteError.text, natRes = -1).run
+        }
 
+      // Peer has sent us an error, offer user to force-close this channel
+      case (chan: NormalChannel, _: HasNormalCommits, remoteError: wire.Error) =>
+        informOfferClose(chan, remoteError.text, ln_chan_close).run
+
+      // Peer now has some incompatible features, display details to user and offer to force-close a channel
       case (chan: NormalChannel, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
-        // Peer now has some incompatible features, display details to user and offer to force-close a channel
-        informOfferClose(chan, host getString err_ln_peer_incompatible format chan.data.announce.alias).run
+        informOfferClose(chan, app.getString(err_ln_peer_incompatible).format(chan.data.announce.alias), ln_chan_close).run
 
       case (_, _, cmd: CMDFulfillHtlc) =>
         revealedPreimages += cmd.preimage

@@ -168,9 +168,10 @@ object PaymentRequest {
             privKey: PrivateKey, description: String, fallbackAddress: Option[String],
             routes: PaymentRouteVec): PaymentRequest = {
 
-    val baseTags = Vector(DescriptionTag(description), MinFinalCltvExpiryTag(72), PaymentHashTag(paymentHash), expiryTag)
+    val timestampSecs = System.currentTimeMillis / 1000L
+    val baseTags = Vector(DescriptionTag(description), MinFinalCltvExpiryTag(LNParams.blocksPerDay), PaymentHashTag(paymentHash), expiryTag)
     val completeTags = routes.map(RoutingInfoTag.apply) ++ fallbackAddress.map(FallbackAddressTag.apply).toVector ++ baseTags
-    PaymentRequest(prefixes(chain), amount, System.currentTimeMillis / 1000L, privKey.publicKey, completeTags, ByteVector.empty) sign privKey
+    PaymentRequest(prefixes(chain), amount, timestampSecs, privKey.publicKey, completeTags, ByteVector.empty) sign privKey
   }
 
   object Amount {

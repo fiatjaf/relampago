@@ -80,8 +80,7 @@ case class CommitSig(channelId: ByteVector, signature: ByteVector, htlcSignature
 case class RevokeAndAck(channelId: ByteVector, perCommitmentSecret: Scalar, nextPerCommitmentPoint: Point) extends ChannelMessage
 
 case class Error(channelId: ByteVector, data: ByteVector) extends ChannelMessage {
-  def exception = new LightningException(reason = s"Remote channel message\n\n$text")
-  lazy val taggedText = bin2readable(data.drop(2).toArray)
+  def exception = new LightningException(text)
   lazy val text = bin2readable(data.toArray)
   lazy val tag = data.take(2)
 }
