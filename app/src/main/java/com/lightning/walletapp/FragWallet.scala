@@ -524,8 +524,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def sendAttempt(alert: AlertDialog) = rateManager.result match {
       case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
-      case Success(ms) if pr.amount.exists(_ > ms) => app toast dialog_sum_small
-      case Success(ms) if minHtlcValue > ms => app toast dialog_sum_small
+      case Success(ms) if ms < pr.msatOrMin => app toast dialog_sum_small
       case Failure(emptyAmount) => app toast dialog_sum_small
 
       case Success(ms) => rm(alert) {
