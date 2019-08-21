@@ -113,7 +113,7 @@ case class UnknownTag(tag: Int5, int5s: Bytes) extends Tag {
 case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestamp: Long,
                           nodeId: PublicKey, tags: Vector[Tag], signature: ByteVector) {
 
-  lazy val msatOrMin = amount getOrElse LNParams.minHtlcValue
+  lazy val msatOrMin = amount getOrElse MilliSatoshi(1L)
   lazy val adjustedMinFinalCltvExpiry = minFinalCltvExpiry.getOrElse(0L) + 10L
   lazy val description = tags.collectFirst { case DescriptionTag(info) => info }.getOrElse(new String)
   lazy val minFinalCltvExpiry = tags.collectFirst { case m: MinFinalCltvExpiryTag => m.expiryDelta }

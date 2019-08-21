@@ -299,15 +299,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     extra match {
       case Some(wr \ lnUrl) =>
         val title = updateView2Blue(str2View(new String), app getString ln_receive_title)
-        val minCanReceive = MilliSatoshi(wr.minCanReceive max LNParams.minHtlcValue.amount)
         val finalMaxCanReceiveCapped = MilliSatoshi(wr.maxWithdrawable min maxCanReceive.amount)
 
         if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_howto).html).create)
         else if (withRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
-        else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, minCanReceive, title, wr.defaultDescription) { rd =>
-          def requestWithdraw = wr.unsafe(s"${wr.callback}?k1=${wr.k1}&sig=$makeSignature&pr=${PaymentRequest write rd.pr}")
-          def makeSignature = Tools.sign(ByteVector fromValidHex wr.k1, LNParams getLinkingKey lnUrl.uri.getHost).toHex
+        else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, wr.minCanReceive, title, wr.defaultDescription) { rd =>
+          def requestWithdraw = wr.unsafe(s"${wr.callback}?k1=${wr.k1}&sig=$makeWithdrawSignature&pr=${PaymentRequest write rd.pr}")
+          def makeWithdrawSignature = Tools.sign(ByteVector fromValidHex wr.k1, LNParams getLinkingKey lnUrl.uri.getHost).toHex
           def onRequestFailed(response: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail response)
           queue.map(_ => requestWithdraw).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
         }
@@ -325,7 +324,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
         def offChain = rm(alert) {
           if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
-          else FragWallet.worker.receive(withRoutes, maxCanReceive, LNParams.minHtlcValue, app.getString(ln_receive_title).html, new String) { rd =>
+          else FragWallet.worker.receive(withRoutes, maxCanReceive, MilliSatoshi(1L), app.getString(ln_receive_title).html, new String) { rd =>
             foregroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
             ContextCompat.startForegroundService(me, foregroundServiceIntent)
             timer.schedule(me stopService foregroundServiceIntent, 1800000)

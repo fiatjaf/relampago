@@ -79,7 +79,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       case (InitData(announce), cmd: CMDOpenChannel, WAIT_FOR_INIT) =>
         BECOME(WaitAcceptData(announce, cmd), WAIT_FOR_ACCEPT) SEND OpenChannel(LNParams.chainHash, cmd.tempChanId,
           cmd.fundingSat, cmd.pushMsat, cmd.localParams.dustLimit.amount, cmd.localParams.maxHtlcValueInFlightMsat,
-          cmd.localParams.channelReserveSat, LNParams.minHtlcValue.amount, cmd.initialFeeratePerKw, cmd.localParams.toSelfDelay,
+          cmd.localParams.channelReserveSat, htlcMinimumMsat = 1L, cmd.initialFeeratePerKw, cmd.localParams.toSelfDelay,
           cmd.localParams.maxAcceptedHtlcs, cmd.localParams.fundingPrivKey.publicKey, cmd.localParams.revocationBasepoint,
           cmd.localParams.paymentBasepoint, cmd.localParams.delayedPaymentBasepoint, cmd.localParams.htlcBasepoint,
           Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), cmd.channelFlags)
@@ -111,11 +111,9 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         val firstPerCommitPoint = Generators.perCommitPoint(localParams.shaSeed, 0L)
         val wait = WaitFundingCreatedRemote(announce, localParams, remoteParams, open)
         BECOME(wait, WAIT_FOR_FUNDING) SEND AcceptChannel(open.temporaryChannelId, localParams.dustLimit.amount,
-          localParams.maxHtlcValueInFlightMsat, localParams.channelReserveSat, LNParams.minHtlcValue.amount,
-          minimumDepth = LNParams.minDepth, localParams.toSelfDelay, localParams.maxAcceptedHtlcs,
-          localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint,
-          localParams.paymentBasepoint, localParams.delayedPaymentBasepoint,
-          localParams.htlcBasepoint, firstPerCommitPoint)
+          localParams.maxHtlcValueInFlightMsat, localParams.channelReserveSat, htlcMinimumMsat = 1L, minimumDepth = LNParams.minDepth,
+          localParams.toSelfDelay, localParams.maxAcceptedHtlcs, localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint,
+          localParams.paymentBasepoint, localParams.delayedPaymentBasepoint, localParams.htlcBasepoint, firstPerCommitPoint)
 
 
       case (WaitAcceptData(announce, cmd), accept: AcceptChannel, WAIT_FOR_ACCEPT) if accept.temporaryChannelId == cmd.tempChanId =>

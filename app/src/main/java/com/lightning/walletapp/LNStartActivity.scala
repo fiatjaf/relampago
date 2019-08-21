@@ -16,6 +16,7 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
 import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
+import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import scodec.bits.ByteVector
 import android.os.Bundle
@@ -154,9 +155,9 @@ case class WithdrawRequest(callback: String, k1: String,
                            maxWithdrawable: Long, defaultDescription: String,
                            minWithdrawable: Option[Long] = None) extends LNUrlData {
 
-  val minCanReceive = minWithdrawable getOrElse 1L
-  require(minCanReceive >= 1L, "minCanReceive is too low")
-  require(minCanReceive <= maxWithdrawable, "minCanReceive is too high")
+  val minCanReceive = MilliSatoshi(minWithdrawable getOrElse 1L)
+  require(minCanReceive.amount <= maxWithdrawable)
+  require(minCanReceive.amount >= 1L)
 }
 
 case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {

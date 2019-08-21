@@ -368,8 +368,8 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
     // This is our point of view because `ensureSenderCanAffordChange` returns reduced local commits
     val inHtlcs \ inFlight = reduced.directedHtlcsAndSum(incoming = true)
 
+    if (add.amountMsat < 1L) throw new LightningException
     if (add.id != remoteNextHtlcId) throw new LightningException
-    if (add.amountMsat < minHtlcValue.amount) throw new LightningException
     if (inHtlcs.size > localParams.maxAcceptedHtlcs) throw new LightningException
     if (UInt64(inFlight) > localParams.maxHtlcValueInFlightMsat) throw new LightningException
     c1
