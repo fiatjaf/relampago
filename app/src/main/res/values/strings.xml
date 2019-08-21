@@ -112,7 +112,6 @@
     <string name="dialog_pr_expired">Expired payment request</string>
     <string name="dialog_sum_small">Amount is too small</string>
     <string name="dialog_sum_big">Amount is too large</string>
-    <string name="dialog_pay_offchain">Off-chain</string>
     <string name="dialog_pay_onchain">On-chain</string>
     <string name="dialog_share_key">Share key</string>
     <string name="dialog_opt_out">Opt out</string>

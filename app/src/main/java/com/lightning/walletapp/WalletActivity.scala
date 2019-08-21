@@ -7,16 +7,19 @@ import android.text.format.DateUtils._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
+import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.NormalChannel._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
+import scala.util.{Success, Try}
 import android.app.{Activity, AlertDialog}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{LightningMessage, NodeAnnouncement, OpenChannel}
+
 import io.github.douglasjunior.androidSimpleTooltip.SimpleTooltip
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -189,8 +192,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       // Erase TransData value
       goOps(null): Unit
 
-    case bitcoinUri: BitcoinURI =>
-      FragWallet.worker.sendBtcPopup(bitcoinUri)
+    case btcURI: BitcoinURI =>
+      val canSendOffChain = Try(btcURI.getAmount).map(coin2MSat).filter(msat => ChannelManager.estimateAIRCanSend >= msat.amount).isSuccess
+      if (canSendOffChain && btcURI.getLightningRequest != null) <(app.TransData recordValue btcURI.getLightningRequest, onFail)(_ => checkTransData)
+      else FragWallet.worker.sendBtcPopup(btcURI)
       me returnToBase null
 
     case lnUrl: LNUrl =>

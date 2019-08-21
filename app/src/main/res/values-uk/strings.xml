@@ -107,7 +107,6 @@
     <string name="dialog_pr_expired">Цей платіжний запит застарів</string>
     <string name="dialog_sum_small">Сума занадто мала</string>
     <string name="dialog_sum_big">Сума занадто велика</string>
-    <string name="dialog_pay_offchain">Off-chain</string>
     <string name="dialog_pay_onchain">On-chain</string>
     <string name="dialog_share_key">Share key</string>
     <string name="dialog_cancel">Скасувати</string>
