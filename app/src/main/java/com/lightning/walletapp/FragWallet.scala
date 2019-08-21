@@ -173,7 +173,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         host stopService host.foregroundServiceIntent
 
     override def onProcessSuccess = {
-      // Hosted channel provide sent an error, let user know
+      // Hosted channel provider sent an error, let user know
       case (chan: HostedChannelClient, _: HostedCommits, remoteError: wire.Error) =>
         ChanErrorCodes.hostedErrors.get(key = remoteError.tag).map(app.getString) match {
           case Some(knownMessage) => informOfferClose(chan, knownMessage, natRes = -1).run
@@ -612,8 +612,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val content = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
     val rateManager = new RateManager(content) hint baseHint
 
-    val maxCanSend = MilliSatoshi(app.kit.conf0Balance.value * 1000L)
-    def useMax(alert: AlertDialog) = rateManager setSum Try(maxCanSend)
     def sendAttempt(alert: AlertDialog): Unit = rateManager.result match {
       case Success(small) if small < minMsatAmount => app toast dialog_sum_small
       case Failure(probablyEmptySum) => app toast dialog_sum_small
@@ -630,14 +628,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         rm(alert)(txProcessor start coloredExplanation)
     }
 
-    def sendOffChainAttempt(alert: AlertDialog) = rm(alert) {
-      // Bitcoin URI may contain an embedded LN invoice so user need to have an off-chain option
-      <(app.TransData recordValue uri.getLightningRequest, onFail)(_ => host.checkTransData)
-    }
-
-    val title = app getString btc_send_title format humanSix(uri.getAddress.toString)
-    if (uri.getLightningRequest == null) mkCheckFormNeutral(sendAttempt, none, useMax, baseBuilder(title.html, content), dialog_next, dialog_cancel, dialog_max)
-    else mkCheckFormNeutral(sendAttempt, none, sendOffChainAttempt, baseBuilder(title.html, content), dialog_next, dialog_cancel, dialog_pay_offchain)
+    def useMax(alert: AlertDialog) = rateManager setSum Try(app.kit.conf0Balance)
+    val title = app.getString(btc_send_title).format(Utils humanSix uri.getAddress.toString).html
+    mkCheckFormNeutral(sendAttempt, none, useMax, baseBuilder(title, content), dialog_next, dialog_cancel, dialog_max)
     rateManager setSum minMsatAmountTry
     rateManager
   }
