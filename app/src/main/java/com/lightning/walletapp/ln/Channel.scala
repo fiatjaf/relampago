@@ -328,7 +328,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         me UPDATA d1 SEND revokeAndAck
         // Clear remote commit first
         doProcess(CMDProceed)
-        events.onSettled(c1)
+        events onSettled c1
 
 
       case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
@@ -732,7 +732,7 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
       case (WaitTheirHostedReply(announce, scriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
         if (init.liabilityDeadlineBlockdays < LNParams.minHostedLiabilityBlockdays) throw new LightningException("Their liability deadline is too low")
         if (init.initialClientBalanceMsat > init.channelCapacityMsat) throw new LightningException("Client init balance is larger than capacity")
-        if (init.minimalOnchainRefundAmountSatoshis > 1000000L) throw new LightningException("Their minimal on-chain refund amount is too low")
+        if (init.minimalOnchainRefundAmountSatoshis > 500000L) throw new LightningException("Their minimal on-chain refund amount is too high")
         if (init.channelCapacityMsat < LNParams.minCapacityMsat) throw new LightningException("Their proposed channel capacity is too low")
         if (UInt64(100000000L) > init.maxHtlcValueInFlightMsat) throw new LightningException("Their maxHtlcValueInFlightMsat is too low")
         if (init.htlcMinimumMsat > 546000L) throw new LightningException("Their htlcMinimumMsat is too high")
@@ -820,7 +820,7 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
             // They have sent a signature first or we have sent/received Add/Fail/Fulfill after receiving their last state update
             if (hc.mustReply) me SEND hc1.lastLocalCrossSignedState.lastLocalStateUpdate
             BECOME(me STORE hc1, OPEN)
-            events.onSettled(hc1)
+            events onSettled hc1
           }
         }
 
