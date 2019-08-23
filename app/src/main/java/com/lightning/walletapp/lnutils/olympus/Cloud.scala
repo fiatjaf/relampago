@@ -38,7 +38,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
       for {
         pr \ memo <- send1
-        if data.info.isEmpty && pr.msatOrMin.amount < maxMsat && memo.clears.size > 20
+        if data.info.isEmpty && pr.msatOrMin.amount <= maxMsat && memo.clears.size > 20
         memoSaved = me BECOME CloudData(Some(pr, memo), clearTokens, actions)
       } retryFreshRequest(pr)
 
