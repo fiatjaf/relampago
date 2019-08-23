@@ -221,8 +221,7 @@ object ChannelManager extends Broadcaster {
     }
 
     override def onHostedMessage(ann: NodeAnnouncement, msg: HostedChannelMessage) =
-      fromNode(ann.nodeId).find(_.getCommits.map(_.channelId) contains ann.hostedChanId)
-        .foreach(_ process msg)
+      fromNode(ann.nodeId).find(_.getCommits.map(_.channelId) contains ann.hostedChanId).foreach(_ process msg)
 
     override def onDisconnect(nodeId: PublicKey) = {
       fromNode(nodeId).foreach(_ process CMDSocketOffline)
@@ -284,20 +283,6 @@ object ChannelManager extends Broadcaster {
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockSend tx catch none
 
-    case (chan: NormalChannel, norm: NormalData, CMDChainTipKnown) if norm.commitments.updateOpt.isEmpty =>
-      // Depth barrier is relevant for Turbo channels, we must restrict receiving until funding is confirmed
-      val fundingDepth \ isFundingDead = broadcaster.getStatus(chan.fundTxId)
-
-      if (fundingDepth > minDepth && !isFundingDead) for {
-        blockHeight \ txIndex <- app.olympus getShortId chan.fundTxId
-        shortChannelId <- Tools.toShortIdOpt(blockHeight, txIndex, norm.commitments.commitInput.outPoint.index)
-        dummy = Announcements.makeChannelUpdate(chainHash, nodePrivateKey, chan.data.announce.nodeId, shortChannelId)
-      } chan process CMDChannelUpdate(dummy)
-
-    case (chan: Channel, _, real: ChannelUpdate) if chan shouldRenew real =>
-      // We had an old or dummy channel update and now they have sent a new one
-      chan process CMDChannelUpdate(real)
-
     case (chan: Channel, _, CMDSocketOnline) =>
       // Memo that channel was online at least once
       chan.permanentOffline = false
@@ -351,6 +336,7 @@ object ChannelManager extends Broadcaster {
   def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
   // We need to connect the rest of channels including special cases like REFUNDING normal channel and SUSPENDED hosted channel
   def initConnect = for (chan <- all if chan.state != CLOSING) ConnectionManager.connectTo(chan.data.announce, notify = false)
+  def hasNormalChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(chan => isOpeningOrOperational(chan) && !chan.isHosted)
   def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
   def fromNode(nodeId: PublicKey) = for (chan <- all if chan.data.announce.nodeId == nodeId) yield chan
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
@@ -487,8 +473,8 @@ object ChannelManager extends Broadcaster {
 }
 
 object Vibrator {
-  private[this] var lastVibrated = 0L
-  private[this] val vib = app.getSystemService(Context.VIBRATOR_SERVICE).asInstanceOf[android.os.Vibrator]
+  private var lastVibrated = 0L
+  private val vib = app.getSystemService(Context.VIBRATOR_SERVICE).asInstanceOf[android.os.Vibrator]
   def canVibrate = null != vib && vib.hasVibrator && lastVibrated < System.currentTimeMillis - 3000L
 
   def vibrate = if (canVibrate) {

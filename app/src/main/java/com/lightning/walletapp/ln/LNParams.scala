@@ -102,7 +102,6 @@ object ChanErrorCodes {
   final val ERR_HOSTED_WRONG_LOCAL_NUMBER = ByteVector.fromValidHex("0005")
   final val ERR_HOSTED_WRONG_REMOTE_NUMBER = ByteVector.fromValidHex("0006")
   final val ERR_HOSTED_WRONG_REMOTE_BALANCE = ByteVector.fromValidHex("0007")
-  final val ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH = ByteVector.fromValidHex("0008")
   final val ERR_HOSTED_UPDATE_CLTV_TOO_LOW = ByteVector.fromValidHex("0009")
   final val ERR_HOSTED_TOO_MANY_UPDATES = ByteVector.fromValidHex("0010")
 
@@ -114,7 +113,6 @@ object ChanErrorCodes {
     ERR_HOSTED_WRONG_LOCAL_NUMBER -> err_ln_hosted_wrong_local_number,
     ERR_HOSTED_WRONG_REMOTE_NUMBER -> err_ln_hosted_wrong_remote_number,
     ERR_HOSTED_WRONG_REMOTE_BALANCE -> err_ln_hosted_wrong_remote_balance,
-    ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH -> err_ln_hosted_update_block_too_high,
     ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low,
     ERR_HOSTED_TOO_MANY_UPDATES -> err_ln_hosted_too_many_updates
   )
