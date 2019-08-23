@@ -19,7 +19,6 @@ import fr.acinq.eclair.UInt64
 
 sealed trait Command
 case class CMDShutdown(scriptPubKey: Option[ByteVector] = None) extends Command
-case class CMDChannelUpdate(upd: ChannelUpdate) extends Command
 case class CMDStateOverride(so: StateOverride) extends Command
 case class CMDConfirmed(tx: Transaction) extends Command
 case class CMDFunding(tx: Transaction) extends Command

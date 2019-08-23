@@ -113,6 +113,7 @@ case class ChannelUpdate(signature: ByteVector, chainHash: ByteVector, shortChan
 
   require(requirement = (messageFlags & 1) != 0 == htlcMaximumMsat.isDefined, "htlcMaximumMsat is not consistent with messageFlags")
   def toHop(nodeId: PublicKey) = Hop(nodeId, shortChannelId, cltvExpiryDelta, htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
+  lazy val isHosted = Tools.fromShortId(shortChannelId) match { case (blockHeight, _, _) => blockHeight <= LNParams.maxHostedBlockHeight }
   lazy val feeEstimate = feeBaseMsat + feeProportionalMillionths * 10
 }
 

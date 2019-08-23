@@ -69,14 +69,15 @@ class LNStartFundActivity extends TimerActivity { me =>
     val freshChannel = ChannelManager.createChannel(bootstrap = InitData(ann), initListeners = Set.empty)
     val peerIncompatible = new LightningException(me getString err_ln_peer_incompatible format ann.alias)
     val peerOffline = new LightningException(me getString err_ln_peer_offline format ann.alias)
+    val chanExistsAlready = new LightningException(me getString err_ln_chan_exists_already)
     val chainDisconnected = new LightningException(me getString err_ln_chain_disconnected)
     lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
     lnStartFundDetails setText asString.html
 
     class OpenListener extends ConnectionListener with ChannelListener { self =>
       override def onMessage(nodeId: PublicKey, message: LightningMessage) = message match {
-        case open: OpenChannel if nodeId == ann.nodeId && !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
         case remoteError: Error if nodeId == ann.nodeId => onException(freshChannel -> remoteError.exception)
+        case open: OpenChannel if nodeId == ann.nodeId && !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
         case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChannel process message
         case _ => // We only listen to setup messages here to avoid conflicts
       }
@@ -108,7 +109,9 @@ class LNStartFundActivity extends TimerActivity { me =>
     abstract class LocalOpenListener extends OpenListener {
       override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (nodeId == ann.nodeId) {
         // Peer has sent us their Init so we ask user to provide a funding amount if peer is compatible
-        if (isCompat) askLocalFundingConfirm.run else onException(freshChannel -> peerIncompatible)
+        if (ChannelManager hasNormalChanWith nodeId) onException(freshChannel -> chanExistsAlready)
+        else if (!isCompat) onException(freshChannel -> peerIncompatible)
+        else askLocalFundingConfirm.run
       }
 
       override def onBecome = {
@@ -183,6 +186,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       val theirReserve = open.fundingSatoshis / LNParams.channelReserveToFundingRatio
       val finalPubKeyScript = ByteVector(ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram)
       val params = LNParams.makeLocalParams(ann, theirReserve, finalPubKeyScript, System.currentTimeMillis, isFunder = false)
+      // We are already connected to remote peer at this point so reply to their request right away
       freshChannel process Tuple2(params, open)
 
       override def onBecome = {

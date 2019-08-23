@@ -198,6 +198,7 @@
     <string name="err_ln_peer_offline">Помилка з\'єднання з %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s не підтримує захист від втрати даних</string>
     <string name="err_ln_chain_disconnected">Створення каналу скасовано тому що он-чейн гаманець в офлайні</string>
+    <string name="err_ln_chan_exists_already">Відкритий канал із цим піром вже існує, будь ласка, спробуйте інший вузол</string>
     <string name="err_ln_local_amount_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для каналу</string>
     <string name="err_ln_remote_amount_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для вашого пiра</string>
     <string name="err_ln_remote_amount_low">Не вийшло тому що сума платежу занадто низька для вашого пiра</string>
@@ -331,7 +332,6 @@
     <string name="err_ln_hosted_wrong_local_sig">incorrect local signature</string>
     <string name="err_ln_hosted_wrong_remote_number">incorrect host update number</string>
     <string name="err_ln_hosted_wrong_local_number">incorrect client update number</string>
-    <string name="err_ln_hosted_update_block_too_high">incorrect channel update block number</string>
     <string name="err_ln_hosted_update_cltv_too_low">incorrect channel update cltv expiry</string>
     <string name="err_ln_hosted_wrong_in_flight">incorrect number of in-flight payments</string>
     <string name="err_ln_hosted_too_many_updates">too many state updates</string>

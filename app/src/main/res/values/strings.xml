@@ -201,6 +201,7 @@
     <string name="err_ln_peer_offline">Could not connect to %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s does not support data loss protection</string>
     <string name="err_ln_chain_disconnected">Could not proceed because on-chain wallet is disconnected</string>
+    <string name="err_ln_chan_exists_already">An open channel with this peer exists already, only one channel per peer is allowed for now, please try another node</string>
     <string name="err_ln_local_amount_high">Failed because payment amount becomes too high to handle for your channel when off-chain fee is added</string>
     <string name="err_ln_remote_amount_high">Failed because payment amount becomes too high to handle for your peer when off-chain fee is added</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
@@ -331,7 +332,6 @@
     <string name="err_ln_hosted_wrong_local_sig">incorrect local signature</string>
     <string name="err_ln_hosted_wrong_remote_number">incorrect remote update number</string>
     <string name="err_ln_hosted_wrong_local_number">incorrect local update number</string>
-    <string name="err_ln_hosted_update_block_too_high">incorrect channel update block number</string>
     <string name="err_ln_hosted_update_cltv_too_low">incorrect channel update cltv expiry</string>
     <string name="err_ln_hosted_wrong_in_flight">incorrect number of in-flight payments</string>
     <string name="err_ln_hosted_too_many_updates">too many state updates</string>

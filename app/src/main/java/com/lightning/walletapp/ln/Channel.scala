@@ -23,8 +23,7 @@ import scala.util.{Failure, Success, Try}
 
 abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
-  def process(change: Any) = Future(me doProcess change) onFailure { case runtimeFailure => events onException me -> runtimeFailure }
-  def shouldRenew(u: ChannelUpdate) = getCommits.flatMap(_.updateOpt).exists(u0 => u0.shortChannelId == u.shortChannelId && u0.timestamp < u.timestamp)
+  def process(change: Any) = Future(me doProcess change) onFailure { case runtimeFailre => events onException me -> runtimeFailre }
 
   def getCommits: Option[Commitments] = data match {
     case normal: HasNormalCommits => Some(normal.commitments)
@@ -51,6 +50,7 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
     // In-flight HTLCs are subtracted here
     estimateCanSend + estimateCanReceive
 
+  var waitingUpdate: Boolean = true
   var permanentOffline: Boolean = true
   var listeners: Set[ChannelListener] = _
   val events: ChannelListener = new ChannelListener {
@@ -233,11 +233,16 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       // OPEN MODE
 
 
-      case (norm: NormalData, CMDChannelUpdate(upd), OPEN | SLEEPING) =>
-        // Got an empty ChannelUpdate with shortChannelId or a final one
-        val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
-        // Do not trigger listeners for this update
-        data = me STORE d1
+      case (norm: NormalData, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && !upd.isHosted =>
+        // GUARD: due to timestamp filter the first update they send to us belongs exactly to our channel
+        val isMoreRecentUpdate = norm.commitments.updateOpt.forall(_.timestamp < upd.timestamp)
+        waitingUpdate = false
+
+        if (isMoreRecentUpdate) {
+          // Update data and store it but do not trigger listeners
+          val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
+          data = me STORE d1
+        }
 
 
       case (norm: NormalData, add: UpdateAddHtlc, OPEN) =>
@@ -903,13 +908,17 @@ abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
         data = me STORE hc.modify(_.announce).setTo(newAnn)
 
 
-      case (hc: HostedCommits, CMDChannelUpdate(upd), OPEN | SLEEPING) =>
-        val Tuple3(blockHeight, _, _) = Tools.fromShortId(upd.shortChannelId)
-        if (blockHeight > LNParams.maxHostedBlockHeight) localSuspend(hc, ERR_HOSTED_UPDATE_BLOCK_TOO_HIGH)
+      case (hc: HostedCommits, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && upd.isHosted =>
+        // GUARD: due to timestamp filter the first update they send to us belongs exactly to our hosted channel
         if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(hc, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
-        val d1 = hc.modify(_.updateOpt) setTo Some(upd)
-        // Do not trigger listeners for this update
-        data = me STORE d1
+        val isMoreRecentUpdate = hc.updateOpt.forall(_.timestamp < upd.timestamp)
+        waitingUpdate = false
+
+        if (isMoreRecentUpdate) {
+          // Update data and store it but do not trigger listeners
+          val d1 = hc.modify(_.updateOpt) setTo Some(upd)
+          data = me STORE d1
+        }
 
 
       case (hc: HostedCommits, remoteError: Error, OPEN | SLEEPING) =>

@@ -108,22 +108,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     def getCount = 2
   }
 
-  private[this] val connectionListener = new ConnectionListener {
-    override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-      case open: OpenChannel if !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
-      case _ => // Ignore public channel offers
-    }
-
-    override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) =
-      ConnectionManager.workers get nodeId foreach { existingWorkerConnection =>
-        val startFundIncomingChannel = app getString ln_ops_start_fund_incoming_channel
-        val hnv = HardcodedNodeView(existingWorkerConnection.ann, startFundIncomingChannel)
-        // This will only work once if user is not on LNStartFundActivity already
-        app.TransData.value = IncomingChannelParams(hnv, open)
-        me goTo classOf[LNStartFundActivity]
-      }
-  }
-
   override def onDestroy = wrap(super.onDestroy)(stopDetecting)
   override def onResume = wrap(super.onResume)(me returnToBase null)
   override def onOptionsItemSelected(m: MenuItem): Boolean = runAnd(true) {
@@ -158,7 +142,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def INIT(state: Bundle) = if (app.isAlive) {
     wrap(me setDetecting true)(me initNfc state)
-    ConnectionManager.listeners += connectionListener
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
   } else me exitTo classOf[MainActivity]
@@ -247,15 +230,30 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def initConnection(incoming: IncomingChannelRequest) = {
     ConnectionManager.listeners += new ConnectionListener { self =>
-      override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (isCompat) {
+      override def onDisconnect(nodeId: PublicKey) = ConnectionManager.listeners -= self
+      override def onOperational(nodeId: PublicKey, isCompatible: Boolean) = if (isCompatible) {
         queue.map(_ => incoming.requestChannel).map(LNUrlData.guardResponse).foreach(none, onFail)
-        ConnectionManager.listeners -= self
       }
+
+      override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+        case open: OpenChannel if !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
+        case _ => // Ignore anything else including public channel offers
+      }
+
+      override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) =
+        ConnectionManager.workers get nodeId foreach { existingWorkerConnection =>
+          val startFundIncomingChannel = app getString ln_ops_start_fund_incoming_channel
+          val hnv = HardcodedNodeView(existingWorkerConnection.ann, startFundIncomingChannel)
+          app.TransData.value = IncomingChannelParams(hnv, open)
+          me goTo classOf[LNStartFundActivity]
+          onDisconnect(nodeId)
+        }
     }
 
     <(incoming.resolveAnnounce, onFail) { ann =>
-      // Make sure we have an LN connection before asking
-      ConnectionManager.connectTo(ann, notify = true)
+      val hasChanAlready = ChannelManager hasNormalChanWith ann.nodeId
+      if (hasChanAlready) app toast err_ln_chan_exists_already
+      else ConnectionManager.connectTo(ann, notify = true)
     }
   }
 
