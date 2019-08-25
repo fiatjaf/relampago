@@ -167,19 +167,21 @@ case class WithdrawRequest(callback: String, k1: String,
                            maxWithdrawable: Long, defaultDescription: String,
                            minWithdrawable: Option[Long] = None) extends LNUrlData {
 
-  val dataToSign = ByteVector.fromValidHex(k1)
   val minCanReceive = MilliSatoshi(minWithdrawable getOrElse 1L)
   require(minCanReceive.amount <= maxWithdrawable)
   require(minCanReceive.amount >= 1L)
 
   def requestWithdraw(lnUrl: LNUrl, pr: PaymentRequest) = {
     val privateKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
-
-    unsafe(android.net.Uri.parse(callback).buildUpon
-      .appendQueryParameter("sig", Tools.sign(dataToSign, privateKey).toHex)
+    val request = android.net.Uri.parse(callback).buildUpon
       .appendQueryParameter("pr", PaymentRequest write pr)
       .appendQueryParameter("k1", k1)
-      .build.toString)
+
+    val req1Try = for {
+      dataToSign <- Try(ByteVector fromValidHex k1)
+      sig = Tools.sign(dataToSign, privateKey).toHex
+    } yield request.appendQueryParameter("sig", sig)
+    unsafe(req1Try.getOrElse(request).build.toString)
   }
 }
 

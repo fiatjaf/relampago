@@ -262,8 +262,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def showLoginForm(lnUrl: LNUrl) = lnUrl.k1 map { k1 =>
-    lazy val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
-    lazy val linkingPubKey = linkingPrivKey.publicKey.toString
+    val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
+    val linkingPubKey = linkingPrivKey.publicKey.toString
+    val dataToSign = ByteVector.fromValidHex(k1)
 
     def wut(alert: AlertDialog): Unit = {
       val bld = baseTextBuilder(getString(ln_url_info_login).format(lnUrl.uri.getHost, linkingPubKey).html)
@@ -271,7 +272,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def doLogin(alert: AlertDialog) = rm(alert) {
-      val dataToSign = ByteVector.fromValidHex(k1)
       val sig = Tools.sign(dataToSign, linkingPrivKey)
       val secondLevelRequestUri = lnUrl.uri.buildUpon.appendQueryParameter("sig", sig.toHex).appendQueryParameter("key", linkingPubKey)
       val sslAwareSecondRequest = get(secondLevelRequestUri.build.toString, true).connectTimeout(15000).trustAllCerts.trustAllHosts
