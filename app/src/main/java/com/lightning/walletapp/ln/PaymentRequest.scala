@@ -41,7 +41,7 @@ object LNUrl {
 }
 
 case class LNUrl(request: String) {
-  val uri = android.net.Uri parse request
+  val uri = android.net.Uri.parse(request)
   require(uri.toString contains "https://", "First level uri is not an HTTPS endpoint")
   lazy val isLogin: Boolean = Try(uri getQueryParameter "tag" contains "login").getOrElse(false)
   lazy val k1: Try[String] = Try(uri getQueryParameter "k1")
