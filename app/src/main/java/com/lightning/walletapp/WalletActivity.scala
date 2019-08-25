@@ -236,7 +236,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     ConnectionManager.listeners += new ConnectionListener { self =>
       override def onDisconnect(nodeId: PublicKey) = ConnectionManager.listeners -= self
       override def onOperational(nodeId: PublicKey, isCompatible: Boolean) = if (isCompatible) {
-        queue.map(_ => incoming.requestChannel).map(LNUrlData.guardResponse).foreach(none, onFail)
+        queue.map(_ => incoming.requestChannel.body).map(LNUrlData.guardResponse).foreach(none, onFail)
       }
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
@@ -254,7 +254,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         }
     }
 
-    <(incoming.resolveAnnounce, onFail) { ann =>
+    <(incoming.resolveNodeAnnouncement, onFail) { ann =>
       val hasChanAlready = ChannelManager hasNormalChanWith ann.nodeId
       if (hasChanAlready) app toast err_ln_chan_exists_already
       else ConnectionManager.connectTo(ann, notify = true)
@@ -262,7 +262,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def showLoginForm(lnUrl: LNUrl) = lnUrl.k1 map { k1 =>
-    lazy val linkingPrivKey = LNParams getLinkingKey lnUrl.uri.getHost
+    lazy val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
     lazy val linkingPubKey = linkingPrivKey.publicKey.toString
 
     def wut(alert: AlertDialog): Unit = {
@@ -271,10 +271,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     def doLogin(alert: AlertDialog) = rm(alert) {
-      val signature = Tools.sign(ByteVector fromValidHex k1, linkingPrivKey).toHex
-      val secondLevelCallback = get(s"${lnUrl.request}?k1=$k1&sig=$signature&key=$linkingPubKey", true)
-      val secondLevelRequest = secondLevelCallback.connectTimeout(7500).trustAllCerts.trustAllHosts
-      queue.map(_ => secondLevelRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
+      val dataToSign = ByteVector.fromValidHex(k1)
+      val sig = Tools.sign(dataToSign, linkingPrivKey)
+      val secondLevelRequestUri = lnUrl.uri.buildUpon.appendQueryParameter("sig", sig.toHex).appendQueryParameter("key", linkingPubKey)
+      val sslAwareSecondRequest = get(secondLevelRequestUri.build.toString, true).connectTimeout(15000).trustAllCerts.trustAllHosts
+      queue.map(_ => sslAwareSecondRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
       app.toast(ln_url_resolving)
     }
 
@@ -307,10 +308,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else if (withRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
         else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, wr.minCanReceive, title, wr.defaultDescription) { rd =>
-          def requestWithdraw = wr.unsafe(s"${wr.callback}?k1=${wr.k1}&sig=$makeWithdrawSignature&pr=${PaymentRequest write rd.pr}")
-          def makeWithdrawSignature = Tools.sign(ByteVector fromValidHex wr.k1, LNParams getLinkingKey lnUrl.uri.getHost).toHex
+          queue.map(_ => wr.requestWithdraw(lnUrl, rd.pr).body).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
           def onRequestFailed(response: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail response)
-          queue.map(_ => requestWithdraw).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
         }
 
       case None =>
