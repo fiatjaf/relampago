@@ -4,6 +4,7 @@ import scala.util.{Success, Try}
 import fr.acinq.bitcoin.{MilliSatoshi, Transaction}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 
+import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.crypto.Sphinx._
 import com.lightning.walletapp.ln.RoutingInfoTag._
@@ -37,7 +38,8 @@ object PaymentInfo {
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int) =
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, PacketAndSecrets(emptyOnionPacket, Vector.empty),
-      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache = useCache, airLeft = airLeft)
+      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache = useCache, airLeft = airLeft,
+      retriedRoutes = Vector.empty)
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: ByteVector): PacketAndSecrets = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
@@ -91,7 +93,7 @@ object PaymentInfo {
     Some(rd1) -> blackListedNodes
   }
 
-  def replaceRoute(rd: RoutingData, upd: ChannelUpdate) = {
+  def replaceChan(rd: RoutingData, upd: ChannelUpdate) = {
     // In some cases we can just replace a faulty hop with a supplied one
     // but only do this once per each channel to avoid infinite loops
     val rd1 = rd.copy(routes = updateHop(rd, upd) +: rd.routes)
@@ -112,18 +114,20 @@ object PaymentInfo {
     parsed map {
       case DecryptedFailurePacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case DecryptedFailurePacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
-      case DecryptedFailurePacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
-      case DecryptedFailurePacket(_, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
-      case DecryptedFailurePacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceRoute(rd, u.update)
+      case DecryptedFailurePacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
+      case DecryptedFailurePacket(_, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
+      case DecryptedFailurePacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
 
       case DecryptedFailurePacket(nodeKey, u: Update) =>
         val isHonest = Announcements.checkSig(u.update, nodeKey)
         if (!isHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
         else rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
           // A node along a payment route may choose a different channel than the one we have requested
-          // if that happens it means our requested channel has not been used so we put it back here and retry it once again
+          // if that happens then our requested channel has not been used so we put it back here and retry it once again
+          // but only do it once per payment route, otherwise we may keep reusing same route indefinitely if peer misbehaves
           if (payHop.shortChannelId == u.update.shortChannelId) withoutChan(payHop.shortChannelId, rd, 180 * 1000, rd.firstMsat)
-          else withoutChan(u.update.shortChannelId, rd.copy(routes = rd.usedRoute +: rd.routes), 180 * 1000, rd.firstMsat)
+          else if (rd.retriedRoutes contains rd.usedRoute) withoutChan(u.update.shortChannelId, rd, span = 180 * 1000, rd.firstMsat)
+          else withoutChan(u.update.shortChannelId, rd.modifyAll(_.routes, _.retriedRoutes).using(rd.usedRoute +: _), 180 * 1000, rd.firstMsat)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case DecryptedFailurePacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
@@ -167,7 +171,7 @@ object PaymentInfo {
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
                        onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */,
                        lastMsat: Long /* amount with off-chain fee */, lastExpiry: Long, callsLeft: Int,
-                       useCache: Boolean, airLeft: Int) {
+                       useCache: Boolean, airLeft: Int, retriedRoutes: PaymentRouteVec) {
 
   // Empty used route means we're sending to peer and its nodeId should be our targetId
   def nextNodeId(route: PaymentRoute) = route.headOption.map(_.nodeId) getOrElse pr.nodeId

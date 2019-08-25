@@ -121,11 +121,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onSettled(cs: Commitments) = {
-    def newRoutesOrGiveUp(rd: RoutingData): Unit =
-      if (rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight) {
-        // We don't care about AIR or multipart here, supposedly it's one of them
-        me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-      } else updStatus(FAILURE, rd.pr.paymentHash)
+    def newRoutesOrGiveUp(rd: RoutingData): Unit = {
+      // We do not care about options such as AIR or AMP here, this may be one of them
+      val isDirectlySpendable = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
+      if (isDirectlySpendable) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
+      else updStatus(FAILURE, rd.pr.paymentHash)
+    }
 
     db txWrap {
       cs.localSpec.fulfilledIncoming foreach updOkIncoming
