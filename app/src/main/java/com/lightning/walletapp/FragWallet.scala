@@ -174,7 +174,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     override def onProcessSuccess = {
       // Hosted channel provider sent an error, let user know
-      case (chan: HostedChannelClient, _: HostedCommits, remoteError: wire.Error) =>
+      case (chan: HostedChannel, _: HostedCommits, remoteError: wire.Error) =>
         ChanErrorCodes.hostedErrors.get(key = remoteError.tag).map(app.getString) match {
           case Some(knownMessage) => informOfferClose(chan, knownMessage, natRes = -1).run
           case None => informOfferClose(chan, remoteError.text, natRes = -1).run
