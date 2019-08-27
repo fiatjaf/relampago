@@ -271,8 +271,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       val sig = Tools.sign(dataToSign, linkingPrivKey)
       val secondLevelRequestUri = lnUrl.uri.buildUpon.appendQueryParameter("sig", sig.toHex).appendQueryParameter("key", linkingPubKey)
       val sslAwareSecondRequest = get(secondLevelRequestUri.build.toString, true).connectTimeout(15000).trustAllCerts.trustAllHosts
-      queue.map(_ => sslAwareSecondRequest.body).map(LNUrlData.guardResponse).foreach(none, onFail)
+      queue.map(_ => sslAwareSecondRequest.body).map(LNUrlData.guardResponse).foreach(_ => onLoginSuccess.run, onFail)
       app.toast(ln_url_resolving)
+    }
+
+    def onLoginSuccess = UITask {
+      val message = getString(ln_url_login_ok).format(lnUrl.uri.getHost).html
+      mkCheckForm(alert => rm(alert)(finish), none, baseTextBuilder(message), dialog_close, -1)
     }
 
     val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")

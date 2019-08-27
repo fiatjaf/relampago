@@ -109,6 +109,7 @@
     <string name="dialog_sum_big">Сума занадто велика</string>
     <string name="dialog_pay_onchain">On-chain</string>
     <string name="dialog_share_key">Share key</string>
+    <string name="dialog_close">Закрити апп</string>
     <string name="dialog_cancel">Скасувати</string>
     <string name="dialog_opt_out">Opt out</string>
     <string name="dialog_retry">Ще раз</string>
@@ -311,11 +312,13 @@
     <string name="ln_ops_start_fund_node_view"><![CDATA[<strong>%1$s</strong><br><font color=#999999><i>відчинення каналу</i></font><br>%2$s<br><br><font color=#999999>ID піра</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[<strong>%1$s</strong><br>%2$s<br><small><font color=#999999>%3$s</font></small>]]></string>
     <string name="ln_ops_start_fund_incoming_channel">вхідний канал</string>
+
     <string name="ln_url_resolving">Підключення до сервісу&#8230;</string>
+    <string name="ln_url_login_ok"><![CDATA[Успiшний логін на <i>%1$s</i>]]></string>
 
     <string name="ln_url_info_login"><![CDATA[
-        Логiн-ключ для <i>%1$s</i>, згенерований вашим гаманцем:<br><br><strong>%2$s</strong><br><br>
-        Цей ключ можно розкрити, але його рекомендується передавати тiльки <i>%3$s</i>
+        Логiн-ключ для <i>%1$s</i> згенерований вашим гаманцем:<br><br><strong>%2$s</strong><br><br>
+        Його буде використано для анонiмної авторизації на <i>%1$s</i> без розкриття ваших особистих даних.
     ]]></string>
 
     <!-- Olympus log messages and notification -->
