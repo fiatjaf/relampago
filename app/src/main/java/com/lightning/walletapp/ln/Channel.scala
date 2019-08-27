@@ -712,7 +712,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
     }
 }
 
-abstract class HostedChannelClient extends Channel(isHosted = true) { me =>
+abstract class HostedChannel extends Channel(isHosted = true) { me =>
   def estimateCanSend = getCommits collect { case nc: HostedCommits => nc.localSpec.toLocalMsat } getOrElse 0L
   def estimateCanReceive = getCommits collect { case nc: HostedCommits => nc.localSpec.toRemoteMsat } getOrElse 0L
   def inFlightHtlcs = getCommits collect { case nc: HostedCommits => nc.localSpec.htlcs } getOrElse Set.empty[Htlc]
