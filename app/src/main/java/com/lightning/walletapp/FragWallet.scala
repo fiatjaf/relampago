@@ -126,7 +126,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val delta = viable.size - online
 
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
-    val btcFunds = if (btcTotalSum.amount == 0L) btcEmpty else denom parsedWithSign btcTotalSum
+    val btcFunds = if (btcTotalSum.amount < 1) btcEmpty else denom parsedWithSign btcTotalSum
     val lnTotalSum = MilliSatoshi(viable.flatMap(_.getCommits).map(_.myFullBalanceMsat).sum)
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
     val perOneBtcRate = formatFiat.format(msatInFiat(oneBtc) getOrElse 0L)
@@ -175,8 +175,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     override def onProcessSuccess = {
       // Hosted channel provider sent an error, let user know
       case (chan: HostedChannel, _: HostedCommits, remoteError: wire.Error) =>
-        ChanErrorCodes.hostedErrors.get(key = remoteError.tag).map(app.getString) match {
-          case Some(knownMessage) => informOfferClose(chan, knownMessage, natRes = -1).run
+        ChanErrorCodes.hostedErrors.get(remoteError.tag).map(app.getString) match {
+          case Some(knownMsg) => informOfferClose(chan, knownMsg, natRes = -1).run
           case None => informOfferClose(chan, remoteError.text, natRes = -1).run
         }
 

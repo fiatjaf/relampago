@@ -75,9 +75,14 @@ object PaymentInfo {
     }
   }
 
-  def without(routes: PaymentRouteVec, fun: Hop => Boolean) = routes.filterNot(routeOfHops => routeOfHops exists fun)
-  def failIncorrectDetails(pkt: DecryptedPacket, msat: MilliSatoshi, add: UpdateAddHtlc) = failHtlc(pkt, IncorrectOrUnknownPaymentDetails(msat.amount), add)
-  def failHtlc(pkt: DecryptedPacket, msg: FailureMessage, add: UpdateAddHtlc) = CMDFailHtlc(reason = FailurePacket.create(pkt.sharedSecret, msg), id = add.id)
+  def without(routes: PaymentRouteVec, fun: Hop => Boolean) =
+    routes.filterNot(_ exists fun)
+
+  def failIncorrectDetails(pkt: DecryptedPacket, msat: MilliSatoshi, add: UpdateAddHtlc) =
+    failHtlc(pkt, IncorrectOrUnknownPaymentDetails(msat.amount, LNParams.broadcaster.currentHeight), add)
+
+  def failHtlc(pkt: DecryptedPacket, msg: FailureMessage, add: UpdateAddHtlc) =
+    CMDFailHtlc(reason = FailurePacket.create(pkt.sharedSecret, msg), id = add.id)
 
   def withoutChan(shortId: Long, rd: RoutingData, span: Long, msat: Long) = {
     val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == shortId)
@@ -112,8 +117,8 @@ object PaymentInfo {
     errors = errors.updated(rd.pr.paymentHash, errors(rd.pr.paymentHash) :+ parsed)
 
     parsed map {
-      case DecryptedFailurePacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case DecryptedFailurePacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
+      case DecryptedFailurePacket(nodeKey, error) if nodeKey == rd.pr.nodeId && error.isPermanent => None -> Vector.empty
       case DecryptedFailurePacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
       case DecryptedFailurePacket(_, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
       case DecryptedFailurePacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
@@ -153,8 +158,9 @@ object PaymentInfo {
   // Once mutually signed HTLCs are present we need to parse and fail/fulfill them
   def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag, loop: Boolean) =
     PaymentPacket.peel(nodeSecret, associatedData = add.paymentHash, add.onionRoutingPacket) match {
-      case Left(badOnion) => CMDFailMalformedHtlc(add.id, badOnion.onionHash, FailureMessageCodecs failureCode badOnion)
-      case Right(packet) => if (packet.isLastPacket) doResolve(packet, add, bag, loop) else failHtlc(packet, UnknownNextPeer, add)
+      case Left(badOnion) => CMDFailMalformedHtlc(add.id, badOnion.onionHash, badOnion.code)
+      case Right(packet) if packet.isLastPacket => doResolve(packet, add, bag, loop)
+      case Right(packet) => failHtlc(packet, UnknownNextPeer, add)
     }
 
   def doResolve(pkt: DecryptedPacket, add: UpdateAddHtlc, bag: PaymentInfoBag, loop: Boolean) =

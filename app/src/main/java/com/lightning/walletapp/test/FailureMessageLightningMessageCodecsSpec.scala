@@ -29,17 +29,35 @@ class FailureMessageLightningMessageCodecsSpec {
   }
 
   def allTests = {
-    val msgs: List[FailureMessage] =
-      InvalidRealm :: TemporaryNodeFailure :: PermanentNodeFailure :: RequiredNodeFeatureMissing ::
-        InvalidOnionVersion(randomBytes(32)) :: InvalidOnionHmac(randomBytes(32)) :: InvalidOnionKey(randomBytes(32)) ::
-        TemporaryChannelFailure(channelUpdate) :: PermanentChannelFailure :: RequiredChannelFeatureMissing :: UnknownNextPeer :: InvalidOnionPayload(randomBytes(32)) ::
-        AmountBelowMinimum(123456, channelUpdate) :: FeeInsufficient(546463, channelUpdate) :: IncorrectCltvExpiry(1211, channelUpdate) :: ExpiryTooSoon(channelUpdate)  ::
-        IncorrectOrUnknownPaymentDetails(11223344L) :: IncorrectPaymentAmount :: FinalExpiryTooSoon :: FinalIncorrectCltvExpiry(1234) :: ChannelDisabled(0, 1, channelUpdate) :: Nil
+    val msgs = Seq[(Boolean, Boolean, FailureMessage)](
+      (false, true, InvalidRealm),
+      (true, false, TemporaryNodeFailure),
+      (true, true, PermanentNodeFailure),
+      (true, true, RequiredNodeFeatureMissing),
+      (false, true, InvalidOnionVersion(randomBytes(32))),
+      (false, true, InvalidOnionHmac(randomBytes(32))),
+      (false, true, InvalidOnionKey(randomBytes(32))),
+      (false, true, InvalidOnionPayload(randomBytes(32))),
+      (false, false, TemporaryChannelFailure(channelUpdate)),
+      (false, true, PermanentChannelFailure),
+      (false, true, RequiredChannelFeatureMissing),
+      (false, true, UnknownNextPeer),
+      (false, false, AmountBelowMinimum(123456, channelUpdate)),
+      (false, false, FeeInsufficient(546463, channelUpdate)),
+      (false, false, IncorrectCltvExpiry(1211, channelUpdate)),
+      (false, false, ExpiryTooSoon(channelUpdate)),
+      (false, true, IncorrectOrUnknownPaymentDetails(123456, 1105)),
+      (false, false, FinalIncorrectCltvExpiry(1234)),
+      (false, false, ChannelDisabled(0, 1, channelUpdate)),
+      (false, false, ExpiryTooFar)
+    )
 
-    msgs.foreach { msg =>
+    for ((temporary, permanent, msg) <- msgs) {
       val encoded = FailureMessageCodecs.failureMessageCodec.encode(msg).require
-      val decoded = FailureMessageCodecs.failureMessageCodec.decode(encoded).require
-      assert(msg == decoded.value)
+      val decoded = FailureMessageCodecs.failureMessageCodec.decode(encoded).require.value
+      assert(msg == decoded)
+      assert(msg.isTemporary == temporary)
+      assert(msg.isPermanent == permanent)
     }
 
     println("support encoding of channel_update with/without type in failure messages")
@@ -53,6 +71,25 @@ class FailureMessageLightningMessageCodecsSpec {
     val u2 = FailureMessageCodecs.failureMessageCodec.decode(BitVector(bin)).require.value
     assert(u2 == ref)
 
+    println("decode unknown failure messages")
+    val testCases = Seq(
+      // Deprecated incorrect_payment_amount.
+      (false, true, ByteVector.fromValidHex("4010")),
+      // Deprecated final_expiry_too_soon.
+      (false, true, ByteVector.fromValidHex("4011")),
+      // Unknown failure messages.
+      (false, false, ByteVector.fromValidHex("00ff 42")),
+      (true, false, ByteVector.fromValidHex("20ff 42")),
+      (true, true, ByteVector.fromValidHex("60ff 42"))
+    )
+
+    for ((temporary, permanent, bin) <- testCases) {
+      val decoded = FailureMessageCodecs.failureMessageCodec.decode(bin.bits).require.value
+      assert(decoded.isInstanceOf[UnknownFailureMessage])
+      assert(decoded.isTemporary == temporary)
+      assert(decoded.isPermanent == permanent)
+    }
+
     {
       println("bad onion failure code")
       val msgs = Map(
@@ -63,7 +100,9 @@ class FailureMessageLightningMessageCodecsSpec {
       )
 
       for ((code, message) <- msgs) {
-        assert(FailureMessageCodecs.failureCode(message) == code)
+        assert(message.code == code)
+        assert(message.isPermanent)
+        assert(!message.isTemporary)
       }
     }
 
@@ -72,7 +111,7 @@ class FailureMessageLightningMessageCodecsSpec {
       val codec = FailureMessageCodecs.failureOnionCodec(Hmac256(Protocol.Zeroes))
       val testCases = Map(
         InvalidOnionKey(ByteVector.fromValidHex("2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a")) -> ByteVector.fromValidHex("41a824e2d630111669fa3e52b600a518f369691909b4e89205dc624ee17ed2c1 0022 c006 2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a 00de 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"),
-        IncorrectOrUnknownPaymentDetails(42) -> ByteVector.fromValidHex("ba6e122b2941619e2106e8437bf525356ffc8439ac3b2245f68546e298a08cc6 000a 400f 000000000000002a 00f6 000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+        IncorrectOrUnknownPaymentDetails(42, 1105) -> ByteVector.fromValidHex("5eb766da1b2f45b4182e064dacd8da9eca2c9a33f0dce363ff308e9bdb3ee4e3 000e 400f 000000000000002a 00000451 00f2 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
       )
 
       for ((expected, bin) <- testCases) {
