@@ -156,7 +156,7 @@ object RevokedInfoTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-extends SQLiteOpenHelper(context, name, null, 7) {
+extends SQLiteOpenHelper(context, name, null, 8) {
 
   val base = getWritableDatabase
   val asString: Any => String = {
@@ -183,21 +183,26 @@ extends SQLiteOpenHelper(context, name, null, 7) {
 
     dbs execSQL OlympusLogTable.createSql
     dbs execSQL OlympusTable.createSql
-
-    val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val dev: Array[AnyRef] = Array("test-server-1", "https://107.175.54.178:9003", emptyData, "1", "0", "0")
-    dbs.execSQL(OlympusTable.newSql, dev)
+    populateOlympus(dbs)
   }
 
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
-    // Old version of RouteTable had a useless expiry column
     dbs execSQL s"DROP TABLE IF EXISTS ${RouteTable.table}"
+    dbs execSQL s"DROP TABLE IF EXISTS ${OlympusTable.table}"
 
     // Should work even for updates across many version ranges
     // because each table and index has CREATE IF EXISTS prefix
     dbs execSQL RevokedInfoTable.createSql
     dbs execSQL OlympusLogTable.createSql
     dbs execSQL PaymentTable.reCreateSql
+    dbs execSQL OlympusTable.createSql
     dbs execSQL RouteTable.createSql
+    populateOlympus(dbs)
+  }
+
+  def populateOlympus(dbs: SQLiteDatabase) = {
+    val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
+    val dev: Array[AnyRef] = Array("test-server-1", "https://172.245.74.10:9203", emptyData, "1", "0", "0")
+    dbs.execSQL(OlympusTable.newSql, dev)
   }
 }
