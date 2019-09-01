@@ -234,11 +234,11 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (norm: NormalData, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && !upd.isHosted =>
-        // GUARD: due to timestamp filter the first update they send to us belongs exactly to our channel
-        val isMoreRecentUpdate = norm.commitments.updateOpt.forall(_.timestamp < upd.timestamp)
+        // GUARD: due to timestamp filter the first update they send is for our channel, update if it's newer or short id is different
+        val isUpdatable = norm.commitments.updateOpt.forall(old => old.timestamp < upd.timestamp || old.shortChannelId != upd.shortChannelId)
         waitingUpdate = false
 
-        if (isMoreRecentUpdate) {
+        if (isUpdatable) {
           // Update data and store it but do not trigger listeners
           val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
           data = me STORE d1
@@ -909,12 +909,12 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && upd.isHosted =>
-        // GUARD: due to timestamp filter the first update they send to us belongs exactly to our hosted channel
+        // GUARD: due to timestamp filter the first update they send is for our channel, update if it's newer or short id is different
+        val isUpdatable = hc.updateOpt.forall(old => old.timestamp < upd.timestamp || old.shortChannelId != upd.shortChannelId)
         if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(hc, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
-        val isMoreRecentUpdate = hc.updateOpt.forall(_.timestamp < upd.timestamp)
         waitingUpdate = false
 
-        if (isMoreRecentUpdate) {
+        if (isUpdatable) {
           // Update data and store it but do not trigger listeners
           val d1 = hc.modify(_.updateOpt) setTo Some(upd)
           data = me STORE d1
