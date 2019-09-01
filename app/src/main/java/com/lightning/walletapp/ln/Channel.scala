@@ -1029,7 +1029,7 @@ object NormalChannel {
 
   def isOperational(chan: Channel) = chan.data match {
     case _: HostedCommits => chan.state != SUSPENDED
-    case NormalData(_, _, None, None, _) => true
+    case NormalData(_, _, None, None, None) => true
     case _ => false
   }
 
