@@ -112,7 +112,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       // For incoming chans reserveAndFee is reserve only since fee is zero
       val reserveAndFee = forceCloseFee.amount + cs.remoteParams.channelReserveSatoshis
       val barLocalReserve = math.min(barCanSend, reserveAndFee * 1000L / capacity.amount)
-      val fundingDepth \ fundingIsDead = LNParams.broadcaster.getStatus(chan.fundTxId)
+      val fundingDepth \ lostFunding = LNParams.broadcaster.getStatus(chan.fundTxId)
       val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
 
       baseBar setProgress barCanSend.toInt
@@ -136,31 +136,38 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       chan.data match {
         case norm: NormalData if isOperational(chan) =>
           // We only can display one item so sort them by increasing importance
+          // Relevant for Turbo channels: show funding depth until it reaches threshold
+          val fundingDepthCondition = if (fundingDepth < threshold) -1 else R.id.fundingDepth
           val extraRoute = channelAndHop(chan) map { case _ \ route => route } getOrElse Vector.empty
+          val hasStuckHtlcs = chan.inFlightHtlcs.exists(_.add.expiry <= LNParams.broadcaster.currentHeight)
           val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, msat = 1000000000L)
           if (isIncomingFeeTooHigh) setExtraInfo(text = me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
           // In Turbo channels we will often have an OPEN state with NormalData and zeroconf
-          if (norm.unknownSpend.isDefined) setExtraInfo(resource = ln_info_unknown_spend)
-          if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
-
-          // Relevant for Turbo channels: show funding depth until it reaches threshold
-          val fundingDepthCondition = if (fundingDepth < threshold) -1 else R.id.fundingDepth
+          if (hasStuckHtlcs) setExtraInfo(resource = ln_info_stuck_htlcs)
+          if (lostFunding) setExtraInfo(resource = ln_info_funding_lost)
           visibleExcept(gone = fundingDepthCondition, R.id.closedAt)
 
-        case _: NormalData | _: NegotiationsData =>
+        case norm: NormalData =>
+          setExtraInfo(resource = ln_info_coop_attempt)
+          // If unknown spend is present then channel is not operational
+          if (norm.unknownSpend.isDefined) setExtraInfo(resource = ln_info_unknown_spend)
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+            R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
+
+        case _: NegotiationsData =>
           setExtraInfo(resource = ln_info_coop_attempt)
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
             R.id.canReceive, R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
 
         case wait: WaitBroadcastRemoteData =>
-          if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
+          if (lostFunding) setExtraInfo(resource = ln_info_funding_lost)
           if (wait.fundingError.isDefined) setExtraInfo(text = wait.fundingError.get)
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
             R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
             R.id.totalPayments)
 
         case _: WaitFundingDoneData =>
-          if (fundingIsDead) setExtraInfo(resource = ln_info_funding_lost)
+          if (lostFunding) setExtraInfo(resource = ln_info_funding_lost)
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
             R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
             R.id.totalPayments)

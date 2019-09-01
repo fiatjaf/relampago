@@ -255,8 +255,9 @@
     <string name="ln_info_coop_attempt">Ждем подпись от пира&#8230;</string>
 
     <string name="ln_info_high_fee">Входящая комиссия слишком высока: %1$s</string>
-    <string name="ln_info_unknown_spend">Обнаружена неизвестная трата!</string>
-    <string name="ln_info_funding_lost">Канал потерян он-чейн!</string>
+    <string name="ln_info_unknown_spend">Обнаружена неизвестная трата</string>
+    <string name="ln_info_stuck_htlcs">Обнаружены зависшие платежи</string>
+    <string name="ln_info_funding_lost">Канал потерян он-чейн</string>
 
     <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>отключен</small></font>]]></string>
     <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>онлайн</small></font>]]></string>
@@ -269,7 +270,7 @@
     <string name="ln_info_status_suspended"><![CDATA[<font color=#E68A00>ЗАМОРОЖЕН</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
-    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В канале есть зависшие платежи</font> поэтому кооперативное закрытие будет отложено пока они не исчезнут<br><br>Рекомендуется не закрывать канал прямо сейчас, а вместо этого дать зависшим платежам некоторое время, все еще хотите продолжить?]]></string>
+    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В канале есть активные платежи</font> поэтому кооперативное закрытие будет отложено пока они не исчезнут.<br><br>Рекомендуется не закрывать канал прямо сейчас, а вместо этого дать платежам пройти, все еще хотите продолжить?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; Учтите, что попытка закрытия канала прямо сейчас приведет к <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсированному закрытию</a>, на которое уйдет большая сумма комиссии и больше времени, все еще хотите продолжить?]]></string>
     <string name="ln_chan_close_confirm_local">Хотите закрыть канал и отправить возвратную Биткоин-транзакцию обратно в этот кошелек?</string>
     <string name="ln_chan_close">Закрыть канал</string>

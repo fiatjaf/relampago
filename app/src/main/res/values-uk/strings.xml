@@ -255,8 +255,9 @@
     <string name="ln_info_coop_attempt">Чекаємо на підпис від пiра&#8230;</string>
 
     <string name="ln_info_high_fee">Вхідна комісія занадто висока: %1$s</string>
-    <string name="ln_info_unknown_spend">Виявлена невідома трата!</string>
-    <string name="ln_info_funding_lost">Канал втрачений он-чейн!</string>
+    <string name="ln_info_unknown_spend">Виявлена невідома трата</string>
+    <string name="ln_info_stuck_htlcs">Виявленi завислі платежі</string>
+    <string name="ln_info_funding_lost">Канал втрачений он-чейн</string>
 
     <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>вимкнений</small></font>]]></string>
     <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>онлайн</small></font>]]></string>
@@ -269,9 +270,9 @@
     <string name="ln_info_status_suspended"><![CDATA[<font color=#E68A00>ЗАМОРОЖЕНИЙ</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
-    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В каналі є завислі платежі</font> тому кооперативне закриття буде відкладено поки вони не зникнуть<br><br>Рекомендується не закривати канал прямо зараз, а замість цього дати завислим платежам деякий час, все ще хочете продовжити?]]></string>
+    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В каналі є завислі активні</font> тому кооперативне закриття буде відкладено поки вони не зникнуть.<br><br>Рекомендується не закривати канал прямо зараз, а замість цього дати платежам пройти, все ще хочете продовжити?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; Майте на увазі, що спроба закриття каналу прямо зараз призведе до <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсованого закриття</a>, на яке піде велика сума комісії і більше часу, все ще хочете продовжити?]]></string>
-    <string name="ln_chan_close_confirm_local">Хочете закрити канал і відправити зворотню Біткоїн-транзакцію назад в цей гаманець?</string>
+    <string name="ln_chan_close_confirm_local">Хочете закрити канал і відправити зворотню Біткоїн-транзакцію назад у цей гаманець?</string>
     <string name="ln_chan_close">Зачинити канал</string>
 
     <array name="ln_normal_chan_actions">

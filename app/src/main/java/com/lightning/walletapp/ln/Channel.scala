@@ -1028,8 +1028,8 @@ object NormalChannel {
   def isOpening(chan: Channel) = chan.data.isInstanceOf[WaitFundingDoneData]
 
   def isOperational(chan: Channel) = chan.data match {
-    case _: HostedCommits => chan.state != SUSPENDED
     case NormalData(_, _, None, None, None) => true
+    case hc: HostedCommits => !hc.isInErrorState
     case _ => false
   }
 
