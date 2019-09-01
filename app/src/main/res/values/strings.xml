@@ -258,8 +258,9 @@
     <string name="ln_info_coop_attempt">Awaiting for peer signature&#8230;</string>
 
     <string name="ln_info_high_fee">Receiving fees are too high: %1$s</string>
-    <string name="ln_info_funding_lost">Funding was lost on-chain!</string>
-    <string name="ln_info_unknown_spend">Unknown spend detected!</string>
+    <string name="ln_info_funding_lost">Funding was lost on-chain</string>
+    <string name="ln_info_unknown_spend">Unknown spend detected</string>
+    <string name="ln_info_stuck_htlcs">Stuck payments detected</string>
 
     <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>disconnected</small></font>]]></string>
     <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>online</small></font>]]></string>
@@ -272,7 +273,7 @@
     <string name="ln_info_status_suspended"><![CDATA[<font color=#E68A00>SUSPENDED</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
-    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved<br><br>It it not recommended to close a channel right now and let those stuck payments to eventually become failed or fulfilled, would you still like to proceed?]]></string>
+    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved.<br><br>It it not recommended to close a channel right now and let these payments to eventually become failed or fulfilled, would you still like to proceed?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; Note that closing right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closure</a> which requires additional fees and time, would you still like to proceed?]]></string>
     <string name="ln_chan_close_confirm_local">Do you want to close this channel and send a refunding transaction back to this wallet?</string>
     <string name="ln_chan_close">Close channel</string>
