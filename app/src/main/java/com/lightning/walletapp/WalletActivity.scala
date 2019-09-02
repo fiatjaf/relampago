@@ -19,7 +19,6 @@ import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.wire.{LightningMessage, NodeAnnouncement, OpenChannel}
-
 import io.github.douglasjunior.androidSimpleTooltip.SimpleTooltip
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -32,11 +31,14 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+
 import scodec.bits.ByteVector
 import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
+
+import com.lightning.walletapp.test.FailureMessageLightningMessageCodecsSpec
 
 
 trait SearchBar { me =>
@@ -133,9 +135,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     if (showTooltip) try {
       app.prefs.edit.putBoolean(AbstractKit.SHOW_TOOLTIP, false).commit
-      new SimpleTooltip.Builder(me).anchorView(floatingActionMenu.getMenuIconView)
-        .text("Menu").gravity(Gravity.START).transparentOverlay(false).animated(true)
-        .build.show
+      val tip = new SimpleTooltip.Builder(me).anchorView(floatingActionMenu.getMenuIconView)
+      tip.text("Menu").gravity(Gravity.START).transparentOverlay(false).animated(true).build.show
     } catch none
     true
   }
@@ -144,6 +145,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrap(me setDetecting true)(me initNfc state)
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
+
+    (new FailureMessageLightningMessageCodecsSpec).allTests
   } else me exitTo classOf[MainActivity]
 
   override def onActivityResult(reqCode: Int, resultCode: Int, results: Intent) = {

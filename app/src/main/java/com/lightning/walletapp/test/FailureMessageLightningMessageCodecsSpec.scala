@@ -52,12 +52,12 @@ class FailureMessageLightningMessageCodecsSpec {
       (false, false, ExpiryTooFar)
     )
 
-    for ((temporary, permanent, msg) <- msgs) {
+    for ((node, perm, msg) <- msgs) {
       val encoded = FailureMessageCodecs.failureMessageCodec.encode(msg).require
       val decoded = FailureMessageCodecs.failureMessageCodec.decode(encoded).require.value
       assert(msg == decoded)
-      assert(msg.isTemporary == temporary)
-      assert(msg.isPermanent == permanent)
+      assert(decoded.isInstanceOf[Node] == node)
+      assert(decoded.isInstanceOf[Perm] == perm)
     }
 
     println("support encoding of channel_update with/without type in failure messages")
@@ -83,11 +83,11 @@ class FailureMessageLightningMessageCodecsSpec {
       (true, true, ByteVector.fromValidHex("60ff 42"))
     )
 
-    for ((temporary, permanent, bin) <- testCases) {
+    for ((node, perm, bin) <- testCases) {
       val decoded = FailureMessageCodecs.failureMessageCodec.decode(bin.bits).require.value
       assert(decoded.isInstanceOf[UnknownFailureMessage])
-      assert(decoded.isTemporary == temporary)
-      assert(decoded.isPermanent == permanent)
+      assert(decoded.isInstanceOf[Node] == node)
+      assert(decoded.isInstanceOf[Perm] == perm)
     }
 
     {
@@ -101,8 +101,6 @@ class FailureMessageLightningMessageCodecsSpec {
 
       for ((code, message) <- msgs) {
         assert(message.code == code)
-        assert(message.isPermanent)
-        assert(!message.isTemporary)
       }
     }
 
