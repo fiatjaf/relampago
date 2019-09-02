@@ -31,6 +31,12 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
     case _ => None
   }
 
+  def isUpdatable(upd: ChannelUpdate) = for {
+    oldUpdate <- getCommits.flatMap(_.updateOpt)
+    isDifferentShortId = oldUpdate.shortChannelId != upd.shortChannelId
+    isOldUpdateRefresh = !isDifferentShortId && oldUpdate.timestamp < upd.timestamp
+  } yield isDifferentShortId || isOldUpdateRefresh
+
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
     // Transition must always be defined before vars are updated
     val trans = Tuple4(me, data1, state, state1)
@@ -234,11 +240,10 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (norm: NormalData, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && !upd.isHosted =>
-        // GUARD: due to timestamp filter the first update they send is for our channel, update if it's newer or short id is different
-        val isUpdatable = norm.commitments.updateOpt.forall(old => old.timestamp < upd.timestamp || old.shortChannelId != upd.shortChannelId)
+        // GUARD: due to timestamp filter the first update they send must be for our channel
         waitingUpdate = false
 
-        if (isUpdatable) {
+        if (me isUpdatable upd contains true) {
           // Update data and store it but do not trigger listeners
           val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
           data = me STORE d1
@@ -909,12 +914,10 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && upd.isHosted =>
-        // GUARD: due to timestamp filter the first update they send is for our channel, update if it's newer or short id is different
-        val isUpdatable = hc.updateOpt.forall(old => old.timestamp < upd.timestamp || old.shortChannelId != upd.shortChannelId)
         if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(hc, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
         waitingUpdate = false
 
-        if (isUpdatable) {
+        if (me isUpdatable upd contains true) {
           // Update data and store it but do not trigger listeners
           val d1 = hc.modify(_.updateOpt) setTo Some(upd)
           data = me STORE d1
