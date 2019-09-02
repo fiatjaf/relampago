@@ -882,8 +882,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, CMDSocketOffline, OPEN) =>
-        BECOME(hc.resetUpdates(hc.localChanges), SLEEPING)
         isSocketConnected = false
+        BECOME(hc, SLEEPING)
 
 
       case (hc: HostedCommits, remoteLCSS: LastCrossSignedState, SLEEPING) =>
@@ -894,8 +894,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (isSigMismatch.isEmpty && isBehind) BECOME(me STORE commitsFromLCSS(remoteLCSS.reverse, hc.announce), OPEN) SEND remoteLCSS.reverse
         else if (isSigMismatch.isDefined || isNotValid.isDefined) localSuspend(hc, errCode = isSigMismatch.orElse(isNotValid).get)
         else {
-          // We may be ahead so let them re-sync if needed
-          BECOME(hc, OPEN) SEND hc.lastLocalCrossSignedState
+          // Let them re-sync if needed, also clear all their updates, they will re-send
+          BECOME(hc.resetUpdates(hc.localChanges), OPEN) SEND hc.lastLocalCrossSignedState
           // Re-transmit signed changes since we are not behind
           hc.localChanges.signed foreach SEND
         }
@@ -986,9 +986,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     else None
   }
 
-  def commitsFromLCSS(localLCSS: LastCrossSignedState, announce: NodeAnnouncement): HostedCommits = {
-    // LastCrossSignedState is directional so `reverse` method must be applied whenever we use their LCSS here
-    // We must always make sure LCSS is valid before applying this method
+  def commitsFromLCSS(localLCSS: LastCrossSignedState, announce: NodeAnnouncement) = {
+    // LastCrossSignedState is directional so apply `reverse` before we use their LCSS here
 
     val spec = CommitmentSpec(feeratePerKw = 0L,
       toLocalMsat = localLCSS.lastLocalStateUpdate.stateOverride.updatedLocalBalanceMsat,
