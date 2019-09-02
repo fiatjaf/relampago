@@ -141,8 +141,7 @@ case class NodeAnnouncement(signature: ByteVector, features: ByteVector, timesta
   } getOrElse "No IP address"
 
   val identifier = (alias + nodeId.toString).toLowerCase
-  val trimmedAlias = alias.take(18).takeWhile(_ != '\u0020')
-  val asString = s"<strong>$trimmedAlias</strong><br><small>$pretty</small>"
+  val asString = s"<strong>${alias.takeWhile(_ != '\u0020') take 18}</strong><br><small>$pretty</small>"
   lazy val hostedChanId = Tools.hostedChanId(LNParams.nodePublicKey.toBin, nodeId.toBin)
 }
 
