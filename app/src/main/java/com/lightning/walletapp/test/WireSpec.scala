@@ -318,7 +318,7 @@ class WireSpec {
       val update_fee = UpdateFee(randomBytes(32), 2)
       val shutdown = Shutdown(randomBytes(32), bin(47, 0))
       val closing_signed = ClosingSigned(randomBytes(32), 2, randomSignature)
-      val update_add_htlc = UpdateAddHtlc(randomBytes(32), 2, 3, bin(32, 0), 4, Sphinx.emptyOnionPacket)
+      val update_add_htlc = UpdateAddHtlc(randomBytes(32), 2, 3, bin(32, 0), 4)
       val update_fulfill_htlc = UpdateFulfillHtlc(randomBytes(32), 2, bin(32, 0))
       val update_fail_htlc = UpdateFailHtlc(randomBytes(32), 2, bin(154, 0))
       val update_fail_malformed_htlc = UpdateFailMalformedHtlc(randomBytes(32), 2, randomBytes(32), 1111)
