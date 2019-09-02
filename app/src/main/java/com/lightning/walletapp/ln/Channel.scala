@@ -823,9 +823,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         else if (validationHasFailed.isDefined) localSuspend(hc, validationHasFailed.get)
         else {
           val hc1 = hc.copy(lastLocalCrossSignedState = remoteLCSS.reverse, localSpec = hc.nextLocalReduced).resetUpdates(emptyChanges)
-          // They have sent a signature first or we have sent/received Add/Fail/Fulfill after receiving their last state update
-          if (hc.reSentOverrides < 1) me SEND hc1.lastLocalCrossSignedState.lastLocalStateUpdate
-          BECOME(me STORE hc1, OPEN)
+          // Send reply if they have sent a signature first or we have sent/received Add/Fail/Fulfill after receiving their last state update
+          if (hc.reSentOverrides < 1) me UPDATA STORE(hc1) SEND hc1.lastLocalCrossSignedState.lastLocalStateUpdate else me UPDATA STORE(hc1)
           events onSettled hc1
         }
 
