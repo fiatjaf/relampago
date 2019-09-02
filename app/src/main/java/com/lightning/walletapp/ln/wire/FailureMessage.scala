@@ -10,30 +10,39 @@ import scodec.Attempt
 
 sealed trait FailureMessage { me =>
   lazy val code: Int = failureMessageCodec.encode(me).flatMap(uint16.decode).require.value
-  lazy val isPermanent: Boolean = (code & PERM) != 0
-  lazy val isTemporary: Boolean = (code & NODE) != 0
 }
 
+sealed trait BadOnion extends FailureMessage { def onionHash: ByteVector }
+sealed trait Update extends FailureMessage { def update: ChannelUpdate }
+sealed trait Perm extends FailureMessage
+sealed trait Node extends FailureMessage
+
+sealed trait UnknownFailureMessage extends FailureMessage {
+  override def equals(another: Any): Boolean = another match {
+    case that: UnknownFailureMessage => that.code == code
+    case _ => false
+  }
+}
+
+case object InvalidRealm extends Perm
+case object UnknownNextPeer extends Perm
+case object PermanentChannelFailure extends Perm
+case object RequiredChannelFeatureMissing extends Perm
+case class IncorrectOrUnknownPaymentDetails(amountMsat: Long, height: Long) extends Perm
+
+case object TemporaryNodeFailure extends Node
+case object PermanentNodeFailure extends Perm with Node
+case object RequiredNodeFeatureMissing extends Perm with Node
+
 case object ExpiryTooFar extends FailureMessage
-case object InvalidRealm extends FailureMessage
-case object UnknownNextPeer extends FailureMessage
-case object TemporaryNodeFailure extends FailureMessage
-case object PermanentNodeFailure extends FailureMessage
-case object PermanentChannelFailure extends FailureMessage
-case object RequiredNodeFeatureMissing extends FailureMessage
-case object RequiredChannelFeatureMissing extends FailureMessage
 case class FinalIncorrectCltvExpiry(expiry: Long) extends FailureMessage
 case class FinalIncorrectHtlcAmount(amountMsat: Long) extends FailureMessage
-case class IncorrectOrUnknownPaymentDetails(amountMsat: Long, height: Long) extends FailureMessage
-case class UnknownFailureMessage(failureCode: Int) extends FailureMessage { override lazy val code = failureCode }
 
-sealed trait BadOnion extends FailureMessage { def onionHash: ByteVector }
-case class InvalidOnionVersion(onionHash: ByteVector) extends BadOnion with FailureMessage
-case class InvalidOnionPayload(onionHash: ByteVector) extends BadOnion with FailureMessage
-case class InvalidOnionHmac(onionHash: ByteVector) extends BadOnion with FailureMessage
-case class InvalidOnionKey(onionHash: ByteVector) extends BadOnion with FailureMessage
+case class InvalidOnionVersion(onionHash: ByteVector) extends BadOnion with Perm
+case class InvalidOnionPayload(onionHash: ByteVector) extends BadOnion with Perm
+case class InvalidOnionHmac(onionHash: ByteVector) extends BadOnion with Perm
+case class InvalidOnionKey(onionHash: ByteVector) extends BadOnion with Perm
 
-sealed trait Update extends FailureMessage { def update: ChannelUpdate }
 case class AmountBelowMinimum(amountMsat: Long, update: ChannelUpdate) extends Update
 case class ChannelDisabled(messageFlags: Byte, channelFlags: Byte, update: ChannelUpdate) extends Update
 case class FeeInsufficient(amountMsat: Long, update: ChannelUpdate) extends Update
@@ -81,8 +90,15 @@ object FailureMessageCodecs {
         .typecase(cr = (uint64Overflow withContext "amountMsat").as[FinalIncorrectHtlcAmount], tag = 19)
         .typecase(cr = disabled.as[ChannelDisabled], tag = UPDATE | 20)
         .typecase(cr = provide(ExpiryTooFar), tag = 21),
-      uint16.xmap(UnknownFailureMessage(_).asInstanceOf[FailureMessage], (_: FailureMessage).code)
+      uint16.xmap(unknownFailureFromCode(_).asInstanceOf[FailureMessage], (_: FailureMessage).code)
     )
+
+  def unknownFailureFromCode(code: Int) = code match {
+    case fc if (fc & PERM) != 0 && (fc & NODE) != 0 => new UnknownFailureMessage with Perm with Node { override lazy val code = fc }
+    case fc if (fc & NODE) != 0 => new UnknownFailureMessage with Node { override lazy val code = fc }
+    case fc if (fc & PERM) != 0 => new UnknownFailureMessage with Perm { override lazy val code = fc }
+    case fc => new UnknownFailureMessage { override lazy val code = fc }
+  }
 
   /**
     * An onion-encrypted failure from an intermediate node:

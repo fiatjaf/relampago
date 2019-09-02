@@ -117,8 +117,8 @@ object PaymentInfo {
     errors = errors.updated(rd.pr.paymentHash, errors(rd.pr.paymentHash) :+ parsed)
 
     parsed map {
+      case DecryptedFailurePacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case DecryptedFailurePacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
-      case DecryptedFailurePacket(nodeKey, error) if nodeKey == rd.pr.nodeId && error.isPermanent => None -> Vector.empty
       case DecryptedFailurePacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
       case DecryptedFailurePacket(_, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
       case DecryptedFailurePacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
