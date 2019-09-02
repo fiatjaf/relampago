@@ -1,6 +1,5 @@
 package com.lightning.walletapp.ln
 
-import crypto.{RandomGenerator, Sphinx}
 import fr.acinq.bitcoin.Protocol.{One, Zeroes}
 import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering, Protocol}
 import com.lightning.walletapp.ln.wire.{InitHostedChannel, StateUpdate, UpdateAddHtlc}
@@ -9,6 +8,7 @@ import com.lightning.walletapp.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PrivateKey
 import java.nio.ByteOrder.LITTLE_ENDIAN
 import language.implicitConversions
+import crypto.RandomGenerator
 import scodec.bits.ByteVector
 import scala.util.Try
 import java.util
@@ -22,17 +22,14 @@ object \ {
 object Tools {
   type Bytes = Array[Byte]
   val random = new RandomGenerator
-
-  val nextDummyHtlc =
-    UpdateAddHtlc(Zeroes, id = -1, LNParams.minCapacityMsat,
-      One, expiry = 144 * 3, Sphinx.emptyOnionPacket)
-
-  def runAnd[T](result: T)(action: Any): T = result
-  def bin2readable(bin: Bytes) = new String(bin, "UTF-8")
-  def log(consoleMessage: String): Unit = android.util.Log.d("LN", consoleMessage)
+  val emptyChanges = Changes(Vector.empty, Vector.empty, Vector.empty)
+  val nextDummyHtlc = UpdateAddHtlc(Zeroes, id = -1, LNParams.minCapacityMsat, One, expiry = 144 * 3)
   def randomPrivKey = PrivateKey(ByteVector.view(random getBytes 32), compressed = true)
+  def log(consoleMessage: String): Unit = android.util.Log.d("LN", consoleMessage)
   def wrap(run: => Unit)(go: => Unit) = try go catch none finally run
+  def bin2readable(bin: Bytes) = new String(bin, "UTF-8")
   def none: PartialFunction[Any, Unit] = { case _ => }
+  def runAnd[T](result: T)(action: Any): T = result
 
   def toMap[T, K, V](source: Seq[T], keyFun: T => K, valFun: T => V): Map[K, V] = {
     val premap = for (mapElement <- source) yield keyFun(mapElement) -> valFun(mapElement)

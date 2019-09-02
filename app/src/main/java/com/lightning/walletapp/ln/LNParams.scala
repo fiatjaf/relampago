@@ -95,6 +95,7 @@ object ChanErrorCodes {
   val ERR_REMOTE_AMOUNT_LOW = err_ln_remote_amount_low
   val ERR_TOO_MANY_HTLC = err_ln_too_many
 
+  val MAX_HOSTED_OVERRIDE_RESEND_TIMES = 20
   final val ERR_HOSTED_WRONG_BLOCKDAY = ByteVector.fromValidHex("0001")
   final val ERR_HOSTED_WRONG_IN_FLIGHT = ByteVector.fromValidHex("0002")
   final val ERR_HOSTED_WRONG_LOCAL_SIG = ByteVector.fromValidHex("0003")

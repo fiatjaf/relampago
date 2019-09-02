@@ -60,9 +60,8 @@ case class Shutdown(channelId: ByteVector, scriptPubKey: ByteVector) extends Cha
   def some = Some(me)
 }
 
-case class UpdateAddHtlc(channelId: ByteVector,
-                         id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long,
-                         onionRoutingPacket: OnionRoutingPacket) extends ChannelMessage {
+case class UpdateAddHtlc(channelId: ByteVector, id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long,
+                         onionRoutingPacket: OnionRoutingPacket = Sphinx.emptyOnionPacket) extends ChannelMessage {
 
   lazy val hash160: ByteVector = Crypto ripemd160 paymentHash
   lazy val amount: MilliSatoshi = MilliSatoshi(amountMsat)
@@ -212,7 +211,7 @@ case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
                                 initHostedChannel: InitHostedChannel, lastLocalStateUpdate: StateUpdate,
                                 lastRemoteStateUpdate: StateUpdate) extends HostedChannelMessage {
 
-  def reverse =
+  lazy val reverse =
     copy(lastLocalStateUpdate = lastRemoteStateUpdate,
       lastRemoteStateUpdate = lastLocalStateUpdate)
 
@@ -225,10 +224,9 @@ case class StateOverride(updatedLocalBalanceMsat: Long,
                          blockDay: Long, localUpdatesSoFar: Long = 0L, remoteUpdatesSoFar: Long = 0L,
                          nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage
 
-case class InFlightHtlc(incoming: Boolean, id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long) { me =>
-  def toAdd(hostedChanId: ByteVector) = UpdateAddHtlc(hostedChanId, id, amountMsat, paymentHash, expiry, Sphinx.emptyOnionPacket)
-  def reverse = InFlightHtlc(incoming = !incoming, id, amountMsat, paymentHash, expiry)
-  def toHtlc(chanId: ByteVector) = Htlc(incoming, me toAdd chanId)
+case class InFlightHtlc(incoming: Boolean, id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long) {
+  def toHtlc(chanId: ByteVector) = Htlc(add = UpdateAddHtlc(chanId, id, amountMsat, paymentHash, expiry), incoming = incoming)
+  def reverse = copy(incoming = !incoming)
 }
 
 case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[InFlightHtlc] = Nil) extends HostedChannelMessage { me =>
