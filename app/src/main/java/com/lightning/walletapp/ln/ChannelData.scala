@@ -486,26 +486,17 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 }
 
 case class HostedCommits(announce: NodeAnnouncement, lastLocalCrossSignedState: LastCrossSignedState,
-                         allLocalUpdatesSoFar: Long, allRemoteUpdatesSoFar: Long, reSentOverrides: Int,
-                         localChanges: Changes, remoteUpdates: LNMessageVector, localSpec: CommitmentSpec,
-                         updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
+                         allLocalUpdatesSoFar: Long, allRemoteUpdatesSoFar: Long, localChanges: Changes, remoteUpdates: LNMessageVector,
+                         localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
                          startedAt: Long = System.currentTimeMillis) extends Commitments with ChannelData { me =>
 
   def isInErrorState = localError.isDefined || remoteError.isDefined
-
-  def addRemoteProposal(update: LightningMessage) =
-    copy(allRemoteUpdatesSoFar = allRemoteUpdatesSoFar + 1,
-      remoteUpdates = remoteUpdates :+ update,
-      reSentOverrides = 0)
-
-  def addLocalProposal(update: LightningMessage) =
-    copy(allLocalUpdatesSoFar = allLocalUpdatesSoFar + 1,
-      localChanges = localChanges.modify(_.proposed).using(_ :+ update),
-      reSentOverrides = 0)
+  def addRemoteProposal(update: LightningMessage) = me.modify(_.allRemoteUpdatesSoFar).using(_ + 1).modify(_.remoteUpdates).using(_ :+ update)
+  def addLocalProposal(update: LightningMessage) = me.modify(_.allLocalUpdatesSoFar).using(_ + 1).modify(_.localChanges.proposed).using(_ :+ update)
 
   def resetUpdates(changes: Changes) =
-    copy(allLocalUpdatesSoFar = lastLocalCrossSignedState.lastLocalStateUpdate.stateOverride.localUpdatesSoFar + changes.signed.size,
-      allRemoteUpdatesSoFar = lastLocalCrossSignedState.lastLocalStateUpdate.stateOverride.remoteUpdatesSoFar, reSentOverrides = 0,
+    copy(allRemoteUpdatesSoFar = lastLocalCrossSignedState.lastLocalStateUpdate.stateOverride.remoteUpdatesSoFar,
+      allLocalUpdatesSoFar = lastLocalCrossSignedState.lastLocalStateUpdate.stateOverride.localUpdatesSoFar + changes.signed.size,
       localChanges = changes.copy(proposed = Vector.empty), remoteUpdates = Vector.empty)
 
   lazy val initMsg = InvokeHostedChannel(chainHash, lastLocalCrossSignedState.lastRefundScriptPubKey)

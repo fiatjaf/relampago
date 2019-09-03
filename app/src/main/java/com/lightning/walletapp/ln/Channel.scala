@@ -764,9 +764,9 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         } throw new LightningException(errMsg)
 
         BECOME(me STORE HostedCommits(announce, remoteLCSS.reverse, allLocalUpdatesSoFar = 0L,
-          allRemoteUpdatesSoFar = 0L, reSentOverrides = 0, localChanges = emptyChanges, remoteUpdates = Vector.empty,
-          CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceMsat, expectedHostBalance), updateOpt = None,
-          localError = None, remoteError = None), OPEN) SEND remoteLCSS.reverse
+          allRemoteUpdatesSoFar = 0L, localChanges = emptyChanges, remoteUpdates = Vector.empty,
+          CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceMsat, expectedHostBalance),
+          updateOpt = None, localError = None, remoteError = None), OPEN) SEND remoteLCSS.reverse
 
 
       case (wait: WaitTheirHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
@@ -821,15 +821,14 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         // They may send us an outdated SU which does not take into account our new updates, so resend
         if (hc.allLocalUpdatesSoFar > remoteSU.stateOverride.remoteUpdatesSoFar) doProcess(CMDProceed)
         else if (validationHasFailed.isDefined) localSuspend(hc, validationHasFailed.get)
-        else {
+        else if (hc.lastLocalCrossSignedState != remoteLCSS.reverse) {
+          // Only update and reply if their signature updates a state since it's possible for peer to send a few identical updates
           val hc1 = hc.copy(lastLocalCrossSignedState = remoteLCSS.reverse, localSpec = hc.nextLocalReduced).resetUpdates(emptyChanges)
-          // Send reply if they have sent a signature first or we have sent/received Add/Fail/Fulfill after receiving their last state update
-          if (hc.reSentOverrides < 1) me UPDATA STORE(hc1) SEND hc1.lastLocalCrossSignedState.lastLocalStateUpdate else me UPDATA STORE(hc1)
-          events onSettled hc1
-        }
+          me UPDATA STORE(hc1) SEND hc1.lastLocalCrossSignedState.lastLocalStateUpdate
 
-        // We may have HTLCs to fulfill
-        doProcess(CMDHTLCProcess)
+          events onSettled hc1
+          doProcess(CMDHTLCProcess)
+        }
 
 
       case (hc: HostedCommits, CMDHTLCProcess, OPEN) =>
@@ -846,12 +845,10 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
       case (hc: HostedCommits, CMDProceed, OPEN)
         if hc.localChanges.proposed.nonEmpty || hc.localChanges.signed.nonEmpty || hc.remoteUpdates.nonEmpty =>
-        // Store all our signed updates every time we send out a signature, needed for retransmission on reconnect
-        if (hc.reSentOverrides > MAX_HOSTED_OVERRIDE_RESEND_TIMES) localSuspend(hc, ERR_HOSTED_TOO_MANY_UPDATES) else {
-          val lc1 = hc.localChanges.copy(proposed = Vector.empty, signed = hc.localChanges.proposed ++ hc.localChanges.signed)
-          val hc1 = me STORE hc.copy(reSentOverrides = hc.reSentOverrides + 1, localChanges = lc1)
-          me UPDATA hc1 SEND hc.nextSignedStateUpdate
-        }
+        // Store all our signed updates every time we send out a signature, needed for retransmission on reconnects
+        val lc1 = hc.localChanges.copy(proposed = Vector.empty, signed = hc.localChanges.proposed ++ hc.localChanges.signed)
+        me UPDATA STORE(hc.modify(_.localChanges) setTo lc1) SEND hc.nextSignedStateUpdate
+
 
       case (hc: HostedCommits, cmd: CMDFulfillHtlc, OPEN) =>
         val fulfill = UpdateFulfillHtlc(hc.channelId, cmd.add.id, cmd.preimage)
@@ -892,7 +889,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         val isSigMismatch = validateSigs(remoteLCSS, hc.announce)
 
         if (isSigMismatch.isEmpty && isBehind) BECOME(me STORE commitsFromLCSS(remoteLCSS.reverse, hc.announce), OPEN) SEND remoteLCSS.reverse
-        else if (isSigMismatch.isDefined || isNotValid.isDefined) localSuspend(hc, errCode = isSigMismatch.orElse(isNotValid).get)
+        else if (isSigMismatch.isDefined || isNotValid.isDefined) localSuspend(hc, isSigMismatch.orElse(isNotValid).get)
         else {
           // Let them re-sync if needed, also clear all their updates, they will re-send
           BECOME(hc.resetUpdates(hc.localChanges), OPEN) SEND hc.lastLocalCrossSignedState
@@ -997,9 +994,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     HostedCommits(announce, localLCSS,
       allLocalUpdatesSoFar = localLCSS.lastLocalStateUpdate.stateOverride.localUpdatesSoFar,
       allRemoteUpdatesSoFar = localLCSS.lastLocalStateUpdate.stateOverride.remoteUpdatesSoFar,
-      reSentOverrides = 0, localChanges = emptyChanges, remoteUpdates = Vector.empty,
-      localSpec = spec, updateOpt = None, localError = None, remoteError = None,
-      startedAt = System.currentTimeMillis)
+      localChanges = emptyChanges, remoteUpdates = Vector.empty, localSpec = spec, updateOpt = None,
+      localError = None, remoteError = None, startedAt = System.currentTimeMillis)
   }
 
   def localSuspend(hc: HostedCommits, errCode: ByteVector) = {
