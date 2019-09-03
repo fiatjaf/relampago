@@ -338,5 +338,4 @@
     <string name="err_ln_hosted_wrong_local_number">incorrect local update number</string>
     <string name="err_ln_hosted_update_cltv_too_low">incorrect channel update cltv expiry</string>
     <string name="err_ln_hosted_wrong_in_flight">incorrect number of in-flight payments</string>
-    <string name="err_ln_hosted_too_many_updates">too many state updates</string>
 </resources>
