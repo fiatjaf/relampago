@@ -815,7 +815,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (hc.allLocalUpdatesSoFar > remoteSU.stateOverride.remoteUpdatesSoFar) doProcess(CMDProceed)
         else if (validationHasFailed.isDefined) localSuspend(hc, validationHasFailed.get)
         else if (hc.lastLocalCrossSignedState != remoteLCSS.reverse) {
-          // Only update and reply if their signature updates a state since it's possible for peer to send a few identical updates
+          // Only update and reply if their signature changes a state since it's possible for peer to send a few identical updates
           val hc1 = hc.copy(lastLocalCrossSignedState = remoteLCSS.reverse, localSpec = hc.nextLocalReduced).resetUpdates(emptyChanges)
           me UPDATA STORE(hc1) SEND hc1.lastLocalCrossSignedState.lastLocalStateUpdate
 
@@ -877,8 +877,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, remoteLCSS: LastCrossSignedState, SLEEPING) =>
-        val isNotValid = validate(remoteLCSS, hc.nextLocalReduced.toRemoteMsat)
         val isBehind = hc.lastLocalCrossSignedState.isBehind(remoteLCSS)
+        val isNotValid = validate(remoteLCSS, hc.localSpec.toRemoteMsat)
         val isSigMismatch = validateSigs(remoteLCSS, hc.announce)
 
         if (isSigMismatch.isEmpty && isBehind) BECOME(me STORE commitsFromLCSS(remoteLCSS.reverse, hc.announce), OPEN) SEND remoteLCSS.reverse

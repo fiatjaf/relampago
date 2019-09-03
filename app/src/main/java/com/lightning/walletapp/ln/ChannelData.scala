@@ -547,6 +547,6 @@ case class HostedCommits(announce: NodeAnnouncement, lastLocalCrossSignedState: 
   def nextSignedStateUpdate = {
     val LastCrossSignedState(scriptPubKey, init, _, _) = lastLocalCrossSignedState
     val so = StateOverride(nextLocalReduced.toLocalMsat, broadcaster.currentBlockDay, allLocalUpdatesSoFar, allRemoteUpdatesSoFar)
-    StateUpdate(so, for (htlc <- nextLocalReduced.htlcs.toList) yield htlc.toInFlight).signed(channelId, scriptPubKey, init, nodePrivateKey)
+    StateUpdate(so, nextLocalReduced.htlcs.map(_.toInFlight).toList).signed(channelId, scriptPubKey, init, nodePrivateKey)
   }
 }
