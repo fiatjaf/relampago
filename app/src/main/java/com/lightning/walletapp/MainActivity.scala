@@ -106,10 +106,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
         // First load wallet files, then init db, then init the rest
         LNParams setup app.kit.wallet.getKeyChainSeed.getSeedBytes
         app.kit.startAsync
-
-      // Just should not ever happen
-      // and when it does we just exit
-      case _ => System exit 0
     }
 
   // MISC
