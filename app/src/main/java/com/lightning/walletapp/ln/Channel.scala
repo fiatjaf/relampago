@@ -215,14 +215,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         else becomeOpen(wait.copy(their = their.some), their)
 
 
-      case (wait: WaitFundingDoneData, CMDConfirmed(fundTx), SLEEPING) if fundTxId == fundTx.txid =>
-        // We have got an idempotent on-chain event while peer is offline, store it for further broadcast
-        val ourFirstFundingLocked = makeFirstFundingLocked(wait)
-        val wait1 = wait.copy(our = ourFirstFundingLocked.some)
-        me UPDATA STORE(wait1)
-
-
-      case (wait: WaitFundingDoneData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE) if fundTxId == fundTx.txid =>
+      case (wait: WaitFundingDoneData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
         // We have got an idempotent on-chain event while peer is online, inform peer and maybe become open
         val ourFirstFundingLocked = makeFirstFundingLocked(wait)
         val wait1 = wait.copy(our = ourFirstFundingLocked.some)
