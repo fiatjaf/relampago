@@ -295,7 +295,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val withRoutes = viableChannels.filter(isOperational).flatMap(channelAndHop).toMap
 
     // For now we a bounded to single largest channel
-    val receivables = withRoutes.keys.map(_.estimateCanReceive)
+    val receivables = withRoutes.keys.map(_.estCanReceiveMsat)
     val largestOne = if (receivables.isEmpty) 0L else receivables.max
     val maxCanReceive = MilliSatoshi(largestOne)
 

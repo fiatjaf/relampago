@@ -482,9 +482,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def makeNormalRequest(sum: MilliSatoshi) = {
       val mostViableChannels = chansWithRoutes.keys.toVector
-        .filter(chan => chan.estimateCanReceive >= sum.amount) // In principle can receive an amount
+        .filter(chan => chan.estCanReceiveMsat >= sum.amount) // In principle can receive an amount
         .sortBy(chan => if (chan.isHosted) 1 else 0) // Hosted channels are pushed to the back of the queue
-        .sortBy(_.estimateCanReceive) // First use channels with the smallest balance but still able to receive
+        .sortBy(_.estCanReceiveMsat) // First use channels with the smallest balance but still able to receive
         .take(4) // Limit number of channels to ensure QR code is always readable
 
       val preimage = ByteVector.view(random getBytes 32)
@@ -572,7 +572,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def startAIR(toChan: Channel, origEmptyRD: RoutingData) = {
     val origEmptyRD1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1)
-    val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(toChan.estimateCanSend, 0L)
+    val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(toChan.estCanSendMsat, 0L)
     val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
     require(deltaAmountToSend > 0, "Accumulator already has enough money for a final payment")
     require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")

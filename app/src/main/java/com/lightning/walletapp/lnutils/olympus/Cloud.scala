@@ -29,7 +29,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   def doProcess(some: Any) = (data, some) match {
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
       (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
-      ChannelManager.mostFundedChanOpt.exists(_.estimateCanSend >= maxMsat) &&
+      ChannelManager.mostFundedChanOpt.exists(_.estCanSendMsat >= maxMsat) &&
       isAuthEnabled =>
 
       // Also executes if we have no actions to upload and a few tokens left
@@ -106,7 +106,8 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   def isAuthEnabled = 1 == auth
   def retryFreshRequest(failedPr: PaymentRequest): Unit = {
-    val isOk = ChannelManager.mostFundedChanOpt.exists(_.estimateCanSend >= failedPr.msatOrMin.amount)
-    if (isOk) PaymentInfoWrap addPendingPayment emptyRD(failedPr, failedPr.msatOrMin.amount, useCache = true, airLeft = 0)
+    val rd = emptyRD(failedPr, failedPr.msatOrMin.amount, useCache = true, airLeft = 0)
+    val isOk = ChannelManager.mostFundedChanOpt.exists(_.estCanSendMsat >= failedPr.msatOrMin.amount)
+    if (isOk) PaymentInfoWrap.addPendingPayment(rd)
   }
 }

@@ -311,7 +311,7 @@ object ChannelManager extends Broadcaster {
   // AIR
 
   def airCanSendInto(targetChan: Channel) = for {
-    canSend <- all.filter(isOperational).diff(targetChan :: Nil).map(_.estimateCanSend)
+    canSend <- all.filter(isOperational).diff(targetChan :: Nil).map(_.estCanSendMsat)
     // While rebalancing, payments from other channels will lose some off-chain fee
     canSendFeeIncluded = canSend - maxAcceptableFee(canSend, hops = 3)
     // Estimation should be smaller than original but not negative
@@ -320,19 +320,19 @@ object ChannelManager extends Broadcaster {
 
   def estimateAIRCanSend = {
     // We are ultimately bound by the useful capacity of the largest channel
-    val airCanSend = mostFundedChanOpt.map(chan => chan.estimateCanSend + airCanSendInto(chan).sum)
-    val largestCapOpt = all.filter(isOperational).map(_.estimateNextUsefulCapacity).reduceOption(_ max _)
+    val airCanSend = mostFundedChanOpt.map(chan => chan.estCanSendMsat + airCanSendInto(chan).sum)
+    val largestCapOpt = all.filter(isOperational).map(_.estNextUsefulCapacityMsat).reduceOption(_ max _)
     math.min(airCanSend getOrElse 0L, largestCapOpt getOrElse 0L)
   }
 
   def accumulatorChanOpt(rd: RoutingData) =
     all.filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty)
-      .filter(_.estimateNextUsefulCapacity >= rd.withMaxOffChainFeeAdded)
-      .sortBy(_.estimateCanReceive).headOption // Smallest receivable
+      .filter(_.estNextUsefulCapacityMsat >= rd.withMaxOffChainFeeAdded)
+      .sortBy(_.estCanReceiveMsat).headOption // Smallest receivable
 
   // CHANNEL
 
-  def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estimateCanSend).lastOption
+  def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estCanSendMsat).lastOption
   def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
   // We need to connect the rest of channels including special cases like REFUNDING normal channel and SUSPENDED hosted channel
   def initConnect = for (chan <- all if chan.state != CLOSING) ConnectionManager.connectTo(chan.data.announce, notify = false)
@@ -412,7 +412,7 @@ object ChannelManager extends Broadcaster {
 
   def checkIfSendable(rd: RoutingData) = {
     val isFulfilledAlready = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS)
-    if (isFulfilledAlready.isSuccess) Left(err_ln_fulfilled, NOT_SENDABLE) else mostFundedChanOpt.map(_.estimateCanSend) match {
+    if (isFulfilledAlready.isSuccess) Left(err_ln_fulfilled, NOT_SENDABLE) else mostFundedChanOpt.map(_.estCanSendMsat) match {
       // May happen such that we had enough while were deciding whether to pay, but do not have enough funds now, also check extended options
       case Some(max) if max < rd.firstMsat && rd.airLeft > 1 && estimateAIRCanSend >= rd.firstMsat => Left(dialog_sum_big, SENDABLE_AIR)
       case Some(max) if max < rd.firstMsat => Left(dialog_sum_big, NOT_SENDABLE)
@@ -423,7 +423,7 @@ object ChannelManager extends Broadcaster {
 
   def fetchRoutes(rd: RoutingData) = {
     // First we collect chans which in principle can handle a given payment sum right now, then prioritize less busy chans
-    val from = all.filter(chan => isOperational(chan) && chan.estimateCanSend >= rd.firstMsat).map(_.data.announce.nodeId).distinct
+    val from = all.filter(chan => isOperational(chan) && chan.estCanSendMsat >= rd.firstMsat).map(_.data.announce.nodeId).distinct
 
     def withHints = for {
       tag <- Obs from rd.pr.routingInfo
@@ -464,7 +464,7 @@ object ChannelManager extends Broadcaster {
         // here we must make sure we don't accidently use terminal channel as source one
         val excludeShortChannelId = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
         val isLoop = chan.getCommits.flatMap(_.updateOpt).exists(_.shortChannelId == excludeShortChannelId)
-        !isLoop && chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) && chan.estimateCanSend >= rd.firstMsat
+        !isLoop && chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) && chan.estCanSendMsat >= rd.firstMsat
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)
         case Some(targetGoodChannel) => targetGoodChannel process rd
