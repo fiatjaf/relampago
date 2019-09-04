@@ -45,16 +45,16 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
   }
 
   def UPDATA(d1: ChannelData) = BECOME(d1, state)
-  def STORE(data: ChannelData): ChannelData
+  def STORE[T <: ChannelData](data: T): T
   def SEND(msg: LightningMessage): Unit
 
   def inFlightHtlcs: Set[Htlc]
-  def estimateCanReceive: Long
-  def estimateCanSend: Long
+  def estCanReceiveMsat: Long
+  def estCanSendMsat: Long
 
-  def estimateNextUsefulCapacity =
+  def estNextUsefulCapacityMsat =
     // In-flight HTLCs are subtracted here
-    estimateCanSend + estimateCanReceive
+    estCanSendMsat + estCanReceiveMsat
 
   var waitingUpdate: Boolean = true
   var permanentOffline: Boolean = true
@@ -71,9 +71,9 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
 
 abstract class NormalChannel extends Channel(isHosted = false) { me =>
   def fundTxId = data match {case hasSome: HasNormalCommits => hasSome.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
-  def estimateCanSend = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat } getOrElse 0L
+  def estCanSendMsat = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat } getOrElse 0L
   def inFlightHtlcs = getCommits collect { case nc: NormalCommits => nc.reducedRemoteState.spec.htlcs } getOrElse Set.empty[Htlc]
-  def estimateCanReceive = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canReceiveMsat } getOrElse 0L
+  def estCanReceiveMsat = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canReceiveMsat } getOrElse 0L
 
   def CLOSEANDWATCH(close: ClosingData): Unit
   def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit
@@ -270,7 +270,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         val c1 \ updateAddHtlc = norm.commitments sendAdd rd
         me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
         events outPaymentAccepted rd
-        doProcess(CMDProceed)
+        me doProcess CMDProceed
 
 
       case (norm: NormalData, cmd: CMDFulfillHtlc, OPEN) =>
@@ -306,7 +306,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
           isLoop = norm.commitments.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == add.paymentHash)
         } me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, isLoop)
         // And sign changes once done because CMDFail/Fulfill above don't do that
-        doProcess(CMDProceed)
+        me doProcess CMDProceed
 
 
       case (norm: NormalData, CMDProceed, OPEN)
@@ -328,7 +328,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         val d1 = me STORE norm.copy(commitments = c1)
         me UPDATA d1 SEND revokeAndAck
         // Clear remote commit first
-        doProcess(CMDProceed)
+        me doProcess CMDProceed
         events onSettled c1
 
 
@@ -352,7 +352,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
           // We send a fee update if current chan unspendable reserve + commitTx fee can afford it
           // otherwise we fail silently in hope that fee will drop or we will receive a payment
           me UPDATA norm.copy(commitments = c1) SEND feeUpdateMessage
-          doProcess(CMDProceed)
+          me doProcess CMDProceed
         }
 
 
@@ -378,7 +378,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         val our = Shutdown(wait.commitments.channelId, wait.commitments.localParams.defaultFinalScriptPubKey)
         val norm = NormalData(wait.announce, wait.commitments, our.some, remote.some)
         BECOME(me STORE norm, OPEN) SEND our
-        doProcess(CMDProceed)
+        me doProcess CMDProceed
 
 
       // SHUTDOWN in OPEN
@@ -421,7 +421,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
             val our = Shutdown(commitments.channelId, commitments.localParams.defaultFinalScriptPubKey)
             val norm1 = me STORE NormalData(announce, commitments, our.some, theirSig.some, txOpt)
             me UPDATA norm1 SEND our
-            doProcess(CMDProceed)
+            me doProcess CMDProceed
 
           case Some(ourSig) \ None =>
             // Was initiated in SLEEPING
@@ -488,7 +488,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
         // We may have HTLC to fulfill, then shutdown
         BECOME(norm.copy(commitments = c1), OPEN)
-        doProcess(CMDHTLCProcess)
+        me doProcess CMDHTLCProcess
 
 
       // We're exiting a sync state while funding tx is still not provided
@@ -711,8 +711,8 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 }
 
 abstract class HostedChannel extends Channel(isHosted = true) { me =>
-  def estimateCanSend = getCommits collect { case nc: HostedCommits => nc.localSpec.toLocalMsat } getOrElse 0L
-  def estimateCanReceive = getCommits collect { case nc: HostedCommits => nc.localSpec.toRemoteMsat } getOrElse 0L
+  def estCanSendMsat = getCommits collect { case nc: HostedCommits => nc.localSpec.toLocalMsat } getOrElse 0L
+  def estCanReceiveMsat = getCommits collect { case nc: HostedCommits => nc.localSpec.toRemoteMsat } getOrElse 0L
   def inFlightHtlcs = getCommits collect { case nc: HostedCommits => nc.nextLocalReduced.htlcs } getOrElse Set.empty[Htlc]
 
   private var isChainHeightKnown: Boolean = false
@@ -744,36 +744,34 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         me UPDATA WaitTheirHostedStateUpdate(announce, scriptPubKey, localSU, init) SEND localSU
 
 
-      case (WaitTheirHostedStateUpdate(announce, scriptPubKey, localSU, init), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
-        // We have expected StateUpdate and got it which means no hosted channel exists with this peer yet, so we create one
+      case (WaitTheirHostedStateUpdate(announce, scriptPubKey, localSU, init), remoteSO: StateOverride, WAIT_FOR_ACCEPT) =>
+        // We have expected StateOverride and got it which means no hosted channel exists with this peer yet, so we create one
         // make sure signatures and other parameters match and if so then become OPEN with initial cross-signed state
 
-        val remoteLCSS = LastCrossSignedState(scriptPubKey, init, remoteSU, localSU)
-        val expectedHostBalance = init.channelCapacityMsat - init.initialClientBalanceMsat
+        val remoteLCSS = LastCrossSignedState(scriptPubKey, init, StateUpdate(remoteSO), localSU)
+        val spec = CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceMsat, init.channelCapacityMsat - init.initialClientBalanceMsat)
+        val hc = HostedCommits(announce, remoteLCSS.reverse, signedLocalUpdates = 0L, signedRemoteUpdates = 0L, localChanges = emptyChanges,
+          remoteChanges = emptyChanges, localSpec = spec, updateOpt = None, localError = None, remoteError = None)
 
         for {
-          errCode <- validateSigs(remoteLCSS, announce) orElse validate(remoteLCSS, expectedHostBalance)
-          errMsg = com.lightning.walletapp.Utils.app.getString(ChanErrorCodes hostedErrors errCode)
-        } throw new LightningException(errMsg)
-
-        BECOME(me STORE HostedCommits(announce, remoteLCSS.reverse, allLocalUpdatesSoFar = 0L,
-          allRemoteUpdatesSoFar = 0L, localChanges = emptyChanges, remoteUpdates = Vector.empty,
-          CommitmentSpec(feeratePerKw = 0L, init.initialClientBalanceMsat, expectedHostBalance),
-          updateOpt = None, localError = None, remoteError = None), OPEN) SEND remoteLCSS.reverse
+          errCode <- validateSigs(remoteLCSS, announce) orElse validateParams(remoteLCSS, spec.toRemoteMsat)
+          errMessage = com.lightning.walletapp.Utils.app.getString(ChanErrorCodes hostedErrors errCode)
+        } throw new LightningException(reason = errMessage)
+        BECOME(me STORE hc, OPEN) SEND remoteLCSS.reverse
 
 
       case (wait: WaitTheirHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
-        // We have expected StateUpdate but got LastCrossSignedState which means this channel exists already on host side
+        // We have expected StateOverride but got LastCrossSignedState which means this channel exists already on host side
         // make sure our signature and other parameters match and if so then become OPEN using host supplied state data
 
         val remoteBalance = remoteLCSS.lastLocalStateUpdate.stateOverride.updatedLocalBalanceMsat
-        validateSigs(remoteLCSS, wait.announce) orElse validate(remoteLCSS, toRemoteMsat = remoteBalance) match {
+        validateSigs(remoteLCSS, wait.announce) orElse validateParams(remoteLCSS, remoteBalance) match {
           case None => BECOME(me STORE commitsFromLCSS(remoteLCSS.reverse, wait.announce), OPEN) SEND remoteLCSS.reverse
           case Some(errorCode) => localSuspend(commitsFromLCSS(remoteLCSS.reverse, wait.announce), errorCode)
         }
 
         // We may have HTLC to fulfill
-        doProcess(CMDHTLCProcess)
+        me doProcess CMDHTLCProcess
 
 
       // CHANNEL IS ESTABLISHED
@@ -804,23 +802,31 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         val hc1 \ updateAddHtlc = hc.sendAdd(rd)
         me UPDATA hc1 SEND updateAddHtlc
         events outPaymentAccepted rd
-        doProcess(CMDProceed)
+        me doProcess CMDProceed
 
 
       case (hc: HostedCommits, remoteSU: StateUpdate, OPEN) =>
-        val remoteLCSS = hc.lastLocalCrossSignedState.copy(lastLocalStateUpdate = remoteSU, lastRemoteStateUpdate = hc.nextSignedStateUpdate)
-        val validationHasFailed = validateSigs(remoteLCSS, hc.announce) orElse validate(remoteLCSS, hc.nextLocalReduced.toRemoteMsat)
+        val rc1 = hc.remoteChanges.copy(proposed = Vector.empty, signed = hc.remoteChanges.proposedAndSigned)
+        val hc1 = hc.copy(remoteChanges = rc1, signedRemoteUpdates = hc.signedRemoteUpdates + hc.remoteChanges.proposed.size)
+        val remoteLCSS = hc1.lastLocalCrossSignedState.copy(lastLocalStateUpdate = remoteSU, lastRemoteStateUpdate = hc1.nextSignedStateUpdate)
+        // Cross-signed state is achieved when signatures match, their balance and in-flight payments are the same and all parameters are correct
+        val wrongParams = validateParams(remoteLCSS, hc1.nextLocalReduced.toRemoteMsat)
+        val wrongSigs = validateSigs(remoteLCSS, hc1.announce)
+        val wrongInFlight = validateInFlight(hc1, remoteSU)
 
-        // They may send us an outdated SU which does not take into account our new updates, so resend
-        if (hc.allLocalUpdatesSoFar > remoteSU.stateOverride.remoteUpdatesSoFar) doProcess(CMDProceed)
-        else if (validationHasFailed.isDefined) localSuspend(hc, validationHasFailed.get)
-        else if (hc.lastLocalCrossSignedState != remoteLCSS.reverse) {
-          // Only update and reply if their signature changes a state since it's possible for peer to send a few identical updates
-          val hc1 = hc.copy(lastLocalCrossSignedState = remoteLCSS.reverse, localSpec = hc.nextLocalReduced).resetUpdates(emptyChanges)
-          me UPDATA STORE(hc1) SEND hc1.lastLocalCrossSignedState.lastLocalStateUpdate
+        // Their signature and in-flight match but they do not take into account all our changes: resend our update with their signed changes
+        val isStale = wrongSigs.isEmpty && wrongInFlight.isEmpty && hc1.signedLocalUpdates > remoteSU.stateOverride.remoteUpdatesSoFar
+        val failure = wrongParams.orElse(wrongSigs).orElse(wrongInFlight)
 
-          events onSettled hc1
-          doProcess(CMDHTLCProcess)
+        if (isStale) me UPDATA hc1 doProcess CMDProceed
+        else if (failure.isDefined) localSuspend(hc1, failure.get)
+        else if (hc1.lastLocalCrossSignedState != remoteLCSS.reverse) {
+          // Only update and reply if state is changed since it's possible for peer to send a few identical updates
+          val hc2 = hc1.copy(lastLocalCrossSignedState = remoteLCSS.reverse, localSpec = hc1.nextLocalReduced)
+          val hcEmptyChanges = me STORE hc2.copy(localChanges = emptyChanges, remoteChanges = emptyChanges)
+          me UPDATA hcEmptyChanges SEND hcEmptyChanges.lastLocalCrossSignedState.lastLocalStateUpdate
+          events onSettled hcEmptyChanges
+          me doProcess CMDHTLCProcess
         }
 
 
@@ -833,14 +839,15 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
           isLoop = hc.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == add.paymentHash)
         } me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, isLoop)
         // And sign changes once done because CMDFail/Fulfill above don't do that
-        doProcess(CMDProceed)
+        me doProcess CMDProceed
 
 
       case (hc: HostedCommits, CMDProceed, OPEN)
-        if hc.localChanges.proposed.nonEmpty || hc.localChanges.signed.nonEmpty || hc.remoteUpdates.nonEmpty =>
-        // Store all our signed updates every time we send out a signature, needed for retransmission on reconnects
-        val lc1 = hc.localChanges.copy(proposed = Vector.empty, signed = hc.localChanges.proposed ++ hc.localChanges.signed)
-        me UPDATA STORE(hc.modify(_.localChanges) setTo lc1) SEND hc.nextSignedStateUpdate
+        if hc.localChanges.proposedAndSigned.nonEmpty || hc.remoteChanges.signed.nonEmpty =>
+        // Store all our signed updates every time we send out a signature, needed for retransmission
+        val lc1 = hc.localChanges.copy(proposed = Vector.empty, signed = hc.localChanges.proposedAndSigned)
+        val hc1 = hc.copy(localChanges = lc1, signedLocalUpdates = hc.signedLocalUpdates + hc.localChanges.proposed.size)
+        me UPDATA STORE(hc1) SEND hc1.nextSignedStateUpdate
 
 
       case (hc: HostedCommits, cmd: CMDFulfillHtlc, OPEN) =>
@@ -892,7 +899,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
         // We may now have HTLCs to fulfill
         // also maybe re-sign our re-transmits
-        doProcess(CMDHTLCProcess)
+        me doProcess CMDHTLCProcess
 
 
       case (hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING)
@@ -948,21 +955,26 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     events onProcessSuccess Tuple3(me, data, change)
   }
 
-  def validate(remoteLCSS: LastCrossSignedState, toRemoteMsat: Long) = {
+  def validateParams(remoteLCSS: LastCrossSignedState, toRemoteMsat: Long) = {
     val LastCrossSignedState(_, _, theirStateUpdate, ourStateUpdate) = remoteLCSS
     // We use remote LastCrossSignedState here so their remote update is our local update
-    val isSameHtlcsInFlight = theirStateUpdate.inFlightHtlcs.toSet == ourStateUpdate.inFlightHtlcs.map(_.reverse).toSet
     val isBlockdayAcceptable = math.abs(theirStateUpdate.stateOverride.blockDay - ourStateUpdate.stateOverride.blockDay) <= 1
     val isSameRemoteUpdatesSoFar = theirStateUpdate.stateOverride.remoteUpdatesSoFar == ourStateUpdate.stateOverride.localUpdatesSoFar
     val isSameLocalUpdatesSoFar = theirStateUpdate.stateOverride.localUpdatesSoFar == ourStateUpdate.stateOverride.remoteUpdatesSoFar
     val isRemoteBalanceOk = theirStateUpdate.stateOverride.updatedLocalBalanceMsat == toRemoteMsat
 
     if (!isRemoteBalanceOk) Some(ERR_HOSTED_WRONG_REMOTE_BALANCE)
-    else if (!isSameHtlcsInFlight) Some(ERR_HOSTED_WRONG_IN_FLIGHT)
     else if (!isBlockdayAcceptable) Some(ERR_HOSTED_WRONG_BLOCKDAY)
     else if (!isSameLocalUpdatesSoFar) Some(ERR_HOSTED_WRONG_LOCAL_NUMBER)
     else if (!isSameRemoteUpdatesSoFar) Some(ERR_HOSTED_WRONG_REMOTE_NUMBER)
     else None
+  }
+
+  def validateInFlight(hc: HostedCommits, remoteSU: StateUpdate) = {
+    // Here we only care that their update signs all in-flight payments proposed to us earlier
+    val remoteOutgoingInFlight = hc.nextLocalReduced.htlcs.filter(_.incoming).map(_.toInFlight.reverse)
+    val isAllRemoteOutgoingPresent = remoteOutgoingInFlight == remoteSU.inFlightHtlcs.filterNot(_.incoming).toSet
+    if (!isAllRemoteOutgoingPresent) Some(ERR_HOSTED_WRONG_IN_FLIGHT) else None
   }
 
   def validateSigs(remoteLCSS: LastCrossSignedState, announce: NodeAnnouncement) = {
@@ -985,9 +997,9 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       htlcs = localLCSS.lastLocalStateUpdate.inFlightHtlcs.map(_ toHtlc announce.hostedChanId).toSet)
 
     HostedCommits(announce, localLCSS,
-      allLocalUpdatesSoFar = localLCSS.lastLocalStateUpdate.stateOverride.localUpdatesSoFar,
-      allRemoteUpdatesSoFar = localLCSS.lastLocalStateUpdate.stateOverride.remoteUpdatesSoFar,
-      localChanges = emptyChanges, remoteUpdates = Vector.empty, localSpec = spec, updateOpt = None,
+      signedLocalUpdates = localLCSS.lastLocalStateUpdate.stateOverride.localUpdatesSoFar,
+      signedRemoteUpdates = localLCSS.lastLocalStateUpdate.stateOverride.remoteUpdatesSoFar,
+      localChanges = emptyChanges, remoteChanges = emptyChanges, localSpec = spec, updateOpt = None,
       localError = None, remoteError = None, startedAt = System.currentTimeMillis)
   }
 

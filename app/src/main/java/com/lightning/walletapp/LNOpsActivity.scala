@@ -105,7 +105,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       val currentState = stateStatusColor(chan)
 
       val capacity = cs.commitInput.txOut.amount
-      val canReceiveMsat = chan.estimateCanReceive
+      val canReceiveMsat = chan.estCanReceiveMsat
       val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
       val barCanReceive = barCanSend + canReceiveMsat / capacity.amount
 
@@ -128,7 +128,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       // All amounts are in MilliSatoshi, but we convert them to Satoshi and / 1000 to erase trailing msat remainders
       paymentsInFlightText setText sumOrNothing(Satoshi(chan.inFlightHtlcs.toList.map(_.add.amountMsat).sum) / 1000L).html
       refundableAmountText setText sumOrNothing(Satoshi(cs.localSpec.toLocalMsat) / 1000L).html
-      canSendText setText denom.parsedWithSign(Satoshi(chan.estimateCanSend) / 1000L).html
+      canSendText setText denom.parsedWithSign(Satoshi(chan.estCanSendMsat) / 1000L).html
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       totalCapacityText setText denom.parsedWithSign(capacity).html
       refundFeeText setText sumOrNothing(forceCloseFee).html
