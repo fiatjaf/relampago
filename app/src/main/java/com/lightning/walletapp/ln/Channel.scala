@@ -812,14 +812,14 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         // Cross-signed state is achieved when signatures match, their balance and in-flight payments are the same and all parameters are correct
         val wrongParams = validateParams(remoteLCSS, hc1.nextLocalReduced.toRemoteMsat)
         val wrongSigs = validateSigs(remoteLCSS, hc1.announce)
-        val wrongInFlight = validateInFlight(hc1, remoteSU)
+        val wrongOutgoing = validateOutgoing(hc1, remoteSU)
 
         // Their signature and in-flight match but they do not take into account all our changes: resend our update with their signed changes
-        val isStale = wrongSigs.isEmpty && wrongInFlight.isEmpty && hc1.signedLocalUpdates > remoteSU.stateOverride.remoteUpdatesSoFar
-        val failure = wrongParams.orElse(wrongSigs).orElse(wrongInFlight)
+        val isStale = wrongSigs.isEmpty && wrongOutgoing.isEmpty && hc1.signedLocalUpdates > remoteSU.stateOverride.remoteUpdatesSoFar
+        val isFailure = wrongParams.orElse(wrongSigs).orElse(wrongOutgoing)
 
         if (isStale) me UPDATA hc1 doProcess CMDProceed
-        else if (failure.isDefined) localSuspend(hc1, failure.get)
+        else if (isFailure.isDefined) localSuspend(hc1, isFailure.get)
         else if (hc1.lastLocalCrossSignedState != remoteLCSS.reverse) {
           // Only update and reply if state is changed since it's possible for peer to send a few identical updates
           val hc2 = hc1.copy(lastLocalCrossSignedState = remoteLCSS.reverse, localSpec = hc1.nextLocalReduced)
@@ -970,7 +970,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     else None
   }
 
-  def validateInFlight(hc: HostedCommits, remoteSU: StateUpdate) = {
+  def validateOutgoing(hc: HostedCommits, remoteSU: StateUpdate) = {
     // Here we only care that their update signs all in-flight payments proposed to us earlier
     val remoteOutgoingInFlight = hc.nextLocalReduced.htlcs.filter(_.incoming).map(_.toInFlight.reverse)
     val isAllRemoteOutgoingPresent = remoteOutgoingInFlight == remoteSU.inFlightHtlcs.filterNot(_.incoming).toSet
