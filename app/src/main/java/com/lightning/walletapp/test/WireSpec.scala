@@ -334,18 +334,20 @@ class WireSpec {
 
       val invoke_hosted_channel = InvokeHostedChannel(randomBytes(32), bin(47, 0))
       val init_hosted_channel = InitHostedChannel(UInt64(6), 10, 20, 500000000L, 5000, 1000000, 1000000)
-      val state_override = StateOverride(500000000L, 500000, 70000, 700000, randomSignature)
-      val in_flight_htlc = InFlightHtlc(false, 1L, 600000000L, bin(32, 0), 1000L)
-      val state_update1 = StateUpdate(state_override, List(in_flight_htlc, in_flight_htlc))
-      val state_update2 = StateUpdate(state_override, Nil)
-      val last_cross_signed_state = LastCrossSignedState(bin(47, 0), init_hosted_channel, state_update1, state_update2)
+      val state_override = StateOverride(50000L, 500000, 70000, 700000, randomSignature)
+      val in_flight_htlc = InFlightHtlc(1L, 600000000L, bin(32, 0), 1000L)
+
+      val state_update = StateUpdate(50000L, 10, 20, randomSignature)
+      val lcss1 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(in_flight_htlc, in_flight_htlc), List(in_flight_htlc, in_flight_htlc), randomSignature)
+      val lcss2 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, List(in_flight_htlc, in_flight_htlc), randomSignature)
+      val lcss3 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(in_flight_htlc, in_flight_htlc), Nil, randomSignature)
+      val lcss4 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, Nil, randomSignature)
 
       val msgs: List[LightningMessage] =
         open :: accept :: funding_created :: funding_signed :: funding_locked :: update_fee :: shutdown :: closing_signed ::
           update_add_htlc :: update_fulfill_htlc :: update_fail_htlc :: update_fail_malformed_htlc :: commit_sig :: revoke_and_ack ::
           channel_announcement :: node_announcement :: channel_update :: announcement_signatures :: ping :: pong :: channel_reestablish ::
-          invoke_hosted_channel :: init_hosted_channel :: last_cross_signed_state :: state_override ::
-          state_update1 :: state_update2 :: Nil
+          invoke_hosted_channel :: init_hosted_channel :: lcss1 :: lcss2 :: lcss3 :: lcss4 :: state_override :: state_update :: Nil
 
       msgs foreach { msg =>
         val encoded = lightningMessageCodec.encode(msg).require

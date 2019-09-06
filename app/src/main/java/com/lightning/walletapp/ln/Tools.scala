@@ -1,12 +1,10 @@
 package com.lightning.walletapp.ln
 
 import fr.acinq.bitcoin.Protocol.{One, Zeroes}
-import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering, Protocol}
-import com.lightning.walletapp.ln.wire.{InitHostedChannel, StateUpdate, UpdateAddHtlc}
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.inFlightHtlcCodec
+import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering}
+import com.lightning.walletapp.ln.wire.UpdateAddHtlc
 import com.lightning.walletapp.ln.Tools.runAnd
 import fr.acinq.bitcoin.Crypto.PrivateKey
-import java.nio.ByteOrder.LITTLE_ENDIAN
 import language.implicitConversions
 import crypto.RandomGenerator
 import scodec.bits.ByteVector
@@ -63,22 +61,6 @@ object Tools {
     val pubkey1First: Boolean = LexicographicalOrdering.isLessThan(pubkey1, pubkey2)
     if (pubkey1First) Crypto.sha256(pubkey1 ++ pubkey2) else Crypto.sha256(pubkey2 ++ pubkey1)
   }
-
-  def hostedSigHash(chanId: ByteVector, refundScriptPubKey: ByteVector, update: StateUpdate, init: InitHostedChannel) = Crypto sha256 {
-    val htlcs = update.inFlightHtlcs.map(htlc => inFlightHtlcCodec.encode(htlc).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
-
-    chanId ++
-      refundScriptPubKey ++
-      Protocol.writeUInt16(init.liabilityDeadlineBlockdays, LITTLE_ENDIAN) ++
-      Protocol.writeUInt64(init.minimalOnchainRefundAmountSatoshis, LITTLE_ENDIAN) ++
-      Protocol.writeUInt64(init.channelCapacityMsat, LITTLE_ENDIAN) ++
-      Protocol.writeUInt64(init.initialClientBalanceMsat, LITTLE_ENDIAN) ++
-      Protocol.writeUInt64(update.stateOverride.updatedLocalBalanceMsat, LITTLE_ENDIAN) ++
-      Protocol.writeUInt32(update.stateOverride.blockDay, LITTLE_ENDIAN) ++
-      Protocol.writeUInt32(update.stateOverride.localUpdatesSoFar, LITTLE_ENDIAN) ++
-      Protocol.writeUInt32(update.stateOverride.remoteUpdatesSoFar, LITTLE_ENDIAN) ++
-      htlcs.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
-  }
 }
 
 object Features {
@@ -100,6 +82,7 @@ object Features {
   }
 }
 
+class LightningTypedErrorException(code: ByteVector) extends RuntimeException(code.toHex)
 class LightningException(reason: String = "Failure") extends RuntimeException(reason)
 case class CMDAddImpossible(rd: RoutingData, code: Int) extends LightningException
 
