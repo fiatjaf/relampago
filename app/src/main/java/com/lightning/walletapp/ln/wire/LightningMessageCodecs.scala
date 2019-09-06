@@ -352,30 +352,9 @@ object LightningMessageCodecs { me =>
 
   // Hosted messages codecs
 
-  val stateOverrideCodec = {
-    (uint64Overflow withContext "updatedLocalBalanceMsat") ::
-      (uint32 withContext "blockDay") ::
-      (uint32 withContext "localUpdatesSoFar") ::
-      (uint32 withContext "remoteUpdatesSoFar") ::
-      (signature withContext "nodeSignature")
-  }.as[StateOverride]
-
-  val inFlightHtlcCodec = {
-    (bool withContext "incoming") ::
-      (uint64Overflow withContext "id") ::
-      (uint64Overflow withContext "amountMsat") ::
-      (bytes32 withContext "paymentHash") ::
-      (uint32 withContext "expiry")
-  }.as[InFlightHtlc]
-
-  val stateUpdateCodec = {
-    (stateOverrideCodec withContext "stateOverride") ::
-      (listOfN(uint16, inFlightHtlcCodec) withContext "inFlightHtlcs")
-  }.as[StateUpdate]
-
   val invokeHostedChannelCodec = {
     (bytes32 withContext "chainHash") ::
-      (varsizebinarydata withContext "scriptPubKey")
+      (varsizebinarydata withContext "refundScriptPubKey")
   }.as[InvokeHostedChannel]
 
   val initHostedChannelCodec = {
@@ -388,12 +367,40 @@ object LightningMessageCodecs { me =>
       (uint64Overflow withContext "initialClientBalanceMsat")
   }.as[InitHostedChannel]
 
+  val inFlightHtlcCodec = {
+    (uint64Overflow withContext "id") ::
+      (uint64Overflow withContext "amountMsat") ::
+      (bytes32 withContext "paymentHash") ::
+      (uint32 withContext "expiry")
+  }.as[InFlightHtlc]
+
   val lastCrossSignedStateCodec = {
-    (varsizebinarydata withContext "lastRefundScriptPubKey") ::
+    (varsizebinarydata withContext "refundScriptPubKey") ::
       (initHostedChannelCodec withContext "initHostedChannel") ::
-      (stateUpdateCodec withContext "lastLocalStateUpdate") ::
-      (stateUpdateCodec withContext "lastRemoteStateUpdate")
+      (uint32 withContext "blockDay") ::
+      (uint64Overflow withContext "localBalanceMsat") ::
+      (uint64Overflow withContext "remoteBalanceMsat") ::
+      (uint32 withContext "localUpdates") ::
+      (uint32 withContext "remoteUpdates") ::
+      (listOfN(uint16, inFlightHtlcCodec) withContext "incomingHtlcs") ::
+      (listOfN(uint16, inFlightHtlcCodec) withContext "outgoingHtlcs") ::
+      (signature withContext "remoteSignature")
   }.as[LastCrossSignedState]
+
+  val stateUpdateCodec = {
+    (uint32 withContext "blockDay") ::
+      (uint32 withContext "localUpdates") ::
+      (uint32 withContext "remoteUpdates") ::
+      (signature withContext "localSigOfRemoteLCSS")
+  }.as[StateUpdate]
+
+  val stateOverrideCodec = {
+    (uint32 withContext "blockDay") ::
+      (uint64Overflow withContext "localBalanceMsat") ::
+      (uint32 withContext "localUpdates") ::
+      (uint32 withContext "remoteUpdates") ::
+      (signature withContext "localSigOfRemoteLCSS")
+  }.as[StateOverride]
 
   val lightningMessageCodec =
     discriminated[LightningMessage].by(uint16)

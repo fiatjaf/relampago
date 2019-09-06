@@ -60,7 +60,7 @@ class RevokedInfoSpec {
     val chan1 = new NormalChannel {
       override def REV(cs: NormalCommits, rev: RevokeAndAck): Unit = none
       override def SEND(msg: LightningMessage): Unit = none
-      override def STORE(data: ChannelData): ChannelData = data
+      def STORE[T <: ChannelData](data: T) = data
       override def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit = none
       override def CLOSEANDWATCH(close: ClosingData): Unit = none
       override def GETREV(cs: NormalCommits, tx: Transaction): Option[RevokedCommitPublished] = None
@@ -97,7 +97,7 @@ class RevokedInfoSpec {
     val chan2 = new NormalChannel {
       override def REV(cs: NormalCommits, rev: RevokeAndAck): Unit = none
       override def SEND(msg: LightningMessage): Unit = none
-      override def STORE(data: ChannelData): ChannelData = data
+      def STORE[T <: ChannelData](data: T) = data
       override def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit = none
       override def CLOSEANDWATCH(close: ClosingData): Unit = none
       override def GETREV(cs: NormalCommits, tx: Transaction): Option[RevokedCommitPublished] = None

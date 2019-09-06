@@ -343,7 +343,7 @@ object ChannelManager extends Broadcaster {
 
   def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel { self =>
     def SEND(msg: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process msg
-    def STORE(data: ChannelData) = runAnd(data)(ChannelWrap put data)
+    def STORE[T <: ChannelData](data: T) = runAnd(data)(ChannelWrap put data)
     listeners = initListeners
     doProcess(bootstrap)
   }
@@ -351,9 +351,8 @@ object ChannelManager extends Broadcaster {
   def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel { self =>
     def SEND(msg: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process msg
 
-    def STORE(data: ChannelData) = runAnd(data) {
-      // Put updated data into db, schedule gdrive upload,
-      // replace if upload is already pending, return data
+    def STORE[T <: ChannelData](data: T) = runAnd(data) {
+      // Put updated data into db and schedule gdrive upload
       ChannelWrap put data
       backUp
     }

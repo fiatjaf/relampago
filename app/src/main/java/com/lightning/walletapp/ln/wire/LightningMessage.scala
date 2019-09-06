@@ -1,13 +1,12 @@
 package com.lightning.walletapp.ln.wire
 
+import java.nio.ByteOrder._
 import com.lightning.walletapp.ln._
-import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
-
-import fr.acinq.bitcoin.{Crypto, MilliSatoshi, Satoshi}
-import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
+import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering, MilliSatoshi, Protocol, Satoshi}
 import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
+import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
 import com.lightning.walletapp.ln.crypto.Sphinx
 import fr.acinq.eclair.UInt64
@@ -200,42 +199,57 @@ case object NodeAddress {
 
 trait HostedChannelMessage extends LightningMessage
 
-case class InvokeHostedChannel(chainHash: ByteVector, scriptPubKey: ByteVector) extends HostedChannelMessage
+case class InvokeHostedChannel(chainHash: ByteVector, refundScriptPubKey: ByteVector) extends HostedChannelMessage
 
 case class InitHostedChannel(maxHtlcValueInFlightMsat: UInt64,
                              htlcMinimumMsat: Long, maxAcceptedHtlcs: Int, channelCapacityMsat: Long,
                              liabilityDeadlineBlockdays: Int, minimalOnchainRefundAmountSatoshis: Long,
                              initialClientBalanceMsat: Long) extends HostedChannelMessage
 
-case class LastCrossSignedState(lastRefundScriptPubKey: ByteVector,
-                                initHostedChannel: InitHostedChannel, lastLocalStateUpdate: StateUpdate,
-                                lastRemoteStateUpdate: StateUpdate) extends HostedChannelMessage {
-
-  lazy val reverse =
-    copy(lastLocalStateUpdate = lastRemoteStateUpdate,
-      lastRemoteStateUpdate = lastLocalStateUpdate)
-
-  def isBehind(remoteLCSS: LastCrossSignedState) =
-    lastLocalStateUpdate.stateOverride.localUpdatesSoFar < remoteLCSS.lastRemoteStateUpdate.stateOverride.localUpdatesSoFar ||
-      lastRemoteStateUpdate.stateOverride.localUpdatesSoFar < remoteLCSS.lastLocalStateUpdate.stateOverride.localUpdatesSoFar
+case class InFlightHtlc(id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long) {
+  def toUpdateAdd(chanId: ByteVector) = UpdateAddHtlc(chanId, id, amountMsat, paymentHash, expiry)
 }
 
-case class StateOverride(updatedLocalBalanceMsat: Long,
-                         blockDay: Long, localUpdatesSoFar: Long = 0L, remoteUpdatesSoFar: Long = 0L,
-                         nodeSignature: ByteVector = ByteVector.empty) extends HostedChannelMessage
+case class LastCrossSignedState(refundScriptPubKey: ByteVector, initHostedChannel: InitHostedChannel, blockDay: Long,
+                                localBalanceMsat: Long, remoteBalanceMsat: Long, localUpdates: Long, remoteUpdates: Long,
+                                incomingHtlcs: List[InFlightHtlc], outgoingHtlcs: List[InFlightHtlc],
+                                remoteSignature: ByteVector) extends HostedChannelMessage {
 
-case class InFlightHtlc(incoming: Boolean, id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long) {
-  def toHtlc(chanId: ByteVector) = Htlc(add = UpdateAddHtlc(chanId, id, amountMsat, paymentHash, expiry), incoming = incoming)
-  def reverse = copy(incoming = !incoming)
+  lazy val reverse = copy(localUpdates = remoteUpdates, remoteUpdates = localUpdates,
+    localBalanceMsat = remoteBalanceMsat, remoteBalanceMsat = localBalanceMsat,
+    incomingHtlcs = outgoingHtlcs, outgoingHtlcs = incomingHtlcs,
+    remoteSignature = ByteVector.empty)
+
+  def hostedSigHash = Crypto sha256 {
+    val inPayments = incomingHtlcs.map(inFlightHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
+    val outPayments = outgoingHtlcs.map(inFlightHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
+
+    refundScriptPubKey ++
+      Protocol.writeUInt16(initHostedChannel.liabilityDeadlineBlockdays, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(initHostedChannel.minimalOnchainRefundAmountSatoshis, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(initHostedChannel.channelCapacityMsat, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(initHostedChannel.initialClientBalanceMsat, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(blockDay, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(localBalanceMsat, LITTLE_ENDIAN) ++
+      Protocol.writeUInt64(remoteBalanceMsat, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(localUpdates, LITTLE_ENDIAN) ++
+      Protocol.writeUInt32(remoteUpdates, LITTLE_ENDIAN) ++
+      inPayments.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc } ++
+      outPayments.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
+  }
+
+  def verifyRemoteSignature(pub: PublicKey) = Crypto.verifySignature(hostedSigHash, remoteSignature, pub)
+  def makeStateUpdate(priv: PrivateKey) = StateUpdate(blockDay, localUpdates, remoteUpdates, sign(hostedSigHash, priv))
+  def isAhead(remote: LastCrossSignedState) = remoteUpdates > remote.localUpdates || localUpdates > remote.remoteUpdates
+  def isBehind(remote: LastCrossSignedState) = remoteUpdates < remote.localUpdates || localUpdates < remoteUpdates
 }
 
-case class StateUpdate(stateOverride: StateOverride, inFlightHtlcs: List[InFlightHtlc] = Nil) extends HostedChannelMessage { me =>
-  def signed(channelId: ByteVector, refundScriptPubKey: ByteVector, init: InitHostedChannel, priv: PrivateKey): StateUpdate =
-    me.modify(_.stateOverride.nodeSignature) setTo sign(hostedSigHash(channelId, refundScriptPubKey, me, init), priv)
+case class StateUpdate(blockDay: Long, localUpdates: Long, remoteUpdates: Long,
+                       localSigOfRemoteLCSS: ByteVector) extends HostedChannelMessage
 
-  def verify(channelId: ByteVector, refundScriptPubKey: ByteVector, init: InitHostedChannel, pub: PublicKey): Boolean =
-    Crypto.verifySignature(hostedSigHash(channelId, refundScriptPubKey, me, init), stateOverride.nodeSignature, pub)
-}
+case class StateOverride(blockDay: Long,
+                         localBalanceMsat: Long, localUpdates: Long, remoteUpdates: Long,
+                         localSigOfRemoteLCSS: ByteVector) extends HostedChannelMessage
 
 // Not in a spec
 case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)
