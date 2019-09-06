@@ -213,12 +213,11 @@ case class InFlightHtlc(id: Long, amountMsat: Long, paymentHash: ByteVector, exp
 case class LastCrossSignedState(refundScriptPubKey: ByteVector, initHostedChannel: InitHostedChannel, blockDay: Long,
                                 localBalanceMsat: Long, remoteBalanceMsat: Long, localUpdates: Long, remoteUpdates: Long,
                                 incomingHtlcs: List[InFlightHtlc], outgoingHtlcs: List[InFlightHtlc],
-                                remoteSignature: ByteVector) extends HostedChannelMessage {
+                                remoteSignature: ByteVector) extends HostedChannelMessage { me =>
 
   lazy val reverse = copy(localUpdates = remoteUpdates, remoteUpdates = localUpdates,
     localBalanceMsat = remoteBalanceMsat, remoteBalanceMsat = localBalanceMsat,
-    incomingHtlcs = outgoingHtlcs, outgoingHtlcs = incomingHtlcs,
-    remoteSignature = ByteVector.empty)
+    incomingHtlcs = outgoingHtlcs, outgoingHtlcs = incomingHtlcs)
 
   def hostedSigHash = Crypto sha256 {
     val inPayments = incomingHtlcs.map(inFlightHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
@@ -238,10 +237,9 @@ case class LastCrossSignedState(refundScriptPubKey: ByteVector, initHostedChanne
       outPayments.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
   }
 
+  def makeSignature(priv: PrivateKey) = sign(hostedSigHash, priv)
   def verifyRemoteSignature(pub: PublicKey) = Crypto.verifySignature(hostedSigHash, remoteSignature, pub)
-  def makeStateUpdate(priv: PrivateKey) = StateUpdate(blockDay, localUpdates, remoteUpdates, sign(hostedSigHash, priv))
-  def isAhead(remote: LastCrossSignedState) = remoteUpdates > remote.localUpdates || localUpdates > remote.remoteUpdates
-  def isBehind(remote: LastCrossSignedState) = remoteUpdates < remote.localUpdates || localUpdates < remoteUpdates
+  def makeStateUpdate(priv: PrivateKey) = StateUpdate(blockDay, localUpdates, remoteUpdates, me makeSignature priv)
 }
 
 case class StateUpdate(blockDay: Long, localUpdates: Long, remoteUpdates: Long,
