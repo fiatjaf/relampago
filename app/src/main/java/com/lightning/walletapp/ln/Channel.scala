@@ -749,8 +749,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (WaitTheirHostedStateUpdate(announce, hc), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
-        // This is normal flow: we have received remote StateUpdate after sending local StateUpdate, become OPEN if signature passes
-        val lcss1 = hc.lastCrossSignedState.copy(blockDay = remoteSU.blockDay, remoteSignature = remoteSU.localSigOfRemoteLCSS)
+        val lcss1 = hc.lastCrossSignedState.copy(remoteSignature = remoteSU.localSigOfRemoteLCSS)
         val isBlockdayAcceptable = math.abs(remoteSU.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
         val isRightRemoteUpdateNumber = hc.lastCrossSignedState.remoteUpdates == remoteSU.localUpdates
         val isRightLocalUpdateNumber = hc.lastCrossSignedState.localUpdates == remoteSU.remoteUpdates
@@ -767,11 +766,11 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         // We have expected InitHostedChannel but got LastCrossSignedState so this channel exists already
         // make sure our signature match and if so then become OPEN using host supplied state data
 
+        val hc = restoreCommits(remoteLCSS.reverse, wait.announce)
         val localSU = remoteLCSS.makeStateUpdate(LNParams.nodePrivateKey)
-        val restoredHC = restoreCommits(remoteLCSS.reverse, wait.announce)
         val isLocalSigOk = remoteLCSS.verifyRemoteSignature(LNParams.nodePublicKey)
-        if (!isLocalSigOk) localSuspend(restoredHC, ERR_HOSTED_WRONG_LOCAL_SIG)
-        else BECOME(me STORE restoredHC, OPEN) SEND localSU
+        if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
+        else BECOME(me STORE hc, OPEN) SEND localSU
         // We may have HTLC to fulfill
         me doProcess CMDHTLCProcess
 
@@ -810,19 +809,18 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       case (hc: HostedCommits, remoteSU: StateUpdate, OPEN) =>
         val lcss1 = hc.nextLocalLCSS.copy(blockDay = remoteSU.blockDay, remoteSignature = remoteSU.localSigOfRemoteLCSS)
         val isBlockdayAcceptable = math.abs(remoteSU.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
-        val localSU = lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
         val isRemoteSigOk = lcss1.verifyRemoteSignature(hc.announce.nodeId)
         val isRemoteBehind = remoteSU.remoteUpdates < lcss1.localUpdates
 
-        if (isRemoteBehind) me SEND localSU
+        if (isRemoteBehind) me SEND lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
         else if (!isBlockdayAcceptable) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
         else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else if (hc.lastCrossSignedState != lcss1) {
           // They may send a few identical updates so only proceed if this one changes state
           val updatedHC = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalReduced)
-          val emptyChangesHC = me STORE updatedHC.copy(localChanges = emptyChanges).resetUpdates
-          me UPDATA STORE(emptyChangesHC) SEND localSU
-          events onSettled emptyChangesHC
+          val withoutChangesHC = me STORE updatedHC.copy(localChanges = emptyChanges).resetUpdates
+          me UPDATA STORE(withoutChangesHC) SEND lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
+          events onSettled withoutChangesHC
           me doProcess CMDHTLCProcess
         }
 
@@ -880,19 +878,15 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
       case (hc: HostedCommits, remoteLCSS: LastCrossSignedState, SLEEPING) =>
         val isLocalSigOk = remoteLCSS.verifyRemoteSignature(LNParams.nodePublicKey)
-        val isBehind = hc.lastCrossSignedState.isBehind(remoteLCSS)
-        val isAhead = hc.lastCrossSignedState.isAhead(remoteLCSS)
+        val localSU = remoteLCSS.makeStateUpdate(LNParams.nodePrivateKey)
 
-        if (isLocalSigOk && isBehind) {
-          val localSU = remoteLCSS.makeStateUpdate(LNParams.nodePrivateKey)
-          val restoredHC = restoreCommits(remoteLCSS.reverse, hc.announce)
-          BECOME(me STORE restoredHC, OPEN) SEND localSU
-        }
+        val isAhead = hc.lastCrossSignedState.remoteUpdates > remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates > remoteLCSS.remoteUpdates
+        val isBehind = hc.lastCrossSignedState.remoteUpdates < remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates < remoteLCSS.remoteUpdates
+        if (isLocalSigOk && isBehind) BECOME(me STORE restoreCommits(remoteLCSS.reverse, hc.announce), OPEN) SEND localSU
         else if (isLocalSigOk && isAhead) BECOME(hc, OPEN) SEND hc.lastCrossSignedState
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
         else {
-          if (hc.lastCrossSignedState.reverse != remoteLCSS) throw new LightningException("LCSS mismatch")
-          BECOME(hc.resetUpdates, OPEN) SEND remoteLCSS.makeStateUpdate(LNParams.nodePrivateKey)
+          BECOME(hc.resetUpdates, OPEN) SEND localSU
           hc.localChanges.signed foreach SEND
         }
 
