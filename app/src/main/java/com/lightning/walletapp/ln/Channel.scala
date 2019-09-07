@@ -806,7 +806,10 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         me doProcess CMDProceed
 
 
-      case (hc: HostedCommits, remoteSU: StateUpdate, OPEN) =>
+      case (hc: HostedCommits, remoteSU: StateUpdate, OPEN)
+        // GUARD: only proceed if signture is defferent, the may send duplicates
+        if hc.lastCrossSignedState.remoteSignature != remoteSU.localSigOfRemoteLCSS =>
+
         val lcss1 = hc.nextLocalLCSS.copy(blockDay = remoteSU.blockDay, remoteSignature = remoteSU.localSigOfRemoteLCSS)
         val isBlockdayAcceptable = math.abs(remoteSU.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
         val isRemoteSigOk = lcss1.verifyRemoteSignature(hc.announce.nodeId)
@@ -815,11 +818,11 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (isRemoteBehind) me SEND lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
         else if (!isBlockdayAcceptable) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
         else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
-        else if (hc.lastCrossSignedState != lcss1) {
+        else {
           // They may send a few identical updates so only proceed if this one changes state
-          val updatedHC = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalReduced)
-          val withoutChangesHC = me STORE updatedHC.copy(localChanges = emptyChanges).resetUpdates
-          me UPDATA STORE(withoutChangesHC) SEND lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
+          val refreshedHC = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalReduced)
+          val withoutChangesHC = me STORE refreshedHC.copy(localChanges = emptyChanges).resetUpdates
+          me UPDATA withoutChangesHC SEND lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
           events onSettled withoutChangesHC
           me doProcess CMDHTLCProcess
         }
@@ -890,8 +893,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
           hc.localChanges.signed foreach SEND
         }
 
-        // We may now have HTLCs to fulfill
-        // also maybe re-sign our re-transmits
+        // We may have HTLC to fulfill
+        // also re-sign our re-transmits
         me doProcess CMDHTLCProcess
 
 
