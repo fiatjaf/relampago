@@ -2,8 +2,8 @@ package com.lightning.walletapp.ln
 
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
-import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.ln.ChanErrorCodes._
 
 import fr.acinq.bitcoin.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
@@ -20,6 +20,37 @@ import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
 import scala.util.{Failure, Success, Try}
 
+
+object Channel {
+  val WAIT_FOR_INIT = "WAIT-FOR-INIT"
+  val WAIT_FOR_ACCEPT = "WAIT-FOR-ACCEPT"
+  val WAIT_FOR_FUNDING = "WAIT-FOR-FUNDING"
+  val WAIT_FUNDING_SIGNED = "WAIT-FUNDING-SIGNED"
+
+  val WAIT_FUNDING_DONE = "OPENING"
+  val NEGOTIATIONS = "NEGOTIATIONS"
+  val SLEEPING = "SLEEPING"
+  val OPEN = "OPEN"
+
+  // No tears, only dreams now
+  val SUSPENDED = "SUSPENDED"
+  val REFUNDING = "REFUNDING"
+  val CLOSING = "CLOSING"
+
+  def isOpeningOrOperational(chan: Channel) = isOperational(chan) || isOpening(chan)
+  def isOpening(chan: Channel) = chan.data.isInstanceOf[WaitFundingDoneData]
+
+  def isOperational(chan: Channel) = chan.data match {
+    case NormalData(_, _, None, None, None) => true
+    case hc: HostedCommits => !hc.isInErrorState
+    case _ => false
+  }
+
+  def channelAndHop(chan: Channel) = for {
+    update <- chan.getCommits.flatMap(_.updateOpt)
+    hop = update.toHop(chan.data.announce.nodeId)
+  } yield chan -> Vector(hop)
+}
 
 abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
@@ -162,7 +193,6 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
       case (WaitFundingData(announce, cmd, accept), CMDFunding(fundTx), WAIT_FOR_FUNDING) =>
         // We are the funder and user made a funding, let peer sign a first commit so we can broadcast a funding later
-        if (fundTx.txOut(cmd.batch.fundOutIdx).amount.amount != cmd.batch.fundingAmountSat) throw new LightningException
         val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstCommitTxs(cmd.localParams, cmd.fundingSat,
           cmd.pushMsat, cmd.initialFeeratePerKw, accept, fundTx.hash, cmd.batch.fundOutIdx, accept.firstPerCommitmentPoint)
 
@@ -922,21 +952,21 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         val isBlockdayAcceptable = math.abs(remoteOverride.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
         val newLocalBalance = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat - remoteOverride.localBalanceMsat
 
-        val localLCSS =
+        val recreatedLocalLCSS =
           hc.nextLocalLCSS.copy(incomingHtlcs = Nil, outgoingHtlcs = Nil,
             localBalanceMsat = newLocalBalance, remoteBalanceMsat = remoteOverride.localBalanceMsat,
             localUpdates = remoteOverride.remoteUpdates, remoteUpdates = remoteOverride.localUpdates,
             blockDay = remoteOverride.blockDay, remoteSignature = remoteOverride.localSigOfRemoteLCSS)
 
-        val isRemoteSigOk = localLCSS.verifyRemoteSignature(hc.announce.nodeId)
-        val localSU = localLCSS.reverse.makeStateUpdate(LNParams.nodePrivateKey)
+        val isRemoteSigOk = recreatedLocalLCSS.verifyRemoteSignature(hc.announce.nodeId)
+        val localSU = recreatedLocalLCSS.reverse.makeStateUpdate(LNParams.nodePrivateKey)
 
         if (!isRightLocalUpdateNumber) throw new LightningException("Provided local update number from remote override is wrong")
         if (!isRightRemoteUpdateNumber) throw new LightningException("Provided remote update number from remote override is wrong")
         if (!isBlockdayAcceptable) throw new LightningException("Provided blockday from remote override is not acceptable")
         if (newLocalBalance < 0) throw new LightningException("Provided updated local balance is larger than capacity")
         if (!isRemoteSigOk) throw new LightningException("Provided remote override signature is wrong")
-        BECOME(me STORE restoreCommits(localLCSS, hc.announce), OPEN) SEND localSU
+        BECOME(me STORE restoreCommits(recreatedLocalLCSS, hc.announce), OPEN) SEND localSU
 
 
       case (null, wait: WaitTheirHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
@@ -962,37 +992,6 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     val hc1 = hc.modify(_.localError) setTo Some(localError)
     BECOME(me STORE hc1, SUSPENDED) SEND localError
   }
-}
-
-object NormalChannel {
-  val WAIT_FOR_INIT = "WAIT-FOR-INIT"
-  val WAIT_FOR_ACCEPT = "WAIT-FOR-ACCEPT"
-  val WAIT_FOR_FUNDING = "WAIT-FOR-FUNDING"
-  val WAIT_FUNDING_SIGNED = "WAIT-FUNDING-SIGNED"
-
-  val WAIT_FUNDING_DONE = "OPENING"
-  val NEGOTIATIONS = "NEGOTIATIONS"
-  val SLEEPING = "SLEEPING"
-  val OPEN = "OPEN"
-
-  // No tears, only dreams now
-  val SUSPENDED = "SUSPENDED"
-  val REFUNDING = "REFUNDING"
-  val CLOSING = "CLOSING"
-
-  def isOpeningOrOperational(chan: Channel) = isOperational(chan) || isOpening(chan)
-  def isOpening(chan: Channel) = chan.data.isInstanceOf[WaitFundingDoneData]
-
-  def isOperational(chan: Channel) = chan.data match {
-    case NormalData(_, _, None, None, None) => true
-    case hc: HostedCommits => !hc.isInErrorState
-    case _ => false
-  }
-
-  def channelAndHop(chan: Channel) = for {
-    update <- chan.getCommits.flatMap(_.updateOpt)
-    hop = update.toHop(chan.data.announce.nodeId)
-  } yield chan -> Vector(hop)
 }
 
 trait ChannelListener {

@@ -6,8 +6,8 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
-import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import android.widget.{ImageButton, TextView, Toast}

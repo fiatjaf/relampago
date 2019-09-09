@@ -3,9 +3,9 @@ package com.lightning.walletapp.lnutils
 import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
-import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._

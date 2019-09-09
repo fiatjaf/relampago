@@ -4,7 +4,7 @@ import android.widget._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
-import com.lightning.walletapp.ln.NormalChannel._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.{ChannelData, RefundingData}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
