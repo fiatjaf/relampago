@@ -18,8 +18,8 @@ import fr.acinq.eclair.UInt64
 
 
 sealed trait Command
+case class CMDHostedStateOverride(so: StateOverride) extends Command
 case class CMDShutdown(scriptPubKey: Option[ByteVector] = None) extends Command
-case class CMDStateOverride(so: StateOverride) extends Command
 case class CMDConfirmed(tx: Transaction) extends Command
 case class CMDFunding(tx: Transaction) extends Command
 case class CMDSpent(tx: Transaction) extends Command
@@ -89,15 +89,7 @@ case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFunding
 }
 
 case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked], their: Option[FundingLocked],
-                               fundingTx: Transaction, commitments: NormalCommits) extends HasNormalCommits {
-
-  def doubleSpendsFunding(that: Transaction) = {
-    val thatInputOutPoints = that.txIn.map(_.outPoint)
-    val fundingInputOutPoints = fundingTx.txIn.map(_.outPoint)
-    val sameOuts = thatInputOutPoints.intersect(fundingInputOutPoints)
-    that.txid != fundingTx.txid && sameOuts.nonEmpty
-  }
-}
+                               fundingTx: Transaction, commitments: NormalCommits) extends HasNormalCommits
 
 case class NormalData(announce: NodeAnnouncement, commitments: NormalCommits, localShutdown: Option[Shutdown] = None,
                       remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends HasNormalCommits

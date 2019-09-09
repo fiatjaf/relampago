@@ -31,11 +31,12 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
     case _ => None
   }
 
-  def isUpdatable(upd: ChannelUpdate) = for {
-    oldUpdate <- getCommits.flatMap(_.updateOpt)
-    isDifferentShortId = oldUpdate.shortChannelId != upd.shortChannelId
-    isOldUpdateRefresh = !isDifferentShortId && oldUpdate.timestamp < upd.timestamp
-  } yield isDifferentShortId || isOldUpdateRefresh
+  def isUpdatable(upd: ChannelUpdate) =
+    getCommits.flatMap(_.updateOpt) forall { oldUpdate =>
+      val isDifferentShortId = oldUpdate.shortChannelId != upd.shortChannelId
+      val isOldUpdateRefresh = !isDifferentShortId && oldUpdate.timestamp < upd.timestamp
+      isDifferentShortId || isOldUpdateRefresh
+    }
 
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
     // Transition must always be defined before vars are updated
@@ -216,7 +217,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (wait: WaitFundingDoneData, CMDConfirmed(fundTx), WAIT_FUNDING_DONE | SLEEPING) if fundTxId == fundTx.txid =>
-        // We have got an idempotent on-chain event while peer is online, inform peer and maybe become open
+        // Transaction has been confirmed, save our FundingLocked and inform peer if we are currently online
         val ourFirstFundingLocked = makeFirstFundingLocked(wait)
         val wait1 = wait.copy(our = ourFirstFundingLocked.some)
         if (wait1.their.isEmpty) me UPDATA STORE(wait1)
@@ -224,19 +225,16 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         me SEND ourFirstFundingLocked
 
 
-      case (wait: WaitFundingDoneData, CMDConfirmed(otherTx), _) if wait doubleSpendsFunding otherTx =>
-        // Other tx has successfully double-spent our channel funding, let user know on UI
-        throw new Exception("Channel funding transaction was double-spent!")
-
-
       // OPEN MODE
 
 
       case (norm: NormalData, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && !upd.isHosted =>
         // GUARD: due to timestamp filter the first update they send must be for our channel
+        println(s"-- GOT $upd")
         waitingUpdate = false
 
-        if (me isUpdatable upd contains true) {
+        if (me isUpdatable upd) {
+          println(s"-- UPDATABLE")
           // Update and store data but do not trigger listeners
           val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
           data = me STORE d1
@@ -908,7 +906,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(hc, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
         waitingUpdate = false
 
-        if (me isUpdatable upd contains true) {
+        if (me isUpdatable upd) {
           // Update and store data but do not trigger listeners
           val d1 = hc.modify(_.updateOpt) setTo Some(upd)
           data = me STORE d1
@@ -920,7 +918,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         BECOME(me STORE cs1, SUSPENDED)
 
 
-      case (hc: HostedCommits, CMDStateOverride(remoteOverride), SLEEPING | SUSPENDED) =>
+      case (hc: HostedCommits, CMDHostedStateOverride(remoteOverride), SLEEPING | SUSPENDED) =>
         val isRightLocalUpdateNumber = remoteOverride.localUpdates > hc.lastCrossSignedState.remoteUpdates
         val isRightRemoteUpdateNumber = remoteOverride.remoteUpdates > hc.lastCrossSignedState.localUpdates
         val isBlockdayAcceptable = math.abs(remoteOverride.blockDay - LNParams.broadcaster.currentBlockDay) <= 1

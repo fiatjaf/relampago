@@ -5,6 +5,7 @@ import android.widget._
 import org.bitcoinj.core._
 import collection.JavaConverters._
 import com.lightning.walletapp.ln._
+import org.bitcoinj.core.listeners._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.R.string._
@@ -15,6 +16,7 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import android.database.{ContentObserver, Cursor}
@@ -23,8 +25,6 @@ import scala.util.{Failure, Success, Try}
 import android.os.{Bundle, Handler}
 
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
-import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
-import org.bitcoinj.core.listeners.PeerConnectedEventListener
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
@@ -87,11 +87,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def onPeerConnected(peer: Peer, leftPeers: Int) = if (leftPeers == 1) updTitleTask.run
   }
 
-  val txsListener = new TxTracker {
+  val txsListener = new TxTracker with TransactionConfidenceEventListener {
     // isGreaterThan check because as of now both listeners are fired on incoming and outgoing txs
     def onCoinsSent(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (a isGreaterThan b) updBtcItems
     def onCoinsReceived(w: Wallet, txj: Transaction, a: Coin, b: Coin) = if (b isGreaterThan a) updBtcItems
-    override def txConfirmed(txj: Transaction) = UITask(adapter.notifyDataSetChanged).run
+
+    def onTransactionConfidenceChanged(w: Wallet, txj: Transaction) =
+      if (txj.getConfidence.getDepthInBlocks == minDepth)
+        UITask(adapter.notifyDataSetChanged).run
   }
 
   val loaderCallbacks = new LoaderCallbacks[Cursor] {

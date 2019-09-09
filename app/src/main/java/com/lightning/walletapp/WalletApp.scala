@@ -162,7 +162,6 @@ class WalletApp extends Application { me =>
       wallet.autosaveToFile(walletFile, 1000, MILLISECONDS, null)
       wallet.addCoinsSentEventListener(ChannelManager.chainEventsListener)
       wallet.addCoinsReceivedEventListener(ChannelManager.chainEventsListener)
-      wallet.addTransactionConfidenceEventListener(ChannelManager.chainEventsListener)
       peerGroup.addDisconnectedEventListener(ChannelManager.chainEventsListener)
 
       Future {
@@ -233,7 +232,6 @@ object ChannelManager extends Broadcaster {
     def onBlocksDownloaded(peer: Peer, b: Block, fb: FilteredBlock, left: Int) = onBlock(left)
     override def onChainDownloadStarted(peer: Peer, left: Int) = onBlock(left)
 
-    override def txConfirmed(txj: Transaction) = for (chan <- all) chan process CMDConfirmed(txj)
     def onCoinsReceived(wallet: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
     def onCoinsSent(wallet: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
 
@@ -281,6 +279,11 @@ object ChannelManager extends Broadcaster {
       val tier12Publishable = for (state <- close.tier12States if state.isPublishable) yield state.txn
       val toSend = close.mutualClose ++ close.localCommit.map(_.commitTx) ++ tier12Publishable
       for (tx <- toSend) try app.kit blockSend tx catch none
+
+    case (chan: NormalChannel, wait: WaitFundingDoneData, CMDChainTipKnown) if wait.our.isEmpty =>
+      // Once all pending blocks are received, check if funding transaction has been confirmed
+      val fundingDepth \ _ = broadcaster.getStatus(txid = wait.fundingTx.txid)
+      if (fundingDepth >= minDepth) chan process CMDConfirmed(wait.fundingTx)
 
     case (chan: Channel, _, CMDSocketOnline) =>
       // Memo that channel was online at least once
