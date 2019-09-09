@@ -98,16 +98,12 @@ object ChanErrorCodes {
   final val ERR_HOSTED_WRONG_BLOCKDAY = ByteVector.fromValidHex("0001")
   final val ERR_HOSTED_WRONG_LOCAL_SIG = ByteVector.fromValidHex("0002")
   final val ERR_HOSTED_WRONG_REMOTE_SIG = ByteVector.fromValidHex("0003")
-  final val ERR_HOSTED_WRONG_LOCAL_NUMBER = ByteVector.fromValidHex("0004")
-  final val ERR_HOSTED_WRONG_REMOTE_NUMBER = ByteVector.fromValidHex("0005")
-  final val ERR_HOSTED_UPDATE_CLTV_TOO_LOW = ByteVector.fromValidHex("0006")
+  final val ERR_HOSTED_UPDATE_CLTV_TOO_LOW = ByteVector.fromValidHex("0004")
 
   val hostedErrors = Map (
     ERR_HOSTED_WRONG_BLOCKDAY -> err_ln_hosted_wrong_blockday,
     ERR_HOSTED_WRONG_LOCAL_SIG -> err_ln_hosted_wrong_local_sig,
     ERR_HOSTED_WRONG_REMOTE_SIG -> err_ln_hosted_wrong_remote_sig,
-    ERR_HOSTED_WRONG_LOCAL_NUMBER -> err_ln_hosted_wrong_local_number,
-    ERR_HOSTED_WRONG_REMOTE_NUMBER -> err_ln_hosted_wrong_remote_number,
     ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low
   )
 }

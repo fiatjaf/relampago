@@ -82,7 +82,6 @@ object Features {
   }
 }
 
-class LightningTypedErrorException(code: ByteVector) extends RuntimeException(code.toHex)
 class LightningException(reason: String = "Failure") extends RuntimeException(reason)
 case class CMDAddImpossible(rd: RoutingData, code: Int) extends LightningException
 

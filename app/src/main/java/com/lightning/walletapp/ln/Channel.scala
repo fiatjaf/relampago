@@ -751,10 +751,10 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         val isRightLocalUpdateNumber = hc.lastCrossSignedState.localUpdates == remoteSU.remoteUpdates
         val isRemoteSigOk = lcss1.verifyRemoteSignature(hc.announce.nodeId)
 
-        if (!isBlockdayAcceptable) throw new LightningTypedErrorException(ERR_HOSTED_WRONG_BLOCKDAY)
-        if (!isRightRemoteUpdateNumber) throw new LightningTypedErrorException(ERR_HOSTED_WRONG_REMOTE_NUMBER)
-        if (!isRightLocalUpdateNumber) throw new LightningTypedErrorException(ERR_HOSTED_WRONG_LOCAL_NUMBER)
-        if (!isRemoteSigOk) throw new LightningTypedErrorException(ERR_HOSTED_WRONG_REMOTE_SIG)
+        if (!isBlockdayAcceptable) throw new LightningException("Their blockday is wrong")
+        if (!isRightRemoteUpdateNumber) throw new LightningException("Their remote update number is wrong")
+        if (!isRightLocalUpdateNumber) throw new LightningException("Their local update number is wrong")
+        if (!isRemoteSigOk) throw new LightningException("Their signature is wrong")
         BECOME(me STORE hc.copy(lastCrossSignedState = lcss1), OPEN)
 
 
@@ -803,7 +803,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, remoteSU: StateUpdate, OPEN)
-        // GUARD: only proceed if signture is defferent, the may send duplicates
+        // GUARD: only proceed if signture is defferent, they may send duplicates
         if hc.lastCrossSignedState.remoteSignature != remoteSU.localSigOfRemoteLCSS =>
 
         val lcss1 = hc.nextLocalLCSS.copy(blockDay = remoteSU.blockDay, remoteSignature = remoteSU.localSigOfRemoteLCSS)
@@ -815,7 +815,6 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         else if (!isBlockdayAcceptable) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
         else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else {
-          // They may send a few identical updates so only proceed if this one changes state
           val refreshedHC = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalReduced)
           val withoutChangesHC = me STORE refreshedHC.copy(localChanges = emptyChanges).resetUpdates
           me UPDATA withoutChangesHC SEND lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
@@ -885,6 +884,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         else if (isLocalSigOk && isAhead) BECOME(hc, OPEN) SEND hc.lastCrossSignedState
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
         else {
+          // Confirm we're OK and re-transmit our updates
           BECOME(hc.resetUpdates, OPEN) SEND localSU
           hc.localChanges.signed foreach SEND
         }
