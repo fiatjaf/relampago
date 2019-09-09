@@ -16,12 +16,12 @@ import org.bitcoinj.wallet.Wallet.ExceededMaxTransactionSize
 import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
 import android.widget.AdapterView.OnItemClickListener
 import concurrent.ExecutionContext.Implicits.global
-import com.lightning.walletapp.ln.LNParams.minDepth
 import android.support.v7.app.AppCompatActivity
 import android.support.v4.content.ContextCompat
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.View.OnClickListener
 import android.app.AlertDialog.Builder
+import org.bitcoinj.wallet.SendRequest
 import fr.acinq.bitcoin.MilliSatoshi
 import language.implicitConversions
 import org.bitcoinj.script.Script
@@ -33,7 +33,6 @@ import com.lightning.walletapp.lnutils.IconGetter.{maxDialog, scrWidth}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import com.lightning.walletapp.lnutils.{GDrive, RatesSaver}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
-import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
 import java.util.{Timer, TimerTask}
@@ -304,7 +303,6 @@ trait BlocksListener extends PeerDataEventListener {
   def onPreMessageReceived(peer: Peer, message: Message) = message
 }
 
-trait TxTracker extends WalletCoinsSentEventListener with WalletCoinsReceivedEventListener with TransactionConfidenceEventListener {
-  def onTransactionConfidenceChanged(w: Wallet, txj: Transaction) = if (txj.getConfidence.getDepthInBlocks == minDepth) txConfirmed(txj)
-  def txConfirmed(txj: Transaction): Unit = none
-}
+trait TxTracker
+  extends WalletCoinsSentEventListener
+    with WalletCoinsReceivedEventListener
