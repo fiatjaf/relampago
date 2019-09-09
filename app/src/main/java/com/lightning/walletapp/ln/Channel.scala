@@ -230,11 +230,9 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
       case (norm: NormalData, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && !upd.isHosted =>
         // GUARD: due to timestamp filter the first update they send must be for our channel
-        println(s"-- GOT $upd")
         waitingUpdate = false
 
         if (me isUpdatable upd) {
-          println(s"-- UPDATABLE")
           // Update and store data but do not trigger listeners
           val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
           data = me STORE d1
