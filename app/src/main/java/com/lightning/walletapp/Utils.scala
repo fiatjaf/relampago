@@ -58,8 +58,9 @@ object Utils {
   // Mappings
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
   val fiatNames = Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan",
-    "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel ", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
-    "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling", "aud" -> "Australian Dollar")
+    "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
+    "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling",
+    "aud" -> "Australian Dollar")
 
   def getDescription(raw: String) = if (raw.isEmpty) s"<i>$noDesc</i>" else raw take 140
   def humanSix(bitcoinAddress: String) = bitcoinAddress grouped 6 mkString "\u0020"
