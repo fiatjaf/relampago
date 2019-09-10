@@ -25,8 +25,9 @@ import scodec.bits.ByteVector
 
 
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
-  private[this] var unsentPayments = Map.empty[ByteVector, RoutingData]
   var acceptedPayments = Map.empty[ByteVector, RoutingData]
+  var unsentPayments = Map.empty[ByteVector, RoutingData]
+  var failOnUI: RoutingData => Unit = _
 
   def addPendingPayment(rd: RoutingData) = {
     // Add payment to unsentPayments and try to resolve it later
@@ -95,12 +96,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def markFailedPayments = db txWrap {
     db.change(PaymentTable.updFailWaitingSql, System.currentTimeMillis - PaymentRequest.expiryTag.seconds * 1000L)
     for (activeInFlightHash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, activeInFlightHash)
-  }
-
-  def failOnUI(rd: RoutingData) = {
-    unsentPayments = unsentPayments - rd.pr.paymentHash
-    updStatus(FAILURE, rd.pr.paymentHash)
-    uiNotify
   }
 
   override def outPaymentAccepted(rd: RoutingData) = {

@@ -63,13 +63,14 @@ object PaymentInfo {
     }
 
     val isCltvBreach = lastExpiry - LNParams.broadcaster.currentHeight > LNParams.maxCltvDelta
-    val onChainBlock = rd.onChainFeeCap && MilliSatoshi(lastMsat - rd.firstMsat) > onChainThreshold
-    val isFeeBreach = LNParams.isFeeBreach(route, rd.firstMsat) || onChainBlock
+    val onChainBlocked = rd.onChainFeeBlock && MilliSatoshi(lastMsat - rd.firstMsat) > onChainThreshold
+    val isOffChainFeeBreach = LNParams.isFeeBreach(route, rd.firstMsat) || onChainBlocked
+    val rd1 = if (onChainBlocked) rd.copy(onChainFeeBlockWasUsed = true) else rd
 
-    if (isFeeBreach || isCltvBreach) useFirstRoute(rest, rd) else {
-      val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, payloads = allPayloads, assoc = rd.pr.paymentHash)
-      val rd1 = rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
-      Right(rd1)
+    if (isOffChainFeeBreach || isCltvBreach) useFirstRoute(rest, rd1) else {
+      val onion = buildOnion(keys = nodeIds :+ rd1.pr.nodeId, payloads = allPayloads, assoc = rd1.pr.paymentHash)
+      val rd2 = rd1.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
+      Right(rd2)
     }
   }
 
@@ -173,9 +174,10 @@ object PaymentInfo {
 }
 
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
-                       onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */,
-                       lastMsat: Long /* amount with off-chain fee added */, lastExpiry: Long, callsLeft: Int,
-                       useCache: Boolean, airLeft: Int, onChainFeeCap: Boolean, retriedRoutes: PaymentRouteVec) {
+                       onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */ ,
+                       lastMsat: Long /* amount with off-chain fee added */ , lastExpiry: Long, callsLeft: Int,
+                       useCache: Boolean, airLeft: Int, onChainFeeBlock: Boolean, onChainFeeBlockWasUsed: Boolean,
+                       retriedRoutes: PaymentRouteVec) {
 
   // Empty used route means we're sending to peer and its nodeId should be our targetId
   def nextNodeId(route: PaymentRoute) = route.headOption.map(_.nodeId) getOrElse pr.nodeId

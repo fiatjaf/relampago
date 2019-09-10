@@ -13,7 +13,6 @@ import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
-import scala.util.{Success, Try}
 import android.app.{Activity, AlertDialog}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
@@ -37,6 +36,7 @@ import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
+import scala.util.Try
 
 
 trait SearchBar { me =>
@@ -143,6 +143,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrap(me setDetecting true)(me initNfc state)
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
+
+    PaymentInfoWrap.failOnUI = rd => {
+      PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash
+      PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
+      if (rd.onChainFeeBlockWasUsed) UITask(app toast ln_fee_expesive_omitted).run
+      PaymentInfoWrap.uiNotify
+    }
 
     val backupUnknownOrFailed = app.prefs.getLong(AbstractKit.GDRIVE_LAST_SAVE, 0L) <= 0L
     val needsCheck = !GDrive.isMissing(app) && app.prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true) && backupUnknownOrFailed

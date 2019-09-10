@@ -145,6 +145,7 @@
     <string name="sets_ln_fee_cap">Limit LN fees to chain fees</string>
     <string name="ln_fee_cap_disabled"><![CDATA[Disabled, maximum LN fee is at most <strong>%1$s</strong> of payment]]></string>
     <string name="ln_fee_cap_enabled"><![CDATA[Enabled, maximum LN fee is at most <strong>%1$s</strong> of payment, but not higher than current on-chain fee of <strong>%2$s</strong>]]></string>
+    <string name="ln_fee_expesive_omitted">Expensive routes were omitted, remove LN fee limit in settings if you would like to try more expensive routes</string>
 
     <array name="info_progress">
         <item>Sync is complete</item>
