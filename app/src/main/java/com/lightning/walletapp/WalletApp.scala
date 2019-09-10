@@ -105,10 +105,12 @@ class WalletApp extends Application { me =>
     NodeAnnouncement(signature = sign(Zeroes, randomPrivKey), features = ByteVector.empty,
       timestamp = 0L, nodeId = id, (-128, -128, -128), alias take 16, addresses = na :: Nil)
 
-  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) =
+  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
+    val useOnChainFeeCap = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, PacketAndSecrets(emptyOnionPacket, Vector.empty),
-      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache = useCache, airLeft = 0,
-      onChainFeeCap = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false), retriedRoutes = Vector.empty)
+      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeCap) 8 else 4, useCache = useCache,
+      airLeft = 0, onChainFeeCap = useOnChainFeeCap, retriedRoutes = Vector.empty)
+  }
 
   object TransData {
     var value: Any = new String
