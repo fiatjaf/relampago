@@ -140,6 +140,7 @@
     <string name="sets_ln_fee_cap">Ограничить размер LN-комиссий</string>
     <string name="ln_fee_cap_disabled"><![CDATA[Отключено, максимальная LN-комиссия равна <strong>%1$s</strong> от суммы платежа]]></string>
     <string name="ln_fee_cap_enabled"><![CDATA[Включено, максимальная LN-комиссия равна <strong>%1$s</strong> от суммы платежа, но не выше чем текущая ончейн комиссия <strong>%2$s</strong>]]></string>
+    <string name="ln_fee_expesive_omitted">Дорогие маршруты не использовались: уберите ограничение на LN-комиссию в настройках чтобы попробовать более дорогие маршруты</string>
 
     <array name="info_progress">
         <item>Синхронизация завершена</item>

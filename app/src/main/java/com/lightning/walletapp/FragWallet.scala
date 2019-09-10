@@ -325,7 +325,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val inFiat = msatInFiatHuman(info.firstSum)
       val retry = if (info.pr.isFresh) dialog_retry else -1
-      val rd = app.emptyRD(info.pr, info.firstMsat, useCache = false)
+      val newRD = app.emptyRD(info.pr, info.firstMsat, useCache = false)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
       val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
@@ -345,9 +345,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         }
       }
 
-      PaymentInfoWrap.acceptedPayments get rd.pr.paymentHash foreach { rd1 =>
+      PaymentInfoWrap.acceptedPayments get newRD.pr.paymentHash foreach { rd1 =>
         val routingPath = for (usedHop <- rd1.usedRoute) yield usedHop.humanDetails
-        val errors = PaymentInfo.errors.getOrElse(rd.pr.paymentHash, Vector.empty).reverse.map(_.toString) mkString "\n==\n"
+        val errors = PaymentInfo.errors.getOrElse(newRD.pr.paymentHash, Vector.empty).reverse.map(_.toString) mkString "\n==\n"
         val receiverInfo = s"Payee node ID: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
         val debugInfo = ("Your wallet" +: routingPath :+ receiverInfo mkString "\n-->\n") + s"\n\n$errors"
         paymentDebug setOnClickListener onButtonTap(host share debugInfo)
@@ -361,7 +361,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         app.getString(ln_outgoing_title).format(humanStatus, sentHuman, inFiat, denom.coloredOut(fee, denom.sign), paidFeePercent)
       }
 
-      info.incoming -> rd.pr.fallbackAddress -> rd.pr.amount match {
+      info.incoming -> newRD.pr.fallbackAddress -> newRD.pr.amount match {
         case 0 \ Some(adr) \ Some(amount) if info.lastExpiry == 0 && info.status == FAILURE =>
           // Payment was failed without even trying because wallet is offline or no suitable routes were found
           mkCheckFormNeutral(_.dismiss, none, neutral = onChain(adr, amount), baseBuilder(app.getString(ln_outgoing_title_no_fee)
@@ -374,12 +374,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         case 0 \ Some(adr) \ Some(amount) if info.status == FAILURE =>
           // Offer a fallback on-chain address along with off-chain retry
-          mkCheckFormNeutral(_.dismiss, doSendOffChain(rd), neutral = onChain(adr, amount),
+          mkCheckFormNeutral(_.dismiss, doSendOffChain(newRD), neutral = onChain(adr, amount),
             baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry, dialog_pay_onchain)
 
         case 0 \ _ \ _ if info.status == FAILURE =>
           // Allow off-chain retry only, no on-chain fallback options since no embedded address is present
-          mkCheckForm(_.dismiss, doSendOffChain(rd), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry)
+          mkCheckForm(_.dismiss, doSendOffChain(newRD), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry)
 
         case _ =>
           val incomingTitle = app.getString(ln_incoming_title).format(humanStatus, denom.coloredIn(info.firstSum, denom.sign), inFiat)

@@ -71,7 +71,7 @@ class WalletApp extends Application { me =>
   // Various utilities
 
   def toast(code: Int): Unit = toast(me getString code)
-  def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_SHORT).show
+  def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def plur1OrZero(opts: Array[String], num: Long) = if (num > 0) plur(opts, num).format(num) else opts(0)
   def getBufferUnsafe = clipboardManager.getPrimaryClip.getItemAt(0).getText.toString
@@ -106,10 +106,10 @@ class WalletApp extends Application { me =>
       timestamp = 0L, nodeId = id, (-128, -128, -128), alias take 16, addresses = na :: Nil)
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
-    val useOnChainFeeCap = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
-    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, PacketAndSecrets(emptyOnionPacket, Vector.empty),
-      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeCap) 8 else 4, useCache = useCache,
-      airLeft = 0, onChainFeeCap = useOnChainFeeCap, retriedRoutes = Vector.empty)
+    val useOnChainFeeBlock = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
+    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, onion = PacketAndSecrets(emptyOnionPacket, Vector.empty),
+      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeBlock) 8 else 4, useCache = useCache,
+      airLeft = 0, onChainFeeBlock = useOnChainFeeBlock, onChainFeeBlockWasUsed = false, retriedRoutes = Vector.empty)
   }
 
   object TransData {

@@ -143,6 +143,14 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrap(me setDetecting true)(me initNfc state)
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
+
+    PaymentInfoWrap.failOnUI = rd => {
+      PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash
+      PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
+      if (rd.onChainFeeBlockWasUsed) UITask(app toast ln_fee_expesive_omitted).run
+      PaymentInfoWrap.uiNotify
+    }
+
   } else me exitTo classOf[MainActivity]
 
   override def onActivityResult(reqCode: Int, resultCode: Int, results: Intent) = {
