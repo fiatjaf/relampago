@@ -61,13 +61,13 @@ object LNParams {
   def hopFee(msat: Long, base: Long, proportional: Long) = base + (proportional * msat) / 1000000L
   def maxAcceptableFee(msat: Long, hops: Int, percent: Long = 100L) = 25000 * (hops + 1) + msat / percent
 
-  def estimateCompoundFee(route: PaymentRoute) = getCompoundFee(route, 10000000L)
-  def getCompoundFee(route: PaymentRoute, msat: Long) = route.reverse.foldLeft(msat) {
+  def estTotalRouteFee(route: PaymentRoute) = totalRouteFee(route, 10000000L)
+  def totalRouteFee(route: PaymentRoute, msat: Long) = route.reverse.foldLeft(msat) {
     case amount \ hop => amount + hopFee(amount, hop.feeBaseMsat, hop.feeProportionalMillionths)
   } - msat
 
   def isFeeBreach(route: PaymentRoute, msat: Long, divider: Long = 100L) =
-    getCompoundFee(route, msat) > maxAcceptableFee(msat, route.size, divider)
+    totalRouteFee(route, msat) > maxAcceptableFee(msat, route.size, divider)
 
   def shouldUpdateFee(network: Long, commit: Long) = {
     val mismatch = 2.0 * (network - commit) / (commit + network)

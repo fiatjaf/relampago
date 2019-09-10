@@ -451,7 +451,7 @@ object ChannelManager extends Broadcaster {
       rs <- paymentRoutesObs
       busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, channel => channel.inFlightHtlcs.size)
       openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, channel => if (channel.state == OPEN) 0 else 1)
-    } yield useFirstRoute(rs.sortBy(estimateCompoundFee).sortBy(busyMap compose rd.nextNodeId).sortBy(openMap compose rd.nextNodeId), rd)
+    } yield useFirstRoute(rs.sortBy(estTotalRouteFee).sortBy(busyMap compose rd.nextNodeId).sortBy(openMap compose rd.nextNodeId), rd)
   }
 
   def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
