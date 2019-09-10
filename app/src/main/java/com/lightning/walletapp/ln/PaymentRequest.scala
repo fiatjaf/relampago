@@ -32,6 +32,10 @@ case class DescriptionTag(description: String) extends Tag {
   def toInt5s = encode(Bech32 eight2five description.getBytes, 'd')
 }
 
+case class DescriptionHashTag(hash: ByteVector) extends Tag {
+  def toInt5s = encode(Bech32 eight2five hash.toArray, 'h')
+}
+
 object LNUrl {
   def fromBech32(bech32url: String) = {
     val _ \ data = Bech32.decode(bech32url)
@@ -110,15 +114,21 @@ case class UnknownTag(tag: Int5, int5s: Bytes) extends Tag {
   def toInt5s = tag +: (writeSize(int5s.length) ++ int5s)
 }
 
-case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestamp: Long,
-                          nodeId: PublicKey, tags: Vector[Tag], signature: ByteVector) {
+case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestamp: Long, nodeId: PublicKey, tags: Vector[Tag], signature: ByteVector) {
+  require(tags.collect { case _: DescriptionTag | _: DescriptionHashTag => true }.size == 1, "There can only be one description or description hash tag")
+  require(tags.collect { case _: PaymentHashTag => true }.size == 1, "There must be exactly one payment hash tag")
+  for (MilliSatoshi(sum) <- amount) require(sum > 0L, "Amount is not valid")
 
   lazy val msatOrMin = amount getOrElse MilliSatoshi(1L)
   lazy val adjustedMinFinalCltvExpiry = minFinalCltvExpiry.getOrElse(0L) + 10L
-  lazy val description = tags.collectFirst { case DescriptionTag(info) => info }.getOrElse(new String)
   lazy val minFinalCltvExpiry = tags.collectFirst { case m: MinFinalCltvExpiryTag => m.expiryDelta }
   lazy val paymentHash = tags.collectFirst { case payHash: PaymentHashTag => payHash.hash }.get
   lazy val routingInfo = tags.collect { case r: RoutingInfoTag => r }
+
+  lazy val description = tags.collectFirst {
+    case DescriptionHashTag(hash) => hash.toHex
+    case DescriptionTag(info) => info
+  } getOrElse new String
 
   lazy val fallbackAddress = tags.collectFirst {
     case FallbackAddressTag(17, hash) if prefix == "lnbc" => Base58Check.encode(Base58.Prefix.PubkeyAddress, hash)
@@ -230,11 +240,15 @@ object PaymentRequest {
       input.head match {
         case pTag if pTag == Bech32.map('p') =>
           val hash = Bech32 five2eight input.slice(3, 52 + 3)
-          PaymentHashTag(ByteVector apply hash)
+          PaymentHashTag(ByteVector view hash)
 
         case dTag if dTag == Bech32.map('d') =>
           val description = Bech32 five2eight input.slice(3, len + 3)
           DescriptionTag(Tools bin2readable description)
+
+        case hTag if hTag == Bech32.map('h') =>
+          val hash = Bech32 five2eight input.slice(3, len + 3)
+          DescriptionHashTag(ByteVector view hash)
 
         case fTag if fTag == Bech32.map('f') =>
           val fallbackAddress = input.slice(4, len + 4 - 1)
