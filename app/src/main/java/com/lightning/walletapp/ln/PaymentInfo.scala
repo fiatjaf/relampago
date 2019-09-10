@@ -22,7 +22,6 @@ object PaymentInfo {
 
   final val NOT_SENDABLE = 0
   final val SENDABLE_AIR = 1
-  final val SENDABLE_MULTIPART = 2
 
   final val NOIMAGE = ByteVector.fromValidHex("3030303030303030")
   final val NOCHANID = ByteVector.fromValidHex("3131313131313131")
@@ -36,11 +35,6 @@ object PaymentInfo {
   var errors = Map.empty[ByteVector, FailureTryVec] withDefaultValue Vector.empty
   private[this] var replacedChans = Set.empty[Long]
 
-  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean, airLeft: Int) =
-    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, PacketAndSecrets(emptyOnionPacket, Vector.empty),
-      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache = useCache, airLeft = airLeft,
-      retriedRoutes = Vector.empty)
-
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: ByteVector): PacketAndSecrets = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
     val encodedPayloads = for (rawPayload <- payloads) yield serialize(OnionCodecs.perHopPayloadCodec encode rawPayload)
@@ -52,6 +46,7 @@ object PaymentInfo {
     case _ => Left(rd)
   }
 
+  def onChainThreshold = Scripts.weight2fee(LNParams.broadcaster.perKwSixSat, 650)
   def useRoute(route: PaymentRoute, rest: PaymentRouteVec, rd: RoutingData): FullOrEmptyRD = {
     // 9 + 1 block in case if block just appeared and there is a 1-block discrepancy between peers
     val firstExpiry = LNParams.broadcaster.currentHeight + rd.pr.adjustedMinFinalCltvExpiry
@@ -68,7 +63,10 @@ object PaymentInfo {
     }
 
     val isCltvBreach = lastExpiry - LNParams.broadcaster.currentHeight > LNParams.maxCltvDelta
-    if (LNParams.isFeeBreach(route, rd.firstMsat) || isCltvBreach) useFirstRoute(rest, rd) else {
+    val onChainBlock = rd.onChainFeeCap && MilliSatoshi(lastMsat - rd.firstMsat) > onChainThreshold
+    val isFeeBreach = LNParams.isFeeBreach(route, rd.firstMsat) || onChainBlock
+
+    if (isFeeBreach || isCltvBreach) useFirstRoute(rest, rd) else {
       val onion = buildOnion(keys = nodeIds :+ rd.pr.nodeId, payloads = allPayloads, assoc = rd.pr.paymentHash)
       val rd1 = rd.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
       Right(rd1)
@@ -176,8 +174,8 @@ object PaymentInfo {
 
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
                        onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */,
-                       lastMsat: Long /* amount with off-chain fee */, lastExpiry: Long, callsLeft: Int,
-                       useCache: Boolean, airLeft: Int, retriedRoutes: PaymentRouteVec) {
+                       lastMsat: Long /* amount with off-chain fee added */, lastExpiry: Long, callsLeft: Int,
+                       useCache: Boolean, airLeft: Int, onChainFeeCap: Boolean, retriedRoutes: PaymentRouteVec) {
 
   // Empty used route means we're sending to peer and its nodeId should be our targetId
   def nextNodeId(route: PaymentRoute) = route.headOption.map(_.nodeId) getOrElse pr.nodeId

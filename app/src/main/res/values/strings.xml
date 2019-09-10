@@ -141,6 +141,11 @@
         will only be using your trusted node instead of random ones.</small>
     ]]></string>
 
+    <!-- ln fee cap -->
+    <string name="sets_ln_fee_cap">Limit LN fees to chain fees</string>
+    <string name="ln_fee_cap_disabled"><![CDATA[Disabled, maximum LN fee is at most <strong>%1$s</strong> of payment]]></string>
+    <string name="ln_fee_cap_enabled"><![CDATA[Enabled, maximum LN fee is at most <strong>%1$s</strong> of payment, but not higher than current on-chain fee of <strong>%2$s</strong>]]></string>
+
     <array name="info_progress">
         <item>Sync is complete</item>
         <item><![CDATA[<font color=#E68A00>Sync: %1$d day behind</font>]]></item>

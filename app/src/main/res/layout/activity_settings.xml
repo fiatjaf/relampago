@@ -53,6 +53,20 @@
                 android:layout_width="match_parent"
                 android:maxLines="1"/>
 
+            <View style="@style/GrayDivider"/>
+
+            <CheckBox
+                style="@style/RightCheckBox"
+                android:id="@+id/constrainLNFees"
+                android:text="@string/sets_ln_fee_cap"
+                android:onClick="onConstrainLNFeesTap"/>
+
+            <TextView
+                style="@style/BaseText"
+                android:layout_marginBottom="15dp"
+                android:id="@+id/constrainLNFeesState"
+                android:layout_width="match_parent"/>
+
             <!-- BUTTONS -->
 
             <View style="@style/GrayDivider"/>

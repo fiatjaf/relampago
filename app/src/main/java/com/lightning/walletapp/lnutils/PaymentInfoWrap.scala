@@ -81,7 +81,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   def recordRoutingDataWithPr(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: ByteVector, description: String): RoutingData = {
     val pr = PaymentRequest(chainHash, amount = Some(sum), Crypto sha256 preimage, nodePrivateKey, description, fallbackAddress = None, extraRoutes)
-    val rd = emptyRD(pr, sum.amount, useCache = true, airLeft = 0)
+    val rd = app.emptyRD(pr, sum.amount, useCache = true)
 
     db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
     db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* this is incoming payment */, WAITING,
@@ -114,7 +114,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     me updOkOutgoing ok
 
     acceptedPayments get ok.paymentHash foreach { rd =>
-      val isFeeLow = !isFeeBreach(rd.usedRoute, rd.firstMsat, divider = 1000L)
+      val isFeeLow = !isFeeBreach(rd.usedRoute, rd.firstMsat, percent = 1000L)
       db.change(PaymentTable.newVirtualSql, rd.queryText, rd.pr.paymentHash)
       if (rd.usedRoute.nonEmpty && isFeeLow) RouteWrap cacheSubRoutes rd
     }
