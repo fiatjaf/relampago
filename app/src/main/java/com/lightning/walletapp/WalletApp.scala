@@ -12,6 +12,7 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.NormalChannel._
+import com.lightning.walletapp.ln.crypto.Sphinx._
 import com.google.common.util.concurrent.Service.State._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
@@ -103,6 +104,11 @@ class WalletApp extends Application { me =>
   def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) =
     NodeAnnouncement(signature = sign(Zeroes, randomPrivKey), features = ByteVector.empty,
       timestamp = 0L, nodeId = id, (-128, -128, -128), alias take 16, addresses = na :: Nil)
+
+  def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) =
+    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, PacketAndSecrets(emptyOnionPacket, Vector.empty),
+      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = 4, useCache = useCache, airLeft = 0,
+      onChainFeeCap = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false), retriedRoutes = Vector.empty)
 
   object TransData {
     var value: Any = new String

@@ -325,7 +325,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       val inFiat = msatInFiatHuman(info.firstSum)
       val retry = if (info.pr.isFresh) dialog_retry else -1
-      val rd = emptyRD(info.pr, info.firstMsat, useCache = false, airLeft = 0)
+      val rd = app.emptyRD(info.pr, info.firstMsat, useCache = false)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
       val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
@@ -516,7 +516,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   abstract class OffChainSender(pr: PaymentRequest) {
     val maxCanSend = MilliSatoshi(ChannelManager.estimateAIRCanSend)
-    val rd = emptyRD(pr, firstMsat = pr.msatOrMin.amount, useCache = true, airLeft = 0)
+    val rd = app.emptyRD(pr, firstMsat = pr.msatOrMin.amount, useCache = true)
     val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCanSend)
     val rateManager = new RateManager(baseContent) hint baseHint

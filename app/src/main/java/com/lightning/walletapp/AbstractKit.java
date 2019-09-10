@@ -20,6 +20,7 @@ public abstract class AbstractKit extends AbstractIdleService {
     public static final String SHOW_TOOLTIP = "showTooltip";
     public static final String ERROR_REPORT = "errorReport";
     public static final String DENOM_TYPE = "denomType1";
+    public static final String CAP_LN_FEES = "capLNFees";
     public static final String RATES_DATA = "ratesData";
     public static final String FIAT_TYPE = "fiatType1";
     public static final String TOP_NODES = "topNodes";

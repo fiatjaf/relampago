@@ -3,7 +3,6 @@ package com.lightning.walletapp.lnutils.olympus
 import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.lnutils._
-import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
@@ -106,8 +105,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   def isAuthEnabled = 1 == auth
   def retryFreshRequest(failedPr: PaymentRequest): Unit = {
-    val rd = emptyRD(failedPr, failedPr.msatOrMin.amount, useCache = true, airLeft = 0)
     val isOk = ChannelManager.mostFundedChanOpt.exists(_.estCanSendMsat >= failedPr.msatOrMin.amount)
-    if (isOk) PaymentInfoWrap.addPendingPayment(rd)
+    if (isOk) PaymentInfoWrap addPendingPayment app.emptyRD(failedPr, failedPr.msatOrMin.amount, useCache = true)
   }
 }

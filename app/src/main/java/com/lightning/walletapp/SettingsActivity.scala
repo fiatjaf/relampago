@@ -41,8 +41,12 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val gDriveBackups = findViewById(R.id.gDriveBackups).asInstanceOf[CheckBox]
   lazy val useTrustedNode = findViewById(R.id.useTrustedNode).asInstanceOf[CheckBox]
   lazy val fpAuthentication = findViewById(R.id.fpAuthentication).asInstanceOf[CheckBox]
+  lazy val constrainLNFees = findViewById(R.id.constrainLNFees).asInstanceOf[CheckBox]
+
   lazy val gDriveBackupState = findViewById(R.id.gDriveBackupState).asInstanceOf[TextView]
   lazy val useTrustedNodeState = findViewById(R.id.useTrustedNodeState).asInstanceOf[TextView]
+  lazy val constrainLNFeesState = findViewById(R.id.constrainLNFeesState).asInstanceOf[TextView]
+
   lazy val exportWalletSnapshot = findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
   lazy val chooseBitcoinUnit = findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
   lazy val recoverFunds = findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
@@ -150,11 +154,17 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     }
   }
 
+  def onConstrainLNFeesTap(cb: View) = wrap(updateConstrainLNFeesView) {
+    app.prefs.edit.putBoolean(AbstractKit.CAP_LN_FEES, constrainLNFees.isChecked).commit
+  }
+
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_settings
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
     getSupportActionBar setSubtitle "App version 0.3-138"
     getSupportActionBar setTitle wallet_settings
+
+    updateConstrainLNFeesView
     updateTrustedView
     updateBackupView
     updateFpView
@@ -314,5 +324,12 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     if (naTry.isFailure) useTrustedNodeState setText trusted_hint_none
     else useTrustedNodeState setText naTry.get.toString
     useTrustedNode setChecked naTry.isSuccess
+  }
+
+  def updateConstrainLNFeesView = {
+    constrainLNFees setChecked app.prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
+    val constrainedText = getString(ln_fee_cap_enabled).format("1%", denom parsedWithSign PaymentInfo.onChainThreshold)
+    val message = if (constrainLNFees.isChecked) constrainedText else getString(ln_fee_cap_disabled).format("1%")
+    constrainLNFeesState setText message.html
   }
 }

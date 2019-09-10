@@ -136,6 +136,11 @@
         використовувати тільки ваш Біткоїн-вузол, а не випадкові з мережі</small>
     ]]></string>
 
+    <!-- ln fee cap -->
+    <string name="sets_ln_fee_cap">Обмежити розмір LN-комісій</string>
+    <string name="ln_fee_cap_disabled"><![CDATA[Відключено, максимальна LN-комісія дорівнює <strong>%1$s</strong> від суми платежу]]></string>
+    <string name="ln_fee_cap_enabled"><![CDATA[Включено, максимальна LN-комісія дорівнює <strong>%1$s</strong> від суми платежу, але не вище ніж поточна ончейн комісія <strong>%2$s</strong>]]></string>
+
     <array name="info_progress">
         <item>Синхронізацію завершено</item>
         <item><![CDATA[<font color=#E68A00>Синхронізація %1$d день</font>]]></item>
