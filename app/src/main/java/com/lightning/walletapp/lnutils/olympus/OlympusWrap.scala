@@ -117,8 +117,8 @@ class Connector(val url: String) extends OlympusProvider {
   def getRates = ask[Result]("rates/get")
   def getBackup(key: ByteVector) = ask[StringVec]("data/get", "key" -> key.toHex)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
-  def getChildTxs(txIds: ByteVecSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
-  def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.hex)
+  def getChildTxs(txIds: ByteVecSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.s2hex)
+  def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.s2hex)
   def http(requestPath: String) = post(s"$url/$requestPath", true).trustAllCerts.trustAllHosts.connectTimeout(15000)
 }
 

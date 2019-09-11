@@ -61,7 +61,7 @@ object Utils {
     "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling",
     "aud" -> "Australian Dollar")
 
-  def getDescription(raw: String) = if (raw.isEmpty) s"<i>$noDesc</i>" else raw take 140
+  def getDescription(raw: String) = if (raw.isEmpty) s"<i>$noDesc</i>" else raw take 72
   def humanSix(bitcoinAddress: String) = bitcoinAddress grouped 6 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {

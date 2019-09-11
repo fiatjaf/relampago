@@ -99,7 +99,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         val ecBlind = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
 
         val memo = BlindMemo(ecBlind params quantity, ecBlind tokens quantity, pubKeyR.getPublicKeyAsHex)
-        connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
+        connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.s2hex,
           "seskey" -> memo.key).map(PaymentRequest.read).map(pr => pr -> memo)
     }
 

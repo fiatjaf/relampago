@@ -36,21 +36,6 @@ case class DescriptionHashTag(hash: ByteVector) extends Tag {
   def toInt5s = encode(Bech32 eight2five hash.toArray, 'h')
 }
 
-object LNUrl {
-  def fromBech32(bech32url: String) = {
-    val _ \ data = Bech32.decode(bech32url)
-    val request = Bech32.five2eight(data)
-    LNUrl(Tools bin2readable request)
-  }
-}
-
-case class LNUrl(request: String) {
-  val uri = android.net.Uri.parse(request)
-  require(uri.toString contains "https://", "First level uri is not an HTTPS endpoint")
-  lazy val isLogin: Boolean = Try(uri getQueryParameter "tag" contains "login").getOrElse(false)
-  lazy val k1: Try[String] = Try(uri getQueryParameter "k1")
-}
-
 case class FallbackAddressTag(version: Byte, hash: ByteVector) extends Tag {
   def toInt5s = encode(version +: Bech32.eight2five(hash.toArray), 'f')
 }
@@ -121,8 +106,8 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
 
   lazy val msatOrMin = amount getOrElse MilliSatoshi(1L)
   lazy val adjustedMinFinalCltvExpiry = minFinalCltvExpiry.getOrElse(0L) + 10L
-  lazy val minFinalCltvExpiry = tags.collectFirst { case m: MinFinalCltvExpiryTag => m.expiryDelta }
-  lazy val paymentHash = tags.collectFirst { case payHash: PaymentHashTag => payHash.hash }.get
+  lazy val minFinalCltvExpiry = tags.collectFirst { case MinFinalCltvExpiryTag(delta) => delta }
+  lazy val paymentHash = tags.collectFirst { case PaymentHashTag(hash) => hash }.get
   lazy val routingInfo = tags.collect { case r: RoutingInfoTag => r }
 
   lazy val description = tags.collectFirst {

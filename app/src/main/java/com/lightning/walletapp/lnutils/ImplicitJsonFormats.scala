@@ -14,7 +14,7 @@ import fr.acinq.eclair.UInt64
 import java.math.BigInteger
 import scodec.Codec
 
-import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData, WithdrawRequest}
+import com.lightning.walletapp.{IncomingChannelRequest, LNUrlData, PayRequest, WithdrawRequest}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import fr.acinq.bitcoin.{MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
@@ -112,25 +112,24 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   // LNURL
 
   implicit object LNUrlDataFmt extends JsonFormat[LNUrlData] {
-    def write(unserialized: LNUrlData): JsValue = unserialized match {
-      case unserialiedMessage: IncomingChannelRequest => unserialiedMessage.toJson
-      case unserialiedMessage: WithdrawRequest => unserialiedMessage.toJson
-    }
-
+    def write(unserialized: LNUrlData): JsValue = throw new RuntimeException
     def read(serialized: JsValue): LNUrlData = serialized.asJsObject fields TAG match {
       case JsString("channelRequest") => serialized.convertTo[IncomingChannelRequest]
       case JsString("withdrawRequest") => serialized.convertTo[WithdrawRequest]
+      case JsString("payRequest") => serialized.convertTo[PayRequest]
       case _ => throw new RuntimeException
     }
   }
 
   implicit val incomingChannelRequestFmt = taggedJsonFmt(jsonFormat[String, String, String,
-    IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1"),
-    tag = "channelRequest")
+    IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1"), tag = "channelRequest")
 
   implicit val withdrawRequestFmt = taggedJsonFmt(jsonFormat[String, String, Long, String, Option[Long],
     WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxWithdrawable", "defaultDescription",
     "minWithdrawable"), tag = "withdrawRequest")
+
+  implicit val payRequestFmt = taggedJsonFmt(jsonFormat[Vector[PayRequest.Route], Long, Long, String, String,
+    PayRequest](PayRequest.apply, "routes", "maxSendable", "minSendable", "metadata", "pr"), tag = "payRequest")
 
   // Channel data
 

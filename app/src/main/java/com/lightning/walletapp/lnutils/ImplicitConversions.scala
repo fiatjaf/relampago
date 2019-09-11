@@ -61,6 +61,6 @@ object IconGetter extends Html.ImageGetter {
 
 class StringOps(source: String) {
   def html = Html.fromHtml(source, IconGetter, null)
-  def hex = ByteVector.view(source getBytes "UTF-8").toHex
+  def s2hex = ByteVector.view(source getBytes "UTF-8").toHex
   def noSpaces = source.replace(" ", "").replace("\u00A0", "")
 }

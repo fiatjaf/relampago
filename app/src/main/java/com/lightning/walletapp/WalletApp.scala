@@ -403,7 +403,7 @@ object ChannelManager extends Broadcaster {
     }
 
     def ASKREFUNDPEER(some: HasNormalCommits, point: Point) = {
-      val msg = ByteVector.fromValidHex("please publish your local commitment".hex)
+      val msg = ByteVector.fromValidHex("please publish your local commitment".s2hex)
       val ref = RefundingData(some.announce, Some(point), some.commitments)
       val error = Error(some.commitments.channelId, msg)
 

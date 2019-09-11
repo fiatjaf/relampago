@@ -746,17 +746,17 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
   def doProcess(change: Any) = {
     Tuple3(data, change, state) match {
-      case (wait: WaitTheirHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
+      case (wait: WaitRemoteHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
         if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initMsg
         isSocketConnected = true
 
 
-      case (wait: WaitTheirHostedReply, CMDChainTipKnown, WAIT_FOR_INIT) =>
+      case (wait: WaitRemoteHostedReply, CMDChainTipKnown, WAIT_FOR_INIT) =>
         if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initMsg
         isChainHeightKnown = true
 
 
-      case (WaitTheirHostedReply(announce, refundScriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
+      case (WaitRemoteHostedReply(announce, refundScriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
         if (init.liabilityDeadlineBlockdays < LNParams.minHostedLiabilityBlockdays) throw new LightningException("Their liability deadline is too low")
         if (init.initialClientBalanceMsat > init.channelCapacityMsat) throw new LightningException("Their init balance for us is larger than capacity")
         if (init.minimalOnchainRefundAmountSatoshis > 1000000L) throw new LightningException("Their minimal on-chain refund amount is too high")
@@ -771,10 +771,10 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
         val hc = restoreCommits(localLCSS, announce)
         val su = localLCSS.reverse.makeStateUpdate(LNParams.nodePrivateKey)
-        me UPDATA WaitTheirHostedStateUpdate(announce, hc) SEND su
+        me UPDATA WaitRemoteHostedStateUpdate(announce, hc) SEND su
 
 
-      case (WaitTheirHostedStateUpdate(announce, hc), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
+      case (WaitRemoteHostedStateUpdate(announce, hc), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
         val lcss1 = hc.lastCrossSignedState.copy(remoteSignature = remoteSU.localSigOfRemoteLCSS)
         val isBlockdayAcceptable = math.abs(remoteSU.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
         val isRightRemoteUpdateNumber = hc.lastCrossSignedState.remoteUpdates == remoteSU.localUpdates
@@ -788,7 +788,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         BECOME(me STORE hc.copy(lastCrossSignedState = lcss1), OPEN)
 
 
-      case (wait: WaitTheirHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
+      case (wait: WaitRemoteHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
         // We have expected InitHostedChannel but got LastCrossSignedState so this channel exists already
         // make sure our signature match and if so then become OPEN using host supplied state data
 
@@ -969,7 +969,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         BECOME(me STORE restoreCommits(recreatedLocalLCSS, hc.announce), OPEN) SEND localSU
 
 
-      case (null, wait: WaitTheirHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
+      case (null, wait: WaitRemoteHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
       case (null, hc: HostedCommits, null) if hc.isInErrorState => super.become(hc, SUSPENDED)
       case (null, hc: HostedCommits, null) => super.become(hc, SLEEPING)
       case _ =>

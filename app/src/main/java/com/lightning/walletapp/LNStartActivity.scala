@@ -9,14 +9,19 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
+import com.lightning.walletapp.PayRequest._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import fr.acinq.bitcoin.{Bech32, Crypto, MilliSatoshi}
+
+import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
+import com.lightning.walletapp.lnutils.JsonHttpUtils.to
 import com.lightning.walletapp.helper.ThrottledWork
+import com.github.kevinsawicki.http.HttpRequest
 import fr.acinq.bitcoin.Crypto.PublicKey
-import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import scodec.bits.ByteVector
 import android.os.Bundle
@@ -134,6 +139,22 @@ case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
 
 // LNURL response types
 
+object LNUrl {
+  def fromBech32(bech32url: String) = {
+    val _ \ data = Bech32.decode(bech32url)
+    val request = Bech32.five2eight(data)
+    LNUrl(Tools bin2readable request)
+  }
+}
+
+case class LNUrl(request: String) {
+  val uri = android.net.Uri.parse(request)
+  require(uri.toString contains "https://", "First level uri is not an HTTPS endpoint")
+  lazy val isLogin: Boolean = Try(uri getQueryParameter "tag" equals "login").getOrElse(false)
+  lazy val isPay: Boolean = Try(uri getQueryParameter "tag" equals "pay").getOrElse(false)
+  lazy val k1: Try[String] = Try(uri getQueryParameter "k1")
+}
+
 object LNUrlData {
   type PayReqVec = Vector[PaymentRequest]
   def guardResponse(raw: String): String = {
@@ -145,16 +166,16 @@ object LNUrlData {
   }
 }
 
-sealed trait LNUrlData {
-  def unsafe(request: String) = get(request, true).trustAllCerts.trustAllHosts
-  require(callback contains "https://", "Callback does not have HTTPS prefix")
-  val callback: String
+trait LNUrlData {
+  def unsafe(request: String): HttpRequest =
+    get(request, true).trustAllCerts.trustAllHosts
 }
 
 case class WithdrawRequest(callback: String, k1: String,
                            maxWithdrawable: Long, defaultDescription: String,
                            minWithdrawable: Option[Long] = None) extends LNUrlData {
 
+  require(callback contains "https://", "Callback does not have HTTPS prefix")
   val minCanReceive = MilliSatoshi(minWithdrawable getOrElse 1L)
   require(minCanReceive.amount <= maxWithdrawable)
   require(minCanReceive.amount >= 1L)
@@ -175,6 +196,7 @@ case class WithdrawRequest(callback: String, k1: String,
 
 case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
   // Recreate node announcement from supplied data and call a second level callback once connected
+  require(callback contains "https://", "Callback does not have HTTPS prefix")
   val nodeLink(key, host, port) = uri
 
   def resolveNodeAnnouncement = {
@@ -189,4 +211,24 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
       .appendQueryParameter("private", "1")
       .appendQueryParameter("k1", k1)
       .build.toString)
+}
+
+object PayRequest {
+  type PayMetadata = (String, String)
+  type PayMetaDataVec = Vector[PayMetadata]
+  type KeyAndUpdate = (PublicKey, ChannelUpdate)
+  type Route = Vector[KeyAndUpdate]
+}
+
+case class PayRequest(routes: Vector[Route], maxSendable: Long, minSendable: Long, metadata: String, pr: String) extends LNUrlData {
+  val extraPaymentRoutes: PaymentRouteVec = for (route <- routes) yield route map { case nodeId \ chanUpdate => chanUpdate toHop nodeId }
+  val paymentRequest = PaymentRequest.read(pr)
+
+  val decodedMetaData = {
+    val json = bin2readable(ByteVector.fromValidHex(metadata).toArray)
+    to[PayMetaDataVec](json).collectFirst { case "text" \ content => content }.get
+  }
+
+  for (route <- routes) for (nodeId \ chanUpdate <- route) require(Announcements.checkSig(chanUpdate, nodeId), "Extra route contains an invalid update")
+  require(ByteVector.fromValidHex(paymentRequest.description) == Crypto.sha256(ByteVector fromValidHex metadata), "Invoice hash does not match metadata")
 }

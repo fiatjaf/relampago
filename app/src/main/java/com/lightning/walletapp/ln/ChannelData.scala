@@ -45,12 +45,12 @@ case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 // HOSTED CHANNEL
 
-case class WaitTheirHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector) extends ChannelData {
+case class WaitRemoteHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector) extends ChannelData {
   require(Helpers isValidFinalScriptPubkey refundScriptPubKey, "Invalid refundScriptPubKey when opening a hosted channel")
   lazy val initMsg = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey)
 }
 
-case class WaitTheirHostedStateUpdate(announce: NodeAnnouncement, hc: HostedCommits) extends ChannelData
+case class WaitRemoteHostedStateUpdate(announce: NodeAnnouncement, hc: HostedCommits) extends ChannelData
 
 // INCOMING CHANNEL
 
@@ -185,10 +185,7 @@ case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig],
 
 // COMMITMENTS
 
-case class Htlc(incoming: Boolean, add: UpdateAddHtlc) {
-  def toInFlight = InFlightHtlc(add.id, add.amountMsat, add.paymentHash, add.expiry)
-}
-
+case class Htlc(incoming: Boolean, add: UpdateAddHtlc)
 case class CommitmentSpec(feeratePerKw: Long, toLocalMsat: Long, toRemoteMsat: Long,
                           htlcs: Set[Htlc] = Set.empty, fulfilled: Set[HtlcAndFulfill] = Set.empty,
                           failed: Set[HtlcAndFail] = Set.empty, malformed: Set[Htlc] = Set.empty) {
@@ -483,8 +480,8 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
                          startedAt: Long = System.currentTimeMillis) extends Commitments with ChannelData { me =>
 
   def isInErrorState = localError.isDefined || remoteError.isDefined
-  def addRemoteProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)
-  def addLocalProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update).modify(_.allRemoteUpdates).using(_ + 1)
+  def addRemoteProposal(update: LightningMessage) = me.modify(_.remoteUpdates).using(_ :+ update).modify(_.allRemoteUpdates).using(_ + 1)
+  def addLocalProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)
 
   lazy val initMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey)
   lazy val nextLocalReduced = CommitmentSpec.reduce(localSpec, localChanges.proposedAndSigned, remoteUpdates)
@@ -537,8 +534,10 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
 
   def nextLocalLCSS = {
     val incomingHtlcs \ outgoingHtlcs = nextLocalReduced.htlcs.toList.partition(_.incoming)
-    LastCrossSignedState(lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel,
-      broadcaster.currentBlockDay, nextLocalReduced.toLocalMsat, nextLocalReduced.toRemoteMsat, allLocalUpdates,
-      allRemoteUpdates, incomingHtlcs.map(_.toInFlight), outgoingHtlcs.map(_.toInFlight), ByteVector.empty)
+    val incoming = for (Htlc(_, add) <- incomingHtlcs) yield InFlightHtlc(add.id, add.amountMsat, add.paymentHash, add.expiry)
+    val outgoing = for (Htlc(_, add) <- outgoingHtlcs) yield InFlightHtlc(add.id, add.amountMsat, add.paymentHash, add.expiry)
+
+    LastCrossSignedState(lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel, broadcaster.currentBlockDay,
+      nextLocalReduced.toLocalMsat, nextLocalReduced.toRemoteMsat, allLocalUpdates, allRemoteUpdates, incoming, outgoing, ByteVector.empty)
   }
 }
