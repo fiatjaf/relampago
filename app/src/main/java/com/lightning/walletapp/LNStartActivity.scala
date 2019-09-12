@@ -182,14 +182,16 @@ case class WithdrawRequest(callback: String, k1: String,
 
   def requestWithdraw(lnUrl: LNUrl, pr: PaymentRequest) = {
     val privateKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
-    val request = android.net.Uri.parse(callback).buildUpon
-      .appendQueryParameter("pr", PaymentRequest write pr)
-      .appendQueryParameter("k1", k1)
+
+    val request =
+      android.net.Uri.parse(callback).buildUpon
+        .appendQueryParameter("pr", PaymentRequest write pr)
+        .appendQueryParameter("k1", k1)
 
     val req1Try = for {
       dataToSign <- Try(ByteVector fromValidHex k1)
-      sig = Tools.sign(dataToSign, privateKey).toHex
-    } yield request.appendQueryParameter("sig", sig)
+      signature = Tools.sign(dataToSign, privateKey).toHex
+    } yield request.appendQueryParameter("sig", signature)
     unsafe(req1Try.getOrElse(request).build.toString)
   }
 }
@@ -214,21 +216,18 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
 }
 
 object PayRequest {
-  type PayMetadata = (String, String)
-  type PayMetaDataVec = Vector[PayMetadata]
+  type TagAndContent = (String, String)
+  type PayMetaData = Vector[TagAndContent]
   type KeyAndUpdate = (PublicKey, ChannelUpdate)
   type Route = Vector[KeyAndUpdate]
 }
 
 case class PayRequest(routes: Vector[Route], maxSendable: Long, minSendable: Long, metadata: String, pr: String) extends LNUrlData {
   val extraPaymentRoutes: PaymentRouteVec = for (route <- routes) yield route map { case nodeId \ chanUpdate => chanUpdate toHop nodeId }
+  val decodedMetadata = ByteVector.fromValidBase64(metadata)
   val paymentRequest = PaymentRequest.read(pr)
 
-  val decodedMetaData = {
-    val json = bin2readable(ByteVector.fromValidHex(metadata).toArray)
-    to[PayMetaDataVec](json).collectFirst { case "text" \ content => content }.get
-  }
-
+  val textMetaData = to[PayMetaData](Tools bin2readable decodedMetadata.toArray).collectFirst { case "text" \ content => content }.get // Throws if not there
   for (route <- routes) for (nodeId \ chanUpdate <- route) require(Announcements.checkSig(chanUpdate, nodeId), "Extra route contains an invalid update")
-  require(ByteVector.fromValidHex(paymentRequest.description) == Crypto.sha256(ByteVector fromValidHex metadata), "Invoice hash does not match metadata")
+  require(ByteVector.fromValidHex(paymentRequest.description) == Crypto.sha256(decodedMetadata), "Invoice hash does not match metadata")
 }
