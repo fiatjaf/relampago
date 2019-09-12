@@ -216,7 +216,7 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
 }
 
 object PayRequest {
-  type TagAndContent = (String, String)
+  type TagAndContent = Vector[String]
   type PayMetaData = Vector[TagAndContent]
   type KeyAndUpdate = (PublicKey, ChannelUpdate)
   type Route = Vector[KeyAndUpdate]
@@ -227,7 +227,7 @@ case class PayRequest(routes: Vector[Route], maxSendable: Long, minSendable: Lon
   val decodedMetadata = ByteVector.fromValidBase64(metadata)
   val paymentRequest = PaymentRequest.read(pr)
 
-  val textMetaData = to[PayMetaData](Tools bin2readable decodedMetadata.toArray).collectFirst { case "text" \ content => content }.get // Throws if not there
+  val textMetaData = to[PayMetaData](Tools bin2readable decodedMetadata.toArray).collectFirst { case Vector("text/plain", content) => content }.get
   for (route <- routes) for (nodeId \ chanUpdate <- route) require(Announcements.checkSig(chanUpdate, nodeId), "Extra route contains an invalid update")
   require(ByteVector.fromValidHex(paymentRequest.description) == Crypto.sha256(decodedMetadata), "Invoice hash does not match metadata")
 }
