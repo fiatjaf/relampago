@@ -27,7 +27,8 @@ object Channel {
   val WAIT_FOR_FUNDING = "WAIT-FOR-FUNDING"
   val WAIT_FUNDING_SIGNED = "WAIT-FUNDING-SIGNED"
 
-  val WAIT_FUNDING_DONE = "OPENING"
+  // All states below are persisted
+  val WAIT_FUNDING_DONE = "WAIT_FUNDING_DONE"
   val NEGOTIATIONS = "NEGOTIATIONS"
   val SLEEPING = "SLEEPING"
   val OPEN = "OPEN"
@@ -42,7 +43,7 @@ object Channel {
 
   def isOperational(chan: Channel) = chan.data match {
     case NormalData(_, _, None, None, None) => true
-    case hc: HostedCommits => !hc.isInErrorState
+    case hc: HostedCommits => hc.getError.isEmpty
     case _ => false
   }
 
@@ -970,7 +971,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (null, wait: WaitRemoteHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
-      case (null, hc: HostedCommits, null) if hc.isInErrorState => super.become(hc, SUSPENDED)
+      case (null, hc: HostedCommits, null) if hc.getError.isDefined => super.become(hc, SUSPENDED)
       case (null, hc: HostedCommits, null) => super.become(hc, SLEEPING)
       case _ =>
     }

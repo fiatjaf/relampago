@@ -159,7 +159,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var lnItems = Vector.empty[LNWrap]
   var btcItems = Vector.empty[BTCWrap]
   var allItems = Vector.empty[ItemWrap]
-  var revealedPreimages = Set.empty[ByteVector]
   val minLinesNum = 4 max IconGetter.scrHeight.ceil.toInt
   var currentCut = minLinesNum
 
@@ -190,10 +189,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       // Peer now has some incompatible features, display details to user and offer to force-close a channel
       case (chan: NormalChannel, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>
         informOfferClose(chan, app.getString(err_ln_peer_incompatible).format(chan.data.announce.alias), ln_chan_close).run
-
-      case (_, _, cmd: CMDFulfillHtlc) =>
-        revealedPreimages += cmd.preimage
-        updPaymentList.run
     }
 
     override def onBecome = {
@@ -302,8 +297,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         else if (info.incoming == 1) denom.coloredIn(info.firstSum, new String)
         else denom.coloredOut(info.firstSum, new String)
 
-      val bgColor = revealedPreimages contains info.preimage match {
-        case true if info.status == WAITING => Denomination.yellowHighlight
+      val bg = info.revealed -> info.status match {
+        case 1 \ WAITING => Denomination.yellowHighlight
         case _ => 0x00000000
       }
 
@@ -312,7 +307,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       holder.transactWhat setText getDescription(info.description).html
       holder.transactSum setText s"<img src='ln'/>$humanAmount".html
       holder.transactCircle setImageResource iconDict(info.status)
-      holder.view setBackgroundColor bgColor
+      holder.view setBackgroundColor bg
     }
 
     def generatePopup = {

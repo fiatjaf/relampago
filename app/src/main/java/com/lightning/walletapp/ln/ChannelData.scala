@@ -479,7 +479,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
                          localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
                          startedAt: Long = System.currentTimeMillis) extends Commitments with ChannelData { me =>
 
-  def isInErrorState = localError.isDefined || remoteError.isDefined
+  def getError: Option[Error] = localError.orElse(remoteError)
   def addRemoteProposal(update: LightningMessage) = me.modify(_.remoteUpdates).using(_ :+ update).modify(_.allRemoteUpdates).using(_ + 1)
   def addLocalProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)
 
@@ -536,7 +536,6 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
     val incomingHtlcs \ outgoingHtlcs = nextLocalReduced.htlcs.toList.partition(_.incoming)
     val incoming = for (Htlc(_, add) <- incomingHtlcs) yield InFlightHtlc(add.id, add.amountMsat, add.paymentHash, add.expiry)
     val outgoing = for (Htlc(_, add) <- outgoingHtlcs) yield InFlightHtlc(add.id, add.amountMsat, add.paymentHash, add.expiry)
-
     LastCrossSignedState(lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel, broadcaster.currentBlockDay,
       nextLocalReduced.toLocalMsat, nextLocalReduced.toRemoteMsat, allLocalUpdates, allRemoteUpdates, incoming, outgoing, ByteVector.empty)
   }
