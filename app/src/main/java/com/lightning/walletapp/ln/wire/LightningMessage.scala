@@ -219,7 +219,7 @@ case class LastCrossSignedState(refundScriptPubKey: ByteVector, initHostedChanne
     localBalanceMsat = remoteBalanceMsat, remoteBalanceMsat = localBalanceMsat,
     incomingHtlcs = outgoingHtlcs, outgoingHtlcs = incomingHtlcs)
 
-  def hostedSigHash = Crypto sha256 {
+  lazy val hostedSigHash = Crypto sha256 {
     val inPayments = incomingHtlcs.map(inFlightHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
     val outPayments = outgoingHtlcs.map(inFlightHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
 

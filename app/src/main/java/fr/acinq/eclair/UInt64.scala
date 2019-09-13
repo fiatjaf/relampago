@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 ACINQ SAS
+ * Copyright 2019 ACINQ SAS
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,37 +15,31 @@
  */
 
 package fr.acinq.eclair
-import java.math.BigInteger
+
+import com.google.common.primitives.UnsignedLongs
+import scala.language.implicitConversions
 import scodec.bits.ByteVector
-import language.implicitConversions
 
 
-case class UInt64(private val underlying: BigInt) extends Ordered[UInt64] {
+case class UInt64(private val underlying: Long) extends Ordered[UInt64] {
 
-  require(underlying >= 0, s"uint64 must be positive (actual=$underlying)")
-  require(underlying <= UInt64.MaxValueBigInt, s"uint64 must be < 2^64 -1 (actual=$underlying)")
+  override def compare(o: UInt64): Int = UnsignedLongs.compare(underlying, o.underlying)
 
-  override def compare(o: UInt64): Int = underlying.compare(o.underlying)
+  def toByteVector: ByteVector = ByteVector.fromLong(underlying)
 
-  def toByteVector: ByteVector = ByteVector.view(underlying.toByteArray.takeRight(8))
+  def toBigInt: BigInt = (BigInt(underlying >>> 1) << 1) + (underlying & 1)
 
-  def toBigInt: BigInt = underlying
-
-  override def toString: String = underlying.toString
+  override def toString: String = UnsignedLongs.toString(underlying, 10)
 }
-
 
 object UInt64 {
 
-  private val MaxValueBigInt = BigInt(new BigInteger("ffffffffffffffff", 16))
+  val MaxValue = UInt64(ByteVector fromValidHex "0xffffffffffffffff")
 
-  val MaxValue = UInt64(MaxValueBigInt)
-
-  def apply(bin: ByteVector) = new UInt64(new BigInteger(1, bin.toArray))
-
-  def apply(value: Long) = new UInt64(BigInt(value))
+  def apply(bin: ByteVector): UInt64 = UInt64(bin.toLong(signed = false))
 
   object Conversions {
+
     implicit def intToUint64(l: Int): UInt64 = UInt64(l)
 
     implicit def longToUint64(l: Long): UInt64 = UInt64(l)
