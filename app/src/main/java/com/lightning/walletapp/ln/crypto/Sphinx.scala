@@ -75,7 +75,7 @@ object Sphinx {
         // The 1.1 BOLT spec changed the frame format to use variable-length per-hop payloads.
         // The first bytes contain a varint encoding the length of the payload data (not including the trailing mac).
         // Since messages are always smaller than 65535 bytes, this varint will either be 1 or 3 bytes long.
-        MacLength + wire.OnionCodecs.payloadLengthDecoder.decode(payload.bits).require.value.toInt
+        MacLength + wire.LightningMessageCodecs.payloadLengthDecoder.decode(payload.bits).require.value.toInt
     }
   }
 
@@ -250,7 +250,7 @@ object Sphinx {
       * When an invalid onion is received, its hash should be included in the failure message.
       */
     def hash(onion: wire.OnionRoutingPacket): ByteVector =
-    Crypto.sha256(wire.OnionCodecs.onionRoutingPacketCodec(onion.payload.length.toInt).encode(onion).require.toByteVector)
+    Crypto.sha256(wire.LightningMessageCodecs.onionRoutingPacketCodec(onion.payload.length.toInt).encode(onion).require.toByteVector)
 
   }
 

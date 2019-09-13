@@ -37,7 +37,7 @@ object PaymentInfo {
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: ByteVector): PacketAndSecrets = {
     require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
-    val encodedPayloads = for (rawPayload <- payloads) yield serialize(OnionCodecs.perHopPayloadCodec encode rawPayload)
+    val encodedPayloads = for (rawPayload <- payloads) yield serialize(perHopPayloadCodec encode rawPayload)
     PaymentPacket.create(Tools.randomPrivKey, keys, encodedPayloads, assoc)
   }
 
@@ -163,7 +163,7 @@ object PaymentInfo {
     }
 
   def doResolve(pkt: DecryptedPacket, add: UpdateAddHtlc, bag: PaymentInfoBag, loop: Boolean) =
-    Tuple2(OnionCodecs.perHopPayloadCodec decode pkt.payload.bits, bag getPaymentInfo add.paymentHash) match {
+    Tuple2(perHopPayloadCodec decode pkt.payload.bits, bag getPaymentInfo add.paymentHash) match {
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin > add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin * 2 < add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case Attempt.Successful(payload) \ _ if payload.value.outgoingCltvValue != add.expiry => failHtlc(pkt, FinalIncorrectCltvExpiry(add.expiry), add)

@@ -18,6 +18,9 @@ import java.math.BigInteger
 import scala.util.Try
 
 
+case class OnionRoutingPacket(version: Int, publicKey: ByteVector, payload: ByteVector, hmac: ByteVector)
+case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltvValue: Long)
+
 object LightningMessageCodecs { me =>
   type NodeAddressList = List[NodeAddress]
   type BitVectorAttempt = Attempt[BitVector]
@@ -158,7 +161,35 @@ object LightningMessageCodecs { me =>
     }
   )
 
-  // Data formats
+  // Onion
+
+  def onionRoutingPacketCodec(payloadLength: Int) = {
+    (uint8 withContext "version") ::
+      (bytes(33) withContext "publicKey") ::
+      (bytes(payloadLength) withContext "payload") ::
+      (bytes32 withContext "hmac")
+  }.as[OnionRoutingPacket]
+
+  val paymentOnionPacketCodec: Codec[OnionRoutingPacket] = {
+    onionRoutingPacketCodec(Sphinx.PaymentPacket.PayloadLength)
+  }
+
+  val perHopPayloadCodec: Codec[PerHopPayload] = {
+    (constant(ByteVector fromByte 0) withContext "realm") ::
+      (uint64Overflow withContext "short_channel_id") ::
+      (uint64Overflow withContext "amt_to_forward") ::
+      (uint32 withContext "outgoing_cltv_value") ::
+      (ignore(8 * 12) withContext "unused_with_v0_version_on_header")
+  }.as[PerHopPayload]
+
+  val payloadLengthDecoder = Decoder[Long] { bits: BitVector =>
+    varintoverflow.decode(bits) map { decResult: DecodeResult[Long] =>
+      val payload = decResult.value + (bits.length - decResult.remainder.length) / 8
+      DecodeResult(payload, decResult.remainder)
+    }
+  }
+
+  // LN Protocol
 
   private val init = (varsizebinarydata withContext "globalFeatures") :: (varsizebinarydata withContext "localFeatures")
   private val ping = (uint16 withContext "pongLength") :: (varsizebinarydata withContext "data")
@@ -247,7 +278,7 @@ object LightningMessageCodecs { me =>
       (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry") ::
-      (OnionCodecs.paymentOnionPacketCodec withContext "onionRoutingPacket")
+      (paymentOnionPacketCodec withContext "onionRoutingPacket")
   }.as[UpdateAddHtlc]
 
   val updateFulfillHtlcCodec = {
@@ -556,37 +587,4 @@ object TlvCodecs { me =>
 
   def lengthPrefixedTlvStream[T <: Tlv](codec: DiscriminatorCodec[T, UInt64]) =
     variableSizeBytesLong(value = tlvStream(codec), size = varintoverflow)
-}
-
-// ONION
-
-case class OnionRoutingPacket(version: Int, publicKey: ByteVector, payload: ByteVector, hmac: ByteVector)
-case class PerHopPayload(shortChannelId: Long, amtToForward: Long, outgoingCltvValue: Long)
-
-object OnionCodecs {
-  def onionRoutingPacketCodec(payloadLength: Int) = {
-    (uint8 withContext "version") ::
-      (bytes(33) withContext "publicKey") ::
-      (bytes(payloadLength) withContext "payload") ::
-      (bytes32 withContext "hmac")
-  }.as[OnionRoutingPacket]
-
-  val paymentOnionPacketCodec: Codec[OnionRoutingPacket] = {
-    onionRoutingPacketCodec(Sphinx.PaymentPacket.PayloadLength)
-  }
-
-  val perHopPayloadCodec: Codec[PerHopPayload] = {
-    (constant(ByteVector fromByte 0) withContext "realm") ::
-      (uint64Overflow withContext "short_channel_id") ::
-      (uint64Overflow withContext "amt_to_forward") ::
-      (uint32 withContext "outgoing_cltv_value") ::
-      (ignore(8 * 12) withContext "unused_with_v0_version_on_header")
-  }.as[PerHopPayload]
-
-  val payloadLengthDecoder = Decoder[Long] { bits: BitVector =>
-    varintoverflow.decode(bits) map { decResult: DecodeResult[Long] =>
-      val payload = decResult.value + (bits.length - decResult.remainder.length) / 8
-      DecodeResult(payload, decResult.remainder)
-    }
-  }
 }

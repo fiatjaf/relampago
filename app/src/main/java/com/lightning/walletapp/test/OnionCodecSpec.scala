@@ -1,6 +1,7 @@
 package com.lightning.walletapp.test
 
-import com.lightning.walletapp.ln.wire.{OnionCodecs, OnionRoutingPacket, PerHopPayload}
+import com.lightning.walletapp.ln.wire.{OnionRoutingPacket, PerHopPayload}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import scodec.bits.ByteVector
 
 
@@ -18,25 +19,25 @@ class OnionCodecSpec {
             "b8075b516569b118233a0f0971d24b83113c0b096f5216a207ca99a7cddc81c130923fe3d91e7508c9ac5f2e914ff5dccab9e558566fa14efb34ac98d878580814b94b73acbfde9072f30b881f7f0fff42d4045d1ace6322d86a97d164aa84d93a60498065cc7c20e636f5862dc81531a88c60305a2e59a985be327a6902e4bed986dbf4a0b50c217af0ea7fdf9ab37f9ea1a1aaa72f54cf40154ea9b269f1a7c09f9f43245109431a175d50e2db0132337baa0ef97eed0fcf20489da36b79a1172faccc2f7ded7c60e00694282d93359c4682135642bc81f433574aa8ef0c97b4ade7ca372c5ffc23c7eddd839bab4e0f14d6df15c9dbeab176bec8b5701cf054eb3072f6dadc98f88819042bf10c407516ee58bce33fbe3b3d86a54255e577db4598e30a" +
             "135361528c101683a5fcde7e8ba53f3456254be8f45fe3a56120ae96ea3773631fcb3873aa3abd91bcff00bd38bd43697a2e789e00da6077482e7b1b1a677b5afae4c54e6cbdf7377b694eb7d7a5b913476a5be923322d3de06060fd5e819635232a2cf4f0731da13b8546d1d6d4f8d75b9fce6c2341a71b0ea6f780df54bfdb0dd5cd9855179f602f9172"), ByteVector.fromValidHex("65f21f9190c70217774a6fbaaa7d63ad64199f4664813b955cff954949076dcf"))
 
-      val decoded = OnionCodecs.paymentOnionPacketCodec.decode(bin.bits).require.value
+      val decoded = paymentOnionPacketCodec.decode(bin.bits).require.value
       assert(decoded == expected)
 
-      val encoded = OnionCodecs.paymentOnionPacketCodec.encode(decoded).require
+      val encoded = paymentOnionPacketCodec.encode(decoded).require
       assert(encoded.toByteVector == bin)
     }
 
     {
       println("encode/decode per-hop payload")
       val payload = PerHopPayload(shortChannelId = 42, amtToForward = 142000, outgoingCltvValue = 500000)
-      val bin = OnionCodecs.perHopPayloadCodec.encode(payload).require
+      val bin = perHopPayloadCodec.encode(payload).require
       assert(bin.toByteVector.size == 33)
-      val payload1 = OnionCodecs.perHopPayloadCodec.decode(bin).require.value
+      val payload1 = perHopPayloadCodec.decode(bin).require.value
       assert(payload == payload1)
 
       // realm (the first byte) should be 0
       val bin1 = bin.toByteVector.update(0, 1)
       try {
-        val payload2 = OnionCodecs.perHopPayloadCodec.decode(bin1.bits).require.value
+        val payload2 = perHopPayloadCodec.decode(bin1.bits).require.value
         assert(payload2 == payload1)
       } catch {
         case _: Throwable =>
@@ -58,7 +59,7 @@ class OnionCodecSpec {
       )
 
       for ((payloadLength, bin) <- testCases) {
-        assert(OnionCodecs.payloadLengthDecoder.decode(bin.bits).require.value == payloadLength)
+        assert(payloadLengthDecoder.decode(bin.bits).require.value == payloadLength)
       }
     }
   }

@@ -311,7 +311,7 @@ class SphinxSpec {
 
 object SphinxSpec {
   def serializePaymentOnion(onion: OnionRoutingPacket): ByteVector =
-    OnionCodecs.paymentOnionPacketCodec.encode(onion).require.toByteVector
+    LightningMessageCodecs.paymentOnionPacketCodec.encode(onion).require.toByteVector
 
   val privKeys = Seq(
     PrivateKey(ByteVector.fromValidHex("4141414141414141414141414141414141414141414141414141414141414141"), compressed = true),
