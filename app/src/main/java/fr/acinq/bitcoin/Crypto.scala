@@ -547,8 +547,8 @@ object Crypto {
     val m = new BigInteger(1, message.toArray)
 
     val (p1, p2) = recoverPoint(r)
-    val Q1 = (p1.multiply(s).subtract(Crypto.curve.getG.multiply(m))).multiply(r.modInverse(Crypto.curve.getN))
-    val Q2 = (p2.multiply(s).subtract(Crypto.curve.getG.multiply(m))).multiply(r.modInverse(Crypto.curve.getN))
+    val Q1 = ecpoint2point(p1.multiply(s).subtract(Crypto.curve.getG multiply m)).multiply(r modInverse Crypto.curve.getN)
+    val Q2 = ecpoint2point(p2.multiply(s).subtract(Crypto.curve.getG multiply m)).multiply(r modInverse Crypto.curve.getN)
     (PublicKey(Q1), PublicKey(Q2))
   }
 

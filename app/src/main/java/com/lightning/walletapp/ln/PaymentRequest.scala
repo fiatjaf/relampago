@@ -9,10 +9,10 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.PaymentRequest._
 import com.lightning.walletapp.ln.RoutingInfoTag._
 import com.lightning.walletapp.ln.crypto.MultiStreamUtils._
+import scodec.bits.{BitVector, ByteVector}
 import com.lightning.walletapp.ln.wire.Hop
 import fr.acinq.eclair.crypto.BitStream
 import java.nio.ByteOrder.BIG_ENDIAN
-import scodec.bits.ByteVector
 import java.math.BigInteger
 import scala.util.Try
 
@@ -90,6 +90,12 @@ case class ExpiryTag(seconds: Long) extends Tag {
   lazy val ints = writeUnsignedLong(seconds)
 }
 
+case class FeaturesTag(features: Long) extends Tag {
+  def toInt5s = Bech32.map('9') +: (writeSize(ints.length) ++ ints)
+  lazy val bitmask = PaymentRequest.long2Bits(features)
+  lazy val ints = writeUnsignedLong(features)
+}
+
 case class MinFinalCltvExpiryTag(expiryDelta: Long) extends Tag {
   def toInt5s = Bech32.map('c') +: (writeSize(ints.length) ++ ints)
   lazy val ints = writeUnsignedLong(expiryDelta)
@@ -108,6 +114,7 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
   lazy val adjustedMinFinalCltvExpiry = minFinalCltvExpiry.getOrElse(0L) + 10L
   lazy val minFinalCltvExpiry = tags.collectFirst { case MinFinalCltvExpiryTag(delta) => delta }
   lazy val paymentHash = tags.collectFirst { case PaymentHashTag(hash) => hash }.get
+  lazy val features = tags.collectFirst { case fts: FeaturesTag => fts.bitmask }
   lazy val routingInfo = tags.collect { case r: RoutingInfoTag => r }
 
   lazy val description = tags.collectFirst {
@@ -169,6 +176,14 @@ object PaymentRequest {
     PaymentRequest(prefixes(chain), amount, timestampSecs, privKey.publicKey, completeTags, ByteVector.empty) sign privKey
   }
 
+  def long2Bits(value: Long) = {
+    var highestPosition: Int = -1
+    val bin = BitVector.fromLong(value)
+    for (ord <- 0 until bin.size.toInt) if (bin(ord) && highestPosition == -1) highestPosition = ord
+    val nonPadded: BitVector = if (highestPosition == -1) BitVector.empty else bin.drop(highestPosition)
+    nonPadded.size % 5 match { case 0 => nonPadded case left => BitVector.fill(5 - left)(high = false) ++ nonPadded }
+  }
+
   object Amount {
     // Shortest representation possible
     def unit(sum: MilliSatoshi): Char = sum match {
@@ -223,39 +238,44 @@ object PaymentRequest {
       val len = input(1) * 32 + input(2)
 
       input.head match {
-        case pTag if pTag == Bech32.map('p') =>
+        case tagP if tagP == 1 =>
           val hash = Bech32 five2eight input.slice(3, 52 + 3)
           PaymentHashTag(ByteVector view hash)
 
-        case dTag if dTag == Bech32.map('d') =>
+        case tagD if tagD == 13 =>
           val description = Bech32 five2eight input.slice(3, len + 3)
           DescriptionTag(Tools bin2readable description)
 
-        case hTag if hTag == Bech32.map('h') =>
+        case tagH if tagH == 23 =>
           val hash = Bech32 five2eight input.slice(3, len + 3)
           DescriptionHashTag(ByteVector view hash)
 
-        case fTag if fTag == Bech32.map('f') =>
+        case tagF if tagF == 9 =>
           val fallbackAddress = input.slice(4, len + 4 - 1)
           if (input(3) < 0 || input(3) > 18) UnknownTag(input.head, fallbackAddress) else {
             val fallbackAddressHash = ByteVector.view(Bech32 five2eight fallbackAddress)
             FallbackAddressTag(input(3), fallbackAddressHash)
           }
 
-        case rTag if rTag == Bech32.map('r') =>
+        case tagR if tagR == 3 =>
           val data = Bech32 five2eight input.slice(3, len + 3)
           val path = RoutingInfoTag parseAll data
           RoutingInfoTag(path)
 
-        case xTag if xTag == Bech32.map('x') =>
+        case tagX if tagX == 6 =>
           val ints: Bytes = input.slice(3, len + 3)
           val expiry = readUnsignedLong(len, ints)
           ExpiryTag(expiry)
 
-        case cTag if cTag == Bech32.map('c') =>
+        case tagC if tagC == 24 =>
           val ints: Bytes = input.slice(3, len + 3)
           val expiry = readUnsignedLong(len, ints)
           MinFinalCltvExpiryTag(expiry)
+
+        case tag9 if tag9 == 5 =>
+          val ints: Bytes = input.slice(3, len + 3)
+          val features = readUnsignedLong(len, ints)
+          FeaturesTag(features)
 
         case _ =>
           val unknown = input.slice(3, len + 3)
