@@ -278,7 +278,8 @@ object LightningMessageCodecs { me =>
       (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry") ::
-      (paymentOnionPacketCodec withContext "onionRoutingPacket")
+      (paymentOnionPacketCodec withContext "onionRoutingPacket") ::
+      (UpdateAddSecretTlv.codec withContext "tlvStream")
   }.as[UpdateAddHtlc]
 
   val updateFulfillHtlcCodec = {
@@ -519,6 +520,11 @@ case class TlvStream[T <: Tlv](records: Traversable[T], unknown: Traversable[Gen
   def get[R <: T : ClassTag]: Option[R] = records.collectFirst { case record: R => record }
 }
 
+object TlvStream {
+  def empty[T <: Tlv]: TlvStream[T] = TlvStream[T](Nil, Nil)
+  def apply[T <: Tlv](records: T*): TlvStream[T] = TlvStream(records, Nil)
+}
+
 object TlvCodecs { me =>
   private val genericTlv = (varint withContext "tag") :: variableSizeBytesLong(varintoverflow, bytes)
   private val genericTlvCodec = genericTlv.as[GenericTlv].exmap(validateGenericTlv, validateGenericTlv)
@@ -556,8 +562,8 @@ object TlvCodecs { me =>
 
     list(withFallback).exmap(
       recordsEitherTlvList => {
-        val knownTags = recordsEitherTlvList.collect { case Right(known) => known }
-        val unknownTags = recordsEitherTlvList.collect { case Left(generic) => generic }
+        val knownTags = for (Right(known) <- recordsEitherTlvList) yield known
+        val unknownTags = for (Left(unknown) <- recordsEitherTlvList) yield unknown
 
         val tags = for (record <- recordsEitherTlvList) yield record match {
           case Right(tlv) => codec.encode(tlv).flatMap(varint.decode).require.value
@@ -570,8 +576,8 @@ object TlvCodecs { me =>
       },
 
       stream => {
-        val knownRecords = stream.records.map(Right.apply)
-        val unknownRecords = stream.unknown.map(Left.apply)
+        val knownRecords = for (known <- stream.records) yield Right(known)
+        val unknownRecords = for (unknown <- stream.unknown) yield Left(unknown)
         val records = (knownRecords ++ unknownRecords).toList
 
         val tags = for (record <- records) yield record match {
@@ -587,4 +593,15 @@ object TlvCodecs { me =>
 
   def lengthPrefixedTlvStream[T <: Tlv](codec: DiscriminatorCodec[T, UInt64]) =
     variableSizeBytesLong(value = tlvStream(codec), size = varintoverflow)
+}
+
+// Secret in UpdateAddHtlc
+
+sealed trait UpdateAddSecretTlv extends Tlv
+
+object UpdateAddSecretTlv {
+  type SecretTlvStream = TlvStream[UpdateAddSecretTlv]
+  case class Secret(data: ByteVector) extends UpdateAddSecretTlv
+  val secretCodec: Codec[Secret] = Codec(varsizebinarydata withContext "data").as[Secret]
+  val codec: Codec[SecretTlvStream] = TlvCodecs tlvStream discriminated.by(varint).typecase(UInt64(1), secretCodec)
 }

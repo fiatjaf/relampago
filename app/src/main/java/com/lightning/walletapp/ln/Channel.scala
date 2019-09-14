@@ -911,6 +911,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
         val isAhead = hc.lastCrossSignedState.remoteUpdates > remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates > remoteLCSS.remoteUpdates
         val isBehind = hc.lastCrossSignedState.remoteUpdates < remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates < remoteLCSS.remoteUpdates
+
         if (isLocalSigOk && isBehind) BECOME(me STORE restoreCommits(remoteLCSS.reverse, hc.announce), OPEN) SEND localSU
         else if (isLocalSigOk && isAhead) BECOME(hc, OPEN) SEND hc.lastCrossSignedState
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
