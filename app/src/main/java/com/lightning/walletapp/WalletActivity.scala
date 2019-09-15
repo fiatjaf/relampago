@@ -239,7 +239,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     ConnectionManager.listeners += new ConnectionListener { self =>
       override def onDisconnect(nodeId: PublicKey) = ConnectionManager.listeners -= self
       override def onOperational(nodeId: PublicKey, isCompatible: Boolean) = if (isCompatible) {
-        queue.map(_ => incoming.requestChannel.body).map(LNUrlData.guardResponse).foreach(none, onFail)
+        queue.map(_ => incoming.requestChannel.body).map(LNUrlData.guardResponse).foreach(none, onCallFailed)
       }
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
@@ -255,6 +255,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           me goTo classOf[LNStartFundActivity]
           onDisconnect(nodeId)
         }
+
+      def onCallFailed(err: Throwable) = {
+        ConnectionManager.listeners -= self
+        onFail(err)
+      }
     }
 
     <(incoming.resolveNodeAnnouncement, onFail) { ann =>
