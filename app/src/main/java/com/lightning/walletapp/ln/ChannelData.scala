@@ -278,7 +278,6 @@ case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LN
 sealed trait Commitments {
   val updateOpt: Option[ChannelUpdate]
   val localSpec: CommitmentSpec
-  val myFullBalanceMsat: Long
   val channelId: ByteVector
   val startedAt: Long
 }
@@ -302,7 +301,6 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 
   lazy val localSpec = localCommit.spec
-  lazy val myFullBalanceMsat = reducedRemoteState.spec.toRemoteMsat
   def latestRemoteCommit = remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse remoteCommit
   def localHasUnsignedOutgoing = localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
   def remoteHasUnsignedOutgoing = remoteChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
@@ -484,8 +482,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   def addLocalProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)
 
   lazy val initMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey)
-  lazy val nextLocalReduced = CommitmentSpec.reduce(localSpec, localChanges.proposedAndSigned, remoteUpdates)
-  lazy val myFullBalanceMsat = nextLocalReduced.toLocalMsat
+  lazy val nextLocalSpec = CommitmentSpec.reduce(localSpec, localChanges.proposedAndSigned, remoteUpdates)
   val channelId = announce.hostedChanId
 
   def resetUpdates =
@@ -497,8 +494,8 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
     val add = UpdateAddHtlc(channelId, allLocalUpdates + 1, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet)
     val c1 = addLocalProposal(update = add)
 
-    val inHtlcs \ inFlight = c1.nextLocalReduced.directedHtlcsAndSum(incoming = false)
-    if (c1.nextLocalReduced.toLocalMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
+    val inHtlcs \ inFlight = c1.nextLocalSpec.directedHtlcsAndSum(incoming = false)
+    if (c1.nextLocalSpec.toLocalMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
     if (rd.firstMsat < lastCrossSignedState.initHostedChannel.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
     if (UInt64(inFlight) > lastCrossSignedState.initHostedChannel.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
     if (inHtlcs.size > lastCrossSignedState.initHostedChannel.maxAcceptedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
@@ -508,8 +505,8 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   def receiveAdd(add: UpdateAddHtlc) = {
     val c1 = addLocalProposal(update = add)
     if (add.id != allRemoteUpdates + 1) throw new LightningException
-    if (c1.nextLocalReduced.toRemoteMsat < 0L) throw new LightningException
-    val inHtlcs \ inFlight = c1.nextLocalReduced.directedHtlcsAndSum(incoming = true)
+    if (c1.nextLocalSpec.toRemoteMsat < 0L) throw new LightningException
+    val inHtlcs \ inFlight = c1.nextLocalSpec.directedHtlcsAndSum(incoming = true)
     if (inHtlcs.size > lastCrossSignedState.initHostedChannel.maxAcceptedHtlcs) throw new LightningException
     if (UInt64(inFlight) > lastCrossSignedState.initHostedChannel.maxHtlcValueInFlightMsat) throw new LightningException
     c1
@@ -533,10 +530,9 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   }
 
   def nextLocalLCSS = {
-    val incomingHtlcs \ outgoingHtlcs = nextLocalReduced.htlcs.toList.partition(_.incoming)
-    val incoming = for (Htlc(_, add) <- incomingHtlcs) yield InFlightHtlc(add.id, add.amountMsat, add.paymentHash, add.expiry)
-    val outgoing = for (Htlc(_, add) <- outgoingHtlcs) yield InFlightHtlc(add.id, add.amountMsat, add.paymentHash, add.expiry)
-    LastCrossSignedState(lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel, broadcaster.currentBlockDay,
-      nextLocalReduced.toLocalMsat, nextLocalReduced.toRemoteMsat, allLocalUpdates, allRemoteUpdates, incoming, outgoing, ByteVector.empty)
+    val inHtlcs \ outHtlcs = nextLocalSpec.htlcs.toList.partition(_.incoming)
+    LastCrossSignedState(lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel,
+      broadcaster.currentBlockDay, nextLocalSpec.toLocalMsat, nextLocalSpec.toRemoteMsat, allLocalUpdates,
+      allRemoteUpdates, inHtlcs.map(_.add), outHtlcs.map(_.add), ByteVector.empty)
   }
 }

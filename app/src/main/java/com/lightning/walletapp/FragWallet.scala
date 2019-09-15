@@ -129,8 +129,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val delta = viable.size - online
 
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
+    val lnTotalSum = MilliSatoshi(viable.map(_.localSpendableMsat).sum)
     val btcFunds = if (btcTotalSum.amount < 1) btcEmpty else denom parsedWithSign btcTotalSum
-    val lnTotalSum = MilliSatoshi(viable.flatMap(_.getCommits).map(_.myFullBalanceMsat).sum)
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
     val perOneBtcRate = formatFiat.format(msatInFiat(oneBtc) getOrElse 0L)
 

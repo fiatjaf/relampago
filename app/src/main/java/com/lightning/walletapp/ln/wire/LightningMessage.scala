@@ -59,11 +59,9 @@ case class Shutdown(channelId: ByteVector, scriptPubKey: ByteVector) extends Cha
   def some = Some(me)
 }
 
-case class UpdateAddHtlc(channelId: ByteVector, id: Long, amountMsat: Long,
-                         paymentHash: ByteVector, expiry: Long, onionRoutingPacket: OnionRoutingPacket = Sphinx.emptyOnionPacket,
-                         tlvStream: TlvStream[UpdateAddSecretTlv] = TlvStream.empty) extends ChannelMessage {
+case class UpdateAddHtlc(channelId: ByteVector, id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long,
+                         onionRoutingPacket: OnionRoutingPacket = Sphinx.emptyOnionPacket) extends ChannelMessage {
 
-  lazy val remoteSecret = tlvStream.get[UpdateAddSecretTlv.Secret]
   lazy val hash160 = Crypto.ripemd160(paymentHash)
   lazy val amount = MilliSatoshi(amountMsat)
 }
@@ -207,13 +205,9 @@ case class InitHostedChannel(maxHtlcValueInFlightMsat: UInt64,
                              liabilityDeadlineBlockdays: Int, minimalOnchainRefundAmountSatoshis: Long,
                              initialClientBalanceMsat: Long) extends HostedChannelMessage
 
-case class InFlightHtlc(id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long) {
-  def toUpdateAdd(chanId: ByteVector) = UpdateAddHtlc(chanId, id, amountMsat, paymentHash, expiry)
-}
-
 case class LastCrossSignedState(refundScriptPubKey: ByteVector, initHostedChannel: InitHostedChannel, blockDay: Long,
                                 localBalanceMsat: Long, remoteBalanceMsat: Long, localUpdates: Long, remoteUpdates: Long,
-                                incomingHtlcs: List[InFlightHtlc], outgoingHtlcs: List[InFlightHtlc],
+                                incomingHtlcs: List[UpdateAddHtlc], outgoingHtlcs: List[UpdateAddHtlc],
                                 remoteSignature: ByteVector) extends HostedChannelMessage { me =>
 
   lazy val reverse = copy(localUpdates = remoteUpdates, remoteUpdates = localUpdates,
@@ -221,8 +215,8 @@ case class LastCrossSignedState(refundScriptPubKey: ByteVector, initHostedChanne
     incomingHtlcs = outgoingHtlcs, outgoingHtlcs = incomingHtlcs)
 
   lazy val hostedSigHash = Crypto sha256 {
-    val inPayments = incomingHtlcs.map(inFlightHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
-    val outPayments = outgoingHtlcs.map(inFlightHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
+    val inPayments = incomingHtlcs.map(updateAddHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
+    val outPayments = outgoingHtlcs.map(updateAddHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
 
     refundScriptPubKey ++
       Protocol.writeUInt16(initHostedChannel.liabilityDeadlineBlockdays, LITTLE_ENDIAN) ++

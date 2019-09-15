@@ -278,8 +278,7 @@ object LightningMessageCodecs { me =>
       (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry") ::
-      (paymentOnionPacketCodec withContext "onionRoutingPacket") ::
-      (UpdateAddSecretTlv.codec withContext "tlvStream")
+      (paymentOnionPacketCodec withContext "onionRoutingPacket")
   }.as[UpdateAddHtlc]
 
   val updateFulfillHtlcCodec = {
@@ -400,13 +399,6 @@ object LightningMessageCodecs { me =>
       (uint64Overflow withContext "initialClientBalanceMsat")
   }.as[InitHostedChannel]
 
-  val inFlightHtlcCodec = {
-    (uint64Overflow withContext "id") ::
-      (uint64Overflow withContext "amountMsat") ::
-      (bytes32 withContext "paymentHash") ::
-      (uint32 withContext "expiry")
-  }.as[InFlightHtlc]
-
   val lastCrossSignedStateCodec = {
     (varsizebinarydata withContext "refundScriptPubKey") ::
       (initHostedChannelCodec withContext "initHostedChannel") ::
@@ -415,8 +407,8 @@ object LightningMessageCodecs { me =>
       (uint64Overflow withContext "remoteBalanceMsat") ::
       (uint32 withContext "localUpdates") ::
       (uint32 withContext "remoteUpdates") ::
-      (listOfN(uint16, inFlightHtlcCodec) withContext "incomingHtlcs") ::
-      (listOfN(uint16, inFlightHtlcCodec) withContext "outgoingHtlcs") ::
+      (listOfN(uint16, updateAddHtlcCodec) withContext "incomingHtlcs") ::
+      (listOfN(uint16, updateAddHtlcCodec) withContext "outgoingHtlcs") ::
       (signature withContext "remoteSignature")
   }.as[LastCrossSignedState]
 
@@ -593,15 +585,4 @@ object TlvCodecs { me =>
 
   def lengthPrefixedTlvStream[T <: Tlv](codec: DiscriminatorCodec[T, UInt64]) =
     variableSizeBytesLong(value = tlvStream(codec), size = varintoverflow)
-}
-
-// Secret in UpdateAddHtlc
-
-sealed trait UpdateAddSecretTlv extends Tlv
-
-object UpdateAddSecretTlv {
-  type SecretTlvStream = TlvStream[UpdateAddSecretTlv]
-  case class Secret(data: ByteVector) extends UpdateAddSecretTlv
-  val secretCodec: Codec[Secret] = Codec(varsizebinarydata withContext "data").as[Secret]
-  val codec: Codec[SecretTlvStream] = TlvCodecs tlvStream discriminated.by(varint).typecase(UInt64(1), secretCodec)
 }

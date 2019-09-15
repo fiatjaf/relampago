@@ -57,6 +57,12 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
   def process(change: Any) = Future(me doProcess change) onFailure { case failure => events onException me -> failure }
 
+  def localSpendableMsat = data match {
+    case normal: HasNormalCommits => normal.commitments.reducedRemoteState.spec.toRemoteMsat
+    case hosted: HostedCommits => hosted.nextLocalSpec.toLocalMsat
+    case _ => 0L
+  }
+
   def getCommits: Option[Commitments] = data match {
     case normal: HasNormalCommits => Some(normal.commitments)
     case hosted: HostedCommits => Some(hosted)
@@ -738,9 +744,9 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 }
 
 abstract class HostedChannel extends Channel(isHosted = true) { me =>
-  def estCanSendMsat = getCommits collect { case nc: HostedCommits => nc.nextLocalReduced.toLocalMsat } getOrElse 0L
-  def estCanReceiveMsat = getCommits collect { case nc: HostedCommits => nc.nextLocalReduced.toRemoteMsat } getOrElse 0L
-  def inFlightHtlcs = getCommits collect { case nc: HostedCommits => nc.nextLocalReduced.htlcs } getOrElse Set.empty[Htlc]
+  def estCanSendMsat = getCommits collect { case nc: HostedCommits => nc.nextLocalSpec.toLocalMsat } getOrElse 0L
+  def estCanReceiveMsat = getCommits collect { case nc: HostedCommits => nc.nextLocalSpec.toRemoteMsat } getOrElse 0L
+  def inFlightHtlcs = getCommits collect { case nc: HostedCommits => nc.nextLocalSpec.htlcs } getOrElse Set.empty[Htlc]
 
   private var isChainHeightKnown: Boolean = false
   private var isSocketConnected: Boolean = false
@@ -846,7 +852,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         else if (!isBlockdayAcceptable) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
         else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else {
-          val refreshedHC = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalReduced)
+          val refreshedHC = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalSpec)
           val withoutChangesHC = me STORE refreshedHC.copy(localChanges = emptyChanges).resetUpdates
           me UPDATA withoutChangesHC SEND lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
           events onSettled withoutChangesHC
@@ -982,8 +988,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
   }
 
   def restoreCommits(localLCSS: LastCrossSignedState, announce: NodeAnnouncement) = {
-    val inHtlcs = for (inFlight <- localLCSS.incomingHtlcs) yield Htlc(incoming = true, inFlight toUpdateAdd announce.hostedChanId)
-    val outHtlcs = for (outFlight <- localLCSS.outgoingHtlcs) yield Htlc(incoming = false, outFlight toUpdateAdd announce.hostedChanId)
+    val inHtlcs = for (add <- localLCSS.incomingHtlcs) yield Htlc(incoming = true, add)
+    val outHtlcs = for (add <- localLCSS.outgoingHtlcs) yield Htlc(incoming = false, add)
     val spec = CommitmentSpec(feeratePerKw = 0L, localLCSS.localBalanceMsat, localLCSS.remoteBalanceMsat, htlcs = (inHtlcs ++ outHtlcs).toSet)
     HostedCommits(announce, localLCSS, localLCSS.localUpdates, localLCSS.remoteUpdates, localChanges = emptyChanges, remoteUpdates = Vector.empty,
       localSpec = spec, updateOpt = None, localError = None, remoteError = None, startedAt = System.currentTimeMillis)
