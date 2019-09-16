@@ -6,21 +6,24 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-import com.lightning.walletapp.ln.{ChannelData, RefundingData}
+import org.bitcoinj.core.{Address, Block, FilteredBlock, Peer}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
-import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.lnutils.PaymentTable
 import com.lightning.walletapp.helper.RichCursor
+import com.lightning.walletapp.ln.RefundingData
 import android.support.v7.widget.Toolbar
+import org.bitcoinj.script.ScriptBuilder
+import org.bitcoinj.uri.BitcoinURI
 import fr.acinq.bitcoin.Satoshi
 import android.content.Intent
 import scodec.bits.ByteVector
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
+import scala.util.Try
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
@@ -191,6 +194,15 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       // MENU PART
 
       view setOnClickListener onButtonTap {
+        def closeBitcoinAddress: Option[Address] =
+          Try(app.TransData parse app.getBufferUnsafe).toOption
+            .collectFirst { case uri: BitcoinURI => uri.getAddress }
+
+        val addressHint = getString(ln_chan_close_address) -> closeBitcoinAddress match {
+          case base \ Some(bitcoinAddress) => base format humanSix(bitcoinAddress.toString)
+          case base \ _ => base format getString(ln_chan_close_address_hint)
+        }
+
         val currentChanActions = chan.data match {
           // Unknown spend may be our own future commit, don't allow force-closing here
           case norm: NormalData if norm.unknownSpend.isDefined => normalChanActions take 1
@@ -200,7 +212,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           case _: RefundingData => normalChanActions take 1
           // No reason to close an already closed channel
           case _: ClosingData => normalChanActions take 1
-          case _ => normalChanActions
+          case _ => normalChanActions :+ addressHint.html
         }
 
         val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
@@ -215,14 +227,26 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             mkCheckForm(alert => rm(alert)(chan process ChannelManager.CMDLocalShutdown), none, bld, dialog_ok, dialog_cancel)
           }
 
+          def warnAndMaybeCloseToAddress = closeBitcoinAddress map { bitcoinAddress =>
+            val text = getString(ln_chan_close_confirm_address) format humanSix(bitcoinAddress.toString)
+            val bld = baseTextBuilder(text.html).setCustomTitle(chan.data.announce.asString.html)
+            val program = ScriptBuilder.createOutputScript(bitcoinAddress).getProgram
+            val customShutdown = CMDShutdown apply Some(ByteVector view program)
+            mkCheckForm(alert => rm(alert)(chan process customShutdown),
+              none, bld, dialog_ok, dialog_cancel)
+          }
+
           rm(alert) {
-            val htlcBlock = chan.inFlightHtlcs.nonEmpty
+            val noHtlcBlock = chan.inFlightHtlcs.isEmpty
             val canCoopClose = isOpeningOrOperational(chan)
             val url = s"https://testnet.smartbit.com.au/tx/" + chan.fundTxId.toHex
             if (0 == pos) host startActivity new Intent(Intent.ACTION_VIEW, Uri parse url)
-            else if (1 == pos && canCoopClose && htlcBlock) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
-            else if (1 == pos && canCoopClose) warnAndMaybeClose(me getString ln_chan_close_confirm_local)
-            else if (1 == pos) warnAndMaybeClose(me getString ln_chan_force_details)
+            else if (1 == pos && canCoopClose && noHtlcBlock) warnAndMaybeClose(me getString ln_chan_close_confirm_wallet)
+            else if (1 == pos && canCoopClose) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
+            else if (1 == pos) warnAndMaybeClose(channelClosureWarning = me getString ln_chan_force_details)
+            else if (2 == pos && closeBitcoinAddress.isEmpty) app toast ln_chan_close_address_hint
+            else if (2 == pos && canCoopClose && noHtlcBlock) warnAndMaybeCloseToAddress
+            else if (2 == pos) app toast ln_chan_close_address_no
           }
         }
       }

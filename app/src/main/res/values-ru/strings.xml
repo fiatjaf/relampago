@@ -278,7 +278,11 @@
 
     <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В канале есть активные платежи</font> поэтому кооперативное закрытие будет отложено пока они не исчезнут.<br><br>Рекомендуется не закрывать канал прямо сейчас, а вместо этого дать платежам пройти, все еще хотите продолжить?]]></string>
     <string name="ln_chan_force_details"><![CDATA[&#9888; Учтите, что попытка закрытия канала прямо сейчас приведет к <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсированному закрытию</a>, на которое уйдет большая сумма комиссии и больше времени, все еще хотите продолжить?]]></string>
-    <string name="ln_chan_close_confirm_local">Хотите закрыть канал и отправить возвратную Биткоин-транзакцию обратно в этот кошелек?</string>
+    <string name="ln_chan_close_confirm_address"><![CDATA[Хотите закрыть канал и отправить возвратную Биткоин-транзакцию на указанный адрес?<br><br><strong>%1$s</strong><br><br>Убедитесь, что адрес верный, потому что позже закрытие канала нельзя будет отменить!]]></string>
+    <string name="ln_chan_close_confirm_wallet">Хотите закрыть канал и отправить возвратную Биткоин-транзакцию обратно в этот кошелек?</string>
+    <string name="ln_chan_close_address"><![CDATA[Закрыть канал на адрес<br><small>%1$s</small>]]></string>
+    <string name="ln_chan_close_address_no">Канал в этом состоянии нельзя закрыть на адрес</string>
+    <string name="ln_chan_close_address_hint">Скопируйте адрес чтобы продолжить</string>
     <string name="ln_chan_close">Закрыть канал</string>
 
     <array name="ln_normal_chan_actions">
@@ -336,8 +340,8 @@
     <string name="notify_title">Ожидается платеж-молния</string>
 
     <!-- hosted channels -->
-    <string name="err_ln_hosted_wrong_blockday">incorrect updated blockday</string>
-    <string name="err_ln_hosted_wrong_remote_sig">incorrect remote signature</string>
+    <string name="err_ln_hosted_wrong_blockday">incorrect blockday</string>
     <string name="err_ln_hosted_wrong_local_sig">incorrect local signature</string>
-    <string name="err_ln_hosted_update_cltv_too_low">incorrect channel update cltv expiry</string>
+    <string name="err_ln_hosted_wrong_remote_sig">incorrect remote signature</string>
+    <string name="err_ln_hosted_update_cltv_too_low">incorrect expiry in channel update</string>
 </resources>
