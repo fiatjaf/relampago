@@ -118,8 +118,8 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def onSettled(cs: Commitments) = {
     def newRoutesOrGiveUp(rd: RoutingData): Unit = {
       // We do not care about options such as AIR or AMP here, this may be one of them
-      val isDirectlySpendable = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
-      if (isDirectlySpendable) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
+      val isStillSpendable = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
+      if (isStillSpendable) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
       else updStatus(FAILURE, rd.pr.paymentHash)
     }
 

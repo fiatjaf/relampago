@@ -40,10 +40,8 @@ object PaymentInfo {
     PaymentPacket.create(Tools.randomPrivKey, keys, for (payload <- payloads) yield payload.encode, assoc)
   }
 
-  def useFirstRoute(rest: PaymentRouteVec, rd: RoutingData) = rest match {
-    case firstRoute +: restOfRoutes => useRoute(firstRoute, restOfRoutes, rd)
-    case _ => Left(rd)
-  }
+  def useFirstRoute(rest: PaymentRouteVec, rd: RoutingData) =
+    if (rest.isEmpty) Left(rd) else useRoute(rest.head, rest.tail, rd)
 
   def onChainThreshold = Scripts.weight2fee(LNParams.broadcaster.perKwSixSat, 650)
   def useRoute(route: PaymentRoute, rest: PaymentRouteVec, rd: RoutingData): FullOrEmptyRD = {
