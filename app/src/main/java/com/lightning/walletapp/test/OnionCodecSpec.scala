@@ -1,7 +1,10 @@
 package com.lightning.walletapp.test
 
-import com.lightning.walletapp.ln.wire.{OnionRoutingPacket, PerHopPayload}
+import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
+import com.lightning.walletapp.ln.wire.OnionTlv.{AmountToForward, OutgoingChannelId, OutgoingCltv}
+import fr.acinq.eclair.UInt64
+import scodec.Attempt
 import scodec.bits.ByteVector
 
 
@@ -27,21 +30,36 @@ class OnionCodecSpec {
     }
 
     {
-      println("encode/decode per-hop payload")
-      val payload = PerHopPayload(shortChannelId = 42, amtToForward = 142000, outgoingCltvValue = 500000)
-      val bin = perHopPayloadCodec.encode(payload).require
-      assert(bin.toByteVector.size == 33)
-      val payload1 = perHopPayloadCodec.decode(bin).require.value
-      assert(payload == payload1)
+      println("encode/decode fixed-size (legacy) relay per-hop payload")
+      val testCases = Map(
+        RelayLegacyPayload(0, 0, 0) -> ByteVector.fromValidHex("00 0000000000000000 0000000000000000 00000000 000000000000000000000000"),
+        RelayLegacyPayload(42, 142000, 500000) -> ByteVector.fromValidHex("00 000000000000002a 0000000000022ab0 0007a120 000000000000000000000000"),
+        RelayLegacyPayload(561, 1105, 1729) -> ByteVector.fromValidHex("00 0000000000000231 0000000000000451 000006c1 000000000000000000000000")
+      )
 
-      // realm (the first byte) should be 0
-      val bin1 = bin.toByteVector.update(0, 1)
-      try {
-        val payload2 = perHopPayloadCodec.decode(bin1.bits).require.value
-        assert(payload2 == payload1)
-      } catch {
-        case _: Throwable =>
-          assert(true)
+      for ((expected, bin) <- testCases) {
+        val decoded = relayPerHopPayloadCodec.decode(bin.bits).require.value
+        assert(decoded == expected)
+
+        val encoded = relayPerHopPayloadCodec.encode(expected).require.bytes
+        assert(encoded == bin)
+      }
+    }
+
+    {
+      println("encode/decode fixed-size (legacy) final per-hop payload")
+      val testCases = Map(
+        FinalLegacyPayload(0, 0) -> ByteVector.fromValidHex("00 0000000000000000 0000000000000000 00000000 000000000000000000000000"),
+        FinalLegacyPayload(142000, 500000) -> ByteVector.fromValidHex("00 0000000000000000 0000000000022ab0 0007a120 000000000000000000000000"),
+        FinalLegacyPayload(1105, 1729) -> ByteVector.fromValidHex("00 0000000000000000 0000000000000451 000006c1 000000000000000000000000")
+      )
+
+      for ((expected, bin) <- testCases) {
+        val decoded = finalPerHopPayloadCodec.decode(bin.bits).require.value
+        assert(decoded == expected)
+
+        val encoded = finalPerHopPayloadCodec.encode(expected).require.bytes
+        assert(encoded == bin)
       }
     }
 
@@ -60,6 +78,95 @@ class OnionCodecSpec {
 
       for ((payloadLength, bin) <- testCases) {
         assert(payloadLengthDecoder.decode(bin.bits).require.value == payloadLength)
+      }
+    }
+
+    {
+      println("encode/decode variable-length (tlv) relay per-hop payload")
+      val testCases = Map(
+        TlvStream[OnionTlv](AmountToForward(561), OutgoingCltv(42), OutgoingChannelId(1105)) -> ByteVector.fromValidHex("11 02020231 04012a 06080000000000000451"),
+        TlvStream[OnionTlv](Seq(AmountToForward(561), OutgoingCltv(42), OutgoingChannelId(1105)), Seq(GenericTlv(UInt64(65535), ByteVector.fromValidHex("06c1")))) -> ByteVector.fromValidHex("17 02020231 04012a 06080000000000000451 fdffff0206c1")
+      )
+
+      for ((expected, bin) <- testCases) {
+        val decoded = relayPerHopPayloadCodec.decode(bin.bits).require.value
+        assert(decoded == RelayTlvPayload(expected))
+        assert(decoded.amountToForwardMsat == 561)
+        assert(decoded.outgoingCltv == 42)
+        assert(decoded.outgoingChannelId == 1105)
+
+        val encoded = relayPerHopPayloadCodec.encode(RelayTlvPayload(expected)).require.bytes
+        assert(encoded == bin)
+      }
+    }
+
+    {
+      println("encode/decode variable-length (tlv) final per-hop payload")
+      val testCases = Map(
+        TlvStream[OnionTlv](AmountToForward(561), OutgoingCltv(42)) -> ByteVector.fromValidHex("07 02020231 04012a"),
+        TlvStream[OnionTlv](AmountToForward(561), OutgoingCltv(42), OutgoingChannelId(1105)) -> ByteVector.fromValidHex("11 02020231 04012a 06080000000000000451"),
+        TlvStream[OnionTlv](Seq(AmountToForward(561), OutgoingCltv(42)), Seq(GenericTlv(UInt64(65535), ByteVector.fromValidHex("06c1")))) -> ByteVector.fromValidHex("0d 02020231 04012a fdffff0206c1")
+      )
+
+      for ((expected, bin) <- testCases) {
+        val decoded = finalPerHopPayloadCodec.decode(bin.bits).require.value
+        assert(decoded == FinalTlvPayload(expected))
+        assert(decoded.amountMsat == 561)
+        assert(decoded.cltvExpiry == 42)
+
+        val encoded = finalPerHopPayloadCodec.encode(FinalTlvPayload(expected)).require.bytes
+        assert(encoded === bin)
+      }
+    }
+
+    {
+      println("decode variable-length (tlv) relay per-hop payload missing information")
+      val testCases = Seq(
+        (InvalidOnionPayload(UInt64(2), 0), ByteVector.fromValidHex("0d 04012a 06080000000000000451")), // missing amount
+        (InvalidOnionPayload(UInt64(4), 0), ByteVector.fromValidHex("0e 02020231 06080000000000000451")), // missing cltv
+        (InvalidOnionPayload(UInt64(6), 0), ByteVector.fromValidHex("07 02020231 04012a")) // missing channel id
+      )
+
+      for ((expectedErr, bin) <- testCases) {
+        val decoded = relayPerHopPayloadCodec.decode(bin.bits)
+        assert(decoded.isFailure)
+        val Attempt.Failure(err: MissingRequiredTlv) = decoded
+        assert(InvalidOnionPayload(err.tag, 0) == expectedErr)
+      }
+    }
+
+    {
+      println("decode variable-length (tlv) final per-hop payload missing information")
+      val testCases = Seq(
+        (InvalidOnionPayload(UInt64(2), 0), ByteVector.fromValidHex("03 04012a")), // missing amount
+        (InvalidOnionPayload(UInt64(4), 0), ByteVector.fromValidHex("04 02020231")) // missing cltv
+      )
+
+      for ((expectedErr, bin) <- testCases) {
+        val decoded = finalPerHopPayloadCodec.decode(bin.bits)
+        assert(decoded.isFailure)
+        val Attempt.Failure(err: MissingRequiredTlv) = decoded
+        assert(InvalidOnionPayload(err.tag, 0) == expectedErr)
+      }
+    }
+
+    {
+      println("decode invalid per-hop payload")
+      val testCases = Seq(
+        // Invalid fixed-size (legacy) payload.
+        ByteVector.fromValidHex("00 000000000000002a 000000000000002a"), // invalid length
+        // Invalid variable-length (tlv) payload.
+        ByteVector.fromValidHex("00"), // empty payload is missing required information
+        ByteVector.fromValidHex("01"), // invalid length
+        ByteVector.fromValidHex("01 0000"), // invalid length
+        ByteVector.fromValidHex("04 0000 2a00"), // unknown even types
+        ByteVector.fromValidHex("04 0000 0000"), // duplicate types
+        ByteVector.fromValidHex("04 0100 0000") // unordered types
+      )
+
+      for (testCase <- testCases) {
+        assert(relayPerHopPayloadCodec.decode(testCase.bits).isFailure)
+        assert(finalPerHopPayloadCodec.decode(testCase.bits).isFailure)
       }
     }
   }

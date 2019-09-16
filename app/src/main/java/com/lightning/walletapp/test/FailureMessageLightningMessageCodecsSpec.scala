@@ -3,7 +3,9 @@ package com.lightning.walletapp.test
 import com.lightning.walletapp.ln.crypto.Hmac256
 import com.lightning.walletapp.ln.wire._
 import fr.acinq.bitcoin.{Block, Protocol}
+import fr.acinq.eclair.UInt64
 import scodec.bits.{BitVector, ByteVector}
+
 import scala.util.Random
 
 
@@ -37,7 +39,7 @@ class FailureMessageLightningMessageCodecsSpec {
       (false, true, InvalidOnionVersion(randomBytes(32))),
       (false, true, InvalidOnionHmac(randomBytes(32))),
       (false, true, InvalidOnionKey(randomBytes(32))),
-      (false, true, InvalidOnionPayload(randomBytes(32))),
+      (false, true, InvalidOnionPayload(UInt64(0), 0)),
       (false, false, TemporaryChannelFailure(channelUpdate)),
       (false, true, PermanentChannelFailure),
       (false, true, RequiredChannelFeatureMissing),
@@ -96,7 +98,7 @@ class FailureMessageLightningMessageCodecsSpec {
         (FailureMessageCodecs.BADONION | FailureMessageCodecs.PERM | 4) -> InvalidOnionVersion(randomBytes(32)),
         (FailureMessageCodecs.BADONION | FailureMessageCodecs.PERM | 5) -> InvalidOnionHmac(randomBytes(32)),
         (FailureMessageCodecs.BADONION | FailureMessageCodecs.PERM | 6) -> InvalidOnionKey(randomBytes(32)),
-        (FailureMessageCodecs.BADONION | FailureMessageCodecs.PERM) -> InvalidOnionPayload(randomBytes(32))
+        (FailureMessageCodecs.PERM | 22) -> InvalidOnionPayload(UInt64(0), 0)
       )
 
       for ((code, message) <- msgs) {

@@ -1,16 +1,16 @@
 package com.lightning.walletapp.ln
 
-import scala.util.{Success, Try}
-import fr.acinq.bitcoin.{MilliSatoshi, Transaction}
-import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
-
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.crypto.Sphinx._
 import com.lightning.walletapp.ln.RoutingInfoTag._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
+
+import scala.util.{Success, Try}
+import fr.acinq.bitcoin.{MilliSatoshi, Transaction}
+import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.to
+import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 import scodec.Attempt
 
@@ -36,9 +36,8 @@ object PaymentInfo {
   private[this] var replacedChans = Set.empty[Long]
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: ByteVector): PacketAndSecrets = {
-    require(keys.size == payloads.size, "Payload count mismatch: there should be exactly as much payloads as node pubkeys")
-    val encodedPayloads = for (rawPayload <- payloads) yield serialize(perHopPayloadCodec encode rawPayload)
-    PaymentPacket.create(Tools.randomPrivKey, keys, encodedPayloads, assoc)
+    require(keys.size == payloads.size, "Count mismatch: there should be exactly as much payloads as node pubkeys")
+    PaymentPacket.create(Tools.randomPrivKey, keys, for (payload <- payloads) yield payload.encode, assoc)
   }
 
   def useFirstRoute(rest: PaymentRouteVec, rd: RoutingData) = rest match {
@@ -50,15 +49,15 @@ object PaymentInfo {
   def useRoute(route: PaymentRoute, rest: PaymentRouteVec, rd: RoutingData): FullOrEmptyRD = {
     // 9 + 1 block in case if block just appeared and there is a 1-block discrepancy between peers
     val firstExpiry = LNParams.broadcaster.currentHeight + rd.pr.adjustedMinFinalCltvExpiry
-    val firstPayloadVector = PerHopPayload(0L, rd.firstMsat, firstExpiry) +: Vector.empty
-    val start = (firstPayloadVector, Vector.empty[PublicKey], rd.firstMsat, firstExpiry)
+    val payloadVec = RelayLegacyPayload(0L, rd.firstMsat, firstExpiry) +: Vector.empty
+    val start = (payloadVec, Vector.empty[PublicKey], rd.firstMsat, firstExpiry)
 
     val (allPayloads, nodeIds, lastMsat, lastExpiry) = route.reverse.foldLeft(start) {
       case (loads, nodes, msat, expiry) \ Hop(nodeId, shortChannelId, delta, _, base, prop) =>
         // Walk in reverse direction from receiver to sender and accumulate cltv deltas with fees
 
         val nextFee = LNParams.hopFee(msat, base, prop)
-        val nextPayload = PerHopPayload(shortChannelId, msat, expiry)
+        val nextPayload = RelayLegacyPayload(shortChannelId, msat, expiry)
         (nextPayload +: loads, nodeId +: nodes, msat + nextFee, expiry + delta)
     }
 
@@ -156,20 +155,21 @@ object PaymentInfo {
 
   // Once mutually signed HTLCs are present we need to parse and fail/fulfill them
   def resolveHtlc(nodeSecret: PrivateKey, add: UpdateAddHtlc, bag: PaymentInfoBag, loop: Boolean) =
-    PaymentPacket.peel(nodeSecret, associatedData = add.paymentHash, add.onionRoutingPacket) match {
-      case Left(badOnion) => CMDFailMalformedHtlc(add.id, badOnion.onionHash, badOnion.code)
-      case Right(packet) if packet.isLastPacket => doResolve(packet, add, bag, loop)
-      case Right(packet) => failHtlc(packet, UnknownNextPeer, add)
+    PaymentPacket.peel(nodeSecret, add.paymentHash, add.onionRoutingPacket) match {
+      case Left(bad) => CMDFailMalformedHtlc(add.id, bad.onionHash, bad.code)
+      case Right(pkt) if pkt.isLastPacket => doResolve(pkt, add, bag, loop)
+      case Right(pkt) => failHtlc(pkt, UnknownNextPeer, add)
     }
 
   def doResolve(pkt: DecryptedPacket, add: UpdateAddHtlc, bag: PaymentInfoBag, loop: Boolean) =
-    Tuple2(perHopPayloadCodec decode pkt.payload.bits, bag getPaymentInfo add.paymentHash) match {
+    (LightningMessageCodecs.finalPerHopPayloadCodec decode pkt.payload.bits, bag getPaymentInfo add.paymentHash) match {
+      case Attempt.Failure(err: LightningMessageCodecs.MissingRequiredTlv) \ _ => failHtlc(pkt, InvalidOnionPayload(err.tag, 0), add)
+      case Attempt.Successful(payload) \ _ if payload.value.cltvExpiry != add.expiry => failHtlc(pkt, FinalIncorrectCltvExpiry(add.expiry), add)
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin > add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin * 2 < add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
-      case Attempt.Successful(payload) \ _ if payload.value.outgoingCltvValue != add.expiry => failHtlc(pkt, FinalIncorrectCltvExpiry(add.expiry), add)
       case attempt \ Success(info) if attempt.isSuccessful && !loop && info.incoming == 1 && info.status != SUCCESS => CMDFulfillHtlc(add, info.preimage)
       case attempt \ _ if attempt.isSuccessful => failIncorrectDetails(pkt, add.amount, add)
-      case _ => InvalidOnionPayload(PaymentPacket hash add.onionRoutingPacket)
+      case _ => failHtlc(pkt, InvalidOnionPayload(UInt64(0), 0), add)
     }
 }
 

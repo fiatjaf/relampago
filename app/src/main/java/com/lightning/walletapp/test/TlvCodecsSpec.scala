@@ -1,6 +1,5 @@
 package com.lightning.walletapp.test
 
-import com.lightning.walletapp.ln.wire.TlvCodecs._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 import com.lightning.walletapp.ln.wire.{GenericTlv, Tlv, TlvStream}
 import scodec.bits.ByteVector
