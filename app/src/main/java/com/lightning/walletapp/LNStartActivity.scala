@@ -180,20 +180,11 @@ case class WithdrawRequest(callback: String, k1: String,
   require(minCanReceive.amount <= maxWithdrawable)
   require(minCanReceive.amount >= 1L)
 
-  def requestWithdraw(lnUrl: LNUrl, pr: PaymentRequest) = {
-    val privateKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
-
-    val request =
-      android.net.Uri.parse(callback).buildUpon
-        .appendQueryParameter("pr", PaymentRequest write pr)
-        .appendQueryParameter("k1", k1)
-
-    val req1Try = for {
-      dataToSign <- Try(ByteVector fromValidHex k1)
-      signature = Tools.sign(dataToSign, privateKey).toHex
-    } yield request.appendQueryParameter("sig", signature)
-    unsafe(req1Try.getOrElse(request).build.toString)
-  }
+  def requestWithdraw(lnUrl: LNUrl, pr: PaymentRequest) =
+    unsafe(request = android.net.Uri.parse(callback).buildUpon
+      .appendQueryParameter("pr", PaymentRequest write pr)
+      .appendQueryParameter("k1", k1)
+      .build.toString)
 }
 
 case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
@@ -208,7 +199,7 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
   }
 
   def requestChannel =
-    unsafe(android.net.Uri.parse(callback).buildUpon
+    unsafe(request = android.net.Uri.parse(callback).buildUpon
       .appendQueryParameter("remoteid", LNParams.nodePublicKey.toString)
       .appendQueryParameter("private", "1")
       .appendQueryParameter("k1", k1)

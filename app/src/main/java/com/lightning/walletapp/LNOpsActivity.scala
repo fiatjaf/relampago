@@ -24,7 +24,7 @@ import java.util.Date
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  lazy val displayedChans = for (channel <- ChannelManager.all if me canDisplayData channel.data) yield channel
+  lazy val displayedChans = ChannelManager.all.filter(canDisplayData).sortBy(chan => if (chan.state == CLOSING) 1 else 0)
   lazy val normalChanActions = for (txt <- getResources getStringArray R.array.ln_normal_chan_actions) yield txt.html
   lazy val barStatus = app.getResources getStringArray R.array.ln_chan_ops_status
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
@@ -269,7 +269,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     case _ => me getString ln_info_status_other format c.state
   }
 
-  def canDisplayData(some: ChannelData) = some match {
+  def canDisplayData(c: Channel): Boolean = c.data match {
     case ref: RefundingData => ref.remoteLatestPoint.isDefined
     case _: HasNormalCommits => true
     case _: HostedCommits => true
