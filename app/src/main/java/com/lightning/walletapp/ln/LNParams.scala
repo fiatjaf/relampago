@@ -28,6 +28,7 @@ object LNParams {
   val channelReserveToFundingRatio = 100
 
   val minHostedCltvDelta = blocksPerDay * 3
+  val minHostedOnChainRefundSat = 1000000L
   val minHostedLiabilityBlockdays = 1000
   val maxHostedBlockHeight = 100000L
 

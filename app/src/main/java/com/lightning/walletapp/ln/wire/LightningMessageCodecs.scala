@@ -1,19 +1,23 @@
 package com.lightning.walletapp.ln.wire
 
 import java.net._
+
 import scodec.codecs._
 import fr.acinq.eclair.UInt64.Conversions._
-import com.lightning.walletapp.ln.{LightningException, RevocationInfo}
-import scodec.{Attempt, Codec, DecodeResult, Decoder, Err}
-import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
-import com.lightning.walletapp.ln.crypto.{Mac32, Sphinx}
 import scodec.bits.{BitVector, ByteVector}
-
+import com.lightning.walletapp.ln.crypto.{Mac32, Sphinx}
+import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
+import scodec.{Attempt, Codec, DecodeResult, Decoder, Err}
+import com.lightning.walletapp.ln.{LightningException, RevocationInfo}
 import org.apache.commons.codec.binary.Base32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
+
 import scala.reflect.ClassTag
 import java.math.BigInteger
+
+import com.lightning.walletapp.ln.wire.UpdateAddSecretTlv.SecretTlvStream
+
 import scala.util.Try
 
 
@@ -229,9 +233,6 @@ object LightningMessageCodecs { me =>
     )
   }
 
-  def lengthPrefixedTlvStream[T <: Tlv](codec: DiscriminatorCodec[T, UInt64]) =
-    variableSizeBytesLong(value = tlvStream(codec), size = varintoverflow)
-
   // Onion
 
   def onionRoutingPacketCodec(payloadLength: Int) = {
@@ -269,8 +270,8 @@ object LightningMessageCodecs { me =>
       .typecase(UInt64(4), outgoingCltv)
       .typecase(UInt64(6), outgoingChannelId)
 
-  val tlvPerHopPayloadCodec: Codec[OnionTlv.Stream] =
-    lengthPrefixedTlvStream[OnionTlv](onionTlvCodec).complete
+  private val tlvPerHopPayloadCodec: Codec[OnionTlv.Stream] =
+    variableSizeBytesLong(value = tlvStream(onionTlvCodec), size = varintoverflow)
 
   private val legacyRelayPerHopPayloadCodec: Codec[RelayLegacyPayload] = {
     (constant(ByteVector fromByte 0) withContext "realm") ::
@@ -408,7 +409,8 @@ object LightningMessageCodecs { me =>
       (uint64Overflow withContext "amountMsat") ::
       (bytes32 withContext "paymentHash") ::
       (uint32 withContext "expiry") ::
-      (paymentOnionPacketCodec withContext "onionRoutingPacket")
+      (paymentOnionPacketCodec withContext "onionRoutingPacket") ::
+      (UpdateAddSecretTlv.codec withContext "tlvStream")
   }.as[UpdateAddHtlc]
 
   val updateFulfillHtlcCodec = {
@@ -686,4 +688,26 @@ case class RelayTlvPayload(records: OnionTlv.Stream) extends RelayPayload {
 case class FinalTlvPayload(records: OnionTlv.Stream) extends FinalPayload {
   override val amountMsat = records.get[OnionTlv.AmountToForward].get.amountMsat
   override val cltvExpiry = records.get[OnionTlv.OutgoingCltv].get.cltv
+}
+
+// Secret in UpdateAddHtlc
+
+sealed trait UpdateAddSecretTlv extends Tlv
+
+object UpdateAddSecretTlv {
+  import LightningMessageCodecs._
+  type SecretTlvStream = TlvStream[UpdateAddSecretTlv]
+  case class Secret(data: ByteVector) extends UpdateAddSecretTlv
+
+  val codec: Codec[SecretTlvStream] = {
+    val emptySecret = TlvStream.empty[UpdateAddSecretTlv]
+    val secretCodec: Codec[Secret] = Codec(varsizebinarydata withContext "data").as[Secret]
+    val discriminatorCodec: DiscriminatorCodec[UpdateAddSecretTlv, UInt64] = discriminated.by(varint).typecase(1, secretCodec)
+    val prefixedTlvCodec: Codec[SecretTlvStream] = variableSizeBytesLong(value = tlvStream(discriminatorCodec), size = varintoverflow)
+
+    fallback(provide(emptySecret), prefixedTlvCodec).narrow(f = {
+      case Left(emptyFallback) => Attempt.successful(emptyFallback)
+      case Right(realStream) => Attempt.successful(realStream)
+    }, g = Right.apply)
+  }
 }

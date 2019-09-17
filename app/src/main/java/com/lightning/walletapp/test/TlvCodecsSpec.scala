@@ -310,7 +310,7 @@ object TlvCodecsSpec {
   private val testTlvCodec = discriminated[Tlv].by(varint).typecase(1, testCodec1).typecase(2, testCodec2).typecase(3, testCodec3).typecase(254, testCodec254)
 
   val testTlvStreamCodec = tlvStream(testTlvCodec)
-  val lengthPrefixedTestTlvStreamCodec = lengthPrefixedTlvStream(testTlvCodec)
+  val lengthPrefixedTestTlvStreamCodec = variableSizeBytesLong(varintoverflow, tlvStream(testTlvCodec))
 
   case class OtherType1(uintValue: UInt64) extends Tlv
   case class OtherType2(smallValue: Long) extends Tlv

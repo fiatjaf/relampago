@@ -766,8 +766,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       case (WaitRemoteHostedReply(announce, refundScriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
         if (init.liabilityDeadlineBlockdays < LNParams.minHostedLiabilityBlockdays) throw new LightningException("Their liability deadline is too low")
         if (init.initialClientBalanceMsat > init.channelCapacityMsat) throw new LightningException("Their init balance for us is larger than capacity")
-        if (init.minimalOnchainRefundAmountSatoshis > 1000000L) throw new LightningException("Their minimal on-chain refund amount is too high")
-        if (init.channelCapacityMsat < LNParams.minCapacityMsat) throw new LightningException("Their proposed channel capacity is too low")
+        if (init.channelCapacityMsat < LNParams.minHostedOnChainRefundSat * 2) throw new LightningException("Their proposed channel capacity is too low")
+        if (init.minimalOnchainRefundAmountSatoshis > LNParams.minHostedOnChainRefundSat) throw new LightningException("Their min refund is too high")
         if (UInt64(100000000L) > init.maxHtlcValueInFlightMsat) throw new LightningException("Their max value in-flight is too low")
         if (init.htlcMinimumMsat > 546000L) throw new LightningException("Their minimal payment size is too high")
         if (init.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
@@ -896,13 +896,13 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (notFound) throw new LightningException else me UPDATA hc.addLocalProposal(fail) SEND fail
 
 
-      case (hc: HostedCommits, CMDSocketOnline, SLEEPING) =>
-        if (isChainHeightKnown) me SEND hc.initMsg
+      case (hc: HostedCommits, CMDSocketOnline, SLEEPING | SUSPENDED) =>
+        if (isChainHeightKnown) me SEND hc.getError.getOrElse(hc.initMsg)
         isSocketConnected = true
 
 
-      case (hc: HostedCommits, CMDChainTipKnown, SLEEPING) =>
-        if (isSocketConnected) me SEND hc.initMsg
+      case (hc: HostedCommits, CMDChainTipKnown, SLEEPING | SUSPENDED) =>
+        if (isSocketConnected) me SEND hc.getError.getOrElse(hc.initMsg)
         isChainHeightKnown = true
 
 
@@ -932,7 +932,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         me doProcess CMDHTLCProcess
 
 
-      case (hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING)
+      case (hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING | SUSPENDED)
         if hc.announce.nodeId == newAnn.nodeId && Announcements.checkSig(newAnn) =>
         // Node was SLEEPING for a long time, do not trigger listeners for this update
         data = me STORE hc.modify(_.announce).setTo(newAnn)
