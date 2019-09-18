@@ -300,10 +300,11 @@ object Sphinx {
       * @return an encrypted failure packet that can be sent to the destination node.
       */
     def wrap(packet: ByteVector, sharedSecret: ByteVector): ByteVector = {
-      require(packet.length == PacketLength, s"invalid error packet length ${packet.length}, must be $PacketLength")
       val key = generateKey("ammag", sharedSecret)
       val stream = generateStream(key, PacketLength)
-      packet xor stream
+      // If we received a packet with an invalid length, we trim and pad to forward a packet with a normal length upstream.
+      // This is a poor man's attempt at increasing the likelihood of the sender receiving the error.
+      packet.take(PacketLength).padLeft(PacketLength) xor stream
     }
 
     /**

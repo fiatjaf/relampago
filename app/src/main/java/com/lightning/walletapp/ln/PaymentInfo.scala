@@ -61,7 +61,7 @@ object PaymentInfo {
 
     val isCltvBreach = lastExpiry - LNParams.broadcaster.currentHeight > LNParams.maxCltvDelta
     val onChainBlocked = rd.onChainFeeBlock && MilliSatoshi(lastMsat - rd.firstMsat) > onChainThreshold
-    val isOffChainFeeBreach = LNParams.isFeeBreach(route, rd.firstMsat) || onChainBlocked
+    val isOffChainFeeBreach = LNParams.isFeeBreach(route, rd.firstMsat, percent = 100L) || onChainBlocked
     val rd1 = if (onChainBlocked) rd.copy(onChainFeeBlockWasUsed = true) else rd
 
     if (isOffChainFeeBreach || isCltvBreach) useFirstRoute(rest, rd1) else {

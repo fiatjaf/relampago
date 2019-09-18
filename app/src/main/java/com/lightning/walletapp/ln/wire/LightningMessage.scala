@@ -64,7 +64,6 @@ case class UpdateAddHtlc(channelId: ByteVector, id: Long, amountMsat: Long, paym
                          expiry: Long, onionRoutingPacket: OnionRoutingPacket = Sphinx.emptyOnionPacket,
                          tlvStream: BaseStream = TlvStream.empty) extends ChannelMessage {
 
-  lazy val secret = tlvStream.get[UpdateAddSecretTlv.Secret]
   lazy val hash160 = Crypto.ripemd160(paymentHash)
   lazy val amount = MilliSatoshi(amountMsat)
 }

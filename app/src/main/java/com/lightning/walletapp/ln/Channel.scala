@@ -777,8 +777,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
           remoteUpdates = 0L, incomingHtlcs = Nil, outgoingHtlcs = Nil, remoteSignature = ByteVector.empty)
 
         val hc = restoreCommits(localLCSS, announce)
-        val su = localLCSS.reverse.makeStateUpdate(LNParams.nodePrivateKey)
-        me UPDATA WaitRemoteHostedStateUpdate(announce, hc) SEND su
+        val localSU = localLCSS.reverse.makeStateUpdate(LNParams.nodePrivateKey)
+        me UPDATA WaitRemoteHostedStateUpdate(announce, hc) SEND localSU
 
 
       case (WaitRemoteHostedStateUpdate(announce, hc), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
@@ -918,7 +918,11 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         val isAhead = hc.lastCrossSignedState.remoteUpdates > remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates > remoteLCSS.remoteUpdates
         val isBehind = hc.lastCrossSignedState.remoteUpdates < remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates < remoteLCSS.remoteUpdates
 
-        if (isLocalSigOk && isBehind) BECOME(me STORE restoreCommits(remoteLCSS.reverse, hc.announce), OPEN) SEND localSU
+        if (isLocalSigOk && isBehind) {
+          // We have provably falled behind, restore newer commitments
+          val hc1 = restoreCommits(remoteLCSS.reverse, hc.announce)
+          BECOME(me STORE hc1, OPEN) SEND localSU
+        }
         else if (isLocalSigOk && isAhead) BECOME(hc, OPEN) SEND hc.lastCrossSignedState
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
         else {

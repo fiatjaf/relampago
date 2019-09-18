@@ -170,6 +170,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       errorLimit -= 1
     }
 
+    def informNoRoutesMatched(msg: String)(rd: RoutingData) = {
+      UITask(host showForm negTextBuilder(dialog_ok, msg).create).run
+      PaymentInfoWrap failOnUI rd
+    }
+
     override def onSettled(cs: Commitments) =
       if (cs.localSpec.fulfilledIncoming.nonEmpty)
         host stopService host.foregroundServiceIntent
@@ -200,9 +205,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     override def onException = {
       case _ \ CMDAddImpossible(rd, code) =>
-        // Remove this payment from unsent since it was not accepted by channel
-        UITask(host showForm negTextBuilder(dialog_ok, app getString code).create).run
-        PaymentInfoWrap failOnUI rd
+        // Route has been chosen and sent to selected channel but then exception was thrown in `sendAdd`
+        // first try to use the rest of available routes and finally inform user if no more routes left
+        val noRoutes: RoutingData => Unit = informNoRoutesMatched(app getString code)
+        ChannelManager.sendEither(useFirstRoute(rd.routes.tail, rd), noRoutes)
 
       case chan \ internalException =>
         val bld = negTextBuilder(dialog_ok, UncaughtHandler toText internalException)

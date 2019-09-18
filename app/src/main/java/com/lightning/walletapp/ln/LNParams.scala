@@ -67,7 +67,7 @@ object LNParams {
     case amount \ hop => amount + hopFee(amount, hop.feeBaseMsat, hop.feeProportionalMillionths)
   } - msat
 
-  def isFeeBreach(route: PaymentRoute, msat: Long, percent: Long = 100L) =
+  def isFeeBreach(route: PaymentRoute, msat: Long, percent: Long) =
     totalRouteFee(route, msat) > maxAcceptableFee(msat, route.size, percent)
 
   def shouldUpdateFee(network: Long, commit: Long) = {

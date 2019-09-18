@@ -143,7 +143,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           val fundingDepthCondition = if (fundingDepth < threshold) -1 else R.id.fundingDepth
           val extraRoute = channelAndHop(chan) map { case _ \ route => route } getOrElse Vector.empty
           val hasStuckHtlcs = chan.inFlightHtlcs.exists(_.add.expiry <= LNParams.broadcaster.currentHeight)
-          val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, msat = 1000000000L)
+          val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, 1000000000L, percent = 100L)
           if (isIncomingFeeTooHigh) setExtraInfo(text = me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
           // In Turbo channels we will often have an OPEN state with NormalData and zeroconf
           if (hasStuckHtlcs) setExtraInfo(resource = ln_info_stuck_htlcs)
