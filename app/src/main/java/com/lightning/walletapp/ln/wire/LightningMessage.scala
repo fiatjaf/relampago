@@ -8,6 +8,7 @@ import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering, MilliSatoshi, Protocol
 import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
+import com.lightning.walletapp.ln.wire.TlvStream.BaseStream
 import com.lightning.walletapp.ln.crypto.Sphinx
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
@@ -61,7 +62,7 @@ case class Shutdown(channelId: ByteVector, scriptPubKey: ByteVector) extends Cha
 
 case class UpdateAddHtlc(channelId: ByteVector, id: Long, amountMsat: Long, paymentHash: ByteVector,
                          expiry: Long, onionRoutingPacket: OnionRoutingPacket = Sphinx.emptyOnionPacket,
-                         tlvStream: TlvStream[UpdateAddSecretTlv] = TlvStream.empty) extends ChannelMessage {
+                         tlvStream: BaseStream = TlvStream.empty) extends ChannelMessage {
 
   lazy val secret = tlvStream.get[UpdateAddSecretTlv.Secret]
   lazy val hash160 = Crypto.ripemd160(paymentHash)

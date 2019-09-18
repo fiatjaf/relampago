@@ -353,6 +353,8 @@ class WireSpec {
         val decoded = lightningMessageCodec.decode(encoded).require
         assert(msg == decoded.value)
       }
+
+      assert(update_add_htlc_tlv.secret.exists(_.data == remoteTlvSecret))
     }
 
     {

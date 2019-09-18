@@ -1,7 +1,6 @@
 package com.lightning.walletapp.ln.wire
 
 import java.net._
-
 import scodec.codecs._
 import fr.acinq.eclair.UInt64.Conversions._
 import scodec.bits.{BitVector, ByteVector}
@@ -9,15 +8,12 @@ import com.lightning.walletapp.ln.crypto.{Mac32, Sphinx}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import scodec.{Attempt, Codec, DecodeResult, Decoder, Err}
 import com.lightning.walletapp.ln.{LightningException, RevocationInfo}
+import com.lightning.walletapp.ln.wire.TlvStream.BaseStream
 import org.apache.commons.codec.binary.Base32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
-
 import scala.reflect.ClassTag
 import java.math.BigInteger
-
-import com.lightning.walletapp.ln.wire.UpdateAddSecretTlv.SecretTlvStream
-
 import scala.util.Try
 
 
@@ -644,7 +640,8 @@ case class TlvStream[T <: Tlv](records: Traversable[T], unknown: Traversable[Gen
 }
 
 object TlvStream {
-  def empty[T <: Tlv]: TlvStream[T] = TlvStream[T](Nil, Nil)
+  type BaseStream = TlvStream[Tlv]
+  val empty: BaseStream = TlvStream[Tlv](Nil, Nil)
   def apply[T <: Tlv](records: T*): TlvStream[T] = TlvStream(records, Nil)
 }
 
@@ -695,19 +692,17 @@ case class FinalTlvPayload(records: OnionTlv.Stream) extends FinalPayload {
 sealed trait UpdateAddSecretTlv extends Tlv
 
 object UpdateAddSecretTlv {
-  import LightningMessageCodecs._
-  type SecretTlvStream = TlvStream[UpdateAddSecretTlv]
+  import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
   case class Secret(data: ByteVector) extends UpdateAddSecretTlv
 
-  val codec: Codec[SecretTlvStream] = {
-    val emptySecret = TlvStream.empty[UpdateAddSecretTlv]
+  val codec: Codec[BaseStream] = {
     val secretCodec: Codec[Secret] = Codec(varsizebinarydata withContext "data").as[Secret]
-    val discriminatorCodec: DiscriminatorCodec[UpdateAddSecretTlv, UInt64] = discriminated.by(varint).typecase(1, secretCodec)
-    val prefixedTlvCodec: Codec[SecretTlvStream] = variableSizeBytesLong(value = tlvStream(discriminatorCodec), size = varintoverflow)
+    val discriminatorCodec: DiscriminatorCodec[Tlv, UInt64] = discriminated.by(varint).typecase(1, secretCodec)
+    val prefixedTlvCodec = variableSizeBytesLong(value = tlvStream(discriminatorCodec), size = varintoverflow)
 
-    fallback(provide(emptySecret), prefixedTlvCodec).narrow(f = {
-      case Left(emptyFallback) => Attempt.successful(emptyFallback)
-      case Right(realStream) => Attempt.successful(realStream)
+    fallback(provide(TlvStream.empty), prefixedTlvCodec).narrow(f = {
+      case Left(emptyFallback) => Attempt successful emptyFallback
+      case Right(realStream) => Attempt successful realStream
     }, g = Right.apply)
   }
 }
