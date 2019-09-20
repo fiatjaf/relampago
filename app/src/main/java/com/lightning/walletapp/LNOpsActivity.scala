@@ -41,9 +41,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     def getView(position: Int, savedView: View, parent: ViewGroup) = getItem(position) match { case chan =>
       val card = if (null == savedView) getLayoutInflater.inflate(R.layout.chan_card, null) else savedView
 
-      val cardView = Tuple3(chan, chan.getCommits, card.getTag) match {
-        case (chan: NormalChannel, Some(nc: NormalCommits), view: NormalViewHolder) => view.fill(chan, nc)
-        case (chan: NormalChannel, Some(nc: NormalCommits), null) => new NormalViewHolder(card).fill(chan, nc)
+      val cardView = Tuple3(chan, chan.data, card.getTag) match {
+        case (chan: NormalChannel, nc: NormalCommits, view: NormalViewHolder) => view.fill(chan, nc)
+        case (chan: NormalChannel, nc: NormalCommits, null) => new NormalViewHolder(card).fill(chan, nc)
         case _ => throw new RuntimeException
       }
 
@@ -130,7 +130,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       fundingDepthText setText getString(ln_mofn).format(fundingDepth, threshold).html
       // All amounts are in MilliSatoshi, but we convert them to Satoshi and / 1000 to erase trailing msat remainders
       paymentsInFlightText setText sumOrNothing(Satoshi(chan.inFlightHtlcs.toList.map(_.add.amountMsat).sum) / 1000L).html
-      refundableAmountText setText sumOrNothing(Satoshi(cs.localSpec.toLocalMsat) / 1000L).html
+      refundableAmountText setText sumOrNothing(Satoshi(chan.refundableMsat) / 1000L).html
       canSendText setText denom.parsedWithSign(Satoshi(chan.estCanSendMsat) / 1000L).html
       canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
       totalCapacityText setText denom.parsedWithSign(capacity).html

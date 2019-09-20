@@ -201,9 +201,8 @@ class WalletApp extends Application { me =>
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
       // Try to clear act leftovers if no channels are left
-      app.olympus tellClouds OlympusWrap.CMDStart
-      // Did not really happen, just sync our db
-      PaymentInfoWrap.onHostedCommitsRestored
+      app.olympus.tellClouds(OlympusWrap.CMDStart)
+      PaymentInfoWrap.markFailedPayments
       ChannelManager.initConnect
       RatesSaver.subscription
     }
@@ -392,13 +391,20 @@ object ChannelManager extends Broadcaster {
     }
 
     def CLOSEANDWATCH(cd: ClosingData) = {
-      val tier12txs = cd.tier12States.map(_.txn.bin).toVector
-      if (tier12txs.nonEmpty) app.olympus tellClouds TxUploadAct(txvec.encode(tier12txs).require.toByteVector, Nil, "txs/schedule")
-      // In case of breach after publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
-      // our job here is to watch for every output of every revoked commit tx and re-spend it before their CSV delay runs out
-      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ map CMDSpent foreach process, none)
-      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
-      // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
+      cd.tier12States.map(_.txn.bin).toVector match {
+        case txs if txs.isEmpty => Tools log "Closing contains no second tier txs, nothing to schedule on Olympus"
+        case txs => app.olympus tellClouds TxUploadAct(txvec.encode(txs).require.toByteVector, Nil, "txs/schedule")
+      }
+
+      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(txs => {
+        // In case of breach after publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
+        // our job here is to watch for every output of every revoked commit tx and re-spend it before their CSV delay runs out
+        for (tx <- txs) self process CMDSpent(tx)
+        for (tx <- txs) bag.extractPreimage(tx)
+      }, none)
+
+      // Collect all the commit txs publicKeyScripts and watch them locally
+      // because it's possible that remote peer will reveal preimages on-chain
       app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
       BECOME(STORE(cd), CLOSING)
     }

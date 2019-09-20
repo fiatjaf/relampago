@@ -16,7 +16,6 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import android.database.{ContentObserver, Cursor}
@@ -129,7 +128,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val delta = viable.size - online
 
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
-    val lnTotalSum = MilliSatoshi(viable.map(_.localSpendableMsat).sum)
+    val lnTotalSum = MilliSatoshi(viable.map(_.refundableMsat).sum)
     val btcFunds = if (btcTotalSum.amount < 1) btcEmpty else denom parsedWithSign btcTotalSum
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
     val perOneBtcRate = formatFiat.format(msatInFiat(oneBtc) getOrElse 0L)
@@ -159,6 +158,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var lnItems = Vector.empty[LNWrap]
   var btcItems = Vector.empty[BTCWrap]
   var allItems = Vector.empty[ItemWrap]
+  var sentHostedPreimages = Set.empty[ByteVector]
   val minLinesNum = 4 max IconGetter.scrHeight.ceil.toInt
   var currentCut = minLinesNum
 
@@ -186,6 +186,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           case Some(knownMsg) => informOfferClose(chan, knownMsg, natRes = -1).run
           case None => informOfferClose(chan, remoteError.text, natRes = -1).run
         }
+
+      case (_: HostedChannel, _: HostedCommits, _: CMDFulfillHtlc) =>
+        // Notify user that preimage has been revealed to hosted channel
+        updPaymentList.run
 
       // Peer has sent us an error, offer user to force-close this channel
       case (chan: NormalChannel, _: HasNormalCommits, remoteError: wire.Error) =>
@@ -220,7 +224,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     TransitionManager beginDelayedTransition mainWrap
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItemWraps = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
-    fundTxIds = ChannelManager.all.collect { case nc: NormalChannel => nc.fundTxId.toHex }.toSet
+    fundTxIds = ChannelManager.all.collect { case normalChannel: NormalChannel => normalChannel.fundTxId.toHex }.toSet
+    sentHostedPreimages = ChannelManager.all.map(_.data).collect { case hc: HostedCommits => hc.sentPreimages }.flatten.toSet
     allItems = tempItemWraps.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
     adapter.notifyDataSetChanged
     updTitleTask.run
@@ -299,21 +304,21 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
-      val humanAmount = if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
+      sentHostedPreimages contains info.preimage match {
+        case false => holder.view setBackgroundColor 0x00000000
+        case true => holder.view setBackgroundColor Denomination.yellowHighlight
+      }
+
+      val humanAmount =
+        if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
         else if (info.incoming == 1) denom.coloredIn(info.firstSum, new String)
         else denom.coloredOut(info.firstSum, new String)
-
-      val bg = info.revealed -> info.status match {
-        case 1 \ WAITING => Denomination.yellowHighlight
-        case _ => 0x00000000
-      }
 
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
       holder.transactWhat setText getDescription(info.description).html
       holder.transactSum setText s"<img src='ln'/>$humanAmount".html
       holder.transactCircle setImageResource iconDict(info.status)
-      holder.view setBackgroundColor bg
     }
 
     def generatePopup = {

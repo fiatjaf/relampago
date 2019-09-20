@@ -288,7 +288,7 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 
   lazy val reducedRemoteState = {
     val reduced = CommitmentSpec.reduce(latestRemoteCommit.spec, remoteChanges.acked, localChanges.proposed)
-    val commitFeeSat = Scripts.commitTxFee(remoteParams.dustLimitSat, reduced).amount
+    val commitFeeSat = Scripts.commitTxFee(remoteParams.dustLimitSat, reduced).toLong
     val theirFeeSat = if (localParams.isFunder) 0L else commitFeeSat
     val myFeeSat = if (localParams.isFunder) commitFeeSat else 0L
 
@@ -299,8 +299,8 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 
   lazy val localSpec = localCommit.spec
   def latestRemoteCommit = remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse remoteCommit
-  def localHasUnsignedOutgoing = localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
-  def remoteHasUnsignedOutgoing = remoteChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
+  def localHasUnsignedOutgoing = localChanges.proposed.collectFirst { case msg: UpdateAddHtlc => msg }.isDefined
+  def remoteHasUnsignedOutgoing = remoteChanges.proposed.collectFirst { case msg: UpdateAddHtlc => msg }.isDefined
   def addRemoteProposal(update: LightningMessage) = me.modify(_.remoteChanges.proposed).using(_ :+ update)
   def addLocalProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update)
   def nextDummyReduced = addLocalProposal(Tools.nextDummyHtlc).reducedRemoteState
@@ -484,6 +484,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
       allLocalUpdates = lastCrossSignedState.localUpdates)
 
   def getError: Option[Error] = localError.orElse(remoteError)
+  def sentPreimages = localUpdates collect { case msg: UpdateFulfillHtlc => msg.paymentPreimage }
   def addRemoteProposal(update: LightningMessage) = me.modify(_.remoteUpdates).using(_ :+ update).modify(_.allRemoteUpdates).using(_ + 1)
   def addLocalProposal(update: LightningMessage) = me.modify(_.localUpdates).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)
 

@@ -57,12 +57,6 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
   def process(change: Any) = Future(me doProcess change) onFailure { case failure => events onException me -> failure }
 
-  def localSpendableMsat = data match {
-    case normal: HasNormalCommits => normal.commitments.reducedRemoteState.spec.toRemoteMsat
-    case hosted: HostedCommits => hosted.nextLocalSpec.toLocalMsat
-    case _ => 0L
-  }
-
   def getCommits: Option[Commitments] = data match {
     case normal: HasNormalCommits => Some(normal.commitments)
     case hosted: HostedCommits => Some(hosted)
@@ -90,6 +84,7 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
   def inFlightHtlcs: Set[Htlc]
   def estCanReceiveMsat: Long
   def estCanSendMsat: Long
+  def refundableMsat: Long
 
   def estNextUsefulCapacityMsat =
     // In-flight HTLCs are subtracted here
@@ -109,10 +104,11 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
 }
 
 abstract class NormalChannel extends Channel(isHosted = false) { me =>
-  def fundTxId = data match {case hasSome: HasNormalCommits => hasSome.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
-  def estCanSendMsat = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat } getOrElse 0L
-  def inFlightHtlcs = getCommits collect { case nc: NormalCommits => nc.reducedRemoteState.spec.htlcs } getOrElse Set.empty[Htlc]
-  def estCanReceiveMsat = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canReceiveMsat } getOrElse 0L
+  def fundTxId = data match { case hnc: HasNormalCommits => hnc.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
+  def estCanSendMsat = data match { case hnc: HasNormalCommits => hnc.commitments.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat case _ => 0L }
+  def inFlightHtlcs: Set[Htlc] = data match { case hnc: HasNormalCommits => hnc.commitments.reducedRemoteState.spec.htlcs case _ => Set.empty }
+  def estCanReceiveMsat = data match { case hnc: HasNormalCommits => hnc.commitments.nextDummyReduced.canReceiveMsat case _ => 0L }
+  def refundableMsat = data match { case hnc: HasNormalCommits => hnc.commitments.localCommit.spec.toLocalMsat case _ => 0L }
 
   def CLOSEANDWATCH(close: ClosingData): Unit
   def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit
@@ -743,10 +739,11 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 }
 
 abstract class HostedChannel extends Channel(isHosted = true) { me =>
-  def estCanSendMsat = getCommits collect { case nc: HostedCommits => nc.nextLocalSpec.toLocalMsat } getOrElse 0L
-  def estCanReceiveMsat = getCommits collect { case nc: HostedCommits => nc.nextLocalSpec.toRemoteMsat } getOrElse 0L
-  def inFlightHtlcs = getCommits collect { case nc: HostedCommits => nc.nextLocalSpec.htlcs } getOrElse Set.empty[Htlc]
+  def estCanSendMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toLocalMsat case _ => 0L }
+  def estCanReceiveMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toRemoteMsat case _ => 0L }
+  def inFlightHtlcs: Set[Htlc] = data match { case hc: HostedCommits => hc.localSpec.htlcs ++ hc.nextLocalSpec.htlcs case _ => Set.empty }
   def isBlockDayOutOfSync(blockDay: Long): Boolean = math.abs(blockDay - LNParams.broadcaster.currentBlockDay) > 1
+  def refundableMsat = estCanSendMsat
 
   private var isChainHeightKnown: Boolean = false
   private var isSocketConnected: Boolean = false
@@ -909,16 +906,16 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         val isLocalSigOk = remoteLCSS.verifyRemoteSig(LNParams.nodePublicKey)
 
         val weAreAhead = hc.lastCrossSignedState.isAhead(remoteLCSS)
-        val theyHaveOurCurrentState = hc.lastCrossSignedState.isEven(remoteLCSS)
-        val theyHaveOurNextState = hc.nextLocalLCSS.isEven(remoteLCSS)
+        val theyHaveCurrent = hc.lastCrossSignedState.isEven(remoteLCSS)
+        val theyHaveNext = hc.nextLocalLCSS.isEven(remoteLCSS)
 
         if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
-        else if (theyHaveOurCurrentState) {
+        else if (theyHaveCurrent) {
           // We both have the same current state, send our update to acknoledge
           BECOME(hc.withUpdatesReset, OPEN) SEND hc.lastCrossSignedState.stateUpdate
           me doProcess CMDHTLCProcess
-        } else if (theyHaveOurNextState) {
+        } else if (theyHaveNext) {
           // We have sent an LCSS and did not get a confirmation, but they did get it from us
           val hc1 = hc.copy(lastCrossSignedState = remoteLCSS.reverse, localSpec = hc.nextLocalSpec)
           applyStateUpdate(updatedSignedStateHC = hc1.withUpdatesReset)

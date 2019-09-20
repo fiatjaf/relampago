@@ -90,12 +90,10 @@ object RouteTable extends Table {
 }
 
 object PaymentTable extends Table {
-  val (search, table, pr, preimage, incoming, status, stamp, description, hash, firstMsat, lastMsat, lastExpiry, chanId, revealed) =
-    ("search", "payment", "pr", "preimage", "incoming", "status", "stamp", "description", "hash", "firstMsat", "lastMsat", "lastExpiry",
-      "chanId", "revealed")
-
-  val insert12 = s"$pr, $preimage, $incoming, $status, $stamp, $description, $hash, $firstMsat, $lastMsat, $lastExpiry, $chanId, $revealed"
-  val newSql = s"INSERT OR IGNORE INTO $table ($insert12) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  val (search, table, pr, preimage, incoming, status, stamp) = ("search", "payment", "pr", "preimage", "incoming", "status", "stamp")
+  val (description, hash, firstMsat, lastMsat, lastExpiry, chanId) = ("description", "hash", "firstMsat", "lastMsat", "lastExpiry", "chanId")
+  val insert11 = s"$pr, $preimage, $incoming, $status, $stamp, $description, $hash, $firstMsat, $lastMsat, $lastExpiry, $chanId"
+  val newSql = s"INSERT OR IGNORE INTO $table ($insert11) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
   val newVirtualSql = s"INSERT INTO $fts$table ($search, $hash) VALUES (?, ?)"
 
   // Selecting
@@ -108,13 +106,11 @@ object PaymentTable extends Table {
   val updOkOutgoingSql = s"UPDATE $table SET $status = $SUCCESS, $preimage = ?, $chanId = ? WHERE $hash = ?"
   val updOkIncomingSql = s"UPDATE $table SET $status = $SUCCESS, $firstMsat = ?, $stamp = ?, $chanId = ? WHERE $hash = ?"
   val updLastParamsOutgoingSql = s"UPDATE $table SET $status = $WAITING, $firstMsat = ?, $lastMsat = ?, $lastExpiry = ? WHERE $hash = ?"
-  val updPreimageRevealedIncomingSql = s"UPDATE $table SET $revealed = 1 WHERE $hash = ?"
-
-  // Broken in-flight payment may become fulfilled on-chain but then marked as failed on restart unless we check for SUCCESS
+  // Broken in-flight payment may become fulfilled but then get overridden on restart unless we check for SUCCESS
   val updStatusSql = s"UPDATE $table SET $status = ? WHERE $hash = ? AND $status <> $SUCCESS"
 
   val updFailWaitingSql = s"""
-    UPDATE $table SET $status = $FAILURE /* mark as failed those which... */
+    UPDATE $table SET $status = $FAILURE /* fail those payments which... */
     WHERE ($status = $WAITING AND $incoming = 0) /* outgoing and pending or broken */
     OR ($status = $WAITING AND $incoming = 1 AND $stamp < ?) /* incoming and expired by now */"""
 
@@ -125,14 +121,14 @@ object PaymentTable extends Table {
     CREATE TABLE IF NOT EXISTS $table (
       $id INTEGER PRIMARY KEY AUTOINCREMENT, $pr STRING NOT NULL, $preimage STRING NOT NULL, $incoming INTEGER NOT NULL,
       $status INTEGER NOT NULL, $stamp INTEGER NOT NULL, $description STRING NOT NULL, $hash STRING NOT NULL UNIQUE,
-      $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL,
-      $chanId STRING NOT NULL, $revealed INTEGER NOT NULL
+      $firstMsat INTEGER NOT NULL, $lastMsat INTEGER NOT NULL, $lastExpiry INTEGER NOT NULL, $chanId STRING NOT NULL
     );
 
     /* hash index is created automatically because this field is UNIQUE */
     CREATE INDEX IF NOT EXISTS idx1$table ON $table ($status, $incoming, $stamp);
     CREATE INDEX IF NOT EXISTS idx2$table ON $table ($chanId);
-    COMMIT"""
+    COMMIT
+    """
 }
 
 object RevokedInfoTable extends Table {
@@ -158,7 +154,7 @@ object RevokedInfoTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-extends SQLiteOpenHelper(context, name, null, 14) {
+extends SQLiteOpenHelper(context, name, null, 16) {
 
   val base = getWritableDatabase
   val asString: Any => String = {
@@ -178,8 +174,8 @@ extends SQLiteOpenHelper(context, name, null, 14) {
   def onCreate(dbs: SQLiteDatabase) = {
     dbs execSQL RevokedInfoTable.createSql
     dbs execSQL BadEntityTable.createSql
-    dbs execSQL PaymentTable.createSql
     dbs execSQL PaymentTable.createVSql
+    dbs execSQL PaymentTable.createSql
     dbs execSQL ChannelTable.createSql
     dbs execSQL RouteTable.createSql
 
@@ -190,10 +186,8 @@ extends SQLiteOpenHelper(context, name, null, 14) {
 
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
     dbs execSQL s"DROP TABLE IF EXISTS ${RouteTable.table}"
-    dbs execSQL s"DROP TABLE IF EXISTS ${PaymentTable.table}"
     dbs execSQL s"DROP TABLE IF EXISTS ${OlympusTable.table}"
     dbs execSQL OlympusTable.createSql
-    dbs execSQL PaymentTable.createSql
     dbs execSQL RouteTable.createSql
     populateOlympus(dbs)
   }

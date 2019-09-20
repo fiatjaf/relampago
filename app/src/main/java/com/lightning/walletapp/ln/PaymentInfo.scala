@@ -184,9 +184,9 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
   lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
 }
 
-case class PaymentInfo(rawPr: String, preimage: ByteVector, incoming: Int, status: Int,
-                       stamp: Long, description: String, firstMsat: Long, lastMsat: Long,
-                       lastExpiry: Long, revealed: Int) {
+case class PaymentInfo(rawPr: String, preimage: ByteVector, incoming: Int,
+                       status: Int, stamp: Long, description: String, firstMsat: Long,
+                       lastMsat: Long, lastExpiry: Long) {
 
   val firstSum = MilliSatoshi(firstMsat)
   // Incoming lastExpiry is 0, updated if reflexive
@@ -199,7 +199,6 @@ trait PaymentInfoBag { me =>
   def extractPreimage(tx: Transaction)
   def getPaymentInfo(hash: ByteVector): Try[PaymentInfo]
   def updStatus(paymentStatus: Int, hash: ByteVector)
-  def updPreimageRevealed(hash: ByteVector)
   def updOkOutgoing(m: UpdateFulfillHtlc)
   def updOkIncoming(m: UpdateAddHtlc)
 }

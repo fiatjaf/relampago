@@ -59,7 +59,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def updOkIncoming(m: UpdateAddHtlc) = db.change(PaymentTable.updOkIncomingSql, m.amountMsat, System.currentTimeMillis, m.channelId, m.paymentHash)
   def updOkOutgoing(m: UpdateFulfillHtlc) = db.change(PaymentTable.updOkOutgoingSql, m.paymentPreimage, m.channelId, m.paymentHash)
   def getPaymentInfo(hash: ByteVector) = RichCursor apply db.select(PaymentTable.selectSql, hash) headTry toPaymentInfo
-  def updPreimageRevealed(hash: ByteVector) = db.change(PaymentTable.updPreimageRevealedIncomingSql, hash)
   def updStatus(status: Int, hash: ByteVector) = db.change(PaymentTable.updStatusSql, status, hash)
   def uiNotify = app.getContentResolver.notifyChange(db sqlPath PaymentTable.table, null)
   def byRecent = db select PaymentTable.selectRecentSql
@@ -70,14 +69,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def toPaymentInfo(rc: RichCursor) =
-    PaymentInfo(rc string PaymentTable.pr, ByteVector.fromValidHex(rc string PaymentTable.preimage), rc int PaymentTable.incoming,
-      rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description, rc long PaymentTable.firstMsat,
-      rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry, rc int PaymentTable.revealed)
+    PaymentInfo(rc string PaymentTable.pr, ByteVector.fromValidHex(rc string PaymentTable.preimage),
+      rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp,
+      rc string PaymentTable.description, rc long PaymentTable.firstMsat,
+      rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsOutgoingSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
-    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* this is outgoing payment */, WAITING, System.currentTimeMillis,
-      rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID, 0 /* preimage not revealed */)
+    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* outgoing payment */, WAITING, System.currentTimeMillis,
+      rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
   def recordRoutingDataWithPr(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: ByteVector, description: String): RoutingData = {
@@ -85,15 +85,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     val rd = app.emptyRD(pr, sum.amount, useCache = true)
 
     db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
-    db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* this is incoming payment */,
-      WAITING, System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount, 0L /* lastMsat */,
-      0L /* lastExpiry, updated on incoming for reflexive payments */, NOCHANID, 0 /* preimage not revealed */)
+    db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* incoming payment */,
+      WAITING, System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount,
+      0L /* lastMsat */, 0L /* lastExpiry, updated for reflexive payments */, NOCHANID)
 
     uiNotify
     rd
   }
 
- def onHostedCommitsRestored = db txWrap {
+  def markFailedPayments = db txWrap {
     db.change(PaymentTable.updFailWaitingSql, System.currentTimeMillis - PaymentRequest.expiryTag.seconds * 1000L)
     for (activeInFlightHash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, activeInFlightHash)
   }
@@ -197,10 +197,6 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       app.kit.wallet.removeWatchedScripts(app.kit fundingPubScript close)
       db.change(RevokedInfoTable.killSql, close.commitments.channelId)
       db.change(ChannelTable.killSql, close.commitments.channelId)
-
-    case (_, _, cmd: CMDFulfillHtlc) =>
-      updPreimageRevealed(cmd.add.paymentHash)
-      uiNotify
   }
 
   override def onBecome = {
