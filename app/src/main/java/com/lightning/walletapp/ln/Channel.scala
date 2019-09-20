@@ -752,12 +752,12 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
   def doProcess(change: Any) = {
     Tuple3(data, change, state) match {
       case (wait: WaitRemoteHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
-        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initMsg
+        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.invokeMsg
         isSocketConnected = true
 
 
       case (wait: WaitRemoteHostedReply, CMDChainTipKnown, WAIT_FOR_INIT) =>
-        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initMsg
+        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.invokeMsg
         isChainHeightKnown = true
 
 
@@ -888,12 +888,12 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, CMDSocketOnline, SLEEPING | SUSPENDED) =>
-        if (isChainHeightKnown) me SEND hc.getError.getOrElse(hc.initMsg)
+        if (isChainHeightKnown) me SEND hc.getError.getOrElse(hc.invokeMsg)
         isSocketConnected = true
 
 
       case (hc: HostedCommits, CMDChainTipKnown, SLEEPING | SUSPENDED) =>
-        if (isSocketConnected) me SEND hc.getError.getOrElse(hc.initMsg)
+        if (isSocketConnected) me SEND hc.getError.getOrElse(hc.invokeMsg)
         isChainHeightKnown = true
 
 
@@ -925,10 +925,9 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
           BECOME(hc.withUpdatesReset, OPEN) SEND hc.lastCrossSignedState
           me doProcess CMDHTLCProcess
         } else {
-          // We are provably behind, restore state from their data
+          // We are behind, restore state from their data
           val hc1 = restoreCommits(remoteLCSS.reverse, hc.announce)
-          val localSU = hc1.lastCrossSignedState.stateUpdate
-          BECOME(me STORE hc1, OPEN) SEND localSU
+          BECOME(me STORE hc1, OPEN) SEND hc1.lastCrossSignedState.stateUpdate
           events unknownHostedHtlcsDetected hc
           me doProcess CMDHTLCProcess
         }

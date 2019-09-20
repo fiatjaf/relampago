@@ -72,14 +72,12 @@ object PaymentInfo {
     }
   }
 
-  def without(routes: PaymentRouteVec, fun: Hop => Boolean) =
-    routes.filterNot(_ exists fun)
+  def without(routes: PaymentRouteVec, fun: Hop => Boolean) = routes.filterNot(_ exists fun)
+  def failIncorrectDetails(packet: DecryptedPacket, msat: MilliSatoshi, add: UpdateAddHtlc): CMDFailHtlc =
+    failHtlc(packet, IncorrectOrUnknownPaymentDetails(msat.toLong, LNParams.broadcaster.currentHeight), add)
 
-  def failIncorrectDetails(pkt: DecryptedPacket, msat: MilliSatoshi, add: UpdateAddHtlc) =
-    failHtlc(pkt, IncorrectOrUnknownPaymentDetails(msat.amount, LNParams.broadcaster.currentHeight), add)
-
-  def failHtlc(pkt: DecryptedPacket, msg: FailureMessage, add: UpdateAddHtlc) =
-    CMDFailHtlc(reason = FailurePacket.create(pkt.sharedSecret, msg), id = add.id)
+  def failHtlc(packet: DecryptedPacket, msg: FailureMessage, add: UpdateAddHtlc) =
+    CMDFailHtlc(reason = FailurePacket.create(packet.sharedSecret, msg), id = add.id)
 
   def withoutChan(shortId: Long, rd: RoutingData, span: Long, msat: Long) = {
     val routesWithoutBadChannels = without(rd.routes, _.shortChannelId == shortId)
