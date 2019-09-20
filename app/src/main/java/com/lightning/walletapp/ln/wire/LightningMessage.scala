@@ -1,6 +1,7 @@
 package com.lightning.walletapp.ln.wire
 
 import java.nio.ByteOrder._
+import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
@@ -207,16 +208,18 @@ case class InitHostedChannel(maxHtlcValueInFlightMsat: UInt64,
                              liabilityDeadlineBlockdays: Int, minimalOnchainRefundAmountSatoshis: Long,
                              initialClientBalanceMsat: Long) extends HostedChannelMessage
 
-case class LastCrossSignedState(refundScriptPubKey: ByteVector, initHostedChannel: InitHostedChannel, blockDay: Long,
-                                localBalanceMsat: Long, remoteBalanceMsat: Long, localUpdates: Long, remoteUpdates: Long,
-                                incomingHtlcs: List[UpdateAddHtlc], outgoingHtlcs: List[UpdateAddHtlc],
-                                remoteSignature: ByteVector) extends HostedChannelMessage { me =>
+case class LastCrossSignedState(refundScriptPubKey: ByteVector,
+                                initHostedChannel: InitHostedChannel, blockDay: Long, localBalanceMsat: Long, remoteBalanceMsat: Long,
+                                localUpdates: Long, remoteUpdates: Long, incomingHtlcs: List[UpdateAddHtlc], outgoingHtlcs: List[UpdateAddHtlc],
+                                remoteSigOfLocal: ByteVector, localSigOfRemote: ByteVector) extends HostedChannelMessage { me =>
 
-  lazy val reverse = copy(localUpdates = remoteUpdates, remoteUpdates = localUpdates,
-    localBalanceMsat = remoteBalanceMsat, remoteBalanceMsat = localBalanceMsat,
-    incomingHtlcs = outgoingHtlcs, outgoingHtlcs = incomingHtlcs)
+  lazy val reverse: LastCrossSignedState =
+    copy(localUpdates = remoteUpdates, remoteUpdates = localUpdates,
+      localBalanceMsat = remoteBalanceMsat, remoteBalanceMsat = localBalanceMsat,
+      remoteSigOfLocal = localSigOfRemote, localSigOfRemote = remoteSigOfLocal,
+      incomingHtlcs = outgoingHtlcs, outgoingHtlcs = incomingHtlcs)
 
-  lazy val hostedSigHash = Crypto sha256 {
+  lazy val hostedSigHash: ByteVector = Crypto sha256 {
     val inPayments = incomingHtlcs.map(updateAddHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
     val outPayments = outgoingHtlcs.map(updateAddHtlcCodec.encode(_).require.toByteVector).sortWith(LexicographicalOrdering.isLessThan)
 
@@ -234,9 +237,16 @@ case class LastCrossSignedState(refundScriptPubKey: ByteVector, initHostedChanne
       outPayments.foldLeft(ByteVector.empty) { case acc \ htlc => acc ++ htlc }
   }
 
-  def makeSignature(priv: PrivateKey) = sign(hostedSigHash, priv)
-  def verifyRemoteSignature(pub: PublicKey) = Crypto.verifySignature(hostedSigHash, remoteSignature, pub)
-  def makeStateUpdate(priv: PrivateKey) = StateUpdate(blockDay, localUpdates, remoteUpdates, me makeSignature priv)
+  def verifyRemoteSig(pubKey: PublicKey) = Crypto.verifySignature(hostedSigHash, remoteSigOfLocal, pubKey)
+  def withLocalSigOfRemote(priv: PrivateKey) = me.modify(_.localSigOfRemote) setTo sign(reverse.hostedSigHash, priv)
+
+  def isAhead(remoteLCSS: LastCrossSignedState) = remoteUpdates > remoteLCSS.localUpdates || localUpdates > remoteLCSS.remoteUpdates
+  def isEven(remoteLCSS: LastCrossSignedState) = remoteUpdates == remoteLCSS.localUpdates && localUpdates == remoteLCSS.remoteUpdates
+
+  def stateUpdate = {
+    require(localSigOfRemote != ByteVector.empty, "Empty localSigOfRemote")
+    StateUpdate(blockDay, localUpdates, remoteUpdates, localSigOfRemote)
+  }
 }
 
 case class StateUpdate(blockDay: Long, localUpdates: Long, remoteUpdates: Long,

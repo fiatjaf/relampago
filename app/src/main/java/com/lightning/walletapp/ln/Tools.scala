@@ -20,7 +20,6 @@ object \ {
 object Tools {
   type Bytes = Array[Byte]
   val random = new RandomGenerator
-  val emptyChanges = Changes(Vector.empty, Vector.empty, Vector.empty)
   val nextDummyHtlc = UpdateAddHtlc(Zeroes, id = -1, LNParams.minCapacityMsat, One, expiry = 144 * 3)
   def randomPrivKey = PrivateKey(ByteVector.view(random getBytes 32), compressed = true)
   def log(consoleMessage: String): Unit = android.util.Log.d("LN", consoleMessage)

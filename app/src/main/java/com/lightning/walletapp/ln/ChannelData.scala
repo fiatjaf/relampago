@@ -68,9 +68,9 @@ case class WaitFundingSignedCore(localParams: LocalParams, channelId: ByteVector
 
   def makeCommitments(signedLocalCommitTx: CommitTx) =
     NormalCommits(localParams, remoteParams, LocalCommit(index = 0L, localSpec, Nil, signedLocalCommitTx), remoteCommit,
-      localChanges = Tools.emptyChanges, remoteChanges = Tools.emptyChanges, localNextHtlcId = 0L, remoteNextHtlcId = 0L,
-      remoteNextCommitInfo = Right(Tools.randomPrivKey.toPoint), signedLocalCommitTx.input, ShaHashesWithIndex(Map.empty, None),
-      channelId, updateOpt = None, channelFlags, startedAt = System.currentTimeMillis)
+      localChanges = Changes(Vector.empty, Vector.empty, Vector.empty), remoteChanges = Changes(Vector.empty, Vector.empty, Vector.empty),
+      localNextHtlcId = 0L, remoteNextHtlcId = 0L, remoteNextCommitInfo = Right(Tools.randomPrivKey.toPoint), signedLocalCommitTx.input,
+      ShaHashesWithIndex(Map.empty, None), channelId, updateOpt = None, channelFlags, startedAt = System.currentTimeMillis)
 }
 
 case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSignedCore,
@@ -270,10 +270,7 @@ case class WaitingForRevocation(nextRemoteCommit: RemoteCommit, sent: CommitSig,
 case class LocalCommit(index: Long, spec: CommitmentSpec, htlcTxsAndSigs: Seq[HtlcTxAndSigs], commitTx: CommitTx)
 case class RemoteCommit(index: Long, spec: CommitmentSpec, txOpt: Option[Transaction], remotePerCommitmentPoint: Point)
 case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: ByteVector, remoteSig: ByteVector)
-case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector) {
-  lazy val withProposedAsSigned = copy(proposed = Vector.empty, signed = proposedAndSigned)
-  lazy val proposedAndSigned = proposed ++ signed
-}
+case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 
 sealed trait Commitments {
   val updateOpt: Option[ChannelUpdate]
@@ -473,21 +470,22 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 }
 
 case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState,
-                         allLocalUpdates: Long, allRemoteUpdates: Long, localChanges: Changes, remoteUpdates: LNMessageVector,
+                         allLocalUpdates: Long, allRemoteUpdates: Long, localUpdates: LNMessageVector, remoteUpdates: LNMessageVector,
                          localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
                          startedAt: Long = System.currentTimeMillis) extends Commitments with ChannelData { me =>
 
-  def getError: Option[Error] = localError.orElse(remoteError)
-  def addRemoteProposal(update: LightningMessage) = me.modify(_.remoteUpdates).using(_ :+ update).modify(_.allRemoteUpdates).using(_ + 1)
-  def addLocalProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)
-
   lazy val initMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey)
-  lazy val nextLocalSpec = CommitmentSpec.reduce(localSpec, localChanges.proposedAndSigned, remoteUpdates)
+  lazy val nextLocalSpec = CommitmentSpec.reduce(localSpec, localUpdates, remoteUpdates)
   val channelId = announce.hostedChanId
 
-  def resetUpdates =
-    copy(allLocalUpdates = lastCrossSignedState.localUpdates + localChanges.signed.size,
-      allRemoteUpdates = lastCrossSignedState.remoteUpdates, remoteUpdates = Vector.empty)
+  lazy val withUpdatesReset =
+    copy(remoteUpdates = Vector.empty, localUpdates = Vector.empty,
+      allRemoteUpdates = lastCrossSignedState.remoteUpdates,
+      allLocalUpdates = lastCrossSignedState.localUpdates)
+
+  def getError: Option[Error] = localError.orElse(remoteError)
+  def addRemoteProposal(update: LightningMessage) = me.modify(_.remoteUpdates).using(_ :+ update).modify(_.allRemoteUpdates).using(_ + 1)
+  def addLocalProposal(update: LightningMessage) = me.modify(_.localUpdates).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)
 
   def sendAdd(rd: RoutingData) = {
     // Let's add this change and see if the new state violates any of constraints including those imposed by them on us
@@ -532,7 +530,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   def nextLocalLCSS = {
     val inHtlcs \ outHtlcs = nextLocalSpec.htlcs.toList.partition(_.incoming)
     LastCrossSignedState(lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel,
-      broadcaster.currentBlockDay, nextLocalSpec.toLocalMsat, nextLocalSpec.toRemoteMsat, allLocalUpdates,
-      allRemoteUpdates, inHtlcs.map(_.add), outHtlcs.map(_.add), ByteVector.empty)
+      broadcaster.currentBlockDay, nextLocalSpec.toLocalMsat, nextLocalSpec.toRemoteMsat, allLocalUpdates, allRemoteUpdates,
+      inHtlcs.map(_.add), outHtlcs.map(_.add), localSigOfRemote = ByteVector.empty, remoteSigOfLocal = ByteVector.empty)
   }
 }

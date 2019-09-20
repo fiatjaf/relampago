@@ -202,7 +202,8 @@ class WalletApp extends Application { me =>
       startBlocksDownload(ChannelManager.chainEventsListener)
       // Try to clear act leftovers if no channels are left
       app.olympus tellClouds OlympusWrap.CMDStart
-      PaymentInfoWrap.markFailedPayments
+      // Did not really happen, just sync our db
+      PaymentInfoWrap.onHostedCommitsRestored
       ChannelManager.initConnect
       RatesSaver.subscription
     }

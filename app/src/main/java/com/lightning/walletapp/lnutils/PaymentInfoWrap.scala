@@ -93,7 +93,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     rd
   }
 
-  def markFailedPayments = db txWrap {
+ def onHostedCommitsRestored = db txWrap {
     db.change(PaymentTable.updFailWaitingSql, System.currentTimeMillis - PaymentRequest.expiryTag.seconds * 1000L)
     for (activeInFlightHash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, activeInFlightHash)
   }

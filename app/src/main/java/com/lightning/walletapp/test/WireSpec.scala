@@ -337,10 +337,10 @@ class WireSpec {
       val state_override = StateOverride(50000L, 500000, 70000, 700000, randomSignature)
 
       val state_update = StateUpdate(50000L, 10, 20, randomSignature)
-      val lcss1 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc_tlv, update_add_htlc, update_add_htlc_tlv), List(update_add_htlc, update_add_htlc, update_add_htlc_tlv), randomSignature)
-      val lcss2 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, List(update_add_htlc_tlv, update_add_htlc_tlv), randomSignature)
-      val lcss3 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc_tlv, update_add_htlc_tlv), Nil, randomSignature)
-      val lcss4 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, Nil, randomSignature)
+      val lcss1 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc_tlv, update_add_htlc, update_add_htlc_tlv), List(update_add_htlc, update_add_htlc, update_add_htlc_tlv), randomSignature, randomSignature)
+      val lcss2 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, List(update_add_htlc_tlv, update_add_htlc_tlv), randomSignature, randomSignature)
+      val lcss3 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc_tlv, update_add_htlc_tlv), Nil, randomSignature, randomSignature)
+      val lcss4 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, Nil, randomSignature, randomSignature)
 
       val msgs: List[LightningMessage] =
         open :: accept :: funding_created :: funding_signed :: funding_locked :: update_fee :: shutdown :: closing_signed ::
