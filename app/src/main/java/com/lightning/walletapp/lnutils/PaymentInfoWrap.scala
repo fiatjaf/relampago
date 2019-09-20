@@ -98,6 +98,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     for (activeInFlightHash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, activeInFlightHash)
   }
 
+  override def unknownHostedHtlcsDetected(hc: HostedCommits) = db txWrap {
+    // Hosted peer is far ahead, we can't know what happened to in-flight payments
+    for (htlc <- hc.currentAndNextInFlight) updStatus(UNKNOWN, htlc.add.paymentHash)
+  }
+
   override def outPaymentAccepted(rd: RoutingData) = {
     acceptedPayments = acceptedPayments.updated(rd.pr.paymentHash, rd)
     unsentPayments = unsentPayments - rd.pr.paymentHash

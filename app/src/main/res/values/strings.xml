@@ -243,8 +243,9 @@
     <!-- see PaymentInfo.scala -->
     <string name="ln_state_wait">still in progress</string>
     <string name="ln_state_success">paid successfully</string>
-    <string name="ln_state_fail_in">expired and cancelled</string>
     <string name="ln_state_fail_out">failed and refunded</string>
+    <string name="ln_state_fail_in">expired and cancelled</string>
+    <string name="ln_state_unknown">status is unknown</string>
 
     <string name="ln_info_total_payments">total payments</string>
     <string name="ln_info_in_flight">value in-flight</string>

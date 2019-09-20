@@ -97,6 +97,7 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
     override def onProcessSuccess = { case ps => for (lst <- listeners if lst.onProcessSuccess isDefinedAt ps) lst onProcessSuccess ps }
     override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
+    override def unknownHostedHtlcsDetected(hc: HostedCommits) = for (lst <- listeners) lst unknownHostedHtlcsDetected hc
     override def fulfillReceived(upd: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived upd
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
     override def onSettled(cs: Commitments) = for (lst <- listeners) lst.onSettled(cs)
@@ -741,7 +742,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 abstract class HostedChannel extends Channel(isHosted = true) { me =>
   def estCanSendMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toLocalMsat case _ => 0L }
   def estCanReceiveMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toRemoteMsat case _ => 0L }
-  def inFlightHtlcs: Set[Htlc] = data match { case hc: HostedCommits => hc.localSpec.htlcs ++ hc.nextLocalSpec.htlcs case _ => Set.empty }
+  def inFlightHtlcs: Set[Htlc] = data match { case hc: HostedCommits => hc.currentAndNextInFlight case _ => Set.empty }
   def isBlockDayOutOfSync(blockDay: Long): Boolean = math.abs(blockDay - LNParams.broadcaster.currentBlockDay) > 1
   def refundableMsat = estCanSendMsat
 
@@ -928,6 +929,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
           val hc1 = restoreCommits(remoteLCSS.reverse, hc.announce)
           val localSU = hc1.lastCrossSignedState.stateUpdate
           BECOME(me STORE hc1, OPEN) SEND localSU
+          events unknownHostedHtlcsDetected hc
           me doProcess CMDHTLCProcess
         }
 
@@ -973,6 +975,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (!isRightRemoteUpdateNumber) throw new LightningException("Provided remote update number from remote override is wrong")
         if (me isBlockDayOutOfSync remoteOverride.blockDay) throw new LightningException("Remote override blockday is not acceptable")
         BECOME(me STORE restoreCommits(recreatedCompleteLocalLCSS, hc.announce), OPEN) SEND recreatedCompleteLocalLCSS.stateUpdate
+        events unknownHostedHtlcsDetected hc
 
 
       case (null, wait: WaitRemoteHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
@@ -1015,6 +1018,7 @@ trait ChannelListener {
   def onException: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
 
+  def unknownHostedHtlcsDetected(hc: HostedCommits): Unit = none
   def fulfillReceived(upd: UpdateFulfillHtlc): Unit = none
   def outPaymentAccepted(rd: RoutingData): Unit = none
   def onSettled(cs: Commitments): Unit = none

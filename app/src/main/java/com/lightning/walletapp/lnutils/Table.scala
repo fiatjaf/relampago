@@ -70,8 +70,7 @@ object BadEntityTable extends Table {
 
     /* resId index is created automatically because this field is UNIQUE */
     CREATE INDEX IF NOT EXISTS idx1$table ON $table ($expire, $amount);
-    COMMIT
-    """
+    COMMIT"""
 }
 
 object RouteTable extends Table {
@@ -111,7 +110,7 @@ object PaymentTable extends Table {
 
   val updFailWaitingSql = s"""
     UPDATE $table SET $status = $FAILURE /* fail those payments which... */
-    WHERE ($status = $WAITING AND $incoming = 0) /* outgoing and pending or broken */
+    WHERE ($status = $WAITING AND $incoming = 0) /* outgoing and pending or not on commits */
     OR ($status = $WAITING AND $incoming = 1 AND $stamp < ?) /* incoming and expired by now */"""
 
   // Once incoming or outgoing payment is settled we can search it by various metadata
@@ -127,8 +126,7 @@ object PaymentTable extends Table {
     /* hash index is created automatically because this field is UNIQUE */
     CREATE INDEX IF NOT EXISTS idx1$table ON $table ($status, $incoming, $stamp);
     CREATE INDEX IF NOT EXISTS idx2$table ON $table ($chanId);
-    COMMIT
-    """
+    COMMIT"""
 }
 
 object RevokedInfoTable extends Table {
@@ -148,8 +146,7 @@ object RevokedInfoTable extends Table {
 
     CREATE INDEX IF NOT EXISTS idx2$table ON $table ($chanId, $myBalance, $uploaded);
     CREATE INDEX IF NOT EXISTS idx1$table ON $table ($txId);
-    COMMIT
-    """
+    COMMIT"""
 }
 
 trait Table { val (id, fts) = "_id" -> "fts4" }

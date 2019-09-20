@@ -73,11 +73,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
   val txsConfs = app.getResources getStringArray R.array.txs_confs
-  // 0 is unsent payment, 4 is former frozen payment, now waiting
-  val iconDict = Array(await, await, conf1, dead, await)
+  val iconDict = Array(await, await, conf1, dead, unknown)
 
   val blocksTitleListener = new BlocksListener {
     def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) =
+      // Limit for performance reasons, we don't need faster updates anyway
       if (left % blocksPerDay == 0) updTitleTask.run
   }
 
@@ -326,6 +326,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case FAILURE if 0 == info.incoming => s"<strong>${app getString ln_state_fail_out}</strong>"
         case FAILURE if 1 == info.incoming => s"<strong>${app getString ln_state_fail_in}</strong>"
         case SUCCESS => s"<strong>${app getString ln_state_success}</strong>"
+        case UNKNOWN => s"<strong>${app getString ln_state_unknown}</strong>"
         case _ => s"<strong>${app getString ln_state_wait}</strong>"
       }
 

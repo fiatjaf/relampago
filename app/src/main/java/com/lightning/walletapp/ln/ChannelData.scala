@@ -484,6 +484,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
       allLocalUpdates = lastCrossSignedState.localUpdates)
 
   def getError: Option[Error] = localError.orElse(remoteError)
+  def currentAndNextInFlight = localSpec.htlcs ++ nextLocalSpec.htlcs
   def sentPreimages = localUpdates collect { case msg: UpdateFulfillHtlc => msg.paymentPreimage }
   def addRemoteProposal(update: LightningMessage) = me.modify(_.remoteUpdates).using(_ :+ update).modify(_.allRemoteUpdates).using(_ + 1)
   def addLocalProposal(update: LightningMessage) = me.modify(_.localUpdates).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)

@@ -19,6 +19,7 @@ object PaymentInfo {
   final val WAITING = 1
   final val SUCCESS = 2
   final val FAILURE = 3
+  final val UNKNOWN = 4
 
   final val NOT_SENDABLE = 0
   final val SENDABLE_AIR = 1

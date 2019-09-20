@@ -240,8 +240,9 @@
     <!-- see PaymentInfo.scala -->
     <string name="ln_state_wait">знаходиться в дорозі</string>
     <string name="ln_state_success">успішно оплачений</string>
-    <string name="ln_state_fail_in">більш не придатний</string>
     <string name="ln_state_fail_out">повернутий назад</string>
+    <string name="ln_state_fail_in">більш не придатний</string>
+    <string name="ln_state_unknown">стан невiдомий</string>
 
     <string name="ln_info_total_payments">total payments</string>
     <string name="ln_info_in_flight">value in-flight</string>
