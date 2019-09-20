@@ -110,7 +110,7 @@ object PaymentTable extends Table {
 
   val updFailWaitingSql = s"""
     UPDATE $table SET $status = $FAILURE /* fail those payments which... */
-    WHERE ($status = $WAITING AND $incoming = 0) /* outgoing and pending or not on commits */
+    WHERE ($status = $WAITING AND $incoming = 0) /* outgoing and pending or not in commits */
     OR ($status = $WAITING AND $incoming = 1 AND $stamp < ?) /* incoming and expired by now */"""
 
   // Once incoming or outgoing payment is settled we can search it by various metadata

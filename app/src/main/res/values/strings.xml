@@ -212,7 +212,7 @@
     <string name="err_ln_local_amount_high">Failed because payment amount becomes too high to handle for your channel when off-chain fee is added</string>
     <string name="err_ln_remote_amount_high">Failed because payment amount becomes too high to handle for your peer when off-chain fee is added</string>
     <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
-    <string name="err_ln_fulfilled">Failed because this payment has been fulfilled already</string>
+    <string name="err_ln_fulfilled">Failed because this payment has probably been fulfilled already</string>
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
     <string name="err_ln_chain_wait">Waiting for on-chain wallet to connect</string>
 

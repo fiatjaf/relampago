@@ -209,7 +209,7 @@
     <string name="err_ln_local_amount_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для канала</string>
     <string name="err_ln_remote_amount_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для вашего пира</string>
     <string name="err_ln_remote_amount_low">Не получилось потому что сумма платежа слишком низка для вашего пира</string>
-    <string name="err_ln_fulfilled">Не получилось потому что этот платежный запрос уже оплачен</string>
+    <string name="err_ln_fulfilled">Не получилось потому что этот платежный запрос уже скорее всего оплачен</string>
     <string name="err_ln_too_many">Не получилось потому что слишком много платежей уже в пути</string>
     <string name="err_ln_chain_wait">Ждем подключения он-чейн кошелька</string>
 
