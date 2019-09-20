@@ -909,19 +909,19 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         val isLocalSigOk = remoteLCSS.verifyRemoteSig(LNParams.nodePublicKey)
 
         val weAreAhead = hc.lastCrossSignedState.isAhead(remoteLCSS)
-        val theyHaveOurCurrent = hc.lastCrossSignedState.isEven(remoteLCSS)
-        val theyHaveOurNext = hc.nextLocalLCSS.isEven(remoteLCSS)
+        val theyHaveOurCurrentState = hc.lastCrossSignedState.isEven(remoteLCSS)
+        val theyHaveOurNextState = hc.nextLocalLCSS.isEven(remoteLCSS)
 
         if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
-        else if (theyHaveOurNext) {
-          // We have sent an LCSS and did not get a confirmation, but they did get it from us
-          val hc1 = hc.copy(lastCrossSignedState = remoteLCSS.reverse, localSpec = hc.nextLocalSpec)
-          applyStateUpdate(updatedSignedStateHC = hc1.withUpdatesReset)
-        } else if (theyHaveOurCurrent) {
+        else if (theyHaveOurCurrentState) {
           // We both have the same current state, send our update to acknoledge
           BECOME(hc.withUpdatesReset, OPEN) SEND hc.lastCrossSignedState.stateUpdate
           me doProcess CMDHTLCProcess
+        } else if (theyHaveOurNextState) {
+          // We have sent an LCSS and did not get a confirmation, but they did get it from us
+          val hc1 = hc.copy(lastCrossSignedState = remoteLCSS.reverse, localSpec = hc.nextLocalSpec)
+          applyStateUpdate(updatedSignedStateHC = hc1.withUpdatesReset)
         } else if (weAreAhead) {
           // They have fallen behind, send our state so they can resync
           BECOME(hc.withUpdatesReset, OPEN) SEND hc.lastCrossSignedState
