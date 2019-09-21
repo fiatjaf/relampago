@@ -345,4 +345,5 @@
     <string name="err_ln_hosted_wrong_local_sig">incorrect local signature</string>
     <string name="err_ln_hosted_wrong_remote_sig">incorrect remote signature</string>
     <string name="err_ln_hosted_update_cltv_too_low">incorrect expiry in channel update</string>
+    <string name="err_ln_too_many_state_updates">too many state updates</string>
 </resources>

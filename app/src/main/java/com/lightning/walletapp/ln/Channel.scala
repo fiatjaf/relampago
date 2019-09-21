@@ -748,6 +748,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
   private var isChainHeightKnown: Boolean = false
   private var isSocketConnected: Boolean = false
+  private var stateUpdateAttempts: Int = 0
 
   def doProcess(change: Any) = {
     Tuple3(data, change, state) match {
@@ -858,15 +859,17 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       case (hc: HostedCommits, remoteSU: StateUpdate, OPEN)
         // GUARD: only proceed if signture is defferent, they may send duplicates
         if hc.lastCrossSignedState.remoteSigOfLocal != remoteSU.localSigOfRemoteLCSS =>
+        if (stateUpdateAttempts > 16) localSuspend(hc, ERR_TOO_MANY_STATE_UPDATES) else {
+          val lcss1 = hc.nextLocalLCSS.copy(blockDay = remoteSU.blockDay, remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS)
+          val hc1 = hc.copy(lastCrossSignedState = lcss1.withLocalSigOfRemote(LNParams.nodePrivateKey), localSpec = hc.nextLocalSpec)
+          val isRemoteSigOk = lcss1.verifyRemoteSig(hc.announce.nodeId)
+          stateUpdateAttempts += 1
 
-        val lcss1 = hc.nextLocalLCSS.copy(blockDay = remoteSU.blockDay, remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS)
-        val hc1 = hc.copy(lastCrossSignedState = lcss1.withLocalSigOfRemote(LNParams.nodePrivateKey), localSpec = hc.nextLocalSpec)
-        val isRemoteSigOk = lcss1.verifyRemoteSig(hc.announce.nodeId)
-
-        if (remoteSU.remoteUpdates < lcss1.localUpdates) me SEND hc1.lastCrossSignedState.stateUpdate
-        else if (me isBlockDayOutOfSync remoteSU.blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
-        else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
-        else applyStateUpdate(updatedSignedStateHC = hc1.withUpdatesReset)
+          if (remoteSU.remoteUpdates < lcss1.localUpdates) me SEND hc1.lastCrossSignedState.stateUpdate
+          else if (me isBlockDayOutOfSync remoteSU.blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
+          else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
+          else doUpdateState(updatedSignedStateHC = hc1.withUpdatesReset)
+        }
 
 
       case (hc: HostedCommits, cmd: CMDFulfillHtlc, OPEN) =>
@@ -919,7 +922,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         } else if (theyHaveNext) {
           // We have sent an LCSS and did not get a confirmation, but they did get it from us
           val hc1 = hc.copy(lastCrossSignedState = remoteLCSS.reverse, localSpec = hc.nextLocalSpec)
-          applyStateUpdate(updatedSignedStateHC = hc1.withUpdatesReset)
+          doUpdateState(updatedSignedStateHC = hc1.withUpdatesReset)
         } else if (weAreAhead) {
           // They have fallen behind, send our state so they can resync
           BECOME(hc.withUpdatesReset, OPEN) SEND hc.lastCrossSignedState
@@ -955,21 +958,21 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         BECOME(me STORE cs1, SUSPENDED)
 
 
-      case (hc: HostedCommits, CMDHostedStateOverride(remoteOverride), SLEEPING | SUSPENDED) =>
+      case (hc: HostedCommits, CMDHostedStateOverride(remoteOverride), OPEN | SLEEPING | SUSPENDED) =>
         val isRightLocalUpdateNumber = remoteOverride.localUpdates > hc.lastCrossSignedState.remoteUpdates
         val isRightRemoteUpdateNumber = remoteOverride.remoteUpdates > hc.lastCrossSignedState.localUpdates
-        val newLocalBalance = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat - remoteOverride.localBalanceMsat
+        val localBalance = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat - remoteOverride.localBalanceMsat
 
         val recreatedCompleteLocalLCSS =
           hc.lastCrossSignedState.copy(incomingHtlcs = Nil, outgoingHtlcs = Nil,
-            localBalanceMsat = newLocalBalance, remoteBalanceMsat = remoteOverride.localBalanceMsat,
+            localBalanceMsat = localBalance, remoteBalanceMsat = remoteOverride.localBalanceMsat,
             localUpdates = remoteOverride.remoteUpdates, remoteUpdates = remoteOverride.localUpdates,
             blockDay = remoteOverride.blockDay, remoteSigOfLocal = remoteOverride.localSigOfRemoteLCSS)
             .withLocalSigOfRemote(LNParams.nodePrivateKey)
 
         val isRemoteSigOk = recreatedCompleteLocalLCSS.verifyRemoteSig(hc.announce.nodeId)
         if (!isRemoteSigOk) throw new LightningException("Provided remote override signature is wrong")
-        if (newLocalBalance < 0) throw new LightningException("Provided updated local balance is larger than capacity")
+        if (localBalance < 0) throw new LightningException("Provided updated local balance is larger than capacity")
         if (!isRightLocalUpdateNumber) throw new LightningException("Provided local update number from remote override is wrong")
         if (!isRightRemoteUpdateNumber) throw new LightningException("Provided remote update number from remote override is wrong")
         if (me isBlockDayOutOfSync remoteOverride.blockDay) throw new LightningException("Remote override blockday is not acceptable")
@@ -987,11 +990,13 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     events onProcessSuccess Tuple3(me, data, change)
   }
 
-  def applyStateUpdate(updatedSignedStateHC: HostedCommits) = {
+  def doUpdateState(updatedSignedStateHC: HostedCommits) = {
     val localSU = updatedSignedStateHC.lastCrossSignedState.stateUpdate
     me UPDATA STORE(updatedSignedStateHC) SEND localSU
     events onSettled updatedSignedStateHC
     me doProcess CMDHTLCProcess
+    // Restore updates counter
+    stateUpdateAttempts = 0
   }
 
   def restoreCommits(localLCSS: LastCrossSignedState, announce: NodeAnnouncement) = {
