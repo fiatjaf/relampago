@@ -42,8 +42,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       val card = if (null == savedView) getLayoutInflater.inflate(R.layout.chan_card, null) else savedView
 
       val cardView = Tuple3(chan, chan.data, card.getTag) match {
-        case (chan: NormalChannel, nc: NormalCommits, view: NormalViewHolder) => view.fill(chan, nc)
-        case (chan: NormalChannel, nc: NormalCommits, null) => new NormalViewHolder(card).fill(chan, nc)
+        case (chan: NormalChannel, hnc: HasNormalCommits, view: NormalViewHolder) => view.fill(chan, hnc.commitments)
+        case (chan: NormalChannel, hnc: HasNormalCommits, null) => new NormalViewHolder(card).fill(chan, hnc.commitments)
         case _ => throw new RuntimeException
       }
 

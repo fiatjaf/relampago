@@ -181,7 +181,7 @@ class WalletApp extends Application { me =>
 
           case _ =>
             val discovery = new DnsDiscovery(params)
-            peerGroup addPeerDiscovery discovery
+            peerGroup.addPeerDiscovery(discovery)
             peerGroup.setMaxConnections(5)
         }
       }

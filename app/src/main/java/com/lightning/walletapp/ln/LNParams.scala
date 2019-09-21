@@ -100,14 +100,16 @@ object ChanErrorCodes {
   final val ERR_HOSTED_WRONG_LOCAL_SIG = ByteVector.fromValidHex("0002")
   final val ERR_HOSTED_WRONG_REMOTE_SIG = ByteVector.fromValidHex("0003")
   final val ERR_HOSTED_UPDATE_CLTV_TOO_LOW = ByteVector.fromValidHex("0004")
-  final val ERR_TOO_MANY_STATE_UPDATES = ByteVector.fromValidHex("0005")
+  final val ERR_HOSTED_TOO_MANY_STATE_UPDATES = ByteVector.fromValidHex("0005")
+  final val ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC = ByteVector.fromValidHex("0006")
+  final val ERR_HOSTED_RELAYED_HTLC_WHILE_RESTORING = ByteVector.fromValidHex("0007")
 
   val hostedErrors = Map (
     ERR_HOSTED_WRONG_BLOCKDAY -> err_ln_hosted_wrong_blockday,
     ERR_HOSTED_WRONG_LOCAL_SIG -> err_ln_hosted_wrong_local_sig,
     ERR_HOSTED_WRONG_REMOTE_SIG -> err_ln_hosted_wrong_remote_sig,
-    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low,
-    ERR_TOO_MANY_STATE_UPDATES -> err_ln_too_many_state_updates
+    ERR_HOSTED_TOO_MANY_STATE_UPDATES -> err_ln_too_many_state_updates,
+    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low
   )
 }
 

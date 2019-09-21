@@ -859,7 +859,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       case (hc: HostedCommits, remoteSU: StateUpdate, OPEN)
         // GUARD: only proceed if signture is defferent, they may send duplicates
         if hc.lastCrossSignedState.remoteSigOfLocal != remoteSU.localSigOfRemoteLCSS =>
-        if (stateUpdateAttempts > 16) localSuspend(hc, ERR_TOO_MANY_STATE_UPDATES) else {
+
+        if (stateUpdateAttempts > 16) localSuspend(hc, ERR_HOSTED_TOO_MANY_STATE_UPDATES) else {
           val lcss1 = hc.nextLocalLCSS.copy(blockDay = remoteSU.blockDay, remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS)
           val hc1 = hc.copy(lastCrossSignedState = lcss1.withLocalSigOfRemote(LNParams.nodePrivateKey), localSpec = hc.nextLocalSpec)
           val isRemoteSigOk = lcss1.verifyRemoteSig(hc.announce.nodeId)

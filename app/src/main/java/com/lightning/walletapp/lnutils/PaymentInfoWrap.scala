@@ -154,17 +154,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     uiNotify
     if (cs.localSpec.fulfilled.nonEmpty) com.lightning.walletapp.Vibrator.vibrate
     if (cs.localSpec.fulfilledOutgoing.nonEmpty) app.olympus.tellClouds(OlympusWrap.CMDStart)
-    if (cs.localSpec.fulfilledIncoming.nonEmpty) getVulnerableRevActs.foreach(app.olympus.tellClouds)
-  }
 
-  def getVulnerableRevActs = {
-    val operational = ChannelManager.all.filter(isOperational)
-    getCerberusActs(operational.flatMap(getVulnerableRevVec).toMap)
+    if (cs.localSpec.fulfilledIncoming.nonEmpty) {
+      val vulnerable = ChannelManager.all.flatMap(getVulnerableRevVec)
+      getCerberusActs(vulnerable.toMap).foreach(app.olympus.tellClouds)
+    }
   }
 
   def getVulnerableRevVec(chan: Channel) =
-    chan.getCommits collect { case nc: NormalCommits =>
-      // Find previous channel states which peer might now be tempted to spend
+    chan.getCommits collect { case nc: NormalCommits if isOperational(chan) =>
       val threshold = nc.remoteCommit.spec.toRemoteMsat - dust.amount * 20 * 1000L
       def toTxidAndInfo(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
       RichCursor apply db.select(RevokedInfoTable.selectLocalSql, nc.channelId, threshold) vec toTxidAndInfo
