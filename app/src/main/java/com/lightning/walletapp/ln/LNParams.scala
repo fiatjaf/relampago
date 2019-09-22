@@ -108,8 +108,10 @@ object ChanErrorCodes {
     ERR_HOSTED_WRONG_BLOCKDAY -> err_ln_hosted_wrong_blockday,
     ERR_HOSTED_WRONG_LOCAL_SIG -> err_ln_hosted_wrong_local_sig,
     ERR_HOSTED_WRONG_REMOTE_SIG -> err_ln_hosted_wrong_remote_sig,
-    ERR_HOSTED_TOO_MANY_STATE_UPDATES -> err_ln_too_many_state_updates,
-    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low
+    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low,
+    ERR_HOSTED_TOO_MANY_STATE_UPDATES -> err_ln_hosted_too_many_state_updates,
+    ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC -> err_ln_hosted_timed_out_outgoing_htlc,
+    ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING -> err_ln_hosted_in_flight_htlc_while_restoring
   )
 }
 
