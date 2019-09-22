@@ -95,10 +95,10 @@ class WalletApp extends Application { me =>
     }
   }
 
-  def setBuffer(bufferText: String, notify: Boolean = true) = {
-    val bufferContent = ClipData.newPlainText("wallet", bufferText)
-    if (notify) me toast getString(copied_to_clipboard).format(bufferText)
-    clipboardManager setPrimaryClip bufferContent
+  def setBuffer(text: String) = {
+    val bufferContent = ClipData.newPlainText("wallet", text)
+    clipboardManager.setPrimaryClip(bufferContent)
+    me toast getString(copied_to_clipboard)
   }
 
   def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) =

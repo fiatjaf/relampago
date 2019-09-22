@@ -12,9 +12,9 @@
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Може зайняти кілька годин</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Більш швидке підтвердження</font></small></small>]]></string>
     <string name="search_hint_payments">Пошук платежiв-блискавок</string>
-    <string name="copied_to_clipboard">Скопійовано «%1$s»</string>
     <string name="wallet_settings">Налаштування гаманця</string>
     <string name="wallet_restore">Відновити гаманець</string>
+    <string name="copied_to_clipboard">Скопійовано</string>
     <string name="wallet_create">Новий гаманець</string>
 
     <array name="denoms">

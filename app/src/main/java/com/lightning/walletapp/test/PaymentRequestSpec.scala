@@ -165,7 +165,7 @@ class PaymentRequestSpec {
       assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
       assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
-      assert(pr.adjustedMinFinalCltvExpiry == Some(12 + 10))
+      assert(pr.adjustedMinFinalCltvExpiry == 12 + 10)
       assert(pr.tags.size == 4)
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
