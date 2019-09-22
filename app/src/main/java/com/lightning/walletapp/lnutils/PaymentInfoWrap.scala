@@ -129,7 +129,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     db txWrap {
-      cs.localSpec.fulfilledIncoming foreach updOkIncoming
+      for (updateAddHtlc <- cs.localSpec.fulfilledIncoming) updOkIncoming(updateAddHtlc)
       // Malformed payments are returned by our direct peer and should never be retried again
       for (Htlc(false, add) <- cs.localSpec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localSpec.failed) {

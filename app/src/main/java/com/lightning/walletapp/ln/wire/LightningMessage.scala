@@ -61,9 +61,8 @@ case class Shutdown(channelId: ByteVector, scriptPubKey: ByteVector) extends Cha
   def some = Some(me)
 }
 
-case class UpdateAddHtlc(channelId: ByteVector, id: Long, amountMsat: Long, paymentHash: ByteVector,
-                         expiry: Long, onionRoutingPacket: OnionRoutingPacket = Sphinx.emptyOnionPacket,
-                         tlvStream: BaseStream = TlvStream.empty) extends ChannelMessage {
+case class UpdateAddHtlc(channelId: ByteVector, id: Long, amountMsat: Long, paymentHash: ByteVector, expiry: Long,
+                         onionRoutingPacket: OnionRoutingPacket = Sphinx.emptyOnionPacket) extends ChannelMessage {
 
   lazy val hash160 = Crypto.ripemd160(paymentHash)
   lazy val amount = MilliSatoshi(amountMsat)

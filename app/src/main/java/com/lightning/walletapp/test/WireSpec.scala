@@ -308,7 +308,6 @@ class WireSpec {
 
     {
       println("encode/decode all channel messages")
-      val remoteTlvSecret = randomSignature
       val open = OpenChannel(randomBytes(32), randomBytes(32), 3, 4, 5, UInt64(6), 7, 8, 9, 10, 11, publicKey(1), point(2), point(3), point(4), point(5), point(6), ChannelFlags(0.toByte))
       val accept = AcceptChannel(randomBytes(32), 3, UInt64(4), 5, 6, 7, 8, 9, publicKey(1), point(2), point(3), point(4), point(5), point(6))
       val funding_created = FundingCreated(randomBytes(32), bin(32, 0), 3, randomSignature)
@@ -318,7 +317,6 @@ class WireSpec {
       val shutdown = Shutdown(randomBytes(32), bin(47, 0))
       val closing_signed = ClosingSigned(randomBytes(32), 2, randomSignature)
       val update_add_htlc = UpdateAddHtlc(randomBytes(32), 2, 3, bin(32, 0), 4)
-      val update_add_htlc_tlv = UpdateAddHtlc(randomBytes(32), 2, 3, bin(32, 0), 4, Sphinx.emptyOnionPacket, TlvStream(UpdateAddSecretTlv.Secret(remoteTlvSecret)))
       val update_fulfill_htlc = UpdateFulfillHtlc(randomBytes(32), 2, bin(32, 0))
       val update_fail_htlc = UpdateFailHtlc(randomBytes(32), 2, bin(154, 0))
       val update_fail_malformed_htlc = UpdateFailMalformedHtlc(randomBytes(32), 2, randomBytes(32), 1111)
@@ -337,14 +335,14 @@ class WireSpec {
       val state_override = StateOverride(50000L, 500000, 70000, 700000, randomSignature)
 
       val state_update = StateUpdate(50000L, 10, 20, randomSignature)
-      val lcss1 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc_tlv, update_add_htlc, update_add_htlc_tlv), List(update_add_htlc, update_add_htlc, update_add_htlc_tlv), randomSignature, randomSignature)
-      val lcss2 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, List(update_add_htlc_tlv, update_add_htlc_tlv), randomSignature, randomSignature)
-      val lcss3 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc_tlv, update_add_htlc_tlv), Nil, randomSignature, randomSignature)
+      val lcss1 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc, update_add_htlc, update_add_htlc), List(update_add_htlc, update_add_htlc, update_add_htlc), randomSignature, randomSignature)
+      val lcss2 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, List(update_add_htlc, update_add_htlc), randomSignature, randomSignature)
+      val lcss3 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc, update_add_htlc), Nil, randomSignature, randomSignature)
       val lcss4 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, Nil, randomSignature, randomSignature)
 
       val msgs: List[LightningMessage] =
         open :: accept :: funding_created :: funding_signed :: funding_locked :: update_fee :: shutdown :: closing_signed ::
-          update_add_htlc :: update_add_htlc_tlv :: update_fulfill_htlc :: update_fail_htlc :: update_fail_malformed_htlc :: commit_sig :: revoke_and_ack ::
+          update_add_htlc :: update_fulfill_htlc :: update_fail_htlc :: update_fail_malformed_htlc :: commit_sig :: revoke_and_ack ::
           channel_announcement :: node_announcement :: channel_update :: announcement_signatures :: ping :: pong :: channel_reestablish ::
           invoke_hosted_channel :: init_hosted_channel :: state_override :: state_update :: lcss1 :: lcss2 :: lcss3 :: lcss4 :: Nil
 

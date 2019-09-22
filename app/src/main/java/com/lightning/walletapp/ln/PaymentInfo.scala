@@ -161,6 +161,7 @@ object PaymentInfo {
   def doResolve(pkt: DecryptedPacket, add: UpdateAddHtlc, bag: PaymentInfoBag, loop: Boolean) =
     (LightningMessageCodecs.finalPerHopPayloadCodec decode pkt.payload.bits, bag getPaymentInfo add.paymentHash) match {
       case Attempt.Failure(err: LightningMessageCodecs.MissingRequiredTlv) \ _ => failHtlc(pkt, InvalidOnionPayload(err.tag, 0), add)
+      case attempt \ Success(info) if LNParams.broadcaster.currentHeight >= add.expiry => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case Attempt.Successful(payload) \ _ if payload.value.cltvExpiry != add.expiry => failHtlc(pkt, FinalIncorrectCltvExpiry(add.expiry), add)
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin > add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin * 2 < add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)

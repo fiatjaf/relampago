@@ -273,9 +273,9 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         }
 
 
-      case (norm: NormalData, add: UpdateAddHtlc, OPEN) =>
+      case (norm: NormalData, addHtlc: UpdateAddHtlc, OPEN) =>
         // Got new incoming HTLC, put it to changes without storing for now
-        me UPDATA norm.copy(commitments = norm.commitments receiveAdd add)
+        me UPDATA norm.copy(commitments = norm.commitments receiveAdd addHtlc)
 
 
       case (norm: NormalData, fulfill: UpdateFulfillHtlc, OPEN) =>
@@ -993,7 +993,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
   def doUpdateState(updatedSignedStateHC: HostedCommits) = {
     val localSU = updatedSignedStateHC.lastCrossSignedState.stateUpdate
-    me UPDATA STORE(updatedSignedStateHC) SEND localSU
+    BECOME(me STORE updatedSignedStateHC, OPEN) SEND localSU
     events onSettled updatedSignedStateHC
     me doProcess CMDHTLCProcess
     // Restore updates counter
