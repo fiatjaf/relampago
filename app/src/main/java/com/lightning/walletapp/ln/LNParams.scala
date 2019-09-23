@@ -12,8 +12,10 @@ import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import com.lightning.walletapp.ChannelManager
 import com.lightning.walletapp.ln.Tools.Bytes
+import java.io.ByteArrayInputStream
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
+import java.nio.ByteOrder
 
 
 object LNParams {
@@ -75,17 +77,33 @@ object LNParams {
     mismatch < -0.25 || mismatch > 0.25
   }
 
-  def getLinkingKey(domain: String) = {
-    val prefix = crypto.Mac32.hmac256(hashingKey, domain).take(8).toLong(signed = true)
-    derivePrivateKey(master, hardened(138L) :: 0L :: prefix :: Nil).privateKey
-  }
-
   def backupFileName = s"blw${chainHash.toHex}-${cloudId.toHex}.bkup"
   def updateFeerate = for (chan <- ChannelManager.all) chan process CMDFeerate(broadcaster.perKwThreeSat)
-  def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: ByteVector, idx: Long, isFunder: Boolean) = {
-    val Seq(fund, rev, pay, delay, htlc, sha) = for (order <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: order :: Nil)
-    LocalParams(UInt64(maxCapacity.amount), theirReserve, toSelfDelay = 2016, maxAcceptedHtlcs = 25, fund.privateKey, rev.privateKey,
-      pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey, dust, sha256(sha.privateKey.toBin), isFunder)
+
+  def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: ByteVector, fundKey: PrivateKey, isFunder: Boolean) = {
+    // It's always possible to re-derive all secret keys because a keyPath is generated from funding pubKey which will be present on a blockchain
+    val Seq(revocationSecret, paymentKey, delayedPaymentKey, htlcKey, shaSeed) = makeChanKeys(fundKey.publicKey)
+    LocalParams(UInt64(maxCapacity.amount), theirReserve, toSelfDelay = 2016, maxAcceptedHtlcs = 25, fundKey,
+      revocationSecret.privateKey, paymentKey.privateKey, delayedPaymentKey.privateKey, htlcKey.privateKey,
+      finalScriptPubKey, dust, sha256(shaSeed.privateKey.toBin), isFunder)
+  }
+
+  def makeChanKeys(fundKey: PublicKey) = {
+    val channelKeyPath: Vector[Long] = makeKeyPath(fundKey.hash160)
+    for (idx <- 1L to 5L) yield derivePrivateKey(extendedNodeKey, channelKeyPath :+ idx)
+  }
+
+  def makeLinkingKey(domain: String): PrivateKey = {
+    val material = crypto.Mac32.hmac256(key = hashingKey, message = domain)
+    derivePrivateKey(extendedNodeKey, makeKeyPath(material) :+ 0L).privateKey
+  }
+
+  def makeKeyPath(material: ByteVector): Vector[Long] = {
+    require(material.size > 7, "Material size must be at least 8")
+    val stream = new ByteArrayInputStream(material.slice(0, 8).toArray)
+    val first = Protocol.uint32(input = stream, order = ByteOrder.BIG_ENDIAN)
+    val second = Protocol.uint32(input = stream, order = ByteOrder.BIG_ENDIAN)
+    Vector(hardened(138L), first, second)
   }
 }
 

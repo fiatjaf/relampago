@@ -162,7 +162,7 @@ class LNStartFundActivity extends TimerActivity { me =>
                 val batch = Batch(unsignedRequest, dummyScript, null)
                 val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
                 val finalPubKeyScript = ByteVector(ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram)
-                val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, System.currentTimeMillis, isFunder = true)
+                val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, randomPrivKey, isFunder = true)
                 val cmd = CMDOpenChannel(localParams, ByteVector(random getBytes 32), LNParams.broadcaster.perKwThreeSat, batch, batch.fundingAmountSat)
                 freshChannel process cmd
               }
@@ -185,7 +185,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     def remoteFundeeListener(open: OpenChannel) = new OpenListener {
       val theirReserve = open.fundingSatoshis / LNParams.channelReserveToFundingRatio
       val finalPubKeyScript = ByteVector(ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram)
-      val params = LNParams.makeLocalParams(ann, theirReserve, finalPubKeyScript, System.currentTimeMillis, isFunder = false)
+      val params = LNParams.makeLocalParams(ann, theirReserve, finalPubKeyScript, randomPrivKey, isFunder = false)
       // We are already connected to remote peer at this point so reply to their request right away
       freshChannel process Tuple2(params, open)
 

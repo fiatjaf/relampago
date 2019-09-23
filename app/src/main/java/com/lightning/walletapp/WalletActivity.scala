@@ -270,7 +270,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def showLoginForm(lnUrl: LNUrl) = lnUrl.k1 map { k1 =>
-    val linkingPrivKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
+    val linkingPrivKey = LNParams.makeLinkingKey(lnUrl.uri.getHost)
     val linkingPubKey = linkingPrivKey.publicKey.toString
     val dataToSign = ByteVector.fromValidHex(k1)
 
