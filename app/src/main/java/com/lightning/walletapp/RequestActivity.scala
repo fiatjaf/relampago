@@ -50,10 +50,8 @@ object QRGen {
 class RequestActivity extends TimerActivity { me =>
   lazy val reqContainer = findViewById(R.id.reqContainer).asInstanceOf[LinearLayout]
   lazy val reqFulfilled = findViewById(R.id.reqFulfilled).asInstanceOf[LinearLayout]
-  lazy val reqOptions = findViewById(R.id.reqOptions).asInstanceOf[LinearLayout]
-  lazy val shareText = findViewById(R.id.shareText).asInstanceOf[ImageButton]
-  lazy val shareQR = findViewById(R.id.shareQR).asInstanceOf[ImageButton]
   lazy val reqCode = findViewById(R.id.reqCode).asInstanceOf[ImageView]
+  lazy val share = findViewById(R.id.share).asInstanceOf[ImageButton]
 
   lazy val textBounds = getResources getDimensionPixelSize R.dimen.bitmap_text_bounds
   lazy val bottomSize = getResources getDimensionPixelSize R.dimen.bitmap_bottom_size
@@ -79,7 +77,7 @@ class RequestActivity extends TimerActivity { me =>
     }
 
     app.TransData checkAndMaybeErase {
-      case pr: PaymentRequest => showInfo(drawAll(denom.asString(pr.amount.get), getString(ln_qr_disposable).html), PaymentRequest.write(pr).toUpperCase)
+      case pr: PaymentRequest => showInfo(drawAll(denom.asString(pr.amount.get), getString(ln_qr_disposable).html), PaymentRequest write pr)
       case onChainAddress: Address => showInfo(drawBottom(Utils humanSix onChainAddress.toString), onChainAddress.toString)
       case _ => finish
     }
@@ -90,22 +88,23 @@ class RequestActivity extends TimerActivity { me =>
 
   def showPaid = UITask {
     TransitionManager beginDelayedTransition reqContainer
+    reqCode  setOnClickListener onButtonTap(none)
     reqFulfilled setVisibility View.VISIBLE
-    reqOptions setVisibility View.GONE
+    share setVisibility View.GONE
   }
 
-  def showInfo(renderBitmap: Bitmap => Bitmap, data: String) = {
-    <(QRGen.get(data, qrSize), onFail)(renderBitmap andThen setView)
-    reqCode setOnClickListener onButtonTap(app setBuffer data)
-    shareText setOnClickListener onButtonTap(me share data)
-  }
+  def showInfo(render: Bitmap => Bitmap, bech32: String) =
+    <(QRGen.get(bech32.toUpperCase, qrSize), onFail) { bitmap =>
 
-  def setView(image: Bitmap) = {
-    def share = <(me shareBitmap image, onFail)(none)
-    shareQR setOnClickListener onButtonTap(share)
-    reqCode setImageBitmap image
-    shareQR setEnabled true
-  }
+      val finalBitmap = render(bitmap)
+      share setOnClickListener onButtonTap {
+        <(shareData(finalBitmap, bech32), onFail)(none)
+      }
+
+      // Display QR to user and allow it to be copied by tapping
+      reqCode setOnClickListener onButtonTap(app setBuffer bech32)
+      reqCode setImageBitmap finalBitmap
+    }
 
   // Low level draw utilites
   def drawAll(top: CharSequence, bot: CharSequence)(qrBitmap: Bitmap) = {
@@ -154,17 +153,17 @@ class RequestActivity extends TimerActivity { me =>
     newPaint
   }
 
-  def shareBitmap(bitmap: Bitmap) = {
+  def shareData(bitmap: Bitmap, bech32: String) = {
     val paymentRequestFilePath = new File(getCacheDir, "images")
     if (!paymentRequestFilePath.isFile) paymentRequestFilePath.mkdirs
     val out = new FileOutputStream(s"$paymentRequestFilePath/qr.png")
-    bitmap.compress(Bitmap.CompressFormat.PNG, 90, out)
+    bitmap.compress(Bitmap.CompressFormat.PNG, 85, out)
     out.close
 
     val savedFile = new File(paymentRequestFilePath, "qr.png")
     val fileURI = FileProvider.getUriForFile(me, "com.lightning.wallet", savedFile)
-    val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
-    share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
+    val share = new Intent setAction Intent.ACTION_SEND setType "text/plain" addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
+    share.putExtra(Intent.EXTRA_TEXT, bech32).putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
     me startActivity Intent.createChooser(share, "Choose an app")
   }
 }

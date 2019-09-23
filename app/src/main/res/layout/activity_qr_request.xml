@@ -6,27 +6,11 @@
         android:id="@+id/reqContainer"
         style="@style/StandardLinearLayout">
 
-        <LinearLayout
-            android:layout_height="wrap_content"
-            android:layout_width="wrap_content"
-            android:orientation="horizontal"
-            android:id="@+id/reqOptions"
-            android:gravity="center">
-
-            <ImageButton
-                android:enabled="false"
-                android:id="@+id/shareQR"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:src="@drawable/qr_18dp"/>
-
-            <ImageButton
-                android:id="@+id/shareText"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
-                android:src="@drawable/ic_share_white_18dp"/>
-
-        </LinearLayout>
+        <ImageButton
+            android:id="@+id/share"
+            android:layout_width="60dp"
+            android:layout_height="60dp"
+            android:src="@drawable/ic_share_white_18dp"/>
 
         <LinearLayout
             android:visibility="gone"
@@ -45,8 +29,7 @@
 
         <ImageView
             android:id="@+id/reqCode"
-            android:layout_marginTop="15dp"
-            android:layout_marginBottom="15dp"
+            android:layout_marginTop="@dimen/app_padding"
             android:layout_width="@dimen/bitmap_qr_wrap_width"
             android:layout_height="@dimen/bitmap_qr_wrap_height"/>
 
