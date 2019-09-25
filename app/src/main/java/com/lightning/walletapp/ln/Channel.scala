@@ -924,20 +924,15 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         else if (theyHaveCurrent) {
           // We both have current state, reset their updates and re-send our updates
           BECOME(hc.withResetRemoteUpdates, OPEN) SEND hc.lastCrossSignedState.stateUpdate
-          for (localUpdate <- hc.localUpdates) me SEND localUpdate
-          me doProcess CMDProceed
-
+          resendUpdatesOrProcessUnsent(hc)
         } else if (theyHaveNext) {
           // We have sent an LCSS and did not get a confirmation, but they did get it from us
           val hc1 = hc.copy(lastCrossSignedState = remoteLCSS.reverse, localSpec = hc.nextLocalSpec)
           doUpdateState(hc1.withResetRemoteUpdates.withResetLocalUpdates)
-
         } else if (weAreAhead) {
           // They have fallen behind, send our state so they can resync
           BECOME(hc.withResetRemoteUpdates, OPEN) SEND hc.lastCrossSignedState
-          for (localUpdate <- hc.localUpdates) me SEND localUpdate
-          me doProcess CMDProceed
-
+          resendUpdatesOrProcessUnsent(hc)
         } else {
           // We are behind, restore state from their data
           val hc1 = restoreCommits(remoteLCSS.reverse, hc.announce)
@@ -1000,6 +995,12 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     // Change has been processed without failures
     events onProcessSuccess Tuple3(me, data, change)
   }
+
+  def resendUpdatesOrProcessUnsent(hc: HostedCommits) =
+    if (hc.localUpdates.isEmpty) me doProcess CMDHTLCProcess else {
+      for (unsentLocalUpdate <- hc.localUpdates) me SEND unsentLocalUpdate
+      me doProcess CMDProceed
+    }
 
   def doUpdateState(updatedSignedStateHC: HostedCommits) = {
     val localSU = updatedSignedStateHC.lastCrossSignedState.stateUpdate

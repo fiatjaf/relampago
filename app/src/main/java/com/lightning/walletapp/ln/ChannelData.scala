@@ -478,10 +478,10 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   lazy val withResetLocalUpdates = copy(localUpdates = Vector.empty, allLocalUpdates = lastCrossSignedState.localUpdates)
   lazy val invokeMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey)
   lazy val nextLocalSpec = CommitmentSpec.reduce(localSpec, localUpdates, remoteUpdates)
+  lazy val currentAndNextInFlight = localSpec.htlcs ++ nextLocalSpec.htlcs
   val channelId = announce.hostedChanId
 
   def getError: Option[Error] = localError.orElse(remoteError)
-  def currentAndNextInFlight = localSpec.htlcs ++ nextLocalSpec.htlcs
   def sentPreimages = localUpdates collect { case msg: UpdateFulfillHtlc => msg.paymentPreimage }
   def addRemoteProposal(update: LightningMessage) = me.modify(_.remoteUpdates).using(_ :+ update).modify(_.allRemoteUpdates).using(_ + 1)
   def addLocalProposal(update: LightningMessage) = me.modify(_.localUpdates).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)
