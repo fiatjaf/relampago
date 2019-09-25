@@ -353,26 +353,27 @@ object ChannelManager extends Broadcaster {
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
-  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel { self =>
-    def SEND(msg: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process msg
-    def STORE[T <: ChannelData](data: T) = runAnd(data)(ChannelWrap put data)
+  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel {
+    def STORE[T <: ChannelData](hostedCommitments: T) = runAnd(hostedCommitments) {
+      // Put updated data into db, no need for additional backups here
+      ChannelWrap put hostedCommitments
+    }
+
     listeners = initListeners
     doProcess(bootstrap)
   }
 
   def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel { self =>
-    def SEND(msg: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process msg
-
-    def STORE[T <: ChannelData](data: T) = runAnd(data) {
-      // Put updated data into db and schedule gdrive upload
-      ChannelWrap put data
+    def STORE[T <: ChannelData](normalCommitments: T) = runAnd(normalCommitments) {
+      // Put updated data into db and schedule gdrive upload if allowed by user
+      ChannelWrap put normalCommitments
       backUp
     }
 
     def REV(cs: NormalCommits, rev: RevokeAndAck) = for {
       tx <- cs.remoteCommit.txOpt // We use old commitments to save a punishment for remote commit before it gets dropped
       myBalance = cs.remoteCommit.spec.toRemoteMsat // Local commit is cleared by now, remote still has relevant balance
-      watchtowerFee = broadcaster.perKwThreeSat * 3 // Scorched earth policy becuase watchtower can't regenerate tx
+      watchtowerFee = broadcaster.perKwThreeSat * 3 // Scorched earth policy because watchtower can't regenerate tx
       revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret, watchtowerFee)
       serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
     } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)

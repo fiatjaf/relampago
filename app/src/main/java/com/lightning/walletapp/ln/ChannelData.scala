@@ -474,14 +474,11 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
                          localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
                          startedAt: Long = System.currentTimeMillis) extends Commitments with ChannelData { me =>
 
+  lazy val withResetRemoteUpdates = copy(remoteUpdates = Vector.empty, allRemoteUpdates = lastCrossSignedState.remoteUpdates)
+  lazy val withResetLocalUpdates = copy(localUpdates = Vector.empty, allLocalUpdates = lastCrossSignedState.localUpdates)
   lazy val invokeMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey)
   lazy val nextLocalSpec = CommitmentSpec.reduce(localSpec, localUpdates, remoteUpdates)
   val channelId = announce.hostedChanId
-
-  lazy val withUpdatesReset =
-    copy(remoteUpdates = Vector.empty, localUpdates = Vector.empty,
-      allRemoteUpdates = lastCrossSignedState.remoteUpdates,
-      allLocalUpdates = lastCrossSignedState.localUpdates)
 
   def getError: Option[Error] = localError.orElse(remoteError)
   def currentAndNextInFlight = localSpec.htlcs ++ nextLocalSpec.htlcs
