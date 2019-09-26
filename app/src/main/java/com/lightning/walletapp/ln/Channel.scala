@@ -939,7 +939,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
             case Some(hc1) =>
               // They have our future state: settle and resend leftovers if any
               val hc2 = hc1.copy(futureUpdates = hc.futureUpdates diff hc1.futureUpdates)
-              val hc3 = hc2.copy(lastCrossSignedState = remoteLCSS.reverse, localSpec = hc2.nextLocalSpec)
+              val hc3 = hc2.copy(lastCrossSignedState = remoteLCSS.reverse, localSpec = hc1.nextLocalSpec)
               // Here it's not guaranteed that future state is our latest so we need to retain localAdd
               BECOME(me STORE hc3.withoutUpdatesExceptLocalAdd, OPEN) SEND hc3.lastCrossSignedState
               for (Left(add) <- hc3.withoutUpdatesExceptLocalAdd.futureUpdates) me SEND add
