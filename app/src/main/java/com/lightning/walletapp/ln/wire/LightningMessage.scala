@@ -15,7 +15,11 @@ import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 
 
-trait LightningMessage
+trait LightningMessage { me =>
+  def remote: LNDirectionalMessage = Right(me)
+  def local: LNDirectionalMessage = Left(me)
+}
+
 trait RoutingMessage extends LightningMessage
 trait ChannelSetupMessage extends LightningMessage
 trait ChannelMessage extends LightningMessage { val channelId: ByteVector }

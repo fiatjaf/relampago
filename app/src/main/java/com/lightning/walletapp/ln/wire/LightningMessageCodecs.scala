@@ -21,6 +21,8 @@ object LightningMessageCodecs { me =>
   type NodeAddressList = List[NodeAddress]
   type BitVectorAttempt = Attempt[BitVector]
   type LNMessageVector = Vector[LightningMessage]
+  // Here Left is sent localy, Right is received from remote peer
+  type LNDirectionalMessage = Either[LightningMessage, LightningMessage]
   type RedeemScriptAndSig = (ByteVector, ByteVector)
   type RGB = (Byte, Byte, Byte)
 

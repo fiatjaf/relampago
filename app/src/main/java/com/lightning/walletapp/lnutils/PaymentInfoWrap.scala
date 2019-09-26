@@ -236,7 +236,7 @@ object ChannelWrap {
 
 object RouteWrap {
   def cacheSubRoutes(rd: RoutingData) = {
-    // This will only work if we have at least one hop, should check if route vector is empty
+    // This will only work if we have at least one hop: must check if route vector is empty!
     // then merge each of generated subroutes with a respected routing node or recipient node key
     val subs = (rd.usedRoute drop 1).scanLeft(rd.usedRoute take 1) { case rs \ hop => rs :+ hop }
 
