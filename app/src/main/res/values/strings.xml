@@ -107,7 +107,6 @@
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
 
-    <string name="dialog_pr_making">Making payment request&#8230;</string>
     <string name="olympus_recovering">Getting Olympus backups&#8230;</string>
     <string name="dialog_pr_expired">Expired payment request</string>
     <string name="dialog_sum_small">Amount is too small</string>
@@ -227,7 +226,7 @@
     <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees, please add some funds and try again</string>
     <string name="err_ln_not_enough">None of your channels contains enough funds to send %1$s off-chain</string>
-    <string name="err_no_data">No useful data found</string>
+    <string name="err_nothing_useful">No useful data found</string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 

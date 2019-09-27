@@ -107,7 +107,7 @@ object PaymentInfo {
     case oldHop => upd.toHop(oldHop.nodeId)
   }
 
-  def lastOfflineNodeIds(paymentHash: ByteVector) = for {
+  def terminalOfflineNodeIds(paymentHash: ByteVector) = for {
     DecryptedFailurePacket(originNode, upd: Update) \ usedRoute <- errors(paymentHash)
     failureAtSecondToLastNode = usedRoute.lastOption.exists(_.nodeId == originNode)
     channelDisabled = !Announcements.isEnabled(upd.update.channelFlags)

@@ -10,7 +10,7 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import android.widget.{ImageButton, TextView, Toast}
+import android.widget.{ImageButton, TextView}
 import scala.util.{Success, Try}
 
 import com.lightning.walletapp.lnutils.olympus.ChannelUploadAct
@@ -100,8 +100,7 @@ class LNStartFundActivity extends TimerActivity { me =>
 
       override def onException = {
         case (_: NormalChannel, openingError) =>
-          // Inform user about error, disconnect this channel, go back to channel list
-          UITask(Toast.makeText(me, openingError.getMessage, Toast.LENGTH_LONG).show).run
+          UITask(app quickToast openingError.getMessage).run
           whenBackPressed.run
       }
     }
@@ -145,8 +144,8 @@ class LNStartFundActivity extends TimerActivity { me =>
           denom parsedWithSign LNParams.maxCapacity, denom parsedWithSign app.kit.conf0Balance)
 
         def askAttempt(alert: AlertDialog) = rateManager.result match {
-          case Success(ms) if ms < minCap => app toast dialog_sum_small
-          case Success(ms) if ms > maxCap => app toast dialog_sum_big
+          case Success(ms) if ms < minCap => app quickToast dialog_sum_small
+          case Success(ms) if ms > maxCap => app quickToast dialog_sum_big
 
           case Success(ms) =>
             val txProcessor = new TxProcessor {
@@ -172,8 +171,8 @@ class LNStartFundActivity extends TimerActivity { me =>
             val coloredExplanation = txProcessor.pay destination coloredAmount
             rm(alert)(txProcessor start coloredExplanation)
 
-          case _ =>
-            app toast dialog_sum_small
+          // No amount has been entered at all
+          case _ => app quickToast dialog_sum_small
         }
 
         def useMax(alert: AlertDialog) = rateManager setSum Try(maxCap)

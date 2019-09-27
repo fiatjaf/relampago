@@ -54,8 +54,8 @@ class FragScan extends Fragment with BarcodeCallback { me =>
   }
 
   def tryParseQR(text: String) = {
-    def fail(err: Throwable) = runAnd(app toast err_no_data)(barcodeReader.resume)
-    <(app.TransData recordValue text, fail)(ok => host.checkTransData)
+    def fail(err: Throwable) = runAnd(app quickToast err_nothing_useful)(barcodeReader.resume)
+    <(app.TransData recordValue text, fail)(parseSuccess => host.checkTransData)
     lastAttempt = System.currentTimeMillis
     barcodeReader.pause
   }

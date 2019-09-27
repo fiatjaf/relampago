@@ -147,13 +147,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     PaymentInfoWrap.newRoutesOrGiveUp = rd => {
       val warnedAlready = warnedOffline.contains(rd.pr.paymentHash)
-      val lastOfflineNodes = PaymentInfo.lastOfflineNodeIds(rd.pr.paymentHash)
-      val lastHintedNodes = rd.pr.routingInfo.flatMap(_.route.lastOption).map(_.nodeId)
+      val termOfflineNodes = PaymentInfo.terminalOfflineNodeIds(rd.pr.paymentHash)
+      val termHintedNodes = rd.pr.routingInfo.flatMap(_.route.lastOption).map(_.nodeId)
 
-      if (!warnedAlready && lastOfflineNodes.intersect(lastHintedNodes).nonEmpty) {
+      if (!warnedAlready && termOfflineNodes.intersect(termHintedNodes).nonEmpty) {
         // One of route hints from receiver invoice returned ChannelDisabled(offline)
         PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
-        UITask(app toast err_ln_receiver_offline).run
+        UITask(me toast err_ln_receiver_offline).run
         warnedOffline += rd.pr.paymentHash
       } else if (rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight) {
         // We do not care about options such as AIR or AMP here, this payment may be one of them
@@ -164,7 +164,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     PaymentInfoWrap.failOnUI = rd => {
       PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash
       PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
-      if (rd.onChainFeeBlockWasUsed) UITask(app toast ln_fee_expesive_omitted).run
+      if (rd.onChainFeeBlockWasUsed) UITask(me toast ln_fee_expesive_omitted).run
       PaymentInfoWrap.uiNotify
     }
 
@@ -174,13 +174,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val isGDriveSignInSuccessful = reqCode == 102 && resultCode == Activity.RESULT_OK
     app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, isGDriveSignInSuccessful).commit
     // This updates lastSaved if user restores wallet from migration file, otherwise no effect
-    if (isGDriveSignInSuccessful) ChannelManager.backUp else app toast gdrive_disabled
+    if (isGDriveSignInSuccessful) ChannelManager.backUp else app quickToast gdrive_disabled
   }
 
   // NFC
 
-  def readEmptyNdefMessage = app toast err_no_data
-  def readNonNdefMessage = app toast err_no_data
+  def readEmptyNdefMessage = app quickToast err_nothing_useful
+  def readNonNdefMessage = app quickToast err_nothing_useful
   def onNfcStateChange(ok: Boolean) = none
   def onNfcFeatureNotFound = none
   def onNfcStateDisabled = none
@@ -188,7 +188,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def readNdefMessage(nfcMessage: Message) =
     <(app.TransData recordValue ndefMessageString(nfcMessage),
-      _ => app toast err_no_data)(_ => checkTransData)
+      error => app quickToast err_nothing_useful)(ok => checkTransData)
 
   // EXTERNAL DATA CHECK
 
@@ -212,12 +212,12 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     case pr: PaymentRequest if PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix =>
       // Payee has provided a payment request from some other network, can't be fulfilled
-      app toast err_no_data
+      app quickToast err_nothing_useful
       me returnToBase null
 
     case pr: PaymentRequest if !pr.isFresh =>
       // Payment request has expired by now
-      app toast dialog_pr_expired
+      app quickToast dialog_pr_expired
       me returnToBase null
 
     case pr: PaymentRequest if ChannelManager.all.exists(isOpening) && ChannelManager.mostFundedChanOpt.isEmpty =>
@@ -243,12 +243,12 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   def fetch1stLevelUrl(lnUrl: LNUrl) = {
     val awaitRequest = get(lnUrl.uri.toString, true).connectTimeout(15000)
     val sslAwareRequest = awaitRequest.trustAllCerts.trustAllHosts
-    app toast ln_url_resolving
+    app quickToast ln_url_resolving
 
     <(to[LNUrlData](LNUrlData guardResponse sslAwareRequest.body), onFail) {
       case incomingChan: IncomingChannelRequest => me initConnection incomingChan
       case withdrawal: WithdrawRequest => me doReceivePayment Some(withdrawal, lnUrl)
-      case _ => app toast err_no_data
+      case _ => app quickToast err_nothing_useful
     }
   }
 
@@ -281,12 +281,12 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     <(incoming.resolveNodeAnnouncement, onFail) { ann =>
       val hasChanAlready = ChannelManager hasNormalChanWith ann.nodeId
-      if (hasChanAlready) app toast err_ln_chan_exists_already
+      if (hasChanAlready) me toast err_ln_chan_exists_already
       else ConnectionManager.connectTo(ann, notify = true)
     }
   }
 
-  def showLoginForm(lnUrl: LNUrl) = lnUrl.k1 map { k1 =>
+  def showLoginForm(lnUrl: LNUrl) = lnUrl.k1 foreach { k1 =>
     val linkingPrivKey = LNParams.makeLinkingKey(lnUrl.uri.getHost)
     val linkingPubKey = linkingPrivKey.publicKey.toString
     val dataToSign = ByteVector.fromValidHex(k1)
@@ -301,7 +301,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       val secondLevelRequestUri = lnUrl.uri.buildUpon.appendQueryParameter("sig", sig.toHex).appendQueryParameter("key", linkingPubKey)
       val sslAwareSecondRequest = get(secondLevelRequestUri.build.toString, true).connectTimeout(15000).trustAllCerts.trustAllHosts
       queue.map(_ => sslAwareSecondRequest.body).map(LNUrlData.guardResponse).foreach(_ => onLoginSuccess.run, onFail)
-      app.toast(ln_url_resolving)
+      app quickToast ln_url_resolving
     }
 
     def onLoginSuccess = UITask {
@@ -311,7 +311,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
     mkCheckFormNeutral(doLogin, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
-  } getOrElse app.toast(err_no_data)
+  }
 
   // BUTTONS REACTIONS
 
@@ -396,7 +396,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     def pasteRequest = rm(alert) {
       def mayResolve(rawBufferString: String) = <(app.TransData recordValue rawBufferString, onFail)(_ => checkTransData)
-      scala.util.Try(app.getBufferUnsafe) match { case scala.util.Success(raw) => mayResolve(raw) case _ => app toast err_no_data }
+      Try(app.getBufferUnsafe) match { case Success(rawData) => mayResolve(rawData) case _ => app quickToast err_nothing_useful }
     }
 
     def depositHivemind = rm(alert) {

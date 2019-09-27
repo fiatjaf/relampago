@@ -20,6 +20,7 @@ import android.support.v7.app.AppCompatActivity
 import android.support.v4.content.ContextCompat
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.View.OnClickListener
+import org.aviran.cookiebar2.CookieBar
 import android.app.AlertDialog.Builder
 import org.bitcoinj.wallet.SendRequest
 import fr.acinq.bitcoin.MilliSatoshi
@@ -105,13 +106,20 @@ trait TimerActivity extends AppCompatActivity { me =>
     startActivityForResult(signInClient.getSignInIntent, 102)
   }
 
+  def rm(prev: Dialog)(exe: => Unit) = {
+    // Add some delay between popup switches
+    timer.schedule(exe, 225)
+    prev.dismiss
+  }
+
   def finishMe(top: View) = finish
-  def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
-  def rm(prev: Dialog)(exe: => Unit) = wrap(prev.dismiss)(me delayUI exe)
   def baseTextBuilder(msg: CharSequence) = new Builder(me).setMessage(msg)
   def baseBuilder(title: View, body: View) = new Builder(me).setCustomTitle(title).setView(body)
   def negTextBuilder(neg: Int, msg: CharSequence) = baseTextBuilder(msg).setNegativeButton(neg, null)
   def negBuilder(neg: Int, title: View, body: View) = baseBuilder(title, body).setNegativeButton(neg, null)
+
+  def toast(code: Int): Unit = toast(me getString code)
+  def toast(msg: String): Unit = try CookieBar.build(me).setMessage(msg).setCookiePosition(CookieBar.BOTTOM).show catch none
   def onFail(error: CharSequence): Unit = UITask(me showForm negBuilder(dialog_ok, null, error).create).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
 

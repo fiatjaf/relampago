@@ -244,9 +244,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             else if (1 == pos && canCoopClose && noHtlcBlock) warnAndMaybeClose(me getString ln_chan_close_confirm_wallet)
             else if (1 == pos && canCoopClose) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
             else if (1 == pos) warnAndMaybeClose(channelClosureWarning = me getString ln_chan_force_details)
-            else if (2 == pos && closeBitcoinAddress.isEmpty) app toast ln_chan_close_address_hint
+            else if (2 == pos && closeBitcoinAddress.isEmpty) host toast ln_chan_close_address_hint
             else if (2 == pos && canCoopClose && noHtlcBlock) warnAndMaybeCloseToAddress
-            else if (2 == pos) app toast ln_chan_close_address_no
+            else if (2 == pos) host toast ln_chan_close_address_no
           }
         }
       }

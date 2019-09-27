@@ -504,14 +504,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
-      case Success(ms) if maxCanReceive < ms => app toast dialog_sum_big
-      case Success(ms) if minCanReceive > ms => app toast dialog_sum_small
-      case Failure(reason) => app toast dialog_sum_small
+      case Success(ms) if maxCanReceive < ms => app quickToast dialog_sum_big
+      case Success(ms) if minCanReceive > ms => app quickToast dialog_sum_small
+      case Failure(reason) => app quickToast dialog_sum_small
 
       case Success(ms) => rm(alert) {
         // Requests without amount are not allowed
         <(makeNormalRequest(ms), onFail)(onDone)
-        app toast dialog_pr_making
       }
     }
 
@@ -533,9 +532,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def onUserAcceptSend(rd: RoutingData): Unit
 
     def sendAttempt(alert: AlertDialog) = rateManager.result match {
-      case Success(ms) if maxCanSend < ms => app toast dialog_sum_big
-      case Success(ms) if ms < pr.msatOrMin => app toast dialog_sum_small
-      case Failure(emptyAmount) => app toast dialog_sum_small
+      case Success(ms) if maxCanSend < ms => app quickToast dialog_sum_big
+      case Success(ms) if ms < pr.msatOrMin => app quickToast dialog_sum_small
+      case Failure(emptyAmount) => app quickToast dialog_sum_small
 
       case Success(ms) => rm(alert) {
         val attempts = ChannelManager.all.count(isOperational)
@@ -569,13 +568,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def doSendOffChain(rd: RoutingData): Unit = {
-    if (ChannelManager.currentBlocksLeft.isEmpty) app toast err_ln_chain_wait
-    val sendableOrAlternatives = ChannelManager.checkIfSendable(rd)
+    if (ChannelManager.currentBlocksLeft.isEmpty) host toast err_ln_chain_wait
+    val sendableDirectlyOrAlternatives = ChannelManager.checkIfSendable(rd)
     val accumulatorChanOpt = ChannelManager.accumulatorChanOpt(rd)
 
-    sendableOrAlternatives -> accumulatorChanOpt match {
+    sendableDirectlyOrAlternatives -> accumulatorChanOpt match {
       case Left(_ \ SENDABLE_AIR) \ Some(acc) => <(startAIR(acc, rd), onFail)(none)
-      case Left(unsendableAirNotPossible \ _) \ _ => app toast unsendableAirNotPossible
+      case Left(unsendableAirImpossible \ _) \ _ => app quickToast unsendableAirImpossible
       case _ => PaymentInfoWrap addPendingPayment rd
     }
   }
@@ -622,8 +621,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val rateManager = new RateManager(content) hint baseHint
 
     def sendAttempt(alert: AlertDialog): Unit = rateManager.result match {
-      case Success(small) if small < minMsatAmount => app toast dialog_sum_small
-      case Failure(probablyEmptySum) => app toast dialog_sum_small
+      case Success(small) if small < minMsatAmount => app quickToast dialog_sum_small
+      case Failure(probablyEmptySum) => app quickToast dialog_sum_small
 
       case Success(ms) =>
         val txProcessor = new TxProcessor {

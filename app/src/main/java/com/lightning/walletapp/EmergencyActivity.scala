@@ -14,7 +14,7 @@ import android.view.View
 class EmergencyActivity extends TimerActivity { me =>
   def viewReport(v: View) = Try(getIntent getStringExtra ERROR_REPORT) match {
     case Success(ereport) => showForm(negTextBuilder(dialog_ok, ereport).create)
-    case _ => app toast err_no_data
+    case _ => app quickToast err_nothing_useful
   }
 
   def INIT(savedInstanceState: Bundle) = {

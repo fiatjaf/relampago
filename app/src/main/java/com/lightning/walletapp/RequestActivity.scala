@@ -13,7 +13,6 @@ import com.google.zxing.qrcode.QRCodeWriter
 import android.graphics.Bitmap.createBitmap
 import android.transition.TransitionManager
 import org.bitcoinj.core.Address
-import android.content.Intent
 import scodec.bits.ByteVector
 import android.view.View
 import android.os.Bundle
@@ -22,6 +21,7 @@ import android.widget.{ImageButton, ImageView, LinearLayout}
 import com.google.zxing.{BarcodeFormat, EncodeHintType}
 import com.lightning.walletapp.ln.Tools.{none, wrap}
 import android.text.{StaticLayout, TextPaint}
+import android.content.{ClipData, Intent}
 import java.io.{File, FileOutputStream}
 
 
@@ -101,9 +101,12 @@ class RequestActivity extends TimerActivity { me =>
         <(shareData(finalBitmap, bech32), onFail)(none)
       }
 
-      // Display QR to user and allow it to be copied by tapping
-      reqCode setOnClickListener onButtonTap(app setBuffer bech32)
       reqCode setImageBitmap finalBitmap
+      reqCode setOnClickListener onButtonTap {
+        val bufferContent = ClipData.newPlainText("wallet", bech32)
+        app.clipboardManager.setPrimaryClip(bufferContent)
+        app quickToast copied_to_clipboard
+      }
     }
 
   // Low level draw utilites

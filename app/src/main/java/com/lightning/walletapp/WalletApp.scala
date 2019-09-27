@@ -23,8 +23,8 @@ import rx.lang.scala.{Observable => Obs}
 import scodec.bits.{BitVector, ByteVector}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
+import android.content.{ClipboardManager, Context}
 import androidx.work.{ExistingWorkPolicy, WorkManager}
-import android.content.{ClipData, ClipboardManager, Context}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{pickInc, repeat}
 import com.lightning.walletapp.lnutils.olympus.{OlympusWrap, TxUploadAct}
@@ -70,8 +70,8 @@ class WalletApp extends Application { me =>
 
   // Various utilities
 
-  def toast(code: Int): Unit = toast(me getString code)
-  def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
+  def quickToast(code: Int): Unit = quickToast(me getString code)
+  def quickToast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_SHORT).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def plur1OrZero(opts: Array[String], num: Long) = if (num > 0) plur(opts, num).format(num) else opts(0)
   def getBufferUnsafe = clipboardManager.getPrimaryClip.getItemAt(0).getText.toString
@@ -93,12 +93,6 @@ class WalletApp extends Application { me =>
       val srvChan = new NotificationChannel(AwaitService.CHANNEL_ID, "NC", importanceLevel)
       me getSystemService classOf[NotificationManager] createNotificationChannel srvChan
     }
-  }
-
-  def setBuffer(text: String) = {
-    val bufferContent = ClipData.newPlainText("wallet", text)
-    clipboardManager.setPrimaryClip(bufferContent)
-    me toast getString(copied_to_clipboard)
   }
 
   def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) =
@@ -434,7 +428,7 @@ object ChannelManager extends Broadcaster {
       // May happen such that we had enough while were deciding whether to pay, but do not have enough funds now, also check extended options
       case Some(max) if max < rd.firstMsat && rd.airLeft > 1 && estimateAIRCanSend >= rd.firstMsat => Left(dialog_sum_big, SENDABLE_AIR)
       case Some(max) if max < rd.firstMsat => Left(dialog_sum_big, NOT_SENDABLE)
-      case None => Left(err_no_data, NOT_SENDABLE)
+      case None => Left(err_nothing_useful, NOT_SENDABLE)
       case _ => Right(rd)
     }
   }

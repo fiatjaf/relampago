@@ -63,7 +63,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // NFC AND SHARE
 
-  private[this] def readFail(readingError: Throwable) = runAnd(app toast err_no_data)(next)
+  private[this] def readFail(readingError: Throwable) = runAnd(app quickToast err_nothing_useful)(next)
   def readNdefMessage(msg: Message) = <(app.TransData recordValue ndefMessageString(msg), readFail)(_ => next)
 
   override def onNoNfcIntentFound = {
@@ -87,7 +87,7 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
       def onError(fpError: FPError) = fpError match {
         case FPError.LOCKOUT => mainFingerprintImage.setAlpha(0.25F)
         case FPError.CANCELED => mainFingerprintImage.setAlpha(0.25F)
-        case _ => app toast fpError.toString
+        case _ => app quickToast fpError.toString
       }
 
       def onSuccess(cipherText: String) = {

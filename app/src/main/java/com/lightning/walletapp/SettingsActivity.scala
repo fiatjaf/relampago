@@ -67,9 +67,9 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def onFpTap(cb: View) = fpAuthentication.isChecked match {
-    case true if VERSION.SDK_INT < VERSION_CODES.M => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
-    case true if !gf.hasFingerprintHardware => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
-    case true if !gf.hasEnrolledFingerprint => runAnd(fpAuthentication setChecked false)(app toast fp_add_print)
+    case true if VERSION.SDK_INT < VERSION_CODES.M => runAnd(fpAuthentication setChecked false)(app quickToast fp_no_support)
+    case true if !gf.hasFingerprintHardware => runAnd(fpAuthentication setChecked false)(app quickToast fp_no_support)
+    case true if !gf.hasEnrolledFingerprint => runAnd(fpAuthentication setChecked false)(app quickToast fp_add_print)
     case mode => FingerPrint switch mode
   }
 
@@ -227,8 +227,8 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
       }
 
       def go = {
-        timer.schedule(finish, 3000)
-        app toast olympus_recovering
+        timer.schedule(finish, 7500)
+        me toast olympus_recovering
         recover
       }
 

@@ -153,6 +153,6 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
 
       case None =>
         me prepareFreshWallet app.kit
-        UITask(app toast gdrive_disabled).run
+        UITask(app quickToast gdrive_disabled).run
     }
 }
