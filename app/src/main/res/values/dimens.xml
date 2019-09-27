@@ -21,4 +21,8 @@
     <dimen name="chip_default_padding_between_image">8dp</dimen>
     <dimen name="chip_default_right_margin">0dp</dimen>
     <dimen name="chip_default_left_margin">0dp</dimen>
+
+    <dimen name="fab_size_normal">56dp</dimen>
+    <dimen name="fab_size_mini">40dp</dimen>
+    <dimen name="labels_text_size">14sp</dimen>
 </resources>

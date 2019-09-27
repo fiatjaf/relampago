@@ -56,7 +56,6 @@ dependencies {
     compile 'org.scala-lang:scala-library:2.11.12'
     compile 'io.reactivex:rxscala_2.11:0.26.5'
     compile 'commons-codec:commons-codec:1.9'
-    compile 'com.github.clans:fab:1.6.4'
 
 //    compile ('eu.lp0.slf4j:slf4j-android:1.7.25-0') {
 //        exclude module: 'slf4j-api'
