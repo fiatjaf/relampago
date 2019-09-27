@@ -50,7 +50,6 @@ dependencies {
     compile 'com.android.support:appcompat-v7:28.0.0'
     compile 'com.android.support:recyclerview-v7:28.0.0'
     compile 'com.android.support:support-media-compat:28.0.0'
-    compile 'com.github.douglasjunior:android-simple-tooltip:0.2.3'
     compile 'com.google.android.gms:play-services-drive:15.0.1'
     compile 'com.google.android.gms:play-services-auth:15.0.1'
     compile 'com.github.kevinsawicki:http-request:6.0'

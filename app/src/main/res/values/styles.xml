@@ -145,4 +145,9 @@
         <item name="android:textColor">#FFBBBBBB</item>
         <item name="android:textSize">18sp</item>
     </style>
+
+    <!-- styles for libraries -->
+
+    <style name="simpletooltip_default" parent="@android:style/TextAppearance.Medium"/>
+
 </resources>

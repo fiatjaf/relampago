@@ -11,4 +11,8 @@
     <item name="fabbgpressed" type="color">#444444</item>
     <item name="fabbgripple" type="color">#66FFFFFF</item>
     <item name="reddish" type="color">#E31300</item>
+
+    <color name="simpletooltip_text">#FFFFFF</color>
+    <color name="simpletooltip_background">#FFB20D</color>
+    <color name="simpletooltip_arrow">#FFB20D</color>
 </resources>

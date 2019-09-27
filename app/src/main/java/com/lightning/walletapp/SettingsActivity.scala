@@ -226,12 +226,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         } chan process ann1
       }
 
-      def go = {
-        timer.schedule(finish, 7500)
-        me toast olympus_recovering
-        recover
-      }
-
+      def go = runAnd(recover)(me toast olympus_recovering)
       val bld = baseTextBuilder(me getString channel_recovery_info)
       mkCheckForm(alert => rm(alert)(go), none, bld, dialog_next, dialog_cancel)
     }
