@@ -204,7 +204,8 @@ case object NodeAddress {
 
 trait HostedChannelMessage extends LightningMessage
 
-case class InvokeHostedChannel(chainHash: ByteVector, refundScriptPubKey: ByteVector) extends HostedChannelMessage
+case class InvokeHostedChannel(chainHash: ByteVector, refundScriptPubKey: ByteVector,
+                               secret: ByteVector = ByteVector.empty) extends HostedChannelMessage
 
 case class InitHostedChannel(maxHtlcValueInFlightMsat: UInt64,
                              htlcMinimumMsat: Long, maxAcceptedHtlcs: Int, channelCapacityMsat: Long,

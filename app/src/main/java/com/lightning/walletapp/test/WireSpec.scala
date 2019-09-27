@@ -330,7 +330,7 @@ class WireSpec {
       val pong = Pong(ByteVector.fromValidHex("01" * 10))
       val channel_reestablish = ChannelReestablish(randomBytes(32), 242842L, 42L, None, None)
 
-      val invoke_hosted_channel = InvokeHostedChannel(randomBytes(32), bin(47, 0))
+      val invoke_hosted_channel = InvokeHostedChannel(randomBytes(32), bin(47, 0), bin(112, 0))
       val init_hosted_channel = InitHostedChannel(UInt64(6), 10, 20, 500000000L, 5000, 1000000, 1000000)
       val state_override = StateOverride(50000L, 500000, 70000, 700000, randomSignature)
 

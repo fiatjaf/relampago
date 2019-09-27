@@ -515,7 +515,8 @@ object LightningMessageCodecs { me =>
 
   val invokeHostedChannelCodec = {
     (bytes32 withContext "chainHash") ::
-      (varsizebinarydata withContext "refundScriptPubKey")
+      (varsizebinarydata withContext "refundScriptPubKey") ::
+      (varsizebinarydata withContext "secret")
   }.as[InvokeHostedChannel]
 
   val initHostedChannelCodec = {
