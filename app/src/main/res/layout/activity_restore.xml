@@ -20,10 +20,10 @@
 
         <com.hootsuite.nachos.NachoTextView
             app:chipBackground="@android:color/white"
+            app:chipHorizontalSpacing="3dp"
             app:chipVerticalSpacing="2dp"
             app:chipTextSize="18sp"
             app:chipHeight="26dp"
-            app:chipSpacing="3dp"
 
             android:inputType="textMultiLine|textVisiblePassword"
             android:layout_height="wrap_content"
