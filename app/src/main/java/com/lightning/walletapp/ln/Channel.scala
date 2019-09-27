@@ -773,12 +773,13 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (init.htlcMinimumMsat > 546000L) throw new LightningException("Their minimal payment size is too high")
         if (init.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
 
-        val hc = restoreCommits(LastCrossSignedState(refundScriptPubKey, init, LNParams.broadcaster.currentBlockDay, init.initialClientBalanceMsat,
-          init.channelCapacityMsat - init.initialClientBalanceMsat, localUpdates = 0L, remoteUpdates = 0L, incomingHtlcs = Nil, outgoingHtlcs = Nil,
-          localSigOfRemote = ByteVector.empty, remoteSigOfLocal = ByteVector.empty).withLocalSigOfRemote(LNParams.nodePrivateKey), announce)
+        val localHalfSignedHC =
+          restoreCommits(LastCrossSignedState(refundScriptPubKey, init, LNParams.broadcaster.currentBlockDay, init.initialClientBalanceMsat,
+            init.channelCapacityMsat - init.initialClientBalanceMsat, localUpdates = 0L, remoteUpdates = 0L, incomingHtlcs = Nil, outgoingHtlcs = Nil,
+            localSigOfRemote = ByteVector.empty, remoteSigOfLocal = ByteVector.empty).withLocalSigOfRemote(LNParams.nodePrivateKey), announce)
 
-        val d1 = WaitRemoteHostedStateUpdate(announce, hc)
-        me UPDATA d1 SEND hc.lastCrossSignedState.stateUpdate
+        val d1 = WaitRemoteHostedStateUpdate(announce, localHalfSignedHC)
+        me UPDATA d1 SEND localHalfSignedHC.lastCrossSignedState.stateUpdate
 
 
       case (WaitRemoteHostedStateUpdate(announce, hc), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
@@ -996,7 +997,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (!isRightLocalUpdateNumber) throw new LightningException("Provided local update number from remote override is wrong")
         if (!isRightRemoteUpdateNumber) throw new LightningException("Provided remote update number from remote override is wrong")
         if (me isBlockDayOutOfSync remoteOverride.blockDay) throw new LightningException("Remote override blockday is not acceptable")
-        BECOME(me STORE restoreCommits(recreatedCompleteLocalLCSS, hc.announce), OPEN) SEND recreatedCompleteLocalLCSS.stateUpdate
+        BECOME(me STORE restoreCommits(recreatedCompleteLocalLCSS, hc.announce), OPEN) SEND recreatedCompleteLocalLCSS
         events unknownHostedHtlcsDetected hc
 
 

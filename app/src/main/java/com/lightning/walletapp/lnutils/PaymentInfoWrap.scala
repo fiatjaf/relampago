@@ -27,6 +27,7 @@ import scodec.bits.ByteVector
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   var acceptedPayments = Map.empty[ByteVector, RoutingData]
   var unsentPayments = Map.empty[ByteVector, RoutingData]
+  var newRoutesOrGiveUp: RoutingData => Unit = _
   var failOnUI: RoutingData => Unit = _
 
   def addPendingPayment(rd: RoutingData) = {
@@ -121,12 +122,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onSettled(cs: Commitments) = {
-    def newRoutesOrGiveUp(rd: RoutingData): Unit = {
-      // We do not care about options such as AIR or AMP here, this may be one of them
-      val isStillSpendable = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
-      if (isStillSpendable) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-      else updStatus(FAILURE, rd.pr.paymentHash)
-    }
+    // Mark failed and fulfilled, upload backups
 
     db txWrap {
       for (updateAddHtlc <- cs.localSpec.fulfilledIncoming) updOkIncoming(updateAddHtlc)

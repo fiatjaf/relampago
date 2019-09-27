@@ -143,6 +143,23 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrap(me setDetecting true)(me initNfc state)
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
+    var warnedOffline = Set.empty[ByteVector]
+
+    PaymentInfoWrap.newRoutesOrGiveUp = rd => {
+      val warnedAlready = warnedOffline.contains(rd.pr.paymentHash)
+      val lastOfflineNodes = PaymentInfo.lastOfflineNodeIds(rd.pr.paymentHash)
+      val lastHintedNodes = rd.pr.routingInfo.flatMap(_.route.lastOption).map(_.nodeId)
+
+      if (!warnedAlready && lastOfflineNodes.intersect(lastHintedNodes).nonEmpty) {
+        // One of route hints from receiver invoice returned ChannelDisabled(offline)
+        PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
+        UITask(app toast err_ln_receiver_offline).run
+        warnedOffline += rd.pr.paymentHash
+      } else if (rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight) {
+        // We do not care about options such as AIR or AMP here, this payment may be one of them
+        PaymentInfoWrap fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
+      } else PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
+    }
 
     PaymentInfoWrap.failOnUI = rd => {
       PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash

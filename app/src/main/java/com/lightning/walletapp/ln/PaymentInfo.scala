@@ -29,11 +29,11 @@ object PaymentInfo {
   final val REBALANCING = "Rebalancing"
 
   type FullOrEmptyRD = Either[RoutingData, RoutingData]
-  type FailureTry = Try[DecryptedFailurePacket]
-  type FailureTryVec = Vector[FailureTry]
+  type FailureDetails = (DecryptedFailurePacket, PaymentRoute)
+  type FailuresVec = Vector[FailureDetails]
 
   // Stores a history of error responses from peers per each outgoing payment request
-  var errors = Map.empty[ByteVector, FailureTryVec] withDefaultValue Vector.empty
+  var errors = Map.empty[ByteVector, FailuresVec] withDefaultValue Vector.empty
   private[this] var replacedChans = Set.empty[Long]
 
   def buildOnion(keys: PublicKeyVec, payloads: Vector[PerHopPayload], assoc: ByteVector): PacketAndSecrets = {
@@ -107,11 +107,23 @@ object PaymentInfo {
     case oldHop => upd.toHop(oldHop.nodeId)
   }
 
+  def lastOfflineNodeIds(paymentHash: ByteVector) = for {
+    DecryptedFailurePacket(originNode, upd: Update) \ usedRoute <- errors(paymentHash)
+    failureAtSecondToLastNode = usedRoute.lastOption.exists(_.nodeId == originNode)
+    channelDisabled = !Announcements.isEnabled(upd.update.channelFlags)
+    if failureAtSecondToLastNode && channelDisabled
+  } yield originNode
+
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
     val parsed = FailurePacket.decrypt(fail.reason, rd.onion.sharedSecrets)
-    errors = errors.updated(rd.pr.paymentHash, errors(rd.pr.paymentHash) :+ parsed)
 
-    parsed map {
+    parsed.foreach { details =>
+      val record = details -> rd.usedRoute
+      val withFailureAdded = errors(rd.pr.paymentHash) :+ record
+      errors = errors.updated(rd.pr.paymentHash, withFailureAdded)
+    }
+
+    parsed.map {
       case DecryptedFailurePacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case DecryptedFailurePacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case DecryptedFailurePacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
