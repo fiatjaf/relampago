@@ -3,12 +3,12 @@ package com.lightning.walletapp.ln.wire
 import java.net._
 import scodec.codecs._
 import fr.acinq.eclair.UInt64.Conversions._
+
 import scodec.bits.{BitVector, ByteVector}
 import com.lightning.walletapp.ln.crypto.{Mac32, Sphinx}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
 import scodec.{Attempt, Codec, DecodeResult, Decoder, Err}
 import com.lightning.walletapp.ln.{LightningException, RevocationInfo}
-import com.lightning.walletapp.ln.wire.TlvStream.BaseStream
 import org.apache.commons.codec.binary.Base32
 import fr.acinq.bitcoin.Crypto
 import fr.acinq.eclair.UInt64
