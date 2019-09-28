@@ -937,8 +937,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
               // They have our future state: settle on that state and carefully resend Add leftovers
               val stateUpdatedHC = hc1.copy(lastCrossSignedState = remoteLCSS.reverse, localSpec = hc1.nextLocalSpec)
               val synchronizedHC = me withResentAdds stateUpdatedHC.copy(futureUpdates = hc.futureUpdates diff hc1.futureUpdates)
-
-              BECOME(synchronizedHC, OPEN)
+              BECOME(me STORE synchronizedHC, OPEN)
               events onSettled synchronizedHC
               me doProcess CMDHTLCProcess
 
