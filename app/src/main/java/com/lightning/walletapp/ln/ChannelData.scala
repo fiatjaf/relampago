@@ -493,11 +493,10 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
       localSigOfRemote = ByteVector.empty, remoteSigOfLocal = ByteVector.empty)
   }
 
-  def findFuture(remoteLCSS: LastCrossSignedState) = for {
-    // Rebuild all messaging and state history starting from local LCSS
-    // then find a future state with same update numbers as remote LCSS
+  def findState(remoteLCSS: LastCrossSignedState) = for {
+    // Find a future state which matches their update numbers
 
-    previousIndex <- futureUpdates.indices.drop(1)
+    previousIndex <- futureUpdates.indices drop 1
     previousHC = me.copy(futureUpdates = futureUpdates take previousIndex)
     if previousHC.nextLocalUnsignedLCSS(remoteLCSS.blockDay).isEven(remoteLCSS)
   } yield previousHC

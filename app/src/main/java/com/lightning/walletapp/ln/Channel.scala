@@ -6,12 +6,12 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.ln.ChanErrorCodes._
 
-import fr.acinq.bitcoin.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
-import fr.acinq.bitcoin.Protocol.Zeroes
-import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
-
+import java.util.concurrent.Executors
+import fr.acinq.bitcoin.Protocol.Zeroes
+import fr.acinq.bitcoin.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.LNDirectionalMessage
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
@@ -926,29 +926,26 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
         else if (weAreAhead || weAreEven) {
-          BECOME(me withResentAdds hc, OPEN)
-          me doProcess CMDHTLCProcess
-        } else {
-          // They have our future state or we are behind
-          val hc1Opt = hc.findFuture(remoteLCSS).headOption
+          // Resend our local pending UpdateAddHtlc but retain our current cross-signed state
+          BECOME(syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec), OPEN)
+        } else hc findState remoteLCSS match {
 
-          hc1Opt match {
-            case Some(hc1) =>
-              // They have our future state: settle on that state and carefully resend Add leftovers
-              val stateUpdatedHC = hc1.copy(lastCrossSignedState = remoteLCSS.reverse, localSpec = hc1.nextLocalSpec)
-              val synchronizedHC = me withResentAdds stateUpdatedHC.copy(futureUpdates = hc.futureUpdates diff hc1.futureUpdates)
-              BECOME(me STORE synchronizedHC, OPEN)
-              events onSettled synchronizedHC
-              me doProcess CMDHTLCProcess
+          case hc1 +: _ =>
+            val leftOvers = hc.futureUpdates.diff(hc1.futureUpdates)
+            // They have one of our future states, we also may have local pending UpdateAddHtlc
+            val synchronizedHC = syncAndResend(hc1, leftOvers, remoteLCSS.reverse, hc1.nextLocalSpec)
+            BECOME(me STORE synchronizedHC, OPEN)
+            events onSettled synchronizedHC
 
-            case None =>
-              // We are behind, restore state from their data
-              val hc1 = restoreCommits(remoteLCSS.reverse, hc.announce)
-              BECOME(me STORE hc1, OPEN) SEND hc1.lastCrossSignedState
-              events unknownHostedHtlcsDetected hc
-              me doProcess CMDHTLCProcess
-          }
+          case _ =>
+            // We are behind, restore state from their data
+            val restoredHC = restoreCommits(remoteLCSS.reverse, hc.announce)
+            BECOME(me STORE restoredHC, OPEN) SEND restoredHC.lastCrossSignedState
+            events unknownHostedHtlcsDetected hc
         }
+
+        // Generate and sign updates
+        me doProcess CMDHTLCProcess
 
 
       case (hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING | SUSPENDED)
@@ -1005,12 +1002,12 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     events onProcessSuccess Tuple3(me, data, change)
   }
 
-  def withResentAdds(hc: HostedCommits): HostedCommits = {
-    val nextUpdateNumber = hc.lastCrossSignedState.localUpdates + 1
-    val adds = hc.futureUpdates collect { case Left(updateAddHtlc: UpdateAddHtlc) => updateAddHtlc }
-    val adds1 = for (index <- adds.indices.toVector) yield adds(index).copy(id = nextUpdateNumber + index)
-    for (resendMessage <- hc.lastCrossSignedState +: adds1) me SEND resendMessage
-    hc.modify(_.futureUpdates) setTo adds1.map(_.local)
+  def syncAndResend(hc: HostedCommits, leftovers: Vector[LNDirectionalMessage], lcss: LastCrossSignedState, spec: CommitmentSpec) = {
+    val addLeftovers = leftovers collect { case Left(localNonCrossSignedUpdateAdd: UpdateAddHtlc) => localNonCrossSignedUpdateAdd }
+    val addLeftovers1 = for (idx <- addLeftovers.indices.toVector) yield addLeftovers(idx).copy(id = lcss.localUpdates + 1 + idx)
+    val hc1 = hc.copy(futureUpdates = addLeftovers1.map(_.local), lastCrossSignedState = lcss, localSpec = spec)
+    for (msg <- lcss +: addLeftovers1) me SEND msg
+    hc1
   }
 
   def restoreCommits(localLCSS: LastCrossSignedState, ann: NodeAnnouncement) = {
