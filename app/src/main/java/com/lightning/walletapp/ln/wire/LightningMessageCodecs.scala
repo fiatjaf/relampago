@@ -500,15 +500,15 @@ object LightningMessageCodecs { me =>
   }.as[ChannelUpdate]
 
   val queryChannelRangeCodec = {
-    ("chainHash" | bytes32) ::
-      ("firstBlockNum" | uint32) ::
-      ("numberOfBlocks" | uint32)
+    (bytes32 withContext "chainHash") ::
+      (uint32 withContext "firstBlockNum") ::
+      (uint32 withContext "numberOfBlocks")
   }.as[QueryChannelRange]
 
   val gossipTimestampFilterCodec = {
-    ("chainHash" | bytes32) ::
-      ("firstTimestamp" | uint32) ::
-      ("timestampRange" | uint32)
+    (bytes32 withContext "chainHash") ::
+      (uint32 withContext "firstTimestamp") ::
+      (uint32 withContext "timestampRange")
   }.as[GossipTimestampFilter]
 
   // Hosted messages codecs
@@ -644,8 +644,8 @@ case class TlvStream[T <: Tlv](records: Traversable[T], unknown: Traversable[Gen
 
 object TlvStream {
   type BaseStream = TlvStream[Tlv]
-  val empty: BaseStream = TlvStream[Tlv](Nil, Nil)
-  def apply[T <: Tlv](records: T*): TlvStream[T] = TlvStream(records, Nil)
+  val empty: BaseStream = TlvStream[Tlv](records = Nil)
+  def apply[T <: Tlv](records: T*): TlvStream[T] = TlvStream(records)
 }
 
 // Onion

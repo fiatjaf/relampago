@@ -107,12 +107,11 @@ object PaymentInfo {
     case oldHop => upd.toHop(oldHop.nodeId)
   }
 
-  def terminalOfflineNodeIds(paymentHash: ByteVector) = for {
-    DecryptedFailurePacket(originNode, upd: Update) \ usedRoute <- errors(paymentHash)
-    failureAtSecondToLastNode = usedRoute.lastOption.exists(_.nodeId == originNode)
-    channelDisabled = !Announcements.isEnabled(upd.update.channelFlags)
-    if failureAtSecondToLastNode && channelDisabled
-  } yield originNode
+  def terminalOfflineNodeIds(paymentHash: ByteVector) = errors(paymentHash) collect {
+    case DecryptedFailurePacket(originNode, _: ChannelDisabled | UnknownNextPeer) \ usedRoute
+      if usedRoute.lastOption.exists(_.nodeId == originNode) =>
+      originNode
+  }
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
     val parsed = FailurePacket.decrypt(fail.reason, rd.onion.sharedSecrets)
@@ -184,8 +183,8 @@ object PaymentInfo {
 }
 
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
-                       onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */ ,
-                       lastMsat: Long /* amount with off-chain fee added */ , lastExpiry: Long, callsLeft: Int,
+                       onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */,
+                       lastMsat: Long /* amount with off-chain fee added */, lastExpiry: Long, callsLeft: Int,
                        useCache: Boolean, airLeft: Int, onChainFeeBlock: Boolean, onChainFeeBlockWasUsed: Boolean,
                        retriedRoutes: PaymentRouteVec) {
 

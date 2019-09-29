@@ -146,17 +146,17 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     var warnedOffline = Set.empty[ByteVector]
 
     PaymentInfoWrap.newRoutesOrGiveUp = rd => {
-      val warnedAlready = warnedOffline.contains(rd.pr.paymentHash)
-      val termOfflineNodes = PaymentInfo.terminalOfflineNodeIds(rd.pr.paymentHash)
-      val termHintedNodes = rd.pr.routingInfo.flatMap(_.route.lastOption).map(_.nodeId)
+      val termNodes = rd.pr.routingInfo.flatMap(_.route.lastOption).map(_.nodeId)
+      val reportedTermOfflineNodes = PaymentInfo.terminalOfflineNodeIds(rd.pr.paymentHash)
+      val isConvincing = reportedTermOfflineNodes.intersect(termNodes).size > termNodes.size / 3
 
-      if (!warnedAlready && termOfflineNodes.intersect(termHintedNodes).nonEmpty) {
-        // One of route hints from receiver invoice returned ChannelDisabled(offline)
+      if (!warnedOffline.contains(rd.pr.paymentHash) && isConvincing) {
+        // One of terminal nodes returned ChannelDisabled | UnknownNextPeer
         PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
         UITask(me toast err_ln_receiver_offline).run
         warnedOffline += rd.pr.paymentHash
       } else if (rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight) {
-        // We do not care about options such as AIR or AMP here, this payment may be one of them
+        // We do not care about options such as AIR or AMP here, this HTLC may be one of them
         PaymentInfoWrap fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
       } else PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
     }
@@ -194,10 +194,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def checkTransData = app.TransData checkAndMaybeErase {
     case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-
-    case FragWallet.REDIRECT =>
-      // Erase TransData value
-      goOps(null): Unit
+    case FragWallet.REDIRECT => goOps(null): Unit
 
     case btcURI: BitcoinURI =>
       val canSendOffChain = Try(btcURI.getAmount).map(coin2MSat).filter(msat => ChannelManager.estimateAIRCanSend >= msat.amount).isSuccess

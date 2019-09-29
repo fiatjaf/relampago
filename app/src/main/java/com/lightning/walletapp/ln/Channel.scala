@@ -951,7 +951,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       case (hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING | SUSPENDED)
         if hc.announce.nodeId == newAnn.nodeId && Announcements.checkSig(newAnn) =>
         // Node was SLEEPING for a long time, do not trigger listeners for this update
-        data = me STORE hc.modify(_.announce).setTo(newAnn)
+        data = me STORE hc.copy(announce = newAnn)
 
 
       case (hc: HostedCommits, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && upd.isHosted =>
