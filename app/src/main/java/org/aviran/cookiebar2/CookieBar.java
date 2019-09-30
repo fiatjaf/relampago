@@ -33,12 +33,9 @@ public class CookieBar {
     private Cookie cookieView;
     private final Activity context;
 
-    public static Builder build(Activity activity) {
-        return new CookieBar.Builder(activity);
-    }
-
-    public static void dismiss(Activity activity) {
+    public static Builder rebuild(Activity activity) {
         new CookieBar(activity, null);
+        return new CookieBar.Builder(activity);
     }
 
     private CookieBar(Activity context, Params params) {

@@ -767,8 +767,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       case (WaitRemoteHostedReply(announce, refundScriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
         if (init.liabilityDeadlineBlockdays < LNParams.minHostedLiabilityBlockdays) throw new LightningException("Their liability deadline is too low")
         if (init.initialClientBalanceMsat > init.channelCapacityMsat) throw new LightningException("Their init balance for us is larger than capacity")
-        if (init.channelCapacityMsat < LNParams.minHostedOnChainRefundSat * 2) throw new LightningException("Their proposed channel capacity is too low")
         if (init.minimalOnchainRefundAmountSatoshis > LNParams.minHostedOnChainRefundSat) throw new LightningException("Their min refund is too high")
+        if (init.channelCapacityMsat < LNParams.minHostedOnChainRefundSat) throw new LightningException("Their proposed channel capacity is too low")
         if (UInt64(100000000L) > init.maxHtlcValueInFlightMsat) throw new LightningException("Their max value in-flight is too low")
         if (init.htlcMinimumMsat > 546000L) throw new LightningException("Their minimal payment size is too high")
         if (init.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
@@ -839,18 +839,6 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         me doProcess CMDProceed
 
 
-      case (hc: HostedCommits, CMDHTLCProcess, OPEN) =>
-        // Fail or fulfill incoming HTLCs
-
-        for {
-          Htlc(true, add) <- hc.localSpec.htlcs
-          // We don't want to receive a payment into a channel we have originally sent it from in an attempt to rebalance
-          isLoop = hc.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == add.paymentHash)
-        } me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, isLoop)
-        // And sign changes once done because CMDFail/Fulfill above don't do that
-        me doProcess CMDProceed
-
-
       case (hc: HostedCommits, CMDProceed, OPEN)
         if hc.nextLocalUpdates.nonEmpty || hc.nextRemoteUpdates.nonEmpty =>
         // Store not yet cross-signed updates because once local sig is sent we don't know if they have a new complete state
@@ -898,6 +886,18 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         val fail = UpdateFailMalformedHtlc(hc.channelId, cmd.id, cmd.onionHash, cmd.code)
         val notFound = CommitmentSpec.findHtlcById(hc.localSpec, cmd.id, isIncoming = true).isEmpty
         if (notFound) throw new LightningException else me UPDATA hc.addProposal(fail.local) SEND fail
+
+
+      case (hc: HostedCommits, CMDHTLCProcess, OPEN) =>
+        // Fail or fulfill incoming HTLCs
+
+        for {
+          Htlc(true, add) <- hc.localSpec.htlcs
+          // We don't want to receive a payment into a channel we have originally sent it from in an attempt to rebalance
+          isLoop = hc.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == add.paymentHash)
+        } me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, isLoop)
+        // And sign changes once done because CMDFail/Fulfill above don't do that
+        me doProcess CMDProceed
 
 
       case (hc: HostedCommits, CMDSocketOnline, SLEEPING | SUSPENDED) =>
@@ -973,6 +973,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       case (hc: HostedCommits, CMDHostedStateOverride(remoteOverride), OPEN | SLEEPING | SUSPENDED) =>
         val isRightLocalUpdateNumber = remoteOverride.localUpdates > hc.lastCrossSignedState.remoteUpdates
         val isRightRemoteUpdateNumber = remoteOverride.remoteUpdates > hc.lastCrossSignedState.localUpdates
+        // Remote peer sends their local balance in StateOverride so our new balance is capacity - their local balance
         val localBalance = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat - remoteOverride.localBalanceMsat
 
         val recreatedCompleteLocalLCSS =
@@ -1003,11 +1004,13 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
   }
 
   def syncAndResend(hc: HostedCommits, leftovers: Vector[LNDirectionalMessage], lcss: LastCrossSignedState, spec: CommitmentSpec) = {
-    val addLeftovers = leftovers collect { case Left(localNonCrossSignedUpdateAdd: UpdateAddHtlc) => localNonCrossSignedUpdateAdd }
+    // Filter out local UpdateAddHtlc, re-assign correct update numbers to each of them, re-send LCSS + UpdateAddHtlc, forget their updates
+
+    val addLeftovers = for (Left(localAdd: UpdateAddHtlc) <- leftovers) yield localAdd
     val addLeftovers1 = for (idx <- addLeftovers.indices.toVector) yield addLeftovers(idx).copy(id = lcss.localUpdates + 1 + idx)
-    val hc1 = hc.copy(futureUpdates = addLeftovers1.map(_.local), lastCrossSignedState = lcss, localSpec = spec)
+    val hostedCommits1 = hc.copy(futureUpdates = addLeftovers1.map(_.local), lastCrossSignedState = lcss, localSpec = spec)
     for (msg <- lcss +: addLeftovers1) me SEND msg
-    hc1
+    hostedCommits1
   }
 
   def restoreCommits(localLCSS: LastCrossSignedState, ann: NodeAnnouncement) = {

@@ -107,6 +107,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   override def outPaymentAccepted(rd: RoutingData) = {
     acceptedPayments = acceptedPayments.updated(rd.pr.paymentHash, rd)
     unsentPayments = unsentPayments - rd.pr.paymentHash
+    // Update once again with actual fees data
     me insertOrUpdateOutgoingPayment rd
   }
 

@@ -119,9 +119,10 @@ trait TimerActivity extends AppCompatActivity { me =>
   def negBuilder(neg: Int, title: View, body: View) = baseBuilder(title, body).setNegativeButton(neg, null)
 
   def toast(code: Int): Unit = toast(me getString code)
-  def toast(msg: String): Unit = try CookieBar.build(me).setMessage(msg).setCookiePosition(CookieBar.BOTTOM).show catch none
+  def toast(msg: String): Unit = try CookieBar.rebuild(me).setMessage(msg).setCookiePosition(CookieBar.BOTTOM).show catch none
   def onFail(error: CharSequence): Unit = UITask(me showForm negBuilder(dialog_ok, null, error).create).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
+
 
   def mkCheckForm(ok: AlertDialog => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) = {
     // Create alert dialog with NEGATIVE button which removes a dialog and calls a respected provided function
