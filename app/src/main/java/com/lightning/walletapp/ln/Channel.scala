@@ -11,7 +11,7 @@ import scodec.bits.ByteVector
 import java.util.concurrent.Executors
 import fr.acinq.bitcoin.Protocol.Zeroes
 import fr.acinq.bitcoin.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{LNDirectionalMessage, LNMessageVector}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.LNDirectionalMessage
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
@@ -70,23 +70,24 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
       isDifferentShortId || isOldUpdateRefresh
     }
 
-  def RESOLVE(cs: Commitments, updates: LNMessageVector) = {
-    // Once new state is settled we resolve remote updates from previous state
-    // this intentionally can be done once since remote updates are erased at a later time
-    // by doing this way we can fulfill a payment once and keep it that way after reestablishment
+  def RESOLVE(cs: Commitments, prevRemoteUpdates: Traversable[LightningMessage], nextData: ChannelData) = {
+    // Once new state is settled we resolve remote updates from previous state or store data if there is nothing to resolve
+    // this can be done once since remote updates are erased at a later time so it's not possible to fulfill then fail a payment
 
-    updates collect { case remoteAdd: UpdateAddHtlc =>
+    val commands = prevRemoteUpdates collect { case remoteAdd: UpdateAddHtlc =>
       // We don't want to receive a payment into a channel we have originally sent it from in an attempt to rebalance
       val isLoop = cs.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == remoteAdd.paymentHash)
-      me doProcess resolveHtlc(LNParams.nodePrivateKey, remoteAdd, LNParams.bag, isLoop)
+      resolveHtlc(LNParams.nodePrivateKey, remoteAdd, LNParams.bag, isLoop)
     }
 
-    // Sign resolved updates
+    BECOME(nextData, OPEN)
+    if (commands.isEmpty) me STORE nextData
+    else commands foreach doProcess
     me doProcess CMDProceed
   }
 
   def SEND(lightningMessage: LightningMessage) = for {
-    work <- ConnectionManager.workers get data.announce.nodeId
+    work <- ConnectionManager.workers.get(data.announce.nodeId)
   } work.handler process lightningMessage
 
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
@@ -124,8 +125,8 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
 
 abstract class NormalChannel extends Channel(isHosted = false) { me =>
   def fundTxId = data match { case hnc: HasNormalCommits => hnc.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
-  def estCanSendMsat = data match { case hnc: HasNormalCommits => hnc.commitments.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat case _ => 0L }
   def inFlightHtlcs: Set[Htlc] = data match { case hnc: HasNormalCommits => hnc.commitments.reducedRemoteState.spec.htlcs case _ => Set.empty }
+  def estCanSendMsat = data match { case hnc: HasNormalCommits => hnc.commitments.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat case _ => 0L }
   def estCanReceiveMsat = data match { case hnc: HasNormalCommits => hnc.commitments.nextDummyReduced.canReceiveMsat case _ => 0L }
   def refundableMsat = data match { case hnc: HasNormalCommits => hnc.commitments.localCommit.spec.toLocalMsat case _ => 0L }
 
@@ -359,9 +360,8 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
-        // Update but not save, then resolve their Adds, then sign and save
-        me UPDATA norm.copy(commitments = norm.commitments receiveRevocation rev)
-        RESOLVE(norm.commitments, norm.commitments.remoteChanges.signed)
+        val d1 = norm.copy(commitments = norm.commitments receiveRevocation rev)
+        RESOLVE(norm.commitments, norm.commitments.remoteChanges.signed, d1)
         REV(norm.commitments, rev)
 
 
@@ -850,10 +850,9 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
           else if (me isBlockDayOutOfSync remoteSU.blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
           else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
           else {
-            me UPDATA hc1.withoutUpdates SEND hc1.lastCrossSignedState.stateUpdate
-            // We remove all updates here because this is a latest state update
+            me SEND hc1.lastCrossSignedState.stateUpdate
+            RESOLVE(hc, hc.nextRemoteUpdates, hc1.withoutUpdates)
             events onSettled hc1.withoutUpdates
-            RESOLVE(hc, hc.nextRemoteUpdates)
             stateUpdateAttempts = 0
           }
         }
@@ -985,11 +984,11 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     hostedCommits1
   }
 
-  def syncFromRestored(restoredHostedCommits: HostedCommits) = {
-    // We may have incoming and outgoing cross-signed HTLCs: resolve incoming right away
-    val localAdds = for (Htlc(true, add) <- restoredHostedCommits.localSpec.htlcs) yield add
-    BECOME(me STORE restoredHostedCommits, OPEN) SEND restoredHostedCommits.lastCrossSignedState
-    RESOLVE(restoredHostedCommits, localAdds.toVector)
+  def syncFromRestored(hc: HostedCommits) = {
+    // We may have incoming cross-signed HTLCs: resolve them right away
+    val adds = for (Htlc(true, add) <- hc.localSpec.htlcs) yield add
+    me SEND hc.lastCrossSignedState
+    RESOLVE(hc, adds, hc)
   }
 
   def restoreCommits(localLCSS: LastCrossSignedState, ann: NodeAnnouncement) = {
