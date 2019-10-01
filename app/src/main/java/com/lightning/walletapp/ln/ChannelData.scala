@@ -364,8 +364,14 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   def receiveFulfill(fulfill: UpdateFulfillHtlc) =
     getHtlcCrossSigned(incomingRelativeToLocal = false, fulfill.id) match {
       case Some(add) if fulfill.paymentHash == add.paymentHash => addRemoteProposal(fulfill)
-      case None => throw new LightningException("Peer has fulfilled non-cross-signed payment")
+      case None => throw new LightningException("Peer has fulfilled a non-cross-signed payment")
     }
+
+  def sendFulfill(cmd: CMDFulfillHtlc) = {
+    val fulfill = UpdateFulfillHtlc(channelId, cmd.add.id, cmd.preimage)
+    val notFound = getHtlcCrossSigned(incomingRelativeToLocal = true, cmd.add.id).isEmpty
+    if (notFound) throw new LightningException else addLocalProposal(fulfill) -> fulfill
+  }
 
   def sendFail(cmd: CMDFailHtlc) = {
     val fail = UpdateFailHtlc(channelId, cmd.id, cmd.reason)
@@ -531,7 +537,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   def receiveFulfill(fulfill: UpdateFulfillHtlc) =
     CommitmentSpec.findHtlcById(localSpec, fulfill.id, isIncoming = false) match {
       case Some(htlc) if fulfill.paymentHash == htlc.add.paymentHash => addProposal(fulfill.remote)
-      case None => throw new LightningException("Peer has fulfilled non-existing payment")
+      case None => throw new LightningException("Peer has fulfilled a non-existing payment")
     }
 
   def receiveFail(fail: UpdateFailHtlc) = {

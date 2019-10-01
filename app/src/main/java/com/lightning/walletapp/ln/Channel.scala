@@ -306,17 +306,8 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (norm: NormalData, cmd: CMDFulfillHtlc, OPEN) =>
-        // We're fulfilling an HTLC we got from them earlier
-
-        for {
-          // this is a special case where we don't throw if cross signed HTLC is not found
-          add <- norm.commitments.getHtlcCrossSigned(incomingRelativeToLocal = true, cmd.add.id)
-          // such a case may happen when we have already fulfilled it just before connection got lost
-          updateFulfillHtlc = UpdateFulfillHtlc(norm.commitments.channelId, cmd.add.id, cmd.preimage)
-
-          if updateFulfillHtlc.paymentHash == add.paymentHash
-          c1 = norm.commitments addLocalProposal updateFulfillHtlc
-        } me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
+        val c1 \ updateFulfillHtlc = norm.commitments sendFulfill cmd
+        me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
 
 
       case (norm: NormalData, cmd: CMDFailHtlc, OPEN) =>
@@ -327,18 +318,6 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       case (norm: NormalData, cmd: CMDFailMalformedHtlc, OPEN) =>
         val c1 \ updateFailMalformedHtlс = norm.commitments sendFailMalformed cmd
         me UPDATA norm.copy(commitments = c1) SEND updateFailMalformedHtlс
-
-
-      case (norm: NormalData, CMDHTLCProcess, OPEN) =>
-        // Fail or fulfill incoming HTLCs
-
-        for {
-          Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs
-          // We don't want to receive a payment into a channel we have originally sent it from in an attempt to rebalance
-          isLoop = norm.commitments.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == add.paymentHash)
-        } me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, isLoop)
-        // And sign changes once done because CMDFail/Fulfill above don't do that
-        me doProcess CMDProceed
 
 
       case (norm: NormalData, CMDProceed, OPEN)
@@ -365,11 +344,16 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
-        // We received a revocation because we sent a commit sig
-        val c1 = norm.commitments receiveRevocation rev
-        val d1 = me STORE norm.copy(commitments = c1)
-        me UPDATA d1 doProcess CMDHTLCProcess
-        // We should use an old commit here
+        // Update but not save, then resolve their Adds, then sign and save
+        me UPDATA norm.copy(commitments = norm.commitments receiveRevocation rev)
+
+        norm.commitments.remoteChanges.signed collect { case remoteAdd: UpdateAddHtlc =>
+          // We don't want to receive a payment into a channel we have originally sent it from in an attempt to rebalance
+          val isLoop = norm.commitments.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == remoteAdd.paymentHash)
+          me doProcess resolveHtlc(LNParams.nodePrivateKey, remoteAdd, LNParams.bag, isLoop)
+        }
+
+        me doProcess CMDProceed
         REV(norm.commitments, rev)
 
 
@@ -484,7 +468,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (norm: NormalData, cr: ChannelReestablish, SLEEPING) =>
-        // Resent our FundingLocked if a channel is fresh since they might not receive it before reconnect
+        // Resend our FundingLocked if a channel is fresh since they might not receive it before reconnect
         val reSendFundingLocked = cr.nextLocalCommitmentNumber == 1 && norm.commitments.localCommit.index == 0
         if (reSendFundingLocked) me SEND makeFirstFundingLocked(norm)
 
@@ -494,7 +478,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         val c1 = norm.commitments.modifyAll(_.localChanges.proposed, _.remoteChanges.proposed).setTo(Vector.empty)
           .modify(_.remoteNextHtlcId).using(_ - remoteDelta.size).modify(_.localNextHtlcId).using(_ - localDelta.size)
 
-        def maybeResendOurRevocation = if (c1.localCommit.index == cr.nextRemoteRevocationNumber + 1) {
+        def maybeResendOurRevocationMessage = if (c1.localCommit.index == cr.nextRemoteRevocationNumber + 1) {
           val localPerCommitmentSecret = Generators.perCommitSecret(c1.localParams.shaSeed, c1.localCommit.index - 1)
           val localNextPerCommitmentPoint = Generators.perCommitPoint(c1.localParams.shaSeed, c1.localCommit.index + 1)
           me SEND RevokeAndAck(channelId = c1.channelId, localPerCommitmentSecret, localNextPerCommitmentPoint)
@@ -507,19 +491,19 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
           case Left(wait) if wait.nextRemoteCommit.index == cr.nextLocalCommitmentNumber =>
             val revocationWasSentLast = c1.localCommit.index > wait.localCommitIndexSnapshot
 
-            if (!revocationWasSentLast) maybeResendOurRevocation
+            if (!revocationWasSentLast) maybeResendOurRevocationMessage
             for (msg <- c1.localChanges.signed :+ wait.sent) me SEND msg
-            if (revocationWasSentLast) maybeResendOurRevocation
+            if (revocationWasSentLast) maybeResendOurRevocationMessage
 
           // We had sent a new sig and were waiting for their revocation, they had received
           // the new sig but their revocation was lost during the disconnection, they'll resend us the revocation
-          case Left(wait) if wait.nextRemoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendOurRevocation
-          case Right(_) if c1.remoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendOurRevocation
+          case Left(wait) if wait.nextRemoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendOurRevocationMessage
+          case Right(_) if c1.remoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendOurRevocationMessage
           case _ => throw new LightningException("Local sync error")
         }
 
         val d1 = norm.copy(commitments = c1)
-        BECOME(d1, OPEN) doProcess CMDHTLCProcess
+        BECOME(d1, OPEN) doProcess CMDProceed
 
 
       // We're exiting a sync state while funding tx is still not provided

@@ -123,7 +123,6 @@ trait TimerActivity extends AppCompatActivity { me =>
   def onFail(error: CharSequence): Unit = UITask(me showForm negBuilder(dialog_ok, null, error).create).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
 
-
   def mkCheckForm(ok: AlertDialog => Unit, no: => Unit, bld: Builder, okResource: Int, noResource: Int) = {
     // Create alert dialog with NEGATIVE button which removes a dialog and calls a respected provided function
     // both POSITIVE and NEGATIVE buttons may be omitted by providing -1 as their resource ids
