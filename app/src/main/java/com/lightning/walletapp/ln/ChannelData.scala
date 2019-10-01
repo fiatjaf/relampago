@@ -27,7 +27,6 @@ case class CMDSpent(tx: Transaction) extends Command
 case object CMDChainTipKnown extends Command
 case object CMDSocketOffline extends Command
 case object CMDSocketOnline extends Command
-case object CMDHTLCProcess extends Command
 case object CMDProceed extends Command
 
 case class CMDOpenChannel(localParams: LocalParams, tempChanId: ByteVector, initialFeeratePerKw: Long, batch: Batch,
