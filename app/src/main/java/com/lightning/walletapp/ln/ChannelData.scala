@@ -194,7 +194,7 @@ case class CommitmentSpec(feeratePerKw: Long, toLocalMsat: Long, toRemoteMsat: L
 
   def directedHtlcsAndSum(incoming: Boolean) = {
     val filtered = htlcs.filter(_.incoming == incoming)
-    filtered -> filtered.map(_.add.amountMsat).sum
+    filtered -> filtered.toVector.map(_.add.amountMsat).sum
   }
 }
 

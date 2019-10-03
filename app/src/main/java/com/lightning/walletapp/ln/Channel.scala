@@ -47,10 +47,10 @@ object Channel {
     case _ => false
   }
 
-  def channelAndHop(chan: Channel) = for {
-    update <- chan.getCommits.flatMap(_.updateOpt)
-    hop = update.toHop(chan.data.announce.nodeId)
-  } yield chan -> Vector(hop)
+  def channelAndHop(chan: Channel) =
+    chan.getCommits.flatMap(_.updateOpt) map { update =>
+      chan -> Vector(update toHop chan.data.announce.nodeId)
+    }
 }
 
 abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] { me =>
