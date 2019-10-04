@@ -281,15 +281,10 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       // OPEN MODE
 
 
+      // GUARD: due to timestamp filter the first update they send must be for our channel
       case (norm: NormalData, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && !upd.isHosted =>
-        // GUARD: due to timestamp filter the first update they send must be for our channel
+        if (me isUpdatable upd) data = me STORE norm.modify(_.commitments.updateOpt).setTo(upd.some)
         waitingUpdate = false
-
-        if (me isUpdatable upd) {
-          // Update and store data but do not trigger listeners
-          val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
-          data = me STORE d1
-        }
 
 
       case (norm: NormalData, addHtlc: UpdateAddHtlc, OPEN) =>
@@ -929,13 +924,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
       case (hc: HostedCommits, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && upd.isHosted =>
         if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(hc, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
+        if (me isUpdatable upd) data = me STORE hc.copy(updateOpt = upd.some)
         waitingUpdate = false
-
-        if (me isUpdatable upd) {
-          // Update and store data but do not trigger listeners
-          val d1 = hc.modify(_.updateOpt) setTo Some(upd)
-          data = me STORE d1
-        }
 
 
       case (hc: HostedCommits, remoteError: Error, OPEN | SLEEPING) =>

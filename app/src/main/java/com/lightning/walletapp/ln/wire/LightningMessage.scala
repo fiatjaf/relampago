@@ -112,10 +112,11 @@ case class ChannelAnnouncement(nodeSignature1: ByteVector, nodeSignature2: ByteV
 case class ChannelUpdate(signature: ByteVector, chainHash: ByteVector, shortChannelId: Long, timestamp: Long,
                          messageFlags: Byte, channelFlags: Byte, cltvExpiryDelta: Int, htlcMinimumMsat: Long,
                          feeBaseMsat: Long, feeProportionalMillionths: Long, htlcMaximumMsat: Option[Long],
-                         unknownFields: ByteVector = ByteVector.empty) extends RoutingMessage {
+                         unknownFields: ByteVector = ByteVector.empty) extends RoutingMessage { me =>
 
-  require(requirement = (messageFlags & 1) != 0 == htlcMaximumMsat.isDefined, "htlcMaximumMsat is not consistent with messageFlags")
+  def some = Some(me)
   def toHop(nodeId: PublicKey) = Hop(nodeId, shortChannelId, cltvExpiryDelta, htlcMinimumMsat, feeBaseMsat, feeProportionalMillionths)
+  require(requirement = (messageFlags & 1) != 0 == htlcMaximumMsat.isDefined, "htlcMaximumMsat is not consistent with messageFlags value")
   lazy val isHosted = Tools.fromShortId(shortChannelId) match { case (blockHeight, _, _) => blockHeight <= LNParams.maxHostedBlockHeight }
   lazy val feeEstimate = feeBaseMsat + feeProportionalMillionths * 10
 }
