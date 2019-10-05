@@ -70,7 +70,7 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
       isDifferentShortId || isOldUpdateRefresh
     }
 
-  def RESOLVE(cs: Commitments, prevRemoteUpdates: Traversable[LightningMessage], nextData: ChannelData) = {
+  def RESOLVE(cs: Commitments, prevRemoteUpdates: Traversable[LightningMessage], nextStateData: ChannelData) = {
     // Once new state is settled we resolve remote updates from previous state or store data if there is nothing to resolve
     // this can be done once since remote updates are erased at a later time so it's not possible to fulfill then fail a payment
 
@@ -80,9 +80,9 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
       resolveHtlc(LNParams.nodePrivateKey, remoteAdd, LNParams.bag, isLoop)
     }
 
-    BECOME(nextData, OPEN)
-    if (commands.isEmpty) me STORE nextData
-    else commands foreach doProcess
+    BECOME(nextStateData, OPEN)
+    if (commands.isEmpty) me STORE nextStateData
+    else for (cmd <- commands) me doProcess cmd
     me doProcess CMDProceed
   }
 
