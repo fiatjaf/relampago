@@ -336,8 +336,8 @@ object Helpers {
       val remoteSpec = CommitmentSpec(initialFeeratePerKw, toRemoteMsat, toLocalMsat)
 
       if (!localParams.isFunder) {
-        val fees = Scripts.commitTxFee(remoteParams.dustLimitSat, remoteSpec).amount
-        val missing = remoteSpec.toLocalMsat / 1000L - localParams.channelReserveSat - fees
+        val feesSat = Scripts.commitTxFee(remoteParams.dustLimitSat, remoteSpec).amount
+        val missing = remoteSpec.toLocalMsat / 1000L - localParams.channelReserveSat - feesSat
         if (missing < 0) throw new LightningException(s"Remote funder misses $missing SAT for fees")
       }
 

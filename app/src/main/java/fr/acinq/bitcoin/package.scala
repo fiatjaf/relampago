@@ -45,10 +45,12 @@ package object bitcoin {
   }
 
   implicit final class SatoshiLong(private val n: Long) extends AnyVal {
+    def fromMsatToSat = Satoshi(n / 1000L)
     def satoshi = Satoshi(n)
   }
 
   implicit final class MilliSatoshiLong(private val n: Long) extends AnyVal {
+    def toTruncatedMsat = MilliSatoshi(n - n % 1000L)
     def millisatoshi = MilliSatoshi(n)
   }
 

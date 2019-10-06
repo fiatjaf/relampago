@@ -17,7 +17,7 @@ import com.lightning.walletapp.ln.RefundingData
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
 import org.bitcoinj.uri.BitcoinURI
-import fr.acinq.bitcoin.Satoshi
+import fr.acinq.bitcoin._
 import android.content.Intent
 import scodec.bits.ByteVector
 import android.os.Bundle
@@ -103,14 +103,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
     def fill(chan: NormalChannel, cs: NormalCommits) = {
       val forceCloseFee = Satoshi(cs.reducedRemoteState.myFeeSat)
-      val started = me time new Date(cs.startedAt)
-      val connect = connectivityStatusColor(chan)
-      val currentState = stateStatusColor(chan)
+      val startedAt = me time new Date(cs.startedAt)
 
       val capacity = cs.commitInput.txOut.amount
-      val canReceiveMsat = chan.estCanReceiveMsat
       val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
-      val barCanReceive = barCanSend + canReceiveMsat / capacity.amount
+      val barCanReceive = barCanSend + chan.estCanReceiveMsat / capacity.amount
 
       // For incoming chans reserveAndFee is reserve only since fee is zero
       val reserveAndFee = forceCloseFee.amount + cs.remoteParams.channelReserveSatoshis
@@ -123,16 +120,16 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       overBar setProgress barLocalReserve.toInt
 
       extraInfo setVisibility View.GONE
-      startedAtText setText started.html
+      startedAtText setText startedAt.html
       addressAndKey setText chan.data.announce.asString.html
       totalPaymentsText setText getStat(cs.channelId).toString
-      stateAndConnectivity setText s"<strong>$currentState</strong><br>$connect".html
       fundingDepthText setText getString(ln_mofn).format(fundingDepth, threshold).html
-      // All amounts are in MilliSatoshi, but we convert them to Satoshi and / 1000 to erase trailing msat remainders
-      paymentsInFlightText setText sumOrNothing(Satoshi(chan.inFlightHtlcs.toList.map(_.add.amountMsat).sum) / 1000L).html
-      refundableAmountText setText sumOrNothing(Satoshi(chan.refundableMsat) / 1000L).html
-      canSendText setText denom.parsedWithSign(Satoshi(chan.estCanSendMsat) / 1000L).html
-      canReceiveText setText denom.parsedWithSign(Satoshi(canReceiveMsat) / 1000L).html
+      // All amounts are in MilliSatoshi, but we divide them by 1000 to erase trailing msat remainders
+      stateAndConnectivity setText s"<strong>${me stateStatusColor chan}</strong><br>${me connectivityStatusColor chan}".html
+      paymentsInFlightText setText sumOrNothing(chan.inFlightHtlcs.toVector.map(_.add.amountMsat).sum.fromMsatToSat).html
+      canReceiveText setText denom.parsedWithSign(chan.estCanReceiveMsat.toTruncatedMsat).html
+      canSendText setText denom.parsedWithSign(chan.estCanSendMsat.toTruncatedMsat).html
+      refundableAmountText setText sumOrNothing(chan.refundableMsat.fromMsatToSat).html
       totalCapacityText setText denom.parsedWithSign(capacity).html
       refundFeeText setText sumOrNothing(forceCloseFee).html
 
