@@ -348,4 +348,5 @@
     <string name="err_ln_hosted_update_cltv_too_low">incorrect expiry in channel update</string>
     <string name="err_ln_hosted_in_flight_htlc_while_restoring">in-flight payments while restoring</string>
     <string name="err_ln_hosted_timed_out_outgoing_htlc">timed out outgoing payment</string>
+    <string name="err_ln_hosted_channel_denied">hosted channel denied</string>
 </resources>

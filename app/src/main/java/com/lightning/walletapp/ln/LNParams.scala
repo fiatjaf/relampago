@@ -120,6 +120,8 @@ object ChanErrorCodes {
   final val ERR_HOSTED_TOO_MANY_STATE_UPDATES = ByteVector.fromValidHex("0005")
   final val ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC = ByteVector.fromValidHex("0006")
   final val ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING = ByteVector.fromValidHex("0007")
+  final val ERR_HOSTED_CHANNEL_DENIED = ByteVector.fromValidHex("0008")
+
 
   val hostedErrors = Map (
     ERR_HOSTED_WRONG_BLOCKDAY -> err_ln_hosted_wrong_blockday,
@@ -128,7 +130,8 @@ object ChanErrorCodes {
     ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low,
     ERR_HOSTED_TOO_MANY_STATE_UPDATES -> err_ln_hosted_too_many_state_updates,
     ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC -> err_ln_hosted_timed_out_outgoing_htlc,
-    ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING -> err_ln_hosted_in_flight_htlc_while_restoring
+    ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING -> err_ln_hosted_in_flight_htlc_while_restoring,
+    ERR_HOSTED_CHANNEL_DENIED -> err_ln_hosted_channel_denied
   )
 }
 
