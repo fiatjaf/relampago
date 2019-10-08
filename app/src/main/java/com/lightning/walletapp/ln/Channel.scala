@@ -824,30 +824,29 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         me doProcess CMDProceed
 
 
-      case (hc: HostedCommits, CMDProceed, OPEN)
-        if hc.nextLocalUpdates.nonEmpty || hc.nextRemoteUpdates.nonEmpty =>
+      case (hc: HostedCommits, CMDProceed, OPEN) =>
         // Store not yet cross-signed updates because once local sig is sent we don't know if they have a new complete state
         // by doing this we can treat these uncertain updates as in-flight while disconnected and then properly resolve their status on reconnect
         me UPDATA STORE(hc) SEND hc.nextLocalUnsignedLCSS(LNParams.broadcaster.currentBlockDay).withLocalSigOfRemote(LNParams.nodePrivateKey).stateUpdate
 
 
-      case (hc: HostedCommits, remoteSU: StateUpdate, OPEN)
-        // GUARD: only proceed if signture is defferent, they may send duplicates
-        if hc.lastCrossSignedState.remoteSigOfLocal != remoteSU.localSigOfRemoteLCSS =>
+      case (hc: HostedCommits, StateUpdate(blockDay, _, remoteUpdates, localSigOfRemoteLCSS), OPEN)
+        // GUARD: only proceed if signture is defferent, they may send a few duplicates
+        if hc.lastCrossSignedState.remoteSigOfLocal != localSigOfRemoteLCSS =>
 
         if (stateUpdateAttempts > 16) localSuspend(hc, ERR_HOSTED_TOO_MANY_STATE_UPDATES) else {
-          val nextLocalLCSS = hc.nextLocalUnsignedLCSS(remoteSU.blockDay).copy(remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS).withLocalSigOfRemote(LNParams.nodePrivateKey)
-          val stateUpdatedHc = hc.copy(lastCrossSignedState = nextLocalLCSS, localSpec = hc.nextLocalSpec, futureUpdates = Vector.empty)
+          val nextLocalLCSS = hc.nextLocalUnsignedLCSS(blockDay).copy(remoteSigOfLocal = localSigOfRemoteLCSS).withLocalSigOfRemote(LNParams.nodePrivateKey)
+          val stateUpdatedHC = hc.copy(lastCrossSignedState = nextLocalLCSS, localSpec = hc.nextLocalSpec, futureUpdates = Vector.empty)
           val isRemoteSigOk = nextLocalLCSS.verifyRemoteSig(hc.announce.nodeId)
           stateUpdateAttempts += 1
 
-          if (remoteSU.remoteUpdates < nextLocalLCSS.localUpdates) me SEND stateUpdatedHc.lastCrossSignedState.stateUpdate
-          else if (me isBlockDayOutOfSync remoteSU.blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
+          if (remoteUpdates < nextLocalLCSS.localUpdates) me SEND stateUpdatedHC.lastCrossSignedState.stateUpdate
+          else if (me isBlockDayOutOfSync blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
           else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
           else {
-            me SEND stateUpdatedHc.lastCrossSignedState.stateUpdate
-            RESOLVE(hc, hc.nextRemoteUpdates, stateUpdatedHc)
-            events onSettled stateUpdatedHc
+            me SEND stateUpdatedHC.lastCrossSignedState.stateUpdate
+            RESOLVE(hc, hc.nextRemoteUpdates, stateUpdatedHC)
+            events onSettled stateUpdatedHC
             stateUpdateAttempts = 0
           }
         }
