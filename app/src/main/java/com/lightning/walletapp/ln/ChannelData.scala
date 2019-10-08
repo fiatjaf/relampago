@@ -488,7 +488,6 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   lazy val invokeMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey)
   lazy val nextLocalSpec = CommitmentSpec.reduce(localSpec, nextLocalUpdates, nextRemoteUpdates)
   lazy val currentAndNextInFlight = localSpec.htlcs ++ nextLocalSpec.htlcs
-  lazy val withoutUpdates = copy(futureUpdates = Vector.empty)
 
   def nextLocalUnsignedLCSS(blockDay: Long) = {
     val incomingHtlcs \ outgoingHtlcs = nextLocalSpec.htlcs.toList.partition(_.incoming)

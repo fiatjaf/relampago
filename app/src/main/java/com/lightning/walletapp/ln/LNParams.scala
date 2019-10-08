@@ -122,7 +122,6 @@ object ChanErrorCodes {
   final val ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING = ByteVector.fromValidHex("0007")
   final val ERR_HOSTED_CHANNEL_DENIED = ByteVector.fromValidHex("0008")
 
-
   val hostedErrors = Map (
     ERR_HOSTED_WRONG_BLOCKDAY -> err_ln_hosted_wrong_blockday,
     ERR_HOSTED_WRONG_LOCAL_SIG -> err_ln_hosted_wrong_local_sig,
@@ -150,8 +149,7 @@ trait DelayedPublishStatus extends PublishStatus {
 case class HideReady(txn: Transaction) extends PublishStatus
 case class ShowReady(txn: Transaction, fee: Satoshi, amount: Satoshi) extends PublishStatus
 case class HideDelayed(parent: (DepthAndDead, Long), txn: Transaction) extends DelayedPublishStatus
-case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, commitTx: Transaction,
-                       fee: Satoshi, amount: Satoshi) extends DelayedPublishStatus
+case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, commitTx: Transaction, fee: Satoshi, amount: Satoshi) extends DelayedPublishStatus
 
 trait Broadcaster extends ChannelListener {
   def getTx(txid: ByteVector): Option[org.bitcoinj.core.Transaction]

@@ -1,6 +1,7 @@
 package com.lightning.walletapp
 
 import android.widget._
+import fr.acinq.bitcoin._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
@@ -17,7 +18,6 @@ import com.lightning.walletapp.ln.RefundingData
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
 import org.bitcoinj.uri.BitcoinURI
-import fr.acinq.bitcoin._
 import android.content.Intent
 import scodec.bits.ByteVector
 import android.os.Bundle

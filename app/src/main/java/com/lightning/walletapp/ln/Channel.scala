@@ -836,18 +836,18 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if hc.lastCrossSignedState.remoteSigOfLocal != remoteSU.localSigOfRemoteLCSS =>
 
         if (stateUpdateAttempts > 16) localSuspend(hc, ERR_HOSTED_TOO_MANY_STATE_UPDATES) else {
-          val nextLocalLCSS = hc.nextLocalUnsignedLCSS(remoteSU.blockDay).copy(remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS)
-          val hc1 = hc.copy(lastCrossSignedState = nextLocalLCSS.withLocalSigOfRemote(LNParams.nodePrivateKey), localSpec = hc.nextLocalSpec)
+          val nextLocalLCSS = hc.nextLocalUnsignedLCSS(remoteSU.blockDay).copy(remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS).withLocalSigOfRemote(LNParams.nodePrivateKey)
+          val stateUpdatedHc = hc.copy(lastCrossSignedState = nextLocalLCSS, localSpec = hc.nextLocalSpec, futureUpdates = Vector.empty)
           val isRemoteSigOk = nextLocalLCSS.verifyRemoteSig(hc.announce.nodeId)
           stateUpdateAttempts += 1
 
-          if (remoteSU.remoteUpdates < nextLocalLCSS.localUpdates) me SEND hc1.lastCrossSignedState.stateUpdate
+          if (remoteSU.remoteUpdates < nextLocalLCSS.localUpdates) me SEND stateUpdatedHc.lastCrossSignedState.stateUpdate
           else if (me isBlockDayOutOfSync remoteSU.blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
           else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
           else {
-            me SEND hc1.lastCrossSignedState.stateUpdate
-            RESOLVE(hc, hc.nextRemoteUpdates, hc1.withoutUpdates)
-            events onSettled hc1.withoutUpdates
+            me SEND stateUpdatedHc.lastCrossSignedState.stateUpdate
+            RESOLVE(hc, hc.nextRemoteUpdates, stateUpdatedHc)
+            events onSettled stateUpdatedHc
             stateUpdateAttempts = 0
           }
         }
