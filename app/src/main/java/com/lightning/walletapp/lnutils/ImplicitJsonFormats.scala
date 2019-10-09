@@ -296,8 +296,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       tag = "NegotiationsData")
 
   implicit val normalDataFmt =
-    taggedJsonFmt(jsonFormat[NodeAnnouncement, NormalCommits, Option[Shutdown], Option[Shutdown], Option[Transaction],
-      NormalData](NormalData.apply, "announce", "commitments", "localShutdown", "remoteShutdown", "unknownSpend"),
+    taggedJsonFmt(jsonFormat[NodeAnnouncement, NormalCommits, Option[Transaction], Option[Shutdown], Option[Shutdown],
+      NormalData](NormalData.apply, "announce", "commitments", "unknownSpend", "localShutdown", "remoteShutdown"),
       tag = "NormalData")
 
   implicit val waitFundingDoneDataFmt =

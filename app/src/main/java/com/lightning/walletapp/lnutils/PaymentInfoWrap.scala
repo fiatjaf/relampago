@@ -190,6 +190,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       app.kit.wallet.removeWatchedScripts(app.kit fundingPubScript wbr)
       db.change(ChannelTable.killSql, wbr.commitments.channelId)
 
+    case (chan: NormalChannel, norm @ NormalData(_, _, Some(spendTx), _, _), CMDChainTipKnown) =>
+      // Must be careful here: unknown spend might be a future commit so only publish local commit if that spend if deeply buried
+      // this way a local commit can not possibly trigger a punishment and will be failed right away with channel becoming CLOSED
+      ChannelManager getStatus spendTx.txid match { case depth \ false if depth > blocksPerDay => chan startLocalClose norm }
+
     case (_: NormalChannel, close: ClosingData, CMDChainTipKnown) if close.canBeRemoved =>
       // Either a lot of time has passed or ALL closing transactions have enough confirmations
       app.kit.wallet.removeWatchedScripts(app.kit closingPubKeyScripts close)

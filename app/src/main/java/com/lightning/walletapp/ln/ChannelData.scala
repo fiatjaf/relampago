@@ -90,8 +90,8 @@ case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFunding
 case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked], their: Option[FundingLocked],
                                fundingTx: Transaction, commitments: NormalCommits) extends HasNormalCommits
 
-case class NormalData(announce: NodeAnnouncement, commitments: NormalCommits, localShutdown: Option[Shutdown] = None,
-                      remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends HasNormalCommits
+case class NormalData(announce: NodeAnnouncement, commitments: NormalCommits, unknownSpend: Option[Transaction] = None,
+                      localShutdown: Option[Shutdown] = None, remoteShutdown: Option[Shutdown] = None) extends HasNormalCommits
 
 case class ClosingTxProposed(unsignedTx: ClosingTx, localClosingSigned: ClosingSigned)
 case class NegotiationsData(announce: NodeAnnouncement, commitments: NormalCommits, localShutdown: Shutdown, remoteShutdown: Shutdown,

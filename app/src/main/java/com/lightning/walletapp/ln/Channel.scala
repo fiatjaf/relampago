@@ -381,7 +381,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), WAIT_FUNDING_DONE) =>
         val finalScriptPubKey = scriptPubKey getOrElse wait.commitments.localParams.defaultFinalScriptPubKey
         val ourShutdown = Shutdown(wait.commitments.channelId, scriptPubKey = finalScriptPubKey)
-        val norm = NormalData(wait.announce, wait.commitments, ourShutdown.some, None)
+        val norm = NormalData(wait.announce, wait.commitments, None, ourShutdown.some)
         for (msg <- makeFirstFundingLocked(wait) :: ourShutdown :: Nil) me SEND msg
         BECOME(me STORE norm, OPEN)
 
@@ -389,13 +389,13 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), SLEEPING) =>
         val finalScriptPubKey = scriptPubKey getOrElse wait.commitments.localParams.defaultFinalScriptPubKey
         val ourShutdown = Shutdown(wait.commitments.channelId, scriptPubKey = finalScriptPubKey)
-        val norm = NormalData(wait.announce, wait.commitments, ourShutdown.some, None)
+        val norm = NormalData(wait.announce, wait.commitments, None, ourShutdown.some)
         BECOME(me STORE norm, SLEEPING)
 
 
       case (wait: WaitFundingDoneData, remote: Shutdown, WAIT_FUNDING_DONE) =>
         val our = Shutdown(wait.commitments.channelId, wait.commitments.localParams.defaultFinalScriptPubKey)
-        val norm = NormalData(wait.announce, wait.commitments, our.some, remote.some)
+        val norm = NormalData(wait.announce, wait.commitments, None, our.some, remote.some)
         BECOME(me STORE norm, OPEN) SEND our
         me doProcess CMDProceed
 
@@ -403,10 +403,10 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       // SHUTDOWN in OPEN
 
 
-      case (norm @ NormalData(announce, commitments, our, their, txOpt), CMDShutdown(script), OPEN | SLEEPING) =>
+      case (norm @ NormalData(announce, commitments, txOpt, our, their), CMDShutdown(script), OPEN | SLEEPING) =>
         if (commitments.localHasUnsignedOutgoing || our.isDefined || their.isDefined) startLocalClose(norm) else {
           val our = Shutdown(commitments.channelId, script getOrElse commitments.localParams.defaultFinalScriptPubKey)
-          val norm1 = me STORE NormalData(announce, commitments, our.some, their, txOpt)
+          val norm1 = me STORE NormalData(announce, commitments, txOpt, our.some, their)
           me UPDATA norm1 SEND our
         }
 
@@ -420,7 +420,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       // We have nothing to sign so check for valid shutdown state, only consider this if we have nothing in-flight
-      case (NormalData(announce, commitments, our, their, txOpt), CMDProceed, OPEN) if inFlightHtlcs.isEmpty =>
+      case (NormalData(announce, commitments, txOpt, our, their), CMDProceed, OPEN) if inFlightHtlcs.isEmpty =>
 
         our -> their match {
           case Some(ourSig) \ Some(theirSig) =>
@@ -438,7 +438,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
           case None \ Some(theirSig) =>
             // We have previously received their Shutdown so can respond, then CMDProceed to enter NEGOTIATIONS
             val our = Shutdown(commitments.channelId, commitments.localParams.defaultFinalScriptPubKey)
-            val norm1 = me STORE NormalData(announce, commitments, our.some, theirSig.some, txOpt)
+            val norm1 = me STORE NormalData(announce, commitments, txOpt, our.some, theirSig.some)
             me UPDATA norm1 SEND our
             me doProcess CMDProceed
 
@@ -705,7 +705,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
     case _ => BECOME(me STORE ClosingData(some.announce, some.commitments, Nil, tx :: Nil), CLOSING)
   }
 
-  private def startLocalClose(some: HasNormalCommits): Unit =
+  def startLocalClose(some: HasNormalCommits): Unit =
     // Something went wrong and we decided to spend our CURRENT commit transaction
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
       case (_, neg: NegotiationsData) if neg.lastSignedTx.isDefined => startMutualClose(neg, neg.lastSignedTx.get.tx)
@@ -896,7 +896,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
         else if (weAreAhead || weAreEven) {
-          // Resend our local leftovers but retain our current cross-signed state
+          // They have our current or previous state, resend our local leftovers but keep our state
           BECOME(syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec), OPEN)
         } else hc findState remoteLCSS match {
 
@@ -965,6 +965,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     events onProcessSuccess Tuple3(me, data, change)
   }
 
+  // TODO: what about when we are ahead with in-flight HTLCs, we resolve them for the first time but they are behind and they suspend a channel?
   def syncAndResend(hc: HostedCommits, leftovers: Vector[LNDirectionalMessage], lcss: LastCrossSignedState, spec: CommitmentSpec) = {
     // Forget about remote updates, re-send our LCSS and all non-cross-signed local updates, finally sign if updates are indeed present
     val hostedCommits1 = hc.copy(futureUpdates = leftovers.filter(_.isLeft), lastCrossSignedState = lcss, localSpec = spec)
