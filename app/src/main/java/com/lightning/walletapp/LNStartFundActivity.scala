@@ -75,10 +75,12 @@ class LNStartFundActivity extends TimerActivity { me =>
     lnStartFundDetails setText asString.html
 
     abstract class OpenListener[T <: Channel] extends ConnectionListener with ChannelListener { self =>
-      override def onMessage(nodeId: PublicKey, remoteMessage: LightningMessage) = remoteMessage match {
+      override def onHostedMessage(ann: NodeAnnouncement, message: HostedChannelMessage) = freshChannel process message
+
+      override def onMessage(nodeId: PublicKey, message: LightningMessage) = message match {
         case remoteError: Error if nodeId == ann.nodeId => onException(freshChannel -> remoteError.exception)
         case open: OpenChannel if nodeId == ann.nodeId && !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
-        case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChannel process remoteMessage
+        case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChannel process message
         case _ => // We only listen to setup messages here to avoid conflicts
       }
 
