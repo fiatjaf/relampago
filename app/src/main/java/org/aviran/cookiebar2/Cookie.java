@@ -43,7 +43,6 @@ final class Cookie extends LinearLayout implements View.OnTouchListener {
     private boolean isAutoDismissEnabled;
     private boolean isSwipeable;
     private CookieBarDismissListener dismissListener;
-    private boolean actionClickDismiss;
     private boolean timeOutDismiss;
 
 
@@ -182,7 +181,11 @@ final class Cookie extends LinearLayout implements View.OnTouchListener {
     }
 
     public void dismiss() {
-        dismiss(null);
+        try {
+            dismiss(null);
+        } catch (Exception ex) {
+            // Do nothing
+        }
     }
 
     public CookieBarDismissListener getDismissListenr() {
@@ -225,10 +228,7 @@ final class Cookie extends LinearLayout implements View.OnTouchListener {
 
     private int getDismissType() {
         int dismissType = DismissType.PROGRAMMATIC_DISMISS;
-        if(actionClickDismiss) {
-            dismissType = DismissType.USER_ACTION_CLICK;
-        }
-        else if(timeOutDismiss) {
+        if(timeOutDismiss) {
             dismissType = DismissType.DURATION_COMPLETE;
         }
         return dismissType;
