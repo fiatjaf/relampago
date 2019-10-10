@@ -46,7 +46,6 @@ case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 case class WaitRemoteHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector) extends ChannelData {
   require(Helpers isValidFinalScriptPubkey refundScriptPubKey, "Invalid refundScriptPubKey when opening a hosted channel")
-  lazy val invokeMsg = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey)
 }
 
 case class WaitRemoteHostedStateUpdate(announce: NodeAnnouncement, hc: HostedCommits) extends ChannelData

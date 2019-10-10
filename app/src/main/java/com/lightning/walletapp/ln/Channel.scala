@@ -728,7 +728,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
     }
 }
 
-abstract class HostedChannel extends Channel(isHosted = true) { me =>
+abstract class HostedChannel(secret: ByteVector) extends Channel(isHosted = true) { me =>
   def estCanSendMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toLocalMsat case _ => 0L }
   def estCanReceiveMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toRemoteMsat case _ => 0L }
   def inFlightHtlcs: Set[Htlc] = data match { case hc: HostedCommits => hc.currentAndNextInFlight case _ => Set.empty }
@@ -741,13 +741,15 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
   def doProcess(change: Any) = {
     Tuple3(data, change, state) match {
-      case (wait: WaitRemoteHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
-        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.invokeMsg
+      case (wait @ WaitRemoteHostedReply(_, refundScriptPubKey), CMDSocketOnline, WAIT_FOR_INIT) =>
+        val invoke = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey, secret)
+        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND invoke
         isSocketConnected = true
 
 
-      case (wait: WaitRemoteHostedReply, CMDChainTipKnown, WAIT_FOR_INIT) =>
-        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.invokeMsg
+      case (wait @ WaitRemoteHostedReply(_, refundScriptPubKey), CMDChainTipKnown, WAIT_FOR_INIT) =>
+        val invoke = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey, secret)
+        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND invoke
         isChainHeightKnown = true
 
 
@@ -965,7 +967,6 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     events onProcessSuccess Tuple3(me, data, change)
   }
 
-  // TODO: what about when we are ahead with in-flight HTLCs, we resolve them for the first time but they are behind and they suspend a channel?
   def syncAndResend(hc: HostedCommits, leftovers: Vector[LNDirectionalMessage], lcss: LastCrossSignedState, spec: CommitmentSpec) = {
     // Forget about remote updates, re-send our LCSS and all non-cross-signed local updates, finally sign if updates are indeed present
     val hostedCommits1 = hc.copy(futureUpdates = leftovers.filter(_.isLeft), lastCrossSignedState = lcss, localSpec = spec)

@@ -210,6 +210,12 @@ object ChannelManager extends Broadcaster {
   val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
   var currentBlocksLeft = Option.empty[Int]
 
+  var all: Vector[Channel] = ChannelWrap doGet db collect {
+    case data: HasNormalCommits => createChannel(operationalListeners, data)
+    case data: HostedCommits => createHostedChannel(operationalListeners, data, ByteVector.empty)
+    case otherwise => throw new RuntimeException(s"Can't create channel with $otherwise")
+  }
+
   val socketEventsListener = new ConnectionListener {
     override def onOperational(nodeId: PublicKey, isCompat: Boolean) =
       fromNode(nodeId).foreach(_ process CMDSocketOnline)
@@ -299,14 +305,6 @@ object ChannelManager extends Broadcaster {
     case (chan: NormalChannel, _: NormalData, SLEEPING, OPEN) => chan process CMDFeerate(perKwThreeSat)
   }
 
-  // CHANNEL CREATION AND MANAGEMENT
-
-  var all: Vector[Channel] = ChannelWrap doGet db collect {
-    case normal: HasNormalCommits => createChannel(operationalListeners, normal)
-    case hosted: HostedCommits => createHostedChannel(operationalListeners, hosted)
-    case other => throw new RuntimeException(s"Can't create channel with $other")
-  }
-
   def delayedPublishes = {
     val statuses = all.map(_.data).collect { case cd: ClosingData => cd.bestClosing.getState }
     // Select all ShowDelayed which can't be published yet because cltv/csv delays are not cleared on them
@@ -347,12 +345,9 @@ object ChannelManager extends Broadcaster {
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
-  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel {
-    def STORE[T <: ChannelData](hostedCommitments: T) = runAnd(hostedCommitments) {
-      // Put updated data into db, no need for additional backups here
-      ChannelWrap put hostedCommitments
-    }
-
+  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData, secret: ByteVector) = new HostedChannel(secret) {
+    // Secret is optional and may be supplied when opening a channel, remote Host may provide some additional benefits if secret is recognized
+    def STORE[T <: ChannelData](hostedCommitments: T) = runAnd(hostedCommitments)(ChannelWrap put hostedCommitments)
     listeners = initListeners
     doProcess(bootstrap)
   }

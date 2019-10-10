@@ -39,15 +39,15 @@ class LNStartFundActivity extends TimerActivity { me =>
   } else me exitTo classOf[MainActivity]
 
   def defineFurtherActionBasedOnTransDataValue = app.TransData checkAndMaybeErase {
-    case remoteNodeView @ RemoteNodeView(ann \ _) => proceed(None, remoteNodeView.asString(fundNodeView), ann)
-    case hardcodedNodeView @ HardcodedNodeView(ann, _) => proceed(None, hardcodedNodeView.asString(fundNodeView), ann)
-    case ann: NodeAnnouncement => proceed(None, HardcodedNodeView(ann, tip = "( ͡° ͜ʖ ͡°)").asString(fundNodeView), ann)
-    case icp: IncomingChannelParams => proceed(Some(icp.open), icp.nodeView.asString(fundNodeView), icp.nodeView.ann)
+    case data @ RemoteNodeView(ann \ _) => proceed(Left(Nil), data.asString(fundNodeView), ann)
+    case data @ HardcodedNodeView(ann, _) => proceed(Left(Nil), data.asString(fundNodeView), ann)
+    case data: NodeAnnouncement => proceed(Left(Nil), HardcodedNodeView(data, tip = "( ͡° ͜ʖ ͡°)").asString(fundNodeView), data)
+    case data: IncomingChannelParams => proceed(Left(data.open :: Nil), data.nodeView.asString(fundNodeView), data.nodeView.ann)
     case _ => finish
   }
 
-  def saveChan(channel: Channel, some: HasNormalCommits) = {
-    // Saving error will halt all further progress, this is desired
+  def saveNormalChannel(channel: NormalChannel, some: HasNormalCommits) = {
+    // Saving error will halt all further progress, this is desired here
     channel STORE some
 
     app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
@@ -65,8 +65,8 @@ class LNStartFundActivity extends TimerActivity { me =>
     me exitTo MainActivity.wallet
   }
 
-  def proceed(openOpt: Option[OpenChannel], asString: String, ann: NodeAnnouncement): Unit = {
-    val freshChannel = ChannelManager.createChannel(bootstrap = InitData(ann), initListeners = Set.empty)
+  def proceed(mode: Either[List[OpenChannel], ByteVector], asString: String, ann: NodeAnnouncement): Unit = {
+    val walletPubKeyScript = ByteVector(ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram)
     val peerIncompatible = new LightningException(me getString err_ln_peer_incompatible format ann.alias)
     val peerOffline = new LightningException(me getString err_ln_peer_offline format ann.alias)
     val chanExistsAlready = new LightningException(me getString err_ln_chan_exists_already)
@@ -74,11 +74,11 @@ class LNStartFundActivity extends TimerActivity { me =>
     lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
     lnStartFundDetails setText asString.html
 
-    class OpenListener extends ConnectionListener with ChannelListener { self =>
-      override def onMessage(nodeId: PublicKey, message: LightningMessage) = message match {
+    abstract class OpenListener[T <: Channel] extends ConnectionListener with ChannelListener { self =>
+      override def onMessage(nodeId: PublicKey, remoteMessage: LightningMessage) = remoteMessage match {
         case remoteError: Error if nodeId == ann.nodeId => onException(freshChannel -> remoteError.exception)
         case open: OpenChannel if nodeId == ann.nodeId && !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
-        case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChannel process message
+        case _: ChannelSetupMessage if nodeId == ann.nodeId => freshChannel process remoteMessage
         case _ => // We only listen to setup messages here to avoid conflicts
       }
 
@@ -87,8 +87,9 @@ class LNStartFundActivity extends TimerActivity { me =>
         onException(freshChannel -> peerOffline)
       }
 
-      override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) = if (openOpt.isEmpty) {
-        val hnv = HardcodedNodeView(ann, tip = app getString ln_ops_start_fund_incoming_channel)
+      override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) = {
+        val incomingOpeningTip = app getString ln_ops_start_fund_incoming_channel
+        val hnv = HardcodedNodeView(ann, incomingOpeningTip)
 
         // This one is useless now
         freshChannel.listeners -= self
@@ -103,9 +104,12 @@ class LNStartFundActivity extends TimerActivity { me =>
           UITask(app quickToast openingError.getMessage).run
           whenBackPressed.run
       }
+
+      val freshChannel: T
     }
 
-    abstract class LocalOpenListener extends OpenListener {
+    class LocalOpenListener extends OpenListener[NormalChannel] {
+      val freshChannel = ChannelManager.createChannel(Set.empty, InitData apply ann)
       override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (nodeId == ann.nodeId) {
         // Peer has sent us their Init so we ask user to provide a funding amount if peer is compatible
         if (ChannelManager hasNormalChanWith nodeId) onException(freshChannel -> chanExistsAlready)
@@ -125,16 +129,26 @@ class LNStartFundActivity extends TimerActivity { me =>
 
         case transition @ (_: NormalChannel, wait: WaitFundingDoneData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
           // Preliminary negotiations are complete, save channel FIRST AND THEN broadcast a funding transaction
-          saveChan(channel = freshChannel, wait)
+          saveNormalChannel(freshChannel, wait)
           ChannelManager onBecome transition
       }
 
-      // Provide manual or batched amount
-      def askLocalFundingConfirm: Runnable
-    }
+      def makeTxProcessor(ms: MilliSatoshi) = new TxProcessor {
+        // A popup which offers user to select a funding on-chain fee, shuts activity down if anything goes wrong along the way
+        def onTxFail(error: Throwable): Unit = mkCheckForm(alert => rm(alert)(finish), none, txMakeErrorBuilder(error), dialog_ok, -1)
 
-    def localWalletFunderListener = new LocalOpenListener {
-      // Asks user to provide a funding amount manually
+        def futureProcess(unsignedRequest: SendRequest) = {
+          val batch = Batch(unsignedRequest, dummyScript, null)
+          val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
+          val localParams = LNParams.makeLocalParams(ann, theirReserveSat, walletPubKeyScript, randomPrivKey, isFunder = true)
+          val cmd = CMDOpenChannel(localParams, ByteVector(random getBytes 32), LNParams.broadcaster.perKwThreeSat, batch, batch.fundingAmountSat)
+          freshChannel process cmd
+        }
+
+        val dummyKey = randomPrivKey.publicKey
+        val dummyScript = pubKeyScript(dummyKey, dummyKey)
+        val pay = P2WSHData(ms, pay2wsh = dummyScript)
+      }
 
       def askLocalFundingConfirm = UITask {
         val content = getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
@@ -148,25 +162,7 @@ class LNStartFundActivity extends TimerActivity { me =>
           case Success(ms) if ms > maxCap => app quickToast dialog_sum_big
 
           case Success(ms) =>
-            val txProcessor = new TxProcessor {
-              val dummyKey = randomPrivKey.publicKey
-              val dummyScript = pubKeyScript(dummyKey, dummyKey)
-              val pay = P2WSHData(ms, pay2wsh = dummyScript)
-
-              def onTxFail(error: Throwable): Unit =
-                mkCheckForm(alert => rm(alert)(finish), none,
-                  txMakeErrorBuilder(error), dialog_ok, -1)
-
-              def futureProcess(unsignedRequest: SendRequest) = {
-                val batch = Batch(unsignedRequest, dummyScript, null)
-                val theirReserveSat = batch.fundingAmountSat / LNParams.channelReserveToFundingRatio
-                val finalPubKeyScript = ByteVector(ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram)
-                val localParams = LNParams.makeLocalParams(ann, theirReserveSat, finalPubKeyScript, randomPrivKey, isFunder = true)
-                val cmd = CMDOpenChannel(localParams, ByteVector(random getBytes 32), LNParams.broadcaster.perKwThreeSat, batch, batch.fundingAmountSat)
-                freshChannel process cmd
-              }
-            }
-
+            val txProcessor = makeTxProcessor(ms)
             val coloredAmount = denom.coloredP2WSH(txProcessor.pay.cn, denom.sign)
             val coloredExplanation = txProcessor.pay destination coloredAmount
             rm(alert)(txProcessor start coloredExplanation)
@@ -181,35 +177,41 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
     }
 
-    def remoteFundeeListener(open: OpenChannel) = new OpenListener {
-      val theirReserve = open.fundingSatoshis / LNParams.channelReserveToFundingRatio
-      val finalPubKeyScript = ByteVector(ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram)
-      val params = LNParams.makeLocalParams(ann, theirReserve, finalPubKeyScript, randomPrivKey, isFunder = false)
-      // We are already connected to remote peer at this point so reply to their request right away
+    class RemoteOpenListener(open: OpenChannel) extends OpenListener[NormalChannel] {
+      val theirReserveSat = open.fundingSatoshis / LNParams.channelReserveToFundingRatio
+      val params = LNParams.makeLocalParams(ann, theirReserveSat, walletPubKeyScript, randomPrivKey, isFunder = false)
+      // We are already connected to remote peer at this point so proceed with replying to their request right away
+      val freshChannel = ChannelManager.createChannel(Set.empty, InitData apply ann)
       freshChannel process Tuple2(params, open)
 
       override def onBecome = {
         case (_: NormalChannel, wait: WaitBroadcastRemoteData, WAIT_FOR_FUNDING, WAIT_FUNDING_DONE) =>
           // Preliminary negotiations are complete, save channel and wait for their funding tx
-          saveChan(channel = freshChannel, wait)
+          saveNormalChannel(freshChannel, wait)
       }
     }
 
-    val openListener = openOpt match {
-      case Some(open) => remoteFundeeListener(open)
-      case None => localWalletFunderListener
+    class HostedClientOpenListener(secret: ByteVector) extends OpenListener[HostedChannel] {
+      val freshChannel = ChannelManager.createHostedChannel(Set.empty, WaitRemoteHostedReply(ann, walletPubKeyScript), secret)
+    }
+
+    val openListener = mode match {
+      case Right(secret) => new HostedClientOpenListener(secret)
+      case Left(open :: _) => new RemoteOpenListener(open)
+      case _ => new LocalOpenListener
     }
 
     whenBackPressed = UITask {
-      freshChannel.listeners -= openListener
       ConnectionManager.listeners -= openListener
+      openListener.freshChannel.listeners -= openListener
       // Worker may have already been removed on some connection failure
+      // we need to disconnect here to not accumulate too many open sockets
       ConnectionManager.workers.get(ann.nodeId).foreach(_.disconnect)
       finish
     }
 
-    freshChannel.listeners += openListener
     ConnectionManager.listeners += openListener
+    openListener.freshChannel.listeners += openListener
     ConnectionManager.connectTo(ann, notify = true)
   }
 }
