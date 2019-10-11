@@ -27,7 +27,7 @@ object LNParams {
   val minDepth = 1
   val blocksPerDay = 144
   val minCapacityMsat = 200000000L
-  val channelReserveToFundingRatio = 100
+  val channelReserveToFundingRatio = 200 // 0.5%
 
   val minHostedCltvDelta = blocksPerDay * 3
   val minHostedOnChainRefundSat = 1000000L
@@ -122,16 +122,17 @@ object ChanErrorCodes {
   final val ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING = ByteVector.fromValidHex("0007")
   final val ERR_HOSTED_CHANNEL_DENIED = ByteVector.fromValidHex("0008")
 
-  val hostedErrors = Map (
-    ERR_HOSTED_WRONG_BLOCKDAY -> err_ln_hosted_wrong_blockday,
-    ERR_HOSTED_WRONG_LOCAL_SIG -> err_ln_hosted_wrong_local_sig,
-    ERR_HOSTED_WRONG_REMOTE_SIG -> err_ln_hosted_wrong_remote_sig,
-    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low,
-    ERR_HOSTED_TOO_MANY_STATE_UPDATES -> err_ln_hosted_too_many_state_updates,
-    ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC -> err_ln_hosted_timed_out_outgoing_htlc,
-    ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING -> err_ln_hosted_in_flight_htlc_while_restoring,
-    ERR_HOSTED_CHANNEL_DENIED -> err_ln_hosted_channel_denied
-  )
+  def translateTag(error: wire.Error) = error.data take 2 match {
+    case ERR_HOSTED_WRONG_BLOCKDAY => new LightningException(app getString err_ln_hosted_wrong_blockday)
+    case ERR_HOSTED_WRONG_LOCAL_SIG => new LightningException(app getString err_ln_hosted_wrong_local_sig)
+    case ERR_HOSTED_WRONG_REMOTE_SIG => new LightningException(app getString err_ln_hosted_wrong_remote_sig)
+    case ERR_HOSTED_UPDATE_CLTV_TOO_LOW => new LightningException(app getString err_ln_hosted_update_cltv_too_low)
+    case ERR_HOSTED_TOO_MANY_STATE_UPDATES => new LightningException(app getString err_ln_hosted_too_many_state_updates)
+    case ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC => new LightningException(app getString err_ln_hosted_timed_out_outgoing_htlc)
+    case ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING => new LightningException(app getString err_ln_hosted_in_flight_htlc_while_restoring)
+    case ERR_HOSTED_CHANNEL_DENIED => new LightningException(app getString err_ln_hosted_channel_denied)
+    case _ => error.exception
+  }
 }
 
 trait PublishStatus {

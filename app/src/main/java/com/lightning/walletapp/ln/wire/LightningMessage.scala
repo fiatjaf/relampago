@@ -83,9 +83,7 @@ case class CommitSig(channelId: ByteVector, signature: ByteVector, htlcSignature
 case class RevokeAndAck(channelId: ByteVector, perCommitmentSecret: Scalar, nextPerCommitmentPoint: Point) extends ChannelMessage
 
 case class Error(channelId: ByteVector, data: ByteVector) extends ChannelMessage {
-  def exception = new LightningException(text)
-  lazy val text = bin2readable(data.toArray)
-  lazy val tag = data.take(2)
+  def exception = new LightningException(Tools bin2readable data.toArray)
 }
 
 case class ChannelReestablish(channelId: ByteVector, nextLocalCommitmentNumber: Long,
@@ -206,7 +204,7 @@ case object NodeAddress {
 trait HostedChannelMessage extends LightningMessage
 
 case class InvokeHostedChannel(chainHash: ByteVector, refundScriptPubKey: ByteVector,
-                               secret: ByteVector = ByteVector.empty) extends HostedChannelMessage
+                               secret: ByteVector) extends HostedChannelMessage
 
 case class InitHostedChannel(maxHtlcValueInFlightMsat: UInt64,
                              htlcMinimumMsat: Long, maxAcceptedHtlcs: Int, channelCapacityMsat: Long,

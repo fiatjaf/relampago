@@ -162,7 +162,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
           throw new LightningException("Both toLocal and toRemote amounts are less than total channel reserve")
 
         if (open.fundingSatoshis / open.channelReserveSatoshis < LNParams.channelReserveToFundingRatio / 5)
-          throw new LightningException("Their proposed channel reserve is too high relative to capacity")
+          throw new LightningException("Their imposed channel reserve is too high relative to capacity")
 
         val remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis, open.maxHtlcValueInFlightMsat,
           open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = 6, open.toSelfDelay, open.maxAcceptedHtlcs,
@@ -728,7 +728,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
     }
 }
 
-abstract class HostedChannel(secret: ByteVector) extends Channel(isHosted = true) { me =>
+abstract class HostedChannel extends Channel(isHosted = true) { me =>
   def estCanSendMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toLocalMsat case _ => 0L }
   def estCanReceiveMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toRemoteMsat case _ => 0L }
   def inFlightHtlcs: Set[Htlc] = data match { case hc: HostedCommits => hc.currentAndNextInFlight case _ => Set.empty }
@@ -741,19 +741,17 @@ abstract class HostedChannel(secret: ByteVector) extends Channel(isHosted = true
 
   def doProcess(change: Any) = {
     Tuple3(data, change, state) match {
-      case (wait @ WaitRemoteHostedReply(_, refundScriptPubKey), CMDSocketOnline, WAIT_FOR_INIT) =>
-        val invoke = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey, secret)
-        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND invoke
+      case (wait: WaitRemoteHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
+        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.invokeMsg
         isSocketConnected = true
 
 
-      case (wait @ WaitRemoteHostedReply(_, refundScriptPubKey), CMDChainTipKnown, WAIT_FOR_INIT) =>
-        val invoke = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey, secret)
-        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND invoke
+      case (wait: WaitRemoteHostedReply, CMDChainTipKnown, WAIT_FOR_INIT) =>
+        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.invokeMsg
         isChainHeightKnown = true
 
 
-      case (WaitRemoteHostedReply(announce, refundScriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
+      case (WaitRemoteHostedReply(announce, refundScriptPubKey, _), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
         if (init.liabilityDeadlineBlockdays < LNParams.minHostedLiabilityBlockdays) throw new LightningException("Their liability deadline is too low")
         if (init.initialClientBalanceMsat > init.channelCapacityMsat) throw new LightningException("Their init balance for us is larger than capacity")
         if (init.minimalOnchainRefundAmountSatoshis > LNParams.minHostedOnChainRefundSat) throw new LightningException("Their min refund is too high")
@@ -782,6 +780,7 @@ abstract class HostedChannel(secret: ByteVector) extends Channel(isHosted = true
         if (!isRightLocalUpdateNumber) throw new LightningException("Their local update number is wrong")
         if (!isRemoteSigOk) throw new LightningException("Their signature is wrong")
         BECOME(me STORE hc.copy(lastCrossSignedState = localCompleteLCSS), OPEN)
+
 
       case (wait: WaitRemoteHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
         // We have expected InitHostedChannel but got LastCrossSignedState so this channel exists already
@@ -887,7 +886,13 @@ abstract class HostedChannel(secret: ByteVector) extends Channel(isHosted = true
         BECOME(hc, SLEEPING)
 
 
-      // Technically they can send remote LCSS without us asking for it
+      // Looks like remote peer has lost this channel
+      // Send our LCSS so they can resync and then continue
+      case (hc: HostedCommits, init: InitHostedChannel, SLEEPING) =>
+        me SEND hc.lastCrossSignedState
+
+
+      // Technically they can send a remote LCSS before us explicitly asking for it first
       // this may be a problem if chain height is not yet known and we have incoming HTLCs to resolve
       case (hc: HostedCommits, remoteLCSS: LastCrossSignedState, SLEEPING) if isChainHeightKnown =>
         val isRemoteSigOk = remoteLCSS.reverse.verifyRemoteSig(hc.announce.nodeId)
@@ -900,16 +905,16 @@ abstract class HostedChannel(secret: ByteVector) extends Channel(isHosted = true
         else if (weAreAhead || weAreEven) {
           // They have our current or previous state, resend our local leftovers but keep our state
           BECOME(syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec), OPEN)
-        } else hc findState remoteLCSS match {
+        } else hc.findState(remoteLCSS).headOption match {
 
-          case hc1 +: _ =>
+          case Some(hc1) =>
             val leftOvers = hc.futureUpdates.diff(hc1.futureUpdates)
             // They have our future state, settle on it and resend local leftovers
             val hc2 = syncAndResend(hc1, leftOvers, remoteLCSS.reverse, hc1.nextLocalSpec)
             BECOME(me STORE hc2, OPEN)
             events onSettled hc2
 
-          case _ =>
+          case None =>
             // We are behind, restore state and resolve incoming adds
             val hc1 = restoreCommits(remoteLCSS.reverse, hc.announce)
             events unknownHostedHtlcsDetected hc

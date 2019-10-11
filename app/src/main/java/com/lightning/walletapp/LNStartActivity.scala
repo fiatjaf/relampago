@@ -125,6 +125,7 @@ sealed trait StartNodeView {
   def asString(base: String): String
 }
 
+case class HostedChannelParams(nodeView: HardcodedNodeView, secret: ByteVector)
 case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
 case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNodeView {
   // App suggests a bunch of hardcoded and separately fetched nodes with a good liquidity
@@ -132,9 +133,9 @@ case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNo
 }
 
 case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
-  def asString(base: String) = base.format(ca.alias, app.plur1OrZero(chansNumber, num), ca.pretty)
-  lazy val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
-  val ca \ num = acn
+  def asString(base: String) = base.format(chanAnnounce.alias, chansNumber, chanAnnounce.pretty)
+  lazy val chansNumber = app.plur1OrZero(app.getResources getStringArray R.array.ln_ops_start_node_channels, num)
+  val chanAnnounce \ num = acn
 }
 
 // LNURL response types
@@ -187,16 +188,22 @@ case class WithdrawRequest(callback: String, k1: String,
       .build.toString)
 }
 
-case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
+trait LNUrlChannelRequest extends LNUrlData {
+  def unsafeResolveNodeAnnounce: NodeAnnouncement = {
+    val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
+    val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
+    app.mkNodeAnnouncement(remoteNodeId, address, alias = hostAddress)
+  }
+
+  val hostAddress: String
+  val portNumber: String
+  val nodeKey: String
+}
+
+case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlChannelRequest {
   // Recreate node announcement from supplied data and call a second level callback once connected
   require(callback contains "https://", "Callback does not have HTTPS prefix")
-  val nodeLink(key, host, port) = uri
-
-  def resolveNodeAnnouncement = {
-    val nodeId = PublicKey(ByteVector fromValidHex key)
-    val nodeAddress = NodeAddress.fromParts(host, port.toInt)
-    app.mkNodeAnnouncement(nodeId, nodeAddress, host)
-  }
+  val nodeLink(nodeKey, hostAddress, portNumber) = uri
 
   def requestChannel =
     unsafe(request = android.net.Uri.parse(callback).buildUpon
@@ -204,6 +211,12 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
       .appendQueryParameter("private", "1")
       .appendQueryParameter("k1", k1)
       .build.toString)
+}
+
+case class HostedChannelRequest(uri: String, k1: String) extends LNUrlChannelRequest {
+  // Recreate node announcement from supplied data and use a secret in InvokeHostedChannel
+  val nodeLink(nodeKey, hostAddress, portNumber) = uri
+  val secret = ByteVector fromValidHex k1
 }
 
 object PayRequest {

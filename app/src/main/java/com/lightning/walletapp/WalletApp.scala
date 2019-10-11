@@ -212,8 +212,8 @@ object ChannelManager extends Broadcaster {
 
   var all: Vector[Channel] = ChannelWrap doGet db collect {
     case data: HasNormalCommits => createChannel(operationalListeners, data)
-    case data: HostedCommits => createHostedChannel(operationalListeners, data, ByteVector.empty)
-    case otherwise => throw new RuntimeException(s"Can't create channel with $otherwise")
+    case data: HostedCommits => createHostedChannel(operationalListeners, data)
+    case data => throw new RuntimeException(s"Can't create channel with $data")
   }
 
   val socketEventsListener = new ConnectionListener {
@@ -335,6 +335,7 @@ object ChannelManager extends Broadcaster {
 
   // CHANNEL
 
+  def hasHostedChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(_.isHosted)
   def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estCanSendMsat).lastOption
   def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
   // We need to connect the rest of channels including special cases like REFUNDING normal channel and SUSPENDED hosted channel
@@ -345,8 +346,7 @@ object ChannelManager extends Broadcaster {
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
-  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData, secret: ByteVector) = new HostedChannel(secret) {
-    // Secret is optional and may be supplied when opening a channel, remote Host may provide some additional benefits if secret is recognized
+  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel {
     def STORE[T <: ChannelData](hostedCommitments: T) = runAnd(hostedCommitments)(ChannelWrap put hostedCommitments)
     listeners = initListeners
     doProcess(bootstrap)

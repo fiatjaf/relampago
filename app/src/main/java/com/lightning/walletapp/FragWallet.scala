@@ -175,12 +175,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         host stopService host.foregroundServiceIntent
 
     override def onProcessSuccess = {
-      // Hosted channel provider sent an error, let user know
+      // Hosted channel provider sent us an error, let user know
       case (chan: HostedChannel, _: HostedCommits, remoteError: wire.Error) =>
-        ChanErrorCodes.hostedErrors.get(remoteError.tag).map(app.getString) match {
-          case Some(knownMsg) => informOfferClose(chan, knownMsg, natRes = -1).run
-          case None => informOfferClose(chan, remoteError.text, natRes = -1).run
-        }
+        informOfferClose(chan, ChanErrorCodes.translateTag(remoteError).getMessage, natRes = -1).run
 
       case (_: HostedChannel, _: HostedCommits, _: CMDFulfillHtlc) =>
         // Notify user that preimage has been revealed to hosted channel
@@ -188,7 +185,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       // Peer has sent us an error, offer user to force-close this channel
       case (chan: NormalChannel, _: HasNormalCommits, remoteError: wire.Error) =>
-        informOfferClose(chan, remoteError.text, ln_chan_close).run
+        informOfferClose(chan, remoteError.exception.getMessage, ln_chan_close).run
 
       // Peer now has some incompatible features, display details to user and offer to force-close a channel
       case (chan: NormalChannel, _: NormalData, cr: ChannelReestablish) if cr.myCurrentPerCommitmentPoint.isEmpty =>

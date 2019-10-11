@@ -158,7 +158,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       } else if (rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight) {
         // We do not care about options such as AIR or AMP here, this HTLC may be one of them
         PaymentInfoWrap fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-      } else PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
+      } else {
+        // Too many attempts and still no luck so we give up for now
+        PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
+      }
     }
 
     PaymentInfoWrap.failOnUI = rd => {
@@ -243,45 +246,54 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     app quickToast ln_url_resolving
 
     <(to[LNUrlData](LNUrlData guardResponse sslAwareRequest.body), onFail) {
-      case incomingChan: IncomingChannelRequest => me initConnection incomingChan
       case withdrawal: WithdrawRequest => me doReceivePayment Some(withdrawal, lnUrl)
+      case incoming: IncomingChannelRequest => me initIncoming incoming
+      case hosted: HostedChannelRequest => me initHosted hosted
       case _ => app quickToast err_nothing_useful
     }
   }
 
-  def initConnection(incoming: IncomingChannelRequest) = {
-    ConnectionManager.listeners += new ConnectionListener { self =>
-      override def onDisconnect(nodeId: PublicKey) = ConnectionManager.listeners -= self
-      override def onOperational(nodeId: PublicKey, isCompatible: Boolean) = if (isCompatible) {
-        queue.map(_ => incoming.requestChannel.body).map(LNUrlData.guardResponse).foreach(none, onCallFailed)
-      }
+  def initHosted(hosted: HostedChannelRequest) =
+    <(hosted.unsafeResolveNodeAnnounce, onFail) { ann =>
+      val hnv = HardcodedNodeView(ann, app getString ln_ops_start_fund_hosted_channel)
+      app.TransData.value = HostedChannelParams(hnv, hosted.secret)
+      me goTo classOf[LNStartFundActivity]
+    }
 
-      override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-        case open: OpenChannel if !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
-        case _ => // Ignore anything else including public channel offers
-      }
-
-      override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) =
-        ConnectionManager.workers get nodeId foreach { existingWorkerConnection =>
-          val startFundIncomingChannel = app getString ln_ops_start_fund_incoming_channel
-          val hnv = HardcodedNodeView(existingWorkerConnection.ann, startFundIncomingChannel)
-          app.TransData.value = IncomingChannelParams(hnv, open)
-          me goTo classOf[LNStartFundActivity]
-          onDisconnect(nodeId)
+  def initIncoming(incoming: IncomingChannelRequest) =
+    <(incoming.unsafeResolveNodeAnnounce, onFail) { ann =>
+      val initialListener = new ConnectionListener { self =>
+        override def onDisconnect(nodeId: PublicKey) = ConnectionManager.listeners -= self
+        override def onOperational(nodeId: PublicKey, isCompatible: Boolean) = if (isCompatible) {
+          queue.map(_ => incoming.requestChannel.body).map(LNUrlData.guardResponse).foreach(none, onCallFailed)
         }
 
-      def onCallFailed(err: Throwable) = {
-        ConnectionManager.listeners -= self
-        onFail(err)
+        override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+          case open: OpenChannel if !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
+          case _ => // Ignore anything else including public channel offers
+        }
+
+        override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) = {
+          val hnv = HardcodedNodeView(ann, app getString ln_ops_start_fund_incoming_channel)
+          app.TransData.value = IncomingChannelParams(hnv, open)
+          me goTo classOf[LNStartFundActivity]
+          ConnectionManager.listeners -= self
+        }
+
+        def onCallFailed(err: Throwable) = {
+          ConnectionManager.listeners -= self
+          onFail(err)
+        }
+      }
+      
+      if (ChannelManager hasNormalChanWith ann.nodeId) {
+        // TODO: remove this once random shortId is merged
+        me toast err_ln_chan_exists_already
+      } else {
+        ConnectionManager.listeners += initialListener
+        ConnectionManager.connectTo(ann, notify = true)
       }
     }
-
-    <(incoming.resolveNodeAnnouncement, onFail) { ann =>
-      val hasChanAlready = ChannelManager hasNormalChanWith ann.nodeId
-      if (hasChanAlready) me toast err_ln_chan_exists_already
-      else ConnectionManager.connectTo(ann, notify = true)
-    }
-  }
 
   def showLoginForm(lnUrl: LNUrl) = lnUrl.k1 foreach { k1 =>
     val linkingPrivKey = LNParams.makeLinkingKey(lnUrl.uri.getHost)

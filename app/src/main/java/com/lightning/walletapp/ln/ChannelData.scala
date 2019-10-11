@@ -44,8 +44,9 @@ case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 // HOSTED CHANNEL
 
-case class WaitRemoteHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector) extends ChannelData {
+case class WaitRemoteHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector, secret: ByteVector) extends ChannelData {
   require(Helpers isValidFinalScriptPubkey refundScriptPubKey, "Invalid refundScriptPubKey when opening a hosted channel")
+  lazy val invokeMsg = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey, secret)
 }
 
 case class WaitRemoteHostedStateUpdate(announce: NodeAnnouncement, hc: HostedCommits) extends ChannelData
@@ -484,7 +485,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
     }
 
   val channelId = announce.hostedChanId
-  lazy val invokeMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey)
+  lazy val invokeMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey, ByteVector.empty)
   lazy val nextLocalSpec = CommitmentSpec.reduce(localSpec, nextLocalUpdates, nextRemoteUpdates)
   lazy val currentAndNextInFlight = localSpec.htlcs ++ nextLocalSpec.htlcs
 
