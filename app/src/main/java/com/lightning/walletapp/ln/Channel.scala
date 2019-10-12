@@ -886,10 +886,9 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         BECOME(hc, SLEEPING)
 
 
-      // Looks like remote peer has lost this channel
-      // Send our LCSS so they can resync and then continue
       case (hc: HostedCommits, init: InitHostedChannel, SLEEPING) =>
-        me SEND hc.lastCrossSignedState
+        // Looks like remote peer has lost this channel, they should re-sync from our LCSS
+        BECOME(syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec), OPEN)
 
 
       // Technically they can send a remote LCSS before us explicitly asking for it first
@@ -975,7 +974,9 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
   def syncAndResend(hc: HostedCommits, leftovers: Vector[LNDirectionalMessage], lcss: LastCrossSignedState, spec: CommitmentSpec) = {
     // Forget about remote updates, re-send our LCSS and all non-cross-signed local updates, finally sign if updates are indeed present
     val hostedCommits1 = hc.copy(futureUpdates = leftovers.filter(_.isLeft), lastCrossSignedState = lcss, localSpec = spec)
-    for (message <- hostedCommits1.lastCrossSignedState +: hostedCommits1.nextLocalUpdates) me SEND message
+
+    me SEND hostedCommits1.lastCrossSignedState
+    for (update <- hostedCommits1.nextLocalUpdates) me SEND update
     if (hostedCommits1.nextLocalUpdates.nonEmpty) me doProcess CMDProceed
     hostedCommits1
   }
