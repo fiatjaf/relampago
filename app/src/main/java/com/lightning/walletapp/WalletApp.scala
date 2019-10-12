@@ -293,10 +293,6 @@ object ChannelManager extends Broadcaster {
       // Once all pending blocks are received, check if funding transaction has been confirmed
       val fundingDepth \ _ = broadcaster.getStatus(txid = wait.fundingTx.txid)
       if (fundingDepth >= minDepth) chan process CMDConfirmed(wait.fundingTx)
-
-    case (chan: Channel, _, CMDSocketOnline) =>
-      // Memo that channel was online at least once
-      chan.permanentOffline = false
   }
 
   override def onBecome = {
@@ -352,7 +348,7 @@ object ChannelManager extends Broadcaster {
     doProcess(bootstrap)
   }
 
-  def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel { self =>
+  def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel {
     def STORE[T <: ChannelData](normalCommitments: T) = runAnd(normalCommitments) {
       // Put updated data into db and schedule gdrive upload if allowed by user
       ChannelWrap put normalCommitments
@@ -390,7 +386,7 @@ object ChannelManager extends Broadcaster {
       repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(txs => {
         // In case of breach after publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
         // our job here is to watch for every output of every revoked commit tx and re-spend it before their CSV delay runs out
-        for (tx <- txs) self process CMDSpent(tx)
+        for (tx <- txs) this process CMDSpent(tx)
         for (tx <- txs) bag.extractPreimage(tx)
       }, none)
 

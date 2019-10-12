@@ -179,8 +179,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case (chan: HostedChannel, _: HostedCommits, remoteError: wire.Error) =>
         informOfferClose(chan, ChanErrorCodes.translateTag(remoteError).getMessage, natRes = -1).run
 
+      // Notify user that preimage has been revealed to hosted channel
       case (_: HostedChannel, _: HostedCommits, _: CMDFulfillHtlc) =>
-        // Notify user that preimage has been revealed to hosted channel
         updPaymentList.run
 
       // Peer has sent us an error, offer user to force-close this channel

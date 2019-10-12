@@ -536,6 +536,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         // According to BOLD a first message on connection should be reestablish
         // will specifically NOT work in REFUNDING to not let them know beforehand
         me SEND makeReestablish(some, some.commitments.localCommit.index + 1)
+        permanentOffline = false
 
 
       case (some: HasNormalCommits, newAnn: NodeAnnouncement, SLEEPING)
@@ -744,6 +745,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       case (wait: WaitRemoteHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
         if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.invokeMsg
         isSocketConnected = true
+        permanentOffline = false
 
 
       case (wait: WaitRemoteHostedReply, CMDChainTipKnown, WAIT_FOR_INIT) =>
@@ -874,6 +876,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
       case (hc: HostedCommits, CMDSocketOnline, SLEEPING | SUSPENDED) =>
         if (isChainHeightKnown) me SEND hc.getError.getOrElse(hc.invokeMsg)
         isSocketConnected = true
+        permanentOffline = false
 
 
       case (hc: HostedCommits, CMDChainTipKnown, SLEEPING | SUSPENDED) =>
