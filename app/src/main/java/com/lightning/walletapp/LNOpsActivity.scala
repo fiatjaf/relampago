@@ -274,6 +274,13 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       // Always reset extra info to GONE at first
       extraInfoText setVisibility View.GONE
 
+      // We only can display one item so sort them by increasing importance
+      val extraRoute = channelAndHop(chan) map { case _ \ route => route } getOrElse Vector.empty
+      val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, 1000000000L, percent = 100L)
+      if (isIncomingFeeTooHigh) setExtraInfo(text = me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
+      val hasStuckHtlcs = chan.inFlightHtlcs.exists(_.add.expiry <= LNParams.broadcaster.currentHeight)
+      if (hasStuckHtlcs) setExtraInfo(resource = ln_info_stuck_htlcs)
+
       for {
         error <- hc.getError
         exception = ChanErrorCodes.translateTag(error)
