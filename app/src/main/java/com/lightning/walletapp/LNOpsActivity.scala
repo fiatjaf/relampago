@@ -102,6 +102,14 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         val isGone = gone contains textWrapper.getId
         textWrapper setVisibility viewMap(!isGone)
       }
+
+    def doNormalOperationalStateChecks(channel: Channel) = {
+      val extraRoute = channelAndHop(channel) map { case _ \ route => route } getOrElse Vector.empty
+      val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, 1000000000L, percent = 100L)
+      if (isIncomingFeeTooHigh) setExtraInfo(text = me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
+      val hasStuckHtlcs = channel.inFlightHtlcs.exists(_.add.expiry <= LNParams.broadcaster.currentHeight)
+      if (hasStuckHtlcs) setExtraInfo(resource = ln_info_stuck_htlcs)
+    }
   }
 
   class NormalViewHolder(view: View) extends ChanViewHolder(view) {
@@ -137,15 +145,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       chan.data match {
         case norm: NormalData if isOperational(chan) =>
-          // We only can display one item so sort them by increasing importance
-          // Relevant for Turbo channels: show funding depth until it reaches threshold
-          val extraRoute = channelAndHop(chan) map { case _ \ route => route } getOrElse Vector.empty
-          val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, 1000000000L, percent = 100L)
-          if (isIncomingFeeTooHigh) setExtraInfo(text = me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
-          val hasStuckHtlcs = chan.inFlightHtlcs.exists(_.add.expiry <= LNParams.broadcaster.currentHeight)
-          if (hasStuckHtlcs) setExtraInfo(resource = ln_info_stuck_htlcs)
+          doNormalOperationalStateChecks(channel = chan)
           if (lostFunding) setExtraInfo(resource = ln_info_funding_lost)
-
+          // Relevant for Turbo channels: show funding depth until it reaches threshold
           val fundingDepthCondition = if (fundingDepth < threshold) -1 else R.id.fundingDepth
           visibleExcept(gone = fundingDepthCondition, R.id.closedAt, R.id.hostedWarningHeader)
 
@@ -274,17 +276,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       // Always reset extra info to GONE at first
       extraInfoText setVisibility View.GONE
 
-      // We only can display one item so sort them by increasing importance
-      val extraRoute = channelAndHop(chan) map { case _ \ route => route } getOrElse Vector.empty
-      val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, 1000000000L, percent = 100L)
-      if (isIncomingFeeTooHigh) setExtraInfo(text = me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
-      val hasStuckHtlcs = chan.inFlightHtlcs.exists(_.add.expiry <= LNParams.broadcaster.currentHeight)
-      if (hasStuckHtlcs) setExtraInfo(resource = ln_info_stuck_htlcs)
-
-      for {
-        error <- hc.getError
-        exception = ChanErrorCodes.translateTag(error)
-      } setExtraInfo(text = exception.getMessage)
+      hc.getError.map(ChanErrorCodes.translateTag) match {
+        case Some(exception) => setExtraInfo(exception.getMessage)
+        case _ => doNormalOperationalStateChecks(chan)
+      }
 
       visibleExcept(gone = R.id.fundingDepth, R.id.closedAt,
         R.id.balancesDivider, R.id.refundableAmount,
