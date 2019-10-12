@@ -171,9 +171,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
         case _: WaitFundingDoneData =>
           if (lostFunding) setExtraInfo(resource = ln_info_funding_lost)
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
-            R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
-            R.id.totalPayments, R.id.hostedWarningHeader)
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+            R.id.closedAt, R.id.paymentsInFlight, R.id.totalPayments, R.id.hostedWarningHeader)
 
         case cd: ClosingData =>
           setExtraInfo(text = me closedBy cd)

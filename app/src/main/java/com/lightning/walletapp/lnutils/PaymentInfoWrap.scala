@@ -152,17 +152,24 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     if (cs.localSpec.fulfilledOutgoing.nonEmpty) app.olympus.tellClouds(OlympusWrap.CMDStart)
 
     if (cs.localSpec.fulfilledIncoming.nonEmpty) {
-      val vulnerable = ChannelManager.all.flatMap(getVulnerableRevVec)
-      getCerberusActs(vulnerable.toMap).foreach(app.olympus.tellClouds)
+      val vulnerableStates = ChannelManager.all.flatMap(getVulnerableRevVec).toMap
+      getCerberusActs(vulnerableStates).foreach(app.olympus.tellClouds)
     }
   }
 
-  def getVulnerableRevVec(chan: Channel) =
-    chan.getCommits collect { case nc: NormalCommits if isOperational(chan) =>
-      val thresholdMsat = nc.remoteCommit.spec.toRemoteMsat - dust.amount * 20 * 1000L
+  def getVulnerableRevVec(chan: Channel) = chan.getCommits match {
+    case Some(normalCommits: NormalCommits) if isOperational(chan) =>
+      // Find previous states where amount is lower by more than 10000 SAT
+      val amountThreshold = normalCommits.remoteCommit.spec.toRemoteMsat - 10000000L
+      val cursor = db.select(RevokedInfoTable.selectLocalSql, normalCommits.channelId, amountThreshold)
       def toTxidAndInfo(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
-      RichCursor apply db.select(RevokedInfoTable.selectLocalSql, nc.channelId, thresholdMsat) vec toTxidAndInfo
-    } getOrElse Vector.empty
+      RichCursor(cursor) vec toTxidAndInfo
+
+    case _ =>
+      // Hosted channels
+      // Closing channges
+      Vector.empty
+  }
 
   def getCerberusActs(infos: Map[String, String] = Map.empty) = {
     // Remove currently pending infos and limit max number of uploads
