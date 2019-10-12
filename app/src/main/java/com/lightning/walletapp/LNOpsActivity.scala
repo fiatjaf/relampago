@@ -42,13 +42,14 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       val card = if (null == savedView) getLayoutInflater.inflate(R.layout.chan_card, null) else savedView
 
       val cardView = Tuple3(chan, chan.data, card.getTag) match {
-        case (chan: NormalChannel, hnc: HasNormalCommits, view: NormalViewHolder) => view.fill(chan, hnc.commitments)
-        case (chan: NormalChannel, hnc: HasNormalCommits, null) => new NormalViewHolder(card).fill(chan, hnc.commitments)
+        case (chan: HostedChannel, commits: HostedCommits, view: HostedViewHolder) => view.fill(chan, commits)
+        case (chan: HostedChannel, commits: HostedCommits, null) => new HostedViewHolder(card).fill(chan, commits)
+        case (chan: NormalChannel, commits: HasNormalCommits, view: NormalViewHolder) => view.fill(chan, commits.commitments)
+        case (chan: NormalChannel, commits: HasNormalCommits, null) => new NormalViewHolder(card).fill(chan, commits.commitments)
         case _ => throw new RuntimeException
       }
 
       // Remember generated view
-      // used for performance reasons
       card setTag cardView
       card
     }
@@ -59,19 +60,20 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = if (left < 1) UITask(adapter.notifyDataSetChanged).run
   }
 
-  class NormalViewHolder(view: View) { self =>
-    val extraInfo = view.findViewById(R.id.extraInfo).asInstanceOf[View]
+  abstract class ChanViewHolder(view: View) {
     val baseBar = view.findViewById(R.id.baseBar).asInstanceOf[ProgressBar]
     val overBar = view.findViewById(R.id.overBar).asInstanceOf[ProgressBar]
     val extraInfoText = view.findViewById(R.id.extraInfoText).asInstanceOf[TextView]
     val addressAndKey = view.findViewById(R.id.addressAndKey).asInstanceOf[TextView]
     val stateAndConnectivity = view.findViewById(R.id.stateAndConnectivity).asInstanceOf[TextView]
-    def setExtraInfo(text: CharSequence) = wrap(extraInfo setVisibility View.VISIBLE)(extraInfoText setText text)
-    def setExtraInfo(resource: Int) = wrap(extraInfo setVisibility View.VISIBLE)(extraInfoText setText resource)
+    def setExtraInfo(text: CharSequence) = wrap(extraInfoText setVisibility View.VISIBLE)(extraInfoText setText text)
+    def setExtraInfo(resource: Int) = wrap(extraInfoText setVisibility View.VISIBLE)(extraInfoText setText resource)
 
     val wrappers =
       view.findViewById(R.id.refundableAmount).asInstanceOf[View] ::
+        view.findViewById(R.id.hostedWarningHeader).asInstanceOf[View] ::
         view.findViewById(R.id.paymentsInFlight).asInstanceOf[View] ::
+        view.findViewById(R.id.balancesDivider).asInstanceOf[View] ::
         view.findViewById(R.id.totalPayments).asInstanceOf[View] ::
         view.findViewById(R.id.totalCapacity).asInstanceOf[View] ::
         view.findViewById(R.id.fundingDepth).asInstanceOf[View] ::
@@ -100,26 +102,24 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         val isGone = gone contains textWrapper.getId
         textWrapper setVisibility viewMap(!isGone)
       }
+  }
 
-    def fill(chan: NormalChannel, cs: NormalCommits) = {
-      val forceCloseFee = Satoshi(cs.reducedRemoteState.myFeeSat)
-      val startedAt = me time new Date(cs.startedAt)
-
-      val capacity = cs.commitInput.txOut.amount
-      val barCanSend = cs.remoteCommit.spec.toRemoteMsat / capacity.amount
-      val barCanReceive = barCanSend + chan.estCanReceiveMsat / capacity.amount
-
-      // For incoming chans reserveAndFee is reserve only since fee is zero
-      val reserveAndFee = forceCloseFee.amount + cs.remoteParams.channelReserveSatoshis
-      val barLocalReserve = math.min(barCanSend, reserveAndFee * 1000L / capacity.amount)
+  class NormalViewHolder(view: View) extends ChanViewHolder(view) {
+    def fill(chan: NormalChannel, cs: NormalCommits): NormalViewHolder = {
       val fundingDepth \ lostFunding = LNParams.broadcaster.getStatus(chan.fundTxId)
       val threshold = math.max(cs.remoteParams.minimumDepth, LNParams.minDepth)
+      val forceCloseFeeSat = Satoshi(cs.reducedRemoteState.myFeeSat)
+      val startedAt = me time new Date(cs.startedAt)
 
-      baseBar setProgress barCanSend.toInt
-      baseBar setSecondaryProgress barCanReceive.toInt
-      overBar setProgress barLocalReserve.toInt
+      val capacitySat = cs.commitInput.txOut.amount
+      // Bar reserve for incoming channels is only reserve since fee is zero, multipled by 1000 to match bar scaling
+      val barLocalReserve = (forceCloseFeeSat.toLong + cs.remoteParams.channelReserveSatoshis) * 1000L / capacitySat.toLong
+      val barCanSend = (cs.remoteCommit.spec.toRemoteMsat / capacitySat.toLong).toInt
+      val barCanReceive = (chan.estCanReceiveMsat / capacitySat.toLong).toInt
+      overBar.setProgress(barCanSend min barLocalReserve.toInt)
+      baseBar.setSecondaryProgress(barCanSend + barCanReceive)
+      baseBar.setProgress(barCanSend)
 
-      extraInfo setVisibility View.GONE
       startedAtText setText startedAt.html
       addressAndKey setText chan.data.announce.asString.html
       totalPaymentsText setText getStat(cs.channelId).toString
@@ -130,62 +130,62 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       canReceiveText setText denom.parsedWithSign(chan.estCanReceiveMsat.toTruncatedMsat).html
       canSendText setText denom.parsedWithSign(chan.estCanSendMsat.toTruncatedMsat).html
       refundableAmountText setText sumOrNothing(chan.refundableMsat.fromMsatToSat).html
-      totalCapacityText setText denom.parsedWithSign(capacity).html
-      refundFeeText setText sumOrNothing(forceCloseFee).html
+      totalCapacityText setText denom.parsedWithSign(capacitySat).html
+      refundFeeText setText sumOrNothing(forceCloseFeeSat).html
+      // Always reset extra info to GONE at first
+      extraInfoText setVisibility View.GONE
 
       chan.data match {
         case norm: NormalData if isOperational(chan) =>
           // We only can display one item so sort them by increasing importance
           // Relevant for Turbo channels: show funding depth until it reaches threshold
-          val fundingDepthCondition = if (fundingDepth < threshold) -1 else R.id.fundingDepth
           val extraRoute = channelAndHop(chan) map { case _ \ route => route } getOrElse Vector.empty
-          val hasStuckHtlcs = chan.inFlightHtlcs.exists(_.add.expiry <= LNParams.broadcaster.currentHeight)
           val isIncomingFeeTooHigh = extraRoute.nonEmpty && LNParams.isFeeBreach(extraRoute, 1000000000L, percent = 100L)
           if (isIncomingFeeTooHigh) setExtraInfo(text = me getString ln_info_high_fee format extraRoute.head.feeBreakdown)
-          // In Turbo channels we will often have an OPEN state with NormalData and zeroconf
+          val hasStuckHtlcs = chan.inFlightHtlcs.exists(_.add.expiry <= LNParams.broadcaster.currentHeight)
           if (hasStuckHtlcs) setExtraInfo(resource = ln_info_stuck_htlcs)
           if (lostFunding) setExtraInfo(resource = ln_info_funding_lost)
-          visibleExcept(gone = fundingDepthCondition, R.id.closedAt)
+
+          val fundingDepthCondition = if (fundingDepth < threshold) -1 else R.id.fundingDepth
+          visibleExcept(gone = fundingDepthCondition, R.id.closedAt, R.id.hostedWarningHeader)
 
         case norm: NormalData =>
           setExtraInfo(resource = ln_info_coop_attempt)
           // If unknown spend is present then channel is not operational
           if (norm.unknownSpend.isDefined) setExtraInfo(resource = ln_info_unknown_spend)
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
-            R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
+            R.id.refundFee, R.id.fundingDepth, R.id.closedAt, R.id.hostedWarningHeader)
 
         case _: NegotiationsData =>
           setExtraInfo(resource = ln_info_coop_attempt)
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
-            R.id.canReceive, R.id.refundFee, R.id.fundingDepth, R.id.closedAt)
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+            R.id.refundFee, R.id.fundingDepth, R.id.closedAt, R.id.hostedWarningHeader)
 
         case wait: WaitBroadcastRemoteData =>
           if (lostFunding) setExtraInfo(resource = ln_info_funding_lost)
           if (wait.fundingError.isDefined) setExtraInfo(text = wait.fundingError.get)
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
-            R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
-            R.id.totalPayments)
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+            R.id.closedAt, R.id.paymentsInFlight, R.id.totalPayments, R.id.hostedWarningHeader)
 
         case _: WaitFundingDoneData =>
           if (lostFunding) setExtraInfo(resource = ln_info_funding_lost)
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
             R.id.canReceive, R.id.closedAt, R.id.paymentsInFlight,
-            R.id.totalPayments)
+            R.id.totalPayments, R.id.hostedWarningHeader)
 
         case cd: ClosingData =>
           setExtraInfo(text = me closedBy cd)
           val closeDate = new Date(cd.closedAt)
           closedAtText setText time(closeDate).html
 
-          // Show breaking fee if this is NOT a mutual closing
-          val refundFeeCondition = if (cd.mutualClose.isEmpty) -1 else R.id.refundFee
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
-            refundFeeCondition, R.id.fundingDepth, R.id.paymentsInFlight)
+            R.id.fundingDepth, R.id.paymentsInFlight, R.id.refundableAmount, R.id.refundFee,
+            R.id.balancesDivider, R.id.hostedWarningHeader)
 
         case _ =>
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
             R.id.canReceive, R.id.refundFee, R.id.closedAt, R.id.fundingDepth,
-            R.id.paymentsInFlight, R.id.totalPayments)
+            R.id.paymentsInFlight, R.id.totalPayments, R.id.hostedWarningHeader)
       }
 
       // MENU PART
@@ -248,7 +248,42 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         }
       }
 
-      self
+      this
+    }
+  }
+
+  class HostedViewHolder(view: View) extends ChanViewHolder(view) {
+    def fill(chan: HostedChannel, hc: HostedCommits): HostedViewHolder = {
+      val capacitySat = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat.fromMsatToSat
+      val startedAt = me time new Date(hc.startedAt)
+
+      val barCanSend = (chan.estCanSendMsat / capacitySat.toLong).toInt
+      val barCanReceive = (chan.estCanReceiveMsat / capacitySat.toLong).toInt
+      baseBar.setSecondaryProgress(barCanSend + barCanReceive)
+      baseBar.setProgress(barCanSend)
+
+      startedAtText setText startedAt.html
+      addressAndKey setText chan.data.announce.asString.html
+      totalPaymentsText setText getStat(hc.channelId).toString
+      // All amounts are in MilliSatoshi, but we divide them by 1000 to erase trailing msat remainders
+      stateAndConnectivity setText s"<strong>${me stateStatusColor chan}</strong><br>${me connectivityStatusColor chan}".html
+      paymentsInFlightText setText sumOrNothing(chan.inFlightHtlcs.toVector.map(_.add.amountMsat).sum.fromMsatToSat).html
+      canReceiveText setText denom.parsedWithSign(chan.estCanReceiveMsat.toTruncatedMsat).html
+      canSendText setText denom.parsedWithSign(chan.estCanSendMsat.toTruncatedMsat).html
+      totalCapacityText setText denom.parsedWithSign(capacitySat).html
+      // Always reset extra info to GONE at first
+      extraInfoText setVisibility View.GONE
+
+      for {
+        error <- hc.getError
+        exception = ChanErrorCodes.translateTag(error)
+      } setExtraInfo(text = exception.getMessage)
+
+      visibleExcept(gone = R.id.fundingDepth, R.id.closedAt,
+        R.id.balancesDivider, R.id.refundableAmount,
+        R.id.refundFee, R.id.overBar)
+
+      this
     }
   }
 

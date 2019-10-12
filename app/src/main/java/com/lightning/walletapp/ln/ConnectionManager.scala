@@ -63,8 +63,7 @@ object ConnectionManager {
     }
 
     val thread = Future {
-      // Node may have many addresses but we use the first valid for simplicity
-      val theOne = ann.addresses.collectFirst(NodeAddress.toInetSocketAddress)
+      val theOne = ann.unsafeFirstAddress
       sock.connect(theOne.get, 7500)
       handler.init
 

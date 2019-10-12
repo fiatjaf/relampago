@@ -145,6 +145,7 @@ case class NodeAnnouncement(signature: ByteVector, features: ByteVector, timesta
   val identifier = (alias + nodeId.toString).toLowerCase
   val asString = s"<strong>${alias.takeWhile(_ != '\u0020') take 18}</strong><br><small>$pretty</small>"
   lazy val hostedChanId = Tools.hostedChanId(LNParams.nodePublicKey.toBin, nodeId.toBin)
+  def unsafeFirstAddress = addresses.collectFirst(NodeAddress.toInetSocketAddress)
 }
 
 sealed trait NodeAddress { def canBeUpdatedIfOffline: Boolean }

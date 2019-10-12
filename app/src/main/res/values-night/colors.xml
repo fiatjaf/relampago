@@ -1,10 +1,7 @@
 <resources>
-    <item name="bgload" type="color">#282B30</item>
     <item name="bgmain" type="color">#282B30</item>
     <item name="bgfiat" type="color">#174E54</item>
     <item name="bgbar" type="color">#FFFFFF</item>
-    <item name="btc" type="color">#E68A00</item>
-    <item name="ln" type="color">#0099FE</item>
 
     <item name="fabtext" type="color">#111111</item>
     <item name="fabbgnormal" type="color">#DDDDDD</item>

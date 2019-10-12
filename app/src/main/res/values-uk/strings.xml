@@ -148,13 +148,13 @@
         <item><![CDATA[<font color=#E68A00>Синхронізація %1$d днів</font>]]></item>
     </array>
 
-    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>отримано %2$s<br><small>%3$s за поточним курсом</small>]]></string>
-    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small>]]></string>
-    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>вхiдний %2$s<br><small>%3$s за поточним курсом</small>]]></string>
+    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>вихiдний %2$s<br><small>%3$s за поточним курсом</small>]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>вихiдний %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
 
-    <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>отримано %2$s<br><small>%3$s за поточним курсом</small>]]></string>
-    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small>]]></string>
-    <string name="btc_outgoing_title"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>відправлено %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
+    <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>вхiдний %2$s<br><small>%3$s за поточним курсом</small>]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>вихiдний %2$s<br><small>%3$s за поточним курсом</small>]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>вихiдний %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
     <string name="btc_pending_title"><![CDATA[<font color=#FF9900><strong>Біткоїн-транзакція</strong></font><br><small>Повернення грошей з каналу</small><br>%1$s<br><br>сума %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
 
     <string name="txs_view_outside">Подивитися на SmartBit</string>
@@ -324,7 +324,7 @@
     <string name="ln_ops_start_fund_node_view"><![CDATA[<strong>%1$s</strong><br><font color=#999999><i>відчинення каналу</i></font><br>%2$s<br><br><font color=#999999>ID піра</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[<strong>%1$s</strong><br>%2$s<br><small><font color=#999999>%3$s</font></small>]]></string>
     <string name="ln_ops_start_fund_incoming_channel">вхідний канал</string>
-    <string name="ln_ops_start_fund_hosted_channel">hosted-канал</string>
+    <string name="ln_ops_start_fund_hosted_channel">HOSTED-КАНАЛ</string>
 
     <string name="ln_url_resolving">Підключення до сервісу&#8230;</string>
     <string name="ln_url_login_ok"><![CDATA[Успiшний логін на <i>%1$s</i>]]></string>
@@ -346,8 +346,8 @@
     <string name="err_ln_hosted_wrong_local_sig">incorrect local signature</string>
     <string name="err_ln_hosted_wrong_remote_sig">incorrect remote signature</string>
     <string name="err_ln_hosted_too_many_state_updates">too many state updates</string>
-    <string name="err_ln_hosted_update_cltv_too_low">incorrect expiry in channel update</string>
-    <string name="err_ln_hosted_in_flight_htlc_while_restoring">in-flight payments while restoring</string>
+    <string name="err_ln_hosted_update_cltv_too_low">incorrect channel update cltv</string>
+    <string name="err_ln_hosted_in_flight_htlc_while_restoring">undecidable in-flight payments</string>
     <string name="err_ln_hosted_timed_out_outgoing_htlc">timed out outgoing payment</string>
     <string name="err_ln_hosted_channel_denied">hosted channel denied</string>
 </resources>
