@@ -125,8 +125,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val incomingChannelRequestFmt = taggedJsonFmt(jsonFormat[String, String, String,
     IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1"), tag = "channelRequest")
 
-  implicit val hostedChannelRequestFmt = taggedJsonFmt(jsonFormat[String, String,
-    HostedChannelRequest](HostedChannelRequest.apply, "uri", "k1"), tag = "hostedChannelRequest")
+  implicit val hostedChannelRequestFmt = taggedJsonFmt(jsonFormat[String, Option[String], String,
+    HostedChannelRequest](HostedChannelRequest.apply, "uri", "alias", "k1"), tag = "hostedChannelRequest")
 
   implicit val withdrawRequestFmt = taggedJsonFmt(jsonFormat[String, String, Long, String, Option[Long],
     WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxWithdrawable", "defaultDescription",

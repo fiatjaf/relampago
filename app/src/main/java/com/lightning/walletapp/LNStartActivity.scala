@@ -205,14 +205,14 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
       .build.toString)
 }
 
-case class HostedChannelRequest(uri: String, k1: String) extends LNUrlData {
+case class HostedChannelRequest(uri: String, alias: Option[String], k1: String) extends LNUrlData {
   // Recreate node announcement from supplied data and use secret in InvokeHostedChannel
-  val secret = ByteVector fromValidHex k1
 
   val nodeLink(nodeKey, hostAddress, portNumber) = uri
   val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
   val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
-  val ann = app.mkNodeAnnouncement(remoteNodeId, address, alias = hostAddress)
+  val ann = app.mkNodeAnnouncement(remoteNodeId, address, alias getOrElse hostAddress)
+  val secret = ByteVector fromValidHex k1
 }
 
 object PayRequest {

@@ -53,9 +53,16 @@ object Utils {
   lazy val app = appReference
   lazy val noDesc = app getString ln_no_description
   lazy val denoms = List(SatDenomination, BtcDenomination)
-  lazy val defaultHostedNode = HostedChannelRequest("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd@172.245.74.10:9935", "00")
-  val fiatNames = Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan", "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel",
-    "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль", "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling", "aud" -> "Australian Dollar")
+
+  lazy val defaultHostedNode = {
+    val nodeId = "02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd"
+    HostedChannelRequest(s"$nodeId@172.245.74.10:9935", Some("Testnet-Node"), "00")
+  }
+
+  val fiatNames =
+    Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan",
+      "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
+      "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling", "aud" -> "Australian Dollar")
 
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
   def getDescription(raw: String) = if (raw.isEmpty) s"<i>$noDesc</i>" else raw take 72
