@@ -615,6 +615,11 @@ object LightningMessageCodecs { me =>
       (publicKey withContext "remoteDelayedPaymentKey")
   }.as[RevocationInfo]
 
+  val hostedStateCodec = {
+    (vectorOfN(valueCodec = either(bool, lightningMessageCodec, lightningMessageCodec), countCodec = uint16) withContext "futureUpdates") ::
+      (lastCrossSignedStateCodec withContext "lastCrossSignedState")
+  }.as[HostedState]
+
   val walletZygoteCodec = {
     (uint16 withContext "v") ::
       (varsizebinarydataLong withContext "db") ::

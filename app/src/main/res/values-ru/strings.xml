@@ -109,7 +109,6 @@
     <string name="dialog_pay_onchain">On-chain</string>
     <string name="dialog_share_key">Share key</string>
     <string name="dialog_close">Закрыть апп</string>
-    <string name="dialog_opt_out">Opt out</string>
     <string name="dialog_cancel">Отмена</string>
     <string name="dialog_retry">Еще раз</string>
     <string name="dialog_login">Войти</string>
@@ -255,7 +254,6 @@
     <string name="ln_info_started">started</string>
     <string name="ln_info_closed">closed</string>
 
-    <string name="ln_mofn">%1$s из %2$s</string>
     <string name="ln_info_close_coop">Закрыт кооперативно</string>
     <string name="ln_info_close_local">Закрыт вашим кошельком</string>
     <string name="ln_info_close_remote">Закрыт со стороны пира</string>
@@ -289,6 +287,16 @@
     <array name="ln_normal_chan_actions">
         <item>Открывающая транзакция</item>
         <item>Закрыть канал в кошелек</item>
+    </array>
+
+    <string name="ln_hosted_remove_inflight_details"><![CDATA[&#9888; <font color=#E68A00>This hosted channel contains pending payments</font>, it is recommended to wait until these payments become failed or fulfilled before removal, would you still like to remove it right now?]]></string>
+    <string name="ln_hosted_remove_non_empty_details"><![CDATA[&#9888; <font color=#E68A00>This hosted channel has a non-empty balance</font>, it is recommended to empty this channel before removal, would you still like to remove it right now?]]></string>
+    <string name="ln_hosted_removed_tip"><![CDATA[Hosted channel has been successfully removed, visit channel opening page to restore it]]></string>
+
+    <array name="ln_hosted_chan_actions">
+        <item><![CDATA[Read about Hosted Channels]]></item>
+        <item><![CDATA[Export channel state]]></item>
+        <item><![CDATA[Remove this channel]]></item>
     </array>
 
     <string name="btc_empty">Нет монет на цепи</string>
@@ -342,12 +350,12 @@
     <string name="notify_title">Ожидается платеж-молния</string>
 
     <!-- hosted channels -->
-    <string name="err_ln_hosted_wrong_blockday">incorrect blockday</string>
-    <string name="err_ln_hosted_wrong_local_sig">incorrect local signature</string>
-    <string name="err_ln_hosted_wrong_remote_sig">incorrect remote signature</string>
-    <string name="err_ln_hosted_too_many_state_updates">too many state updates</string>
-    <string name="err_ln_hosted_update_cltv_too_low">incorrect channel update cltv</string>
-    <string name="err_ln_hosted_in_flight_htlc_while_restoring">undecidable in-flight payments</string>
-    <string name="err_ln_hosted_timed_out_outgoing_htlc">timed out outgoing payment</string>
-    <string name="err_ln_hosted_channel_denied">hosted channel denied</string>
+    <string name="err_ln_hosted_wrong_blockday">Incorrect blockday</string>
+    <string name="err_ln_hosted_wrong_local_sig">Incorrect local signature</string>
+    <string name="err_ln_hosted_wrong_remote_sig">Incorrect remote signature</string>
+    <string name="err_ln_hosted_too_many_state_updates">Too many state updates</string>
+    <string name="err_ln_hosted_update_cltv_too_low">Incorrect channel update cltv</string>
+    <string name="err_ln_hosted_in_flight_htlc_while_restoring">Remote restore failure</string>
+    <string name="err_ln_hosted_timed_out_outgoing_htlc">Timed out outgoing payment</string>
+    <string name="err_ln_hosted_channel_denied">Hosted channel denied</string>
 </resources>

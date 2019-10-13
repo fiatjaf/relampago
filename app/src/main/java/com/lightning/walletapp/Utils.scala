@@ -160,6 +160,15 @@ trait TimerActivity extends AppCompatActivity { me =>
     alertDialog
   }
 
+  def makeChoiceList[T <: Object](actions: Array[T], title: CharSequence) = {
+    val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, actions)
+    val alert = showForm(negBuilder(dialog_cancel, title, lst).create)
+    lst setDividerHeight 0
+    lst setDivider null
+    lst -> alert
+  }
+
   def INIT(savedInstanceState: Bundle): Unit
   def updateView2Blue(oldView: View, newText: String) = {
     val titleTip = oldView.findViewById(R.id.titleTip).asInstanceOf[TextView]

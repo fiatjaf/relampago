@@ -113,7 +113,6 @@
     <string name="dialog_sum_big">Amount is too large</string>
     <string name="dialog_pay_onchain">On-chain</string>
     <string name="dialog_share_key">Share key</string>
-    <string name="dialog_opt_out">Opt out</string>
     <string name="dialog_close">Close app</string>
     <string name="dialog_cancel">Cancel</string>
     <string name="dialog_retry">Retry</string>
@@ -245,7 +244,7 @@
     <string name="ln_state_success">paid successfully</string>
     <string name="ln_state_fail_out">failed and refunded</string>
     <string name="ln_state_fail_in">expired and cancelled</string>
-    <string name="ln_state_unknown">status is unknown</string>
+    <string name="ln_state_unknown">unknown status</string>
 
     <string name="ln_info_total_payments">total payments</string>
     <string name="ln_info_in_flight">value in-flight</string>
@@ -258,7 +257,6 @@
     <string name="ln_info_started">started</string>
     <string name="ln_info_closed">closed</string>
 
-    <string name="ln_mofn">%1$s of %2$s</string>
     <string name="ln_info_close_coop">Closed cooperatively</string>
     <string name="ln_info_close_local">Force-closed by your wallet</string>
     <string name="ln_info_close_remote">Force-closed by remote peer</string>
@@ -280,8 +278,8 @@
     <string name="ln_info_status_suspended"><![CDATA[<font color=#E68A00>SUSPENDED</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
-    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved.<br><br>It it not recommended to close a channel right now and let these payments to eventually become failed or fulfilled, would you still like to proceed?]]></string>
-    <string name="ln_chan_force_details"><![CDATA[&#9888; Note that closing right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closure</a> which requires additional fees and time, would you still like to proceed?]]></string>
+    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>Pending payments are present</font> so cooperative closing is going to be postponed until they are resolved.<br><br>It is recommended to wait until these payments become failed or fulfilled before closing, would you still like to close it right now?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[&#9888; Note that closing right now will result in a <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>forced channel closure</a> which requires additional fees and time, would you still like to close it right now?]]></string>
     <string name="ln_chan_close_confirm_address"><![CDATA[Do you want to close this channel and send a refunding transaction to the following address?<br><br><strong>%1$s</strong><br><br>Please make sure that address is the right one as this action can not be undone!]]></string>
     <string name="ln_chan_close_confirm_wallet">Do you want to close this channel and send a refunding transaction back to this wallet?</string>
     <string name="ln_chan_close_address"><![CDATA[Close channel to address<br><small>%1$s</small>]]></string>
@@ -292,6 +290,16 @@
     <array name="ln_normal_chan_actions">
         <item><![CDATA[View funding transaction]]></item>
         <item><![CDATA[Close channel to wallet]]></item>
+    </array>
+
+    <string name="ln_hosted_remove_inflight_details"><![CDATA[&#9888; <font color=#E68A00>This hosted channel contains pending payments</font>, it is recommended to wait until these payments become failed or fulfilled before removal, would you still like to remove it right now?]]></string>
+    <string name="ln_hosted_remove_non_empty_details"><![CDATA[&#9888; <font color=#E68A00>This hosted channel has a non-empty balance</font>, it is recommended to empty this channel before removal, would you still like to remove it right now?]]></string>
+    <string name="ln_hosted_removed_tip"><![CDATA[Hosted channel has been successfully removed, visit channel opening page to restore it]]></string>
+
+    <array name="ln_hosted_chan_actions">
+        <item><![CDATA[Read about Hosted Channels]]></item>
+        <item><![CDATA[Export channel state]]></item>
+        <item><![CDATA[Remove this channel]]></item>
     </array>
 
     <string name="btc_status_operational">Bitcoin wallet is online</string>
@@ -342,12 +350,12 @@
     <string name="notify_title">Waiting for incoming payment</string>
 
     <!-- hosted channels -->
-    <string name="err_ln_hosted_wrong_blockday">incorrect blockday</string>
-    <string name="err_ln_hosted_wrong_local_sig">incorrect local signature</string>
-    <string name="err_ln_hosted_wrong_remote_sig">incorrect remote signature</string>
-    <string name="err_ln_hosted_too_many_state_updates">too many state updates</string>
-    <string name="err_ln_hosted_update_cltv_too_low">incorrect channel update cltv</string>
-    <string name="err_ln_hosted_in_flight_htlc_while_restoring">undecidable in-flight payments</string>
-    <string name="err_ln_hosted_timed_out_outgoing_htlc">timed out outgoing payment</string>
-    <string name="err_ln_hosted_channel_denied">hosted channel denied</string>
+    <string name="err_ln_hosted_wrong_blockday">Incorrect blockday</string>
+    <string name="err_ln_hosted_wrong_local_sig">Incorrect local signature</string>
+    <string name="err_ln_hosted_wrong_remote_sig">Incorrect remote signature</string>
+    <string name="err_ln_hosted_too_many_state_updates">Too many state updates</string>
+    <string name="err_ln_hosted_update_cltv_too_low">Incorrect channel update cltv</string>
+    <string name="err_ln_hosted_in_flight_htlc_while_restoring">Remote restore failure</string>
+    <string name="err_ln_hosted_timed_out_outgoing_htlc">Timed out outgoing payment</string>
+    <string name="err_ln_hosted_channel_denied">Hosted channel denied</string>
 </resources>

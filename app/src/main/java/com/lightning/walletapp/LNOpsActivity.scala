@@ -7,12 +7,14 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-import org.bitcoinj.core.{Address, Block, FilteredBlock, Peer}
-import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
-import android.view.{Menu, MenuItem, View, ViewGroup}
 
+import android.view.{Menu, MenuItem, View, ViewGroup}
+import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
+import org.bitcoinj.core.{Address, Block, FilteredBlock, Peer}
+import com.lightning.walletapp.lnutils.{ChannelTable, PaymentTable}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.hostedStateCodec
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
-import com.lightning.walletapp.lnutils.PaymentTable
+import com.lightning.walletapp.ln.wire.HostedState
 import com.lightning.walletapp.helper.RichCursor
 import com.lightning.walletapp.ln.RefundingData
 import android.support.v7.widget.Toolbar
@@ -28,6 +30,7 @@ import scala.util.Try
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val displayedChans = ChannelManager.all.filter(canDisplayData).sortBy(chan => if (chan.state == CLOSING) 1 else 0)
+  lazy val hostedChanActions = for (txt <- getResources getStringArray R.array.ln_hosted_chan_actions) yield txt.html
   lazy val normalChanActions = for (txt <- getResources getStringArray R.array.ln_normal_chan_actions) yield txt.html
   lazy val barStatus = app.getResources getStringArray R.array.ln_chan_ops_status
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
@@ -130,8 +133,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       startedAtText setText startedAt.html
       addressAndKey setText chan.data.announce.asString.html
+      fundingDepthText setText s"$fundingDepth / $threshold"
       totalPaymentsText setText getStat(cs.channelId).toString
-      fundingDepthText setText getString(ln_mofn).format(fundingDepth, threshold).html
       // All amounts are in MilliSatoshi, but we divide them by 1000 to erase trailing msat remainders
       stateAndConnectivity setText s"<strong>${me stateStatusColor chan}</strong><br>${me connectivityStatusColor chan}".html
       paymentsInFlightText setText sumOrNothing(chan.inFlightHtlcs.toVector.map(_.add.amountMsat).sum.fromMsatToSat).html
@@ -201,7 +204,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           case base \ _ => base format getString(ln_chan_close_address_hint)
         }
 
-        val currentChanActions = chan.data match {
+        val lst \ alert = makeChoiceList(chan.data match {
           // Unknown spend may be our own future commit, don't allow force-closing here
           case norm: NormalData if norm.unknownSpend.isDefined => normalChanActions take 1
           // Remote funding may not be visible yet, channel will be removed automatically later
@@ -211,13 +214,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           // No reason to close an already closed channel
           case _: ClosingData => normalChanActions take 1
           case _ => normalChanActions :+ addressHint.html
-        }
-
-        val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-        val alert = showForm(negBuilder(dialog_cancel, chan.data.announce.asString.html, lst).create)
-        lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, currentChanActions)
-        lst setDividerHeight 0
-        lst setDivider null
+        }, chan.data.announce.asString.html)
 
         lst setOnItemClickListener onTap { pos =>
           def warnAndMaybeClose(channelClosureWarning: String) = {
@@ -283,6 +280,40 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       visibleExcept(gone = R.id.fundingDepth, R.id.closedAt,
         R.id.balancesDivider, R.id.refundableAmount,
         R.id.refundFee, R.id.overBar)
+
+      view setOnClickListener onButtonTap {
+        val title = chan.data.announce.asString.html
+        val lst \ alert = makeChoiceList(hostedChanActions, title)
+
+        lst setOnItemClickListener onTap { pos =>
+          def warnAndMaybeRemove(removalWarning: String) = {
+            val bld = baseTextBuilder(removalWarning.html).setCustomTitle(chan.data.announce.asString.html)
+            mkCheckForm(alert => rm(alert)(removeChannel), none, bld, dialog_ok, dialog_cancel)
+          }
+
+          def removeChannel = {
+            // This activity only works fine if channels are intact
+            // so once hosted channel is removed we exit this activity
+            ChannelManager.all = ChannelManager.all diff Vector(chan)
+            LNParams.db.change(ChannelTable.killSql, hc.channelId)
+            app.TransData.value = FragWallet.HOSTED_REMOVED
+            finish
+          }
+
+          rm(alert) {
+            val htlcBlock = chan.inFlightHtlcs.nonEmpty
+            val balanceBlock = chan.estCanSendMsat.fromMsatToSat > LNParams.dust
+            val hostedChanState = HostedState(hc.futureUpdates, hc.lastCrossSignedState)
+            val uri = s"https://lightning-wallet.com/hosted-channels"
+
+            if (0 == pos) host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
+            else if (1 == pos) me share hostedStateCodec.encode(hostedChanState).require.toHex
+            else if (2 == pos && balanceBlock) warnAndMaybeRemove(me getString ln_hosted_remove_non_empty_details)
+            else if (2 == pos && htlcBlock) warnAndMaybeRemove(me getString ln_hosted_remove_inflight_details)
+            else if (2 == pos) removeChannel
+          }
+        }
+      }
 
       this
     }

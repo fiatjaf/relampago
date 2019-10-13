@@ -199,6 +199,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
     case FragWallet.REDIRECT => goOps(null): Unit
 
+    case FragWallet.HOSTED_REMOVED =>
+      PaymentInfoWrap.markFailedPayments
+      me toast ln_hosted_removed_tip
+
     case btcURI: BitcoinURI =>
       val canSendOffChain = Try(btcURI.getAmount).map(coin2MSat).filter(msat => ChannelManager.estimateAIRCanSend >= msat.amount).isSuccess
       if (canSendOffChain && btcURI.getLightningRequest != null) <(app.TransData recordValue btcURI.getLightningRequest, onFail)(_ => checkTransData)
@@ -358,9 +362,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           else if (maxCanReceive.amount < 0L) reserveUnspentWarning
           else getString(ln_receive_ok)
 
-        val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-        val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_receive, lst).create)
-        val options = Array(getString(ln_receive_option).format(alertLNHint).html, getString(btc_receive_option).html)
+        val actions = Array(getString(ln_receive_option).format(alertLNHint).html, getString(btc_receive_option).html)
+        val lst \ alert = makeChoiceList(actions, me getString action_coins_receive)
+        lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
 
         def offChain = rm(alert) {
           if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
@@ -376,11 +380,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           app.TransData.value = app.kit.currentAddress
           me goTo classOf[RequestActivity]
         }
-
-        lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
-        lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
-        lst setDividerHeight 0
-        lst setDivider null
     }
   }
 
@@ -390,13 +389,9 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def goSendPaymentForm(top: View) = {
-    val fragCenterList = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
-    val alert = showForm(negBuilder(dialog_cancel, me getString action_coins_send, fragCenterList).create)
-    val options = Array(send_scan_qr, send_paste_payment_request, send_hivemind_deposit).map(res => getString(res).html)
-    fragCenterList setOnItemClickListener onTap { case 0 => scanQR case 1 => pasteRequest case 2 => depositHivemind }
-    fragCenterList setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, options)
-    fragCenterList setDividerHeight 0
-    fragCenterList setDivider null
+    val actions = Array(send_scan_qr, send_paste_payment_request, send_hivemind_deposit)
+    val lst \ alert = makeChoiceList(for (res <- actions) yield getString(res).html, me getString action_coins_send)
+    lst setOnItemClickListener onTap { case 0 => scanQR case 1 => pasteRequest case 2 => depositHivemind }
 
     def scanQR = rm(alert) {
       // Just jump to QR scanner section
