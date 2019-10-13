@@ -59,7 +59,7 @@ class LNStartFundActivity extends TimerActivity { me =>
   }
 
   def saveNormalChannel(chan: NormalChannel, some: HasNormalCommits) = {
-    // Saving error will halt all further progress, this is desired here
+    // Saving error will halt all further progress, this is exactly desired
     chan STORE some
 
     app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)

@@ -1,7 +1,6 @@
 package com.lightning.walletapp
 
 import android.view._
-import android.widget._
 import com.lightning.walletapp.ln._
 import android.text.format.DateUtils._
 import com.lightning.walletapp.Utils._
@@ -15,6 +14,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import scala.util.{Success, Try}
 import android.app.{Activity, AlertDialog}
+import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
@@ -129,7 +129,19 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     // Worker is definitely not null
     FragWallet.worker.setupSearch(menu)
     FragWallet.worker.searchView.setQueryHint(app getString search_hint_payments)
+    val autoHostedChan = app.prefs.getBoolean(AbstractKit.AUTO_HOSTED_CHAN, true)
     val showTooltip = app.prefs.getBoolean(AbstractKit.SHOW_TOOLTIP, true)
+
+    if (autoHostedChan) new BlocksListener { self =>
+      app.kit.peerGroup addBlocksDownloadedEventListener self
+      def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) = {
+        // Once chain height is known we automatically attempt to invoke a default hosted channel, once
+        val defaultHostedChanExistsAlready = ChannelManager hasHostedChanWith defaultHostedNode.ann.nodeId
+        if (!defaultHostedChanExistsAlready) attemptHostedChannel(defaultHostedNode).run
+        app.prefs.edit.putBoolean(AbstractKit.AUTO_HOSTED_CHAN, false).commit
+        app.kit.peerGroup removeBlocksDownloadedEventListener self
+      }
+    }
 
     if (showTooltip) try {
       app.prefs.edit.putBoolean(AbstractKit.SHOW_TOOLTIP, false).commit
@@ -251,53 +263,46 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
     <(to[LNUrlData](LNUrlData guardResponse sslAwareRequest.body), onFail) {
       case withdrawal: WithdrawRequest => me doReceivePayment Some(withdrawal, lnUrl)
-      case incoming: IncomingChannelRequest => me initIncoming incoming
-      case hosted: HostedChannelRequest => me initHosted hosted
+      case hosted: HostedChannelRequest => attemptHostedChannel(hosted).run
+      case incoming: IncomingChannelRequest => initIncoming(incoming)
       case _ => app quickToast err_nothing_useful
     }
   }
 
-  def initHosted(hosted: HostedChannelRequest) =
-    <(hosted.unsafeResolveNodeAnnounce, onFail) { ann =>
-      val hnv = HardcodedNodeView(ann, app getString ln_ops_start_fund_hosted_channel)
-      app.TransData.value = HostedChannelParams(hnv, hosted.secret)
-      me goTo classOf[LNStartFundActivity]
-    }
-
-  def initIncoming(incoming: IncomingChannelRequest) =
-    <(incoming.unsafeResolveNodeAnnounce, onFail) { ann =>
-      val initialListener = new ConnectionListener { self =>
-        override def onDisconnect(nodeId: PublicKey) = ConnectionManager.listeners -= self
-        override def onOperational(nodeId: PublicKey, isCompatible: Boolean) = if (isCompatible) {
-          queue.map(_ => incoming.requestChannel.body).map(LNUrlData.guardResponse).foreach(none, onCallFailed)
-        }
-
-        override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
-          case open: OpenChannel if !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
-          case _ => // Ignore anything else including public channel offers
-        }
-
-        override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) = {
-          val hnv = HardcodedNodeView(ann, app getString ln_ops_start_fund_incoming_channel)
-          app.TransData.value = IncomingChannelParams(hnv, open)
-          me goTo classOf[LNStartFundActivity]
-          ConnectionManager.listeners -= self
-        }
-
-        def onCallFailed(err: Throwable) = {
-          ConnectionManager.listeners -= self
-          onFail(err)
-        }
+  def initIncoming(incoming: IncomingChannelRequest) = {
+    val initialListener = new ConnectionListener { self =>
+      override def onDisconnect(nodeId: PublicKey) = ConnectionManager.listeners -= self
+      override def onOperational(nodeId: PublicKey, isCompatible: Boolean) = if (isCompatible) {
+        queue.map(_ => incoming.requestChannel.body).map(LNUrlData.guardResponse).foreach(none, onCallFailed)
       }
-      
-      if (ChannelManager hasNormalChanWith ann.nodeId) {
-        // TODO: remove this once random shortId is merged
-        me toast err_ln_chan_exists_already
-      } else {
-        ConnectionManager.listeners += initialListener
-        ConnectionManager.connectTo(ann, notify = true)
+
+      override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
+        case open: OpenChannel if !open.channelFlags.isPublic => onOpenOffer(nodeId, open)
+        case _ => // Ignore anything else including public channel offers
+      }
+
+      override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) = {
+        val incomingTip = app getString ln_ops_start_fund_incoming_channel
+        val hnv = HardcodedNodeView(incoming.ann, incomingTip)
+        app.TransData.value = IncomingChannelParams(hnv, open)
+        me goTo classOf[LNStartFundActivity]
+        ConnectionManager.listeners -= self
+      }
+
+      def onCallFailed(err: Throwable) = {
+        ConnectionManager.listeners -= self
+        onFail(err)
       }
     }
+
+    if (ChannelManager hasNormalChanWith incoming.ann.nodeId) {
+      // TODO: remove this limitation once random shortId is merged
+      me toast err_ln_chan_exists_already
+    } else {
+      ConnectionManager.listeners += initialListener
+      ConnectionManager.connectTo(incoming.ann, notify = true)
+    }
+  }
 
   def showLoginForm(lnUrl: LNUrl) = lnUrl.k1 foreach { k1 =>
     val linkingPrivKey = LNParams.makeLinkingKey(lnUrl.uri.getHost)

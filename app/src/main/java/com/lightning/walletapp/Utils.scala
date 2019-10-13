@@ -53,15 +53,11 @@ object Utils {
   lazy val app = appReference
   lazy val noDesc = app getString ln_no_description
   lazy val denoms = List(SatDenomination, BtcDenomination)
-  val singleChoice = android.R.layout.select_dialog_singlechoice
+  lazy val defaultHostedNode = HostedChannelRequest("02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd@172.245.74.10:9935", "00")
+  val fiatNames = Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan", "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel",
+    "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль", "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling", "aud" -> "Australian Dollar")
 
-  // Mappings
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
-  val fiatNames = Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan",
-    "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
-    "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling",
-    "aud" -> "Australian Dollar")
-
   def getDescription(raw: String) = if (raw.isEmpty) s"<i>$noDesc</i>" else raw take 72
   def humanSix(bitcoinAddress: String) = bitcoinAddress grouped 6 mkString "\u0020"
 
@@ -237,9 +233,9 @@ trait TimerActivity extends AppCompatActivity { me =>
         case 1 => self futureProcess plainRequest(RatesSaver.rates.feeSix)
       }, onTxFail)(none)
 
-      val bld = baseBuilder(getString(step_fees).format(coloredAmount).html, form)
-      mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_pay, dialog_cancel)
-      lst setAdapter new ArrayAdapter(me, singleChoice, feesOptions)
+      val stepFees = getString(step_fees).format(coloredAmount).html
+      mkCheckForm(alert => rm(alert)(proceed), none, baseBuilder(stepFees, form), dialog_pay, dialog_cancel)
+      lst setAdapter new ArrayAdapter(me, android.R.layout.select_dialog_singlechoice, feesOptions)
       lst.setItemChecked(0, true)
     }
 
@@ -264,6 +260,12 @@ trait TimerActivity extends AppCompatActivity { me =>
         val info = UncaughtHandler toText other
         negTextBuilder(dialog_ok, info)
     }
+  }
+
+  def attemptHostedChannel(request: HostedChannelRequest) = UITask {
+    val hnv = HardcodedNodeView(request.ann, app getString ln_ops_start_fund_hosted_channel)
+    app.TransData.value = HostedChannelParams(hnv, request.secret)
+    me goTo classOf[LNStartFundActivity]
   }
 }
 

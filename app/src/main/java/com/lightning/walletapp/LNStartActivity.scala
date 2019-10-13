@@ -188,22 +188,14 @@ case class WithdrawRequest(callback: String, k1: String,
       .build.toString)
 }
 
-trait LNUrlChannelRequest extends LNUrlData {
-  def unsafeResolveNodeAnnounce: NodeAnnouncement = {
-    val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
-    val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
-    app.mkNodeAnnouncement(remoteNodeId, address, alias = hostAddress)
-  }
-
-  val hostAddress: String
-  val portNumber: String
-  val nodeKey: String
-}
-
-case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlChannelRequest {
+case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
   // Recreate node announcement from supplied data and call a second level callback once connected
   require(callback contains "https://", "Callback does not have HTTPS prefix")
+
   val nodeLink(nodeKey, hostAddress, portNumber) = uri
+  val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
+  val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
+  val ann = app.mkNodeAnnouncement(remoteNodeId, address, alias = hostAddress)
 
   def requestChannel =
     unsafe(request = android.net.Uri.parse(callback).buildUpon
@@ -213,10 +205,14 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
       .build.toString)
 }
 
-case class HostedChannelRequest(uri: String, k1: String) extends LNUrlChannelRequest {
-  // Recreate node announcement from supplied data and use a secret in InvokeHostedChannel
-  val nodeLink(nodeKey, hostAddress, portNumber) = uri
+case class HostedChannelRequest(uri: String, k1: String) extends LNUrlData {
+  // Recreate node announcement from supplied data and use secret in InvokeHostedChannel
   val secret = ByteVector fromValidHex k1
+
+  val nodeLink(nodeKey, hostAddress, portNumber) = uri
+  val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
+  val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
+  val ann = app.mkNodeAnnouncement(remoteNodeId, address, alias = hostAddress)
 }
 
 object PayRequest {

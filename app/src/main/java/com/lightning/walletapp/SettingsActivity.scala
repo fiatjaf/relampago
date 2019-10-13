@@ -123,8 +123,8 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
       }
 
       lst setOnItemClickListener onTap(updateFiatType)
-      lst setAdapter new ArrayAdapter(me, singleChoice, fiatHumanNames.toArray)
-      showForm(negBuilder(dialog_ok, me getString sets_set_fiat, form).create)
+      lst setAdapter new ArrayAdapter(me, android.R.layout.select_dialog_singlechoice, fiatHumanNames.toArray)
+      showForm(alertDialog = negBuilder(dialog_ok, me getString sets_set_fiat, form).create)
       lst.setItemChecked(fiatCodes.toList indexOf fiatCode, true)
     }
 
@@ -144,9 +144,9 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         Option(FragWallet.worker).foreach(_.updTitleTask.run)
       }
 
-      showForm(negBuilder(dialog_ok, me getString sets_choose_unit, form).create)
-      lst setAdapter new ArrayAdapter(me, singleChoice, allDenoms)
       lst setOnItemClickListener onTap(updateDenomination)
+      lst setAdapter new ArrayAdapter(me, android.R.layout.select_dialog_singlechoice, allDenoms)
+      showForm(alertDialog = negBuilder(dialog_ok, me getString sets_choose_unit, form).create)
       lst.setItemChecked(currentDenom, true)
     }
 
