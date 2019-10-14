@@ -11,7 +11,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.core.{Address, Block, FilteredBlock, Peer}
-import com.lightning.walletapp.lnutils.{ChannelTable, PaymentTable}
+import com.lightning.walletapp.lnutils.{ChannelTable, PaymentInfoWrap, PaymentTable}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.hostedStateCodec
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.ln.wire.HostedState
@@ -287,7 +287,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
         lst setOnItemClickListener onTap { pos =>
           def warnAndMaybeRemove(removalWarning: String) = {
-            val bld = baseTextBuilder(removalWarning.html).setCustomTitle(chan.data.announce.asString.html)
+            val bld = baseTextBuilder(removalWarning.html).setCustomTitle(title)
             mkCheckForm(alert => rm(alert)(removeChannel), none, bld, dialog_ok, dialog_cancel)
           }
 
@@ -296,7 +296,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             // so once hosted channel is removed we exit this activity
             ChannelManager.all = ChannelManager.all diff Vector(chan)
             LNParams.db.change(ChannelTable.killSql, hc.channelId)
-            app.TransData.value = FragWallet.HOSTED_REMOVED
+            PaymentInfoWrap unknownHostedHtlcsDetected hc
             finish
           }
 

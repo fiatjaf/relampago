@@ -268,12 +268,6 @@ trait TimerActivity extends AppCompatActivity { me =>
         negTextBuilder(dialog_ok, info)
     }
   }
-
-  def attemptHostedChannel(request: HostedChannelRequest) = UITask {
-    val hnv = HardcodedNodeView(request.ann, app getString ln_ops_start_fund_hosted_channel)
-    app.TransData.value = HostedChannelParams(hnv, request.secret)
-    me goTo classOf[LNStartFundActivity]
-  }
 }
 
 class RateManager(val content: View) { me =>

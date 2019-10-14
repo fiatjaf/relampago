@@ -413,8 +413,8 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
       // Either they initiate a shutdown or respond to the one we have sent
       // should sign our unsigned outgoing HTLCs if present and then proceed with shutdown
-      case (NormalData(announce, commitments, our, None, txOpt), remote: Shutdown, OPEN) =>
-        val norm = NormalData(announce, commitments, our, remote.some, txOpt)
+      case (NormalData(announce, commitments, txOpt, our, None), remote: Shutdown, OPEN) =>
+        val norm = NormalData(announce, commitments, txOpt, our, remote.some)
         if (commitments.remoteHasUnsignedOutgoing) startLocalClose(norm)
         else me UPDATA norm doProcess CMDProceed
 
@@ -1002,6 +1002,11 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     val localError = Error(channelId = hc.channelId, data = errCode)
     val hc1 = hc.modify(_.localError) setTo Some(localError)
     BECOME(me STORE hc1, SUSPENDED) SEND localError
+  }
+
+  def startUp = {
+    me process CMDChainTipKnown
+    me process CMDSocketOnline
   }
 }
 

@@ -83,7 +83,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     def error(nodeSearchError: Throwable) = host onFail nodeSearchError
 
     def process(userQuery: String, results: AnnounceChansNumVec) = {
-      nodes = for (result <- results) yield RemoteNodeView(result)
+      nodes = defaultHostedNode +: results.map(RemoteNodeView)
       host.UITask(adapter.notifyDataSetChanged).run
     }
   }
@@ -125,7 +125,6 @@ sealed trait StartNodeView {
   def asString(base: String): String
 }
 
-case class HostedChannelParams(nodeView: HardcodedNodeView, secret: ByteVector)
 case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
 case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNodeView {
   // App suggests a bunch of hardcoded and separately fetched nodes with a good liquidity
@@ -134,8 +133,8 @@ case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNo
 
 case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
   def asString(base: String) = base.format(chanAnnounce.alias, chansNumber, chanAnnounce.pretty)
-  lazy val chansNumber = app.plur1OrZero(app.getResources getStringArray R.array.ln_ops_start_node_channels, num)
-  val chanAnnounce \ num = acn
+  lazy val chansNumber = app.plur1OrZero(app.getResources getStringArray R.array.ln_ops_start_node_channels, chansNum)
+  val chanAnnounce \ chansNum = acn
 }
 
 // LNURL response types
@@ -146,6 +145,14 @@ object LNUrl {
     val request = Bech32.five2eight(data)
     LNUrl(Tools bin2readable request)
   }
+
+  def guardResponse(raw: String): String = {
+    val validJson = Try(raw.parseJson.asJsObject.fields)
+    val hasError = validJson.map(_ apply "reason").map(json2String)
+    if (validJson.isFailure) throw new Exception(s"Invalid response $raw")
+    if (hasError.isSuccess) throw new Exception(hasError.get)
+    raw
+  }
 }
 
 case class LNUrl(request: String) {
@@ -154,17 +161,6 @@ case class LNUrl(request: String) {
   lazy val isLogin: Boolean = Try(uri getQueryParameter "tag" equals "login").getOrElse(false)
   lazy val isPay: Boolean = Try(uri getQueryParameter "tag" equals "pay").getOrElse(false)
   lazy val k1: Try[String] = Try(uri getQueryParameter "k1")
-}
-
-object LNUrlData {
-  type PayReqVec = Vector[PaymentRequest]
-  def guardResponse(raw: String): String = {
-    val validJson = Try(raw.parseJson.asJsObject.fields)
-    val hasError = validJson.map(_ apply "reason").map(json2String)
-    if (validJson.isFailure) throw new Exception(s"Invalid response $raw")
-    if (hasError.isSuccess) throw new Exception(hasError.get)
-    raw
-  }
 }
 
 trait LNUrlData {
@@ -188,14 +184,14 @@ case class WithdrawRequest(callback: String, k1: String,
       .build.toString)
 }
 
-case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
-  // Recreate node announcement from supplied data and call a second level callback once connected
-  require(callback contains "https://", "Callback does not have HTTPS prefix")
+case class IncomingChannelRequest(uri: String, callback: String,
+                                  k1: String) extends LNUrlData {
 
   val nodeLink(nodeKey, hostAddress, portNumber) = uri
   val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
   val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
   val ann = app.mkNodeAnnouncement(remoteNodeId, address, alias = hostAddress)
+  require(callback contains "https://", "Callback does not have HTTPS prefix")
 
   def requestChannel =
     unsafe(request = android.net.Uri.parse(callback).buildUpon
@@ -205,14 +201,14 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
       .build.toString)
 }
 
-case class HostedChannelRequest(uri: String, alias: Option[String], k1: String) extends LNUrlData {
-  // Recreate node announcement from supplied data and use secret in InvokeHostedChannel
+case class HostedChannelRequest(uri: String, alias: Option[String],
+                                k1: String) extends LNUrlData with StartNodeView {
 
-  val nodeLink(nodeKey, hostAddress, portNumber) = uri
-  val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
-  val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
-  val ann = app.mkNodeAnnouncement(remoteNodeId, address, alias getOrElse hostAddress)
   val secret = ByteVector fromValidHex k1
+  val nodeLink(nodeKey, hostAddress, portNumber) = uri
+  val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
+  val ann = app.mkNodeAnnouncement(PublicKey(ByteVector fromValidHex nodeKey), address, alias getOrElse hostAddress)
+  def asString(base: String) = base.format(ann.alias, app getString ln_ops_start_fund_hosted_channel, ann.pretty)
 }
 
 object PayRequest {

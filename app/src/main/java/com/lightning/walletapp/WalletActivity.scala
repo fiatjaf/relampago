@@ -4,6 +4,7 @@ import android.view._
 import com.lightning.walletapp.ln._
 import android.text.format.DateUtils._
 import com.lightning.walletapp.Utils._
+import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.ln.Channel._
@@ -18,8 +19,6 @@ import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
-import com.lightning.walletapp.ln.wire.{LightningMessage, NodeAnnouncement, OpenChannel}
-
 import io.github.douglasjunior.androidSimpleTooltip.SimpleTooltip
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -27,6 +26,7 @@ import com.lightning.walletapp.helper.AwaitService
 import android.support.v4.content.ContextCompat
 import com.github.clans.fab.FloatingActionMenu
 import android.support.v7.widget.SearchView
+import org.bitcoinj.script.ScriptBuilder
 import fr.acinq.bitcoin.Crypto.PublicKey
 import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
@@ -132,14 +132,71 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val autoHostedChan = app.prefs.getBoolean(AbstractKit.AUTO_HOSTED_CHAN, true)
     val showTooltip = app.prefs.getBoolean(AbstractKit.SHOW_TOOLTIP, true)
 
-    if (autoHostedChan) new BlocksListener { self =>
-      app.kit.peerGroup addBlocksDownloadedEventListener self
-      def onBlocksDownloaded(peer: Peer, block: Block, fb: FilteredBlock, left: Int) = {
-        // Once chain height is known we automatically attempt to invoke a default hosted channel, once
-        val defaultHostedChanExistsAlready = ChannelManager hasHostedChanWith defaultHostedNode.ann.nodeId
-        if (!defaultHostedChanExistsAlready) attemptHostedChannel(defaultHostedNode).run
-        app.prefs.edit.putBoolean(AbstractKit.AUTO_HOSTED_CHAN, false).commit
-        app.kit.peerGroup removeBlocksDownloadedEventListener self
+    if (autoHostedChan) {
+      val refundScriptPubKey = ByteVector(ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram)
+      val waitData = WaitRemoteHostedReply(defaultHostedNode.ann, refundScriptPubKey, defaultHostedNode.secret)
+      val freshChannel = ChannelManager.createHostedChannel(Set.empty, waitData)
+
+      val autoOpenListener = new ConnectionListener with ChannelListener {
+        override def onHostedMessage(ann: NodeAnnouncement, message: HostedChannelMessage) =
+          // At this point hosted channel can only receive hosted messages or remote Error
+          if (ann.nodeId == defaultHostedNode.ann.nodeId) freshChannel process message
+
+        override def onDisconnect(nodeId: PublicKey) =
+          // We risk nothing by just halting and not doing anything
+          if (nodeId == defaultHostedNode.ann.nodeId) detachItself
+
+        override def onMessage(nodeId: PublicKey, remoteMessage: LightningMessage) = remoteMessage match {
+          case error: wire.Error if nodeId == defaultHostedNode.ann.nodeId => translateHostedTaggedError(error)
+          case _ => // Do nothing
+        }
+
+        override def onOperational(nodeId: PublicKey, isCompat: Boolean) =
+          // All sanity checks have already been made at this point so just proceed
+          if (nodeId == defaultHostedNode.ann.nodeId && isCompat) freshChannel.startUp
+
+        override def onBecome = {
+          case (_: HostedChannel, _, WAIT_FOR_ACCEPT, OPEN) =>
+            freshChannel.listeners = ChannelManager.operationalListeners
+            ChannelManager.all +:= freshChannel
+            FragWallet.worker.updTitleTask.run
+            detachItself
+        }
+
+        override def onException = {
+          case (_: HostedChannel, openingError) =>
+            // Cancel everything in case of local failure
+            UITask(app quickToast openingError.getMessage).run
+            detachItself
+        }
+
+        def translateHostedTaggedError(error: wire.Error) = {
+          val errorMessage = ChanErrorCodes.translateTag(error)
+          onException(freshChannel -> errorMessage)
+        }
+
+        def detachItself = {
+          // In case of success or any failure we cancel further automatic attemps
+          app.prefs.edit.putBoolean(AbstractKit.AUTO_HOSTED_CHAN, false).commit
+          ConnectionManager.listeners -= this
+          freshChannel.listeners -= this
+        }
+      }
+
+      new BlocksListener {
+        app.kit.peerGroup addBlocksDownloadedEventListener this
+        var exists = ChannelManager hasHostedChanWith defaultHostedNode.ann.nodeId
+        def onBlocksDownloaded(peer: Peer, block: Block, fileterdBlock: FilteredBlock, left: Int) = {
+          if (exists) app.prefs.edit.putBoolean(AbstractKit.AUTO_HOSTED_CHAN, false).commit else attemptHosted
+          app.kit.peerGroup removeBlocksDownloadedEventListener this
+        }
+
+        def attemptHosted = {
+          freshChannel.listeners += autoOpenListener
+          ConnectionManager.listeners += autoOpenListener
+          ConnectionManager.connectTo(defaultHostedNode.ann, notify = true)
+          exists = true
+        }
       }
     }
 
@@ -163,7 +220,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       val isConvincing = reportedTermOfflineNodes.intersect(termNodes).size > termNodes.size / 3
 
       if (!warnedOffline.contains(rd.pr.paymentHash) && isConvincing) {
-        // One of terminal nodes returned ChannelDisabled | UnknownNextPeer
+        // One of terminal nodes returned ChannelDisabled or UnknownNextPeer
         PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
         UITask(me toast err_ln_receiver_offline).run
         warnedOffline += rd.pr.paymentHash
@@ -211,10 +268,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
     case FragWallet.REDIRECT => goOps(null): Unit
 
-    case FragWallet.HOSTED_REMOVED =>
-      PaymentInfoWrap.markFailedPayments
-      me toast ln_hosted_removed_tip
-
     case btcURI: BitcoinURI =>
       val canSendOffChain = Try(btcURI.getAmount).map(coin2MSat).filter(msat => ChannelManager.estimateAIRCanSend >= msat.amount).isSuccess
       if (canSendOffChain && btcURI.getLightningRequest != null) <(app.TransData recordValue btcURI.getLightningRequest, onFail)(_ => checkTransData)
@@ -261,19 +314,24 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val sslAwareRequest = awaitRequest.trustAllCerts.trustAllHosts
     app quickToast ln_url_resolving
 
-    <(to[LNUrlData](LNUrlData guardResponse sslAwareRequest.body), onFail) {
+    <(to[LNUrlData](LNUrl guardResponse sslAwareRequest.body), onFail) {
       case withdrawal: WithdrawRequest => me doReceivePayment Some(withdrawal, lnUrl)
-      case hosted: HostedChannelRequest => attemptHostedChannel(hosted).run
-      case incoming: IncomingChannelRequest => initIncoming(incoming)
+      case hostedRequest: HostedChannelRequest => me goLNStartFund hostedRequest
+      case incoming: IncomingChannelRequest => me initIncoming incoming
       case _ => app quickToast err_nothing_useful
     }
+  }
+
+  def goLNStartFund(data: Any) = {
+    me goTo classOf[LNStartFundActivity]
+    app.TransData.value = data
   }
 
   def initIncoming(incoming: IncomingChannelRequest) = {
     val initialListener = new ConnectionListener { self =>
       override def onDisconnect(nodeId: PublicKey) = ConnectionManager.listeners -= self
       override def onOperational(nodeId: PublicKey, isCompatible: Boolean) = if (isCompatible) {
-        queue.map(_ => incoming.requestChannel.body).map(LNUrlData.guardResponse).foreach(none, onCallFailed)
+        queue.map(_ => incoming.requestChannel.body).map(LNUrl.guardResponse).foreach(none, onCallFailed)
       }
 
       override def onMessage(nodeId: PublicKey, msg: LightningMessage) = msg match {
@@ -284,8 +342,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       override def onOpenOffer(nodeId: PublicKey, open: OpenChannel) = {
         val incomingTip = app getString ln_ops_start_fund_incoming_channel
         val hnv = HardcodedNodeView(incoming.ann, incomingTip)
-        app.TransData.value = IncomingChannelParams(hnv, open)
-        me goTo classOf[LNStartFundActivity]
+        me goLNStartFund IncomingChannelParams(hnv, open)
         ConnectionManager.listeners -= self
       }
 
@@ -318,7 +375,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       val sig = Tools.sign(dataToSign, linkingPrivKey)
       val secondLevelRequestUri = lnUrl.uri.buildUpon.appendQueryParameter("sig", sig.toHex).appendQueryParameter("key", linkingPubKey)
       val sslAwareSecondRequest = get(secondLevelRequestUri.build.toString, true).connectTimeout(15000).trustAllCerts.trustAllHosts
-      queue.map(_ => sslAwareSecondRequest.body).map(LNUrlData.guardResponse).foreach(_ => onLoginSuccess.run, onFail)
+      queue.map(_ => sslAwareSecondRequest.body).map(LNUrl.guardResponse).foreach(_ => onLoginSuccess.run, onFail)
       app quickToast ln_url_resolving
     }
 
@@ -356,7 +413,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else if (withRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
         else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, wr.minCanReceive, title, wr.defaultDescription) { rd =>
-          queue.map(_ => wr.requestWithdraw(lnUrl, rd.pr).body).map(LNUrlData.guardResponse).foreach(none, onRequestFailed)
+          queue.map(_ => wr.requestWithdraw(lnUrl, rd.pr).body).map(LNUrl.guardResponse).foreach(none, onRequestFailed)
           def onRequestFailed(response: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail response)
         }
 

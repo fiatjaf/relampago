@@ -43,7 +43,7 @@ class LNStartFundActivity extends TimerActivity { me =>
     case data @ HardcodedNodeView(ann, _) => proceed(Left(Nil), data.asString(fundNodeView), ann)
     case data: NodeAnnouncement => proceed(Left(Nil), HardcodedNodeView(data, tip = "( ͡° ͜ʖ ͡°)").asString(fundNodeView), data)
     case data: IncomingChannelParams => proceed(Left(data.open :: Nil), data.nodeView.asString(fundNodeView), data.nodeView.ann)
-    case data: HostedChannelParams => proceed(Right(data.secret), data.nodeView.asString(fundNodeView), data.nodeView.ann)
+    case data: HostedChannelRequest => proceed(Right(data.secret), data.asString(fundNodeView), data.ann)
     case _ => finish
   }
 
@@ -214,16 +214,12 @@ class LNStartFundActivity extends TimerActivity { me =>
         if (ChannelManager.currentBlocksLeft.isEmpty) onException(freshChannel -> chainNotConnectedYet)
         else if (ChannelManager hasHostedChanWith nodeId) onException(freshChannel -> chanExistsAlready)
         else if (!isCompat) onException(freshChannel -> peerIncompatible)
-        else {
-          // This will get the channel going
-          freshChannel process CMDChainTipKnown
-          freshChannel process CMDSocketOnline
-        }
+        else freshChannel.startUp
       }
 
-      override def onHostedMessage(ann: NodeAnnouncement, message: HostedChannelMessage) =
+      override def onHostedMessage(ann1: NodeAnnouncement, message: HostedChannelMessage) =
         // At this point hosted channel can only receive hosted messages or Error
-        freshChannel process message
+        if (ann.nodeId == ann1.nodeId) freshChannel process message
 
       // We override this once again to treat possibly tagged remote Error differently
       override def onMessage(nodeId: PublicKey, message: LightningMessage) = message match {
