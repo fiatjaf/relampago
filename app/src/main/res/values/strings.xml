@@ -39,12 +39,6 @@
         will happen.\n\nUsing this tool does not affect open channels currently present on this phone.
     </string>
 
-    <string name="tokens_warn"><![CDATA[
-        Please note: this wallet uses paid <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>storage tokens</a> to store your encrypted channel backups and
-        <a href=https://medium.com/@akumaigorodski/watchtower-support-is-coming-to-bitcoin-lightning-wallet-8f969ac206b2>secure off-chain balance</a> while your device is offline.
-        <br><br>An automatic Lightning payment of <i>%1$s</i> will acquire 50 storage tokens once your first channel becomes open.
-    ]]></string>
-
     <string name="migrator_usage_warning"><![CDATA[
         Migration tool creates a snapshot file which can be used to fully
         restore your wallet at a later time, possibly on another device.<br><br>

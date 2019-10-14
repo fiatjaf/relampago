@@ -10,7 +10,8 @@
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:paddingBottom="@dimen/app_padding">
 
         <!-- hosted warning -->
 
@@ -131,7 +132,7 @@
             <TextView style="@style/CardBaseText" android:id="@+id/fundingDepthText" android:gravity="end"/>
         </LinearLayout>
 
-        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/totalPayments" android:layout_marginBottom="@dimen/app_padding">
+        <LinearLayout style="@style/CardLinearLayout" android:id="@+id/totalPayments">
             <TextView style="@style/CardBaseText" android:text="@string/ln_info_total_payments"/>
             <TextView style="@style/CardBaseText" android:id="@+id/totalPaymentsText" android:gravity="end"/>
         </LinearLayout>
@@ -145,7 +146,7 @@
             android:layout_width="wrap_content"
             android:paddingLeft="@dimen/app_padding"
             android:paddingRight="@dimen/app_padding"
-            android:paddingBottom="@dimen/app_padding"/>
+            android:paddingTop="@dimen/app_padding"/>
 
     </LinearLayout>
 </android.support.v7.widget.CardView>

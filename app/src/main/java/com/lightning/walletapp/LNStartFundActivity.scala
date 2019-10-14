@@ -134,10 +134,10 @@ class LNStartFundActivity extends TimerActivity { me =>
           freshChannel process CMDFunding(app.kit.sign(req).tx)
 
         case transition @ (_: NormalChannel, wait: WaitFundingDoneData, WAIT_FUNDING_SIGNED, WAIT_FUNDING_DONE) =>
-          // Preliminary negotiations are complete, save channel FIRST AND THEN broadcast a funding transaction
+          // Preliminary negotiations are complete, save channel FIRST and THEN broadcast a funding transaction
           saveNormalChannel(freshChannel, wait)
           ConnectionManager.listeners -= this
-          ChannelManager onBecome transition
+          app.kit blockSend wait.fundingTx
       }
 
       def makeTxProcessor(ms: MilliSatoshi) = new TxProcessor {

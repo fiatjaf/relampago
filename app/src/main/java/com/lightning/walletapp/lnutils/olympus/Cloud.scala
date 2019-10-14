@@ -26,10 +26,10 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   }
 
   def doProcess(some: Any) = (data, some) match {
+    // We do not have memo or tokens but there are pending actions
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
-      (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
       ChannelManager.mostFundedChanOpt.exists(_.estCanSendMsat >= maxMsat) &&
-      isAuthEnabled =>
+      clearTokens.isEmpty && actions.nonEmpty && isAuthEnabled =>
 
       // Also executes if we have no actions to upload and a few tokens left
       val send = retry(getPaymentRequestBlindMemo, pick = pickInc, times = 4 to 5)
@@ -60,7 +60,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         case _ =>
       }
 
-    // We do not have any acts or tokens but have a memo
+    // We can't upload actions but have a memo to resolve
     case CloudData(Some(pr \ memo), _, _) \ CMDStart if isFree =>
       // Payment may still be unsent OR in-flight OR fulfilled OR failed already
       val isInFlight = ChannelManager.activeInFlightHashes contains pr.paymentHash

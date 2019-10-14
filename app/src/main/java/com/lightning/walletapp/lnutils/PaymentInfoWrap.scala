@@ -150,12 +150,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     uiNotify
-    if (cs.localSpec.fulfilled.nonEmpty) com.lightning.walletapp.Vibrator.vibrate
-    if (cs.localSpec.fulfilledOutgoing.nonEmpty) app.olympus.tellClouds(OlympusWrap.CMDStart)
-
     if (cs.localSpec.fulfilledIncoming.nonEmpty) {
       val vulnerableStates = ChannelManager.all.flatMap(getVulnerableRevVec).toMap
       getCerberusActs(vulnerableStates).foreach(app.olympus.tellClouds)
+    }
+
+    if (cs.localSpec.fulfilled.nonEmpty) {
+      com.lightning.walletapp.Vibrator.vibrate
+      // This could be a memo-resolving payment
+      app.olympus.tellClouds(OlympusWrap.CMDStart)
     }
   }
 
@@ -219,7 +222,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     case (_, _, WAIT_FUNDING_DONE, OPEN) =>
       // We may have a channel upload act waiting
-      app.olympus tellClouds OlympusWrap.CMDStart
+      app.olympus.tellClouds(OlympusWrap.CMDStart)
   }
 }
 

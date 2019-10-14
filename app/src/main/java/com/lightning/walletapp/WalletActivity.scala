@@ -472,17 +472,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
   }
 
-  def goStart = me goTo classOf[LNStartActivity]
   def goOps(top: View) = me goTo classOf[LNOpsActivity]
+  def goAddChannel(top: View) = me goTo classOf[LNStartActivity]
   def goReceivePayment(top: View) = doReceivePayment(extra = Option.empty)
-  def goAddChannel(top: View) = if (app.olympus.backupExhausted) warnAboutTokens else goStart
-
-  def warnAboutTokens = {
-    val tokensPrice = MilliSatoshi(1000000L)
-    val fiatAmount = msatInFiatHuman(tokensPrice)
-    val amount = denom.coloredIn(tokensPrice, denom.sign)
-    val body = getString(tokens_warn).format(s"$amount <font color=#999999>$fiatAmount</font>")
-    val bld = baseTextBuilder(body.html).setCustomTitle(me getString action_ln_open)
-    mkCheckForm(alert => rm(alert)(goStart), none, bld, dialog_ok, dialog_cancel)
-  }
 }
