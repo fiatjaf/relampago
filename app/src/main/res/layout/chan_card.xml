@@ -23,7 +23,8 @@
             <TextView
                 style="@style/CardBaseText"
                 android:textColor="@color/bgbar"
-                android:text="@string/ln_ops_start_fund_hosted_channel"/>
+                android:text="@string/ln_ops_start_fund_hosted_channel"
+                android:textStyle="bold"/>
 
             <ImageButton
                 android:background="?android:selectableItemBackground"

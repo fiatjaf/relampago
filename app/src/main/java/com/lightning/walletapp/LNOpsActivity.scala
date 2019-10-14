@@ -184,7 +184,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
             R.id.fundingDepth, R.id.paymentsInFlight, R.id.refundableAmount, R.id.refundFee,
-            R.id.balancesDivider, R.id.hostedWarningHeader)
+            R.id.balancesDivider, R.id.totalPayments, R.id.hostedWarningHeader)
 
         case _ =>
           visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
@@ -292,8 +292,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           }
 
           def removeChannel = {
-            // This activity only works fine if channels are intact
-            // so once hosted channel is removed we exit this activity
+            // This activity only works fine if channels are intact so exit on removal
+            // We also need to disconnect from peer because they still have NORMAL state
+            ConnectionManager.workers.get(hc.announce.nodeId).foreach(_.disconnect)
             ChannelManager.all = ChannelManager.all diff Vector(chan)
             LNParams.db.change(ChannelTable.killSql, hc.channelId)
             PaymentInfoWrap unknownHostedHtlcsDetected hc

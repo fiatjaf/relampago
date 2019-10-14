@@ -269,10 +269,10 @@
     <string name="ln_info_status_suspended"><![CDATA[<font color=#E68A00>ЗАМОРОЖЕНИЙ</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
-    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В каналі є завислі активні</font> тому кооперативне закриття буде відкладено поки вони не зникнуть.<br><br>Рекомендується не закривати канал прямо зараз, а замість цього дати платежам пройти, все ще хочете продовжити?]]></string>
-    <string name="ln_chan_force_details"><![CDATA[&#9888; Майте на увазі, що спроба закриття каналу прямо зараз призведе до <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсованого закриття</a>, на яке піде велика сума комісії і більше часу, все ще хочете продовжити?]]></string>
-    <string name="ln_chan_close_confirm_address"><![CDATA[Хочете закрити канал і відправити зворотню Біткоїн-транзакцію на наступну адресу?<br><br><strong>%1$s</strong><br><br>Переконайтеся, що адреса вірна, тому що пізніше закриття каналу не можна буде скасувати!]]></string>
-    <string name="ln_chan_close_confirm_wallet">Хочете закрити канал і відправити зворотню Біткоїн-транзакцію назад у цей гаманець?</string>
+    <string name="ln_chan_close_inflight_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>В каналі є завислі активні</font> тому кооперативне закриття буде відкладено поки вони не зникнуть.<br><br>Рекомендується не закривати канал прямо зараз, а замість цього дати платежам пройти, все ще хочете продовжити?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[<small><br></small>&#9888; Майте на увазі, що спроба закриття каналу прямо зараз призведе до <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсованого закриття</a>, на яке піде велика сума комісії і більше часу, все ще хочете продовжити?]]></string>
+    <string name="ln_chan_close_confirm_address"><![CDATA[<small><br></small>Хочете закрити канал і відправити зворотню Біткоїн-транзакцію на наступну адресу?<br><br><strong>%1$s</strong><br><br>Переконайтеся, що адреса вірна, тому що пізніше закриття каналу не можна буде скасувати!]]></string>
+    <string name="ln_chan_close_confirm_wallet"><![CDATA[<small><br></small>Хочете закрити канал і відправити зворотню Біткоїн-транзакцію назад у цей гаманець?]]></string>
     <string name="ln_chan_close_address"><![CDATA[Закрити канал на адресу<br><small>%1$s</small>]]></string>
     <string name="ln_chan_close_address_no">Канал в цьому станi неможливо закрити на адресу</string>
     <string name="ln_chan_close_address_hint">Скопiюйте адресу щоб продовжити</string>
@@ -283,11 +283,11 @@
         <item>Закрити канал до гаманця</item>
     </array>
 
-    <string name="ln_hosted_remove_inflight_details"><![CDATA[&#9888; <font color=#E68A00>This hosted channel contains pending payments</font>, it is recommended to wait until these payments become failed or fulfilled before removal, would you still like to remove it right now?]]></string>
-    <string name="ln_hosted_remove_non_empty_details"><![CDATA[&#9888; <font color=#E68A00>This hosted channel has a non-empty balance</font>, it is recommended to empty this channel before removal, would you still like to remove it right now?]]></string>
+    <string name="ln_hosted_remove_inflight_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel contains pending payments</font><br><br>It is recommended to wait until these payments become failed or fulfilled before removal, would you still like to remove it right now?]]></string>
+    <string name="ln_hosted_remove_non_empty_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel has a non-empty balance</font><br><br>It is recommended to empty this channel before removal, would you still like to remove it right now?]]></string>
 
     <array name="ln_hosted_chan_actions">
-        <item><![CDATA[Read about Hosted Channels]]></item>
+        <item><![CDATA[About hosted channels]]></item>
         <item><![CDATA[Export channel state]]></item>
         <item><![CDATA[Remove this channel]]></item>
     </array>

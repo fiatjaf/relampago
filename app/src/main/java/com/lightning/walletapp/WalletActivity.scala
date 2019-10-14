@@ -157,9 +157,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
         override def onBecome = {
           case (_: HostedChannel, _, WAIT_FOR_ACCEPT, OPEN) =>
-            freshChannel.listeners = ChannelManager.operationalListeners
-            ChannelManager.all +:= freshChannel
-            FragWallet.worker.updTitleTask.run
+            FragWallet.worker.reg(freshChannel)
             detachItself
         }
 

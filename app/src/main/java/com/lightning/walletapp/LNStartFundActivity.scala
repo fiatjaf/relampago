@@ -48,14 +48,10 @@ class LNStartFundActivity extends TimerActivity { me =>
   }
 
   def finalizeSetup(chan: Channel) = {
-    // Make this channel able to receive ordinary events now
-    // additionally this will implicitly remove an OpenListener
-    chan.listeners = ChannelManager.operationalListeners
-    ChannelManager.all +:= chan
-
     // Tell wallet activity to redirect to ops
     app.TransData.value = FragWallet.REDIRECT
     me exitTo MainActivity.wallet
+    FragWallet.worker.reg(chan)
   }
 
   def saveNormalChannel(chan: NormalChannel, some: HasNormalCommits) = {

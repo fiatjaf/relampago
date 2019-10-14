@@ -489,9 +489,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def makeNormalRequest(sum: MilliSatoshi) = {
       val mostViableChannels = chansWithRoutes.keys.toVector
-        .filter(chan => chan.estCanReceiveMsat >= sum.amount) // In principle can receive an amount
-        .sortBy(chan => if (chan.isHosted) 1 else 0) // Hosted channels are pushed to the back of the queue
+        .filter(_.estCanReceiveMsat >= sum.amount) // In principle can receive an amount
         .sortBy(_.estCanReceiveMsat) // First use channels with the smallest balance but still able to receive
+        .sortBy(chan => if (chan.isHosted) 1 else 0) // Hosted channels are pushed to the back of the queue
         .take(4) // Limit number of channels to ensure QR code is always readable
 
       val preimage = ByteVector.view(random getBytes 32)
@@ -670,6 +670,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val wraps = for (txnj <- rawTxs.asScala.toVector) yield new TxWrap(txnj)
     btcItems = for (wrap <- wraps if wrap.isVisible) yield BTCWrap(wrap)
     updPaymentList.run
+  }
+
+  def reg(chan: Channel) = {
+    ChannelManager.all +:= chan
+    chan.listeners = ChannelManager.operationalListeners
+    ChannelManager attachListener chanListener
+    updTitleTask.run
   }
 
   def react = android.support.v4.app.LoaderManager.getInstance(host).restartLoader(1, null, loaderCallbacks).forceLoad
