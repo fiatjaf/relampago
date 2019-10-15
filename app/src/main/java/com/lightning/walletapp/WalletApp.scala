@@ -318,16 +318,17 @@ object ChannelManager extends Broadcaster {
   } yield canSendFeeIncluded
 
   def estimateAIRCanSend = {
-    // We are ultimately bound by the useful capacity of the largest channel
+    // It's possible that balance from all channels will be less than most funded chan capacity
     val airCanSend = mostFundedChanOpt.map(chan => chan.estCanSendMsat + airCanSendInto(chan).sum)
     val largestCapOpt = all.filter(isOperational).map(_.estNextUsefulCapacityMsat).reduceOption(_ max _)
+    // We are ultimately bound by the useful capacity of the largest channel
     math.min(airCanSend getOrElse 0L, largestCapOpt getOrElse 0L)
   }
 
   def accumulatorChanOpt(rd: RoutingData) =
-    all.filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty)
-      .filter(_.estNextUsefulCapacityMsat >= rd.withMaxOffChainFeeAdded)
-      .sortBy(_.estCanReceiveMsat).headOption // Smallest receivable
+    all.filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty) // Can in principle be used for receiving
+      .filter(_.estNextUsefulCapacityMsat >= rd.withMaxOffChainFeeAdded) // Able or will be able to send an amount after AIR
+      .sortBy(_.estCanReceiveMsat).headOption // The one closest to needed amount, meaning as few/low AIR transfers as possible
 
   // CHANNEL
 

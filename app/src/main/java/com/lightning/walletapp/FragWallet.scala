@@ -577,8 +577,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   def startAIR(toChan: Channel, origEmptyRD: RoutingData) = {
-    val origEmptyRD1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1)
-    val deltaAmountToSend = origEmptyRD1.withMaxOffChainFeeAdded - math.max(toChan.estCanSendMsat, 0L)
+    val rd1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1)
+    val deltaAmountToSend = rd1.withMaxOffChainFeeAdded - math.max(toChan.estCanSendMsat, 0L)
     val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
     require(deltaAmountToSend > 0, "Accumulator already has enough money for a final payment")
     require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
@@ -588,14 +588,17 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops),
       finalAmount, ByteVector(random getBytes 32), REBALANCING)
 
-    val listener = new ChannelListener { self =>
-      override def outPaymentAccepted(rd: RoutingData) =
-        if (rd.pr.paymentHash != rbRD.pr.paymentHash)
-          ChannelManager detachListener self
+    val listener = new ChannelListener {
+      override def outPaymentAccepted(rd: RoutingData) = {
+        // User may send a different payment while AIR is active, halt AIR if that happens
+        if (rd.pr.paymentHash != rbRD.pr.paymentHash) ChannelManager detachListener this
+      }
 
       override def onSettled(cs: Commitments) = {
         val isOK = cs.localSpec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)
-        if (isOK) runAnd(ChannelManager detachListener self) { UITask(me doSendOffChain origEmptyRD1).run }
+        // Same accumulator will be chosen next time because its balance would be even more attractive
+        if (isOK) ChannelManager detachListener this
+        if (isOK) UITask(me doSendOffChain rd1).run
       }
     }
 

@@ -217,9 +217,9 @@ class LNStartFundActivity extends TimerActivity { me =>
         // At this point hosted channel can only receive hosted messages or Error
         if (ann.nodeId == ann1.nodeId) freshChannel process message
 
-      // We override this once again to treat possibly tagged remote Error differently
       override def onMessage(nodeId: PublicKey, message: LightningMessage) = message match {
         case remoteError: Error if nodeId == ann.nodeId => translateHostedTaggedError(remoteError)
+        case upd: ChannelUpdate if nodeId == ann.nodeId && upd.isHosted => freshChannel process upd
         case _ => super.onMessage(nodeId, message)
       }
 

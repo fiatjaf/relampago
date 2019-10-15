@@ -46,9 +46,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       val cardView = Tuple3(chan, chan.data, card.getTag) match {
         case (chan: HostedChannel, commits: HostedCommits, view: HostedViewHolder) => view.fill(chan, commits)
-        case (chan: HostedChannel, commits: HostedCommits, null) => new HostedViewHolder(card).fill(chan, commits)
+        case (chan: HostedChannel, commits: HostedCommits, _) => new HostedViewHolder(card).fill(chan, commits)
         case (chan: NormalChannel, commits: HasNormalCommits, view: NormalViewHolder) => view.fill(chan, commits.commitments)
-        case (chan: NormalChannel, commits: HasNormalCommits, null) => new NormalViewHolder(card).fill(chan, commits.commitments)
+        case (chan: NormalChannel, commits: HasNormalCommits, _) => new NormalViewHolder(card).fill(chan, commits.commitments)
         case _ => throw new RuntimeException
       }
 
@@ -304,13 +304,13 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           rm(alert) {
             val htlcBlock = chan.inFlightHtlcs.nonEmpty
             val balanceBlock = chan.estCanSendMsat.fromMsatToSat > LNParams.dust
-            val hostedChanState = HostedState(hc.futureUpdates, hc.lastCrossSignedState)
+            val hostedChanState = HostedState(hc.nextLocalUpdates, hc.nextRemoteUpdates, hc.lastCrossSignedState)
             val uri = s"https://lightning-wallet.com/hosted-channels"
 
             if (0 == pos) host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
             else if (1 == pos) me share hostedStateCodec.encode(hostedChanState).require.toHex
-            else if (2 == pos && balanceBlock) warnAndMaybeRemove(me getString ln_hosted_remove_non_empty_details)
             else if (2 == pos && htlcBlock) warnAndMaybeRemove(me getString ln_hosted_remove_inflight_details)
+            else if (2 == pos && balanceBlock) warnAndMaybeRemove(me getString ln_hosted_remove_non_empty_details)
             else if (2 == pos) removeChannel
           }
         }

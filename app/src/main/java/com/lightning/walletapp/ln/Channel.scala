@@ -81,9 +81,10 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
     }
 
     BECOME(nextStateData, OPEN)
-    if (commands.isEmpty) me STORE nextStateData
-    else for (cmd <- commands) me doProcess cmd
-    me doProcess CMDProceed
+    if (commands.isEmpty) me STORE nextStateData else {
+      for (cmdUpdate <- commands) me doProcess cmdUpdate
+      me doProcess CMDProceed
+    }
   }
 
   def SEND(lightningMessage: LightningMessage) = for {
@@ -937,8 +938,9 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, remoteError: Error, OPEN | SLEEPING) =>
-        val cs1 = hc.modify(_.remoteError) setTo Some(remoteError)
-        BECOME(me STORE cs1, SUSPENDED)
+        val hc1 = hc.modify(_.remoteError) setTo Some(remoteError)
+        events unknownHostedHtlcsDetected hc
+        BECOME(me STORE hc1, SUSPENDED)
 
 
       case (hc: HostedCommits, CMDHostedStateOverride(remoteOverride), OPEN | SLEEPING | SUSPENDED) =>
@@ -961,7 +963,6 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (!isRightRemoteUpdateNumber) throw new LightningException("Provided remote update number from remote override is wrong")
         if (me isBlockDayOutOfSync remoteOverride.blockDay) throw new LightningException("Remote override blockday is not acceptable")
         BECOME(me STORE restoreCommits(recreatedCompleteLocalLCSS, hc.announce), OPEN) SEND recreatedCompleteLocalLCSS
-        events unknownHostedHtlcsDetected hc
 
 
       case (null, wait: WaitRemoteHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
@@ -1002,6 +1003,7 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     val localError = Error(channelId = hc.channelId, data = errCode)
     val hc1 = hc.modify(_.localError) setTo Some(localError)
     BECOME(me STORE hc1, SUSPENDED) SEND localError
+    events unknownHostedHtlcsDetected hc
   }
 
   def startUp = {

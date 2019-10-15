@@ -148,6 +148,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
         override def onMessage(nodeId: PublicKey, remoteMessage: LightningMessage) = remoteMessage match {
           case error: wire.Error if nodeId == defaultHostedNode.ann.nodeId => translateHostedTaggedError(error)
+          case upd: ChannelUpdate if nodeId == defaultHostedNode.ann.nodeId && upd.isHosted => freshChannel process upd
           case _ => // Do nothing
         }
 
