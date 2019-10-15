@@ -224,6 +224,7 @@
     <string name="ln_share_pr">Платежный запрос</string>
     <string name="ln_share_node_id">ID моего LN-узла</string>
     <string name="ln_share_debug">Отладочная информация</string>
+    <string name="ln_drain_hosted">Drain hosted channels</string>
     <string name="ln_share_proof">Доказательство платежа</string>
     <string name="ln_description_hint">добавьте описание</string>
     <string name="ln_no_description">Описание отсутствует</string>

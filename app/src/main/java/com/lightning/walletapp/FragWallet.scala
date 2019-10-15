@@ -567,10 +567,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def doSendOffChain(rd: RoutingData): Unit = {
     if (ChannelManager.currentBlocksLeft.isEmpty) host toast err_ln_chain_wait
     val sendableDirectlyOrAlternatives = ChannelManager.checkIfSendable(rd)
-    val accumulatorChanOpt = ChannelManager.accumulatorChanOpt(rd)
 
-    sendableDirectlyOrAlternatives -> accumulatorChanOpt match {
-      case Left(_ \ SENDABLE_AIR) \ Some(acc) => <(startAIR(acc, rd), onFail)(none)
+    val accumulatorChannel = ChannelManager.all
+      .filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty) // Can in principle be used for receiving
+      .filter(_.estNextUsefulCapacityMsat >= maxAcceptableFee(rd.firstMsat, hops = 3) + rd.firstMsat) // Able to send after AIR
+      .sortBy(_.estCanReceiveMsat).headOption // The one closest to needed amount, meaning as few/low AIR transfers as possible
+
+    sendableDirectlyOrAlternatives -> accumulatorChannel match {
+      case Left(_ \ SENDABLE_AIR) \ Some(accum) => <(startAIR(accum, rd), onFail)(none)
       case Left(unsendableAirImpossible \ _) \ _ => app quickToast unsendableAirImpossible
       case _ => PaymentInfoWrap addPendingPayment rd
     }
@@ -578,21 +582,20 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def startAIR(toChan: Channel, origEmptyRD: RoutingData) = {
     val rd1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1)
-    val deltaAmountToSend = rd1.withMaxOffChainFeeAdded - math.max(toChan.estCanSendMsat, 0L)
-    val amountCanRebalance = ChannelManager.airCanSendInto(toChan).reduceOption(_ max _) getOrElse 0L
-    require(deltaAmountToSend > 0, "Accumulator already has enough money for a final payment")
+    val deltaAmountToSend = maxAcceptableFee(rd1.firstMsat, hops = 3) + rd1.firstMsat - math.max(toChan.estCanSendMsat, 0L)
+    val amountCanRebalance = ChannelManager.airCanSendInto(targetChan = toChan).reduceOption(_ max _) getOrElse 0L
+    require(deltaAmountToSend > 0, "Accumulator already has enough money for a final payment + fees")
     require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
 
-    val Some(_ \ extraHops) = channelAndHop(toChan)
-    val finalAmount = MilliSatoshi(deltaAmountToSend min amountCanRebalance)
-    val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHops),
-      finalAmount, ByteVector(random getBytes 32), REBALANCING)
+    val Some(_ \ extraHop) = channelAndHop(toChan)
+    val finalAmount = MilliSatoshi(amount = deltaAmountToSend min amountCanRebalance)
+    val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHop), finalAmount, ByteVector(random getBytes 32), REBALANCING)
 
     val listener = new ChannelListener {
-      override def outPaymentAccepted(rd: RoutingData) = {
+      override def outPaymentAccepted(rd: RoutingData) =
         // User may send a different payment while AIR is active, halt AIR if that happens
+        // also this is desired happen when AIR fails and then user sends a different payment
         if (rd.pr.paymentHash != rbRD.pr.paymentHash) ChannelManager detachListener this
-      }
 
       override def onSettled(cs: Commitments) = {
         val isOK = cs.localSpec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)

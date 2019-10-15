@@ -227,6 +227,7 @@
     <string name="ln_no_description">Опис відсутній</string>
     <string name="ln_share_node_id">ID мого LN-вузла</string>
     <string name="ln_share_debug">Отладочна інформація</string>
+    <string name="ln_drain_hosted">Drain hosted channels</string>
     <string name="ln_proof">Підписаний платіжний запит: %1$s\n\nПрообраз платежу: %2$s</string>
     <string name="ln_qr_disposable"><![CDATA[Запит валідний 1 день<br>Не використовуйте QR повторно]]></string>
 

@@ -9,11 +9,12 @@ import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import android.view.{Menu, MenuItem, View, ViewGroup}
-import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.core.{Address, Block, FilteredBlock, Peer}
+import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap, random}
 import com.lightning.walletapp.lnutils.{ChannelTable, PaymentInfoWrap, PaymentTable}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.hostedStateCodec
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
+import com.lightning.walletapp.ln.PaymentInfo.REBALANCING
 import com.lightning.walletapp.ln.wire.HostedState
 import com.lightning.walletapp.helper.RichCursor
 import com.lightning.walletapp.ln.RefundingData
@@ -327,6 +328,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   override def onOptionsItemSelected(m: MenuItem) = runAnd(true) {
     if (m.getItemId == R.id.actionAddNodeId) me share LNParams.nodePublicKey.toString
+    else if (m.getItemId == R.id.actionDrainHosted) drainHostedChans
   }
 
   override def onDestroy = wrap(super.onDestroy) {
@@ -345,6 +347,23 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     app.kit.peerGroup addBlocksDownloadedEventListener eventsListener
     for (chan <- displayedChans) chan.listeners += eventsListener
   } else me exitTo classOf[MainActivity]
+
+  def drainHostedChans: Unit = {
+    val hosted \ normal = ChannelManager.all.partition(_.isHosted)
+    val hosted1 = hosted.filter(chan => isOperational(chan) && chan.estCanSendMsat.fromMsatToSat > LNParams.dust)
+    val normal1 = normal.filter(chan => isOperational(chan) && chan.estCanReceiveMsat.fromMsatToSat > LNParams.dust && channelAndHop(chan).nonEmpty)
+
+    if (hosted1.isEmpty) return
+    if (normal1.isEmpty) return
+
+    val preimage = ByteVector(random getBytes 32)
+    val largestCanSendMsat = hosted1.sortBy(_.estCanSendMsat).last.estCanSendMsat
+    val largestCanSendMinusFeesMsat = largestCanSendMsat - LNParams.maxAcceptableFee(largestCanSendMsat, hops = 3)
+    val toTransfer = MilliSatoshi(normal1.sortBy(_.estCanReceiveMsat).head.estCanReceiveMsat min largestCanSendMinusFeesMsat)
+    val normalExtraRoutes = normal1 flatMap channelAndHop collect { case _ \ normalExtraHop => normalExtraHop }
+    val rd = PaymentInfoWrap.recordRoutingDataWithPr(normalExtraRoutes, toTransfer, preimage, REBALANCING)
+    PaymentInfoWrap addPendingPayment rd.copy(fromHostedOnly = true)
+  }
 
   // UTILS
 

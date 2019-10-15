@@ -101,9 +101,9 @@ class WalletApp extends Application { me =>
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
     val useOnChainFeeBlock = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
-    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, onion = PacketAndSecrets(emptyOnionPacket, Vector.empty),
-      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeBlock) 8 else 4, useCache = useCache,
-      airLeft = 0, onChainFeeBlock = useOnChainFeeBlock, onChainFeeBlockWasUsed = false, retriedRoutes = Vector.empty)
+    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, onion = PacketAndSecrets(emptyOnionPacket, Vector.empty), firstMsat = firstMsat,
+      lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeBlock) 8 else 4, useCache = useCache, airLeft = 0, onChainFeeBlock = useOnChainFeeBlock,
+      onChainFeeBlockWasUsed = false, retriedRoutes = Vector.empty, fromHostedOnly = false)
   }
 
   object TransData {
@@ -325,19 +325,15 @@ object ChannelManager extends Broadcaster {
     math.min(airCanSend getOrElse 0L, largestCapOpt getOrElse 0L)
   }
 
-  def accumulatorChanOpt(rd: RoutingData) =
-    all.filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty) // Can in principle be used for receiving
-      .filter(_.estNextUsefulCapacityMsat >= rd.withMaxOffChainFeeAdded) // Able or will be able to send an amount after AIR
-      .sortBy(_.estCanReceiveMsat).headOption // The one closest to needed amount, meaning as few/low AIR transfers as possible
-
   // CHANNEL
 
   def hasHostedChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(_.isHosted)
+  def hasNormalChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(chan => isOpeningOrOperational(chan) && !chan.isHosted)
+
   def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estCanSendMsat).lastOption
   def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
   // We need to connect the rest of channels including special cases like REFUNDING normal channel and SUSPENDED hosted channel
   def initConnect = for (chan <- all if chan.state != CLOSING) ConnectionManager.connectTo(chan.data.announce, notify = false)
-  def hasNormalChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(chan => isOpeningOrOperational(chan) && !chan.isHosted)
   def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
   def fromNode(nodeId: PublicKey) = for (chan <- all if chan.data.announce.nodeId == nodeId) yield chan
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
@@ -426,8 +422,10 @@ object ChannelManager extends Broadcaster {
   }
 
   def fetchRoutes(rd: RoutingData) = {
-    // First we collect chans which in principle can handle a given payment sum right now, then prioritize less busy chans
-    val from = all.filter(chan => isOperational(chan) && chan.estCanSendMsat >= rd.firstMsat).map(_.data.announce.nodeId).distinct
+    val from: PublicKeyVec = rd.fromHostedOnly match {
+      case false => all.filter(chan => isOperational(chan) && chan.estCanSendMsat >= rd.firstMsat).map(_.data.announce.nodeId).distinct
+      case true => all.filter(chan => isOperational(chan) && chan.estCanSendMsat >= rd.firstMsat && chan.isHosted).map(_.data.announce.nodeId).distinct
+    }
 
     def withHints = for {
       tag <- Obs from rd.pr.routingInfo
@@ -466,11 +464,10 @@ object ChannelManager extends Broadcaster {
 
     case Right(rd) =>
       all filter isOperational find { chan =>
-        // Reflexive payment may happen through two chans belonging to the same peer
-        // here we must make sure we don't accidently use terminal channel as source one
-        val excludeShortChannelId = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
-        val isLoop = chan.getCommits.flatMap(_.updateOpt).exists(_.shortChannelId == excludeShortChannelId)
-        !isLoop && chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) && chan.estCanSendMsat >= rd.firstMsat
+        val matchesHostedOnlyPolicy = if (rd.fromHostedOnly) chan.isHosted else true // User may desire to only spend from hosted channels
+        val correctTargetPeerNodeId = chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) // Onion does not care about specific chan but peer nodeId must match
+        val notLoop = chan.getCommits.flatMap(_.updateOpt).map(_.shortChannelId) != rd.usedRoute.lastOption.map(_.shortChannelId) // Not chans like A -> B -> A
+        notLoop && matchesHostedOnlyPolicy && correctTargetPeerNodeId && chan.estCanSendMsat >= rd.firstMsat // Balance may change in a meantime
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)
         case Some(targetGoodChannel) => targetGoodChannel process rd
