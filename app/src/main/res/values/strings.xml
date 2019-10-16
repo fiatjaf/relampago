@@ -101,7 +101,8 @@
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
 
-    <string name="olympus_recovering">Getting Olympus backups&#8230;</string>
+    <string name="dialog_olympus_recovering">Getting Olympus backups&#8230;</string>
+    <string name="dialog_hosted_draining">Draining has started&#8230;</string>
     <string name="dialog_pr_expired">Expired payment request</string>
     <string name="dialog_sum_small">Amount is too small</string>
     <string name="dialog_sum_big">Amount is too large</string>
@@ -208,18 +209,20 @@
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
     <string name="err_ln_chain_wait">Waiting for on-chain wallet to become online</string>
 
-    <string name="err_not_enough_funds"><![CDATA[
-        At most %1$s can be sent on-chain right now with miner fees included while you were trying to send %2$s which exceeds current max amount by %3$s.<br><br><strong>
-        What can be done about it</strong>:<br><br>- Try to send a smaller amount if possible.<br><br>- Refill your on-chain wallet balance.<br><br>- Send exactly %1$s in which case fees will be subtracted from amount, not added on top of it.
-    ]]></string>
-
+    <string name="err_ln_not_enough">None of your channels contains enough funds to send %1$s off-chain</string>
+    <string name="err_ln_drain_ho_hosted">No hosted channel exists with balance large enough for withdrawal</string>
+    <string name="err_ln_drain_ho_normal">No normal channel exists with capacity large enough for receiving</string>
     <string name="err_ln_receiver_offline">Receiver is likely offline now, please make sure their wallet is online if possible</string>
     <string name="err_ln_still_opening">Failed because a payment channel is not open yet\n\nFunding transaction needs to get up to 6 confirmations before a channel can be used to send payments</string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process, try breaking it into a number of smaller transactions</string>
     <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees, please add some funds and try again</string>
-    <string name="err_ln_not_enough">None of your channels contains enough funds to send %1$s off-chain</string>
     <string name="err_nothing_useful">No useful data found</string>
+
+    <string name="err_not_enough_funds"><![CDATA[
+        At most %1$s can be sent on-chain right now with miner fees included while you were trying to send %2$s which exceeds current max amount by %3$s.<br><br><strong>
+        What can be done about it</strong>:<br><br>- Try to send a smaller amount if possible.<br><br>- Refill your on-chain wallet balance.<br><br>- Send exactly %1$s in which case fees will be subtracted from amount, not added on top of it.
+    ]]></string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
@@ -227,7 +230,7 @@
     <string name="ln_share_debug">Share debug info</string>
     <string name="ln_share_pr">Share Payment Request</string>
     <string name="ln_share_node_id">Share my LN Node ID</string>
-    <string name="ln_drain_hosted">Drain hosted channels</string>
+    <string name="ln_drain_hosted">Drain hosted channel</string>
     <string name="ln_share_proof">Share Proof of Payment</string>
     <string name="ln_description_hint">add some description</string>
     <string name="ln_no_description">No description provided</string>

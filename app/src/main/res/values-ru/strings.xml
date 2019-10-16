@@ -96,7 +96,8 @@
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
 
-    <string name="olympus_recovering">Getting Olympus backups&#8230;</string>
+    <string name="dialog_olympus_recovering">Getting Olympus backups&#8230;</string>
+    <string name="dialog_hosted_draining">Draining has started&#8230;</string>
     <string name="dialog_pr_expired">Этот платежный запрос устарел</string>
     <string name="dialog_sum_small">Сумма слишком мала</string>
     <string name="dialog_sum_big">Сумма слишком велика</string>
@@ -205,18 +206,20 @@
     <string name="err_ln_too_many">Не получилось потому что слишком много платежей уже в пути</string>
     <string name="err_ln_chain_wait">Ждем подключения он-чейн кошелька</string>
 
+    <string name="err_ln_drain_ho_hosted">Нет hosted-канала с достаточным балансом для снятия денег</string>
+    <string name="err_ln_drain_ho_normal">Нет обычного канала с емкостью, достаточно большой для приема денег</string>
+    <string name="err_ln_not_enough">У вас нет канала, в котором было бы достаточно денег, чтобы отправить %1$s офф-чейн</string>
+    <string name="err_ln_receiver_offline">Похоже что получатель в оффлайне, пожалуйста, убедитесь, что кошелек получателя в онлайне, если это возможно</string>
+    <string name="err_ln_still_opening">Не получилось потому что платежный канал еще не открыт\n\nНаполняющая канал Биткоин-транзакция должна получить до 6 подтверждений перед тем как его можно будет использовать для отправки платежей</string>
+    <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии, вы можете добавить денег в кошелек и попробовать еше раз</string>
+    <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой, попробуйте разбить ее на несколько более мелких транзакций</string>
+    <string name="err_gdrive_sign_in_failed">Не получилось залогиниться в GDrive, хотите продолжить без восстановления каналов из бекапов GDrive?</string>
+    <string name="err_nothing_useful">Ничего не найдено</string>
+
     <string name="err_not_enough_funds"><![CDATA[
         На данный момент вы можете отправить до %1$s он-чейн, а сумма вашего платежа равна %2$s, что превышает максимальный размер на %3$s.
         <br><br><strong>Что можно сделать</strong>:<br><br>- Отправьте меньшую сумму если это возможно.<br><br>- Пополните он-чейн баланс кошелька.<br><br>- Отправьте точно %1$s, в этом случае комиссия майнерам будет вычтена из суммы, а не добавлена сверху.
     ]]></string>
-
-    <string name="err_ln_receiver_offline">Похоже что получатель в оффлайне, пожалуйста, убедитесь, что кошелек получателя в онлайне, если это возможно</string>
-    <string name="err_ln_still_opening">Не получилось потому что платежный канал еще не открыт\n\nПополняющая канал Биткоин-транзакция должна получить до 6 подтверждений перед тем как его можно будет использовать для отправки платежей</string>
-    <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии, вы можете добавить денег в кошелек и попробовать еше раз</string>
-    <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой, попробуйте разбить ее на несколько более мелких транзакций</string>
-    <string name="err_gdrive_sign_in_failed">Не получилось залогиниться в GDrive, хотите продолжить без восстановления каналов из бекапов GDrive?</string>
-    <string name="err_ln_not_enough">У вас нет канала, в котором было бы достаточно денег, чтобы отправить %1$s офф-чейн</string>
-    <string name="err_nothing_useful">Ничего не найдено</string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
@@ -224,7 +227,7 @@
     <string name="ln_share_pr">Платежный запрос</string>
     <string name="ln_share_node_id">ID моего LN-узла</string>
     <string name="ln_share_debug">Отладочная информация</string>
-    <string name="ln_drain_hosted">Drain hosted channels</string>
+    <string name="ln_drain_hosted">Drain hosted channel</string>
     <string name="ln_share_proof">Доказательство платежа</string>
     <string name="ln_description_hint">добавьте описание</string>
     <string name="ln_no_description">Описание отсутствует</string>

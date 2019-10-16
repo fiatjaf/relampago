@@ -226,9 +226,9 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         } chan process ann1
       }
 
-      def go = runAnd(recover)(me toast olympus_recovering)
       val bld = baseTextBuilder(me getString channel_recovery_info)
-      mkCheckForm(alert => rm(alert)(go), none, bld, dialog_next, dialog_cancel)
+      def proceed = runAnd(recover)(me toast dialog_olympus_recovering)
+      mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
     }
 
     // Wallet may not notice incoming tx until synchronized

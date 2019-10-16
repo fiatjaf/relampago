@@ -39,12 +39,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def resolvePending =
-    if (ChannelManager.currentBlocksLeft.isDefined) {
+    if (ChannelManager.currentBlocksLeft.isDefined)
       // When uncapable chan becomes online: persists, waits for capable channel
       // When no routes found or any other error happens: gets removed in failOnUI
       // When accepted by channel: gets removed in outPaymentAccepted
       unsentPayments.values foreach fetchAndSend
-    }
 
   def extractPreimage(candidateTx: Transaction) = {
     val fulfills = candidateTx.txIn.map(_.witness.stack) collect {
