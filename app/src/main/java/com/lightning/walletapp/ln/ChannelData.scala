@@ -480,8 +480,8 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
 
   lazy val Tuple4(nextLocalUpdates, nextRemoteUpdates, nextTotalLocal, nextTotalRemote) =
     (Tuple4(Vector.empty[LightningMessage], Vector.empty[LightningMessage], lastCrossSignedState.localUpdates, lastCrossSignedState.remoteUpdates) /: futureUpdates) {
-      case (localMessages, remoteMessages, totalLocalNumber, totalRemoteNumber) \ Left(msg) => (localMessages :+ msg, remoteMessages, totalLocalNumber + 1, totalRemoteNumber)
-      case (localMessages, remoteMessages, totalLocalNumber, totalRemoteNumber) \ Right(msg) => (localMessages, remoteMessages :+ msg, totalLocalNumber, totalRemoteNumber + 1)
+      case (localMessages, remoteMessages, totalLocalNumber, totalRemoteNumber) \ (msg \ true) => (localMessages :+ msg, remoteMessages, totalLocalNumber + 1, totalRemoteNumber)
+      case (localMessages, remoteMessages, totalLocalNumber, totalRemoteNumber) \ (msg \ false) => (localMessages, remoteMessages :+ msg, totalLocalNumber, totalRemoteNumber + 1)
     }
 
   val channelId = announce.hostedChanId

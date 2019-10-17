@@ -16,8 +16,8 @@ import scodec.bits.ByteVector
 
 
 trait LightningMessage { me =>
-  def remote: LNDirectionalMessage = Right(me)
-  def local: LNDirectionalMessage = Left(me)
+  def remote: LNDirectionalMessage = me -> false
+  def local: LNDirectionalMessage = me -> true
 }
 
 trait RoutingMessage extends LightningMessage

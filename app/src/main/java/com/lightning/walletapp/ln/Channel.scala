@@ -70,21 +70,19 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
       isDifferentShortId || isOldUpdateRefresh
     }
 
-  def RESOLVE(cs: Commitments, prevRemoteUpdates: Traversable[LightningMessage], nextStateData: ChannelData) = {
-    // Once new state is settled we resolve remote updates from previous state or store data if there is nothing to resolve
-    // this can be done once since remote updates are erased at a later time so it's not possible to fulfill then fail a payment
+  def RESOLVE(prevRemoteUpdates: Traversable[LightningMessage], cs: Commitments) = {
+    // New state is settled, we resolve remote updates from previous state which can be done once
+    // by doing it this way we ensure it is not possible to resolve the same payment twice
 
-    val commands = prevRemoteUpdates collect { case remoteAdd: UpdateAddHtlc =>
+    val resolves = prevRemoteUpdates collect { case remoteAdd: UpdateAddHtlc =>
       // We don't want to receive a payment into a channel we have originally sent it from in an attempt to rebalance
       val isLoop = cs.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == remoteAdd.paymentHash)
       resolveHtlc(LNParams.nodePrivateKey, remoteAdd, LNParams.bag, isLoop)
     }
 
-    BECOME(nextStateData, OPEN)
-    if (commands.isEmpty) me STORE nextStateData else {
-      for (cmdUpdate <- commands) me doProcess cmdUpdate
-      me doProcess CMDProceed
-    }
+    for (cmd <- resolves) me doProcess cmd
+    // Inform if there were any commands
+    resolves.isEmpty
   }
 
   def SEND(lightningMessage: LightningMessage) = for {
@@ -356,8 +354,11 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
-        val d1 = norm.copy(commitments = norm.commitments receiveRevocation rev)
-        RESOLVE(norm.commitments, norm.commitments.remoteChanges.signed, d1)
+        me UPDATA norm.copy(commitments = norm.commitments receiveRevocation rev)
+        val noResolves = RESOLVE(norm.commitments.remoteChanges.signed, norm.commitments)
+        if (noResolves) me STORE data
+
+        me doProcess CMDProceed
         REV(norm.commitments, rev)
 
 
@@ -829,9 +830,9 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, CMDProceed, OPEN) =>
-        // Store not yet cross-signed updates because once local sig is sent we don't know if they have a new complete state
-        // by doing this we can treat these uncertain updates as in-flight while disconnected and then properly resolve their status on reconnect
-        me UPDATA STORE(hc) SEND hc.nextLocalUnsignedLCSS(LNParams.broadcaster.currentBlockDay).withLocalSigOfRemote(LNParams.nodePrivateKey).stateUpdate
+        // Store not yet cross-signed updates because once local signature is sent they may have a new complete state
+        val nextHC = hc.nextLocalUnsignedLCSS(LNParams.broadcaster.currentBlockDay).withLocalSigOfRemote(LNParams.nodePrivateKey)
+        me UPDATA STORE(hc) SEND nextHC.stateUpdate
 
 
       case (hc: HostedCommits, StateUpdate(blockDay, _, remoteUpdates, localSigOfRemoteLCSS), OPEN)
@@ -839,19 +840,20 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if hc.lastCrossSignedState.remoteSigOfLocal != localSigOfRemoteLCSS =>
 
         if (stateUpdateAttempts > 16) localSuspend(hc, ERR_HOSTED_TOO_MANY_STATE_UPDATES) else {
-          val nextLocalLCSS = hc.nextLocalUnsignedLCSS(blockDay).copy(remoteSigOfLocal = localSigOfRemoteLCSS).withLocalSigOfRemote(LNParams.nodePrivateKey)
-          val stateUpdatedHC = hc.copy(lastCrossSignedState = nextLocalLCSS, localSpec = hc.nextLocalSpec, futureUpdates = Vector.empty)
-          val isRemoteSigOk = nextLocalLCSS.verifyRemoteSig(hc.announce.nodeId)
+          val lcss1 = hc.nextLocalUnsignedLCSS(blockDay).copy(remoteSigOfLocal = localSigOfRemoteLCSS).withLocalSigOfRemote(LNParams.nodePrivateKey)
+          val hc1 = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalSpec, futureUpdates = Vector.empty)
+          val isRemoteSigOk = lcss1.verifyRemoteSig(hc.announce.nodeId)
           stateUpdateAttempts += 1
 
-          if (remoteUpdates < nextLocalLCSS.localUpdates) me SEND stateUpdatedHC.lastCrossSignedState.stateUpdate
+          if (remoteUpdates < lcss1.localUpdates) me SEND lcss1.stateUpdate
           else if (me isBlockDayOutOfSync blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
           else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
           else {
-            me SEND stateUpdatedHC.lastCrossSignedState.stateUpdate
-            RESOLVE(hc, hc.nextRemoteUpdates, stateUpdatedHC)
-            events onSettled stateUpdatedHC
             stateUpdateAttempts = 0
+            me UPDATA hc1 SEND lcss1.stateUpdate
+            val noResolves = RESOLVE(hc.nextRemoteUpdates, hc)
+            if (noResolves) me STORE hc1 else me doProcess CMDProceed
+            events onSettled hc1
           }
         }
 
@@ -891,8 +893,8 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, init: InitHostedChannel, SLEEPING) =>
-        // Looks like remote peer has lost this channel, they should re-sync from our LCSS
-        BECOME(syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec), OPEN)
+        // Remote peer has lost this channel, they should re-sync from our LCSS
+        syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec)
 
 
       // Technically they can send a remote LCSS before us explicitly asking for it first
@@ -906,15 +908,14 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
         else if (weAreAhead || weAreEven) {
-          // They have our current or previous state, resend our local leftovers but keep our state
-          BECOME(syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec), OPEN)
+          // They have our current or previous state, resend but keep our state
+          syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec)
         } else hc.findState(remoteLCSS).headOption match {
 
           case Some(hc1) =>
             val leftOvers = hc.futureUpdates.diff(hc1.futureUpdates)
             // They have our future state, settle on it and resend local leftovers
             val hc2 = syncAndResend(hc1, leftOvers, remoteLCSS.reverse, hc1.nextLocalSpec)
-            BECOME(me STORE hc2, OPEN)
             events onSettled hc2
 
           case None =>
@@ -976,20 +977,24 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
   }
 
   def syncAndResend(hc: HostedCommits, leftovers: Vector[LNDirectionalMessage], lcss: LastCrossSignedState, spec: CommitmentSpec) = {
-    // Forget about remote updates, re-send our LCSS and all non-cross-signed local updates, finally sign if updates are indeed present
-    val hostedCommits1 = hc.copy(futureUpdates = leftovers.filter(_.isLeft), lastCrossSignedState = lcss, localSpec = spec)
+    // Forget about remote, re-send our LCSS and all non-cross-signed local updates, finally sign if local leftovers are indeed present
+    val hc1 = hc.copy(futureUpdates = leftovers.filter { case _ \ isLocal => isLocal }, lastCrossSignedState = lcss, localSpec = spec)
 
-    me SEND hostedCommits1.lastCrossSignedState
-    for (update <- hostedCommits1.nextLocalUpdates) me SEND update
-    if (hostedCommits1.nextLocalUpdates.nonEmpty) me doProcess CMDProceed
-    hostedCommits1
+    BECOME(hc1, OPEN) SEND hc1.lastCrossSignedState
+    for (update <- hc1.nextLocalUpdates) me SEND update
+    if (hc1.nextLocalUpdates.nonEmpty) me doProcess CMDProceed
+    hc1
   }
 
-  def syncFromRestored(hc: HostedCommits) = {
+  def syncFromRestored(restoredHC: HostedCommits) = {
     // We may have incoming cross-signed HTLCs: resolve them right away
-    val adds = for (Htlc(true, add) <- hc.localSpec.htlcs) yield add
-    me SEND hc.lastCrossSignedState
-    RESOLVE(hc, adds, hc)
+    val adds = for (Htlc(true, add) <- restoredHC.localSpec.htlcs) yield add
+    me SEND restoredHC.lastCrossSignedState
+    BECOME(restoredHC, OPEN)
+
+    val noResolves = RESOLVE(adds, restoredHC)
+    if (noResolves) me STORE restoredHC
+    else me doProcess CMDProceed
   }
 
   def restoreCommits(localLCSS: LastCrossSignedState, ann: NodeAnnouncement) = {

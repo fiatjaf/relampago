@@ -142,15 +142,15 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           // At this point hosted channel can only receive hosted messages or remote Error
           if (ann.nodeId == defaultHostedNode.ann.nodeId) freshChannel process message
 
-        override def onDisconnect(nodeId: PublicKey) =
-          // We risk nothing by just halting and not doing anything
-          if (nodeId == defaultHostedNode.ann.nodeId) detachItself
-
         override def onMessage(nodeId: PublicKey, remoteMessage: LightningMessage) = remoteMessage match {
           case error: wire.Error if nodeId == defaultHostedNode.ann.nodeId => translateHostedTaggedError(error)
           case upd: ChannelUpdate if nodeId == defaultHostedNode.ann.nodeId && upd.isHosted => freshChannel process upd
           case _ => // Do nothing
         }
+
+        override def onDisconnect(nodeId: PublicKey) =
+        // We risk nothing by just halting and not doing anything
+          if (nodeId == defaultHostedNode.ann.nodeId) detachItself
 
         override def onOperational(nodeId: PublicKey, isCompat: Boolean) =
           // All sanity checks have already been made at this point so just proceed

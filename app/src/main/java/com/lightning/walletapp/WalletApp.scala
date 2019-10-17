@@ -228,7 +228,8 @@ object ChannelManager extends Broadcaster {
     }
 
     override def onHostedMessage(ann: NodeAnnouncement, msg: HostedChannelMessage) =
-      fromNode(ann.nodeId).find(_.getCommits.map(_.channelId) contains ann.hostedChanId).foreach(_ process msg)
+      fromNode(ann.nodeId).find(_.getCommits.map(_.channelId) contains ann.hostedChanId)
+        .foreach(_ process msg)
 
     override def onDisconnect(nodeId: PublicKey) = {
       fromNode(nodeId).foreach(_ process CMDSocketOffline)
