@@ -7,29 +7,24 @@ import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
-import com.google.android.gms.auth.api.signin._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 
-import android.app.{Activity, AlertDialog}
 import android.view.{Menu, MenuItem, View}
 import android.content.{DialogInterface, Intent}
 import android.os.Build.{VERSION, VERSION_CODES}
 import com.lightning.walletapp.helper.{AES, FingerPrint}
-import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
 import com.lightning.walletapp.ln.wire.{Domain, NodeAddress, WalletZygote}
-import com.google.android.gms.common.api.CommonStatusCodes.SIGN_IN_REQUIRED
 import android.content.DialogInterface.OnDismissListener
-import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.drive.MetadataBuffer
+import com.lightning.walletapp.lnutils.RatesSaver
 import android.support.v4.content.FileProvider
-import com.lightning.walletapp.lnutils.GDrive
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.store.SPVBlockStore
 import co.infinum.goldfinger.Goldfinger
 import com.google.common.io.Files
+import android.app.AlertDialog
 import scodec.bits.ByteVector
 import android.os.Bundle
 import android.net.Uri

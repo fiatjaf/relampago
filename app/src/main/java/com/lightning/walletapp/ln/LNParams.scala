@@ -46,7 +46,7 @@ object LNParams {
   lazy val extendedCloudKey = derivePrivateKey(master, hardened(92L) :: hardened(0L) :: Nil)
   // HashingKey is used for creating domain-specific identifiers when using "linkable payment" LNUrl
   lazy val hashingKey = derivePrivateKey(master, hardened(138L) :: 0L :: Nil).privateKey.toBin
-  // Cloud secret is used to encrypt Olympus and GDrive data, cloud ID is used as identifier
+  // Cloud secret is used to encrypt Olympus data, cloud ID is used as identifier
   lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin)
   lazy val cloudId = sha256(cloudSecret)
 

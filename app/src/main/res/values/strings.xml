@@ -72,13 +72,6 @@
         <item><![CDATA[<small><i>backup disabled</i></small>]]></item>
     </array>
 
-    <!-- GDrive backups -->
-    <string name="gdrive_last_saved">Last save %1$s</string>
-    <string name="gdrive_failed">Backup saving has failed</string>
-    <string name="gdrive_disabled">GDrive backups are disabled</string>
-    <string name="gdrive_not_present">No backup is present yet</string>
-    <string name="sets_gdrive">Backup channels to GDrive</string>
-
     <!-- menu and fab -->
     <string name="sets_set_fiat">Set Fiat currency</string>
     <string name="sets_choose_unit">Choose Bitcoin unit</string>
@@ -215,7 +208,6 @@
     <string name="err_ln_peer_can_not_route">Your peer can\'t route payments at this time, please try again a bit later or open another channel</string>
     <string name="err_ln_still_opening">Failed because a payment channel is not open yet\n\nFunding transaction needs to get up to 6 confirmations before a channel can be used to send payments</string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process, try breaking it into a number of smaller transactions</string>
-    <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees, please add some funds and try again</string>
     <string name="err_nothing_useful">No useful data found</string>
 

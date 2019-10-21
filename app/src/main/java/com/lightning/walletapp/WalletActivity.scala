@@ -14,14 +14,13 @@ import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import scala.util.{Success, Try}
-import android.app.{Activity, AlertDialog}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
-import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.ln.crypto.Sphinx.DecryptedFailurePacket
 import io.github.douglasjunior.androidSimpleTooltip.SimpleTooltip
 import android.support.v4.app.FragmentStatePagerAdapter
+import com.lightning.walletapp.lnutils.PaymentInfoWrap
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
 import android.support.v4.content.ContextCompat
@@ -33,6 +32,7 @@ import android.text.format.DateFormat
 import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
+import android.app.AlertDialog
 import scodec.bits.ByteVector
 import android.content.Intent
 import org.ndeftools.Message
@@ -239,13 +239,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
   } else me exitTo classOf[MainActivity]
-
-  override def onActivityResult(reqCode: Int, resultCode: Int, results: Intent) = {
-    val isGDriveSignInSuccessful = reqCode == 102 && resultCode == Activity.RESULT_OK
-    app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, isGDriveSignInSuccessful).commit
-    // This updates lastSaved if user restores wallet from migration file, otherwise no effect
-    if (isGDriveSignInSuccessful) ChannelManager.backUp else app quickToast gdrive_disabled
-  }
 
   // NFC
 

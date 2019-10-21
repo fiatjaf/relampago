@@ -24,7 +24,6 @@ import scodec.bits.{BitVector, ByteVector}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import android.content.{ClipboardManager, Context}
-import androidx.work.{ExistingWorkPolicy, WorkManager}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{pickInc, repeat}
 import com.lightning.walletapp.lnutils.olympus.{OlympusWrap, TxUploadAct}
@@ -207,7 +206,6 @@ class WalletApp extends Application { me =>
 object ChannelManager extends Broadcaster {
   val operationalListeners = Set(ChannelManager, bag)
   val CMDLocalShutdown = CMDShutdown(scriptPubKey = None)
-  val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
   var currentBlocksLeft = Option.empty[Int]
 
   var all: Vector[Channel] = ChannelWrap doGet db collect {
@@ -332,7 +330,6 @@ object ChannelManager extends Broadcaster {
   def hasNormalChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(chan => isOpeningOrOperational(chan) && !chan.isHosted)
   // We need to connect the rest of channels including special cases like REFUNDING normal channel and SUSPENDED hosted channel
   def initConnect = for (chan <- all if chan.state != CLOSING) ConnectionManager.connectTo(chan.data.announce, notify = false)
-  def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
   def fromNode(nodeId: PublicKey) = for (chan <- all if chan.data.announce.nodeId == nodeId) yield chan
   def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
   def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estCanSendMsat).lastOption
@@ -346,11 +343,7 @@ object ChannelManager extends Broadcaster {
   }
 
   def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel {
-    def STORE[T <: ChannelData](normalCommitments: T) = runAnd(normalCommitments) {
-      // Put updated data into db and schedule gdrive upload if allowed by user
-      ChannelWrap put normalCommitments
-      backUp
-    }
+    def STORE[T <: ChannelData](normalCommitments: T) = runAnd(normalCommitments)(ChannelWrap put normalCommitments)
 
     def REV(cs: NormalCommits, rev: RevokeAndAck) = for {
       tx <- cs.remoteCommit.txOpt // We use old commitments to save a punishment for remote commit before it gets dropped

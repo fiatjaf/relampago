@@ -9,7 +9,6 @@ import fr.acinq.bitcoin.{Crypto, LexicographicalOrdering, MilliSatoshi, Protocol
 import java.net.{Inet4Address, Inet6Address, InetAddress, InetSocketAddress}
 import fr.acinq.bitcoin.Crypto.{Point, PrivateKey, PublicKey, Scalar}
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap.StringVec
-import com.lightning.walletapp.ln.wire.TlvStream.BaseStream
 import com.lightning.walletapp.ln.crypto.Sphinx
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
@@ -266,4 +265,3 @@ case class HostedState(nextLocalUpdates: LNMessageVector, nextRemoteUpdates: LNM
 case class WalletZygote(v: Int, db: ByteVector, wallet: ByteVector, chain: ByteVector)
 case class CerberusPayload(payloads: Vector[AESZygote], halfTxIds: StringVec)
 case class AESZygote(v: Int, iv: ByteVector, ciphertext: ByteVector)
-case class GDriveBackup(chans: Vector[HasNormalCommits], v: Int)

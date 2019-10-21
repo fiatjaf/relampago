@@ -68,13 +68,6 @@
         <item><![CDATA[<small><i>бекап вимкнено</i></small>]]></item>
     </array>
 
-    <!-- GDrive backups -->
-    <string name="gdrive_last_saved">Оновлений %1$s</string>
-    <string name="gdrive_disabled">Бекап в GDrive вимкнений</string>
-    <string name="gdrive_not_present">Бекап поки відсутній</string>
-    <string name="gdrive_failed">Не вийшло зберегти бекап</string>
-    <string name="sets_gdrive">Бекап каналів в GDrive</string>
-
     <!-- menu and fab -->
     <string name="sets_set_fiat">Обрати валюту</string>
     <string name="sets_choose_unit">Обрати Біткоїн-юніт</string>
@@ -213,7 +206,6 @@
     <string name="err_ln_still_opening">Не вийшло тому що платіжний канал ще не відкритий\n\nНаповнююча канал Біткоїн-транзакція повинна отримати до 6 підтверджень перед тим як його можна буде використовувати для платежів</string>
     <string name="err_empty_shrunk">Не вийшло тому що не вдалося підібрати потрібну суму комісії, ви можете додати грошей в гаманець та спробувати еше раз</string>
     <string name="err_tx_too_large">Не вийшло тому що розмір транзакції занадто великий, спробуйте розбити її на кілька дрібніших транзакцій</string>
-    <string name="err_gdrive_sign_in_failed">Не вийшло залогінитися в GDrive, хочете продовжити без відновлення каналів з бекапів GDrive?</string>
     <string name="err_nothing_useful">Нічого не знайдено</string>
 
     <string name="err_not_enough_funds"><![CDATA[
