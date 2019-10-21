@@ -243,6 +243,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val resource = if (isTablet) R.layout.frag_tx_line_tablet else R.layout.frag_tx_line
       val view = if (null == savedView) host.getLayoutInflater.inflate(resource, null) else savedView
       val holder = if (null == view.getTag) ViewHolder(view) else view.getTag.asInstanceOf[ViewHolder]
+      // Reset bg to transparent each time because LN slot may mark a revealed preimage
+      view setBackgroundColor 0x00000000
       getItem(position) fillView holder
       view
     }
@@ -301,9 +303,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
-      sentHostedPreimages contains info.preimage match {
-        case false => holder.view setBackgroundColor 0x00000000
-        case true => holder.view setBackgroundColor Denomination.yellowHighlight
+      if (sentHostedPreimages contains info.preimage) {
+        holder.view setBackgroundColor Denomination.yellowHighlight
       }
 
       val humanAmount =

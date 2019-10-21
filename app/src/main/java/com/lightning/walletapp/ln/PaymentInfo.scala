@@ -68,7 +68,6 @@ object PaymentInfo {
     if (isOffChainFeeBreach || isCltvBreach) useFirstRoute(rest, rd1) else {
       val onion = buildOnion(keys = nodeIds :+ rd1.pr.nodeId, payloads = allPayloads, assoc = rd1.pr.paymentHash)
       val rd2 = rd1.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
-      println(s"-- ${rd2.usedRoute.size}")
       Right(rd2)
     }
   }

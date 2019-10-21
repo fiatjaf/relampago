@@ -105,7 +105,8 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
 
   def isAuthEnabled = 1 == auth
   def retryFreshRequest(failedPr: PaymentRequest): Unit = {
-    val isOk = ChannelManager.mostFundedChanOpt.exists(_.estCanSendMsat >= failedPr.msatOrMin.amount)
-    if (isOk) PaymentInfoWrap addPendingPayment app.emptyRD(failedPr, failedPr.msatOrMin.amount, useCache = true)
+    val retryRD = app.emptyRD(failedPr, failedPr.msatOrMin.amount, useCache = true)
+    // We do not care about options such as AIR or AMP here because price is supposed to be small
+    if (ChannelManager.checkIfSendable(retryRD).isRight) PaymentInfoWrap addPendingPayment retryRD
   }
 }
