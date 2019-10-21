@@ -321,22 +321,21 @@ object ChannelManager extends Broadcaster {
   def estimateAIRCanSend = {
     // It's possible that balance from all channels will be less than most funded chan capacity
     val airCanSend = mostFundedChanOpt.map(chan => chan.estCanSendMsat + airCanSendInto(chan).sum)
-    val largestCapOpt = all.filter(isOperational).map(_.estNextUsefulCapacityMsat).reduceOption(_ max _)
-    // We are ultimately bound by the useful capacity of the largest channel
-    math.min(airCanSend getOrElse 0L, largestCapOpt getOrElse 0L)
+    val usefulCaps = all.filter(isOperational).map(chan => chan.estCanSendMsat + chan.estCanReceiveMsat)
+    // We are bound by the useful capacity (sendable + receivable - inflight) of the largest channel
+    math.min(airCanSend getOrElse 0L, usefulCaps.reduceOption(_ max _) getOrElse 0L)
   }
 
   // CHANNEL
 
   def hasHostedChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(_.isHosted)
   def hasNormalChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(chan => isOpeningOrOperational(chan) && !chan.isHosted)
-
-  def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estCanSendMsat).lastOption
-  def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
   // We need to connect the rest of channels including special cases like REFUNDING normal channel and SUSPENDED hosted channel
   def initConnect = for (chan <- all if chan.state != CLOSING) ConnectionManager.connectTo(chan.data.announce, notify = false)
   def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
   def fromNode(nodeId: PublicKey) = for (chan <- all if chan.data.announce.nodeId == nodeId) yield chan
+  def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
+  def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estCanSendMsat).lastOption
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 

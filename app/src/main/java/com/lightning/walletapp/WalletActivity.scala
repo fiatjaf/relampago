@@ -19,6 +19,7 @@ import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import com.lightning.walletapp.lnutils.{GDrive, PaymentInfoWrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
+import com.lightning.walletapp.ln.crypto.Sphinx.DecryptedFailurePacket
 import io.github.douglasjunior.androidSimpleTooltip.SimpleTooltip
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
@@ -211,31 +212,29 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     wrap(me setDetecting true)(me initNfc state)
     me setContentView R.layout.activity_double_pager
     walletPager setAdapter slidingFragmentAdapter
-    var warnedOffline = Set.empty[ByteVector]
 
-    PaymentInfoWrap.newRoutesOrGiveUp = rd => {
-      val termNodes = rd.pr.routingInfo.flatMap(_.route.lastOption).map(_.nodeId)
-      val reportedTermOfflineNodes = PaymentInfo.terminalOfflineNodeIds(rd.pr.paymentHash)
-      val isConvincing = reportedTermOfflineNodes.intersect(termNodes).size > termNodes.size / 3
-
-      if (!warnedOffline.contains(rd.pr.paymentHash) && isConvincing) {
-        // One of terminal nodes returned ChannelDisabled or UnknownNextPeer
-        PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
-        UITask(me toast err_ln_receiver_offline).run
-        warnedOffline += rd.pr.paymentHash
-      } else if (rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight) {
+    PaymentInfoWrap.newRoutesOrGiveUp = rd =>
+      if (rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight) {
         // We do not care about options such as AIR or AMP here, this HTLC may be one of them
         PaymentInfoWrap fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
       } else {
-        // Too many attempts and still no luck so we give up for now
+        // Our direct peers likely have no liquidity at the moment
+        val allChanFailsFromPeers = PaymentInfo.errors(rd.pr.paymentHash) forall {
+          // Ensure failed route is not like A -> B [peer] -> C because peer may send temp failure for these but it could be C's fault
+          case DecryptedFailurePacket(origin, _: TemporaryChannelFailure) \ route => route.size > 1 && origin == rd.nextNodeId(route)
+          case DecryptedFailurePacket(origin, PermanentChannelFailure) \ route => route.size > 1 && origin == rd.nextNodeId(route)
+          case _ => false
+        }
+
+        if (allChanFailsFromPeers) UITask(me toast err_ln_peer_can_not_route).run
+        // Too many attempts and still no luck so we give up on payment for now
         PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
       }
-    }
 
     PaymentInfoWrap.failOnUI = rd => {
       PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash
       PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
-      if (rd.onChainFeeBlockWasUsed) UITask(me toast ln_fee_expesive_omitted).run
+      if (rd.onChainFeeBlockWasUsed) UITask(me toast ln_fee_expensive_omitted).run
       PaymentInfoWrap.uiNotify
     }
 

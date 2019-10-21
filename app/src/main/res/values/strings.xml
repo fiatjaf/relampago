@@ -138,7 +138,7 @@
     <string name="sets_ln_fee_cap">Limit LN fees to chain fees</string>
     <string name="ln_fee_cap_disabled"><![CDATA[Disabled, maximum LN fee is at most <strong>%1$s</strong> of payment]]></string>
     <string name="ln_fee_cap_enabled"><![CDATA[Enabled, maximum LN fee is at most <strong>%1$s</strong> of payment, but not higher than current on-chain fee of <strong>%2$s</strong>]]></string>
-    <string name="ln_fee_expesive_omitted">Expensive routes were omitted, remove LN fee limit in settings if you would like to try more expensive routes</string>
+    <string name="ln_fee_expensive_omitted">Expensive routes were omitted, remove LN fee limit in settings if you would like to try more expensive routes</string>
 
     <array name="info_progress">
         <item>Sync is complete</item>
@@ -210,9 +210,9 @@
     <string name="err_ln_chain_wait">Waiting for on-chain wallet to become online</string>
 
     <string name="err_ln_not_enough">None of your channels contains enough funds to send %1$s off-chain</string>
-    <string name="err_ln_drain_ho_hosted">No hosted channel exists with balance large enough for withdrawal</string>
-    <string name="err_ln_drain_ho_normal">No normal channel exists with capacity large enough for receiving</string>
-    <string name="err_ln_receiver_offline">Receiver is likely offline now, please make sure their wallet is online if possible</string>
+    <string name="err_ln_drain_no_hosted">No hosted channel exists with balance large enough for withdrawal</string>
+    <string name="err_ln_drain_no_normal">No normal channel exists with capacity large enough for receiving</string>
+    <string name="err_ln_peer_can_not_route">Your peer can\'t route payments at this time, please try again a bit later or open another channel</string>
     <string name="err_ln_still_opening">Failed because a payment channel is not open yet\n\nFunding transaction needs to get up to 6 confirmations before a channel can be used to send payments</string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process, try breaking it into a number of smaller transactions</string>
     <string name="err_gdrive_sign_in_failed">Could not sign in to GDrive, would you like to proceed without restoring channels from GDrive backups?</string>

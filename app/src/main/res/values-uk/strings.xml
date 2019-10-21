@@ -133,7 +133,7 @@
     <string name="sets_ln_fee_cap">Обмежити розмір LN-комісій</string>
     <string name="ln_fee_cap_disabled"><![CDATA[Відключено, максимальна LN-комісія дорівнює <strong>%1$s</strong> від суми платежу]]></string>
     <string name="ln_fee_cap_enabled"><![CDATA[Включено, максимальна LN-комісія дорівнює <strong>%1$s</strong> від суми платежу, але не вище ніж поточна ончейн комісія <strong>%2$s</strong>]]></string>
-    <string name="ln_fee_expesive_omitted">Дорогі маршрути не були використанi: приберіть обмеження на LN-комісію в налаштуваннях щоб спробувати більш дорогі маршрути</string>
+    <string name="ln_fee_expensive_omitted">Дорогі маршрути не були використанi: приберіть обмеження на LN-комісію в налаштуваннях щоб спробувати більш дорогі маршрути</string>
 
     <array name="info_progress">
         <item>Синхронізацію завершено</item>
@@ -206,10 +206,10 @@
     <string name="err_ln_too_many">Не вийшло тому що занадто багато платежів вже в дорозі</string>
     <string name="err_ln_chain_wait">Очiкуємо на пiдключення он-чейн гаманця</string>
 
-    <string name="err_ln_drain_ho_hosted">Немає hosted-каналу з достатнім балансом для зняття грошей</string>
-    <string name="err_ln_drain_ho_normal">Ні звичайного каналу з ємністю, досить великою для прийому грошей</string>
+    <string name="err_ln_drain_no_hosted">Немає hosted-каналу з достатнім балансом для зняття грошей</string>
+    <string name="err_ln_drain_no_normal">Ні звичайного каналу з ємністю, досить великою для прийому грошей</string>
     <string name="err_ln_not_enough">У вас немає каналу, в якому було б достатньо грошей, щоб відправити %1$s офф-чейн</string>
-    <string name="err_ln_receiver_offline">Одержувач платежу скорiш за все в офлайні, будь ласка, переконайтеся, що гаманець одержувача в онлайні, якщо це можливо</string>
+    <string name="err_ln_peer_can_not_route">Пiр тимчасово не може передавати платежi, спробуйте ще раз пiзнiше або відкрийте інший канал</string>
     <string name="err_ln_still_opening">Не вийшло тому що платіжний канал ще не відкритий\n\nНаповнююча канал Біткоїн-транзакція повинна отримати до 6 підтверджень перед тим як його можна буде використовувати для платежів</string>
     <string name="err_empty_shrunk">Не вийшло тому що не вдалося підібрати потрібну суму комісії, ви можете додати грошей в гаманець та спробувати еше раз</string>
     <string name="err_tx_too_large">Не вийшло тому що розмір транзакції занадто великий, спробуйте розбити її на кілька дрібніших транзакцій</string>

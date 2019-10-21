@@ -68,6 +68,7 @@ object PaymentInfo {
     if (isOffChainFeeBreach || isCltvBreach) useFirstRoute(rest, rd1) else {
       val onion = buildOnion(keys = nodeIds :+ rd1.pr.nodeId, payloads = allPayloads, assoc = rd1.pr.paymentHash)
       val rd2 = rd1.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
+      println(s"-- ${rd2.usedRoute.size}")
       Right(rd2)
     }
   }
@@ -105,12 +106,6 @@ object PaymentInfo {
   def updateHop(rd: RoutingData, upd: ChannelUpdate) = rd.usedRoute map {
     case keepHop if keepHop.shortChannelId != upd.shortChannelId => keepHop
     case oldHop => upd.toHop(oldHop.nodeId)
-  }
-
-  def terminalOfflineNodeIds(paymentHash: ByteVector) = errors(paymentHash) collect {
-    case DecryptedFailurePacket(originNode, _: ChannelDisabled | UnknownNextPeer) \ usedRoute
-      if usedRoute.lastOption.exists(_.nodeId == originNode) =>
-      originNode
   }
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {

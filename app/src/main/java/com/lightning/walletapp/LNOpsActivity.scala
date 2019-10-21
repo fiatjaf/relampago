@@ -354,8 +354,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     val hosted1 = hosted.filter(chan => isOperational(chan) && chan.estCanSendMsat.fromMsatToSat > LNParams.dust)
     val normal1 = normal.filter(chan => isOperational(chan) && chan.estCanReceiveMsat.fromMsatToSat > LNParams.dust && channelAndHop(chan).nonEmpty)
 
-    if (hosted1.isEmpty) me toast err_ln_drain_ho_hosted
-    else if (normal1.isEmpty) me toast err_ln_drain_ho_normal
+    if (hosted1.isEmpty) me toast err_ln_drain_no_hosted
+    else if (normal1.isEmpty) me toast err_ln_drain_no_normal
     else {
       val preimage = ByteVector(random getBytes 32)
       val largestCanSendMsat = hosted1.map(_.estCanSendMsat).sorted.last

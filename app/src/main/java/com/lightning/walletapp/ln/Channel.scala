@@ -104,10 +104,6 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
   def estCanSendMsat: Long
   def refundableMsat: Long
 
-  def estNextUsefulCapacityMsat =
-    // In-flight HTLCs are subtracted here
-    estCanSendMsat + estCanReceiveMsat
-
   var waitingUpdate: Boolean = true
   var permanentOffline: Boolean = true
   var listeners: Set[ChannelListener] = _

@@ -570,7 +570,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     val accumulatorChannel = ChannelManager.all
       .filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty) // Can in principle be used for receiving
-      .filter(_.estNextUsefulCapacityMsat >= maxAcceptableFee(rd.firstMsat, hops = 3) + rd.firstMsat) // Able to send after AIR
+      .filter(chan => chan.estCanSendMsat + chan.estCanReceiveMsat >= maxAcceptableFee(rd.firstMsat, hops = 3) + rd.firstMsat)
       .sortBy(_.estCanReceiveMsat).headOption // The one closest to needed amount, meaning as few/low AIR transfers as possible
 
     sendableDirectlyOrAlternatives -> accumulatorChannel match {
@@ -599,9 +599,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       override def onSettled(cs: Commitments) = {
         val isOK = cs.localSpec.fulfilledOutgoing.exists(_.paymentHash == rbRD.pr.paymentHash)
-        // Same accumulator will be chosen next time because its balance would be even more attractive
+        // Same accumulator will be chosen next time because its balance would be more attractive
+        if (isOK) host.timer.schedule(me doSendOffChain rd1, 250L)
         if (isOK) ChannelManager detachListener this
-        if (isOK) UITask(me doSendOffChain rd1).run
       }
     }
 
