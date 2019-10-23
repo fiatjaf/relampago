@@ -291,10 +291,12 @@
         <item><![CDATA[Remove this channel]]></item>
     </array>
 
-    <string name="btc_status_operational">Bitcoin wallet is online</string>
-    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Connecting to peers</font>]]></string>
     <string name="btc_empty"><![CDATA[<font color=#BBBBBB>No on-chain funds</font>]]></string>
     <string name="ln_empty"><![CDATA[<font color=#BBBBBB>No off-chain funds</font>]]></string>
+
+    <string name="btc_status_operational">Bitcoin wallet is online</string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Connecting to peers</font>]]></string>
+    <string name="ln_status_hosted_suspended"><![CDATA[<font color=#E68A00>Hosted channel is suspended</font>]]></string>
     <string name="ln_status_operational_many">All channels are online</string>
     <string name="ln_status_operational_one">Channel is online</string>
 

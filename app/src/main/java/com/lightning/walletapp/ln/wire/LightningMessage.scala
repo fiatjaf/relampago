@@ -245,19 +245,14 @@ case class LastCrossSignedState(refundScriptPubKey: ByteVector,
 
   def isAhead(remoteLCSS: LastCrossSignedState) = remoteUpdates > remoteLCSS.localUpdates || localUpdates > remoteLCSS.remoteUpdates
   def isEven(remoteLCSS: LastCrossSignedState) = remoteUpdates == remoteLCSS.localUpdates && localUpdates == remoteLCSS.remoteUpdates
-
-  def stateUpdate = {
-    require(localSigOfRemote != ByteVector.empty, "Empty localSigOfRemote")
-    StateUpdate(blockDay, localUpdates, remoteUpdates, localSigOfRemote)
-  }
+  def stateUpdate(isTerminal: Boolean) = StateUpdate(blockDay, localUpdates, remoteUpdates, localSigOfRemote, isTerminal)
 }
 
 case class StateUpdate(blockDay: Long, localUpdates: Long, remoteUpdates: Long,
-                       localSigOfRemoteLCSS: ByteVector) extends HostedChannelMessage
+                       localSigOfRemoteLCSS: ByteVector, isTerminal: Boolean) extends HostedChannelMessage
 
-case class StateOverride(blockDay: Long,
-                         localBalanceMsat: Long, localUpdates: Long, remoteUpdates: Long,
-                         localSigOfRemoteLCSS: ByteVector) extends HostedChannelMessage
+case class StateOverride(blockDay: Long, localBalanceMsat: Long, localUpdates: Long,
+                         remoteUpdates: Long, localSigOfRemoteLCSS: ByteVector) extends HostedChannelMessage
 
 // Not in a spec
 case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)

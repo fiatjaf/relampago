@@ -288,10 +288,12 @@
         <item><![CDATA[Remove this channel]]></item>
     </array>
 
-    <string name="btc_empty">Немає монет он-чейн</string>
-    <string name="ln_empty">Немає монет офф-чейн</string>
+    <string name="btc_empty"><![CDATA[<font color=#BBBBBB>Немає монет он-чейн</font>]]></string>
+    <string name="ln_empty"><![CDATA[<font color=#BBBBBB>Немає монет офф-чейн</font>]]></string>
+
     <string name="btc_status_operational">Біткоїн-гаманець онлайн</string>
     <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Пошук вузлів</font>]]></string>
+    <string name="ln_status_hosted_suspended"><![CDATA[<font color=#E68A00>Hosted-канал призупинено</font>]]></string>
     <string name="ln_status_operational_many">Усi канали працюють</string>
     <string name="ln_status_operational_one">Канал працює</string>
 

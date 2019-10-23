@@ -334,7 +334,7 @@ class WireSpec {
       val init_hosted_channel = InitHostedChannel(UInt64(6), 10, 20, 500000000L, 5000, 1000000, 1000000)
       val state_override = StateOverride(50000L, 500000, 70000, 700000, randomSignature)
 
-      val state_update = StateUpdate(50000L, 10, 20, randomSignature)
+      val state_update = StateUpdate(50000L, 10, 20, randomSignature, isTerminal = false)
       val lcss1 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc, update_add_htlc, update_add_htlc), List(update_add_htlc, update_add_htlc, update_add_htlc), randomSignature, randomSignature)
       val lcss2 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, List(update_add_htlc, update_add_htlc), randomSignature, randomSignature)
       val lcss3 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc, update_add_htlc), Nil, randomSignature, randomSignature)

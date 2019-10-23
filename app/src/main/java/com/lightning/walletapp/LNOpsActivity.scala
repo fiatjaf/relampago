@@ -280,8 +280,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       }
 
       visibleExcept(gone = R.id.fundingDepth, R.id.closedAt,
-        R.id.balancesDivider, R.id.refundableAmount,
-        R.id.refundFee, R.id.overBar)
+        R.id.balancesDivider, R.id.refundableAmount, R.id.refundFee,
+        R.id.overBar)
 
       view setOnClickListener onButtonTap {
         val title = chan.data.announce.asString.html
@@ -290,10 +290,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         lst setOnItemClickListener onTap { pos =>
           def warnAndMaybeRemove(removalWarning: String) = {
             val bld = baseTextBuilder(removalWarning.html).setCustomTitle(title)
-            mkCheckForm(alert => rm(alert)(removeChannel), none, bld, dialog_ok, dialog_cancel)
+            mkCheckForm(alert => rm(alert)(removeChan), none, bld, dialog_ok, dialog_cancel)
           }
 
-          def removeChannel = {
+          def removeChan = {
             // This activity only works fine if channels are intact so exit on removal
             // We also need to disconnect from peer because they still have NORMAL state
             ConnectionManager.workers.get(hc.announce.nodeId).foreach(_.disconnect)
@@ -313,7 +313,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             else if (1 == pos) me share hostedStateCodec.encode(hostedChanState).require.toHex
             else if (2 == pos && htlcBlock) warnAndMaybeRemove(me getString ln_hosted_remove_inflight_details)
             else if (2 == pos && balanceBlock) warnAndMaybeRemove(me getString ln_hosted_remove_non_empty_details)
-            else if (2 == pos) removeChannel
+            else if (2 == pos) removeChan
           }
         }
       }
@@ -351,7 +351,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def drainHostedChan = {
     val hosted \ normal = ChannelManager.all.partition(_.isHosted)
-    val hosted1 = hosted.filter(chan => isOperational(chan) && chan.estCanSendMsat.fromMsatToSat > LNParams.dust)
+    val hosted1 = hosted.filter(hostedChan => isOperational(hostedChan) && hostedChan.estCanSendMsat.fromMsatToSat > LNParams.dust)
     val normal1 = normal.filter(chan => isOperational(chan) && chan.estCanReceiveMsat.fromMsatToSat > LNParams.dust && channelAndHop(chan).nonEmpty)
 
     if (hosted1.isEmpty) me toast err_ln_drain_no_hosted

@@ -112,6 +112,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   // UPDATING TITLE
 
   val lnStateInfo = app.getResources getStringArray R.array.ln_chan_connecting
+  val lnStatusHostedSuspended = app getString ln_status_hosted_suspended
   val lnStatusOperationalMany = app getString ln_status_operational_many
   val lnStatusOperationalOne = app getString ln_status_operational_one
   val lnEmpty = app getString ln_empty
@@ -123,12 +124,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   val btcEmpty = app getString btc_empty
 
   val updTitleTask = UITask {
-    val viable = ChannelManager.all.filter(isOpeningOrOperational)
-    val online = viable.count(chan => OPEN == chan.state)
-    val delta = viable.size - online
+    val suspended = ChannelManager.all.filter(_.isHosted).filterNot(isOperational)
+    val allViable = ChannelManager.all.filter(isOpeningOrOperational)
+    val online = allViable.count(chan => OPEN == chan.state)
+    val delta = allViable.size - online
 
     val btcTotalSum = coin2MSat(app.kit.conf0Balance)
-    val lnTotalSum = MilliSatoshi(viable.map(_.refundableMsat).sum)
+    val lnTotalSum = MilliSatoshi(allViable.map(_.refundableMsat).sum)
     val btcFunds = if (btcTotalSum.amount < 1) btcEmpty else denom parsedWithSign btcTotalSum
     val lnFunds = if (lnTotalSum.amount < 1) lnEmpty else denom parsedWithSign lnTotalSum
     val perOneBtcRate = formatFiat.format(msatInFiat(oneBtc) getOrElse 0L)
@@ -139,8 +141,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       else app.plur1OrZero(btcSyncInfo, ChannelManager.blockDaysLeft)
 
     val lnSubtitleText =
-      if (delta == 0 && viable.size == 1) lnStatusOperationalOne
-      else if (delta == 0 && viable.size > 1) lnStatusOperationalMany
+      if (suspended.nonEmpty) lnStatusHostedSuspended
+      else if (delta == 0 && allViable.size == 1) lnStatusOperationalOne
+      else if (delta == 0 && allViable.size > 1) lnStatusOperationalMany
       else app.plur1OrZero(lnStateInfo, delta)
 
     lnStatus setText lnSubtitleText.html

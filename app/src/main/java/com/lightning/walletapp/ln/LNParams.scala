@@ -77,9 +77,7 @@ object LNParams {
     mismatch < -0.25 || mismatch > 0.25
   }
 
-  def backupFileName = s"blw${chainHash.toHex}-${cloudId.toHex}.bkup"
   def updateFeerate = for (chan <- ChannelManager.all) chan process CMDFeerate(broadcaster.perKwThreeSat)
-
   def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: ByteVector, fundKey: PrivateKey, isFunder: Boolean) = {
     // It's always possible to re-derive all secret keys because a keyPath is generated from funding pubKey which will be present on a blockchain
     val Seq(revocationSecret, paymentKey, delayedPaymentKey, htlcKey, shaSeed) = makeChanKeys(fundKey.publicKey)

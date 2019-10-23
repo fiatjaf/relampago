@@ -288,10 +288,12 @@
         <item><![CDATA[Remove this channel]]></item>
     </array>
 
-    <string name="btc_empty">Нет монет на цепи</string>
-    <string name="ln_empty">Нет монет в каналах</string>
+    <string name="btc_empty"><![CDATA[<font color=#BBBBBB>Нет монет на цепи</font>]]></string>
+    <string name="ln_empty"><![CDATA[<font color=#BBBBBB>Нет монет в каналах</font>]]></string>
+
     <string name="btc_status_operational">Биткоин-кошелек онлайн</string>
     <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Поиск узлов</font>]]></string>
+    <string name="ln_status_hosted_suspended"><![CDATA[<font color=#E68A00>Hosted-канал приостановлен</font>]]></string>
     <string name="ln_status_operational_many">Все каналы работают</string>
     <string name="ln_status_operational_one">Канал работает</string>
 
