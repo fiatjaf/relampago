@@ -728,8 +728,8 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 }
 
 abstract class HostedChannel extends Channel(isHosted = true) { me =>
-  def estCanSendMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toLocalMsat case _ => 0L }
-  def estCanReceiveMsat = data match { case hc: HostedCommits => hc.nextLocalSpec.toRemoteMsat case _ => 0L }
+  def estCanSendMsat = data match { case hc: HostedCommits => hc.localSpec.toLocalMsat case _ => 0L }
+  def estCanReceiveMsat = data match { case hc: HostedCommits => hc.localSpec.toRemoteMsat case _ => 0L }
   def inFlightHtlcs: Set[Htlc] = data match { case hc: HostedCommits => hc.currentAndNextInFlight case _ => Set.empty }
   def isBlockDayOutOfSync(blockDay: Long): Boolean = math.abs(blockDay - LNParams.broadcaster.currentBlockDay) > 1
   def refundableMsat = estCanSendMsat
