@@ -87,10 +87,7 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
 
   def SEND(lightningMessage: LightningMessage) = for {
     work <- ConnectionManager.workers.get(data.announce.nodeId)
-  } {
-    println(s"--> $lightningMessage")
-    work.handler process lightningMessage
-  }
+  } work.handler process lightningMessage
 
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
     // Transition must always be defined before vars are updated
@@ -835,13 +832,15 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
 
 
       case (hc: HostedCommits, StateUpdate(blockDay, _, remoteUpdates, localSigOfRemoteLCSS, isTerminal), OPEN)
-        if hc.lastCrossSignedState.remoteSigOfLocal != localSigOfRemoteLCSS && remoteUpdates == hc.nextTotalLocal =>
+        // GUARD: only proceed if signture is defferent because they will send a few non-terminal duplicates
+        if hc.lastCrossSignedState.remoteSigOfLocal != localSigOfRemoteLCSS =>
 
         val lcss1 = hc.nextLocalUnsignedLCSS(blockDay).copy(remoteSigOfLocal = localSigOfRemoteLCSS).withLocalSigOfRemote(LNParams.nodePrivateKey)
         val hc1 = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalSpec, futureUpdates = Vector.empty)
         val isRemoteSigOk = lcss1.verifyRemoteSig(hc.announce.nodeId)
 
-        if (me isBlockDayOutOfSync blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
+        if (remoteUpdates < lcss1.localUpdates) me SEND lcss1.stateUpdate(isTerminal = false)
+        else if (me isBlockDayOutOfSync blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
         else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else if (!isTerminal) me SEND lcss1.stateUpdate(isTerminal = true)
         else {
