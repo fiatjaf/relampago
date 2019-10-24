@@ -83,7 +83,7 @@ case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFunding
 
   def isLost: Boolean = fundingError match {
     case None => commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 21 * 1000L
-    case _ => commitments.startedAt < System.currentTimeMillis - 3600 * 2 * 21 * 1000L
+    case _ => commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 7 * 1000L
   }
 }
 
@@ -97,8 +97,7 @@ case class ClosingTxProposed(unsignedTx: ClosingTx, localClosingSigned: ClosingS
 case class NegotiationsData(announce: NodeAnnouncement, commitments: NormalCommits, localShutdown: Shutdown, remoteShutdown: Shutdown,
                             localProposals: Seq[ClosingTxProposed], lastSignedTx: Option[ClosingTx] = None) extends HasNormalCommits
 
-case class RefundingData(announce: NodeAnnouncement, remoteLatestPoint: Option[Point],
-                         commitments: NormalCommits) extends HasNormalCommits
+case class RefundingData(announce: NodeAnnouncement, remoteLatestPoint: Option[Point], commitments: NormalCommits) extends HasNormalCommits
 
 case class ClosingData(announce: NodeAnnouncement,
                        commitments: NormalCommits, localProposals: Seq[ClosingTxProposed] = Nil,
@@ -113,18 +112,20 @@ case class ClosingData(announce: NodeAnnouncement,
   def tier12States: Seq[PublishStatus] = realTier12Closings.flatMap(_.getState)
 
   def bestClosing: CommitPublished = {
-    // At least one closing is guaranteed to be here
+    // At least one closing is guaranteed to be present
     val mutualWrappers = mutualClose map MutualCommitPublished
-    mutualWrappers ++ realTier12Closings maxBy { commitPublished =>
-      val txDepth \ isDead = getStatus(commitPublished.commitTx.txid)
-      if (isDead) -txDepth else txDepth
-    }
+    (mutualWrappers ++ realTier12Closings).maxBy(_.getDepth)
   }
 }
 
 sealed trait CommitPublished {
   def getState: Seq[PublishStatus] = Nil
-  val commitTx: Transaction
+  def commitTx: Transaction
+
+  def getDepth: Int = {
+    val txDepth \ isDead = getStatus(commitTx.txid)
+    if (isDead) -txDepth else txDepth
+  }
 }
 
 case class LocalCommitPublished(claimMainDelayed: Seq[ClaimDelayedOutputTx], claimHtlcSuccess: Seq[SuccessAndClaim],
@@ -170,16 +171,9 @@ case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig],
                           remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey) {
 
   lazy val dustLim = Satoshi(dustLimit)
-  def makeClaimP2WPKHOutput(tx: Transaction) =
-    Scripts.makeClaimP2WPKHOutputTx(tx, localPubKey,
-      finalScriptPubKey, feeRate, dustLim)
-
-  def makeHtlcPenalty(finder: PubKeyScriptIndexFinder)(redeemScript: ByteVector) =
-    Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, feeRate, dustLim)
-
-  def makeMainPenalty(tx: Transaction) =
-    Scripts.makeMainPenaltyTx(tx, remoteRevocationPubkey, finalScriptPubKey,
-      toSelfDelay, remoteDelayedPaymentKey, feeRate, dustLim)
+  def makeClaimP2WPKHOutput(tx: Transaction) = Scripts.makeClaimP2WPKHOutputTx(tx, localPubKey, finalScriptPubKey, feeRate, dustLim)
+  def makeHtlcPenalty(finder: PubKeyScriptIndexFinder)(redeemScript: ByteVector) = Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, feeRate, dustLim)
+  def makeMainPenalty(tx: Transaction) = Scripts.makeMainPenaltyTx(tx, remoteRevocationPubkey, finalScriptPubKey, toSelfDelay, remoteDelayedPaymentKey, feeRate, dustLim)
 }
 
 // COMMITMENTS

@@ -381,7 +381,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def canDisplayData(c: Channel): Boolean = c.data match {
-    case ref: RefundingData => ref.remoteLatestPoint.isDefined
+    case refund: RefundingData => refund.remoteLatestPoint.isDefined
+    case cd: ClosingData => cd.bestClosing.getDepth <= LNParams.minDepth
     case _: HasNormalCommits => true
     case _: HostedCommits => true
     case _ => false
