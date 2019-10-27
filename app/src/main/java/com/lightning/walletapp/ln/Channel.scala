@@ -937,11 +937,10 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         BECOME(me STORE hc1, SUSPENDED)
 
 
-      case (hc: HostedCommits, remoteOverride: StateOverride, OPEN | SLEEPING | SUSPENDED) =>
+      case (hc: HostedCommits, CMDHostedStateOverride(remoteOverride), SUSPENDED) if isSocketConnected =>
         val isRightLocalUpdateNumber = remoteOverride.localUpdates > hc.lastCrossSignedState.remoteUpdates
         val isRightRemoteUpdateNumber = remoteOverride.remoteUpdates > hc.lastCrossSignedState.localUpdates
-        // Remote peer sends their local balance in StateOverride so our new balance is capacity - their local balance
-        val localBalance = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat - remoteOverride.localBalanceMsat
+        val localBalance = hc.newLocalBalanceMsat(remoteOverride)
 
         val restoredCompleteLCSS =
           hc.lastCrossSignedState.copy(incomingHtlcs = Nil, outgoingHtlcs = Nil,

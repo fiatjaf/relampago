@@ -1,7 +1,6 @@
 package com.lightning.walletapp
 
 import android.widget._
-import fr.acinq.bitcoin._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.R.string._
@@ -11,6 +10,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import org.bitcoinj.core.{Address, Block, FilteredBlock, Peer}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap, random}
+import fr.acinq.bitcoin.{Satoshi, MilliSatoshi, SatoshiLong, MilliSatoshiLong}
 import com.lightning.walletapp.lnutils.{ChannelTable, PaymentInfoWrap, PaymentTable}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.hostedStateCodec
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
@@ -30,19 +30,22 @@ import scala.util.Try
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  lazy val displayedChans = ChannelManager.all.filter(canDisplayData).sortBy(chan => if (chan.state == CLOSING) 1 else 0)
   lazy val hostedChanActions = for (txt <- getResources getStringArray R.array.ln_hosted_chan_actions) yield txt.html
   lazy val normalChanActions = for (txt <- getResources getStringArray R.array.ln_normal_chan_actions) yield txt.html
   lazy val barStatus = app.getResources getStringArray R.array.ln_chan_ops_status
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
+  lazy val displayedChans = ChannelManager.all.filter(canDisplayData)
   lazy val host = me
 
   val adapter = new BaseAdapter {
-    def getItem(position: Int) = displayedChans(position)
-    def getItemId(chanPosition: Int) = chanPosition
     def getCount = displayedChans.size
+    def getItemId(chanPosition: Int) = chanPosition
+    def getItem(position: Int) = displayedChans(position)
+    def getView(position: Int, savedView: View, parent: ViewGroup) = {
+      // Use View as well as ViewHolder caching to display chan cards as fast as possible
+      // it may happen that HostedView gets on NormalChannel and vice versa: account for that
 
-    def getView(position: Int, savedView: View, parent: ViewGroup) = getItem(position) match { case chan =>
+      val chan = getItem(position)
       val card = if (null == savedView) getLayoutInflater.inflate(R.layout.chan_card, null) else savedView
 
       val cardView = Tuple3(chan, chan.data, card.getTag) match {
@@ -60,8 +63,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   val eventsListener = new ChannelListener with BlocksListener {
-    override def onBecome: PartialFunction[Transition, Unit] = { case _ => UITask(adapter.notifyDataSetChanged).run }
-    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = if (left < 1) UITask(adapter.notifyDataSetChanged).run
+    override def onBecome = { case _ => UITask(adapter.notifyDataSetChanged).run }
+    override def onProcessSuccess = { case (chan: HostedChannel, _: HostedCommits, _: wire.StateOverride) if chan.state == SUSPENDED => finish case _ => }
+    def onBlocksDownloaded(peer: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) = if (left < 1) UITask(adapter.notifyDataSetChanged).run
   }
 
   abstract class ChanViewHolder(view: View) {

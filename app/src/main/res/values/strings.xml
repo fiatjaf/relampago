@@ -282,6 +282,7 @@
         <item><![CDATA[Close channel to wallet]]></item>
     </array>
 
+    <string name="ln_hosted_override_warn"><![CDATA[Remote host wants to override your hosted channel balance from current %1$s to updated %2$s, this can only happen with your permission.<br><br><strong>Make sure an updated balance looks correct before proceeding with this!</strong><br><br>Would you like to proceed with proposed hosted channel override?]]></string>
     <string name="ln_hosted_remove_inflight_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel contains pending payments</font><br><br>It is recommended to wait until these payments become failed or fulfilled before removal, would you still like to remove it right now?]]></string>
     <string name="ln_hosted_remove_non_empty_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel has a non-empty balance</font><br><br>It is recommended to empty this channel before removal, would you still like to remove it right now?]]></string>
 

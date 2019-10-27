@@ -279,6 +279,7 @@
         <item>Закрити канал до гаманця</item>
     </array>
 
+    <string name="ln_hosted_override_warn"><![CDATA[Віддалений хост хоче оновити баланс вашого hosted-каналу з поточного %1$s на новий %2$s, але це можливо тільки з вашого дозволу.<br><br><strong>Перш ніж продовжити, переконайтеся що новий баланс виглядає правильно!</strong><br><br>Ви підтверджуєте запропоноване оновлення баланса?]]></string>
     <string name="ln_hosted_remove_inflight_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel contains pending payments</font><br><br>It is recommended to wait until these payments become failed or fulfilled before removal, would you still like to remove it right now?]]></string>
     <string name="ln_hosted_remove_non_empty_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel has a non-empty balance</font><br><br>It is recommended to empty this channel before removal, would you still like to remove it right now?]]></string>
 

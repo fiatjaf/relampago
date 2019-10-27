@@ -18,6 +18,7 @@ import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
+import fr.acinq.bitcoin.{MilliSatoshi, MilliSatoshiLong}
 import android.database.{ContentObserver, Cursor}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import scala.util.{Failure, Success, Try}
@@ -34,7 +35,6 @@ import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
-import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import android.app.AlertDialog
 import android.content.Intent
@@ -182,6 +182,10 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       case (chan: HostedChannel, _: HostedCommits, remoteError: wire.Error) =>
         informOfferClose(chan, ChanErrorCodes.translateTag(remoteError).getMessage, natRes = -1).run
 
+      // Let user manually choose if remotely proposed override should be applied if chan is suspended
+      case (chan: HostedChannel, hc: HostedCommits, so: wire.StateOverride) if chan.state == SUSPENDED =>
+        proposeOverride(CMDHostedStateOverride(so), chan, hc).run
+
       // Notify user that preimage has been revealed to hosted channel
       case (_: HostedChannel, _: HostedCommits, _: CMDFulfillHtlc) =>
         updPaymentList.run
@@ -212,6 +216,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         val bld = negTextBuilder(dialog_ok, UncaughtHandler toText internalException)
         UITask(host showForm bld.setCustomTitle(chan.data.announce.asString.html).create).run
     }
+  }
+
+  def proposeOverride(cmd: CMDHostedStateOverride, chan: HostedChannel, hc: HostedCommits) = UITask {
+    val currentBalance = s"<strong>${denom.parsedWithSign(chan.estCanSendMsat.toTruncatedMsat).html}</strong>"
+    val proposedBalance = s"<strong>${denom.parsedWithSign(hc.newLocalBalanceMsat(cmd.so).toTruncatedMsat).html}</strong>"
+    val hostedOverrideDetails = app.getString(ln_hosted_override_warn).format(currentBalance, proposedBalance).html
+    val bld = host.baseTextBuilder(hostedOverrideDetails).setCustomTitle(chan.data.announce.asString.html)
+    mkCheckForm(alert => rm(alert)(chan process cmd), none, bld, dialog_ok, dialog_cancel)
   }
 
   def informNoRoutesMatched(code: Int)(rd: RoutingData) = {
@@ -661,9 +673,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     def replace: Unit = {
       if (wrap.tx.getConfidence.getDepthInBlocks > 0) return
       if (DEAD == wrap.tx.getConfidence.getConfidenceType) return
+      // Parent transaction hiding must happen before child is broadcasted
       wrap.makeHidden
 
-      // Parent transaction hiding must happen before child is broadcasted
       val unsigned = childPaysForParent(app.kit.wallet, wrap.tx, newFee)
       app.kit blockSend app.kit.sign(unsigned).tx
     }
