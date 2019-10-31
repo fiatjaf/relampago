@@ -9,7 +9,7 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import org.bitcoinj.core.{Address, Block, FilteredBlock, Peer}
-import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap, random}
+import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap, random, memoize}
 import fr.acinq.bitcoin.{Satoshi, MilliSatoshi, SatoshiLong, MilliSatoshiLong}
 import com.lightning.walletapp.lnutils.{ChannelTable, PaymentInfoWrap, PaymentTable}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.hostedStateCodec
@@ -37,6 +37,11 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val displayedChans = ChannelManager.all.filter(canDisplayData)
   lazy val host = me
 
+  val getTotalPayments = memoize { chanId: ByteVector =>
+    val cursor = LNParams.db.select(PaymentTable.selectPaymentNumSql, chanId)
+    RichCursor(cursor) headTry { case RichCursor(c1) => c1 getLong 0 } getOrElse 0L
+  }
+
   val adapter = new BaseAdapter {
     def getCount = displayedChans.size
     def getItemId(chanPosition: Int) = chanPosition
@@ -44,11 +49,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     def getView(position: Int, savedView: View, parent: ViewGroup) = {
       // Use View as well as ViewHolder caching to display chan cards as fast as possible
       // it may happen that HostedView gets on NormalChannel and vice versa: account for that
-
-      val chan = getItem(position)
       val card = if (null == savedView) getLayoutInflater.inflate(R.layout.chan_card, null) else savedView
 
-      val cardView = Tuple3(chan, chan.data, card.getTag) match {
+      val cardView = Tuple3(getItem(position), getItem(position).data, card.getTag) match {
         case (chan: HostedChannel, commits: HostedCommits, view: HostedViewHolder) => view.fill(chan, commits)
         case (chan: HostedChannel, commits: HostedCommits, _) => new HostedViewHolder(card).fill(chan, commits)
         case (chan: NormalChannel, commits: HasNormalCommits, view: NormalViewHolder) => view.fill(chan, commits.commitments)
@@ -139,7 +142,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       startedAtText setText startedAt.html
       addressAndKey setText chan.data.announce.asString.html
       fundingDepthText setText s"$fundingDepth / $threshold"
-      totalPaymentsText setText getStat(cs.channelId).toString
+      totalPaymentsText setText getTotalPayments(cs.channelId).toString
       // All amounts are in MilliSatoshi, but we divide them by 1000 to erase trailing msat remainders
       stateAndConnectivity setText s"<strong>${me stateStatusColor chan}</strong><br>${me connectivityStatusColor chan}".html
       paymentsInFlightText setText sumOrNothing(chan.inFlightHtlcs.toVector.map(_.add.amountMsat).sum.fromMsatToSat).html
@@ -267,7 +270,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
       startedAtText setText startedAt.html
       addressAndKey setText chan.data.announce.asString.html
-      totalPaymentsText setText getStat(hc.channelId).toString
+      totalPaymentsText setText getTotalPayments(hc.channelId).toString
       // All amounts are in MilliSatoshi, but we divide them by 1000 to erase trailing msat remainders
       stateAndConnectivity setText s"<strong>${me stateStatusColor chan}</strong><br>${me connectivityStatusColor chan}".html
       paymentsInFlightText setText sumOrNothing(chan.inFlightHtlcs.toVector.map(_.add.amountMsat).sum.fromMsatToSat).html
@@ -409,9 +412,4 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     else if (cd.refundRemoteCommit.nonEmpty) me getString ln_info_close_remote
     else if (cd.mutualClose.nonEmpty) me getString ln_info_close_coop
     else me getString ln_info_close_local
-
-  def getStat(chanId: ByteVector) = {
-    val cursor = LNParams.db.select(PaymentTable.selectPaymentNumSql, chanId)
-    RichCursor(cursor) headTry { case RichCursor(c1) => c1 getLong 0 } getOrElse 0L
-  }
 }

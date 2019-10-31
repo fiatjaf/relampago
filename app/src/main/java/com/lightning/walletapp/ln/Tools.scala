@@ -33,6 +33,10 @@ object Tools {
     premap.toMap
   }
 
+  def memoize[I, O](f: I => O): I => O = new collection.mutable.HashMap[I, O] { self =>
+    override def apply(key: I) = getOrElseUpdate(key, f apply key)
+  }
+
   def sign(data: ByteVector, pk: PrivateKey) = Try {
     Crypto encodeSignature Crypto.sign(data, pk)
   } getOrElse ByteVector.empty
