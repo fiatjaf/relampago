@@ -28,9 +28,9 @@ object Tools {
   def none: PartialFunction[Any, Unit] = { case _ => }
   def runAnd[T](result: T)(action: Any): T = result
 
-  def toMap[T, K, V](source: Seq[T], keyFun: T => K, valFun: T => V): Map[K, V] = {
-    val premap = for (mapElement <- source) yield keyFun(mapElement) -> valFun(mapElement)
-    premap.toMap
+  def toDefMap[T, K, V](source: Seq[T], keyFun: T => K, valFun: T => V, default: V): Map[K, V] = {
+    val sequenceOfTuples = for (mapElement <- source) yield keyFun(mapElement) -> valFun(mapElement)
+    sequenceOfTuples.toMap withDefaultValue default
   }
 
   def memoize[I, O](f: I => O): I => O = new collection.mutable.HashMap[I, O] { self =>

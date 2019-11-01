@@ -586,7 +586,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     val accumulatorChannel = ChannelManager.all
       .filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty) // Can in principle be used for receiving
-      .filter(chan => chan.estCanSendMsat + chan.estCanReceiveMsat >= maxAcceptableFee(rd.firstMsat, hops = 3) + rd.firstMsat)
+      .filter(chan => chan.estCanReceiveMsat + chan.estCanSendMsat >= maxAcceptableFee(rd.firstMsat, hops = 3) + rd.firstMsat)
       .sortBy(_.estCanReceiveMsat).headOption // The one closest to needed amount, meaning as few/low AIR transfers as possible
 
     sendableDirectlyOrAlternatives -> accumulatorChannel match {

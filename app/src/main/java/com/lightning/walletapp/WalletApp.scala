@@ -38,6 +38,7 @@ import org.bitcoinj.wallet.Wallet.BalanceType
 import rx.lang.scala.schedulers.IOScheduler
 import java.util.Collections.singletonList
 import fr.acinq.bitcoin.Protocol.Zeroes
+import fr.acinq.bitcoin.SatoshiLong
 import org.bitcoinj.uri.BitcoinURI
 import scala.concurrent.Future
 import android.widget.Toast
@@ -318,10 +319,10 @@ object ChannelManager extends Broadcaster {
 
   def estimateAIRCanSend = {
     // It's possible that balance from all channels will be less than most funded chan capacity
-    val airCanSend = mostFundedChanOpt.map(chan => chan.estCanSendMsat + airCanSendInto(chan).sum)
-    val usefulCaps = all.filter(isOperational).map(chan => chan.estCanSendMsat + chan.estCanReceiveMsat)
-    // We are bound by the useful capacity (sendable + receivable - inflight) of the largest channel
-    math.min(airCanSend getOrElse 0L, usefulCaps.reduceOption(_ max _) getOrElse 0L)
+    val airCanSend = mostFundedChanOpt.map(chan => chan.estCanSendMsat + airCanSendInto(chan).sum) getOrElse 0L
+    val usefulCaps = all.filter(isOperational).map(chan => chan.estCanSendMsat.zeroIfNegative + chan.estCanReceiveMsat.zeroIfNegative)
+    // We are ultimately bound by the useful capacity (sendable + receivable - currently inflight payments) of the largest channel
+    usefulCaps.reduceOption(_ max _) getOrElse 0L min airCanSend
   }
 
   // CHANNEL
@@ -443,10 +444,10 @@ object ChannelManager extends Broadcaster {
 
     for {
       rs <- paymentRoutesObs
-      busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, channel => channel.inFlightHtlcs.size)
-      openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, channel => if (channel.state == OPEN) 0 else 1)
-      foundRoutes = rs.sortBy(estTotalRouteFee).sortBy(busyMap compose rd.nextNodeId).sortBy(openMap compose rd.nextNodeId)
-      // We may have out of band routes in RD (e.g. extracted from lnurl-pay), append them to found routes
+      openMap = Tools.toDefMap[Channel, PublicKey, Int](all.filter(isOperational), _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1, default = 1)
+      busyMap = Tools.toDefMap[Channel, PublicKey, Int](all.filter(isOperational), _.data.announce.nodeId, chan => chan.inFlightHtlcs.size, default = 1)
+      foundRoutes = rs.sortBy(estTotalRouteFee).sortBy(openMap compose rd.nextNodeId).sortBy(busyMap compose rd.nextNodeId)
+      // We may have out of band routes in RD so append them to found ones
     } yield useFirstRoute(foundRoutes ++ rd.routes, rd)
   }
 
@@ -456,7 +457,7 @@ object ChannelManager extends Broadcaster {
     case Left(emptyRD) => noRoutes(emptyRD)
 
     case Right(rd) =>
-      all filter isOperational find { chan =>
+      all.filter(isOperational) find { chan =>
         val matchesHostedOnlyPolicy = if (rd.fromHostedOnly) chan.isHosted else true // User may desire to only spend from hosted channels
         val correctTargetPeerNodeId = chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) // Onion does not care about specific chan but peer nodeId must match
         val notLoop = chan.getCommits.flatMap(_.updateOpt).map(_.shortChannelId) != rd.usedRoute.lastOption.map(_.shortChannelId) // Not chans like A -> B -> A

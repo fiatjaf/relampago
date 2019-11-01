@@ -45,6 +45,7 @@ package object bitcoin {
   }
 
   implicit final class SatoshiLong(private val n: Long) extends AnyVal {
+    def zeroIfNegative = if (n < 0L) 0L else n
     def fromMsatToSat = Satoshi(n / 1000L)
     def satoshi = Satoshi(n)
   }

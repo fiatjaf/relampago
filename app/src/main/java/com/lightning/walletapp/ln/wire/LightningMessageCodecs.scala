@@ -583,14 +583,14 @@ object LightningMessageCodecs { me =>
       .typecase(cr = channelAnnouncement.as[ChannelAnnouncement], tag = 256)
       .typecase(cr = nodeAnnouncementCodec, tag = 257)
       .typecase(cr = channelUpdateCodec, tag = 258)
+      .typecase(cr = announcementSignatures.as[AnnouncementSignatures], tag = 259)
       .typecase(cr = queryChannelRangeCodec, tag = 263)
       .typecase(cr = gossipTimestampFilterCodec, tag = 265)
-      .typecase(cr = announcementSignatures.as[AnnouncementSignatures], tag = 259)
       .typecase(cr = invokeHostedChannelCodec, tag = 65535)
-      .typecase(cr = initHostedChannelCodec, tag = 65534)
-      .typecase(cr = lastCrossSignedStateCodec, tag = 65533)
-      .typecase(cr = stateUpdateCodec, tag = 65532)
-      .typecase(cr = stateOverrideCodec, tag = 65531)
+      .typecase(cr = initHostedChannelCodec, tag = 65533)
+      .typecase(cr = lastCrossSignedStateCodec, tag = 65531)
+      .typecase(cr = stateUpdateCodec, tag = 65529)
+      .typecase(cr = stateOverrideCodec, tag = 65527)
 
   // Not in a spec
 
