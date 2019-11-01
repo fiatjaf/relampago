@@ -444,6 +444,7 @@ object ChannelManager extends Broadcaster {
 
     for {
       rs <- paymentRoutesObs
+      // Channel could have been operational when we were asking for a route but got closed later, so there always must be a default value for non-existing keys
       openMap = Tools.toDefMap[Channel, PublicKey, Int](all.filter(isOperational), _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1, default = 1)
       busyMap = Tools.toDefMap[Channel, PublicKey, Int](all.filter(isOperational), _.data.announce.nodeId, chan => chan.inFlightHtlcs.size, default = 1)
       foundRoutes = rs.sortBy(estTotalRouteFee).sortBy(openMap compose rd.nextNodeId).sortBy(busyMap compose rd.nextNodeId)
