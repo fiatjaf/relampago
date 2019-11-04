@@ -253,10 +253,14 @@ trait TimerActivity extends AppCompatActivity { me =>
       case _: CouldNotAdjustDownwards => baseBuilder(app getString err_empty_shrunk, null)
 
       case notEnough: InsufficientMoneyException =>
+        // Payment itself is fine but exceeds balance once miner fee is added
+        val totalFee = app.kit.conf0Balance.minus(pay.cn).plus(notEnough.missing)
+
+        val fee = s"<strong>${denom parsedWithSign totalFee}</strong>"
         val sending = s"<strong>${denom parsedWithSign pay.cn}</strong>"
-        val missing = s"<strong>${denom parsedWithSign notEnough.missing}</strong>"
         val canSend = s"<strong>${denom parsedWithSign app.kit.conf0Balance}</strong>"
-        baseTextBuilder(getString(err_not_enough_funds).format(canSend, sending, missing).html)
+        val msg = getString(err_not_enough_funds).format(canSend, sending, fee).html
+        baseTextBuilder(msg)
 
       case other: Throwable =>
         val info = UncaughtHandler toText other

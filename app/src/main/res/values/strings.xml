@@ -212,7 +212,7 @@
     <string name="err_nothing_useful">No useful data found</string>
 
     <string name="err_not_enough_funds"><![CDATA[
-        At most %1$s can be sent on-chain right now with miner fees included while you were trying to send %2$s which exceeds current max amount by %3$s.<br><br><strong>
+        At most %1$s can be sent on-chain right now <i>with miner fees included</i> while you were trying to send %2$s with %3$s of fees on top of that.<br><br><strong>
         What can be done about it</strong>:<br><br>- Try to send a smaller amount if possible.<br><br>- Refill your on-chain wallet balance.<br><br>- Send exactly %1$s in which case fees will be subtracted from amount, not added on top of it.
     ]]></string>
 
