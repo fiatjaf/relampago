@@ -24,10 +24,10 @@ import scodec.bits.{BitVector, ByteVector}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
 import android.content.{ClipboardManager, Context}
-import com.lightning.walletapp.helper.{AwaitService, RichCursor}
-import com.lightning.walletapp.lnutils.JsonHttpUtils.{pickInc, repeat}
 import com.lightning.walletapp.lnutils.olympus.{OlympusWrap, TxUploadAct}
 import android.app.{Application, NotificationChannel, NotificationManager}
+import com.lightning.walletapp.helper.{AwaitService, RichCursor, ThrottledWork}
+import com.lightning.walletapp.lnutils.JsonHttpUtils.{ioQueue, pickInc, repeat}
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -35,7 +35,6 @@ import android.support.v7.app.AppCompatDelegate
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
-import rx.lang.scala.schedulers.IOScheduler
 import java.util.Collections.singletonList
 import fr.acinq.bitcoin.Protocol.Zeroes
 import fr.acinq.bitcoin.SatoshiLong
@@ -186,7 +185,7 @@ class WalletApp extends Application { me =>
       peerGroup.addWallet(wallet)
 
       for {
-        _ <- Obs just null subscribeOn IOScheduler.apply delay 20.seconds
+        _ <- ioQueue delay 20.seconds
         offlineChannel <- ChannelManager.all if offlineChannel.permanentOffline
         if offlineChannel.data.announce.addresses.headOption.forall(_.canBeUpdatedIfOffline)
         // Call findNodes without `retry` wrapper because it gives harmless `Obs.empty` on error
@@ -337,70 +336,90 @@ object ChannelManager extends Broadcaster {
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
-  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel {
-    def STORE[T <: ChannelData](hostedCommitments: T) = runAnd(hostedCommitments)(ChannelWrap put hostedCommitments)
-    listeners = initListeners
-    doProcess(bootstrap)
+  val backupSaveWorker = new ThrottledWork[String, String] {
+    def work(cmd: String) = ioQueue delay 4.seconds map { _ => "OK" }
+    def error(canNotHappen: Throwable) = none
+
+    def process(cmd: String, execResult: String) =
+      if ("OK" == execResult && LocalBackup.isExternalStorageWritable)
+        try LocalBackup.encryptAndWrite(LocalBackup.getBackupFile) catch none
   }
 
-  def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel {
-    def STORE[T <: ChannelData](normalCommitments: T) = runAnd(normalCommitments)(ChannelWrap put normalCommitments)
-
-    def REV(cs: NormalCommits, rev: RevokeAndAck) = for {
-      tx <- cs.remoteCommit.txOpt // We use old commitments to save a punishment for remote commit before it gets dropped
-      myBalance = cs.remoteCommit.spec.toRemoteMsat // Local commit is cleared by now, remote still has relevant balance
-      watchtowerFee = broadcaster.perKwThreeSat * 3 // Scorched earth policy because watchtower can't regenerate tx
-      revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret, watchtowerFee)
-      serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
-    } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
-
-    def GETREV(cs: NormalCommits, tx: fr.acinq.bitcoin.Transaction) = {
-      val databaseCursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
-      val rc = RichCursor(databaseCursor).headTry(_ string RevokedInfoTable.info)
-
-      for {
-        serialized <- rc.toOption
-        bitVec = BitVector.fromValidHex(serialized)
-        DecodeResult(ri, _) <- revocationInfoCodec.decode(bitVec).toOption
-        perCommitmentSecret <- Helpers.Closing.extractCommitmentSecret(cs, tx)
-        riWithCurrentFeeRate = ri.copy(feeRate = ri.feeRate max broadcaster.perKwThreeSat)
-        ri1 = Helpers.Closing.reMakeRevocationInfo(riWithCurrentFeeRate, cs, tx, perCommitmentSecret)
-      } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri1, tx)
-    }
-
-    def CLOSEANDWATCH(cd: ClosingData) = {
-      cd.tier12States.map(_.txn.bin).toVector match {
-        case txs if txs.isEmpty => Tools log "Closing contains no second tier txs, nothing to schedule on Olympus"
-        case txs => app.olympus tellClouds TxUploadAct(txvec.encode(txs).require.toByteVector, Nil, "txs/schedule")
+  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) =
+    new HostedChannel {
+      def STORE[T <: ChannelData](hostedCommitments: T) = {
+        backupSaveWorker replaceWork "HOSTED-INIT-SAVE-BACKUP"
+        ChannelWrap put hostedCommitments
+        hostedCommitments
       }
 
-      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(txs => {
-        // In case of breach after publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
-        // our job here is to watch for every output of every revoked commit tx and re-spend it before their CSV delay runs out
-        for (tx <- txs) this process CMDSpent(tx)
-        for (tx <- txs) bag.extractPreimage(tx)
-      }, none)
-
-      // Collect all the commit txs publicKeyScripts and watch them locally
-      // because it's possible that remote peer will reveal preimages on-chain
-      app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
-      BECOME(STORE(cd), CLOSING)
+      listeners = initListeners
+      doProcess(bootstrap)
     }
 
-    def ASKREFUNDPEER(some: HasNormalCommits, point: Point) = {
-      val msg = ByteVector.fromValidHex("please publish your local commitment".s2hex)
-      val ref = RefundingData(some.announce, Some(point), some.commitments)
-      val error = Error(some.commitments.channelId, msg)
+  def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) =
+    new NormalChannel {
+      def STORE[T <: ChannelData](normalCommitments: T) = {
+        backupSaveWorker replaceWork "NORMAL-INIT-SAVE-BACKUP"
+        ChannelWrap put normalCommitments
+        normalCommitments
+      }
 
-      // Send both invalid reestablish and an error
-      app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
-      BECOME(STORE(ref), REFUNDING) SEND makeReestablish(some, 0L)
-      SEND(error)
+      def REV(cs: NormalCommits, rev: RevokeAndAck) = for {
+        tx <- cs.remoteCommit.txOpt // We use old commitments to save a punishment for remote commit before it gets dropped
+        myBalance = cs.remoteCommit.spec.toRemoteMsat // Local commit is cleared by now, remote still has relevant balance
+        watchtowerFee = broadcaster.perKwThreeSat * 3 // Scorched earth policy because watchtower can't regenerate tx
+        revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret, watchtowerFee)
+        serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
+      } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
+
+      def GETREV(cs: NormalCommits, tx: fr.acinq.bitcoin.Transaction) = {
+        val databaseCursor = db.select(RevokedInfoTable.selectTxIdSql, tx.txid)
+        val rc = RichCursor(databaseCursor).headTry(_ string RevokedInfoTable.info)
+
+        for {
+          serialized <- rc.toOption
+          bitVec = BitVector.fromValidHex(serialized)
+          DecodeResult(ri, _) <- revocationInfoCodec.decode(bitVec).toOption
+          perCommitmentSecret <- Helpers.Closing.extractCommitmentSecret(cs, tx)
+          riWithCurrentFeeRate = ri.copy(feeRate = ri.feeRate max broadcaster.perKwThreeSat)
+          ri1 = Helpers.Closing.reMakeRevocationInfo(riWithCurrentFeeRate, cs, tx, perCommitmentSecret)
+        } yield Helpers.Closing.claimRevokedRemoteCommitTxOutputs(ri1, tx)
+      }
+
+      def CLOSEANDWATCH(cd: ClosingData) = {
+        cd.tier12States.map(_.txn.bin).toVector match {
+          case txs if txs.isEmpty => Tools log "Closing contains no second tier txs, nothing to schedule on Olympus"
+          case txs => app.olympus tellClouds TxUploadAct(txvec.encode(txs).require.toByteVector, Nil, "txs/schedule")
+        }
+
+        repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(txs => {
+          // In case of breach after publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
+          // our job here is to watch for every output of every revoked commit tx and re-spend it before their CSV delay runs out
+          for (tx <- txs) this process CMDSpent(tx)
+          for (tx <- txs) bag.extractPreimage(tx)
+        }, none)
+
+        // Collect all the commit txs publicKeyScripts and watch them locally
+        // because it's possible that remote peer will reveal preimages on-chain
+        app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
+        BECOME(STORE(cd), CLOSING)
+      }
+
+      def ASKREFUNDPEER(some: HasNormalCommits, point: Point) = {
+        val msg = ByteVector.fromValidHex("please publish your local commitment".s2hex)
+        val ref = RefundingData(some.announce, Some(point), some.commitments)
+        val error = Error(some.commitments.channelId, msg)
+
+        // Send both invalid reestablish and an error
+        app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
+        BECOME(STORE(ref), REFUNDING) SEND makeReestablish(some, 0L)
+        SEND(error)
+      }
+
+      listeners = initListeners
+      doProcess(bootstrap)
     }
-
-    listeners = initListeners
-    doProcess(bootstrap)
-  }
 
   // SENDING PAYMENTS
 

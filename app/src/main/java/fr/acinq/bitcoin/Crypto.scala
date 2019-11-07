@@ -410,7 +410,7 @@ object Crypto {
 
   def isDefinedHashtypeSignature(sig: ByteVector): Boolean = if (sig.isEmpty) false
   else {
-    val hashType = (sig.last & 0xff) & (~(SIGHASH_ANYONECANPAY))
+    val hashType = (sig.last & 0xff) & (~SIGHASH_ANYONECANPAY)
     if (hashType < SIGHASH_ALL || hashType > SIGHASH_SINGLE) false else true
   }
 

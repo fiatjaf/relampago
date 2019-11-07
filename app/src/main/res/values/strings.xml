@@ -22,11 +22,6 @@
         <item><![CDATA[Bitcoin <font color=#999999><small>= 100 000 000 sat</small></font>]]></item>
     </array>
 
-    <array name="restore_options">
-        <item>Enter mnemonic phrase</item>
-        <item>Use migration file</item>
-    </array>
-
     <string name="restore_when">When was your wallet created?\nLeave date as is if not sure</string>
     <string name="create_wallet_creating">Generating your wallet\nIt may take up to a few minutes</string>
     <string name="restore_wallet_restoring">Restoring your wallet\nIt may take a while</string>
@@ -38,17 +33,6 @@
         \n\nYou should expect a refunding Bitcoin transaction shortly after starting it if you do have lost channels with some locked funds, otherwise nothing
         will happen.\n\nUsing this tool does not affect open channels currently present on this phone.
     </string>
-
-    <string name="migrator_usage_warning"><![CDATA[
-        Migration tool creates a snapshot file which can be used to fully
-        restore your wallet at a later time, possibly on another device.<br><br>
-        <strong>Two use cases for this tool</strong><br>
-        1. Moving wallet data from one phone to another.<br>
-        2. Deleting wallet and restoring it a bit later.<br><br>
-        This tool <strong>SHOULD NOT</strong> be used to store a long-term backup of
-        your wallet or create multiple copies of the same wallet on many devices!<br><br>
-        Snapshot file is <strong>NOT</strong> encrypted so never put it to public places!
-    ]]></string>
 
     <string name="hivemind_details"><![CDATA[
         <strong>Hivemind deposits are disabled</strong><br><br>
@@ -77,7 +61,6 @@
     <string name="sets_choose_unit">Choose Bitcoin unit</string>
     <string name="sets_manage_olympus">Manage Olympus servers</string>
     <string name="sets_chan_recover">Use Olympus recovery tool</string>
-    <string name="sets_migrator">Use wallet migration tool</string>
     <string name="sets_mnemonic">View mnemonic phrase</string>
     <string name="sets_rescan">Rescan blockchain</string>
 
@@ -132,6 +115,10 @@
     <string name="ln_fee_cap_disabled"><![CDATA[Disabled, maximum LN fee is at most <strong>%1$s</strong> of payment]]></string>
     <string name="ln_fee_cap_enabled"><![CDATA[Enabled, maximum LN fee is at most <strong>%1$s</strong> of payment, but not higher than current on-chain fee of <strong>%2$s</strong>]]></string>
     <string name="ln_fee_expensive_omitted">Expensive routes were omitted, remove LN fee limit in settings if you would like to try more expensive routes</string>
+
+    <!-- local backups -->
+    <string name="sets_backups">Make local channel backup</string>
+    <string name="ln_backup_detected">Channel backup file is found</string>
 
     <array name="info_progress">
         <item>Sync is complete</item>

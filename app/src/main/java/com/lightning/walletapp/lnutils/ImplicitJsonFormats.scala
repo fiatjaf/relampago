@@ -349,9 +349,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     }
   }
 
-  implicit val legacyActFmt =
-    jsonFormat[ByteVector, Seq[HttpParam], String,
-      LegacyAct](LegacyAct.apply, "data", "plus", "path")
+  implicit val legacyActFmt = jsonFormat[ByteVector, Seq[HttpParam], String,
+    LegacyAct](LegacyAct.apply, "data", "plus", "path")
 
   implicit val cerberusActFmt = taggedJsonFmt(jsonFormat[ByteVector, Seq[HttpParam], String, StringVec,
     CerberusAct](CerberusAct.apply, "data", "plus", "path", "txids"), tag = "CerberusAct")
@@ -362,6 +361,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val channelUploadActFmt = taggedJsonFmt(jsonFormat[ByteVector, Seq[HttpParam], String, String,
     ChannelUploadAct](ChannelUploadAct.apply, "data", "plus", "path", "alias"), tag = "ChannelUploadAct")
 
-  implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
   implicit val ratesFmt = jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
+  implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
+  implicit val localBackupsFmt = jsonFormat[Vector[HasNormalCommits], Vector[HostedCommits], Int, LocalBackups](LocalBackups.apply, "normal", "hosted", "v")
 }

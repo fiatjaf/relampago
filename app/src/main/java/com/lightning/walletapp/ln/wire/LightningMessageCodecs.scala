@@ -622,13 +622,6 @@ object LightningMessageCodecs { me =>
       (lastCrossSignedStateCodec withContext "lastCrossSignedState")
   }.as[HostedState]
 
-  val walletZygoteCodec = {
-    (uint16 withContext "v") ::
-      (varsizebinarydataLong withContext "db") ::
-      (varsizebinarydataLong withContext "wallet") ::
-      (varsizebinarydataLong withContext "chain")
-  }.as[WalletZygote]
-
   val aesZygoteCodec = {
     (uint16 withContext "v") ::
       (varsizebinarydataLong withContext "iv") ::

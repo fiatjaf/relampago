@@ -17,10 +17,10 @@ import scala.util.{Success, Try}
 import org.bitcoinj.core.{Block, FilteredBlock, Peer}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
+import com.lightning.walletapp.lnutils.{LocalBackup, PaymentInfoWrap}
 import com.lightning.walletapp.ln.crypto.Sphinx.DecryptedFailurePacket
 import io.github.douglasjunior.androidSimpleTooltip.SimpleTooltip
 import android.support.v4.app.FragmentStatePagerAdapter
-import com.lightning.walletapp.lnutils.PaymentInfoWrap
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
 import android.support.v4.content.ContextCompat
@@ -238,6 +238,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       PaymentInfoWrap.uiNotify
     }
 
+    val backupAllowed = LocalBackup.isAllowed(activity = me)
+    if (!backupAllowed) LocalBackup.askPermission(activity = me)
   } else me exitTo classOf[MainActivity]
 
   // NFC

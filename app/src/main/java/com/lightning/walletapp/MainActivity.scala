@@ -4,20 +4,16 @@ import R.string._
 import android.widget._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
-import java.io.{File, FileInputStream}
 import co.infinum.goldfinger.{Error => FPError}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
-import com.google.common.io.{ByteStreams, Files}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
-import ln.wire.LightningMessageCodecs.walletZygoteCodec
 import org.ndeftools.util.activity.NfcReaderActivity
 import org.bitcoinj.wallet.WalletProtobufSerializer
 import com.lightning.walletapp.helper.FingerPrint
 import co.infinum.goldfinger.Goldfinger
+import java.io.FileInputStream
 import android.content.Intent
 import org.ndeftools.Message
-import scodec.bits.BitVector
-import android.app.Activity
 import android.os.Bundle
 import android.view.View
 
@@ -50,9 +46,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
   lazy val mainFingerprint = findViewById(R.id.mainFingerprint).asInstanceOf[View]
   lazy val mainChoice = findViewById(R.id.mainChoice).asInstanceOf[View]
   lazy val gf = new Goldfinger.Builder(me).build
-
-  override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent) =
-    if (requestCode == 101 & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
 
   def INIT(state: Bundle) = {
     runAnd(me setContentView R.layout.activity_main)(me initNfc state)
@@ -110,33 +103,6 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // MISC
 
-  def goRestoreWallet(view: View) = {
-    val actions = getResources getStringArray R.array.restore_options
-    val lst \ alert = makeChoiceList(actions, me getString wallet_restore)
-
-    lst setOnItemClickListener onTap {
-      case 0 => rm(alert)(exitRestoreWallet)
-      case 1 => proceedWithMigrationFile
-    }
-
-    def proceedWithMigrationFile = rm(alert) {
-      val intent = new Intent(Intent.ACTION_OPEN_DOCUMENT) setType "text/plain"
-      startActivityForResult(intent addCategory Intent.CATEGORY_OPENABLE, 101)
-    }
-  }
-
-  def restoreFromZygote(intent: Intent) = {
-    val databaseFile = new File(app.getDatabasePath(dbFileName).getPath)
-    val inputStream = getContentResolver.openInputStream(intent.getData)
-    val bitVector = BitVector.view(ByteStreams toByteArray inputStream)
-    val zygote = walletZygoteCodec.decode(bitVector).require.value
-    if (!databaseFile.exists) databaseFile.getParentFile.mkdirs
-    Files.write(zygote.wallet.toArray, app.walletFile)
-    Files.write(zygote.chain.toArray, app.chainFile)
-    Files.write(zygote.db.toArray, databaseFile)
-    next
-  }
-
-  def exitRestoreWallet = me exitTo classOf[WalletRestoreActivity]
+  def goRestoreWallet(view: View) = me exitTo classOf[WalletRestoreActivity]
   def exitCreateWallet(view: View) = me exitTo classOf[WalletCreateActivity]
 }

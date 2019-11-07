@@ -22,11 +22,6 @@
         <item><![CDATA[Bitcoin <font color=#999999><small>= 100 000 000 sat</small></font>]]></item>
     </array>
 
-    <array name="restore_options">
-        <item>Мнемонический код</item>
-        <item>Файл-снапшот кошелька</item>
-    </array>
-
     <string name="restore_when">Когда вы создали кошелек?\nНе менйяте дату если не уверены</string>
     <string name="create_wallet_creating">Создается новый кошелек\nЭто может занять пару минут</string>
     <string name="restore_wallet_restoring">Кошелек восстанавливается\nЭто может занять пару минут</string>
@@ -38,12 +33,6 @@
         их для возмещения средств обратно в ваш он-чейн кошелек.\n\nОжидайте возвратной транзакции вскоре после
         запуска восстановителя если у вас есть потерянные каналы с деньгами.
     </string>
-
-    <string name="migrator_usage_warning"><![CDATA[
-        Файл-снапшот можно создать если вы хотите перенести кошелек с одного телефона на другой или удалить кошелек чтобы вскоре его восстановить.
-        <br><br>Файл-снапшот <strong>НЕ НУЖНО</strong> использовать для долговременного хранения или для создания множественных копий одного и
-        того же кошелька на нескольких телефонах!<br><br>Файл-снапшот <string>НЕ ЗАШИФРОВАН</string>, поэтому не храните его в публичных местах.
-    ]]></string>
 
     <string name="hivemind_details"><![CDATA[
         <strong>Hivemind deposits are disabled</strong><br><br>
@@ -73,7 +62,6 @@
     <string name="sets_choose_unit">Выбрать Биткоин-юнит</string>
     <string name="sets_manage_olympus">Настроить бекап-сервера</string>
     <string name="sets_chan_recover">Восстановитель каналов</string>
-    <string name="sets_migrator">Сохранить файл-снапшот</string>
     <string name="sets_mnemonic">Мнемонический код</string>
     <string name="sets_rescan">Рескан блокчейна</string>
 
@@ -127,6 +115,10 @@
     <string name="ln_fee_cap_disabled"><![CDATA[Отключено, максимальная LN-комиссия равна <strong>%1$s</strong> от суммы платежа]]></string>
     <string name="ln_fee_cap_enabled"><![CDATA[Включено, максимальная LN-комиссия равна <strong>%1$s</strong> от суммы платежа, но не выше чем текущая ончейн комиссия <strong>%2$s</strong>]]></string>
     <string name="ln_fee_expensive_omitted">Дорогие маршруты не использовались: уберите ограничение на LN-комиссию в настройках чтобы попробовать более дорогие маршруты</string>
+
+    <!-- local backups -->
+    <string name="sets_backups">Локальный бекап каналов</string>
+    <string name="ln_backup_detected">Есть файл с бекапом каналов</string>
 
     <array name="info_progress">
         <item>Синхронизация завершена</item>

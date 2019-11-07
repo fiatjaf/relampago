@@ -16,31 +16,30 @@ import android.view.{Menu, MenuItem, View}
 import android.content.{DialogInterface, Intent}
 import android.os.Build.{VERSION, VERSION_CODES}
 import com.lightning.walletapp.helper.{AES, FingerPrint}
-import com.lightning.walletapp.ln.wire.{Domain, NodeAddress, WalletZygote}
+import com.lightning.walletapp.ln.wire.{Domain, NodeAddress}
 import android.content.DialogInterface.OnDismissListener
-import com.lightning.walletapp.lnutils.RatesSaver
-import android.support.v4.content.FileProvider
+import com.lightning.walletapp.lnutils.LocalBackup
 import android.support.v7.widget.Toolbar
+import android.content.pm.PackageManager
 import org.bitcoinj.store.SPVBlockStore
 import co.infinum.goldfinger.Goldfinger
-import com.google.common.io.Files
+import android.provider.Settings
 import android.app.AlertDialog
 import scodec.bits.ByteVector
 import android.os.Bundle
 import android.net.Uri
-import java.util.Date
-import java.io.File
 
 
 class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val useTrustedNode = findViewById(R.id.useTrustedNode).asInstanceOf[CheckBox]
+  lazy val saveLocalBackups = findViewById(R.id.saveLocalBackups).asInstanceOf[CheckBox]
   lazy val fpAuthentication = findViewById(R.id.fpAuthentication).asInstanceOf[CheckBox]
   lazy val constrainLNFees = findViewById(R.id.constrainLNFees).asInstanceOf[CheckBox]
 
   lazy val useTrustedNodeState = findViewById(R.id.useTrustedNodeState).asInstanceOf[TextView]
   lazy val constrainLNFeesState = findViewById(R.id.constrainLNFeesState).asInstanceOf[TextView]
+  lazy val saveLocalBackupsPath = findViewById(R.id.saveLocalBackupsPath).asInstanceOf[TextView]
 
-  lazy val exportWalletSnapshot = findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
   lazy val chooseBitcoinUnit = findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
   lazy val recoverFunds = findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
   lazy val setFiatCurrency = findViewById(R.id.setFiatCurrency).asInstanceOf[Button]
@@ -59,6 +58,22 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     val walletManual = Uri parse "http://lightning-wallet.com"
     me startActivity new Intent(Intent.ACTION_VIEW, walletManual)
     true
+  }
+
+  type GrantResults = Array[Int]
+  override def onRequestPermissionsResult(reqCode: Int, permissions: Array[String], grantResults: GrantResults): Unit = {
+    val isAllowed = reqCode == LocalBackup.LOCAL_BACKUP_REQUEST_NUMBER && grantResults.nonEmpty && grantResults.head == PackageManager.PERMISSION_GRANTED
+    if (isAllowed) ChannelManager.backupSaveWorker.replaceWork("SETTINGS-INIT-SAVE-BACKUP")
+    updateBackupView
+  }
+
+  def onBackupTap(cb: View) = {
+    val isAllowed = LocalBackup.isAllowed(me)
+    if (!isAllowed) LocalBackup.askPermission(me) else {
+      val intent = (new Intent).setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+      val intent1 = intent setData Uri.fromParts("package", getPackageName, null)
+      startActivity(intent1)
+    }
   }
 
   def onFpTap(cb: View) = fpAuthentication.isChecked match {
@@ -103,6 +118,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
     updateConstrainLNFeesView
     updateTrustedView
+    updateBackupView
     updateFpView
 
     setFiatCurrency setOnClickListener onButtonTap {
@@ -170,36 +186,6 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
       me viewMnemonic null
     }
 
-    exportWalletSnapshot setOnClickListener onButtonTap {
-      // Warn user about risks before proceeding with this further
-      val bld = me baseTextBuilder getString(migrator_usage_warning).html
-      mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
-      def proceed = <(createZygote, onFail)(none)
-
-      def createZygote = {
-        // Prevent channel state updates
-        RatesSaver.subscription.unsubscribe
-        val walletByteVec = ByteVector.view(Files toByteArray app.walletFile)
-        val chainByteVec = ByteVector.view(Files toByteArray app.chainFile)
-        val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
-        val dbByteVec = ByteVector.view(Files toByteArray dbFile)
-
-        val zygote = WalletZygote(1, dbByteVec, walletByteVec, chainByteVec)
-        val encoded = walletZygoteCodec.encode(zygote).require.toByteArray
-
-        val name = s"Testnet BLW Snapshot ${new Date}.txt"
-        val walletSnapshotFilePath = new File(getCacheDir, "images")
-        if (!walletSnapshotFilePath.isFile) walletSnapshotFilePath.mkdirs
-        val savedFile = new File(walletSnapshotFilePath, name)
-        Files.write(encoded, savedFile)
-
-        val fileURI = FileProvider.getUriForFile(me, "com.lightning.wallet", savedFile)
-        val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
-        share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
-        me startActivity Intent.createChooser(share, "Choose an app")
-      }
-    }
-
     recoverFunds setOnClickListener onButtonTap {
       def recover = app.olympus getBackup cloudId foreach { backups =>
         // Decrypt channel recovery data and put it to channels list if it is not present already
@@ -229,6 +215,13 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     // Wallet may not notice incoming tx until synchronized
     recoverFunds.setEnabled(ChannelManager.blockDaysLeft <= 1)
   } else me exitTo classOf[MainActivity]
+
+  def updateBackupView = {
+    val canWrite = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable
+    if (canWrite) saveLocalBackupsPath setText LocalBackup.getBackupFile.getPath
+    saveLocalBackupsPath setVisibility viewMap(canWrite)
+    saveLocalBackups setChecked canWrite
+  }
 
   def updateFpView = {
     val isOperational = FingerPrint isOperational gf

@@ -11,8 +11,8 @@ import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 
 import rx.lang.scala.{Observable => Obs}
 import org.bitcoinj.core.{Coin, PeerAddress}
+import rx.lang.scala.schedulers.{IOScheduler, ComputationScheduler}
 import org.bitcoinj.core.Transaction.DEFAULT_TX_FEE
-import rx.lang.scala.schedulers.ComputationScheduler
 import com.lightning.walletapp.AbstractKit
 import com.lightning.walletapp.Utils.app
 import spray.json.JsonFormat
@@ -34,6 +34,7 @@ object JsonHttpUtils {
   def retry[T](obs: Obs[T], pick: (Throwable, Int) => Duration, times: Range) =
     obs.retryWhen(_.zipWith(Obs from times)(pick) flatMap Obs.timer)
 
+  def ioQueue = Obs just null subscribeOn IOScheduler.apply
   def queue = Obs just null subscribeOn ComputationScheduler.apply
   def to[T : JsonFormat](raw: String): T = raw.parseJson.convertTo[T]
   def pickInc(errorOrUnit: Any, next: Int) = next.seconds

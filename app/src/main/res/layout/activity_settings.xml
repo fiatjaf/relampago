@@ -33,6 +33,23 @@
 
             <CheckBox
                 style="@style/RightCheckBox"
+                android:id="@+id/saveLocalBackups"
+                android:text="@string/sets_backups"
+                android:onClick="onBackupTap"/>
+
+            <TextView
+                style="@style/BaseText"
+                android:textSize="14sp"
+                android:id="@+id/saveLocalBackupsPath"
+                android:layout_width="match_parent"
+                android:maxLines="1"/>
+
+            <View
+                style="@style/GrayDivider"
+                android:layout_marginTop="15dp"/>
+
+            <CheckBox
+                style="@style/RightCheckBox"
                 android:id="@+id/fpAuthentication"
                 android:layout_marginBottom="15dp"
                 android:text="@string/sets_fp"
@@ -110,13 +127,6 @@
                 style="@style/TransButton"
                 android:id="@+id/recoverChannelFunds"
                 android:text="@string/sets_chan_recover"/>
-
-            <View style="@style/GrayDivider"/>
-
-            <Button
-                style="@style/TransButton"
-                android:id="@+id/exportWalletSnapshot"
-                android:text="@string/sets_migrator"/>
 
         </LinearLayout>
     </ScrollView>

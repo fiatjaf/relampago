@@ -8,6 +8,12 @@
         android:id="@+id/restoreInfo">
 
         <TextView
+            style="@style/Info"
+            android:textSize="14sp"
+            android:layout_width="wrap_content"
+            android:id="@+id/localBackupStatus"/>
+
+        <TextView
             style="@style/MarginInfo"
             android:layout_width="wrap_content"
             android:text="@string/restore_when"/>

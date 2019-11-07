@@ -22,11 +22,6 @@
         <item><![CDATA[Bitcoin <font color=#999999><small>= 100 000 000 sat</small></font>]]></item>
     </array>
 
-    <array name="restore_options">
-        <item>Мнемонічна фраза</item>
-        <item>Файл-снапшот гаманця</item>
-    </array>
-
     <string name="restore_when">Коли ви створили гаманець?\nлишiть дату якщо не впевнені</string>
     <string name="create_wallet_creating">Створюється новий гаманець\nМоже зайняти декілька хвилин</string>
     <string name="restore_wallet_restoring">Гаманець відновлюється\nМоже зайняти декілька хвилин</string>
@@ -38,12 +33,6 @@
         їх для відшкодування коштів назад в ваш он-чейн гаманець.\n\nОчікуйте зворотної транзакції незабаром
         після запуску відновлювача якщо у вас є втрачені канали з грошима.
     </string>
-
-    <string name="migrator_usage_warning"><![CDATA[
-        Файл-снапшот можна створити якщо ви хочете перенести гаманець з одного телефону на інший або видалити гаманець щоб незабаром його відновити.
-        <br><br>Файл-снапшот <strong>НЕ ПОТРІБНО</strong> використовувати для довготривалого зберігання або для створення багатьох копій одного і
-        того ж гаманця на різних телефонах!<br><br>Файл-снапшот <string>НЕ ЗАШИФРОВАНИЙ</string>, тому не зберігайте його в публічних місцях.
-    ]]></string>
 
     <string name="hivemind_details"><![CDATA[
         <Strong>Hivemind deposits are disabled</strong><br><br>
@@ -73,7 +62,6 @@
     <string name="sets_choose_unit">Обрати Біткоїн-юніт</string>
     <string name="sets_manage_olympus">Налаштувати бекап-сервера</string>
     <string name="sets_chan_recover">Відновлювач каналів</string>
-    <string name="sets_migrator">Зберегти файл-снапшот</string>
     <string name="sets_mnemonic">Мнемонічний код</string>
     <string name="sets_rescan">Рескан блокчейна</string>
 
@@ -127,6 +115,10 @@
     <string name="ln_fee_cap_disabled"><![CDATA[Відключено, максимальна LN-комісія дорівнює <strong>%1$s</strong> від суми платежу]]></string>
     <string name="ln_fee_cap_enabled"><![CDATA[Включено, максимальна LN-комісія дорівнює <strong>%1$s</strong> від суми платежу, але не вище ніж поточна ончейн комісія <strong>%2$s</strong>]]></string>
     <string name="ln_fee_expensive_omitted">Дорогі маршрути не були використанi: приберіть обмеження на LN-комісію в налаштуваннях щоб спробувати більш дорогі маршрути</string>
+
+    <!-- local backups -->
+    <string name="sets_backups">Локальний бекап каналiв</string>
+    <string name="ln_backup_detected">Файл з бекапом каналів присутнiй</string>
 
     <array name="info_progress">
         <item>Синхронізацію завершено</item>
