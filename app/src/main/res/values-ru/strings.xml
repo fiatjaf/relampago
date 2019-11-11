@@ -11,7 +11,7 @@
     <string name="mnemonic_info">Мнемонический код важен!\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> зачем он нужен\n\n\nПодсказка: свайпните влево\nчтобы открыть QR сканер</string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Может занять несколько часов</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Более быстрое подтверждение</font></small></small>]]></string>
-    <string name="search_hint_payments">Поиск по платежам-молниям</string>
+    <string name="search_hint_payments">Поиск по платежам</string>
     <string name="wallet_restore">Восстановить кошелек</string>
     <string name="wallet_settings">Настройки кошелька</string>
     <string name="copied_to_clipboard">Скопировано</string>

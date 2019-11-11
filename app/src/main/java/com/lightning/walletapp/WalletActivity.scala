@@ -113,6 +113,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   override def onResume = wrap(super.onResume)(me returnToBase null)
   override def onOptionsItemSelected(m: MenuItem): Boolean = runAnd(true) {
     if (m.getItemId == R.id.actionSettings) me goTo classOf[SettingsActivity]
+    else if (m.getItemId == R.id.actionScan) walletPager.setCurrentItem(1, true)
   }
 
   override def onBackPressed = {
@@ -444,16 +445,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def goSendPaymentForm(top: View) = {
-    val actions = Array(send_scan_qr, send_paste_payment_request, send_hivemind_deposit)
-    val lst \ alert = makeChoiceList(for (res <- actions) yield getString(res).html, me getString action_coins_send)
-    lst setOnItemClickListener onTap { case 0 => scanQR case 1 => pasteRequest case 2 => depositHivemind }
+    val actions = Array(send_paste_payment_request, send_hivemind_deposit)
+    val lst \ alert = makeChoiceList(actions.map(getString).map(_.html), me getString action_coins_send)
+    lst setOnItemClickListener onTap { case 0 => pastePaymentRequest case 1 => depositHivemind }
 
-    def scanQR = rm(alert) {
-      // Just jump to QR scanner section
-      walletPager.setCurrentItem(1, true)
-    }
-
-    def pasteRequest = rm(alert) {
+    def pastePaymentRequest = rm(alert) {
       def mayResolve(rawBufferString: String) = <(app.TransData recordValue rawBufferString, onFail)(_ => checkTransData)
       Try(app.getBufferUnsafe) match { case Success(rawData) => mayResolve(rawData) case _ => app quickToast err_nothing_useful }
     }

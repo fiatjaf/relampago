@@ -5,15 +5,19 @@
 
     <item
         app:showAsAction="always|collapseActionView"
-        android:icon="@android:drawable/ic_menu_search"
+        android:title="@string/send_scan_qr"
+        android:icon="@drawable/qr_18dp"
+        android:id="@+id/actionScan"/>
+
+    <item
+        app:showAsAction="never|collapseActionView"
         app:actionViewClass="android.support.v7.widget.SearchView"
         android:title="@string/search_hint_payments"
         android:id="@+id/action_search"/>
 
     <item
+        app:showAsAction="never"
         android:title="@string/wallet_settings"
-        app:showAsAction="always|collapseActionView"
-        android:icon="@drawable/ic_settings_white_24dp"
         android:id="@+id/actionSettings"/>
 
 </menu>
