@@ -93,18 +93,18 @@ object PaymentInfo {
     Some(rd1) -> blackListedNodes
   }
 
-  def replaceChan(rd: RoutingData, upd: ChannelUpdate) = {
+  def replaceChan(nodeKey: PublicKey, rd: RoutingData, upd: ChannelUpdate) = {
     // In some cases we can just replace a faulty hop with a supplied one
     // but only do this once per each channel to avoid infinite loops
-    val rd1 = rd.copy(routes = updateHop(rd, upd) +: rd.routes)
+
+    val rd1 = rd.copy(routes = rd.usedRoute.map {
+      case keepMe if keepMe.nodeId != nodeKey => keepMe
+      case _ => upd.toHop(nodeKey)
+    } +: rd.routes)
+
     // Prevent endless loop by marking this channel
     replacedChans += upd.shortChannelId
     Some(rd1) -> Vector.empty
-  }
-
-  def updateHop(rd: RoutingData, upd: ChannelUpdate) = rd.usedRoute map {
-    case keepHop if keepHop.shortChannelId != upd.shortChannelId => keepHop
-    case oldHop => upd.toHop(oldHop.nodeId)
   }
 
   def parseFailureCutRoutes(fail: UpdateFailHtlc)(rd: RoutingData) = {
@@ -119,20 +119,15 @@ object PaymentInfo {
     parsed.map {
       case DecryptedFailurePacket(nodeKey, _: Perm) if nodeKey == rd.pr.nodeId => None -> Vector.empty
       case DecryptedFailurePacket(nodeKey, ExpiryTooFar) if nodeKey == rd.pr.nodeId => None -> Vector.empty
-      case DecryptedFailurePacket(_, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
-      case DecryptedFailurePacket(_, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
-      case DecryptedFailurePacket(_, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(rd, u.update)
+      case DecryptedFailurePacket(nodeKey, u: ExpiryTooSoon) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(nodeKey, rd, u.update)
+      case DecryptedFailurePacket(nodeKey, u: FeeInsufficient) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(nodeKey, rd, u.update)
+      case DecryptedFailurePacket(nodeKey, u: IncorrectCltvExpiry) if !replacedChans.contains(u.update.shortChannelId) => replaceChan(nodeKey, rd, u.update)
 
       case DecryptedFailurePacket(nodeKey, u: Update) =>
         val isHonest = Announcements.checkSig(u.update, nodeKey)
         if (!isHonest) withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
         else rd.usedRoute.collectFirst { case payHop if payHop.nodeId == nodeKey =>
-          // A node along a payment route may choose a different channel than the one we have requested
-          // if that happens then our requested channel has not been used so we put it back here and retry it once again
-          // but only do it once per payment route, otherwise we may keep reusing same route indefinitely if peer misbehaves
-          if (payHop.shortChannelId == u.update.shortChannelId) withoutChan(payHop.shortChannelId, rd, 180 * 1000, rd.firstMsat)
-          else if (rd.retriedRoutes contains rd.usedRoute) withoutChan(u.update.shortChannelId, rd, span = 180 * 1000, rd.firstMsat)
-          else withoutChan(u.update.shortChannelId, rd.modifyAll(_.routes, _.retriedRoutes).using(rd.usedRoute +: _), 180 * 1000, rd.firstMsat)
+          withoutChan(u.update.shortChannelId, rd, 180 * 1000, rd.firstMsat)
         } getOrElse withoutNodes(Vector(nodeKey), rd, 180 * 1000)
 
       case DecryptedFailurePacket(nodeKey, PermanentNodeFailure) => withoutNodes(Vector(nodeKey), rd, 86400 * 7 * 1000)
@@ -180,7 +175,7 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */ ,
                        lastMsat: Long /* amount with off-chain fee added */ , lastExpiry: Long, callsLeft: Int,
                        useCache: Boolean, airLeft: Int, onChainFeeBlock: Boolean, onChainFeeBlockWasUsed: Boolean,
-                       retriedRoutes: PaymentRouteVec, fromHostedOnly: Boolean) {
+                       fromHostedOnly: Boolean) {
 
   // Empty used route means we're sending to peer and its nodeId should be our targetId
   def nextNodeId(route: PaymentRoute) = route.headOption.map(_.nodeId) getOrElse pr.nodeId

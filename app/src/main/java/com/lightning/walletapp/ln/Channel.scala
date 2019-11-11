@@ -47,10 +47,14 @@ object Channel {
     case _ => false
   }
 
-  def channelAndHop(chan: Channel) =
-    chan.getCommits.flatMap(_.updateOpt) map { update =>
-      chan -> Vector(update toHop chan.data.announce.nodeId)
-    }
+  def channelAndHop(chan: Channel) = for {
+    // Only proceed if channel has (1) commits
+    // and (2) remote update supplied by peer
+
+    commits <- chan.getCommits
+    chanUpdate <- commits.updateOpt
+    nodeId = chan.data.announce.nodeId
+  } yield chan -> Vector(chanUpdate toHop nodeId)
 }
 
 abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] { me =>

@@ -100,9 +100,9 @@ class WalletApp extends Application { me =>
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
     val useOnChainFeeBlock = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
-    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, onion = PacketAndSecrets(emptyOnionPacket, Vector.empty), firstMsat = firstMsat,
-      lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeBlock) 8 else 4, useCache = useCache, airLeft = 0, onChainFeeBlock = useOnChainFeeBlock,
-      onChainFeeBlockWasUsed = false, retriedRoutes = Vector.empty, fromHostedOnly = false)
+    RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, onion = PacketAndSecrets(emptyOnionPacket, Vector.empty),
+      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeBlock) 8 else 4, useCache = useCache,
+      airLeft = 0, onChainFeeBlock = useOnChainFeeBlock, onChainFeeBlockWasUsed = false, fromHostedOnly = false)
   }
 
   object TransData {
