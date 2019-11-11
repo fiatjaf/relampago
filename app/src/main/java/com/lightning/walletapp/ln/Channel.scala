@@ -54,7 +54,8 @@ object Channel {
     commits <- chan.getCommits
     chanUpdate <- commits.updateOpt
     nodeId = chan.data.announce.nodeId
-  } yield chan -> Vector(chanUpdate toHop nodeId)
+    path = Vector(chanUpdate toHop nodeId)
+  } yield chan -> path
 }
 
 abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] { me =>

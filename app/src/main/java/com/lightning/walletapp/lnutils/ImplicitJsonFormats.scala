@@ -1,6 +1,7 @@
 package com.lightning.walletapp.lnutils
 
 import spray.json._
+import com.lightning.walletapp._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.Scripts._
@@ -14,7 +15,6 @@ import fr.acinq.eclair.UInt64
 import java.math.BigInteger
 import scodec.Codec
 
-import com.lightning.walletapp.{IncomingChannelRequest, HostedChannelRequest, LNUrlData, PayRequest, WithdrawRequest}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import fr.acinq.bitcoin.{MilliSatoshi, OutPoint, Satoshi, Transaction, TxOut}
@@ -55,9 +55,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     def write(internal: PublicKey): JsValue = internal.toBin.toHex.toJson
   }
 
-  implicit object ShaHashesWithIndexFmt
-  extends JsonFormat[ShaHashesWithIndex] {
-
+  implicit object ShaHashesWithIndexFmt extends JsonFormat[ShaHashesWithIndex] {
     def read(json: JsValue): ShaHashesWithIndex = json match {
       case JsArray(hashesIndexBytesSeq +: lastIndexOption +: _) =>
         val lastIndexLongOption = lastIndexOption.convertTo[LongOption]
@@ -66,8 +64,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case _ => throw new RuntimeException
     }
 
-    def write(internal: ShaHashesWithIndex): JsValue =
+    def write(internal: ShaHashesWithIndex): JsValue = {
       JsArray(internal.hashes.toSeq.toJson, internal.lastIndex.toJson)
+    }
 
     type LongOption = Option[Long]
     type IndexBytes = (Index, Bytes)
@@ -129,11 +128,12 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     HostedChannelRequest](HostedChannelRequest.apply, "uri", "alias", "k1"), tag = "hostedChannelRequest")
 
   implicit val withdrawRequestFmt = taggedJsonFmt(jsonFormat[String, String, Long, String, Option[Long],
-    WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxWithdrawable", "defaultDescription",
-    "minWithdrawable"), tag = "withdrawRequest")
+    WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxWithdrawable", "defaultDescription", "minWithdrawable"), tag = "withdrawRequest")
 
-  implicit val payRequestFmt = taggedJsonFmt(jsonFormat[Vector[PayRequest.Route], Long, Long, String, String,
-    PayRequest](PayRequest.apply, "routes", "maxSendable", "minSendable", "metadata", "pr"), tag = "payRequest")
+  implicit val payRequestFmt = taggedJsonFmt(jsonFormat[String, Long, Long, String,
+    PayRequest](PayRequest.apply, "callback", "maxSendable", "minSendable", "metadata"), tag = "payRequest")
+
+  implicit val payRequestFinalFmt = jsonFormat[Vector[PayRequest.Route], String, PayRequestFinal](PayRequestFinal.apply, "routes", "pr")
 
   // Channel data
 
@@ -141,24 +141,21 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val txOutFmt = jsonFormat[Satoshi, ByteVector, TxOut](TxOut.apply, "amount", "publicKeyScript")
   implicit val inputInfoFmt = jsonFormat[OutPoint, TxOut, ByteVector, InputInfo](InputInfo.apply, "outPoint", "txOut", "redeemScript")
 
-  implicit object TransactionWithInputInfoFmt
-  extends JsonFormat[TransactionWithInputInfo] {
-
-    def read(json: JsValue) =
-      json.asJsObject fields TAG match {
-        case JsString("CommitTx") => json.convertTo[CommitTx]
-        case JsString("HtlcSuccessTx") => json.convertTo[HtlcSuccessTx]
-        case JsString("HtlcTimeoutTx") => json.convertTo[HtlcTimeoutTx]
-        case JsString("ClaimHtlcSuccessTx") => json.convertTo[ClaimHtlcSuccessTx]
-        case JsString("ClaimHtlcTimeoutTx") => json.convertTo[ClaimHtlcTimeoutTx]
-        case JsString("ClaimP2WPKHOutputTx") => json.convertTo[ClaimP2WPKHOutputTx]
-        case JsString("ClaimDelayedOutputTx") => json.convertTo[ClaimDelayedOutputTx]
-        case JsString("ClaimDelayedOutputPenaltyTx") => json.convertTo[ClaimDelayedOutputPenaltyTx]
-        case JsString("MainPenaltyTx") => json.convertTo[MainPenaltyTx]
-        case JsString("HtlcPenaltyTx") => json.convertTo[HtlcPenaltyTx]
-        case JsString("ClosingTx") => json.convertTo[ClosingTx]
-        case _ => throw new RuntimeException
-      }
+  implicit object TransactionWithInputInfoFmt extends JsonFormat[TransactionWithInputInfo] {
+    def read(json: JsValue) = json.asJsObject fields TAG match {
+      case JsString("CommitTx") => json.convertTo[CommitTx]
+      case JsString("HtlcSuccessTx") => json.convertTo[HtlcSuccessTx]
+      case JsString("HtlcTimeoutTx") => json.convertTo[HtlcTimeoutTx]
+      case JsString("ClaimHtlcSuccessTx") => json.convertTo[ClaimHtlcSuccessTx]
+      case JsString("ClaimHtlcTimeoutTx") => json.convertTo[ClaimHtlcTimeoutTx]
+      case JsString("ClaimP2WPKHOutputTx") => json.convertTo[ClaimP2WPKHOutputTx]
+      case JsString("ClaimDelayedOutputTx") => json.convertTo[ClaimDelayedOutputTx]
+      case JsString("ClaimDelayedOutputPenaltyTx") => json.convertTo[ClaimDelayedOutputPenaltyTx]
+      case JsString("MainPenaltyTx") => json.convertTo[MainPenaltyTx]
+      case JsString("HtlcPenaltyTx") => json.convertTo[HtlcPenaltyTx]
+      case JsString("ClosingTx") => json.convertTo[ClosingTx]
+      case _ => throw new RuntimeException
+    }
 
     def write(internal: TransactionWithInputInfo) = internal match {
       case transactionWithInputInfo: CommitTx => transactionWithInputInfo.toJson
@@ -260,8 +257,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       RevokedCommitPublished](RevokedCommitPublished.apply, "claimMain", "claimTheirMainPenalty",
       "htlcPenalty", "commitTx")
 
-  implicit object HasNormalCommitsFmt
-  extends JsonFormat[HasNormalCommits] {
+  implicit object HasNormalCommitsFmt extends JsonFormat[HasNormalCommits] {
     def read(json: JsValue) = json.asJsObject fields TAG match {
       case JsString("WaitBroadcastRemoteData") => json.convertTo[WaitBroadcastRemoteData]
       case JsString("WaitFundingDoneData") => json.convertTo[WaitFundingDoneData]
@@ -349,8 +345,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     }
   }
 
-  implicit val legacyActFmt = jsonFormat[ByteVector, Seq[HttpParam], String,
-    LegacyAct](LegacyAct.apply, "data", "plus", "path")
+  implicit val legacyActFmt =
+    jsonFormat[ByteVector, Seq[HttpParam], String,
+      LegacyAct](LegacyAct.apply, "data", "plus", "path")
 
   implicit val cerberusActFmt = taggedJsonFmt(jsonFormat[ByteVector, Seq[HttpParam], String, StringVec,
     CerberusAct](CerberusAct.apply, "data", "plus", "path", "txids"), tag = "CerberusAct")

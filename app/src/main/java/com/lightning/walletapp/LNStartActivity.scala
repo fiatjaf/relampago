@@ -157,9 +157,8 @@ object LNUrl {
 
 case class LNUrl(request: String) {
   val uri = android.net.Uri.parse(request)
-  require(uri.toString contains "https://", "First level uri is not an HTTPS endpoint")
+  require(uri.toString contains "https://")
   lazy val isLogin: Boolean = Try(uri getQueryParameter "tag" equals "login").getOrElse(false)
-  lazy val isPay: Boolean = Try(uri getQueryParameter "tag" equals "pay").getOrElse(false)
   lazy val k1: Try[String] = Try(uri getQueryParameter "k1")
 }
 
@@ -172,7 +171,7 @@ case class WithdrawRequest(callback: String, k1: String,
                            maxWithdrawable: Long, defaultDescription: String,
                            minWithdrawable: Option[Long] = None) extends LNUrlData {
 
-  require(callback contains "https://", "Callback does not have HTTPS prefix")
+  require(callback contains "https://")
   val minCanReceive = MilliSatoshi(minWithdrawable getOrElse 1L)
   require(minCanReceive.amount <= maxWithdrawable)
   require(minCanReceive.amount >= 1L)
@@ -191,7 +190,7 @@ case class IncomingChannelRequest(uri: String, callback: String,
   val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
   val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
   val ann = app.mkNodeAnnouncement(remoteNodeId, address, alias = hostAddress)
-  require(callback contains "https://", "Callback does not have HTTPS prefix")
+  require(callback contains "https://")
 
   def requestChannel =
     unsafe(request = android.net.Uri.parse(callback).buildUpon
@@ -218,12 +217,36 @@ object PayRequest {
   type Route = Vector[KeyAndUpdate]
 }
 
-case class PayRequest(routes: Vector[Route], maxSendable: Long, minSendable: Long, metadata: String, pr: String) extends LNUrlData {
-  val extraPaymentRoutes: PaymentRouteVec = for (route <- routes) yield route map { case nodeId \ chanUpdate => chanUpdate toHop nodeId }
-  val decodedMetadata = ByteVector.fromValidBase64(metadata)
-  val paymentRequest = PaymentRequest.read(pr)
+case class PayRequest(callback: String,
+                      maxSendable: Long, minSendable: Long,
+                      metadata: String) extends LNUrlData {
 
-  val textMetaData = to[PayMetaData](Tools bin2readable decodedMetadata.toArray).collectFirst { case Vector("text/plain", content) => content }.get
+  require(callback contains "https://")
+  require(minSendable <= maxSendable)
+  require(minSendable >= 1L)
+
+  def metaDataHash: ByteVector = {
+    val bytes = metadata getBytes "UTF-8"
+    Crypto.sha256(ByteVector view bytes)
+  }
+
+  def metaDataTextPlain: String = {
+    val metaVector = to[PayMetaData](StringContext treatEscapes metadata)
+    metaVector.collectFirst { case Vector("text/plain", content) => content }.get
+  }
+
+  def requestPartTwo(fromnodes: String, amount: MilliSatoshi) =
+    unsafe(request = android.net.Uri.parse(callback).buildUpon
+      .appendQueryParameter("amount", amount.toLong.toString)
+      .appendQueryParameter("fromnodes", fromnodes)
+      .build.toString)
+}
+
+case class PayRequestFinal(routes: Vector[Route], pr: String) extends LNUrlData {
+  // Lnurl-pay is two-fold: this object is returned once user called a first callback
+
+  val paymentRequest: PaymentRequest = PaymentRequest.read(input = pr)
+  val descriptionHash: ByteVector = ByteVector.fromValidHex(paymentRequest.description)
+  val extraPaymentRoutes: PaymentRouteVec = for (route <- routes) yield route map { case nodeId \ chanUpdate => chanUpdate toHop nodeId }
   for (route <- routes) for (nodeId \ chanUpdate <- route) require(Announcements.checkSig(chanUpdate, nodeId), "Extra route contains an invalid update")
-  require(ByteVector.fromValidHex(paymentRequest.description) == Crypto.sha256(decodedMetadata), "Invoice hash does not match metadata")
 }
