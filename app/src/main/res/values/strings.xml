@@ -314,6 +314,7 @@
     <string name="ln_ops_start_fund_hosted_channel">HOSTED CHANNEL</string>
 
     <string name="ln_url_resolving">Connecting to service&#8230;</string>
+    <string name="ln_url_payreq_processing">Processing payment&#8230;</string>
     <string name="ln_url_login_ok"><![CDATA[Successful login at <i>%1$s</i>]]></string>
 
     <string name="ln_url_info_login"><![CDATA[

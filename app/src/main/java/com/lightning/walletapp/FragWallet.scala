@@ -16,6 +16,8 @@ import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import fr.acinq.bitcoin.{MilliSatoshi, MilliSatoshiLong}
@@ -533,51 +535,95 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     inputDescription setText desc
   }
 
-  abstract class OffChainSender(pr: PaymentRequest) {
-    val maxCanSend = MilliSatoshi(ChannelManager.estimateAIRCanSend)
-    val rd = app.emptyRD(pr, firstMsat = pr.msatOrMin.amount, useCache = true)
+  abstract class OffChainSender(val maxCanSend: MilliSatoshi, val minCanSend: MilliSatoshi) {
     val baseContent = host.getLayoutInflater.inflate(R.layout.frag_input_fiat_converter, null, false)
     val baseHint = app.getString(amount_hint_can_send).format(denom parsedWithSign maxCanSend)
     val rateManager = new RateManager(baseContent) hint baseHint
 
     def getTitle: View
     def displayPaymentForm: Unit
-    def onUserAcceptSend(rd: RoutingData): Unit
+    def onUserAcceptSend(ms: MilliSatoshi): Unit
 
     def sendAttempt(alert: AlertDialog) = rateManager.result match {
       case Success(ms) if maxCanSend < ms => app quickToast dialog_sum_big
-      case Success(ms) if ms < pr.msatOrMin => app quickToast dialog_sum_small
+      case Success(ms) if ms < minCanSend => app quickToast dialog_sum_small
       case Failure(emptyAmount) => app quickToast dialog_sum_small
-
-      case Success(ms) => rm(alert) {
-        val attempts = ChannelManager.all.count(isOperational)
-        val rd1 = rd.copy(firstMsat = ms.amount, airLeft = attempts)
-        onUserAcceptSend(rd1)
-      }
-    }
-
-    pr.fallbackAddress -> pr.amount match {
-      case Some(adr) \ Some(amount) if amount > maxCanSend && amount < app.kit.conf0Balance =>
-        val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
-        // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback option
-        mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
-
-      case _ \ Some(amount) if amount > maxCanSend =>
-        val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
-        // Either this payment request contains no fallback address or we don't have enough funds on-chain at all
-        showForm(negBuilder(dialog_ok, getTitle, failureMessage.html).create)
-
-      case _ =>
-        for (amount <- pr.amount) rateManager setSum Try(amount)
-        // We can pay this off-chain, show payment form
-        displayPaymentForm
+      case Success(ms) => rm(alert)(this onUserAcceptSend ms)
     }
   }
 
-  def standardOffChainSend(pr: PaymentRequest) = new OffChainSender(pr) {
-    def displayPaymentForm = mkCheckForm(sendAttempt, none, baseBuilder(getTitle, baseContent), dialog_pay, dialog_cancel)
-    def getTitle = str2View(app.getString(ln_send_title).format(Utils getDescription pr.description).html)
-    def onUserAcceptSend(rd: RoutingData) = doSendOffChain(rd)
+  def standardOffChainSend(pr: PaymentRequest) =
+    new OffChainSender(maxCanSend = ChannelManager.estimateAIRCanSend.millisatoshi, minCanSend = pr.msatOrMin) {
+      def displayPaymentForm = mkCheckForm(sendAttempt, none, baseBuilder(getTitle, baseContent), dialog_pay, dialog_cancel)
+      def getTitle = str2View(app.getString(ln_send_title).format(Utils getDescription pr.description).html)
+
+      def onUserAcceptSend(ms: MilliSatoshi) = {
+        val rd = app.emptyRD(pr, firstMsat = ms.amount, useCache = true)
+        val rd1 = rd.copy(airLeft = ChannelManager.all count isOperational)
+        doSendOffChain(rd1)
+      }
+
+      pr.fallbackAddress -> pr.amount match {
+        case Some(adr) \ Some(amount) if amount > maxCanSend && amount < app.kit.conf0Balance =>
+          val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
+          // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback option
+          mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
+
+        case _ \ Some(amount) if amount > maxCanSend =>
+          val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
+          // Either this payment request contains no fallback address or we don't have enough funds on-chain at all
+          showForm(negBuilder(dialog_ok, getTitle, failureMessage.html).create)
+
+        case _ =>
+          // We can pay this request off-chain
+          // show payment form and set a default sum is possible
+          for (amount <- pr.amount) rateManager setSum Try(amount)
+          displayPaymentForm
+      }
+    }
+
+  def lnurlPayOffChainSend(domain: String, payReq: PayRequest) = {
+    val finalMaxCanSend = math.min(ChannelManager.estimateAIRCanSend, payReq.maxSendable)
+    new OffChainSender(maxCanSend = finalMaxCanSend.millisatoshi, minCanSend = payReq.minSendable.millisatoshi) {
+      def displayPaymentForm = mkCheckForm(sendAttempt, none, baseBuilder(getTitle, baseContent), dialog_pay, dialog_cancel)
+
+      def getTitle = {
+        val content = s"<strong>$domain</strong><br><br>${payReq.metaDataTextPlain take 72}"
+        host.updateView2Blue(oldView = str2View(new String), app.getString(ln_send_title) format content)
+      }
+
+      def onUserAcceptSend(ms: MilliSatoshi) = {
+        // Issue second level call and send payment
+        host toast ln_url_payreq_processing
+
+        def convert(raw: String) = {
+          val prf = to[PayRequestFinal](raw)
+          require(prf.descriptionHash == payReq.metaDataHash, s"Metadata hash mismatch, original=${payReq.metaDataHash}, provided=${prf.descriptionHash}")
+          require(prf.paymentRequest.amount.contains(ms), s"Payment amount mismatch, requested=$ms, provided=${prf.paymentRequest.amount}")
+          prf
+        }
+
+        def send(prf: PayRequestFinal) = {
+          val rd = app.emptyRD(prf.paymentRequest, firstMsat = ms.toLong, useCache = true)
+          val rd1 = rd.copy(airLeft = ChannelManager.all count isOperational)
+          UITask(me doSendOffChain rd1).run
+        }
+
+        queue.map(_ => payReq.requestFinal(ms).body)
+          .map(LNUrl.guardResponse).map(convert)
+          .foreach(send, onFail)
+      }
+
+      if (maxCanSend < minCanSend) {
+        val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign minCanSend}</strong>"
+        // We can send less off-chain than minimum amount they are willing to receive as specified in lnurl pay request
+        showForm(negBuilder(dialog_ok, getTitle, failureMessage.html).create)
+      } else {
+        if (maxCanSend == minCanSend) rateManager setSum Try(minCanSend)
+        // Equal min/max is a special case when payment sum is strict
+        displayPaymentForm
+      }
+    }
   }
 
   def doSendOffChain(rd: RoutingData): Unit = {

@@ -309,7 +309,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     app quickToast ln_url_resolving
 
     <(to[LNUrlData](LNUrl guardResponse sslAwareRequest.body), onFail) {
-      case withdrawal: WithdrawRequest => me doReceivePayment Some(withdrawal, lnUrl)
+      case payReq: PayRequest => FragWallet.worker.lnurlPayOffChainSend(lnUrl.uri.getHost, payReq)
+      case withdrawReq: WithdrawRequest => me doReceivePayment Some(withdrawReq, lnUrl)
       case hostedRequest: HostedChannelRequest => me goLNStartFund hostedRequest
       case incoming: IncomingChannelRequest => me initIncoming incoming
       case _ => app quickToast err_nothing_useful

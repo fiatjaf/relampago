@@ -235,7 +235,7 @@ case class PayRequest(callback: String,
     metaVector.collectFirst { case Vector("text/plain", content) => content }.get
   }
 
-  def requestPartTwo(fromnodes: String, amount: MilliSatoshi) =
+  def requestFinal(amount: MilliSatoshi, fromnodes: String = new String) =
     unsafe(request = android.net.Uri.parse(callback).buildUpon
       .appendQueryParameter("amount", amount.toLong.toString)
       .appendQueryParameter("fromnodes", fromnodes)
