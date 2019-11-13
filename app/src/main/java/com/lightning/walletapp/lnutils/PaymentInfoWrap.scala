@@ -100,7 +100,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def unknownHostedHtlcsDetected(hc: HostedCommits) = {
     // Hosted peer is far ahead, we can't know what happened to in-flight payments
-    for (htlc <- hc.currentAndNextInFlight) updStatus(UNKNOWN, htlc.add.paymentHash)
+    for (htlc <- hc.currentAndNextInFlight) updStatus(FROZEN, htlc.add.paymentHash)
     // Don't enclose this in a transaction becuase we notify UI right away
     uiNotify
   }

@@ -19,7 +19,7 @@ object PaymentInfo {
   final val WAITING = 1
   final val SUCCESS = 2
   final val FAILURE = 3
-  final val UNKNOWN = 4
+  final val FROZEN = 4
 
   final val NOT_SENDABLE = 0
   final val SENDABLE_AIR = 1
@@ -165,7 +165,7 @@ object PaymentInfo {
       case Attempt.Successful(payload) \ _ if payload.value.cltvExpiry != add.expiry => failHtlc(pkt, FinalIncorrectCltvExpiry(add.expiry), add)
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin > add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin * 2 < add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
-      case attempt \ Success(info) if attempt.isSuccessful && !loop && info.incoming == 1 && info.isFulfillable => CMDFulfillHtlc(add, info.preimage)
+      case attempt \ Success(info) if attempt.isSuccessful && !loop && info.incoming == 1 && info.status != PaymentInfo.SUCCESS => CMDFulfillHtlc(add, info.preimage)
       case attempt \ _ if attempt.isSuccessful => failIncorrectDetails(pkt, add.amount, add)
       case _ => failHtlc(pkt, InvalidOnionPayload(UInt64(0), 0), add)
     }
@@ -188,9 +188,7 @@ case class PaymentInfo(rawPr: String, preimage: ByteVector, incoming: Int,
                        lastMsat: Long, lastExpiry: Long) {
 
   val firstSum = MilliSatoshi(firstMsat)
-  // Payments in these states can't be attempted or fulfilled to exclude double spend
-  val isFulfillable = status != PaymentInfo.SUCCESS && status != PaymentInfo.UNKNOWN
-  // Incoming lastExpiry is 0, updated if payment becomes reflexive
+  // Incoming lastExpiry is 0, updated on becoming reflexive
   val isLooper = incoming == 1 && lastExpiry != 0
   // Keep serialized for performance reasons
   lazy val pr = to[PaymentRequest](rawPr)

@@ -341,7 +341,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case FAILURE if 0 == info.incoming => s"<strong>${app getString ln_state_fail_out}</strong>"
         case FAILURE if 1 == info.incoming => s"<strong>${app getString ln_state_fail_in}</strong>"
         case SUCCESS => s"<strong>${app getString ln_state_success}</strong>"
-        case UNKNOWN => s"<strong>${app getString ln_state_unknown}</strong>"
+        case FROZEN => s"<strong>${app getString ln_state_unknown}</strong>"
         case _ => s"<strong>${app getString ln_state_wait}</strong>"
       }
 
