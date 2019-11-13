@@ -40,6 +40,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val constrainLNFeesState = findViewById(R.id.constrainLNFeesState).asInstanceOf[TextView]
   lazy val saveLocalBackupsPath = findViewById(R.id.saveLocalBackupsPath).asInstanceOf[TextView]
 
+  lazy val backupFile = LocalBackup.getBackupFile(LocalBackup getBackupDirectory LNParams.chainHash)
   lazy val chooseBitcoinUnit = findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
   lazy val recoverFunds = findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
   lazy val setFiatCurrency = findViewById(R.id.setFiatCurrency).asInstanceOf[Button]
@@ -68,8 +69,8 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def onBackupTap(cb: View) = {
-    val isAllowed = LocalBackup.isAllowed(me)
-    if (!isAllowed) LocalBackup.askPermission(me) else {
+    val isAllowed = LocalBackup.isAllowed(activity = me)
+    if (!isAllowed) LocalBackup.askPermission(activity = me) else {
       val intent = (new Intent).setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
       val intent1 = intent setData Uri.fromParts("package", getPackageName, null)
       startActivity(intent1)
@@ -218,7 +219,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   def updateBackupView = {
     val canWrite = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable
-    if (canWrite) saveLocalBackupsPath setText LocalBackup.getBackupFile.getPath
+    if (canWrite) saveLocalBackupsPath.setText(backupFile.getPath)
     saveLocalBackupsPath setVisibility viewMap(canWrite)
     saveLocalBackups setChecked canWrite
   }
@@ -229,10 +230,10 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def updateTrustedView = {
-    val naTry = app.kit.trustedNodeTry
-    if (naTry.isFailure) useTrustedNodeState setText trusted_hint_none
-    else useTrustedNodeState setText naTry.get.toString
-    useTrustedNode setChecked naTry.isSuccess
+    val nodeAddressTry = app.kit.trustedNodeTry
+    if (nodeAddressTry.isFailure) useTrustedNodeState setText trusted_hint_none
+    else useTrustedNodeState setText nodeAddressTry.get.toString
+    useTrustedNode setChecked nodeAddressTry.isSuccess
   }
 
   def updateConstrainLNFeesView = {

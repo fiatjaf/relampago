@@ -27,7 +27,7 @@ import android.content.{ClipboardManager, Context}
 import com.lightning.walletapp.lnutils.olympus.{OlympusWrap, TxUploadAct}
 import android.app.{Application, NotificationChannel, NotificationManager}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor, ThrottledWork}
-import com.lightning.walletapp.lnutils.JsonHttpUtils.{ioQueue, pickInc, repeat}
+import com.lightning.walletapp.lnutils.JsonHttpUtils.{ioQueue, pickInc, repeat, retry}
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -341,8 +341,10 @@ object ChannelManager extends Broadcaster {
     def error(canNotHappen: Throwable) = none
 
     def process(cmd: String, execResult: String) =
-      if ("OK" == execResult && LocalBackup.isExternalStorageWritable)
-        try LocalBackup.encryptAndWrite(LocalBackup.getBackupFile) catch none
+      if ("OK" == execResult && LocalBackup.isExternalStorageWritable) try {
+        val backupFile = LocalBackup.getBackupFile(LocalBackup getBackupDirectory LNParams.chainHash)
+        LocalBackup.encryptAndWrite(backupFile, for (chan <- all) yield chan.data, app.kit.wallet, LNParams.cloudSecret)
+      } catch none
   }
 
   def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) =
@@ -410,6 +412,11 @@ object ChannelManager extends Broadcaster {
         val msg = ByteVector.fromValidHex("please publish your local commitment".s2hex)
         val ref = RefundingData(some.announce, Some(point), some.commitments)
         val error = Error(some.commitments.channelId, msg)
+
+        retry(app.olympus getChildTxs Seq(ref.commitments.commitInput.outPoint.txid), pickInc, 7 to 8).foreach(txs => {
+          // Failsafe check in case if peer has already closed this channel unilaterally while us being offline at that time
+          for (tx <- txs) this process CMDSpent(tx)
+        }, none)
 
         // Send both invalid reestablish and an error
         app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)

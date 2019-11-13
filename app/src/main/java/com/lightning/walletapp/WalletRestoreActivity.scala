@@ -9,11 +9,10 @@ import com.lightning.walletapp.lnutils.{ChannelWrap, LocalBackup}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
 import org.bitcoinj.wallet.{DeterministicSeed, Wallet}
 import android.view.{View, ViewGroup}
+import scala.util.{Failure, Success}
 
-import com.lightning.walletapp.ln.wire.LocalBackups
 import com.hootsuite.nachos.NachoTextView
 import com.lightning.walletapp.Utils.app
-import android.content.pm.PackageManager
 import org.bitcoinj.crypto.MnemonicCode
 import java.util.Calendar
 import android.os.Bundle
@@ -34,6 +33,7 @@ class WhenPicker(host: TimerActivity, start: Long) extends DatePicker(host) with
 }
 
 class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
+  lazy val backupFile = LocalBackup.getBackupFile(LocalBackup getBackupDirectory LNParams.chainHash)
   lazy val localBackupStatus = findViewById(R.id.localBackupStatus).asInstanceOf[TextView]
   lazy val restoreCode = findViewById(R.id.restoreCode).asInstanceOf[NachoTextView]
   lazy val restoreProgress = findViewById(R.id.restoreProgress).asInstanceOf[View]
@@ -70,10 +70,9 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
 
   type GrantResults = Array[Int]
   override def onBackPressed: Unit = wrap(super.onBackPressed)(app.kit.stopAsync)
-  override def onRequestPermissionsResult(reqCode: Int, permissions: Array[String], grantResults: GrantResults): Unit = {
-    val isFilePresent = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable && LocalBackup.getBackupFile.exists
-    if (isFilePresent) localBackupStatus setText ln_backup_detected
-  }
+  override def onRequestPermissionsResult(reqCode: Int, perms: Array[String], grantResults: GrantResults) =
+    if (LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable && backupFile.exists)
+      localBackupStatus setText ln_backup_detected
 
   def getMnemonic: String = {
     val trimmed = restoreCode.getText.toString.trim
@@ -93,23 +92,35 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
       def startUp = {
         // Make a seed from user provided mnemonic code and restore a wallet using it
         val seed = new DeterministicSeed(getMnemonic, null, "", dp.cal.getTimeInMillis / 1000)
-        wallet = Wallet.fromSeed(app.params, seed)
         LNParams setup seed.getSeedBytes
 
-        val attemptBackup = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable
-        if (attemptBackup) LocalBackup.readAndDecrypt(LocalBackup.getBackupFile).foreach(restoreChans)
-        me prepareFreshWallet app.kit
+        Option {
+          val hasPerm = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable
+          if (hasPerm) LocalBackup.readAndDecrypt(backupFile, LNParams.cloudSecret) else null
+        } map {
+          case Success(localBackups) =>
+            // Update ealiest key creation time to our watch timestamp
+            seed.setCreationTimeSeconds(localBackups.earliestUtxoSeconds)
+            wallet = Wallet.fromSeed(app.params, seed)
+
+            // Restore channels before proceeding
+            localBackups.hosted.foreach(restoreHostedChannel)
+            localBackups.normal.foreach(restoreNormalChannel)
+            me prepareFreshWallet app.kit
+
+          case Failure(reason) =>
+            // Do not proceed here
+            UITask(throw reason).run
+
+        } getOrElse {
+          // No file system permission, proceed as is
+          wallet = Wallet.fromSeed(app.params, seed)
+          me prepareFreshWallet app.kit
+        }
       }
     }
 
   // Restoring from local backup
-  // app.kit has been assigned at this point
-  // LNParams.setup has been called at this point
-
-  def restoreChans(localBackups: LocalBackups) = {
-    localBackups.hosted.foreach(restoreHostedChannel)
-    localBackups.normal.foreach(restoreNormalChannel)
-  }
 
   def restoreHostedChannel(some: HostedCommits) = {
     val chan = ChannelManager.createHostedChannel(ChannelManager.operationalListeners, some)

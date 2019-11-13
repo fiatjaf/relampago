@@ -360,5 +360,5 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
 
   implicit val ratesFmt = jsonFormat[Seq[Double], Seq[Double], Fiat2Btc, Long, Rates](Rates.apply, "feesSix", "feesThree", "exchange", "stamp")
   implicit val cloudDataFmt = jsonFormat[Option[RequestAndMemo], Vector[ClearToken], Vector[CloudAct], CloudData](CloudData.apply, "info", "tokens", "acts")
-  implicit val localBackupsFmt = jsonFormat[Vector[HasNormalCommits], Vector[HostedCommits], Int, LocalBackups](LocalBackups.apply, "normal", "hosted", "v")
+  implicit val localBackupsFmt = jsonFormat[Vector[HasNormalCommits], Vector[HostedCommits], Long, Int, LocalBackups](LocalBackups.apply, "normal", "hosted", "earliestUtxoSeconds", "v")
 }
