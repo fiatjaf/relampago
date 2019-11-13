@@ -41,7 +41,7 @@ object LocalBackup {
     case _ => "unknown"
   }
 
-  def getBackupFile(channelBackupDirectoryName: String): File = {
+  def getBackupFile(channelBackupDirectoryName: String) = {
     val publicDir = new File(Environment.getExternalStorageDirectory, BACKUP_DIR)
     val chainDir = new File(publicDir, channelBackupDirectoryName)
     val backup = new File(chainDir, BACKUP_FILE_NAME)

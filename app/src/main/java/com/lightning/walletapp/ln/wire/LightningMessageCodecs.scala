@@ -617,7 +617,8 @@ object LightningMessageCodecs { me =>
   }.as[RevocationInfo]
 
   val hostedStateCodec = {
-    (vectorOfN(uint16, lightningMessageCodec) withContext "nextLocalUpdates") ::
+    (bytes32 withContext "channelId") ::
+      (vectorOfN(uint16, lightningMessageCodec) withContext "nextLocalUpdates") ::
       (vectorOfN(uint16, lightningMessageCodec) withContext "nextRemoteUpdates") ::
       (lastCrossSignedStateCodec withContext "lastCrossSignedState")
   }.as[HostedState]

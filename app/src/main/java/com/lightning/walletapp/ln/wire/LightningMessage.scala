@@ -257,6 +257,6 @@ case class StateOverride(blockDay: Long, localBalanceMsat: Long, localUpdates: L
 // Not in a spec
 case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)
 case class LocalBackups(normal: Vector[HasNormalCommits], hosted: Vector[HostedCommits], earliestUtxoSeconds: Long, v: Int)
-case class HostedState(nextLocalUpdates: LNMessageVector, nextRemoteUpdates: LNMessageVector, lastCrossSignedState: LastCrossSignedState)
+case class HostedState(channelId: ByteVector, nextLocalUpdates: LNMessageVector, nextRemoteUpdates: LNMessageVector, lastCrossSignedState: LastCrossSignedState)
 case class CerberusPayload(payloads: Vector[AESZygote], halfTxIds: StringVec)
 case class AESZygote(v: Int, iv: ByteVector, ciphertext: ByteVector)

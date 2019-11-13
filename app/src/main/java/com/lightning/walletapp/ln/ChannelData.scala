@@ -503,6 +503,7 @@ case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastC
   def addProposal(update: LNDirectionalMessage) = copy(futureUpdates = futureUpdates :+ update)
   def sentPreimages = nextLocalUpdates collect { case fulfillUpdate: UpdateFulfillHtlc => fulfillUpdate.paymentPreimage }
   def newLocalBalanceMsat(so: StateOverride) = lastCrossSignedState.initHostedChannel.channelCapacityMsat - so.localBalanceMsat
+  def hostedState = HostedState(channelId, nextLocalUpdates, nextRemoteUpdates, lastCrossSignedState)
 
   def sendAdd(rd: RoutingData) = {
     // Let's add this change and see if the new state violates any of constraints including those imposed by them on us

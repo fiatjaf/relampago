@@ -7,17 +7,18 @@ import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 
+import java.io.{BufferedWriter, File, FileWriter}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import org.bitcoinj.core.{Address, Block, FilteredBlock, Peer}
-import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap, random, memoize}
-import fr.acinq.bitcoin.{Satoshi, MilliSatoshi, SatoshiLong, MilliSatoshiLong}
+import com.lightning.walletapp.ln.Tools.{memoize, none, random, runAnd, wrap}
+import fr.acinq.bitcoin.{MilliSatoshi, MilliSatoshiLong, Satoshi, SatoshiLong}
 import com.lightning.walletapp.lnutils.{ChannelTable, PaymentInfoWrap, PaymentTable}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.hostedStateCodec
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
 import com.lightning.walletapp.ln.PaymentInfo.REBALANCING
-import com.lightning.walletapp.ln.wire.HostedState
 import com.lightning.walletapp.helper.RichCursor
 import com.lightning.walletapp.ln.RefundingData
+import android.support.v4.content.FileProvider
 import android.support.v7.widget.Toolbar
 import org.bitcoinj.script.ScriptBuilder
 import org.bitcoinj.uri.BitcoinURI
@@ -310,16 +311,34 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             finish
           }
 
-          rm(alert) {
-            val htlcBlock = chan.inFlightHtlcs.nonEmpty
-            val balanceBlock = chan.estCanSendMsat.fromMsatToSat > LNParams.dust
-            val hostedChanState = HostedState(hc.nextLocalUpdates, hc.nextRemoteUpdates, hc.lastCrossSignedState)
-            val uri = s"https://lightning-wallet.com/hosted-channels"
+          def shareStateAsFile = {
+            val snapshotFilePath = new File(getCacheDir, "images")
+            if (!snapshotFilePath.isFile) snapshotFilePath.mkdirs
 
-            if (0 == pos) host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
-            else if (1 == pos) me share hostedStateCodec.encode(hostedChanState).require.toHex
-            else if (2 == pos && htlcBlock) warnAndMaybeRemove(me getString ln_hosted_remove_inflight_details)
-            else if (2 == pos && balanceBlock) warnAndMaybeRemove(me getString ln_hosted_remove_non_empty_details)
+            val data = hostedStateCodec.encode(hc.hostedState).require
+            val name = s"Hosted channel state ${new Date}.txt"
+            val savedFile = new File(snapshotFilePath, name)
+            val writer = new FileWriter(savedFile)
+            val bw = new BufferedWriter(writer)
+            bw.write(data.toHex)
+            bw.close
+
+            val fileURI = FileProvider.getUriForFile(me, "com.lightning.wallet", savedFile)
+            val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
+            share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
+            me startActivity Intent.createChooser(share, "Choose an app")
+          }
+
+          def viewInfo = {
+            val uri = s"https://lightning-wallet.com/hosted-channels"
+            host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
+          }
+
+          rm(alert) {
+            if (0 == pos) viewInfo
+            else if (1 == pos) shareStateAsFile
+            else if (2 == pos && chan.inFlightHtlcs.nonEmpty) warnAndMaybeRemove(me getString ln_hosted_remove_inflight_details)
+            else if (2 == pos && chan.estCanSendMsat.fromMsatToSat > LNParams.dust) warnAndMaybeRemove(me getString ln_hosted_remove_non_empty_details)
             else if (2 == pos) removeChan
           }
         }
