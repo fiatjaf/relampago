@@ -260,6 +260,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def checkTransData = app.TransData checkAndMaybeErase {
     case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
+    case FragWallet.RECEIVE => goReceivePayment(null): Unit
     case FragWallet.REDIRECT => goOps(null): Unit
 
     case btcURI: BitcoinURI =>

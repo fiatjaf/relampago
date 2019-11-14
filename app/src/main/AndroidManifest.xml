@@ -47,6 +47,10 @@
             android:screenOrientation="portrait"
             android:theme="@style/NoBarMain">
 
+            <meta-data
+                android:resource="@xml/shortcuts"
+                android:name="android.app.shortcuts"/>
+
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>

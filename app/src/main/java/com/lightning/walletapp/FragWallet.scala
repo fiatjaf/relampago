@@ -47,6 +47,7 @@ import android.net.Uri
 object FragWallet {
   var worker: FragWalletWorker = _
   val REDIRECT = "goToLnOpsActivity"
+  val RECEIVE = "openReceiveChooser"
 }
 
 class FragWallet extends Fragment {
