@@ -271,6 +271,7 @@
         <item>Закрыть канал в кошелек</item>
     </array>
 
+    <string name="ln_hosted_state_wrap">ID:\n%1$s\n\nСнапшот состояния канала:\n%2$s\n\nРаскрытые секреты:\n%3$s</string>
     <string name="ln_hosted_override_warn"><![CDATA[Удаленный хост хочет обновить баланс вашего hosted-канала с текущего %1$s на новый %2$s, но это возможно только с вашего разрешения.<br><br><strong>Прежде чем продолжить, убедитесь что новый баланс выглядит правильно!</strong><br><br>Вы подтверждаете предложенное обновление баланса?]]></string>
     <string name="ln_hosted_remove_inflight_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel contains pending payments</font><br><br>It is recommended to wait until these payments become failed or fulfilled before removal, would you still like to remove it right now?]]></string>
     <string name="ln_hosted_remove_non_empty_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel has a non-empty balance</font><br><br>It is recommended to empty this channel before removal, would you still like to remove it right now?]]></string>

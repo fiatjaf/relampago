@@ -31,9 +31,9 @@ import scala.util.Try
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  lazy val hostedChanActions = for (txt <- getResources getStringArray R.array.ln_hosted_chan_actions) yield txt.html
-  lazy val normalChanActions = for (txt <- getResources getStringArray R.array.ln_normal_chan_actions) yield txt.html
-  lazy val barStatus = app.getResources getStringArray R.array.ln_chan_ops_status
+  lazy val hostedChanActions = getResources.getStringArray(R.array.ln_hosted_chan_actions).map(_.html)
+  lazy val normalChanActions = getResources.getStringArray(R.array.ln_normal_chan_actions).map(_.html)
+  lazy val barStatus = app.getResources.getStringArray(R.array.ln_chan_ops_status)
   lazy val gridView = findViewById(R.id.gridView).asInstanceOf[GridView]
   lazy val displayedChans = ChannelManager.all.filter(canDisplayData)
   lazy val host = me
@@ -68,8 +68,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   val eventsListener = new ChannelListener with BlocksListener {
     override def onBecome = { case _ => UITask(adapter.notifyDataSetChanged).run }
-    override def onProcessSuccess = { case (chan: HostedChannel, _: HostedCommits, _: wire.StateOverride) if chan.state == SUSPENDED => finish case _ => }
-    def onBlocksDownloaded(peer: Peer, block: Block, filteredBlock: FilteredBlock, left: Int) = if (left < 1) UITask(adapter.notifyDataSetChanged).run
+    def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = if (left < 1) UITask(adapter.notifyDataSetChanged).run
   }
 
   abstract class ChanViewHolder(view: View) {
@@ -282,8 +281,8 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       extraInfoText setVisibility View.GONE
 
       (hc.localError, hc.remoteError) match {
-        case _ \ Some(err) => setExtraInfo(s"R: ${ChanErrorCodes translateTag err}")
-        case Some(err) \ _ => setExtraInfo(s"L: ${ChanErrorCodes translateTag err}")
+        case _ \ Some(err) => setExtraInfo(s"Remote: ${ChanErrorCodes translateTag err}")
+        case Some(err) \ _ => setExtraInfo(s"Local: ${ChanErrorCodes translateTag err}")
         case _ => doNormalOperationalStateChecks(chan)
       }
 
@@ -315,12 +314,13 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             val snapshotFilePath = new File(getCacheDir, "images")
             if (!snapshotFilePath.isFile) snapshotFilePath.mkdirs
 
-            val data = hostedStateCodec.encode(hc.hostedState).require
-            val name = s"Hosted channel state ${new Date}.txt"
-            val savedFile = new File(snapshotFilePath, name)
+            val preimages = hc.sentPreimages.map(_.toHex).mkString("\n")
+            val data = hostedStateCodec.encode(hc.hostedState).require.toHex
+            val text = getString(ln_hosted_state_wrap).format(hc.channelId.toHex, data, preimages)
+            val savedFile = new File(snapshotFilePath, s"Hosted channel state ${new Date}.txt")
             val writer = new FileWriter(savedFile)
             val bw = new BufferedWriter(writer)
-            bw.write(data.toHex)
+            bw.write(text)
             bw.close
 
             val fileURI = FileProvider.getUriForFile(me, "com.lightning.wallet", savedFile)
