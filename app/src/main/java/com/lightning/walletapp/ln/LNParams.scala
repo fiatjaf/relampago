@@ -32,7 +32,7 @@ object LNParams {
   val minHostedCltvDelta = blocksPerDay * 3
   val minHostedOnChainRefundSat = 1000000L
   val minHostedLiabilityBlockdays = 1000
-  val maxHostedBlockHeight = 100000L
+  val maxHostedBlockHeight = 500000L
 
   final val dust = Satoshi(546)
   final val maxToSelfDelay = 2016
