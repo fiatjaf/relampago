@@ -29,9 +29,9 @@ object LNParams {
   val minCapacityMsat = 200000000L
   val channelReserveToFundingRatio = 200 // 0.5%
 
-  val minHostedCltvDelta = blocksPerDay * 3
+  val minHostedCltvDelta = blocksPerDay * 2
   val minHostedOnChainRefundSat = 1000000L
-  val minHostedLiabilityBlockdays = 1000
+  val minHostedLiabilityBlockdays = 500
   val maxHostedBlockHeight = 500000L
 
   final val dust = Satoshi(546)
