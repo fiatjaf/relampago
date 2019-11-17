@@ -10,7 +10,7 @@ import com.lightning.walletapp.ln.LNParams.broadcaster._
 import com.lightning.walletapp.ln.CommitmentSpec.{HtlcAndFail, HtlcAndFulfill}
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import com.lightning.walletapp.ln.Helpers.Closing.{SuccessAndClaim, TimeoutAndClaim}
-import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{LNMessageVector, RedeemScriptAndSig}
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.{LNDirectionalMessage, LNMessageVector, RedeemScriptAndSig}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
 import org.bitcoinj.core.Batch
 import scodec.bits.ByteVector
@@ -27,7 +27,6 @@ case class CMDSpent(tx: Transaction) extends Command
 case object CMDChainTipKnown extends Command
 case object CMDSocketOffline extends Command
 case object CMDSocketOnline extends Command
-case object CMDHTLCProcess extends Command
 case object CMDProceed extends Command
 
 case class CMDOpenChannel(localParams: LocalParams, tempChanId: ByteVector, initialFeeratePerKw: Long, batch: Batch,
@@ -45,12 +44,12 @@ case class InitData(announce: NodeAnnouncement) extends ChannelData
 
 // HOSTED CHANNEL
 
-case class WaitTheirHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector) extends ChannelData {
+case class WaitRemoteHostedReply(announce: NodeAnnouncement, refundScriptPubKey: ByteVector, secret: ByteVector) extends ChannelData {
   require(Helpers isValidFinalScriptPubkey refundScriptPubKey, "Invalid refundScriptPubKey when opening a hosted channel")
-  lazy val initMsg = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey)
+  lazy val invokeMsg = InvokeHostedChannel(LNParams.chainHash, refundScriptPubKey, secret)
 }
 
-case class WaitTheirHostedStateUpdate(announce: NodeAnnouncement, hc: HostedCommits) extends ChannelData
+case class WaitRemoteHostedStateUpdate(announce: NodeAnnouncement, hc: HostedCommits) extends ChannelData
 
 // INCOMING CHANNEL
 
@@ -68,9 +67,9 @@ case class WaitFundingSignedCore(localParams: LocalParams, channelId: ByteVector
 
   def makeCommitments(signedLocalCommitTx: CommitTx) =
     NormalCommits(localParams, remoteParams, LocalCommit(index = 0L, localSpec, Nil, signedLocalCommitTx), remoteCommit,
-      localChanges = Tools.emptyChanges, remoteChanges = Tools.emptyChanges, localNextHtlcId = 0L, remoteNextHtlcId = 0L,
-      remoteNextCommitInfo = Right(Tools.randomPrivKey.toPoint), signedLocalCommitTx.input, ShaHashesWithIndex(Map.empty, None),
-      channelId, updateOpt = None, channelFlags, startedAt = System.currentTimeMillis)
+      localChanges = Changes(Vector.empty, Vector.empty, Vector.empty), remoteChanges = Changes(Vector.empty, Vector.empty, Vector.empty),
+      localNextHtlcId = 0L, remoteNextHtlcId = 0L, remoteNextCommitInfo = Right(Tools.randomPrivKey.toPoint), signedLocalCommitTx.input,
+      ShaHashesWithIndex(Map.empty, None), channelId, updateOpt = None, channelFlags, startedAt = System.currentTimeMillis)
 }
 
 case class WaitFundingSignedData(announce: NodeAnnouncement, core: WaitFundingSignedCore,
@@ -84,22 +83,21 @@ case class WaitBroadcastRemoteData(announce: NodeAnnouncement, core: WaitFunding
 
   def isLost: Boolean = fundingError match {
     case None => commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 21 * 1000L
-    case _ => commitments.startedAt < System.currentTimeMillis - 3600 * 2 * 21 * 1000L
+    case _ => commitments.startedAt < System.currentTimeMillis - 3600 * 24 * 7 * 1000L
   }
 }
 
 case class WaitFundingDoneData(announce: NodeAnnouncement, our: Option[FundingLocked], their: Option[FundingLocked],
                                fundingTx: Transaction, commitments: NormalCommits) extends HasNormalCommits
 
-case class NormalData(announce: NodeAnnouncement, commitments: NormalCommits, localShutdown: Option[Shutdown] = None,
-                      remoteShutdown: Option[Shutdown] = None, unknownSpend: Option[Transaction] = None) extends HasNormalCommits
+case class NormalData(announce: NodeAnnouncement, commitments: NormalCommits, unknownSpend: Option[Transaction] = None,
+                      localShutdown: Option[Shutdown] = None, remoteShutdown: Option[Shutdown] = None) extends HasNormalCommits
 
 case class ClosingTxProposed(unsignedTx: ClosingTx, localClosingSigned: ClosingSigned)
 case class NegotiationsData(announce: NodeAnnouncement, commitments: NormalCommits, localShutdown: Shutdown, remoteShutdown: Shutdown,
                             localProposals: Seq[ClosingTxProposed], lastSignedTx: Option[ClosingTx] = None) extends HasNormalCommits
 
-case class RefundingData(announce: NodeAnnouncement, remoteLatestPoint: Option[Point],
-                         commitments: NormalCommits) extends HasNormalCommits
+case class RefundingData(announce: NodeAnnouncement, remoteLatestPoint: Option[Point], commitments: NormalCommits) extends HasNormalCommits
 
 case class ClosingData(announce: NodeAnnouncement,
                        commitments: NormalCommits, localProposals: Seq[ClosingTxProposed] = Nil,
@@ -114,18 +112,20 @@ case class ClosingData(announce: NodeAnnouncement,
   def tier12States: Seq[PublishStatus] = realTier12Closings.flatMap(_.getState)
 
   def bestClosing: CommitPublished = {
-    // At least one closing is guaranteed to be here
+    // At least one closing is guaranteed to be present
     val mutualWrappers = mutualClose map MutualCommitPublished
-    mutualWrappers ++ realTier12Closings maxBy { commitPublished =>
-      val txDepth \ isDead = getStatus(commitPublished.commitTx.txid)
-      if (isDead) -txDepth else txDepth
-    }
+    (mutualWrappers ++ realTier12Closings).maxBy(_.getDepth)
   }
 }
 
 sealed trait CommitPublished {
   def getState: Seq[PublishStatus] = Nil
-  val commitTx: Transaction
+  def commitTx: Transaction
+
+  def getDepth: Int = {
+    val txDepth \ isDead = getStatus(commitTx.txid)
+    if (isDead) -txDepth else txDepth
+  }
 }
 
 case class LocalCommitPublished(claimMainDelayed: Seq[ClaimDelayedOutputTx], claimHtlcSuccess: Seq[SuccessAndClaim],
@@ -171,24 +171,14 @@ case class RevocationInfo(redeemScriptsToSigs: List[RedeemScriptAndSig],
                           remoteRevocationPubkey: PublicKey, remoteDelayedPaymentKey: PublicKey) {
 
   lazy val dustLim = Satoshi(dustLimit)
-  def makeClaimP2WPKHOutput(tx: Transaction) =
-    Scripts.makeClaimP2WPKHOutputTx(tx, localPubKey,
-      finalScriptPubKey, feeRate, dustLim)
-
-  def makeHtlcPenalty(finder: PubKeyScriptIndexFinder)(redeemScript: ByteVector) =
-    Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, feeRate, dustLim)
-
-  def makeMainPenalty(tx: Transaction) =
-    Scripts.makeMainPenaltyTx(tx, remoteRevocationPubkey, finalScriptPubKey,
-      toSelfDelay, remoteDelayedPaymentKey, feeRate, dustLim)
+  def makeClaimP2WPKHOutput(tx: Transaction) = Scripts.makeClaimP2WPKHOutputTx(tx, localPubKey, finalScriptPubKey, feeRate, dustLim)
+  def makeHtlcPenalty(finder: PubKeyScriptIndexFinder)(redeemScript: ByteVector) = Scripts.makeHtlcPenaltyTx(finder, redeemScript, finalScriptPubKey, feeRate, dustLim)
+  def makeMainPenalty(tx: Transaction) = Scripts.makeMainPenaltyTx(tx, remoteRevocationPubkey, finalScriptPubKey, toSelfDelay, remoteDelayedPaymentKey, feeRate, dustLim)
 }
 
 // COMMITMENTS
 
-case class Htlc(incoming: Boolean, add: UpdateAddHtlc) {
-  def toInFlight = InFlightHtlc(add.id, add.amountMsat, add.paymentHash, add.expiry)
-}
-
+case class Htlc(incoming: Boolean, add: UpdateAddHtlc)
 case class CommitmentSpec(feeratePerKw: Long, toLocalMsat: Long, toRemoteMsat: Long,
                           htlcs: Set[Htlc] = Set.empty, fulfilled: Set[HtlcAndFulfill] = Set.empty,
                           failed: Set[HtlcAndFail] = Set.empty, malformed: Set[Htlc] = Set.empty) {
@@ -198,7 +188,7 @@ case class CommitmentSpec(feeratePerKw: Long, toLocalMsat: Long, toRemoteMsat: L
 
   def directedHtlcsAndSum(incoming: Boolean) = {
     val filtered = htlcs.filter(_.incoming == incoming)
-    filtered -> filtered.map(_.add.amountMsat).sum
+    filtered -> filtered.toVector.map(_.add.amountMsat).sum
   }
 }
 
@@ -273,15 +263,11 @@ case class WaitingForRevocation(nextRemoteCommit: RemoteCommit, sent: CommitSig,
 case class LocalCommit(index: Long, spec: CommitmentSpec, htlcTxsAndSigs: Seq[HtlcTxAndSigs], commitTx: CommitTx)
 case class RemoteCommit(index: Long, spec: CommitmentSpec, txOpt: Option[Transaction], remotePerCommitmentPoint: Point)
 case class HtlcTxAndSigs(txinfo: TransactionWithInputInfo, localSig: ByteVector, remoteSig: ByteVector)
-case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector) {
-  lazy val withProposedAsSigned = copy(proposed = Vector.empty, signed = proposedAndSigned)
-  lazy val proposedAndSigned = proposed ++ signed
-}
+case class Changes(proposed: LNMessageVector, signed: LNMessageVector, acked: LNMessageVector)
 
 sealed trait Commitments {
   val updateOpt: Option[ChannelUpdate]
   val localSpec: CommitmentSpec
-  val myFullBalanceMsat: Long
   val channelId: ByteVector
   val startedAt: Long
 }
@@ -295,7 +281,7 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
 
   lazy val reducedRemoteState = {
     val reduced = CommitmentSpec.reduce(latestRemoteCommit.spec, remoteChanges.acked, localChanges.proposed)
-    val commitFeeSat = Scripts.commitTxFee(remoteParams.dustLimitSat, reduced).amount
+    val commitFeeSat = Scripts.commitTxFee(remoteParams.dustLimitSat, reduced).toLong
     val theirFeeSat = if (localParams.isFunder) 0L else commitFeeSat
     val myFeeSat = if (localParams.isFunder) commitFeeSat else 0L
 
@@ -305,10 +291,9 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 
   lazy val localSpec = localCommit.spec
-  lazy val myFullBalanceMsat = reducedRemoteState.spec.toRemoteMsat
   def latestRemoteCommit = remoteNextCommitInfo.left.toOption.map(_.nextRemoteCommit) getOrElse remoteCommit
-  def localHasUnsignedOutgoing = localChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
-  def remoteHasUnsignedOutgoing = remoteChanges.proposed.collectFirst { case u: UpdateAddHtlc => u }.isDefined
+  def localHasUnsignedOutgoing = localChanges.proposed.collectFirst { case msg: UpdateAddHtlc => msg }.isDefined
+  def remoteHasUnsignedOutgoing = remoteChanges.proposed.collectFirst { case msg: UpdateAddHtlc => msg }.isDefined
   def addRemoteProposal(update: LightningMessage) = me.modify(_.remoteChanges.proposed).using(_ :+ update)
   def addLocalProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update)
   def nextDummyReduced = addLocalProposal(Tools.nextDummyHtlc).reducedRemoteState
@@ -372,8 +357,14 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   def receiveFulfill(fulfill: UpdateFulfillHtlc) =
     getHtlcCrossSigned(incomingRelativeToLocal = false, fulfill.id) match {
       case Some(add) if fulfill.paymentHash == add.paymentHash => addRemoteProposal(fulfill)
-      case None => throw new LightningException("Peer has fulfilled non-cross-signed payment")
+      case None => throw new LightningException("Peer has fulfilled a non-cross-signed payment")
     }
+
+  def sendFulfill(cmd: CMDFulfillHtlc) = {
+    val fulfill = UpdateFulfillHtlc(channelId, cmd.add.id, cmd.preimage)
+    val notFound = getHtlcCrossSigned(incomingRelativeToLocal = true, cmd.add.id).isEmpty
+    if (notFound) throw new LightningException else addLocalProposal(fulfill) -> fulfill
+  }
 
   def sendFail(cmd: CMDFailHtlc) = {
     val fail = UpdateFailHtlc(channelId, cmd.id, cmd.reason)
@@ -477,68 +468,80 @@ case class NormalCommits(localParams: LocalParams, remoteParams: AcceptChannel, 
   }
 }
 
-case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState,
-                         allLocalUpdates: Long, allRemoteUpdates: Long, localChanges: Changes, remoteUpdates: LNMessageVector,
+case class HostedCommits(announce: NodeAnnouncement, lastCrossSignedState: LastCrossSignedState, futureUpdates: Vector[LNDirectionalMessage],
                          localSpec: CommitmentSpec, updateOpt: Option[ChannelUpdate], localError: Option[Error], remoteError: Option[Error],
                          startedAt: Long = System.currentTimeMillis) extends Commitments with ChannelData { me =>
 
-  def isInErrorState = localError.isDefined || remoteError.isDefined
-  def addRemoteProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update).modify(_.allLocalUpdates).using(_ + 1)
-  def addLocalProposal(update: LightningMessage) = me.modify(_.localChanges.proposed).using(_ :+ update).modify(_.allRemoteUpdates).using(_ + 1)
+  lazy val Tuple4(nextLocalUpdates, nextRemoteUpdates, nextTotalLocal, nextTotalRemote) =
+    (Tuple4(Vector.empty[LightningMessage], Vector.empty[LightningMessage], lastCrossSignedState.localUpdates, lastCrossSignedState.remoteUpdates) /: futureUpdates) {
+      case (localMessages, remoteMessages, totalLocalNumber, totalRemoteNumber) \ (msg \ true) => (localMessages :+ msg, remoteMessages, totalLocalNumber + 1, totalRemoteNumber)
+      case (localMessages, remoteMessages, totalLocalNumber, totalRemoteNumber) \ (msg \ false) => (localMessages, remoteMessages :+ msg, totalLocalNumber, totalRemoteNumber + 1)
+    }
 
-  lazy val initMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey)
-  lazy val nextLocalReduced = CommitmentSpec.reduce(localSpec, localChanges.proposedAndSigned, remoteUpdates)
-  lazy val myFullBalanceMsat = nextLocalReduced.toLocalMsat
   val channelId = announce.hostedChanId
+  lazy val invokeMsg = InvokeHostedChannel(chainHash, lastCrossSignedState.refundScriptPubKey, ByteVector.empty)
+  lazy val nextLocalSpec = CommitmentSpec.reduce(localSpec, nextLocalUpdates, nextRemoteUpdates)
+  lazy val currentAndNextInFlight = localSpec.htlcs ++ nextLocalSpec.htlcs
 
-  def resetUpdates =
-    copy(allLocalUpdates = lastCrossSignedState.localUpdates + localChanges.signed.size,
-      allRemoteUpdates = lastCrossSignedState.remoteUpdates, remoteUpdates = Vector.empty)
+  def nextLocalUnsignedLCSS(blockDay: Long) = {
+    val incomingHtlcs \ outgoingHtlcs = nextLocalSpec.htlcs.toList.partition(_.incoming)
+    LastCrossSignedState(lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel,
+      blockDay, nextLocalSpec.toLocalMsat, nextLocalSpec.toRemoteMsat, nextTotalLocal, nextTotalRemote,
+      incomingHtlcs = incomingHtlcs.map(_.add), outgoingHtlcs = outgoingHtlcs.map(_.add),
+      localSigOfRemote = ByteVector.empty, remoteSigOfLocal = ByteVector.empty)
+  }
+
+  def findState(remoteLCSS: LastCrossSignedState) = for {
+  // Find a future state which matches their update numbers
+
+    previousIndex <- futureUpdates.indices drop 1
+    previousHC = me.copy(futureUpdates = futureUpdates take previousIndex)
+    if previousHC.nextLocalUnsignedLCSS(remoteLCSS.blockDay).isEven(remoteLCSS)
+  } yield previousHC
+
+  def getError: Option[Error] = localError.orElse(remoteError)
+  def addProposal(update: LNDirectionalMessage) = copy(futureUpdates = futureUpdates :+ update)
+  def sentPreimages = nextLocalUpdates collect { case fulfillUpdate: UpdateFulfillHtlc => fulfillUpdate.paymentPreimage }
+  def newLocalBalanceMsat(so: StateOverride) = lastCrossSignedState.initHostedChannel.channelCapacityMsat - so.localBalanceMsat
+  def hostedState = HostedState(channelId, nextLocalUpdates, nextRemoteUpdates, lastCrossSignedState)
 
   def sendAdd(rd: RoutingData) = {
     // Let's add this change and see if the new state violates any of constraints including those imposed by them on us
-    val add = UpdateAddHtlc(channelId, allLocalUpdates + 1, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet)
-    val c1 = addLocalProposal(update = add)
+    val add = UpdateAddHtlc(channelId, nextTotalLocal + 1, rd.lastMsat, rd.pr.paymentHash, rd.lastExpiry, rd.onion.packet)
+    val commits1 = addProposal(add.local)
 
-    val inHtlcs \ inFlight = c1.nextLocalReduced.directedHtlcsAndSum(incoming = false)
-    if (c1.nextLocalReduced.toLocalMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
+    val inHtlcs \ inFlight = commits1.nextLocalSpec.directedHtlcsAndSum(incoming = false)
+    if (commits1.nextLocalSpec.toLocalMsat < 0L) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
     if (rd.firstMsat < lastCrossSignedState.initHostedChannel.htlcMinimumMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW)
     if (UInt64(inFlight) > lastCrossSignedState.initHostedChannel.maxHtlcValueInFlightMsat) throw CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH)
     if (inHtlcs.size > lastCrossSignedState.initHostedChannel.maxAcceptedHtlcs) throw CMDAddImpossible(rd, ERR_TOO_MANY_HTLC)
-    c1 -> add
+    commits1 -> add
   }
 
   def receiveAdd(add: UpdateAddHtlc) = {
-    val c1 = addLocalProposal(update = add)
-    if (add.id != allRemoteUpdates + 1) throw new LightningException
-    if (c1.nextLocalReduced.toRemoteMsat < 0L) throw new LightningException
-    val inHtlcs \ inFlight = c1.nextLocalReduced.directedHtlcsAndSum(incoming = true)
+    val commits1 = addProposal(add.remote)
+    if (add.id != nextTotalRemote + 1) throw new LightningException
+    if (commits1.nextLocalSpec.toRemoteMsat < 0L) throw new LightningException
+    val inHtlcs \ inFlight = commits1.nextLocalSpec.directedHtlcsAndSum(incoming = true)
     if (inHtlcs.size > lastCrossSignedState.initHostedChannel.maxAcceptedHtlcs) throw new LightningException
     if (UInt64(inFlight) > lastCrossSignedState.initHostedChannel.maxHtlcValueInFlightMsat) throw new LightningException
-    c1
+    commits1
   }
 
   def receiveFulfill(fulfill: UpdateFulfillHtlc) =
     CommitmentSpec.findHtlcById(localSpec, fulfill.id, isIncoming = false) match {
-      case Some(htlc) if fulfill.paymentHash == htlc.add.paymentHash => addRemoteProposal(fulfill)
-      case None => throw new LightningException("Peer has fulfilled non-existing payment")
+      case Some(htlc) if fulfill.paymentHash == htlc.add.paymentHash => addProposal(fulfill.remote)
+      case None => throw new LightningException("Peer has fulfilled a non-existing payment")
     }
 
   def receiveFail(fail: UpdateFailHtlc) = {
     val notFound = CommitmentSpec.findHtlcById(localSpec, fail.id, isIncoming = false).isEmpty
-    if (notFound) throw new LightningException else addRemoteProposal(fail)
+    if (notFound) throw new LightningException else addProposal(fail.remote)
   }
 
   def receiveFailMalformed(fail: UpdateFailMalformedHtlc) = {
     val notFound = CommitmentSpec.findHtlcById(localSpec, fail.id, isIncoming = false).isEmpty
     if (fail.failureCode.&(FailureMessageCodecs.BADONION) == 0) throw new LightningException
-    if (notFound) throw new LightningException else addRemoteProposal(fail)
-  }
-
-  def nextLocalLCSS = {
-    val incomingHtlcs \ outgoingHtlcs = nextLocalReduced.htlcs.toList.partition(_.incoming)
-    LastCrossSignedState(lastCrossSignedState.refundScriptPubKey, lastCrossSignedState.initHostedChannel,
-      broadcaster.currentBlockDay, nextLocalReduced.toLocalMsat, nextLocalReduced.toRemoteMsat, allLocalUpdates,
-      allRemoteUpdates, incomingHtlcs.map(_.toInFlight), outgoingHtlcs.map(_.toInFlight), ByteVector.empty)
+    if (notFound) throw new LightningException else addProposal(fail.remote)
   }
 }

@@ -5,49 +5,42 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.ln.Tools._
 import com.lightning.walletapp.R.string._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
-import com.google.android.gms.auth.api.signin._
-import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs._
 
-import android.app.{Activity, AlertDialog}
 import android.view.{Menu, MenuItem, View}
 import android.content.{DialogInterface, Intent}
 import android.os.Build.{VERSION, VERSION_CODES}
 import com.lightning.walletapp.helper.{AES, FingerPrint}
-import com.lightning.walletapp.lnutils.{RatesSaver, TaskWrap}
-import com.lightning.walletapp.ln.wire.{Domain, NodeAddress, WalletZygote}
-import com.google.android.gms.common.api.CommonStatusCodes.SIGN_IN_REQUIRED
+import com.lightning.walletapp.ln.wire.{Domain, NodeAddress}
 import android.content.DialogInterface.OnDismissListener
-import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.drive.MetadataBuffer
-import android.support.v4.content.FileProvider
-import com.lightning.walletapp.lnutils.GDrive
+import com.lightning.walletapp.lnutils.LocalBackup
 import android.support.v7.widget.Toolbar
+import android.content.pm.PackageManager
 import org.bitcoinj.store.SPVBlockStore
 import co.infinum.goldfinger.Goldfinger
-import com.google.common.io.Files
+import android.provider.Settings
+import android.app.AlertDialog
 import scodec.bits.ByteVector
 import android.os.Bundle
 import android.net.Uri
-import java.util.Date
-import java.io.File
 
 
 class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
-  lazy val gDriveBackups = findViewById(R.id.gDriveBackups).asInstanceOf[CheckBox]
   lazy val useTrustedNode = findViewById(R.id.useTrustedNode).asInstanceOf[CheckBox]
+  lazy val saveLocalBackups = findViewById(R.id.saveLocalBackups).asInstanceOf[CheckBox]
   lazy val fpAuthentication = findViewById(R.id.fpAuthentication).asInstanceOf[CheckBox]
   lazy val constrainLNFees = findViewById(R.id.constrainLNFees).asInstanceOf[CheckBox]
 
-  lazy val gDriveBackupState = findViewById(R.id.gDriveBackupState).asInstanceOf[TextView]
   lazy val useTrustedNodeState = findViewById(R.id.useTrustedNodeState).asInstanceOf[TextView]
   lazy val constrainLNFeesState = findViewById(R.id.constrainLNFeesState).asInstanceOf[TextView]
+  lazy val saveLocalBackupsPath = findViewById(R.id.saveLocalBackupsPath).asInstanceOf[TextView]
 
-  lazy val exportWalletSnapshot = findViewById(R.id.exportWalletSnapshot).asInstanceOf[Button]
+  lazy val backupFile = LocalBackup.getBackupFile(LocalBackup getBackupDirectory LNParams.chainHash)
   lazy val chooseBitcoinUnit = findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
   lazy val recoverFunds = findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
   lazy val setFiatCurrency = findViewById(R.id.setFiatCurrency).asInstanceOf[Button]
@@ -56,13 +49,6 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val viewMnemonic = findViewById(R.id.viewMnemonic).asInstanceOf[Button]
   lazy val gf = new Goldfinger.Builder(me).build
   lazy val host = me
-
-  override def onActivityResult(reqCode: Int, resultCode: Int, result: Intent) = {
-    val isGDriveSignInSuccessful = reqCode == 102 && resultCode == Activity.RESULT_OK
-    app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, isGDriveSignInSuccessful).commit
-    if (isGDriveSignInSuccessful) checkBackup(GoogleSignIn.getSignedInAccountFromIntent(result).getResult)
-    updateBackupView
-  }
 
   override def onCreateOptionsMenu(menu: Menu) = {
     getMenuInflater.inflate(R.menu.status, menu)
@@ -75,59 +61,26 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     true
   }
 
-  def checkBackup(signInAcc: GoogleSignInAccount) = {
-    val syncTask = GDrive.syncClientTask(app)(signInAcc)
-    val driveResClient = GDrive.driveResClient(app)(signInAcc)
-
-    val onMedaData = TaskWrap.onSuccess[MetadataBuffer] { buf =>
-      // Update values right away and upload backup since it may be stale at this point
-      // for example: user turned backups off a long time ago and now has changed his mind
-      GDrive.updateLastSaved(app, if (buf.getCount < 1) 0L else System.currentTimeMillis)
-      UITask(updateBackupView).run
-      ChannelManager.backUp
-    }
-
-    val updateInterface = TaskWrap.onFailure { exc =>
-      // At this point we know it does not work so update UI and settings
-      app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, false).commit
-      UITask(updateBackupView).run
-    }
-
-    val maybeAskSignIn = TaskWrap.onFailure {
-      case api: ApiException if api.getStatusCode == SIGN_IN_REQUIRED =>
-        val onDGriveAccessRevoked = TaskWrap.onSuccess[Void] { _ => askGDriveSignIn }
-        GDrive.signInAttemptClient(me).revokeAccess.addOnSuccessListener(onDGriveAccessRevoked)
-
-      case exc =>
-        // At least let user know
-        app toast exc.getMessage
-    }
-
-    new TaskWrap[Void, MetadataBuffer] sContinueWithTask syncTask apply { _ =>
-      GDrive.getMetaTask(driveResClient.getAppFolder, driveResClient, backupFileName)
-        .addOnFailureListener(updateInterface).addOnFailureListener(maybeAskSignIn)
-        .addOnSuccessListener(onMedaData)
-    }
+  type GrantResults = Array[Int]
+  override def onRequestPermissionsResult(reqCode: Int, permissions: Array[String], grantResults: GrantResults): Unit = {
+    val isAllowed = reqCode == LocalBackup.LOCAL_BACKUP_REQUEST_NUMBER && grantResults.nonEmpty && grantResults.head == PackageManager.PERMISSION_GRANTED
+    if (isAllowed) ChannelManager.backupSaveWorker.replaceWork("SETTINGS-INIT-SAVE-BACKUP")
+    updateBackupView
   }
 
-  def onGDriveTap(cb: View) = {
-    def proceed = queue.map(_ => GDrive signInAccount me) foreach {
-      case Some(gDriveAccountMaybe) => checkBackup(gDriveAccountMaybe)
-      case _ => askGDriveSignIn
-    }
-
-    if (gDriveBackups.isChecked) proceed else {
-      // User has opted out of GDrive backups, revoke access immediately
-      app.prefs.edit.putBoolean(AbstractKit.GDRIVE_ENABLED, false).commit
-      GDrive.signInAttemptClient(me).revokeAccess
-      updateBackupView
+  def onBackupTap(cb: View) = {
+    val isAllowed = LocalBackup.isAllowed(activity = me)
+    if (!isAllowed) LocalBackup.askPermission(activity = me) else {
+      val intent = (new Intent).setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+      val intent1 = intent setData Uri.fromParts("package", getPackageName, null)
+      startActivity(intent1)
     }
   }
 
   def onFpTap(cb: View) = fpAuthentication.isChecked match {
-    case true if VERSION.SDK_INT < VERSION_CODES.M => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
-    case true if !gf.hasFingerprintHardware => runAnd(fpAuthentication setChecked false)(app toast fp_no_support)
-    case true if !gf.hasEnrolledFingerprint => runAnd(fpAuthentication setChecked false)(app toast fp_add_print)
+    case true if VERSION.SDK_INT < VERSION_CODES.M => runAnd(fpAuthentication setChecked false)(app quickToast fp_no_support)
+    case true if !gf.hasFingerprintHardware => runAnd(fpAuthentication setChecked false)(app quickToast fp_no_support)
+    case true if !gf.hasEnrolledFingerprint => runAnd(fpAuthentication setChecked false)(app quickToast fp_add_print)
     case mode => FingerPrint switch mode
   }
 
@@ -161,7 +114,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def INIT(s: Bundle) = if (app.isAlive) {
     me setContentView R.layout.activity_settings
     me initToolbar findViewById(R.id.toolbar).asInstanceOf[Toolbar]
-    getSupportActionBar setSubtitle "App version 0.3-138"
+    getSupportActionBar setSubtitle "App version 0.4-149"
     getSupportActionBar setTitle wallet_settings
 
     updateConstrainLNFeesView
@@ -182,8 +135,8 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
       }
 
       lst setOnItemClickListener onTap(updateFiatType)
-      lst setAdapter new ArrayAdapter(me, singleChoice, fiatHumanNames.toArray)
-      showForm(negBuilder(dialog_ok, me getString sets_set_fiat, form).create)
+      lst setAdapter new ArrayAdapter(me, android.R.layout.select_dialog_singlechoice, fiatHumanNames.toArray)
+      showForm(alertDialog = negBuilder(dialog_ok, me getString sets_set_fiat, form).create)
       lst.setItemChecked(fiatCodes.toList indexOf fiatCode, true)
     }
 
@@ -203,9 +156,9 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         Option(FragWallet.worker).foreach(_.updTitleTask.run)
       }
 
-      showForm(negBuilder(dialog_ok, me getString sets_choose_unit, form).create)
-      lst setAdapter new ArrayAdapter(me, singleChoice, allDenoms)
       lst setOnItemClickListener onTap(updateDenomination)
+      lst setAdapter new ArrayAdapter(me, android.R.layout.select_dialog_singlechoice, allDenoms)
+      showForm(alertDialog = negBuilder(dialog_ok, me getString sets_choose_unit, form).create)
       lst.setItemChecked(currentDenom, true)
     }
 
@@ -234,36 +187,6 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
       me viewMnemonic null
     }
 
-    exportWalletSnapshot setOnClickListener onButtonTap {
-      // Warn user about risks before proceeding with this further
-      val bld = me baseTextBuilder getString(migrator_usage_warning).html
-      mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
-      def proceed = <(createZygote, onFail)(none)
-
-      def createZygote = {
-        // Prevent channel state updates
-        RatesSaver.subscription.unsubscribe
-        val walletByteVec = ByteVector.view(Files toByteArray app.walletFile)
-        val chainByteVec = ByteVector.view(Files toByteArray app.chainFile)
-        val dbFile = new File(app.getDatabasePath(dbFileName).getPath)
-        val dbByteVec = ByteVector.view(Files toByteArray dbFile)
-
-        val zygote = WalletZygote(1, dbByteVec, walletByteVec, chainByteVec)
-        val encoded = walletZygoteCodec.encode(zygote).require.toByteArray
-
-        val name = s"BLW Snapshot ${new Date}.txt"
-        val walletSnapshotFilePath = new File(getCacheDir, "images")
-        if (!walletSnapshotFilePath.isFile) walletSnapshotFilePath.mkdirs
-        val savedFile = new File(walletSnapshotFilePath, name)
-        Files.write(encoded, savedFile)
-
-        val fileURI = FileProvider.getUriForFile(me, "com.lightning.walletapp", savedFile)
-        val share = new Intent setAction Intent.ACTION_SEND addFlags Intent.FLAG_GRANT_READ_URI_PERMISSION
-        share.putExtra(Intent.EXTRA_STREAM, fileURI).setDataAndType(fileURI, getContentResolver getType fileURI)
-        me startActivity Intent.createChooser(share, "Choose an app")
-      }
-    }
-
     recoverFunds setOnClickListener onButtonTap {
       def recover = app.olympus getBackup cloudId foreach { backups =>
         // Decrypt channel recovery data and put it to channels list if it is not present already
@@ -285,14 +208,9 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
         } chan process ann1
       }
 
-      def go = {
-        timer.schedule(finish, 3000)
-        app toast olympus_recovering
-        recover
-      }
-
       val bld = baseTextBuilder(me getString channel_recovery_info)
-      mkCheckForm(alert => rm(alert)(go), none, bld, dialog_next, dialog_cancel)
+      def proceed = runAnd(recover)(me toast dialog_olympus_recovering)
+      mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_next, dialog_cancel)
     }
 
     // Wallet may not notice incoming tx until synchronized
@@ -300,18 +218,10 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   } else me exitTo classOf[MainActivity]
 
   def updateBackupView = {
-    val isUserEnabled = app.prefs.getBoolean(AbstractKit.GDRIVE_ENABLED, true)
-    val lastStamp = app.prefs.getLong(AbstractKit.GDRIVE_LAST_SAVE, 0L)
-    val state = time apply new java.util.Date(lastStamp)
-    val gDriveMissing = GDrive isMissing app
-
-    if (gDriveMissing) gDriveBackupState setText gdrive_not_present
-    else if (!isUserEnabled) gDriveBackupState setText gdrive_disabled
-    else if (lastStamp == -1L) gDriveBackupState setText gdrive_failed
-    else if (lastStamp == 0L) gDriveBackupState setText gdrive_not_present
-    else gDriveBackupState setText getString(gdrive_last_saved).format(state).html
-    gDriveBackups.setChecked(!gDriveMissing && isUserEnabled)
-    gDriveBackups.setEnabled(!gDriveMissing)
+    val canWrite = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable
+    if (canWrite) saveLocalBackupsPath.setText(backupFile.getPath)
+    saveLocalBackupsPath setVisibility viewMap(canWrite)
+    saveLocalBackups setChecked canWrite
   }
 
   def updateFpView = {
@@ -320,10 +230,10 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   def updateTrustedView = {
-    val naTry = app.kit.trustedNodeTry
-    if (naTry.isFailure) useTrustedNodeState setText trusted_hint_none
-    else useTrustedNodeState setText naTry.get.toString
-    useTrustedNode setChecked naTry.isSuccess
+    val nodeAddressTry = app.kit.trustedNodeTry
+    if (nodeAddressTry.isFailure) useTrustedNodeState setText trusted_hint_none
+    else useTrustedNodeState setText nodeAddressTry.get.toString
+    useTrustedNode setChecked nodeAddressTry.isSuccess
   }
 
   def updateConstrainLNFeesView = {

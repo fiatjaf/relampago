@@ -2,24 +2,61 @@ package com.lightning.walletapp.ln
 
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.PaymentInfo._
-import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.ln.ChanErrorCodes._
 
-import fr.acinq.bitcoin.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
-import fr.acinq.bitcoin.Protocol.Zeroes
-import java.util.concurrent.Executors
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
-
+import java.util.concurrent.Executors
+import fr.acinq.bitcoin.Protocol.Zeroes
+import fr.acinq.bitcoin.ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS
+import com.lightning.walletapp.ln.wire.LightningMessageCodecs.LNDirectionalMessage
 import com.lightning.walletapp.ln.crypto.{Generators, ShaChain, ShaHashesWithIndex}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import com.lightning.walletapp.ln.Tools.{none, runAnd, emptyChanges}
 import com.lightning.walletapp.ln.Helpers.{Closing, Funding}
+import com.lightning.walletapp.ln.Tools.{none, runAnd}
 import fr.acinq.bitcoin.Crypto.{Point, Scalar}
 import fr.acinq.bitcoin.{Satoshi, Transaction}
 import scala.util.{Failure, Success, Try}
 
+
+object Channel {
+  val WAIT_FOR_INIT = "WAIT-FOR-INIT"
+  val WAIT_FOR_ACCEPT = "WAIT-FOR-ACCEPT"
+  val WAIT_FOR_FUNDING = "WAIT-FOR-FUNDING"
+  val WAIT_FUNDING_SIGNED = "WAIT-FUNDING-SIGNED"
+
+  // All states below are persisted
+  val WAIT_FUNDING_DONE = "WAIT-FUNDING-DONE"
+  val NEGOTIATIONS = "NEGOTIATIONS"
+  val SLEEPING = "SLEEPING"
+  val OPEN = "OPEN"
+
+  // No tears, only dreams now
+  val SUSPENDED = "SUSPENDED"
+  val REFUNDING = "REFUNDING"
+  val CLOSING = "CLOSING"
+
+  def isOpeningOrOperational(chan: Channel) = isOperational(chan) || isOpening(chan)
+  def isOpening(chan: Channel) = chan.data.isInstanceOf[WaitFundingDoneData]
+
+  def isOperational(chan: Channel) = chan.data match {
+    case NormalData(_, _, None, None, None) => true
+    case hc: HostedCommits => hc.getError.isEmpty
+    case _ => false
+  }
+
+  def channelAndHop(chan: Channel) = for {
+    // Only proceed if channel has (1) commits
+    // and (2) remote update supplied by peer
+
+    commits <- chan.getCommits
+    chanUpdate <- commits.updateOpt
+    nodeId = chan.data.announce.nodeId
+    path = Vector(chanUpdate toHop nodeId)
+  } yield chan -> path
+}
 
 abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] { me =>
   implicit val context: ExecutionContextExecutor = ExecutionContext fromExecutor Executors.newSingleThreadExecutor
@@ -38,6 +75,25 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
       isDifferentShortId || isOldUpdateRefresh
     }
 
+  def RESOLVE(prevUpds: Traversable[LightningMessage], cs: Commitments) = {
+    // New state is settled, we resolve remote updates from previous state which can be done once
+    // by doing it this way we ensure it is not possible to resolve the same payment differently twice
+
+    val resolves = prevUpds collect { case remoteAdd: UpdateAddHtlc =>
+      // We don't want to receive a payment into a channel we have originally sent it from in an attempt to rebalance
+      val isLoop = cs.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == remoteAdd.paymentHash)
+      resolveHtlc(LNParams.nodePrivateKey, remoteAdd, LNParams.bag, isLoop)
+    }
+
+    for (cmd <- resolves) me doProcess cmd
+    // Inform if there were any commands
+    resolves.isEmpty
+  }
+
+  def SEND(lightningMessage: LightningMessage) = for {
+    work <- ConnectionManager.workers.get(data.announce.nodeId)
+  } work.handler process lightningMessage
+
   def BECOME(data1: ChannelData, state1: String) = runAnd(me) {
     // Transition must always be defined before vars are updated
     val trans = Tuple4(me, data1, state, state1)
@@ -47,15 +103,11 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
 
   def UPDATA(d1: ChannelData) = BECOME(d1, state)
   def STORE[T <: ChannelData](data: T): T
-  def SEND(msg: LightningMessage): Unit
 
   def inFlightHtlcs: Set[Htlc]
   def estCanReceiveMsat: Long
   def estCanSendMsat: Long
-
-  def estNextUsefulCapacityMsat =
-    // In-flight HTLCs are subtracted here
-    estCanSendMsat + estCanReceiveMsat
+  def refundableMsat: Long
 
   var waitingUpdate: Boolean = true
   var permanentOffline: Boolean = true
@@ -64,6 +116,7 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
     override def onProcessSuccess = { case ps => for (lst <- listeners if lst.onProcessSuccess isDefinedAt ps) lst onProcessSuccess ps }
     override def onException = { case failure => for (lst <- listeners if lst.onException isDefinedAt failure) lst onException failure }
     override def onBecome = { case transition => for (lst <- listeners if lst.onBecome isDefinedAt transition) lst onBecome transition }
+    override def unknownHostedHtlcsDetected(hc: HostedCommits) = for (lst <- listeners) lst unknownHostedHtlcsDetected hc
     override def fulfillReceived(upd: UpdateFulfillHtlc) = for (lst <- listeners) lst fulfillReceived upd
     override def outPaymentAccepted(rd: RoutingData) = for (lst <- listeners) lst outPaymentAccepted rd
     override def onSettled(cs: Commitments) = for (lst <- listeners) lst.onSettled(cs)
@@ -71,10 +124,11 @@ abstract class Channel(val isHosted: Boolean) extends StateMachine[ChannelData] 
 }
 
 abstract class NormalChannel extends Channel(isHosted = false) { me =>
-  def fundTxId = data match {case hasSome: HasNormalCommits => hasSome.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
-  def estCanSendMsat = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat } getOrElse 0L
-  def inFlightHtlcs = getCommits collect { case nc: NormalCommits => nc.reducedRemoteState.spec.htlcs } getOrElse Set.empty[Htlc]
-  def estCanReceiveMsat = getCommits collect { case nc: NormalCommits => nc.nextDummyReduced.canReceiveMsat } getOrElse 0L
+  def fundTxId = data match { case hnc: HasNormalCommits => hnc.commitments.commitInput.outPoint.txid case _ => ByteVector.empty }
+  def inFlightHtlcs: Set[Htlc] = data match { case hnc: HasNormalCommits => hnc.commitments.reducedRemoteState.spec.htlcs case _ => Set.empty }
+  def estCanSendMsat = data match { case hnc: HasNormalCommits => hnc.commitments.nextDummyReduced.canSendMsat + LNParams.minCapacityMsat case _ => 0L }
+  def estCanReceiveMsat = data match { case hnc: HasNormalCommits => hnc.commitments.nextDummyReduced.canReceiveMsat case _ => 0L }
+  def refundableMsat = data match { case hnc: HasNormalCommits => hnc.commitments.localCommit.spec.toLocalMsat case _ => 0L }
 
   def CLOSEANDWATCH(close: ClosingData): Unit
   def ASKREFUNDPEER(some: HasNormalCommits, point: Point): Unit
@@ -108,7 +162,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
           throw new LightningException("Both toLocal and toRemote amounts are less than total channel reserve")
 
         if (open.fundingSatoshis / open.channelReserveSatoshis < LNParams.channelReserveToFundingRatio / 5)
-          throw new LightningException("Their proposed channel reserve is too high relative to capacity")
+          throw new LightningException("Their imposed channel reserve is too high relative to capacity")
 
         val remoteParams = AcceptChannel(open.temporaryChannelId, open.dustLimitSatoshis, open.maxHtlcValueInFlightMsat,
           open.channelReserveSatoshis, open.htlcMinimumMsat, minimumDepth = 6, open.toSelfDelay, open.maxAcceptedHtlcs,
@@ -162,7 +216,6 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
       case (WaitFundingData(announce, cmd, accept), CMDFunding(fundTx), WAIT_FOR_FUNDING) =>
         // We are the funder and user made a funding, let peer sign a first commit so we can broadcast a funding later
-        if (fundTx.txOut(cmd.batch.fundOutIdx).amount.amount != cmd.batch.fundingAmountSat) throw new LightningException
         val (localSpec, localCommitTx, remoteSpec, remoteCommitTx) = Funding.makeFirstCommitTxs(cmd.localParams, cmd.fundingSat,
           cmd.pushMsat, cmd.initialFeeratePerKw, accept, fundTx.hash, cmd.batch.fundOutIdx, accept.firstPerCommitmentPoint)
 
@@ -228,20 +281,15 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       // OPEN MODE
 
 
+      // GUARD: due to timestamp filter the first update they send must be for our channel
       case (norm: NormalData, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && !upd.isHosted =>
-        // GUARD: due to timestamp filter the first update they send must be for our channel
+        if (me isUpdatable upd) data = me STORE norm.modify(_.commitments.updateOpt).setTo(upd.some)
         waitingUpdate = false
 
-        if (me isUpdatable upd) {
-          // Update and store data but do not trigger listeners
-          val d1 = norm.modify(_.commitments.updateOpt) setTo Some(upd)
-          data = me STORE d1
-        }
 
-
-      case (norm: NormalData, add: UpdateAddHtlc, OPEN) =>
+      case (norm: NormalData, addHtlc: UpdateAddHtlc, OPEN) =>
         // Got new incoming HTLC, put it to changes without storing for now
-        me UPDATA norm.copy(commitments = norm.commitments receiveAdd add)
+        me UPDATA norm.copy(commitments = norm.commitments receiveAdd addHtlc)
 
 
       case (norm: NormalData, fulfill: UpdateFulfillHtlc, OPEN) =>
@@ -260,27 +308,17 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         me UPDATA norm.copy(commitments = norm.commitments receiveFailMalformed fail)
 
 
-      case (norm: NormalData, rd: RoutingData, OPEN) if isOperational(me) =>
+      case (norm: NormalData, routingData: RoutingData, OPEN) if isOperational(me) =>
         // We can send a new HTLC when channel is both operational and online
-
-        val c1 \ updateAddHtlc = norm.commitments sendAdd rd
+        val c1 \ updateAddHtlc = norm.commitments sendAdd routingData
         me UPDATA norm.copy(commitments = c1) SEND updateAddHtlc
-        events outPaymentAccepted rd
+        events outPaymentAccepted routingData
         me doProcess CMDProceed
 
 
       case (norm: NormalData, cmd: CMDFulfillHtlc, OPEN) =>
-        // We're fulfilling an HTLC we got from them earlier
-
-        for {
-          // this is a special case where we don't throw if cross signed HTLC is not found
-          add <- norm.commitments.getHtlcCrossSigned(incomingRelativeToLocal = true, cmd.add.id)
-          // such a case may happen when we have already fulfilled it just before connection got lost
-          updateFulfillHtlc = UpdateFulfillHtlc(norm.commitments.channelId, cmd.add.id, cmd.preimage)
-
-          if updateFulfillHtlc.paymentHash == add.paymentHash
-          c1 = norm.commitments addLocalProposal updateFulfillHtlc
-        } me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
+        val c1 \ updateFulfillHtlc = norm.commitments sendFulfill cmd
+        me UPDATA norm.copy(commitments = c1) SEND updateFulfillHtlc
 
 
       case (norm: NormalData, cmd: CMDFailHtlc, OPEN) =>
@@ -291,18 +329,6 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       case (norm: NormalData, cmd: CMDFailMalformedHtlc, OPEN) =>
         val c1 \ updateFailMalformedHtlс = norm.commitments sendFailMalformed cmd
         me UPDATA norm.copy(commitments = c1) SEND updateFailMalformedHtlс
-
-
-      case (norm: NormalData, CMDHTLCProcess, OPEN) =>
-        // Fail or fulfill incoming HTLCs
-
-        for {
-          Htlc(false, add) <- norm.commitments.remoteCommit.spec.htlcs
-          // We don't want to receive a payment into a channel we have originally sent it from in an attempt to rebalance
-          isLoop = norm.commitments.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == add.paymentHash)
-        } me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, isLoop)
-        // And sign changes once done because CMDFail/Fulfill above don't do that
-        me doProcess CMDProceed
 
 
       case (norm: NormalData, CMDProceed, OPEN)
@@ -329,11 +355,11 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (norm: NormalData, rev: RevokeAndAck, OPEN) =>
-        // We received a revocation because we sent a commit sig
-        val c1 = norm.commitments receiveRevocation rev
-        val d1 = me STORE norm.copy(commitments = c1)
-        me UPDATA d1 doProcess CMDHTLCProcess
-        // We should use an old commit here
+        me UPDATA norm.copy(commitments = norm.commitments receiveRevocation rev)
+        val noResolves = RESOLVE(norm.commitments.remoteChanges.signed, norm.commitments)
+        if (noResolves) me STORE data
+
+        me doProcess CMDProceed
         REV(norm.commitments, rev)
 
 
@@ -358,21 +384,21 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), WAIT_FUNDING_DONE) =>
         val finalScriptPubKey = scriptPubKey getOrElse wait.commitments.localParams.defaultFinalScriptPubKey
         val ourShutdown = Shutdown(wait.commitments.channelId, scriptPubKey = finalScriptPubKey)
-        val norm = NormalData(wait.announce, wait.commitments, ourShutdown.some, None)
-        makeFirstFundingLocked(wait) :: ourShutdown :: Nil foreach SEND
+        val norm = NormalData(wait.announce, wait.commitments, None, ourShutdown.some)
+        for (msg <- makeFirstFundingLocked(wait) :: ourShutdown :: Nil) me SEND msg
         BECOME(me STORE norm, OPEN)
 
 
       case (wait: WaitFundingDoneData, CMDShutdown(scriptPubKey), SLEEPING) =>
         val finalScriptPubKey = scriptPubKey getOrElse wait.commitments.localParams.defaultFinalScriptPubKey
         val ourShutdown = Shutdown(wait.commitments.channelId, scriptPubKey = finalScriptPubKey)
-        val norm = NormalData(wait.announce, wait.commitments, ourShutdown.some, None)
+        val norm = NormalData(wait.announce, wait.commitments, None, ourShutdown.some)
         BECOME(me STORE norm, SLEEPING)
 
 
       case (wait: WaitFundingDoneData, remote: Shutdown, WAIT_FUNDING_DONE) =>
         val our = Shutdown(wait.commitments.channelId, wait.commitments.localParams.defaultFinalScriptPubKey)
-        val norm = NormalData(wait.announce, wait.commitments, our.some, remote.some)
+        val norm = NormalData(wait.announce, wait.commitments, None, our.some, remote.some)
         BECOME(me STORE norm, OPEN) SEND our
         me doProcess CMDProceed
 
@@ -380,24 +406,24 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       // SHUTDOWN in OPEN
 
 
-      case (norm @ NormalData(announce, commitments, our, their, txOpt), CMDShutdown(script), OPEN | SLEEPING) =>
+      case (norm @ NormalData(announce, commitments, txOpt, our, their), CMDShutdown(script), OPEN | SLEEPING) =>
         if (commitments.localHasUnsignedOutgoing || our.isDefined || their.isDefined) startLocalClose(norm) else {
           val our = Shutdown(commitments.channelId, script getOrElse commitments.localParams.defaultFinalScriptPubKey)
-          val norm1 = me STORE NormalData(announce, commitments, our.some, their, txOpt)
+          val norm1 = me STORE NormalData(announce, commitments, txOpt, our.some, their)
           me UPDATA norm1 SEND our
         }
 
 
       // Either they initiate a shutdown or respond to the one we have sent
       // should sign our unsigned outgoing HTLCs if present and then proceed with shutdown
-      case (NormalData(announce, commitments, our, None, txOpt), remote: Shutdown, OPEN) =>
-        val norm = NormalData(announce, commitments, our, remote.some, txOpt)
+      case (NormalData(announce, commitments, txOpt, our, None), remote: Shutdown, OPEN) =>
+        val norm = NormalData(announce, commitments, txOpt, our, remote.some)
         if (commitments.remoteHasUnsignedOutgoing) startLocalClose(norm)
         else me UPDATA norm doProcess CMDProceed
 
 
       // We have nothing to sign so check for valid shutdown state, only consider this if we have nothing in-flight
-      case (NormalData(announce, commitments, our, their, txOpt), CMDProceed, OPEN) if inFlightHtlcs.isEmpty =>
+      case (NormalData(announce, commitments, txOpt, our, their), CMDProceed, OPEN) if inFlightHtlcs.isEmpty =>
 
         our -> their match {
           case Some(ourSig) \ Some(theirSig) =>
@@ -415,7 +441,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
           case None \ Some(theirSig) =>
             // We have previously received their Shutdown so can respond, then CMDProceed to enter NEGOTIATIONS
             val our = Shutdown(commitments.channelId, commitments.localParams.defaultFinalScriptPubKey)
-            val norm1 = me STORE NormalData(announce, commitments, our.some, theirSig.some, txOpt)
+            val norm1 = me STORE NormalData(announce, commitments, txOpt, our.some, theirSig.some)
             me UPDATA norm1 SEND our
             me doProcess CMDProceed
 
@@ -448,7 +474,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (norm: NormalData, cr: ChannelReestablish, SLEEPING) =>
-        // Resent our FundingLocked if a channel is fresh since they might not receive it before reconnect
+        // Resend our FundingLocked if a channel is fresh since they might not receive it before reconnect
         val reSendFundingLocked = cr.nextLocalCommitmentNumber == 1 && norm.commitments.localCommit.index == 0
         if (reSendFundingLocked) me SEND makeFirstFundingLocked(norm)
 
@@ -458,7 +484,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         val c1 = norm.commitments.modifyAll(_.localChanges.proposed, _.remoteChanges.proposed).setTo(Vector.empty)
           .modify(_.remoteNextHtlcId).using(_ - remoteDelta.size).modify(_.localNextHtlcId).using(_ - localDelta.size)
 
-        def maybeResendRevocation = if (c1.localCommit.index == cr.nextRemoteRevocationNumber + 1) {
+        def maybeResendOurRevocationMessage = if (c1.localCommit.index == cr.nextRemoteRevocationNumber + 1) {
           val localPerCommitmentSecret = Generators.perCommitSecret(c1.localParams.shaSeed, c1.localCommit.index - 1)
           val localNextPerCommitmentPoint = Generators.perCommitPoint(c1.localParams.shaSeed, c1.localCommit.index + 1)
           me SEND RevokeAndAck(channelId = c1.channelId, localPerCommitmentSecret, localNextPerCommitmentPoint)
@@ -471,20 +497,19 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
           case Left(wait) if wait.nextRemoteCommit.index == cr.nextLocalCommitmentNumber =>
             val revocationWasSentLast = c1.localCommit.index > wait.localCommitIndexSnapshot
 
-            if (!revocationWasSentLast) maybeResendRevocation
-            c1.localChanges.signed :+ wait.sent foreach SEND
-            if (revocationWasSentLast) maybeResendRevocation
+            if (!revocationWasSentLast) maybeResendOurRevocationMessage
+            for (msg <- c1.localChanges.signed :+ wait.sent) me SEND msg
+            if (revocationWasSentLast) maybeResendOurRevocationMessage
 
           // We had sent a new sig and were waiting for their revocation, they had received
           // the new sig but their revocation was lost during the disconnection, they'll resend us the revocation
-          case Left(wait) if wait.nextRemoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendRevocation
-          case Right(_) if c1.remoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendRevocation
+          case Left(wait) if wait.nextRemoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendOurRevocationMessage
+          case Right(_) if c1.remoteCommit.index + 1 == cr.nextLocalCommitmentNumber => maybeResendOurRevocationMessage
           case _ => throw new LightningException("Local sync error")
         }
 
-        // We may have HTLC to fulfill, then shutdown
-        BECOME(norm.copy(commitments = c1), OPEN)
-        me doProcess CMDHTLCProcess
+        val d1 = norm.copy(commitments = c1)
+        BECOME(d1, OPEN) doProcess CMDProceed
 
 
       // We're exiting a sync state while funding tx is still not provided
@@ -495,15 +520,15 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
       // We're exiting a sync state while waiting for their FundingLocked
       case (wait: WaitFundingDoneData, _: ChannelReestablish, SLEEPING) =>
+        for (fundingLocked <- wait.our) me SEND fundingLocked
         BECOME(wait, WAIT_FUNDING_DONE)
-        wait.our foreach SEND
 
 
       // No in-flight HTLCs here, just proceed with negotiations
       case (neg: NegotiationsData, _: ChannelReestablish, SLEEPING) =>
         // Last closing signed may be empty if we are not a funder of this channel
         val lastClosingSignedOpt = neg.localProposals.headOption.map(_.localClosingSigned)
-        neg.localShutdown +: lastClosingSignedOpt.toVector foreach SEND
+        for (msg <- neg.localShutdown +: lastClosingSignedOpt.toVector) me SEND msg
         BECOME(neg, NEGOTIATIONS)
 
 
@@ -514,6 +539,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
         // According to BOLD a first message on connection should be reestablish
         // will specifically NOT work in REFUNDING to not let them know beforehand
         me SEND makeReestablish(some, some.commitments.localCommit.index + 1)
+        permanentOffline = false
 
 
       case (some: HasNormalCommits, newAnn: NodeAnnouncement, SLEEPING)
@@ -539,7 +565,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
 
       case (neg @ NegotiationsData(_, commitments, localShutdown, remoteShutdown, localProposals, _),
-        ClosingSigned(_, remoteClosingFee, remoteClosingSig), NEGOTIATIONS) =>
+      ClosingSigned(_, remoteClosingFee, remoteClosingSig), NEGOTIATIONS) =>
 
         val lastLocalFee = localProposals.headOption.map(_.localClosingSigned.feeSatoshis) getOrElse {
           // If we are fundee and we were waiting for them to send their first proposal, we don't have a lastLocalClosingFee
@@ -683,8 +709,8 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
     case _ => BECOME(me STORE ClosingData(some.announce, some.commitments, Nil, tx :: Nil), CLOSING)
   }
 
-  private def startLocalClose(some: HasNormalCommits): Unit =
-    // Something went wrong and we decided to spend our CURRENT commit transaction
+  def startLocalClose(some: HasNormalCommits): Unit =
+  // Something went wrong and we decided to spend our CURRENT commit transaction
     Closing.claimCurrentLocalCommitTxOutputs(some.commitments, LNParams.bag) -> some match {
       case (_, neg: NegotiationsData) if neg.lastSignedTx.isDefined => startMutualClose(neg, neg.lastSignedTx.get.tx)
       case (localClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(localCommit = localClaim :: Nil)
@@ -692,14 +718,14 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
     }
 
   private def startRemoteCurrentClose(some: HasNormalCommits) =
-    // They've decided to spend their CURRENT commit tx, we need to take what's ours
+  // They've decided to spend their CURRENT commit tx, we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, some.commitments.remoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(remoteCommit = remoteClaim :: Nil)
       case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, remoteCommit = remoteClaim :: Nil)
     }
 
   private def startRemoteNextClose(some: HasNormalCommits, nextRemoteCommit: RemoteCommit) =
-    // They've decided to spend their NEXT commit tx, once again we need to take what's ours
+  // They've decided to spend their NEXT commit tx, once again we need to take what's ours
     Closing.claimRemoteCommitTxOutputs(some.commitments, nextRemoteCommit, LNParams.bag) -> some match {
       case (remoteClaim, closingData: ClosingData) => me CLOSEANDWATCH closingData.copy(nextRemoteCommit = remoteClaim :: Nil)
       case (remoteClaim, _) => me CLOSEANDWATCH ClosingData(some.announce, some.commitments, nextRemoteCommit = remoteClaim :: Nil)
@@ -707,68 +733,69 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 }
 
 abstract class HostedChannel extends Channel(isHosted = true) { me =>
-  def estCanSendMsat = getCommits collect { case nc: HostedCommits => nc.nextLocalReduced.toLocalMsat } getOrElse 0L
-  def estCanReceiveMsat = getCommits collect { case nc: HostedCommits => nc.nextLocalReduced.toRemoteMsat } getOrElse 0L
-  def inFlightHtlcs = getCommits collect { case nc: HostedCommits => nc.nextLocalReduced.htlcs } getOrElse Set.empty[Htlc]
+  def estCanSendMsat = data match { case hc: HostedCommits => hc.localSpec.toLocalMsat case _ => 0L }
+  def estCanReceiveMsat = data match { case hc: HostedCommits => hc.localSpec.toRemoteMsat case _ => 0L }
+  def inFlightHtlcs: Set[Htlc] = data match { case hc: HostedCommits => hc.currentAndNextInFlight case _ => Set.empty }
+  def isBlockDayOutOfSync(blockDay: Long): Boolean = math.abs(blockDay - LNParams.broadcaster.currentBlockDay) > 1
+  def refundableMsat = estCanSendMsat
 
   private var isChainHeightKnown: Boolean = false
   private var isSocketConnected: Boolean = false
 
   def doProcess(change: Any) = {
     Tuple3(data, change, state) match {
-      case (wait: WaitTheirHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
-        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initMsg
+      case (wait: WaitRemoteHostedReply, CMDSocketOnline, WAIT_FOR_INIT) =>
+        if (isChainHeightKnown) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.invokeMsg
         isSocketConnected = true
+        permanentOffline = false
 
 
-      case (wait: WaitTheirHostedReply, CMDChainTipKnown, WAIT_FOR_INIT) =>
-        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.initMsg
+      case (wait: WaitRemoteHostedReply, CMDChainTipKnown, WAIT_FOR_INIT) =>
+        if (isSocketConnected) BECOME(wait, WAIT_FOR_ACCEPT) SEND wait.invokeMsg
         isChainHeightKnown = true
 
 
-      case (WaitTheirHostedReply(announce, refundScriptPubKey), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
+      case (WaitRemoteHostedReply(announce, refundScriptPubKey, _), init: InitHostedChannel, WAIT_FOR_ACCEPT) =>
         if (init.liabilityDeadlineBlockdays < LNParams.minHostedLiabilityBlockdays) throw new LightningException("Their liability deadline is too low")
         if (init.initialClientBalanceMsat > init.channelCapacityMsat) throw new LightningException("Their init balance for us is larger than capacity")
-        if (init.minimalOnchainRefundAmountSatoshis > 1000000L) throw new LightningException("Their minimal on-chain refund amount is too high")
-        if (init.channelCapacityMsat < LNParams.minCapacityMsat) throw new LightningException("Their proposed channel capacity is too low")
+        if (init.minimalOnchainRefundAmountSatoshis > LNParams.minHostedOnChainRefundSat) throw new LightningException("Their min refund is too high")
+        if (init.channelCapacityMsat < LNParams.minHostedOnChainRefundSat) throw new LightningException("Their proposed channel capacity is too low")
         if (UInt64(100000000L) > init.maxHtlcValueInFlightMsat) throw new LightningException("Their max value in-flight is too low")
         if (init.htlcMinimumMsat > 546000L) throw new LightningException("Their minimal payment size is too high")
         if (init.maxAcceptedHtlcs < 1) throw new LightningException("They can accept too few payments")
 
-        val localLCSS = LastCrossSignedState(refundScriptPubKey, init, blockDay = LNParams.broadcaster.currentBlockDay,
-          init.initialClientBalanceMsat, init.channelCapacityMsat - init.initialClientBalanceMsat, localUpdates = 0L,
-          remoteUpdates = 0L, incomingHtlcs = Nil, outgoingHtlcs = Nil, remoteSignature = ByteVector.empty)
+        val localHalfSignedHC =
+          restoreCommits(LastCrossSignedState(refundScriptPubKey, init, LNParams.broadcaster.currentBlockDay, init.initialClientBalanceMsat,
+            init.channelCapacityMsat - init.initialClientBalanceMsat, localUpdates = 0L, remoteUpdates = 0L, incomingHtlcs = Nil, outgoingHtlcs = Nil,
+            localSigOfRemote = ByteVector.empty, remoteSigOfLocal = ByteVector.empty).withLocalSigOfRemote(LNParams.nodePrivateKey), announce)
 
-        val hc = restoreCommits(localLCSS, announce)
-        val su = localLCSS.reverse.makeStateUpdate(LNParams.nodePrivateKey)
-        me UPDATA WaitTheirHostedStateUpdate(announce, hc) SEND su
+        val localSU = localHalfSignedHC.lastCrossSignedState.stateUpdate(isTerminal = true)
+        me UPDATA WaitRemoteHostedStateUpdate(announce, localHalfSignedHC) SEND localSU
 
 
-      case (WaitTheirHostedStateUpdate(announce, hc), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
-        val lcss1 = hc.lastCrossSignedState.copy(remoteSignature = remoteSU.localSigOfRemoteLCSS)
-        val isBlockdayAcceptable = math.abs(remoteSU.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
+      case (WaitRemoteHostedStateUpdate(announce, hc), remoteSU: StateUpdate, WAIT_FOR_ACCEPT) =>
+        val localCompleteLCSS = hc.lastCrossSignedState.copy(remoteSigOfLocal = remoteSU.localSigOfRemoteLCSS)
         val isRightRemoteUpdateNumber = hc.lastCrossSignedState.remoteUpdates == remoteSU.localUpdates
         val isRightLocalUpdateNumber = hc.lastCrossSignedState.localUpdates == remoteSU.remoteUpdates
-        val isRemoteSigOk = lcss1.verifyRemoteSignature(hc.announce.nodeId)
+        val isRemoteSigOk = localCompleteLCSS.verifyRemoteSig(hc.announce.nodeId)
 
-        if (!isBlockdayAcceptable) throw new LightningTypedErrorException(ERR_HOSTED_WRONG_BLOCKDAY)
-        if (!isRightRemoteUpdateNumber) throw new LightningTypedErrorException(ERR_HOSTED_WRONG_REMOTE_NUMBER)
-        if (!isRightLocalUpdateNumber) throw new LightningTypedErrorException(ERR_HOSTED_WRONG_LOCAL_NUMBER)
-        if (!isRemoteSigOk) throw new LightningTypedErrorException(ERR_HOSTED_WRONG_REMOTE_SIG)
-        BECOME(me STORE hc.copy(lastCrossSignedState = lcss1), OPEN)
+        if (me isBlockDayOutOfSync remoteSU.blockDay) throw new LightningException("Their blockday is wrong")
+        if (!isRightRemoteUpdateNumber) throw new LightningException("Their remote update number is wrong")
+        if (!isRightLocalUpdateNumber) throw new LightningException("Their local update number is wrong")
+        if (!isRemoteSigOk) throw new LightningException("Their signature is wrong")
+        BECOME(me STORE hc.copy(lastCrossSignedState = localCompleteLCSS), OPEN)
 
 
-      case (wait: WaitTheirHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
+      case (wait: WaitRemoteHostedReply, remoteLCSS: LastCrossSignedState, WAIT_FOR_ACCEPT) =>
         // We have expected InitHostedChannel but got LastCrossSignedState so this channel exists already
         // make sure our signature match and if so then become OPEN using host supplied state data
-
+        val isRemoteSigOk = remoteLCSS.reverse.verifyRemoteSig(wait.announce.nodeId)
+        val isLocalSigOk = remoteLCSS.verifyRemoteSig(LNParams.nodePublicKey)
         val hc = restoreCommits(remoteLCSS.reverse, wait.announce)
-        val localSU = remoteLCSS.makeStateUpdate(LNParams.nodePrivateKey)
-        val isLocalSigOk = remoteLCSS.verifyRemoteSignature(LNParams.nodePublicKey)
-        if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
-        else BECOME(me STORE hc, OPEN) SEND localSU
-        // We may have HTLC to fulfill
-        me doProcess CMDHTLCProcess
+
+        if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
+        else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
+        else syncFromRestored(hc)
 
 
       // CHANNEL IS ESTABLISHED
@@ -795,78 +822,66 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         me UPDATA hc.receiveFailMalformed(fail)
 
 
-      case (hc: HostedCommits, rd: RoutingData, OPEN) =>
-        val hc1 \ updateAddHtlc = hc.sendAdd(rd)
-        me UPDATA hc1 SEND updateAddHtlc
-        events outPaymentAccepted rd
+      case (hc: HostedCommits, routingData: RoutingData, OPEN) =>
+        val hostedCommits1 \ updateAddHtlc = hc.sendAdd(routingData)
+        me UPDATA hostedCommits1 SEND updateAddHtlc
+        events outPaymentAccepted routingData
         me doProcess CMDProceed
 
 
-      case (hc: HostedCommits, remoteSU: StateUpdate, OPEN)
-        // GUARD: only proceed if signture is defferent, the may send duplicates
-        if hc.lastCrossSignedState.remoteSignature != remoteSU.localSigOfRemoteLCSS =>
+      case (hc: HostedCommits, CMDProceed, OPEN) =>
+        // Store not yet cross-signed updates because once local signature is sent they may have a new complete state
+        val nextHC = hc.nextLocalUnsignedLCSS(LNParams.broadcaster.currentBlockDay).withLocalSigOfRemote(LNParams.nodePrivateKey)
+        // Tell them not to resolve updates yet even though they may have a cross-signed state because they may also be sending changes
+        me UPDATA STORE(hc) SEND nextHC.stateUpdate(isTerminal = false)
 
-        val lcss1 = hc.nextLocalLCSS.copy(blockDay = remoteSU.blockDay, remoteSignature = remoteSU.localSigOfRemoteLCSS)
-        val isBlockdayAcceptable = math.abs(remoteSU.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
-        val isRemoteSigOk = lcss1.verifyRemoteSignature(hc.announce.nodeId)
-        val isRemoteBehind = remoteSU.remoteUpdates < lcss1.localUpdates
 
-        if (isRemoteBehind) me SEND lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
-        else if (!isBlockdayAcceptable) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
+      case (hc: HostedCommits, StateUpdate(blockDay, _, remoteUpdates, localSigOfRemoteLCSS, isTerminal), OPEN)
+        // GUARD: only proceed if signture is defferent because they will send a few non-terminal duplicates
+        if hc.lastCrossSignedState.remoteSigOfLocal != localSigOfRemoteLCSS =>
+
+        val lcss1 = hc.nextLocalUnsignedLCSS(blockDay).copy(remoteSigOfLocal = localSigOfRemoteLCSS).withLocalSigOfRemote(LNParams.nodePrivateKey)
+        val hc1 = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalSpec, futureUpdates = Vector.empty)
+        val isRemoteSigOk = lcss1.verifyRemoteSig(hc.announce.nodeId)
+
+        if (remoteUpdates < lcss1.localUpdates) me SEND lcss1.stateUpdate(isTerminal = false)
+        else if (me isBlockDayOutOfSync blockDay) localSuspend(hc, ERR_HOSTED_WRONG_BLOCKDAY)
         else if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
+        else if (!isTerminal) me SEND lcss1.stateUpdate(isTerminal = true)
         else {
-          // They may send a few identical updates so only proceed if this one changes state
-          val refreshedHC = hc.copy(lastCrossSignedState = lcss1, localSpec = hc.nextLocalReduced)
-          val withoutChangesHC = me STORE refreshedHC.copy(localChanges = emptyChanges).resetUpdates
-          me UPDATA withoutChangesHC SEND lcss1.reverse.makeStateUpdate(LNParams.nodePrivateKey)
-          events onSettled withoutChangesHC
-          me doProcess CMDHTLCProcess
+          me UPDATA hc1 SEND lcss1.stateUpdate(isTerminal = true)
+          val noResolves = RESOLVE(prevUpds = hc.nextRemoteUpdates, hc)
+          if (noResolves) me STORE hc1 else me doProcess CMDProceed
+          events onSettled hc1
         }
-
-
-      case (hc: HostedCommits, CMDHTLCProcess, OPEN) =>
-        // Fail or fulfill incoming HTLCs
-
-        for {
-          Htlc(true, add) <- hc.localSpec.htlcs
-          // We don't want to receive a payment into a channel we have originally sent it from in an attempt to rebalance
-          isLoop = hc.localSpec.htlcs.exists(htlc => !htlc.incoming && htlc.add.paymentHash == add.paymentHash)
-        } me doProcess resolveHtlc(LNParams.nodePrivateKey, add, LNParams.bag, isLoop)
-        // And sign changes once done because CMDFail/Fulfill above don't do that
-        me doProcess CMDProceed
-
-
-      case (hc: HostedCommits, CMDProceed, OPEN)
-        if hc.localChanges.proposedAndSigned.nonEmpty || hc.remoteUpdates.nonEmpty =>
-        val hc1 = me STORE hc.copy(localChanges = hc.localChanges.withProposedAsSigned)
-        me UPDATA hc1 SEND hc1.nextLocalLCSS.reverse.makeStateUpdate(LNParams.nodePrivateKey)
 
 
       case (hc: HostedCommits, cmd: CMDFulfillHtlc, OPEN) =>
         val fulfill = UpdateFulfillHtlc(hc.channelId, cmd.add.id, cmd.preimage)
         val notFound = CommitmentSpec.findHtlcById(hc.localSpec, cmd.add.id, isIncoming = true).isEmpty
-        if (notFound) throw new LightningException else me UPDATA hc.addLocalProposal(fulfill) SEND fulfill
+        if (notFound) throw new LightningException else me UPDATA hc.addProposal(fulfill.local) SEND fulfill
 
 
       case (hc: HostedCommits, cmd: CMDFailHtlc, OPEN) =>
         val fail = UpdateFailHtlc(hc.channelId, cmd.id, cmd.reason)
         val notFound = CommitmentSpec.findHtlcById(hc.localSpec, cmd.id, isIncoming = true).isEmpty
-        if (notFound) throw new LightningException else me UPDATA hc.addLocalProposal(fail) SEND fail
+        if (notFound) throw new LightningException else me UPDATA hc.addProposal(fail.local) SEND fail
 
 
       case (hc: HostedCommits, cmd: CMDFailMalformedHtlc, OPEN) =>
         val fail = UpdateFailMalformedHtlc(hc.channelId, cmd.id, cmd.onionHash, cmd.code)
         val notFound = CommitmentSpec.findHtlcById(hc.localSpec, cmd.id, isIncoming = true).isEmpty
-        if (notFound) throw new LightningException else me UPDATA hc.addLocalProposal(fail) SEND fail
+        if (notFound) throw new LightningException else me UPDATA hc.addProposal(fail.local) SEND fail
 
 
-      case (hc: HostedCommits, CMDSocketOnline, SLEEPING) =>
-        if (isChainHeightKnown) me SEND hc.initMsg
+      case (hc: HostedCommits, CMDSocketOnline, SLEEPING | SUSPENDED) =>
+        if (isChainHeightKnown) me SEND hc.getError.getOrElse(hc.invokeMsg)
         isSocketConnected = true
+        permanentOffline = false
 
 
-      case (hc: HostedCommits, CMDChainTipKnown, SLEEPING) =>
-        if (isSocketConnected) me SEND hc.initMsg
+      case (hc: HostedCommits, CMDChainTipKnown, SLEEPING | SUSPENDED) =>
+        if (isSocketConnected) me SEND hc.getError.getOrElse(hc.invokeMsg)
         isChainHeightKnown = true
 
 
@@ -875,72 +890,83 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
         BECOME(hc, SLEEPING)
 
 
-      case (hc: HostedCommits, remoteLCSS: LastCrossSignedState, SLEEPING) =>
-        val isLocalSigOk = remoteLCSS.verifyRemoteSignature(LNParams.nodePublicKey)
-        val localSU = remoteLCSS.makeStateUpdate(LNParams.nodePrivateKey)
+      case (hc: HostedCommits, init: InitHostedChannel, SLEEPING) =>
+        // Remote peer has lost this channel, they should re-sync from our LCSS
+        syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec)
 
-        val isAhead = hc.lastCrossSignedState.remoteUpdates > remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates > remoteLCSS.remoteUpdates
-        val isBehind = hc.lastCrossSignedState.remoteUpdates < remoteLCSS.localUpdates || hc.lastCrossSignedState.localUpdates < remoteLCSS.remoteUpdates
-        if (isLocalSigOk && isBehind) BECOME(me STORE restoreCommits(remoteLCSS.reverse, hc.announce), OPEN) SEND localSU
-        else if (isLocalSigOk && isAhead) BECOME(hc, OPEN) SEND hc.lastCrossSignedState
+
+      // Technically they can send a remote LCSS before us explicitly asking for it first
+      // this may be a problem if chain height is not yet known and we have incoming HTLCs to resolve
+      case (hc: HostedCommits, remoteLCSS: LastCrossSignedState, SLEEPING) if isChainHeightKnown =>
+        val isRemoteSigOk = remoteLCSS.reverse.verifyRemoteSig(hc.announce.nodeId)
+        val isLocalSigOk = remoteLCSS.verifyRemoteSig(LNParams.nodePublicKey)
+        val weAreAhead = hc.lastCrossSignedState.isAhead(remoteLCSS)
+        val weAreEven = hc.lastCrossSignedState.isEven(remoteLCSS)
+
+        if (!isRemoteSigOk) localSuspend(hc, ERR_HOSTED_WRONG_REMOTE_SIG)
         else if (!isLocalSigOk) localSuspend(hc, ERR_HOSTED_WRONG_LOCAL_SIG)
-        else {
-          BECOME(hc.resetUpdates, OPEN) SEND localSU
-          hc.localChanges.signed foreach SEND
+        else if (weAreAhead || weAreEven) {
+          // They have our current or previous state, resend but keep our state
+          syncAndResend(hc, hc.futureUpdates, hc.lastCrossSignedState, hc.localSpec)
+        } else hc.findState(remoteLCSS).headOption match {
+
+          case Some(hc1) =>
+            val leftOvers = hc.futureUpdates.diff(hc1.futureUpdates)
+            // They have our future state, settle on it and resend local leftovers
+            val hc2 = syncAndResend(hc1, leftOvers, remoteLCSS.reverse, hc1.nextLocalSpec)
+            events onSettled hc2
+
+          case None =>
+            // We are far behind, restore state and resolve incoming adds
+            val hc1 = restoreCommits(remoteLCSS.reverse, hc.announce)
+            events unknownHostedHtlcsDetected hc
+            syncFromRestored(hc1)
         }
 
-        // We may have HTLC to fulfill
-        // also re-sign our re-transmits
-        me doProcess CMDHTLCProcess
 
-
-      case (hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING)
+      case (hc: HostedCommits, newAnn: NodeAnnouncement, SLEEPING | SUSPENDED)
         if hc.announce.nodeId == newAnn.nodeId && Announcements.checkSig(newAnn) =>
         // Node was SLEEPING for a long time, do not trigger listeners for this update
-        data = me STORE hc.modify(_.announce).setTo(newAnn)
+        data = me STORE hc.copy(announce = newAnn)
 
 
       case (hc: HostedCommits, upd: ChannelUpdate, OPEN | SLEEPING) if waitingUpdate && upd.isHosted =>
         if (upd.cltvExpiryDelta < LNParams.minHostedCltvDelta) localSuspend(hc, ERR_HOSTED_UPDATE_CLTV_TOO_LOW)
+        if (me isUpdatable upd) data = me STORE hc.copy(updateOpt = upd.some)
         waitingUpdate = false
-
-        if (me isUpdatable upd) {
-          // Update and store data but do not trigger listeners
-          val d1 = hc.modify(_.updateOpt) setTo Some(upd)
-          data = me STORE d1
-        }
 
 
       case (hc: HostedCommits, remoteError: Error, OPEN | SLEEPING) =>
-        val cs1 = hc.modify(_.remoteError) setTo Some(remoteError)
-        BECOME(me STORE cs1, SUSPENDED)
+        val hc1 = hc.modify(_.remoteError) setTo Some(remoteError)
+        events unknownHostedHtlcsDetected hc
+        BECOME(me STORE hc1, SUSPENDED)
 
 
-      case (hc: HostedCommits, CMDHostedStateOverride(remoteOverride), SLEEPING | SUSPENDED) =>
+      case (hc: HostedCommits, CMDHostedStateOverride(remoteOverride), SUSPENDED) if isSocketConnected =>
         val isRightLocalUpdateNumber = remoteOverride.localUpdates > hc.lastCrossSignedState.remoteUpdates
         val isRightRemoteUpdateNumber = remoteOverride.remoteUpdates > hc.lastCrossSignedState.localUpdates
-        val isBlockdayAcceptable = math.abs(remoteOverride.blockDay - LNParams.broadcaster.currentBlockDay) <= 1
-        val newLocalBalance = hc.lastCrossSignedState.initHostedChannel.channelCapacityMsat - remoteOverride.localBalanceMsat
+        val localBalance = hc.newLocalBalanceMsat(remoteOverride)
 
-        val localLCSS =
-          hc.nextLocalLCSS.copy(incomingHtlcs = Nil, outgoingHtlcs = Nil,
-            localBalanceMsat = newLocalBalance, remoteBalanceMsat = remoteOverride.localBalanceMsat,
+        val restoredCompleteLCSS =
+          hc.lastCrossSignedState.copy(incomingHtlcs = Nil, outgoingHtlcs = Nil,
+            localBalanceMsat = localBalance, remoteBalanceMsat = remoteOverride.localBalanceMsat,
             localUpdates = remoteOverride.remoteUpdates, remoteUpdates = remoteOverride.localUpdates,
-            blockDay = remoteOverride.blockDay, remoteSignature = remoteOverride.localSigOfRemoteLCSS)
+            blockDay = remoteOverride.blockDay, remoteSigOfLocal = remoteOverride.localSigOfRemoteLCSS)
+            .withLocalSigOfRemote(LNParams.nodePrivateKey)
 
-        val isRemoteSigOk = localLCSS.verifyRemoteSignature(hc.announce.nodeId)
-        val localSU = localLCSS.reverse.makeStateUpdate(LNParams.nodePrivateKey)
-
+        val isRemoteSigOk = restoredCompleteLCSS.verifyRemoteSig(hc.announce.nodeId)
+        if (!isRemoteSigOk) throw new LightningException("Provided remote override signature is wrong")
+        if (localBalance < 0) throw new LightningException("Provided updated local balance is larger than capacity")
         if (!isRightLocalUpdateNumber) throw new LightningException("Provided local update number from remote override is wrong")
         if (!isRightRemoteUpdateNumber) throw new LightningException("Provided remote update number from remote override is wrong")
-        if (!isBlockdayAcceptable) throw new LightningException("Provided blockday from remote override is not acceptable")
-        if (newLocalBalance < 0) throw new LightningException("Provided updated local balance is larger than capacity")
-        if (!isRemoteSigOk) throw new LightningException("Provided remote override signature is wrong")
-        BECOME(me STORE restoreCommits(localLCSS, hc.announce), OPEN) SEND localSU
+        if (me isBlockDayOutOfSync remoteOverride.blockDay) throw new LightningException("Remote override blockday is not acceptable")
+        BECOME(me STORE restoreCommits(restoredCompleteLCSS, hc.announce), OPEN) SEND restoredCompleteLCSS.stateUpdate(isTerminal = true)
+        // They may send a new StateUpdate right after overriding
+        waitingUpdate = true
 
 
-      case (null, wait: WaitTheirHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
-      case (null, hc: HostedCommits, null) if hc.isInErrorState => super.become(hc, SUSPENDED)
+      case (null, wait: WaitRemoteHostedReply, null) => super.become(wait, WAIT_FOR_INIT)
+      case (null, hc: HostedCommits, null) if hc.getError.isDefined => super.become(hc, SUSPENDED)
       case (null, hc: HostedCommits, null) => super.become(hc, SLEEPING)
       case _ =>
     }
@@ -949,50 +975,44 @@ abstract class HostedChannel extends Channel(isHosted = true) { me =>
     events onProcessSuccess Tuple3(me, data, change)
   }
 
-  def restoreCommits(localLCSS: LastCrossSignedState, announce: NodeAnnouncement) = {
-    val inHtlcs = for (inFlight <- localLCSS.incomingHtlcs) yield Htlc(incoming = true, inFlight toUpdateAdd announce.hostedChanId)
-    val outHtlcs = for (outFlight <- localLCSS.outgoingHtlcs) yield Htlc(incoming = false, outFlight toUpdateAdd announce.hostedChanId)
-    val spec = CommitmentSpec(feeratePerKw = 0L, localLCSS.localBalanceMsat, localLCSS.remoteBalanceMsat, htlcs = (inHtlcs ++ outHtlcs).toSet)
-    HostedCommits(announce, localLCSS, localLCSS.localUpdates, localLCSS.remoteUpdates, localChanges = emptyChanges, remoteUpdates = Vector.empty,
-      localSpec = spec, updateOpt = None, localError = None, remoteError = None, startedAt = System.currentTimeMillis)
+  def syncAndResend(hc: HostedCommits, leftovers: Vector[LNDirectionalMessage], lcss: LastCrossSignedState, spec: CommitmentSpec) = {
+    // Forget about remote, re-send our LCSS and all non-cross-signed local updates, finally sign if local leftovers are indeed present
+    val hc1 = hc.copy(futureUpdates = leftovers.filter { case _ \ isLocal => isLocal }, lastCrossSignedState = lcss, localSpec = spec)
+
+    BECOME(hc1, OPEN) SEND hc1.lastCrossSignedState
+    for (update <- hc1.nextLocalUpdates) me SEND update
+    if (hc1.nextLocalUpdates.nonEmpty) me doProcess CMDProceed
+    hc1
+  }
+
+  def syncFromRestored(restoredHC: HostedCommits) = {
+    // We may have incoming cross-signed HTLCs: resolve them right away
+    val adds = for (Htlc(true, add) <- restoredHC.localSpec.htlcs) yield add
+    BECOME(restoredHC, OPEN) SEND restoredHC.lastCrossSignedState
+
+    val noResolves = RESOLVE(adds, restoredHC)
+    if (noResolves) me STORE restoredHC
+    else me doProcess CMDProceed
+  }
+
+  def restoreCommits(localLCSS: LastCrossSignedState, ann: NodeAnnouncement) = {
+    val inHtlcs = for (updateAddHtlc <- localLCSS.incomingHtlcs) yield Htlc(incoming = true, updateAddHtlc)
+    val outHtlcs = for (updateAddHtlc <- localLCSS.outgoingHtlcs) yield Htlc(incoming = false, updateAddHtlc)
+    val localSpec = CommitmentSpec(feeratePerKw = 0L, localLCSS.localBalanceMsat, localLCSS.remoteBalanceMsat, htlcs = (inHtlcs ++ outHtlcs).toSet)
+    HostedCommits(ann, localLCSS, futureUpdates = Vector.empty, localSpec, updateOpt = None, localError = None, remoteError = None, System.currentTimeMillis)
   }
 
   def localSuspend(hc: HostedCommits, errCode: ByteVector) = {
     val localError = Error(channelId = hc.channelId, data = errCode)
     val hc1 = hc.modify(_.localError) setTo Some(localError)
     BECOME(me STORE hc1, SUSPENDED) SEND localError
-  }
-}
-
-object NormalChannel {
-  val WAIT_FOR_INIT = "WAIT-FOR-INIT"
-  val WAIT_FOR_ACCEPT = "WAIT-FOR-ACCEPT"
-  val WAIT_FOR_FUNDING = "WAIT-FOR-FUNDING"
-  val WAIT_FUNDING_SIGNED = "WAIT-FUNDING-SIGNED"
-
-  val WAIT_FUNDING_DONE = "OPENING"
-  val NEGOTIATIONS = "NEGOTIATIONS"
-  val SLEEPING = "SLEEPING"
-  val OPEN = "OPEN"
-
-  // No tears, only dreams now
-  val SUSPENDED = "SUSPENDED"
-  val REFUNDING = "REFUNDING"
-  val CLOSING = "CLOSING"
-
-  def isOpeningOrOperational(chan: Channel) = isOperational(chan) || isOpening(chan)
-  def isOpening(chan: Channel) = chan.data.isInstanceOf[WaitFundingDoneData]
-
-  def isOperational(chan: Channel) = chan.data match {
-    case NormalData(_, _, None, None, None) => true
-    case hc: HostedCommits => !hc.isInErrorState
-    case _ => false
+    events unknownHostedHtlcsDetected hc
   }
 
-  def channelAndHop(chan: Channel) = for {
-    update <- chan.getCommits.flatMap(_.updateOpt)
-    hop = update.toHop(chan.data.announce.nodeId)
-  } yield chan -> Vector(hop)
+  def startUp = {
+    me process CMDChainTipKnown
+    me process CMDSocketOnline
+  }
 }
 
 trait ChannelListener {
@@ -1003,6 +1023,7 @@ trait ChannelListener {
   def onException: PartialFunction[Malfunction, Unit] = none
   def onBecome: PartialFunction[Transition, Unit] = none
 
+  def unknownHostedHtlcsDetected(hc: HostedCommits): Unit = none
   def fulfillReceived(upd: UpdateFulfillHtlc): Unit = none
   def outPaymentAccepted(rd: RoutingData): Unit = none
   def onSettled(cs: Commitments): Unit = none

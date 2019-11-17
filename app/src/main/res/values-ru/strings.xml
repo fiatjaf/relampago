@@ -8,23 +8,18 @@
     <string name="greetings">Bitcoin Кошелек-Молния\nПрочитайте <a href='http://lightning-wallet.com'>инструкцию</a></string>
     <string name="sets_rescan_ok">Сейчас кошелек закроется, рескан блокчейна начнется автоматически при следующем запуске</string>
     <string name="boost_details"><![CDATA[Хотите поднять комиссию для этой транзакции и подтвердить ее быстрее?<br><br>сейчас %1$s<br>после %2$s<br>]]></string>
-    <string name="mnemonic_info">Мнемонический код важен!\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> зачем он нужен\n\n\n<small>Подсказка: свайпните влево\nчтобы открыть QR сканер</small></string>
+    <string name="mnemonic_info">Мнемонический код важен!\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Прочитайте</a> зачем он нужен\n\n\nПодсказка: свайпните влево\nчтобы открыть QR сканер</string>
     <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Может занять несколько часов</font></small></small>]]></string>
     <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Более быстрое подтверждение</font></small></small>]]></string>
-    <string name="search_hint_payments">Поиск по платежам-молниям</string>
-    <string name="copied_to_clipboard">Скопировано «%1$s»</string>
+    <string name="search_hint_payments">Поиск по платежам</string>
     <string name="wallet_restore">Восстановить кошелек</string>
     <string name="wallet_settings">Настройки кошелька</string>
+    <string name="copied_to_clipboard">Скопировано</string>
     <string name="wallet_create">Новый кошелек</string>
 
     <array name="denoms">
         <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 btc</small></font>]]></item>
         <item><![CDATA[Bitcoin <font color=#999999><small>= 100 000 000 sat</small></font>]]></item>
-    </array>
-
-    <array name="restore_options">
-        <item>Мнемонический код</item>
-        <item>Файл-снапшот кошелька</item>
     </array>
 
     <string name="restore_when">Когда вы создали кошелек?\nНе менйяте дату если не уверены</string>
@@ -38,18 +33,6 @@
         их для возмещения средств обратно в ваш он-чейн кошелек.\n\nОжидайте возвратной транзакции вскоре после
         запуска восстановителя если у вас есть потерянные каналы с деньгами.
     </string>
-
-    <string name="tokens_warn"><![CDATA[
-        Пожалуйста, учтите: этот кошелек использует <a href=http://lightning-wallet.com/storage-tokens#storage-tokens>платные талоны</a>
-        для хранения зашифрованных бэкапов ваших каналов.<br><br>Автоматический платеж-Молния в сумме <i>%1$s</i> купит 50 талонов
-        как только вы откроете первый канал.<br><br>Эти талоны защитят вас от случайной потери денег в каналах
-    ]]></string>
-
-    <string name="migrator_usage_warning"><![CDATA[
-        Файл-снапшот можно создать если вы хотите перенести кошелек с одного телефона на другой или удалить кошелек чтобы вскоре его восстановить.
-        <br><br>Файл-снапшот <strong>НЕ НУЖНО</strong> использовать для долговременного хранения или для создания множественных копий одного и
-        того же кошелька на нескольких телефонах!<br><br>Файл-снапшот <string>НЕ ЗАШИФРОВАН</string>, поэтому не храните его в публичных местах.
-    ]]></string>
 
     <string name="hivemind_details"><![CDATA[
         <strong>Hivemind deposits are disabled</strong><br><br>
@@ -74,19 +57,11 @@
         <item><![CDATA[<small><i>бэкап отключен</i></small>]]></item>
     </array>
 
-    <!-- GDrive backups -->
-    <string name="gdrive_last_saved">Обновлен %1$s</string>
-    <string name="gdrive_disabled">Бекапы в GDrive отключены</string>
-    <string name="gdrive_not_present">Бекап пока отсутствует</string>
-    <string name="gdrive_failed">Не получилось сохранить бекап</string>
-    <string name="sets_gdrive">Бекапы каналов в GDrive</string>
-
     <!-- menu and fab -->
     <string name="sets_set_fiat">Выбрать валюту</string>
     <string name="sets_choose_unit">Выбрать Биткоин-юнит</string>
     <string name="sets_manage_olympus">Настроить бекап-сервера</string>
     <string name="sets_chan_recover">Восстановитель каналов</string>
-    <string name="sets_migrator">Сохранить файл-снапшот</string>
     <string name="sets_mnemonic">Мнемонический код</string>
     <string name="sets_rescan">Рескан блокчейна</string>
 
@@ -102,15 +77,14 @@
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
 
-    <string name="dialog_pr_making">Создаю платежный запрос&#8230;</string>
-    <string name="olympus_recovering">Getting Olympus backups&#8230;</string>
+    <string name="dialog_olympus_recovering">Getting Olympus backups&#8230;</string>
+    <string name="dialog_hosted_draining">Draining has started&#8230;</string>
     <string name="dialog_pr_expired">Этот платежный запрос устарел</string>
     <string name="dialog_sum_small">Сумма слишком мала</string>
     <string name="dialog_sum_big">Сумма слишком велика</string>
     <string name="dialog_pay_onchain">On-chain</string>
     <string name="dialog_share_key">Share key</string>
     <string name="dialog_close">Закрыть апп</string>
-    <string name="dialog_opt_out">Opt out</string>
     <string name="dialog_cancel">Отмена</string>
     <string name="dialog_retry">Еще раз</string>
     <string name="dialog_login">Войти</string>
@@ -140,7 +114,11 @@
     <string name="sets_ln_fee_cap">Ограничить размер LN-комиссий</string>
     <string name="ln_fee_cap_disabled"><![CDATA[Отключено, максимальная LN-комиссия равна <strong>%1$s</strong> от суммы платежа]]></string>
     <string name="ln_fee_cap_enabled"><![CDATA[Включено, максимальная LN-комиссия равна <strong>%1$s</strong> от суммы платежа, но не выше чем текущая ончейн комиссия <strong>%2$s</strong>]]></string>
-    <string name="ln_fee_expesive_omitted">Дорогие маршруты не использовались: уберите ограничение на LN-комиссию в настройках чтобы попробовать более дорогие маршруты</string>
+    <string name="ln_fee_expensive_omitted">Дорогие маршруты не использовались: уберите ограничение на LN-комиссию в настройках чтобы попробовать более дорогие маршруты</string>
+
+    <!-- local backups -->
+    <string name="sets_backups">Локальный бекап каналов</string>
+    <string name="ln_backup_detected">Есть файл с бекапом каналов</string>
 
     <array name="info_progress">
         <item>Синхронизация завершена</item>
@@ -149,13 +127,13 @@
         <item><![CDATA[<font color=#E68A00>Синхронизация %1$d дней</font>]]></item>
     </array>
 
-    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
-    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
-    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>входящий %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>исходящий %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платеж-Молния</strong></font><br>%1$s<br><br>исходящий %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
 
-    <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>получено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
-    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small>]]></string>
-    <string name="btc_outgoing_title"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>отправлено %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
+    <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>входящий %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>исходящий %2$s<br><small>%3$s по текущему курсу</small>]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#E68A00><strong>Биткоин-транзакция</strong></font><br>%1$s<br><br>исходящий %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
     <string name="btc_pending_title"><![CDATA[<font color=#FF9900><strong>Биткоин-транзакция</strong></font><br><small>Возврат денег из канала</small><br>%1$s<br><br>сумма %2$s<br><small>%3$s по текущему курсу</small><br>комса %4$s = %5$.2f%%]]></string>
 
     <string name="txs_view_outside">Посмотреть на SmartBit</string>
@@ -209,21 +187,23 @@
     <string name="err_ln_local_amount_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для канала</string>
     <string name="err_ln_remote_amount_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для вашего пира</string>
     <string name="err_ln_remote_amount_low">Не получилось потому что сумма платежа слишком низка для вашего пира</string>
-    <string name="err_ln_fulfilled">Не получилось потому что этот платежный запрос уже оплачен</string>
+    <string name="err_ln_fulfilled">Не получилось потому что этот платежный запрос уже скорее всего оплачен</string>
     <string name="err_ln_too_many">Не получилось потому что слишком много платежей уже в пути</string>
     <string name="err_ln_chain_wait">Ждем подключения он-чейн кошелька</string>
 
-    <string name="err_not_enough_funds"><![CDATA[
-        На данный момент вы можете отправить до %1$s он-чейн, а сумма вашего платежа равна %2$s, что превышает максимальный размер на %3$s.
-        <br><br><strong>Что можно сделать</strong>:<br><br>- Отправьте меньшую сумму если это возможно.<br><br>- Пополните он-чейн баланс кошелька.<br><br>- Отправьте точно %1$s, в этом случае комиссия майнерам будет вычтена из суммы, а не добавлена сверху.
-    ]]></string>
-
-    <string name="err_ln_still_opening">Не получилось потому что платежный канал еще не открыт\n\nПополняющая канал Биткоин-транзакция должна получить до 6 подтверждений перед тем как его можно будет использовать для отправки платежей</string>
-    <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии. Вы можете добавить денег в кошелек и попробовать еше раз</string>
-    <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой. Попробуйте разбить ее на несколько более мелких транзакций</string>
-    <string name="err_gdrive_sign_in_failed">Не получилось залогиниться в GDrive, хотите продолжить без восстановления каналов из бекапов GDrive?</string>
+    <string name="err_ln_drain_no_hosted">Нет hosted-канала с достаточным балансом для снятия денег</string>
+    <string name="err_ln_drain_no_normal">Нет обычного канала с емкостью, достаточно большой для приема денег</string>
     <string name="err_ln_not_enough">У вас нет канала, в котором было бы достаточно денег, чтобы отправить %1$s офф-чейн</string>
-    <string name="err_no_data">Ничего не найдено</string>
+    <string name="err_ln_peer_can_not_route">Пир временно не может передавать платежи, попробуйте еще раз позже или откройте другой канал</string>
+    <string name="err_ln_still_opening">Не получилось потому что платежный канал еще не открыт\n\nНаполняющая канал Биткоин-транзакция должна получить до 6 подтверждений перед тем как его можно будет использовать для отправки платежей</string>
+    <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии, вы можете добавить денег в кошелек и попробовать еше раз</string>
+    <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой, попробуйте разбить ее на несколько более мелких транзакций</string>
+    <string name="err_nothing_useful">Ничего не найдено</string>
+
+    <string name="err_not_enough_funds"><![CDATA[
+        Сейчас вы можете отправить до %1$s он-чейн <i>включая комиссию майнерам</i>, что меньше суммы платежа в размере %2$s вместе с комиссией в размере %3$s.
+        <br><br><strong>Что можно сделать</strong>:<br><br>- Отправьте меньшую сумму если это возможно.<br><br>- Пополните он-чейн баланс кошелька.<br><br>- Отправьте точно %1$s, в этом случае комиссия будет вычтена из суммы, а не добавлена сверху.
+    ]]></string>
 
     <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
@@ -231,6 +211,7 @@
     <string name="ln_share_pr">Платежный запрос</string>
     <string name="ln_share_node_id">ID моего LN-узла</string>
     <string name="ln_share_debug">Отладочная информация</string>
+    <string name="ln_drain_hosted">Drain hosted channel</string>
     <string name="ln_share_proof">Доказательство платежа</string>
     <string name="ln_description_hint">добавьте описание</string>
     <string name="ln_no_description">Описание отсутствует</string>
@@ -240,8 +221,9 @@
     <!-- see PaymentInfo.scala -->
     <string name="ln_state_wait">находится в пути</string>
     <string name="ln_state_success">успешно оплачен</string>
-    <string name="ln_state_fail_in">срок годности истек</string>
     <string name="ln_state_fail_out">возвращен назад</string>
+    <string name="ln_state_fail_in">срок годности истек</string>
+    <string name="ln_state_unknown">состояние неизвестно</string>
 
     <string name="ln_info_total_payments">total payments</string>
     <string name="ln_info_in_flight">value in-flight</string>
@@ -254,7 +236,6 @@
     <string name="ln_info_started">started</string>
     <string name="ln_info_closed">closed</string>
 
-    <string name="ln_mofn">%1$s из %2$s</string>
     <string name="ln_info_close_coop">Закрыт кооперативно</string>
     <string name="ln_info_close_local">Закрыт вашим кошельком</string>
     <string name="ln_info_close_remote">Закрыт со стороны пира</string>
@@ -276,9 +257,13 @@
     <string name="ln_info_status_suspended"><![CDATA[<font color=#E68A00>ЗАМОРОЖЕН</font>]]></string>
     <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
 
-    <string name="ln_chan_close_inflight_details"><![CDATA[&#9888; <font color=#E68A00>В канале есть активные платежи</font> поэтому кооперативное закрытие будет отложено пока они не исчезнут.<br><br>Рекомендуется не закрывать канал прямо сейчас, а вместо этого дать платежам пройти, все еще хотите продолжить?]]></string>
-    <string name="ln_chan_force_details"><![CDATA[&#9888; Учтите, что попытка закрытия канала прямо сейчас приведет к <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсированному закрытию</a>, на которое уйдет большая сумма комиссии и больше времени, все еще хотите продолжить?]]></string>
-    <string name="ln_chan_close_confirm_local">Хотите закрыть канал и отправить возвратную Биткоин-транзакцию обратно в этот кошелек?</string>
+    <string name="ln_chan_close_inflight_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>В канале есть активные платежи</font> поэтому кооперативное закрытие будет отложено пока они не исчезнут.<br><br>Рекомендуется не закрывать канал прямо сейчас, а вместо этого дать платежам пройти, все еще хотите продолжить?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[<small><br></small>&#9888; Учтите, что попытка закрытия канала прямо сейчас приведет к <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>форсированному закрытию</a>, на которое уйдет большая сумма комиссии и больше времени, все еще хотите продолжить?]]></string>
+    <string name="ln_chan_close_confirm_address"><![CDATA[<small><br></small>Хотите закрыть канал и отправить возвратную Биткоин-транзакцию на указанный адрес?<br><br><strong>%1$s</strong><br><br>Убедитесь, что адрес верный, потому что позже закрытие канала нельзя будет отменить!]]></string>
+    <string name="ln_chan_close_confirm_wallet"><![CDATA[<small><br></small>Хотите закрыть канал и отправить возвратную Биткоин-транзакцию обратно в этот кошелек?]]></string>
+    <string name="ln_chan_close_address"><![CDATA[Закрыть канал на адрес<br><small>%1$s</small>]]></string>
+    <string name="ln_chan_close_address_no">Канал в этом состоянии нельзя закрыть на адрес</string>
+    <string name="ln_chan_close_address_hint">Скопируйте адрес чтобы продолжить</string>
     <string name="ln_chan_close">Закрыть канал</string>
 
     <array name="ln_normal_chan_actions">
@@ -286,10 +271,23 @@
         <item>Закрыть канал в кошелек</item>
     </array>
 
-    <string name="btc_empty">Нет монет на цепи</string>
-    <string name="ln_empty">Нет монет в каналах</string>
+    <string name="ln_hosted_state_wrap">ID:\n%1$s\n\nСнапшот состояния канала:\n%2$s\n\nРаскрытые секреты:\n%3$s</string>
+    <string name="ln_hosted_override_warn"><![CDATA[Удаленный хост хочет обновить баланс вашего hosted-канала с текущего %1$s на новый %2$s, но это возможно только с вашего разрешения.<br><br><strong>Прежде чем продолжить, убедитесь что новый баланс выглядит правильно!</strong><br><br>Вы подтверждаете предложенное обновление баланса?]]></string>
+    <string name="ln_hosted_remove_inflight_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel contains pending payments</font><br><br>It is recommended to wait until these payments become failed or fulfilled before removal, would you still like to remove it right now?]]></string>
+    <string name="ln_hosted_remove_non_empty_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>This hosted channel has a non-empty balance</font><br><br>It is recommended to empty this channel before removal, would you still like to remove it right now?]]></string>
+
+    <array name="ln_hosted_chan_actions">
+        <item><![CDATA[About hosted channels]]></item>
+        <item><![CDATA[Export channel state]]></item>
+        <item><![CDATA[Remove this channel]]></item>
+    </array>
+
+    <string name="btc_empty"><![CDATA[<font color=#BBBBBB>Нет монет на цепи</font>]]></string>
+    <string name="ln_empty"><![CDATA[<font color=#BBBBBB>Нет монет в каналах</font>]]></string>
+
     <string name="btc_status_operational">Биткоин-кошелек онлайн</string>
     <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Поиск узлов</font>]]></string>
+    <string name="ln_status_hosted_suspended"><![CDATA[<font color=#E68A00>Hosted-канал приостановлен</font>]]></string>
     <string name="ln_status_operational_many">Все каналы работают</string>
     <string name="ln_status_operational_one">Канал работает</string>
 
@@ -319,8 +317,10 @@
     <string name="ln_ops_start_fund_node_view"><![CDATA[<strong>%1$s</strong><br><font color=#999999><i>открытие канала</i></font><br>%2$s<br><br><font color=#999999>ID пира</font><br><small>%3$s</small>]]></string>
     <string name="ln_ops_start_node_view"><![CDATA[<strong>%1$s</strong><br>%2$s<br><small><font color=#999999>%3$s</font></small>]]></string>
     <string name="ln_ops_start_fund_incoming_channel">входящий канал</string>
+    <string name="ln_ops_start_fund_hosted_channel">HOSTED-КАНАЛ</string>
 
     <string name="ln_url_resolving">Подключение к сервису&#8230;</string>
+    <string name="ln_url_payreq_processing">Платеж отправляется&#8230;</string>
     <string name="ln_url_login_ok"><![CDATA[Успешный логин на <i>%1$s</i>]]></string>
 
     <string name="ln_url_info_login"><![CDATA[
@@ -336,10 +336,12 @@
     <string name="notify_title">Ожидается платеж-молния</string>
 
     <!-- hosted channels -->
-    <string name="err_ln_hosted_wrong_blockday">incorrect updated blockday</string>
-    <string name="err_ln_hosted_wrong_remote_sig">incorrect remote signature</string>
-    <string name="err_ln_hosted_wrong_local_sig">incorrect local signature</string>
-    <string name="err_ln_hosted_wrong_remote_number">incorrect host update number</string>
-    <string name="err_ln_hosted_wrong_local_number">incorrect client update number</string>
-    <string name="err_ln_hosted_update_cltv_too_low">incorrect channel update cltv expiry</string>
+    <string name="err_ln_hosted_wrong_blockday">Incorrect blockday</string>
+    <string name="err_ln_hosted_wrong_local_sig">Incorrect local signature</string>
+    <string name="err_ln_hosted_wrong_remote_sig">Incorrect remote signature</string>
+    <string name="err_ln_hosted_too_many_state_updates">Too many state updates</string>
+    <string name="err_ln_hosted_update_cltv_too_low">Incorrect channel update cltv</string>
+    <string name="err_ln_hosted_in_flight_htlc_while_restoring">Remote restore failure</string>
+    <string name="err_ln_hosted_timed_out_outgoing_htlc">Timed out outgoing payment</string>
+    <string name="err_ln_hosted_channel_denied">Hosted channel denied</string>
 </resources>

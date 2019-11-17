@@ -7,4 +7,9 @@
         android:id="@+id/actionAddNodeId"
         android:title="@string/ln_share_node_id"/>
 
+    <item
+        app:showAsAction="never"
+        android:id="@+id/actionDrainHosted"
+        android:title="@string/ln_drain_hosted"/>
+
 </menu>

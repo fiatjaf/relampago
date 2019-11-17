@@ -23,6 +23,8 @@
         <item name="android:orientation">horizontal</item>
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
+        <item name="android:paddingRight">@dimen/app_padding</item>
+        <item name="android:paddingLeft">@dimen/app_padding</item>
         <item name="android:paddingBottom">3dp</item>
         <item name="android:paddingTop">2dp</item>
     </style>
@@ -145,4 +147,17 @@
         <item name="android:textColor">#FFBBBBBB</item>
         <item name="android:textSize">18sp</item>
     </style>
+
+    <!-- styles for libraries -->
+
+    <style name="simpletooltip_default" parent="@android:style/TextAppearance.Medium"/>
+
+    <style name="DefaultChipSuggestionTextView">
+        <item name="chipHorizontalSpacing">6dp</item>
+        <item name="chipBackground">@color/chip_material_background</item>
+        <item name="chipTextSize">14sp</item>
+        <item name="chipHeight">32dp</item>
+        <item name="chipVerticalSpacing">4dp</item>
+    </style>
+
 </resources>

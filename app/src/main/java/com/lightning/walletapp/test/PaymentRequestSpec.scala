@@ -6,11 +6,9 @@ import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire.Hop
 import fr.acinq.bitcoin.{Btc, Crypto, MilliBtc, MilliSatoshi, Protocol, Satoshi}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
-import scodec.bits.ByteVector
+import scodec.bits.{BitVector, ByteVector}
 
-/**
-  * Created by anton on 13.07.17.
-  */
+
 class PaymentRequestSpec {
 
   def allTests = {
@@ -42,13 +40,6 @@ class PaymentRequestSpec {
       assert(Some(MilliSatoshi(100000000)) == Amount.decode("1000000n"))
       assert(Some(MilliSatoshi(100000000)) == Amount.decode("1000000000p"))
     }
-
-//    {
-//      println("Pay 1 BTC without multiplier")
-//      val ref = "lnbc11pdk67ujpp5gdvqef4hmd3g2djev34fl3uhz0rc6v403v8gzpwf2c6mzncmz0qsdqsf4ujqarfwqsxymmccqp29v9ej57ruyrf87twdat34z9wuug8gk0ukftu6kr3cpvvzw4xu6736922360favck2caryehmvz7d73z4dpgyr4vsmcvsna0y3qvr67qqr7tdjc"
-//      val pr = PaymentRequest.read(ref)
-//      assert(pr.amount == Some(MilliSatoshi(1 * 100000000000L)))
-//    }
 
     {
       println("Please make a donation of any amount using payment_hash 0001020304050607080900010203040506070809000102030405060708090102 to me @03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")
@@ -112,7 +103,7 @@ class PaymentRequestSpec {
       assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
       assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
-      assert(pr.description == "")
+      assert(pr.description == "3925b6f67e2c340036ed12093dd44e0368df1b6ea26c53dbe4811f58fd5db8c1")
 
       assert(pr.routingInfo == Vector(RoutingInfoTag(Vector(
       Hop(PublicKey(ByteVector.fromValidHex("029e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255")),72623859790382856L,3,0,1,20),
@@ -174,8 +165,23 @@ class PaymentRequestSpec {
       assert(pr.paymentHash == ByteVector.fromValidHex("0001020304050607080900010203040506070809000102030405060708090102"))
       assert(pr.timestamp == 1496314658L)
       assert(pr.nodeId == PublicKey(ByteVector.fromValidHex("03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")))
-      assert(pr.minFinalCltvExpiry == Some(12))
+      assert(pr.adjustedMinFinalCltvExpiry == 12 + 10)
       assert(pr.tags.size == 4)
+      assert(PaymentRequest.write(pr.sign(priv)) == ref)
+    }
+
+    {
+      println("On mainnet, please send $30 for coffee beans to the same peer, which supports features 1 and 9")
+      val ref = "lnbc25m1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5vdhkven9v5sxyetpdees9qzsze992adudgku8p05pstl6zh7av6rx2f297pv89gu5q93a0hf3g7lynl3xq56t23dpvah6u7y9qey9lccrdml3gaqwc6nxsl5ktzm464sq73t7cl"
+      val pr = PaymentRequest.read(ref)
+      assert(pr.prefix == "lnbc")
+      assert(pr.amount.get == MilliSatoshi(2500000000L))
+      assert(pr.paymentHash.toHex == "0001020304050607080900010203040506070809000102030405060708090102")
+      assert(pr.timestamp == 1496314658L)
+      assert(pr.nodeId.toString == "03e7156ae33b0a208d0744199163177e909e80176e55d97a2f221ede0f934dd9ad")
+      assert(pr.description == "coffee beans")
+      assert(pr.fallbackAddress.isEmpty)
+      assert(pr.features.get == BitVector.fromValidBin("1000000010"))
       assert(PaymentRequest.write(pr.sign(priv)) == ref)
     }
   }

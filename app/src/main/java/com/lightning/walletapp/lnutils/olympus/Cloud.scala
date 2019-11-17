@@ -26,10 +26,10 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
   }
 
   def doProcess(some: Any) = (data, some) match {
+    // We do not have memo or tokens but there are pending actions
     case CloudData(None, clearTokens, actions) \ CMDStart if isFree &&
-      (clearTokens.isEmpty || actions.isEmpty && clearTokens.size < 5) &&
       ChannelManager.mostFundedChanOpt.exists(_.estCanSendMsat >= maxMsat) &&
-      isAuthEnabled =>
+      clearTokens.isEmpty && actions.nonEmpty && isAuthEnabled =>
 
       // Also executes if we have no actions to upload and a few tokens left
       val send = retry(getPaymentRequestBlindMemo, pick = pickInc, times = 4 to 5)
@@ -60,7 +60,7 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         case _ =>
       }
 
-    // We do not have any acts or tokens but have a memo
+    // We can't upload actions but have a memo to resolve
     case CloudData(Some(pr \ memo), _, _) \ CMDStart if isFree =>
       // Payment may still be unsent OR in-flight OR fulfilled OR failed already
       val isInFlight = ChannelManager.activeInFlightHashes contains pr.paymentHash
@@ -99,13 +99,14 @@ class Cloud(val identifier: String, var connector: Connector, var auth: Int, val
         val ecBlind = new ECBlind(pubKeyQ.getPubKeyPoint, pubKeyR.getPubKeyPoint)
 
         val memo = BlindMemo(ecBlind params quantity, ecBlind tokens quantity, pubKeyR.getPublicKeyAsHex)
-        connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.hex,
+        connector.ask[String]("blindtokens/buy", "tokens" -> memo.makeBlindTokens.toJson.toString.s2hex,
           "seskey" -> memo.key).map(PaymentRequest.read).map(pr => pr -> memo)
     }
 
   def isAuthEnabled = 1 == auth
   def retryFreshRequest(failedPr: PaymentRequest): Unit = {
-    val isOk = ChannelManager.mostFundedChanOpt.exists(_.estCanSendMsat >= failedPr.msatOrMin.amount)
-    if (isOk) PaymentInfoWrap addPendingPayment app.emptyRD(failedPr, failedPr.msatOrMin.amount, useCache = true)
+    val retryRD = app.emptyRD(failedPr, failedPr.msatOrMin.amount, useCache = true)
+    // We do not care about options such as AIR or AMP here because price is supposed to be small
+    if (ChannelManager.checkIfSendable(retryRD).isRight) PaymentInfoWrap addPendingPayment retryRD
   }
 }

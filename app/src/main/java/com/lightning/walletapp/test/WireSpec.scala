@@ -11,8 +11,6 @@ import scodec.bits.{BitVector, ByteVector}
 import fr.acinq.bitcoin.{Block, Crypto, Protocol}
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey, Scalar}
 import fr.acinq.eclair.UInt64
-import org.bitcoinj.core.NetworkParameters.ProtocolVersion
-
 import scala.util.Random
 
 
@@ -332,22 +330,21 @@ class WireSpec {
       val pong = Pong(ByteVector.fromValidHex("01" * 10))
       val channel_reestablish = ChannelReestablish(randomBytes(32), 242842L, 42L, None, None)
 
-      val invoke_hosted_channel = InvokeHostedChannel(randomBytes(32), bin(47, 0))
+      val invoke_hosted_channel = InvokeHostedChannel(randomBytes(32), bin(47, 0), bin(112, 0))
       val init_hosted_channel = InitHostedChannel(UInt64(6), 10, 20, 500000000L, 5000, 1000000, 1000000)
       val state_override = StateOverride(50000L, 500000, 70000, 700000, randomSignature)
-      val in_flight_htlc = InFlightHtlc(1L, 600000000L, bin(32, 0), 1000L)
 
-      val state_update = StateUpdate(50000L, 10, 20, randomSignature)
-      val lcss1 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(in_flight_htlc, in_flight_htlc), List(in_flight_htlc, in_flight_htlc), randomSignature)
-      val lcss2 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, List(in_flight_htlc, in_flight_htlc), randomSignature)
-      val lcss3 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(in_flight_htlc, in_flight_htlc), Nil, randomSignature)
-      val lcss4 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, Nil, randomSignature)
+      val state_update = StateUpdate(50000L, 10, 20, randomSignature, isTerminal = false)
+      val lcss1 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc, update_add_htlc, update_add_htlc), List(update_add_htlc, update_add_htlc, update_add_htlc), randomSignature, randomSignature)
+      val lcss2 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, List(update_add_htlc, update_add_htlc), randomSignature, randomSignature)
+      val lcss3 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, List(update_add_htlc, update_add_htlc), Nil, randomSignature, randomSignature)
+      val lcss4 = LastCrossSignedState(bin(47, 0), init_hosted_channel, 10000, 10000, 20000, 10, 20, Nil, Nil, randomSignature, randomSignature)
 
       val msgs: List[LightningMessage] =
         open :: accept :: funding_created :: funding_signed :: funding_locked :: update_fee :: shutdown :: closing_signed ::
           update_add_htlc :: update_fulfill_htlc :: update_fail_htlc :: update_fail_malformed_htlc :: commit_sig :: revoke_and_ack ::
           channel_announcement :: node_announcement :: channel_update :: announcement_signatures :: ping :: pong :: channel_reestablish ::
-          invoke_hosted_channel :: init_hosted_channel :: lcss1 :: lcss2 :: lcss3 :: lcss4 :: state_override :: state_update :: Nil
+          invoke_hosted_channel :: init_hosted_channel :: state_override :: state_update :: lcss1 :: lcss2 :: lcss3 :: lcss4 :: Nil
 
       msgs foreach { msg =>
         val encoded = lightningMessageCodec.encode(msg).require

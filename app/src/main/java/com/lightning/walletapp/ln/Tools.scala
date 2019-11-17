@@ -20,7 +20,6 @@ object \ {
 object Tools {
   type Bytes = Array[Byte]
   val random = new RandomGenerator
-  val emptyChanges = Changes(Vector.empty, Vector.empty, Vector.empty)
   val nextDummyHtlc = UpdateAddHtlc(Zeroes, id = -1, LNParams.minCapacityMsat, One, expiry = 144 * 3)
   def randomPrivKey = PrivateKey(ByteVector.view(random getBytes 32), compressed = true)
   def log(consoleMessage: String): Unit = android.util.Log.d("LN", consoleMessage)
@@ -29,9 +28,13 @@ object Tools {
   def none: PartialFunction[Any, Unit] = { case _ => }
   def runAnd[T](result: T)(action: Any): T = result
 
-  def toMap[T, K, V](source: Seq[T], keyFun: T => K, valFun: T => V): Map[K, V] = {
-    val premap = for (mapElement <- source) yield keyFun(mapElement) -> valFun(mapElement)
-    premap.toMap
+  def toDefMap[T, K, V](source: Seq[T], keyFun: T => K, valFun: T => V, default: V): Map[K, V] = {
+    val sequenceOfTuples = for (mapElement <- source) yield keyFun(mapElement) -> valFun(mapElement)
+    sequenceOfTuples.toMap withDefaultValue default
+  }
+
+  def memoize[I, O](f: I => O): I => O = new collection.mutable.HashMap[I, O] { self =>
+    override def apply(key: I) = getOrElseUpdate(key, f apply key)
   }
 
   def sign(data: ByteVector, pk: PrivateKey) = Try {

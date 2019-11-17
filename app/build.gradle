@@ -6,12 +6,12 @@ android {
     buildToolsVersion '28.0.3'
 
     defaultConfig {
-        versionName "0.3"
+        versionName "0.4"
         applicationId "com.lightning.walletapp"
         multiDexEnabled true
         targetSdkVersion 28
         minSdkVersion 21
-        versionCode 138
+        versionCode 140
     }
 
     buildTypes {
@@ -40,25 +40,14 @@ dependencies {
     compile 'io.spray:spray-json_2.11:1.3.5'
     compile 'com.google.zxing:core:3.3.3'
 
-    compile('android.arch.work:work-runtime:1.0.0-alpha11') {
-        exclude group: 'com.google.guava', module: 'listenablefuture'
-    }
-
     // Misc
     compile 'com.android.support:support-v4:28.0.0'
     compile 'com.android.support:cardview-v7:28.0.0'
     compile 'com.android.support:appcompat-v7:28.0.0'
     compile 'com.android.support:recyclerview-v7:28.0.0'
-    compile 'com.android.support:support-media-compat:28.0.0'
-    compile 'com.github.douglasjunior:android-simple-tooltip:0.2.3'
-    compile 'com.google.android.gms:play-services-drive:15.0.1'
-    compile 'com.google.android.gms:play-services-auth:15.0.1'
-    compile 'com.github.kevinsawicki:http-request:6.0'
     compile 'org.scala-lang:scala-library:2.11.12'
-    compile 'com.hootsuite.android:nachos:1.1.1'
     compile 'io.reactivex:rxscala_2.11:0.26.5'
     compile 'commons-codec:commons-codec:1.9'
-    compile 'com.github.clans:fab:1.6.4'
 
 //    compile ('eu.lp0.slf4j:slf4j-android:1.7.25-0') {
 //        exclude module: 'slf4j-api'

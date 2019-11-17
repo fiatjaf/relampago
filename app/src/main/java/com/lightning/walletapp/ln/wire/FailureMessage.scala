@@ -4,6 +4,7 @@ import scodec.codecs._
 import LightningMessageCodecs._
 import com.lightning.walletapp.ln.wire.FailureMessageCodecs._
 import com.lightning.walletapp.ln.crypto.Mac32
+import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 import scodec.Attempt
 
@@ -39,9 +40,9 @@ case class FinalIncorrectCltvExpiry(expiry: Long) extends FailureMessage
 case class FinalIncorrectHtlcAmount(amountMsat: Long) extends FailureMessage
 
 case class InvalidOnionVersion(onionHash: ByteVector) extends BadOnion with Perm
-case class InvalidOnionPayload(onionHash: ByteVector) extends BadOnion with Perm
 case class InvalidOnionHmac(onionHash: ByteVector) extends BadOnion with Perm
 case class InvalidOnionKey(onionHash: ByteVector) extends BadOnion with Perm
+case class InvalidOnionPayload(tag: UInt64, offset: Int) extends Perm
 
 case class AmountBelowMinimum(amountMsat: Long, update: ChannelUpdate) extends Update
 case class ChannelDisabled(messageFlags: Byte, channelFlags: Byte, update: ChannelUpdate) extends Update
@@ -51,6 +52,7 @@ case class TemporaryChannelFailure(update: ChannelUpdate) extends Update
 case class ExpiryTooSoon(update: ChannelUpdate) extends Update
 
 object FailureMessageCodecs {
+  private val invalidOnionPayload = (varint withContext "tag") :: (uint16 withContext "offset")
   private val channelUpdateCodecWithType = lightningMessageCodec.narrow[ChannelUpdate](Attempt successful _.asInstanceOf[ChannelUpdate], identity)
   private val channelUpdateWithLengthCodec = variableSizeBytes(value = choice(channelUpdateCodecWithType, channelUpdateCodec), size = uint16)
   private val disabled = (byte withContext "messageFlags") :: (byte withContext "channelFlags") :: channelUpdateWithLengthCodec
@@ -73,7 +75,6 @@ object FailureMessageCodecs {
         .typecase(cr = provide(TemporaryNodeFailure), tag = NODE | 2)
         .typecase(cr = provide(PermanentNodeFailure), tag = PERM | NODE | 2)
         .typecase(cr = provide(RequiredNodeFeatureMissing), tag = PERM | NODE | 3)
-        .typecase(cr = bytes32.as[InvalidOnionPayload], tag = BADONION | PERM)
         .typecase(cr = bytes32.as[InvalidOnionVersion], tag = BADONION | PERM | 4)
         .typecase(cr = bytes32.as[InvalidOnionHmac], tag = BADONION | PERM | 5)
         .typecase(cr = bytes32.as[InvalidOnionKey], tag = BADONION | PERM | 6)
@@ -89,7 +90,8 @@ object FailureMessageCodecs {
         .typecase(cr = (uint32 withContext "expiry").as[FinalIncorrectCltvExpiry], tag = 18)
         .typecase(cr = (uint64Overflow withContext "amountMsat").as[FinalIncorrectHtlcAmount], tag = 19)
         .typecase(cr = disabled.as[ChannelDisabled], tag = UPDATE | 20)
-        .typecase(cr = provide(ExpiryTooFar), tag = 21),
+        .typecase(cr = provide(ExpiryTooFar), tag = 21)
+        .typecase(cr = invalidOnionPayload.as[InvalidOnionPayload], tag = PERM | 22),
       uint16.xmap(unknownFailureFromCode(_).asInstanceOf[FailureMessage], (_: FailureMessage).code)
     )
 

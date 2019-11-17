@@ -9,14 +9,19 @@ import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.R.string._
 import com.lightning.walletapp.ln.Tools._
+import com.lightning.walletapp.PayRequest._
 import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import fr.acinq.bitcoin.{Bech32, Crypto, MilliSatoshi}
+
+import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
+import com.lightning.walletapp.lnutils.JsonHttpUtils.to
 import com.lightning.walletapp.helper.ThrottledWork
+import com.github.kevinsawicki.http.HttpRequest
 import fr.acinq.bitcoin.Crypto.PublicKey
-import fr.acinq.bitcoin.MilliSatoshi
 import org.bitcoinj.uri.BitcoinURI
 import scodec.bits.ByteVector
 import android.os.Bundle
@@ -139,15 +144,20 @@ case class HardcodedNodeView(ann: NodeAnnouncement, tip: String) extends StartNo
 }
 
 case class RemoteNodeView(acn: AnnounceChansNum) extends StartNodeView {
-  def asString(base: String) = base.format(ca.alias, app.plur1OrZero(chansNumber, num), ca.pretty)
-  lazy val chansNumber = app.getResources getStringArray R.array.ln_ops_start_node_channels
-  val ca \ num = acn
+  def asString(base: String) = base.format(chanAnnounce.alias, chansNumber, chanAnnounce.pretty)
+  lazy val chansNumber = app.plur1OrZero(app.getResources getStringArray R.array.ln_ops_start_node_channels, chansNum)
+  val chanAnnounce \ chansNum = acn
 }
 
 // LNURL response types
 
-object LNUrlData {
-  type PayReqVec = Vector[PaymentRequest]
+object LNUrl {
+  def fromBech32(bech32url: String) = {
+    val _ \ data = Bech32.decode(bech32url)
+    val request = Bech32.five2eight(data)
+    LNUrl(Tools bin2readable request)
+  }
+
   def guardResponse(raw: String): String = {
     val validJson = Try(raw.parseJson.asJsObject.fields)
     val hasError = validJson.map(_ apply "reason").map(json2String)
@@ -157,48 +167,98 @@ object LNUrlData {
   }
 }
 
-sealed trait LNUrlData {
-  def unsafe(request: String) = get(request, true).trustAllCerts.trustAllHosts
-  require(callback contains "https://", "Callback does not have HTTPS prefix")
-  val callback: String
+case class LNUrl(request: String) {
+  val uri = android.net.Uri.parse(request)
+  require(uri.toString contains "https://")
+  lazy val isLogin: Boolean = Try(uri getQueryParameter "tag" equals "login").getOrElse(false)
+  lazy val k1: Try[String] = Try(uri getQueryParameter "k1")
+}
+
+trait LNUrlData {
+  def unsafe(request: String): HttpRequest =
+    get(request, true).trustAllCerts.trustAllHosts
 }
 
 case class WithdrawRequest(callback: String, k1: String,
                            maxWithdrawable: Long, defaultDescription: String,
                            minWithdrawable: Option[Long] = None) extends LNUrlData {
 
+  require(callback contains "https://")
   val minCanReceive = MilliSatoshi(minWithdrawable getOrElse 1L)
   require(minCanReceive.amount <= maxWithdrawable)
   require(minCanReceive.amount >= 1L)
 
-  def requestWithdraw(lnUrl: LNUrl, pr: PaymentRequest) = {
-    val privateKey = LNParams.getLinkingKey(lnUrl.uri.getHost)
-    val request = android.net.Uri.parse(callback).buildUpon
+  def requestWithdraw(lnUrl: LNUrl, pr: PaymentRequest) =
+    unsafe(request = android.net.Uri.parse(callback).buildUpon
       .appendQueryParameter("pr", PaymentRequest write pr)
       .appendQueryParameter("k1", k1)
-
-    val req1Try = for {
-      dataToSign <- Try(ByteVector fromValidHex k1)
-      sig = Tools.sign(dataToSign, privateKey).toHex
-    } yield request.appendQueryParameter("sig", sig)
-    unsafe(req1Try.getOrElse(request).build.toString)
-  }
+      .build.toString)
 }
 
-case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
-  // Recreate node announcement from supplied data and call a second level callback once connected
-  val nodeLink(key, host, port) = uri
+case class IncomingChannelRequest(uri: String, callback: String,
+                                  k1: String) extends LNUrlData {
 
-  def resolveNodeAnnouncement = {
-    val nodeId = PublicKey(ByteVector fromValidHex key)
-    val nodeAddress = NodeAddress.fromParts(host, port.toInt)
-    app.mkNodeAnnouncement(nodeId, nodeAddress, host)
-  }
+  val nodeLink(nodeKey, hostAddress, portNumber) = uri
+  val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
+  val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
+  val ann = app.mkNodeAnnouncement(remoteNodeId, address, alias = hostAddress)
+  require(callback contains "https://")
 
   def requestChannel =
-    unsafe(android.net.Uri.parse(callback).buildUpon
+    unsafe(request = android.net.Uri.parse(callback).buildUpon
       .appendQueryParameter("remoteid", LNParams.nodePublicKey.toString)
       .appendQueryParameter("private", "1")
       .appendQueryParameter("k1", k1)
       .build.toString)
+}
+
+case class HostedChannelRequest(uri: String, alias: Option[String],
+                                k1: String) extends LNUrlData with StartNodeView {
+
+  val secret = ByteVector fromValidHex k1
+  val nodeLink(nodeKey, hostAddress, portNumber) = uri
+  val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
+  val ann = app.mkNodeAnnouncement(PublicKey(ByteVector fromValidHex nodeKey), address, alias getOrElse hostAddress)
+  def asString(base: String) = base.format(ann.alias, app getString ln_ops_start_fund_hosted_channel, ann.pretty)
+}
+
+object PayRequest {
+  type TagAndContent = Vector[String]
+  type PayMetaData = Vector[TagAndContent]
+  type KeyAndUpdate = (PublicKey, ChannelUpdate)
+  type Route = Vector[KeyAndUpdate]
+}
+
+case class PayRequest(callback: String,
+                      maxSendable: Long, minSendable: Long,
+                      metadata: String) extends LNUrlData {
+
+  require(callback contains "https://")
+  require(minSendable <= maxSendable)
+  require(minSendable >= 1L)
+
+  def metaDataHash: ByteVector = {
+    val bytes = metadata getBytes "UTF-8"
+    Crypto.sha256(ByteVector view bytes)
+  }
+
+  def metaDataTextPlain: String = {
+    val metaVector = to[PayMetaData](StringContext treatEscapes metadata)
+    metaVector.collectFirst { case Vector("text/plain", content) => content }.get
+  }
+
+  def requestFinal(amount: MilliSatoshi, fromnodes: String = new String) =
+    unsafe(request = android.net.Uri.parse(callback).buildUpon
+      .appendQueryParameter("amount", amount.toLong.toString)
+      .appendQueryParameter("fromnodes", fromnodes)
+      .build.toString)
+}
+
+case class PayRequestFinal(routes: Vector[Route], pr: String) extends LNUrlData {
+  // Lnurl-pay is two-fold: this object is returned once user called a first callback
+
+  val paymentRequest: PaymentRequest = PaymentRequest.read(input = pr)
+  val descriptionHash: ByteVector = ByteVector.fromValidHex(paymentRequest.description)
+  val extraPaymentRoutes: PaymentRouteVec = for (route <- routes) yield route map { case nodeId \ chanUpdate => chanUpdate toHop nodeId }
+  for (route <- routes) for (nodeId \ chanUpdate <- route) require(Announcements.checkSig(chanUpdate, nodeId), "Extra route contains an invalid update")
 }

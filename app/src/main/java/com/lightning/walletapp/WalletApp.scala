@@ -9,9 +9,9 @@ import com.lightning.walletapp.lnutils._
 import com.lightning.walletapp.ln.wire._
 import scala.collection.JavaConverters._
 import com.lightning.walletapp.ln.Tools._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
-import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.ln.crypto.Sphinx._
 import com.google.common.util.concurrent.Service.State._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
@@ -23,12 +23,11 @@ import rx.lang.scala.{Observable => Obs}
 import scodec.bits.{BitVector, ByteVector}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
-import androidx.work.{ExistingWorkPolicy, WorkManager}
-import android.content.{ClipData, ClipboardManager, Context}
-import com.lightning.walletapp.helper.{AwaitService, RichCursor}
-import com.lightning.walletapp.lnutils.JsonHttpUtils.{pickInc, repeat}
+import android.content.{ClipboardManager, Context}
 import com.lightning.walletapp.lnutils.olympus.{OlympusWrap, TxUploadAct}
 import android.app.{Application, NotificationChannel, NotificationManager}
+import com.lightning.walletapp.helper.{AwaitService, RichCursor, ThrottledWork}
+import com.lightning.walletapp.lnutils.JsonHttpUtils.{ioQueue, pickInc, repeat, retry}
 import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -36,9 +35,9 @@ import android.support.v7.app.AppCompatDelegate
 import org.bitcoinj.wallet.KeyChain.KeyPurpose
 import org.bitcoinj.net.discovery.DnsDiscovery
 import org.bitcoinj.wallet.Wallet.BalanceType
-import rx.lang.scala.schedulers.IOScheduler
 import java.util.Collections.singletonList
 import fr.acinq.bitcoin.Protocol.Zeroes
+import fr.acinq.bitcoin.SatoshiLong
 import org.bitcoinj.uri.BitcoinURI
 import scala.concurrent.Future
 import android.widget.Toast
@@ -70,8 +69,8 @@ class WalletApp extends Application { me =>
 
   // Various utilities
 
-  def toast(code: Int): Unit = toast(me getString code)
-  def toast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_LONG).show
+  def quickToast(code: Int): Unit = quickToast(me getString code)
+  def quickToast(msg: CharSequence): Unit = Toast.makeText(me, msg, Toast.LENGTH_SHORT).show
   def clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE).asInstanceOf[ClipboardManager]
   def plur1OrZero(opts: Array[String], num: Long) = if (num > 0) plur(opts, num).format(num) else opts(0)
   def getBufferUnsafe = clipboardManager.getPrimaryClip.getItemAt(0).getText.toString
@@ -95,12 +94,6 @@ class WalletApp extends Application { me =>
     }
   }
 
-  def setBuffer(bufferText: String, notify: Boolean = true) = {
-    val bufferContent = ClipData.newPlainText("wallet", bufferText)
-    if (notify) me toast getString(copied_to_clipboard).format(bufferText)
-    clipboardManager setPrimaryClip bufferContent
-  }
-
   def mkNodeAnnouncement(id: PublicKey, na: NodeAddress, alias: String) =
     NodeAnnouncement(signature = sign(Zeroes, randomPrivKey), features = ByteVector.empty,
       timestamp = 0L, nodeId = id, (-128, -128, -128), alias take 16, addresses = na :: Nil)
@@ -109,7 +102,7 @@ class WalletApp extends Application { me =>
     val useOnChainFeeBlock = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, onion = PacketAndSecrets(emptyOnionPacket, Vector.empty),
       firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeBlock) 8 else 4, useCache = useCache,
-      airLeft = 0, onChainFeeBlock = useOnChainFeeBlock, onChainFeeBlockWasUsed = false, retriedRoutes = Vector.empty)
+      airLeft = 0, onChainFeeBlock = useOnChainFeeBlock, onChainFeeBlockWasUsed = false, fromHostedOnly = false)
   }
 
   object TransData {
@@ -192,7 +185,7 @@ class WalletApp extends Application { me =>
       peerGroup.addWallet(wallet)
 
       for {
-        _ <- Obs just null subscribeOn IOScheduler.apply delay 20.seconds
+        _ <- ioQueue delay 20.seconds
         offlineChannel <- ChannelManager.all if offlineChannel.permanentOffline
         if offlineChannel.data.announce.addresses.headOption.forall(_.canBeUpdatedIfOffline)
         // Call findNodes without `retry` wrapper because it gives harmless `Obs.empty` on error
@@ -202,7 +195,7 @@ class WalletApp extends Application { me =>
       ConnectionManager.listeners += ChannelManager.socketEventsListener
       startBlocksDownload(ChannelManager.chainEventsListener)
       // Try to clear act leftovers if no channels are left
-      app.olympus tellClouds OlympusWrap.CMDStart
+      app.olympus.tellClouds(OlympusWrap.CMDStart)
       PaymentInfoWrap.markFailedPayments
       ChannelManager.initConnect
       RatesSaver.subscription
@@ -213,8 +206,13 @@ class WalletApp extends Application { me =>
 object ChannelManager extends Broadcaster {
   val operationalListeners = Set(ChannelManager, bag)
   val CMDLocalShutdown = CMDShutdown(scriptPubKey = None)
-  private val chanBackupWork = BackupWorker.workRequest(backupFileName, cloudSecret)
   var currentBlocksLeft = Option.empty[Int]
+
+  var all: Vector[Channel] = ChannelWrap doGet db collect {
+    case data: HasNormalCommits => createChannel(operationalListeners, data)
+    case data: HostedCommits => createHostedChannel(operationalListeners, data)
+    case data => throw new RuntimeException(s"Can't create channel with $data")
+  }
 
   val socketEventsListener = new ConnectionListener {
     override def onOperational(nodeId: PublicKey, isCompat: Boolean) =
@@ -228,7 +226,8 @@ object ChannelManager extends Broadcaster {
     }
 
     override def onHostedMessage(ann: NodeAnnouncement, msg: HostedChannelMessage) =
-      fromNode(ann.nodeId).find(_.getCommits.map(_.channelId) contains ann.hostedChanId).foreach(_ process msg)
+      fromNode(ann.nodeId).find(_.getCommits.map(_.channelId) contains ann.hostedChanId)
+        .foreach(_ process msg)
 
     override def onDisconnect(nodeId: PublicKey) = {
       fromNode(nodeId).foreach(_ process CMDSocketOffline)
@@ -293,24 +292,12 @@ object ChannelManager extends Broadcaster {
       // Once all pending blocks are received, check if funding transaction has been confirmed
       val fundingDepth \ _ = broadcaster.getStatus(txid = wait.fundingTx.txid)
       if (fundingDepth >= minDepth) chan process CMDConfirmed(wait.fundingTx)
-
-    case (chan: Channel, _, CMDSocketOnline) =>
-      // Memo that channel was online at least once
-      chan.permanentOffline = false
   }
 
   override def onBecome = {
     // Repeatedly resend a funding tx, update feerate on becoming open
     case (_: NormalChannel, wait: WaitFundingDoneData, _, _) => app.kit blockSend wait.fundingTx
     case (chan: NormalChannel, _: NormalData, SLEEPING, OPEN) => chan process CMDFeerate(perKwThreeSat)
-  }
-
-  // CHANNEL CREATION AND MANAGEMENT
-
-  var all: Vector[Channel] = ChannelWrap doGet db collect {
-    case normal: HasNormalCommits => createChannel(operationalListeners, normal)
-    case hosted: HostedCommits => createHostedChannel(operationalListeners, hosted)
-    case other => throw new RuntimeException(s"Can't create channel with $other")
   }
 
   def delayedPublishes = {
@@ -330,49 +317,58 @@ object ChannelManager extends Broadcaster {
   } yield canSendFeeIncluded
 
   def estimateAIRCanSend = {
-    // We are ultimately bound by the useful capacity of the largest channel
-    val airCanSend = mostFundedChanOpt.map(chan => chan.estCanSendMsat + airCanSendInto(chan).sum)
-    val largestCapOpt = all.filter(isOperational).map(_.estNextUsefulCapacityMsat).reduceOption(_ max _)
-    math.min(airCanSend getOrElse 0L, largestCapOpt getOrElse 0L)
+    // It's possible that balance from all channels will be less than most funded chan capacity
+    val airCanSend = mostFundedChanOpt.map(chan => chan.estCanSendMsat + airCanSendInto(chan).sum) getOrElse 0L
+    val usefulCaps = all.filter(isOperational).map(chan => chan.estCanSendMsat.zeroIfNegative + chan.estCanReceiveMsat.zeroIfNegative)
+    // We are ultimately bound by the useful capacity (sendable + receivable - currently inflight payments) of the largest channel
+    usefulCaps.reduceOption(_ max _) getOrElse 0L min airCanSend
   }
-
-  def accumulatorChanOpt(rd: RoutingData) =
-    all.filter(chan => isOperational(chan) && channelAndHop(chan).nonEmpty)
-      .filter(_.estNextUsefulCapacityMsat >= rd.withMaxOffChainFeeAdded)
-      .sortBy(_.estCanReceiveMsat).headOption // Smallest receivable
 
   // CHANNEL
 
-  def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estCanSendMsat).lastOption
-  def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
+  def hasHostedChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(_.isHosted)
+  def hasNormalChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(chan => isOpeningOrOperational(chan) && !chan.isHosted)
   // We need to connect the rest of channels including special cases like REFUNDING normal channel and SUSPENDED hosted channel
   def initConnect = for (chan <- all if chan.state != CLOSING) ConnectionManager.connectTo(chan.data.announce, notify = false)
-  def hasNormalChanWith(nodeId: PublicKey) = fromNode(nodeId).exists(chan => isOpeningOrOperational(chan) && !chan.isHosted)
-  def backUp = WorkManager.getInstance.beginUniqueWork("Backup", ExistingWorkPolicy.REPLACE, chanBackupWork).enqueue
   def fromNode(nodeId: PublicKey) = for (chan <- all if chan.data.announce.nodeId == nodeId) yield chan
+  def activeInFlightHashes = all.filter(isOperational).flatMap(_.inFlightHtlcs).map(_.add.paymentHash)
+  def mostFundedChanOpt = all.filter(isOperational).sortBy(_.estCanSendMsat).lastOption
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
-  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel { self =>
-    def SEND(msg: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process msg
-    def STORE[T <: ChannelData](data: T) = runAnd(data)(ChannelWrap put data)
+  val backupSaveWorker = new ThrottledWork[String, String] {
+    def work(cmd: String) = ioQueue delay 4.seconds map { _ => "OK" }
+    def error(canNotHappen: Throwable) = none
+
+    def process(cmd: String, execResult: String) =
+      if ("OK" == execResult && LocalBackup.isExternalStorageWritable) try {
+        val backupFile = LocalBackup.getBackupFile(LocalBackup getBackupDirectory LNParams.chainHash)
+        LocalBackup.encryptAndWrite(backupFile, for (chan <- all) yield chan.data, app.kit.wallet, LNParams.cloudSecret)
+      } catch none
+  }
+
+  def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel {
+    def STORE[T <: ChannelData](hostedCommitments: T) = {
+      backupSaveWorker replaceWork "HOSTED-INIT-SAVE-BACKUP"
+      ChannelWrap put hostedCommitments
+      hostedCommitments
+    }
+
     listeners = initListeners
     doProcess(bootstrap)
   }
 
-  def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel { self =>
-    def SEND(msg: LightningMessage) = for (work <- ConnectionManager.workers get data.announce.nodeId) work.handler process msg
-
-    def STORE[T <: ChannelData](data: T) = runAnd(data) {
-      // Put updated data into db and schedule gdrive upload
-      ChannelWrap put data
-      backUp
+  def createChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new NormalChannel {
+    def STORE[T <: ChannelData](normalCommitments: T) = {
+      backupSaveWorker replaceWork "NORMAL-INIT-SAVE-BACKUP"
+      ChannelWrap put normalCommitments
+      normalCommitments
     }
 
     def REV(cs: NormalCommits, rev: RevokeAndAck) = for {
       tx <- cs.remoteCommit.txOpt // We use old commitments to save a punishment for remote commit before it gets dropped
       myBalance = cs.remoteCommit.spec.toRemoteMsat // Local commit is cleared by now, remote still has relevant balance
-      watchtowerFee = broadcaster.perKwThreeSat * 3 // Scorched earth policy becuase watchtower can't regenerate tx
+      watchtowerFee = broadcaster.perKwThreeSat * 3 // Scorched earth policy because watchtower can't regenerate tx
       revocationInfo = Helpers.Closing.makeRevocationInfo(cs, tx, rev.perCommitmentSecret, watchtowerFee)
       serialized = LightningMessageCodecs.serialize(revocationInfoCodec encode revocationInfo)
     } db.change(RevokedInfoTable.newSql, tx.txid, cs.channelId, myBalance, serialized)
@@ -392,21 +388,33 @@ object ChannelManager extends Broadcaster {
     }
 
     def CLOSEANDWATCH(cd: ClosingData) = {
-      val tier12txs = cd.tier12States.map(_.txn.bin).toVector
-      if (tier12txs.nonEmpty) app.olympus tellClouds TxUploadAct(txvec.encode(tier12txs).require.toByteVector, Nil, "txs/schedule")
-      // In case of breach after publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
-      // our job here is to watch for every output of every revoked commit tx and re-spend it before their CSV delay runs out
-      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ map CMDSpent foreach process, none)
-      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(_ foreach bag.extractPreimage, none)
-      // Collect all the commit txs publicKeyScripts and watch these scripts locally for future possible payment preimages
+      cd.tier12States.map(_.txn.bin).toVector match {
+        case txs if txs.isEmpty => Tools log "Closing contains no second tier txs, nothing to schedule on Olympus"
+        case txs => app.olympus tellClouds TxUploadAct(txvec.encode(txs).require.toByteVector, Nil, "txs/schedule")
+      }
+
+      repeat(app.olympus getChildTxs cd.commitTxs.map(_.txid), pickInc, 7 to 8).foreach(txs => {
+        // In case of breach after publishing a revoked remote commit our peer may further publish Timeout and Success HTLC outputs
+        // our job here is to watch for every output of every revoked commit tx and re-spend it before their CSV delay runs out
+        for (tx <- txs) this process CMDSpent(tx)
+        for (tx <- txs) bag.extractPreimage(tx)
+      }, none)
+
+      // Collect all the commit txs publicKeyScripts and watch them locally
+      // because it's possible that remote peer will reveal preimages on-chain
       app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
       BECOME(STORE(cd), CLOSING)
     }
 
     def ASKREFUNDPEER(some: HasNormalCommits, point: Point) = {
-      val msg = ByteVector.fromValidHex("please publish your local commitment".hex)
+      val msg = ByteVector.fromValidHex("please publish your local commitment".s2hex)
       val ref = RefundingData(some.announce, Some(point), some.commitments)
       val error = Error(some.commitments.channelId, msg)
+
+      retry(app.olympus getChildTxs Seq(ref.commitments.commitInput.outPoint.txid), pickInc, 7 to 8).foreach(txs => {
+        // Failsafe check in case if peer has already closed this channel unilaterally while us being offline at that time
+        for (tx <- txs) this process CMDSpent(tx)
+      }, none)
 
       // Send both invalid reestablish and an error
       app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
@@ -421,19 +429,23 @@ object ChannelManager extends Broadcaster {
   // SENDING PAYMENTS
 
   def checkIfSendable(rd: RoutingData) = {
-    val isFulfilledAlready = bag.getPaymentInfo(rd.pr.paymentHash).filter(_.status == SUCCESS)
-    if (isFulfilledAlready.isSuccess) Left(err_ln_fulfilled, NOT_SENDABLE) else mostFundedChanOpt.map(_.estCanSendMsat) match {
+    val paymentInfoOpt = bag.getPaymentInfo(rd.pr.paymentHash).toOption
+    // We never allow to re-send already fulfilled payments or those with unknown status
+    val canNotBeSent = paymentInfoOpt.exists(info => info.status == SUCCESS || info.status == FROZEN)
+    if (canNotBeSent) Left(err_ln_fulfilled, NOT_SENDABLE) else mostFundedChanOpt.map(_.estCanSendMsat) match {
       // May happen such that we had enough while were deciding whether to pay, but do not have enough funds now, also check extended options
       case Some(max) if max < rd.firstMsat && rd.airLeft > 1 && estimateAIRCanSend >= rd.firstMsat => Left(dialog_sum_big, SENDABLE_AIR)
       case Some(max) if max < rd.firstMsat => Left(dialog_sum_big, NOT_SENDABLE)
-      case None => Left(err_no_data, NOT_SENDABLE)
+      case None => Left(err_nothing_useful, NOT_SENDABLE)
       case _ => Right(rd)
     }
   }
 
   def fetchRoutes(rd: RoutingData) = {
-    // First we collect chans which in principle can handle a given payment sum right now, then prioritize less busy chans
-    val from = all.filter(chan => isOperational(chan) && chan.estCanSendMsat >= rd.firstMsat).map(_.data.announce.nodeId).distinct
+    val from: PublicKeyVec = rd.fromHostedOnly match {
+      case false => all.filter(chan => isOperational(chan) && chan.estCanSendMsat >= rd.firstMsat).map(_.data.announce.nodeId).distinct
+      case true => all.filter(chan => isOperational(chan) && chan.estCanSendMsat >= rd.firstMsat && chan.isHosted).map(_.data.announce.nodeId).distinct
+    }
 
     def withHints = for {
       tag <- Obs from rd.pr.routingInfo
@@ -458,9 +470,12 @@ object ChannelManager extends Broadcaster {
 
     for {
       rs <- paymentRoutesObs
-      busyMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, channel => channel.inFlightHtlcs.size)
-      openMap = Tools.toMap[Channel, PublicKey, Int](all, _.data.announce.nodeId, channel => if (channel.state == OPEN) 0 else 1)
-    } yield useFirstRoute(rs.sortBy(estimateCompoundFee).sortBy(busyMap compose rd.nextNodeId).sortBy(openMap compose rd.nextNodeId), rd)
+      // Channel could have been operational when we were asking for a route but got closed later, so there always must be a default value for non-existing keys
+      openMap = Tools.toDefMap[Channel, PublicKey, Int](all.filter(isOperational), _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1, default = 1)
+      busyMap = Tools.toDefMap[Channel, PublicKey, Int](all.filter(isOperational), _.data.announce.nodeId, chan => chan.inFlightHtlcs.size, default = 1)
+      foundRoutes = rs.sortBy(estTotalRouteFee).sortBy(openMap compose rd.nextNodeId).sortBy(busyMap compose rd.nextNodeId)
+    // We may have out of band routes in RD so append them to found ones
+    } yield useFirstRoute(foundRoutes ++ rd.routes, rd)
   }
 
   def sendEither(foeRD: FullOrEmptyRD, noRoutes: RoutingData => Unit): Unit = foeRD match {
@@ -469,12 +484,11 @@ object ChannelManager extends Broadcaster {
     case Left(emptyRD) => noRoutes(emptyRD)
 
     case Right(rd) =>
-      all filter isOperational find { chan =>
-        // Reflexive payment may happen through two chans belonging to the same peer
-        // here we must make sure we don't accidently use terminal channel as source one
-        val excludeShortChannelId = if (rd.usedRoute.isEmpty) 0L else rd.usedRoute.last.shortChannelId
-        val isLoop = chan.getCommits.flatMap(_.updateOpt).exists(_.shortChannelId == excludeShortChannelId)
-        !isLoop && chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) && chan.estCanSendMsat >= rd.firstMsat
+      all.filter(isOperational) find { chan =>
+        val matchesHostedOnlyPolicy = if (rd.fromHostedOnly) chan.isHosted else true // User may desire to only spend from hosted channels
+      val correctTargetPeerNodeId = chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) // Onion does not care about specific chan but peer nodeId must match
+      val notLoop = chan.getCommits.flatMap(_.updateOpt).map(_.shortChannelId) != rd.usedRoute.lastOption.map(_.shortChannelId) // Not chans like A -> B -> A
+        notLoop && matchesHostedOnlyPolicy && correctTargetPeerNodeId && chan.estCanSendMsat >= rd.firstMsat // Balance may change in a meantime
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)
         case Some(targetGoodChannel) => targetGoodChannel process rd

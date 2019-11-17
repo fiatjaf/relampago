@@ -4,6 +4,7 @@ package com.lightning.walletapp.test
 import com.lightning.walletapp.ln.wire._
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.Protocol
+import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
 
 import scala.util.Success
@@ -226,7 +227,7 @@ class SphinxSpec {
 
       val packet = FailurePacket.wrap(
         FailurePacket.wrap(
-          FailurePacket.create(sharedSecrets.head, InvalidOnionPayload(Protocol.Zeroes)),
+          FailurePacket.create(sharedSecrets.head, InvalidOnionPayload(UInt64(0), 0)),
           sharedSecrets(1)),
         sharedSecrets(2))
 
@@ -311,7 +312,7 @@ class SphinxSpec {
 
 object SphinxSpec {
   def serializePaymentOnion(onion: OnionRoutingPacket): ByteVector =
-    OnionCodecs.paymentOnionPacketCodec.encode(onion).require.toByteVector
+    LightningMessageCodecs.paymentOnionPacketCodec.encode(onion).require.toByteVector
 
   val privKeys = Seq(
     PrivateKey(ByteVector.fromValidHex("4141414141414141414141414141414141414141414141414141414141414141"), compressed = true),

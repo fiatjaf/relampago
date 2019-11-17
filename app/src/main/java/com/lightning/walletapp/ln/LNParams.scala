@@ -12,24 +12,27 @@ import com.lightning.walletapp.ln.LNParams.DepthAndDead
 import com.lightning.walletapp.ln.wire.NodeAnnouncement
 import com.lightning.walletapp.ChannelManager
 import com.lightning.walletapp.ln.Tools.Bytes
+import java.io.ByteArrayInputStream
 import fr.acinq.eclair.UInt64
 import scodec.bits.ByteVector
+import java.nio.ByteOrder
 
 
 object LNParams {
   type DepthAndDead = (Int, Boolean)
-  val localFeatures = ByteVector.fromValidHex("8a")
-  val globalFeatures = ByteVector.fromValidHex("")
+  val localFeatures = ByteVector.fromValidHex("8a") // data_loss_protect, channel_range_queries
+  val globalFeatures = ByteVector.fromValidHex("0200") // variable_length_onion
   val chainHash = Block.LivenetGenesisBlock.hash
 
   val minDepth = 1
   val blocksPerDay = 144
   val minCapacityMsat = 200000000L
-  val channelReserveToFundingRatio = 100
+  val channelReserveToFundingRatio = 200 // 0.5%
 
   val minHostedCltvDelta = blocksPerDay * 3
+  val minHostedOnChainRefundSat = 1000000L
   val minHostedLiabilityBlockdays = 1000
-  val maxHostedBlockHeight = 100000L
+  val maxHostedBlockHeight = 500000L
 
   final val dust = Satoshi(546)
   final val maxToSelfDelay = 2016
@@ -43,7 +46,7 @@ object LNParams {
   lazy val extendedCloudKey = derivePrivateKey(master, hardened(92L) :: hardened(0L) :: Nil)
   // HashingKey is used for creating domain-specific identifiers when using "linkable payment" LNUrl
   lazy val hashingKey = derivePrivateKey(master, hardened(138L) :: 0L :: Nil).privateKey.toBin
-  // Cloud secret is used to encrypt Olympus and GDrive data, cloud ID is used as identifier
+  // Cloud secret is used to encrypt Olympus data, cloud ID is used as identifier
   lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin)
   lazy val cloudId = sha256(cloudSecret)
 
@@ -61,30 +64,43 @@ object LNParams {
   def hopFee(msat: Long, base: Long, proportional: Long) = base + (proportional * msat) / 1000000L
   def maxAcceptableFee(msat: Long, hops: Int, percent: Long = 100L) = 25000 * (hops + 1) + msat / percent
 
-  def estimateCompoundFee(route: PaymentRoute) = getCompoundFee(route, 10000000L)
-  def getCompoundFee(route: PaymentRoute, msat: Long) = route.reverse.foldLeft(msat) {
+  def estTotalRouteFee(route: PaymentRoute) = totalRouteFee(route, 10000000L)
+  def totalRouteFee(route: PaymentRoute, msat: Long) = route.reverse.foldLeft(msat) {
     case amount \ hop => amount + hopFee(amount, hop.feeBaseMsat, hop.feeProportionalMillionths)
   } - msat
 
-  def isFeeBreach(route: PaymentRoute, msat: Long, percent: Long = 100L) =
-    getCompoundFee(route, msat) > maxAcceptableFee(msat, route.size, percent)
+  def isFeeBreach(route: PaymentRoute, msat: Long, percent: Long) =
+    totalRouteFee(route, msat) > maxAcceptableFee(msat, route.size, percent)
 
   def shouldUpdateFee(network: Long, commit: Long) = {
     val mismatch = 2.0 * (network - commit) / (commit + network)
     mismatch < -0.25 || mismatch > 0.25
   }
 
-  def getLinkingKey(domain: String) = {
-    val prefix = crypto.Mac32.hmac256(hashingKey, domain).take(8).toLong(signed = true)
-    derivePrivateKey(master, hardened(138L) :: 0L :: prefix :: Nil).privateKey
+  def updateFeerate = for (chan <- ChannelManager.all) chan process CMDFeerate(broadcaster.perKwThreeSat)
+  def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: ByteVector, fundKey: PrivateKey, isFunder: Boolean) = {
+    // It's always possible to re-derive all secret keys because a keyPath is generated from funding pubKey which will be present on a blockchain
+    val Seq(revocationSecret, paymentKey, delayedPaymentKey, htlcKey, shaSeed) = makeChanKeys(fundKey.publicKey)
+    LocalParams(UInt64(maxCapacity.amount), theirReserve, toSelfDelay = 2016, maxAcceptedHtlcs = 25, fundKey,
+      revocationSecret.privateKey, paymentKey.privateKey, delayedPaymentKey.privateKey, htlcKey.privateKey,
+      finalScriptPubKey, dust, sha256(shaSeed.privateKey.toBin), isFunder)
   }
 
-  def backupFileName = s"blw${chainHash.toHex}-${cloudId.toHex}.bkup"
-  def updateFeerate = for (chan <- ChannelManager.all) chan process CMDFeerate(broadcaster.perKwThreeSat)
-  def makeLocalParams(ann: NodeAnnouncement, theirReserve: Long, finalScriptPubKey: ByteVector, idx: Long, isFunder: Boolean) = {
-    val Seq(fund, rev, pay, delay, htlc, sha) = for (order <- 0L to 5L) yield derivePrivateKey(extendedNodeKey, idx :: order :: Nil)
-    LocalParams(UInt64(maxCapacity.amount), theirReserve, toSelfDelay = 2016, maxAcceptedHtlcs = 25, fund.privateKey, rev.privateKey,
-      pay.privateKey, delay.privateKey, htlc.privateKey, finalScriptPubKey, dust, sha256(sha.privateKey.toBin), isFunder)
+  def makeChanKeys(fundKey: PublicKey) = {
+    val channelKeyPath: Vector[Long] = makeKeyPath(material = fundKey.hash160)
+    for (idx <- 1L to 5L) yield derivePrivateKey(extendedNodeKey, channelKeyPath :+ idx)
+  }
+
+  def makeLinkingKey(domain: String): PrivateKey = {
+    val material = crypto.Mac32.hmac256(key = hashingKey, message = domain)
+    derivePrivateKey(extendedNodeKey, makeKeyPath(material) :+ 0L).privateKey
+  }
+
+  def makeKeyPath(material: ByteVector): Vector[Long] = {
+    require(material.size > 15, "Material size must be at least 16")
+    val stream = new ByteArrayInputStream(material.slice(0, 16).toArray)
+    def generateNewBranch = Protocol.uint32(stream, ByteOrder.BIG_ENDIAN)
+    Vector.fill(4)(generateNewBranch)
   }
 }
 
@@ -98,18 +114,23 @@ object ChanErrorCodes {
   final val ERR_HOSTED_WRONG_BLOCKDAY = ByteVector.fromValidHex("0001")
   final val ERR_HOSTED_WRONG_LOCAL_SIG = ByteVector.fromValidHex("0002")
   final val ERR_HOSTED_WRONG_REMOTE_SIG = ByteVector.fromValidHex("0003")
-  final val ERR_HOSTED_WRONG_LOCAL_NUMBER = ByteVector.fromValidHex("0004")
-  final val ERR_HOSTED_WRONG_REMOTE_NUMBER = ByteVector.fromValidHex("0005")
-  final val ERR_HOSTED_UPDATE_CLTV_TOO_LOW = ByteVector.fromValidHex("0006")
+  final val ERR_HOSTED_UPDATE_CLTV_TOO_LOW = ByteVector.fromValidHex("0004")
+  final val ERR_HOSTED_TOO_MANY_STATE_UPDATES = ByteVector.fromValidHex("0005")
+  final val ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC = ByteVector.fromValidHex("0006")
+  final val ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING = ByteVector.fromValidHex("0007")
+  final val ERR_HOSTED_CHANNEL_DENIED = ByteVector.fromValidHex("0008")
 
-  val hostedErrors = Map (
-    ERR_HOSTED_WRONG_BLOCKDAY -> err_ln_hosted_wrong_blockday,
-    ERR_HOSTED_WRONG_LOCAL_SIG -> err_ln_hosted_wrong_local_sig,
-    ERR_HOSTED_WRONG_REMOTE_SIG -> err_ln_hosted_wrong_remote_sig,
-    ERR_HOSTED_WRONG_LOCAL_NUMBER -> err_ln_hosted_wrong_local_number,
-    ERR_HOSTED_WRONG_REMOTE_NUMBER -> err_ln_hosted_wrong_remote_number,
-    ERR_HOSTED_UPDATE_CLTV_TOO_LOW -> err_ln_hosted_update_cltv_too_low
-  )
+  def translateTag(error: wire.Error) = error.data take 2 match {
+    case ERR_HOSTED_WRONG_BLOCKDAY => new LightningException(app getString err_ln_hosted_wrong_blockday)
+    case ERR_HOSTED_WRONG_LOCAL_SIG => new LightningException(app getString err_ln_hosted_wrong_local_sig)
+    case ERR_HOSTED_WRONG_REMOTE_SIG => new LightningException(app getString err_ln_hosted_wrong_remote_sig)
+    case ERR_HOSTED_UPDATE_CLTV_TOO_LOW => new LightningException(app getString err_ln_hosted_update_cltv_too_low)
+    case ERR_HOSTED_TOO_MANY_STATE_UPDATES => new LightningException(app getString err_ln_hosted_too_many_state_updates)
+    case ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC => new LightningException(app getString err_ln_hosted_timed_out_outgoing_htlc)
+    case ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING => new LightningException(app getString err_ln_hosted_in_flight_htlc_while_restoring)
+    case ERR_HOSTED_CHANNEL_DENIED => new LightningException(app getString err_ln_hosted_channel_denied)
+    case _ => error.exception
+  }
 }
 
 trait PublishStatus {
@@ -127,8 +148,7 @@ trait DelayedPublishStatus extends PublishStatus {
 case class HideReady(txn: Transaction) extends PublishStatus
 case class ShowReady(txn: Transaction, fee: Satoshi, amount: Satoshi) extends PublishStatus
 case class HideDelayed(parent: (DepthAndDead, Long), txn: Transaction) extends DelayedPublishStatus
-case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, commitTx: Transaction,
-                       fee: Satoshi, amount: Satoshi) extends DelayedPublishStatus
+case class ShowDelayed(parent: (DepthAndDead, Long), txn: Transaction, commitTx: Transaction, fee: Satoshi, amount: Satoshi) extends DelayedPublishStatus
 
 trait Broadcaster extends ChannelListener {
   def getTx(txid: ByteVector): Option[org.bitcoinj.core.Transaction]

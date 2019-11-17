@@ -3,9 +3,9 @@ package com.lightning.walletapp.lnutils
 import spray.json._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.ln.wire._
+import com.lightning.walletapp.ln.Channel._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.ln.PaymentInfo._
-import com.lightning.walletapp.ln.NormalChannel._
 import com.lightning.walletapp.lnutils.JsonHttpUtils._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
@@ -27,6 +27,7 @@ import scodec.bits.ByteVector
 object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   var acceptedPayments = Map.empty[ByteVector, RoutingData]
   var unsentPayments = Map.empty[ByteVector, RoutingData]
+  var newRoutesOrGiveUp: RoutingData => Unit = _
   var failOnUI: RoutingData => Unit = _
 
   def addPendingPayment(rd: RoutingData) = {
@@ -38,12 +39,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def resolvePending =
-    if (ChannelManager.currentBlocksLeft.isDefined) {
-      // When uncapable chan becomes online: persists, waits for capable channel
-      // When no routes found or any other error happens: gets removed in failOnUI
-      // When accepted by channel: gets removed in outPaymentAccepted
+    if (ChannelManager.currentBlocksLeft.isDefined)
+    // When uncapable chan becomes online: persists, waits for capable channel
+    // When no routes found or any other error happens: gets removed in failOnUI
+    // When accepted by channel: gets removed in outPaymentAccepted
       unsentPayments.values foreach fetchAndSend
-    }
 
   def extractPreimage(candidateTx: Transaction) = {
     val fulfills = candidateTx.txIn.map(_.witness.stack) collect {
@@ -69,15 +69,15 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def toPaymentInfo(rc: RichCursor) =
-    PaymentInfo(rawPr = rc string PaymentTable.pr, preimage = ByteVector.fromValidHex(rc string PaymentTable.preimage),
-      rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp, rc string PaymentTable.description,
-      rc long PaymentTable.firstMsat, rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
+    PaymentInfo(rc string PaymentTable.pr, ByteVector.fromValidHex(rc string PaymentTable.preimage),
+      rc int PaymentTable.incoming, rc int PaymentTable.status, rc long PaymentTable.stamp,
+      rc string PaymentTable.description, rc long PaymentTable.firstMsat,
+      rc long PaymentTable.lastMsat, rc long PaymentTable.lastExpiry)
 
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
-    db.change(PaymentTable.updLastParamsSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
-    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* this is outgoing payment */, WAITING,
-      System.currentTimeMillis, rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat,
-      rd.lastExpiry, NOCHANID)
+    db.change(PaymentTable.updLastParamsOutgoingSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
+    db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* outgoing payment */, WAITING, System.currentTimeMillis,
+      rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
   def recordRoutingDataWithPr(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: ByteVector, description: String): RoutingData = {
@@ -85,9 +85,9 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     val rd = app.emptyRD(pr, sum.amount, useCache = true)
 
     db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
-    db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* this is incoming payment */, WAITING,
-      System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount, 0L /* lastMsat */,
-      0L /* lastExpiry, will be updated on incoming for reflexive payments */, NOCHANID)
+    db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* incoming payment */,
+      WAITING, System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount,
+      0L /* lastMsat */, 0L /* lastExpiry, updated for reflexive payments */, NOCHANID)
 
     uiNotify
     rd
@@ -98,9 +98,17 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     for (activeInFlightHash <- ChannelManager.activeInFlightHashes) updStatus(WAITING, activeInFlightHash)
   }
 
+  override def unknownHostedHtlcsDetected(hc: HostedCommits) = {
+    // Hosted peer is far ahead, we can't know what happened to in-flight payments
+    for (htlc <- hc.currentAndNextInFlight) updStatus(FROZEN, htlc.add.paymentHash)
+    // Don't enclose this in a transaction becuase we notify UI right away
+    uiNotify
+  }
+
   override def outPaymentAccepted(rd: RoutingData) = {
     acceptedPayments = acceptedPayments.updated(rd.pr.paymentHash, rd)
     unsentPayments = unsentPayments - rd.pr.paymentHash
+    // Update once again with actual fees data
     me insertOrUpdateOutgoingPayment rd
   }
 
@@ -116,16 +124,10 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   override def onSettled(cs: Commitments) = {
-    def newRoutesOrGiveUp(rd: RoutingData): Unit = {
-      // We do not care about options such as AIR or AMP here, this may be one of them
-      val isDirectlySpendable = rd.callsLeft > 0 && ChannelManager.checkIfSendable(rd).isRight
-      if (isDirectlySpendable) me fetchAndSend rd.copy(callsLeft = rd.callsLeft - 1, useCache = false)
-      else updStatus(FAILURE, rd.pr.paymentHash)
-    }
+    // Mark failed and fulfilled, upload backups
 
     db txWrap {
-      cs.localSpec.fulfilledIncoming foreach updOkIncoming
-      // Malformed payments are returned by our direct peer and should never be retried again
+      for (updateAddHtlc <- cs.localSpec.fulfilledIncoming) updOkIncoming(updateAddHtlc)
       for (Htlc(false, add) <- cs.localSpec.malformed) updStatus(FAILURE, add.paymentHash)
       for (Htlc(false, add) \ failReason <- cs.localSpec.failed) {
 
@@ -147,23 +149,31 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
     }
 
     uiNotify
-    if (cs.localSpec.fulfilled.nonEmpty) com.lightning.walletapp.Vibrator.vibrate
-    if (cs.localSpec.fulfilledOutgoing.nonEmpty) app.olympus.tellClouds(OlympusWrap.CMDStart)
-    if (cs.localSpec.fulfilledIncoming.nonEmpty) getVulnerableRevActs.foreach(app.olympus.tellClouds)
+    if (cs.localSpec.fulfilledIncoming.nonEmpty) {
+      val vulnerableStates = ChannelManager.all.flatMap(getVulnerableRevVec).toMap
+      getCerberusActs(vulnerableStates).foreach(app.olympus.tellClouds)
+    }
+
+    if (cs.localSpec.fulfilled.nonEmpty) {
+      com.lightning.walletapp.Vibrator.vibrate
+      // This could be a memo-resolving payment
+      app.olympus.tellClouds(OlympusWrap.CMDStart)
+    }
   }
 
-  def getVulnerableRevActs = {
-    val operational = ChannelManager.all.filter(isOperational)
-    getCerberusActs(operational.flatMap(getVulnerableRevVec).toMap)
-  }
-
-  def getVulnerableRevVec(chan: Channel) =
-    chan.getCommits collect { case nc: NormalCommits =>
-      // Find previous channel states which peer might now be tempted to spend
-      val threshold = nc.remoteCommit.spec.toRemoteMsat - dust.amount * 20 * 1000L
+  def getVulnerableRevVec(chan: Channel) = chan.getCommits match {
+    case Some(normalCommits: NormalCommits) if isOperational(chan) =>
+      // Find previous states where amount is lower by more than 10000 SAT
+      val amountThreshold = normalCommits.remoteCommit.spec.toRemoteMsat - 10000000L
+      val cursor = db.select(RevokedInfoTable.selectLocalSql, normalCommits.channelId, amountThreshold)
       def toTxidAndInfo(rc: RichCursor) = Tuple2(rc string RevokedInfoTable.txId, rc string RevokedInfoTable.info)
-      RichCursor apply db.select(RevokedInfoTable.selectLocalSql, nc.channelId, threshold) vec toTxidAndInfo
-    } getOrElse Vector.empty
+      RichCursor(cursor) vec toTxidAndInfo
+
+    case _ =>
+      // Hosted channels
+      // Closing channges
+      Vector.empty
+  }
 
   def getCerberusActs(infos: Map[String, String] = Map.empty) = {
     // Remove currently pending infos and limit max number of uploads
@@ -191,6 +201,11 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
       app.kit.wallet.removeWatchedScripts(app.kit fundingPubScript wbr)
       db.change(ChannelTable.killSql, wbr.commitments.channelId)
 
+    case (chan: NormalChannel, norm @ NormalData(_, _, Some(spendTx), _, _), CMDChainTipKnown) =>
+      // Must be careful here: unknown spend might be a future commit so only publish local commit if that spend if deeply buried
+      // this way a published local commit can not possibly trigger a punishment and will be failed right away with channel becoming CLOSED
+      ChannelManager getStatus spendTx.txid match { case depth \ false if depth > blocksPerDay => chan startLocalClose norm case _ => }
+
     case (_: NormalChannel, close: ClosingData, CMDChainTipKnown) if close.canBeRemoved =>
       // Either a lot of time has passed or ALL closing transactions have enough confirmations
       app.kit.wallet.removeWatchedScripts(app.kit closingPubKeyScripts close)
@@ -201,12 +216,12 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
   override def onBecome = {
     case (_, _, SLEEPING, OPEN) =>
-      // We may have some payments waiting
+      // We may have payments waiting
       resolvePending
 
     case (_, _, WAIT_FUNDING_DONE, OPEN) =>
       // We may have a channel upload act waiting
-      app.olympus tellClouds OlympusWrap.CMDStart
+      app.olympus.tellClouds(OlympusWrap.CMDStart)
   }
 }
 
@@ -233,7 +248,7 @@ object ChannelWrap {
 
 object RouteWrap {
   def cacheSubRoutes(rd: RoutingData) = {
-    // This will only work if we have at least one hop, should check if route vector is empty
+    // This will only work if we have at least one hop: must check if route vector is empty!
     // then merge each of generated subroutes with a respected routing node or recipient node key
     val subs = (rd.usedRoute drop 1).scanLeft(rd.usedRoute take 1) { case rs \ hop => rs :+ hop }
 

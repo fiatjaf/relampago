@@ -75,7 +75,7 @@ object Sphinx {
         // The 1.1 BOLT spec changed the frame format to use variable-length per-hop payloads.
         // The first bytes contain a varint encoding the length of the payload data (not including the trailing mac).
         // Since messages are always smaller than 65535 bytes, this varint will either be 1 or 3 bytes long.
-        MacLength + wire.OnionCodecs.payloadLengthDecoder.decode(payload.bits).require.value.toInt
+        MacLength + wire.LightningMessageCodecs.payloadLengthDecoder.decode(payload.bits).require.value.toInt
     }
   }
 
@@ -250,7 +250,7 @@ object Sphinx {
       * When an invalid onion is received, its hash should be included in the failure message.
       */
     def hash(onion: wire.OnionRoutingPacket): ByteVector =
-    Crypto.sha256(wire.OnionCodecs.onionRoutingPacketCodec(onion.payload.length.toInt).encode(onion).require.toByteVector)
+    Crypto.sha256(wire.LightningMessageCodecs.onionRoutingPacketCodec(onion.payload.length.toInt).encode(onion).require.toByteVector)
 
   }
 
@@ -300,10 +300,11 @@ object Sphinx {
       * @return an encrypted failure packet that can be sent to the destination node.
       */
     def wrap(packet: ByteVector, sharedSecret: ByteVector): ByteVector = {
-      require(packet.length == PacketLength, s"invalid error packet length ${packet.length}, must be $PacketLength")
       val key = generateKey("ammag", sharedSecret)
       val stream = generateStream(key, PacketLength)
-      packet xor stream
+      // If we received a packet with an invalid length, we trim and pad to forward a packet with a normal length upstream.
+      // This is a poor man's attempt at increasing the likelihood of the sender receiving the error.
+      packet.take(PacketLength).padLeft(PacketLength) xor stream
     }
 
     /**

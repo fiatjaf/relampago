@@ -16,10 +16,12 @@ import org.bitcoinj.wallet.Wallet.ExceededMaxTransactionSize
 import org.bitcoinj.wallet.Wallet.CouldNotAdjustDownwards
 import android.widget.AdapterView.OnItemClickListener
 import concurrent.ExecutionContext.Implicits.global
+import com.lightning.walletapp.lnutils.RatesSaver
 import android.support.v7.app.AppCompatActivity
 import android.support.v4.content.ContextCompat
 import ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.View.OnClickListener
+import org.aviran.cookiebar2.CookieBar
 import android.app.AlertDialog.Builder
 import org.bitcoinj.wallet.SendRequest
 import fr.acinq.bitcoin.MilliSatoshi
@@ -31,7 +33,6 @@ import android.os.Bundle
 
 import com.lightning.walletapp.lnutils.IconGetter.{maxDialog, scrWidth}
 import com.lightning.walletapp.ln.Tools.{none, runAnd, wrap}
-import com.lightning.walletapp.lnutils.{GDrive, RatesSaver}
 import org.bitcoinj.wallet.SendRequest.{emptyWallet, to}
 import scala.util.{Failure, Success, Try}
 import android.app.{AlertDialog, Dialog}
@@ -52,16 +53,14 @@ object Utils {
   lazy val app = appReference
   lazy val noDesc = app getString ln_no_description
   lazy val denoms = List(SatDenomination, BtcDenomination)
-  val singleChoice = android.R.layout.select_dialog_singlechoice
 
-  // Mappings
+  val fiatNames =
+    Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan",
+      "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
+      "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling", "aud" -> "Australian Dollar")
+
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
-  val fiatNames = Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan",
-    "inr" -> "Indian Rupee", "ils" -> "Israeli Shekel", "cad" -> "Canadian Dollar", "rub" -> "Русский Рубль",
-    "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling",
-    "aud" -> "Australian Dollar")
-
-  def getDescription(raw: String) = if (raw.isEmpty) s"<i>$noDesc</i>" else raw take 140
+  def getDescription(raw: String) = if (raw.isEmpty) s"<i>$noDesc</i>" else raw take 72
   def humanSix(bitcoinAddress: String) = bitcoinAddress grouped 6 mkString "\u0020"
 
   def clickableTextField(view: View): TextView = {
@@ -100,18 +99,20 @@ trait TimerActivity extends AppCompatActivity { me =>
     runAnd(app.TransData.DoNotEraseValue)(finish)
   }
 
-  def askGDriveSignIn = {
-    val signInClient = GDrive signInAttemptClient me
-    startActivityForResult(signInClient.getSignInIntent, 102)
+  def rm(prev: Dialog)(exe: => Unit) = {
+    // Add some delay between popup switches
+    timer.schedule(exe, 225)
+    prev.dismiss
   }
 
   def finishMe(top: View) = finish
-  def delayUI(fun: TimerTask) = timer.schedule(fun, 225)
-  def rm(prev: Dialog)(exe: => Unit) = wrap(prev.dismiss)(me delayUI exe)
   def baseTextBuilder(msg: CharSequence) = new Builder(me).setMessage(msg)
   def baseBuilder(title: View, body: View) = new Builder(me).setCustomTitle(title).setView(body)
   def negTextBuilder(neg: Int, msg: CharSequence) = baseTextBuilder(msg).setNegativeButton(neg, null)
   def negBuilder(neg: Int, title: View, body: View) = baseBuilder(title, body).setNegativeButton(neg, null)
+
+  def toast(code: Int): Unit = toast(me getString code)
+  def toast(msg: String): Unit = try CookieBar.rebuild(me).setMessage(msg).setCookiePosition(CookieBar.BOTTOM).show catch none
   def onFail(error: CharSequence): Unit = UITask(me showForm negBuilder(dialog_ok, null, error).create).run
   def onFail(error: Throwable): Unit = onFail(error.getMessage)
 
@@ -150,6 +151,15 @@ trait TimerActivity extends AppCompatActivity { me =>
     try alertDialog.show catch none finally if (scrWidth > 2.3) alertDialog.getWindow.setLayout(maxDialog.toInt, WRAP_CONTENT)
     try clickableTextField(alertDialog findViewById android.R.id.message) catch none
     alertDialog
+  }
+
+  def makeChoiceList[T <: Object](actions: Array[T], title: CharSequence) = {
+    val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, actions)
+    val alert = showForm(negBuilder(dialog_cancel, title, lst).create)
+    lst setDividerHeight 0
+    lst setDivider null
+    lst -> alert
   }
 
   def INIT(savedInstanceState: Bundle): Unit
@@ -220,9 +230,9 @@ trait TimerActivity extends AppCompatActivity { me =>
         case 1 => self futureProcess plainRequest(RatesSaver.rates.feeSix)
       }, onTxFail)(none)
 
-      val bld = baseBuilder(getString(step_fees).format(coloredAmount).html, form)
-      mkCheckForm(alert => rm(alert)(proceed), none, bld, dialog_pay, dialog_cancel)
-      lst setAdapter new ArrayAdapter(me, singleChoice, feesOptions)
+      val stepFees = getString(step_fees).format(coloredAmount).html
+      mkCheckForm(alert => rm(alert)(proceed), none, baseBuilder(stepFees, form), dialog_pay, dialog_cancel)
+      lst setAdapter new ArrayAdapter(me, android.R.layout.select_dialog_singlechoice, feesOptions)
       lst.setItemChecked(0, true)
     }
 
@@ -238,10 +248,14 @@ trait TimerActivity extends AppCompatActivity { me =>
       case _: CouldNotAdjustDownwards => baseBuilder(app getString err_empty_shrunk, null)
 
       case notEnough: InsufficientMoneyException =>
+        // Payment itself is fine but exceeds balance once miner fee is added
+        val totalFee = app.kit.conf0Balance.minus(pay.cn).plus(notEnough.missing)
+
+        val fee = s"<strong>${denom parsedWithSign totalFee}</strong>"
         val sending = s"<strong>${denom parsedWithSign pay.cn}</strong>"
-        val missing = s"<strong>${denom parsedWithSign notEnough.missing}</strong>"
         val canSend = s"<strong>${denom parsedWithSign app.kit.conf0Balance}</strong>"
-        baseTextBuilder(getString(err_not_enough_funds).format(canSend, sending, missing).html)
+        val msg = getString(err_not_enough_funds).format(canSend, sending, fee).html
+        baseTextBuilder(msg)
 
       case other: Throwable =>
         val info = UncaughtHandler toText other

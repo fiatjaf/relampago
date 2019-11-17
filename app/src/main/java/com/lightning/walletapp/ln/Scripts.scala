@@ -274,13 +274,13 @@ object Scripts { me =>
                    remoteHtlcPubkey: PublicKey, spec: CommitmentSpec): CommitTx = {
 
     val commitFee = commitTxFee(localDustLimit, spec)
-    val toRemote = Satoshi(spec.toRemoteMsat / 1000L)
-    val toLocal = Satoshi(spec.toLocalMsat / 1000L)
+    val toRemote = spec.toRemoteMsat.fromMsatToSat
+    val toLocal = spec.toLocalMsat.fromMsatToSat
 
     val redeem = toLocalDelayed(localRevocationPubkey, toLocalDelay, localDelayedPaymentPubkey)
-    val localSat \ remoteSat = if (localIsFunder) Tuple2(toLocal - commitFee, toRemote) else Tuple2(toLocal, toRemote - commitFee)
-    val toRemoteOutput = if (remoteSat < localDustLimit) Nil else TxOut(remoteSat, Script pay2wpkh remotePaymentPubkey) :: Nil
-    val toLocalDelayedOutput = if (localSat < localDustLimit) Nil else TxOut(localSat, Script pay2wsh redeem) :: Nil
+    val local \ remote = if (localIsFunder) Tuple2(toLocal - commitFee, toRemote) else Tuple2(toLocal, toRemote - commitFee)
+    val toRemoteOutput = if (remote < localDustLimit) Nil else TxOut(remote, Script pay2wpkh remotePaymentPubkey) :: Nil
+    val toLocalDelayedOutput = if (local < localDustLimit) Nil else TxOut(local, Script pay2wsh redeem) :: Nil
 
     val htlcOfferedOutputs = trimOfferedHtlcs(dustLimit = localDustLimit, spec) map { add =>
       val offered = htlcOffered(localHtlcPubkey, remoteHtlcPubkey, localRevocationPubkey, add.hash160)

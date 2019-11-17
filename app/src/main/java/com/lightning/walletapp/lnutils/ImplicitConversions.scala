@@ -9,7 +9,11 @@ import android.text.Html
 
 
 object ImplicitConversions {
-  implicit def string2Ops(raw: String): StringOps = new StringOps(raw)
+  implicit class StringOps(source: String) {
+    def html = Html.fromHtml(source, IconGetter, null)
+    def s2hex = ByteVector.view(source getBytes "UTF-8").toHex
+    def noSpaces = source.replace(" ", "").replace("\u00A0", "")
+  }
 
   implicit def bitcoinLibScript2bitcoinjScript(pubKeyScript: ByteVector): org.bitcoinj.script.Script =
     new org.bitcoinj.script.Script(pubKeyScript.toArray, System.currentTimeMillis / 1000L - 3600 * 24)
@@ -57,10 +61,4 @@ object IconGetter extends Html.ImageGetter {
   lnDrawableTitle.setGravity(Gravity.TOP)
   btcDrawable.setGravity(Gravity.TOP)
   lnDrawable.setGravity(Gravity.TOP)
-}
-
-class StringOps(source: String) {
-  def html = Html.fromHtml(source, IconGetter, null)
-  def hex = ByteVector.view(source getBytes "UTF-8").toHex
-  def noSpaces = source.replace(" ", "").replace("\u00A0", "")
 }

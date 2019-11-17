@@ -66,7 +66,6 @@ class OlympusWrap extends OlympusProvider {
   // and final filtering is done inside of each available cloud
   var clouds = RichCursor(db select OlympusTable.selectAllSql) vec toCloud
   def tellClouds(candidateData: Any) = for (cloud <- clouds) cloud doProcess candidateData
-  def backupExhausted = clouds.exists(cloud => cloud.isAuthEnabled && cloud.data.tokens.size <= 5)
   def pendingWatchTxIds = clouds.flatMap(_.data.acts) collect { case ca: CerberusAct => ca.txids } flatten
 
   // SQL interface
@@ -117,8 +116,8 @@ class Connector(val url: String) extends OlympusProvider {
   def getRates = ask[Result]("rates/get")
   def getBackup(key: ByteVector) = ask[StringVec]("data/get", "key" -> key.toHex)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
-  def getChildTxs(txIds: ByteVecSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.hex)
-  def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.hex)
+  def getChildTxs(txIds: ByteVecSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.s2hex)
+  def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.s2hex)
   def http(requestPath: String) = post(s"$url/$requestPath", true).trustAllCerts.trustAllHosts.connectTimeout(15000)
 }
 
