@@ -151,7 +151,7 @@ object RevokedInfoTable extends Table {
 
 trait Table { val (id, fts) = "_id" -> "fts4" }
 class LNOpenHelper(context: Context, name: String)
-extends SQLiteOpenHelper(context, name, null, 16) {
+  extends SQLiteOpenHelper(context, name, null, 7) {
 
   val base = getWritableDatabase
   val asString: Any => String = {
@@ -161,7 +161,7 @@ extends SQLiteOpenHelper(context, name, null, 16) {
 
   def change(sql: String, params: Any*) = base.execSQL(sql, params.map(asString).toArray)
   def select(sql: String, params: Any*) = base.rawQuery(sql, params.map(asString).toArray)
-  def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.wallet/table/$tbl"
+  def sqlPath(tbl: String) = Uri parse s"sqlite://com.lightning.walletapp/table/$tbl"
 
   def txWrap(run: => Unit) = try {
     runAnd(base.beginTransaction)(run)
@@ -178,20 +178,25 @@ extends SQLiteOpenHelper(context, name, null, 16) {
 
     dbs execSQL OlympusLogTable.createSql
     dbs execSQL OlympusTable.createSql
-    populateOlympus(dbs)
+
+    // Randomize an order of two available default servers
+    val (ord1, ord2) = if (random.nextBoolean) ("0", "1") else ("1", "0")
+    val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
+    val dev1: Array[AnyRef] = Array("server-1", "https://a.lightning-wallet.com:9103", emptyData, "1", ord1, "0")
+    val dev2: Array[AnyRef] = Array("server-2", "https://b.lightning-wallet.com:9103", emptyData, "0", ord2, "1")
+    dbs.execSQL(OlympusTable.newSql, dev1)
+    dbs.execSQL(OlympusTable.newSql, dev2)
   }
 
   def onUpgrade(dbs: SQLiteDatabase, v0: Int, v1: Int) = {
+    // Old version of RouteTable had a useless expiry column
     dbs execSQL s"DROP TABLE IF EXISTS ${RouteTable.table}"
-    dbs execSQL s"DROP TABLE IF EXISTS ${OlympusTable.table}"
-    dbs execSQL OlympusTable.createSql
-    dbs execSQL RouteTable.createSql
-    populateOlympus(dbs)
-  }
 
-  def populateOlympus(dbs: SQLiteDatabase) = {
-    val emptyData = CloudData(info = None, tokens = Vector.empty, acts = Vector.empty).toJson.toString
-    val dev: Array[AnyRef] = Array("test-server-1", "https://172.245.74.10:9203", emptyData, "1", "0", "0")
-    dbs.execSQL(OlympusTable.newSql, dev)
+    // Should work even for updates across many version ranges
+    // because each table and index has CREATE IF EXISTS prefix
+    dbs execSQL RevokedInfoTable.createSql
+    dbs execSQL OlympusLogTable.createSql
+    dbs execSQL PaymentTable.createSql
+    dbs execSQL RouteTable.createSql
   }
 }

@@ -163,9 +163,10 @@
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><small><br><br>%1$s</small>]]></string>
 
     <string name="ln_receive_howto"><![CDATA[
-        Receiving off-chain Lightning funds requires you to have at least one <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channel</a>. There are two ways to accomplish this:<br><br>
-        1. Open an <i>outgoing channel</i> with a peer of your choice and spend some Lightning funds first to <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>make room</a> for incoming payments.<br><br>
-        2. <a href=https://www.bitrefill.com/thor-lightning-network-channels>Order</a> an <i>incoming channel</i> which would allow you to receive Lightning payments right away.
+        Receiving off-chain Lightning funds requires you to have at least one <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channel</a>. There are many ways to accomplish this:<br><br>
+        - Open an <i>outgoing channel</i> with a peer of your choice and spend some Lightning funds first to <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>make room</a> for incoming payments.<br><br>
+        - <a href=https://www.bitrefill.com/thor-lightning-network-channels>Order</a> an <i>incoming channel</i> from Bitrefill.<br><br>
+        - <a href=https://lnbig.com/#/open-channel/>Get a free incoming channel</a> from LNBIG.COM service.
     ]]></string>
 
     <string name="ln_receive_6conf"><![CDATA[&#9888; Can\'t ask for Lightning payments because your peer has not allowed receiving yet, this typically happens once a funding Bitcoin transaction gets 6 confirmations.]]></string>
