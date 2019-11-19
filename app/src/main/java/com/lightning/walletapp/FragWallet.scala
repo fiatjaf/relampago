@@ -17,8 +17,9 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
+
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
+import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import fr.acinq.bitcoin.{MilliSatoshi, MilliSatoshiLong}
 import android.database.{ContentObserver, Cursor}
@@ -39,9 +40,7 @@ import org.bitcoinj.script.ScriptPattern
 import android.support.v4.app.Fragment
 import org.bitcoinj.uri.BitcoinURI
 import android.app.AlertDialog
-import android.content.Intent
 import scodec.bits.ByteVector
-import android.net.Uri
 
 
 object FragWallet {
@@ -304,9 +303,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     def generatePopup = {
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_btc_details, null)
-      detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button] setOnClickListener onButtonTap {
-        host startActivity new Intent(Intent.ACTION_VIEW, Uri parse s"https://smartbit.com.au/tx/$txid")
-      }
+      val useExplorerButton = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
+      useExplorerButton setOnClickListener onButtonTap(host browse s"https://smartbit.com.au/tx/$txid")
 
       val inFiat = msatInFiatHuman(stat.amount)
       val base = app.getString(btc_pending_title)
@@ -444,10 +442,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case outgoingPayment: AddrData => outgoingPayment destination denom.coloredOut(outgoingPayment.cn, denom.sign)
       }
 
-      detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button] setOnClickListener onButtonTap {
-        host startActivity new Intent(Intent.ACTION_VIEW, Uri parse s"https://smartbit.com.au/tx/$txid")
-      }
-
+      val useExplorerButton = detailsWrapper.findViewById(R.id.viewTxOutside).asInstanceOf[Button]
+      useExplorerButton setOnClickListener onButtonTap(host browse s"https://smartbit.com.au/tx/$txid")
       val views = new ArrayAdapter(host, R.layout.frag_top_tip, R.id.titleTip, humanValues.map(_.html).toArray)
       val lst = host.getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
       lst setHeaderDividersEnabled false
@@ -584,9 +580,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
   def lnurlPayOffChainSend(domain: String, payReq: PayRequest) = {
-    val finalMaxCanSend = math.min(ChannelManager.estimateAIRCanSend, payReq.maxSendable)
-    new OffChainSender(maxCanSend = finalMaxCanSend.millisatoshi, minCanSend = payReq.minSendable.millisatoshi) {
-      def displayPaymentForm = mkCheckForm(sendAttempt, none, baseBuilder(getTitle, baseContent), dialog_pay, dialog_cancel)
+    new OffChainSender(maxCanSend = math.min(ChannelManager.estimateAIRCanSend, payReq.maxSendable).millisatoshi, minCanSend = payReq.minSendable.millisatoshi) {
+      def displayPaymentForm = mkCheckFormNeutral(sendAttempt, none, visitSite, baseBuilder(getTitle, baseContent), dialog_ok, dialog_cancel, dialog_info)
+      def visitSite(alert: AlertDialog) = host.browse(s"https://$domain")
 
       def getTitle = {
         val content = s"<strong><big>$domain</big></strong><br><br>${payReq.metaDataTextPlain take 72}"

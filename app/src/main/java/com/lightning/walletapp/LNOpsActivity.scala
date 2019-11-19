@@ -25,7 +25,6 @@ import org.bitcoinj.uri.BitcoinURI
 import android.content.Intent
 import scodec.bits.ByteVector
 import android.os.Bundle
-import android.net.Uri
 import java.util.Date
 import scala.util.Try
 
@@ -242,8 +241,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
           rm(alert) {
             val noHtlcBlock = chan.inFlightHtlcs.isEmpty
             val canCoopClose = isOpeningOrOperational(chan)
-            val url = s"https://smartbit.com.au/tx/" + chan.fundTxId.toHex
-            if (0 == pos) host startActivity new Intent(Intent.ACTION_VIEW, Uri parse url)
+            if (0 == pos) host.browse(s"https://smartbit.com.au/tx/${chan.fundTxId.toHex}")
             else if (1 == pos && canCoopClose && noHtlcBlock) warnAndMaybeClose(me getString ln_chan_close_confirm_wallet)
             else if (1 == pos && canCoopClose) warnAndMaybeClose(me getString ln_chan_close_inflight_details)
             else if (1 == pos) warnAndMaybeClose(channelClosureWarning = me getString ln_chan_force_details)
@@ -329,14 +327,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             me startActivity Intent.createChooser(share, "Choose an app")
           }
 
-          def viewInfo = {
-            val uri = s"https://lightning-wallet.com/hosted-channels"
-            host startActivity new Intent(Intent.ACTION_VIEW, Uri parse uri)
-          }
-
           rm(alert) {
-            if (0 == pos) viewInfo
-            else if (1 == pos) shareStateAsFile
+            if (1 == pos) shareStateAsFile
+            else if (0 == pos) host.browse(s"https://lightning-wallet.com/hosted-channels")
             else if (2 == pos && chan.inFlightHtlcs.nonEmpty) warnAndMaybeRemove(me getString ln_hosted_remove_inflight_details)
             else if (2 == pos && chan.estCanSendMsat.fromMsatToSat > LNParams.dust) warnAndMaybeRemove(me getString ln_hosted_remove_non_empty_details)
             else if (2 == pos) removeChan

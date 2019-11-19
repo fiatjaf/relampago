@@ -27,7 +27,6 @@ import android.provider.Settings
 import android.app.AlertDialog
 import scodec.bits.ByteVector
 import android.os.Bundle
-import android.net.Uri
 
 
 class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
@@ -55,8 +54,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   override def onOptionsItemSelected(m: MenuItem) = {
-    val walletManual = Uri parse "http://lightning-wallet.com"
-    me startActivity new Intent(Intent.ACTION_VIEW, walletManual)
+    browse("http://lightning-wallet.com")
     true
   }
 
@@ -71,7 +69,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     val isAllowed = LocalBackup.isAllowed(activity = me)
     if (!isAllowed) LocalBackup.askPermission(activity = me) else {
       val intent = (new Intent).setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-      val intent1 = intent setData Uri.fromParts("package", getPackageName, null)
+      val intent1 = intent setData android.net.Uri.fromParts("package", getPackageName, null)
       startActivity(intent1)
     }
   }

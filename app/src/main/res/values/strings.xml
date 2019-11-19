@@ -95,7 +95,7 @@
     <string name="dialog_login">Login</string>
     <string name="dialog_boost">CPFP</string>
     <string name="dialog_next">Next</string>
-    <string name="dialog_wut">Info</string>
+    <string name="dialog_info">Info</string>
     <string name="dialog_pay">Pay</string>
     <string name="dialog_max">Max</string>
     <string name="dialog_ok">OK</string>

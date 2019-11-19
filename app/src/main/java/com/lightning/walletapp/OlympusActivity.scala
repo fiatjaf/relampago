@@ -18,7 +18,6 @@ import com.lightning.walletapp.ln.LNParams
 import com.lightning.walletapp.Utils.app
 import android.app.AlertDialog
 import scodec.bits.ByteVector
-import android.content.Intent
 import android.os.Bundle
 import android.net.Uri
 import java.util.Date
@@ -103,8 +102,7 @@ class OlympusActivity extends TimerActivity with HumanTimeDisplay { me =>
   }
 
   override def onOptionsItemSelected(m: MenuItem) = {
-    val url = "http://lightning-wallet.com/what-does-olympus-server-do#what-does-olympus-server-do"
-    if (m.getItemId == R.id.actionQuestionMark) me startActivity new Intent(Intent.ACTION_VIEW, Uri parse url)
+    if (m.getItemId == R.id.actionQuestionMark) browse("http://lightning-wallet.com/what-does-olympus-server-do")
     else if (m.getItemId == R.id.actionAddEntity) new FormManager(addNewCloud, olympus_add)
     else if (m.getItemId == R.id.actionTokenLog) viewTokenUsageLog
     true

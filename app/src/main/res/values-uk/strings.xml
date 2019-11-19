@@ -95,7 +95,7 @@
     <string name="dialog_login">Увiйти</string>
     <string name="dialog_boost">CPFP</string>
     <string name="dialog_next">Далі</string>
-    <string name="dialog_wut">Iнфо</string>
+    <string name="dialog_info">Iнфо</string>
     <string name="dialog_pay">Pay</string>
     <string name="dialog_max">Max</string>
     <string name="dialog_ok">OK</string>

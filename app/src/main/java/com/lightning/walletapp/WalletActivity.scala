@@ -313,7 +313,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     }
 
     val title = updateView2Blue(oldView = str2View(new String), s"<big>${lnUrl.uri.getHost}</big>")
-    mkCheckFormNeutral(doLogin, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_wut)
+    mkCheckFormNeutral(doLogin, none, wut, baseBuilder(title, null), dialog_login, dialog_cancel, dialog_info)
   }
 
   // BUTTONS REACTIONS
