@@ -229,9 +229,8 @@ object PayRequest {
   type Route = Vector[KeyAndUpdate]
 }
 
-case class PayRequest(callback: String,
-                      maxSendable: Long, minSendable: Long,
-                      metadata: String) extends LNUrlData {
+case class PayRequest(callback: String, maxSendable: Long, minSendable: Long, metadata: String) extends LNUrlData {
+  val metaDataTextPlain: String = to[PayMetaData](metadata).collectFirst { case Vector("text/plain", content) => content }.get
 
   require(callback contains "https://")
   require(minSendable <= maxSendable)
@@ -240,11 +239,6 @@ case class PayRequest(callback: String,
   def metaDataHash: ByteVector = {
     val bytes = metadata getBytes "UTF-8"
     Crypto.sha256(ByteVector view bytes)
-  }
-
-  def metaDataTextPlain: String = {
-    val metaVector = to[PayMetaData](StringContext treatEscapes metadata)
-    metaVector.collectFirst { case Vector("text/plain", content) => content }.get
   }
 
   def requestFinal(amount: MilliSatoshi, fromnodes: String = new String) =
