@@ -33,7 +33,6 @@ class WhenPicker(host: TimerActivity, start: Long) extends DatePicker(host) with
 }
 
 class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
-  lazy val backupFile = LocalBackup.getBackupFile(LocalBackup getBackupDirectory LNParams.chainHash)
   lazy val localBackupStatus = findViewById(R.id.localBackupStatus).asInstanceOf[TextView]
   lazy val restoreCode = findViewById(R.id.restoreCode).asInstanceOf[NachoTextView]
   lazy val restoreProgress = findViewById(R.id.restoreProgress).asInstanceOf[View]
@@ -41,6 +40,11 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
   lazy val restoreWhen = findViewById(R.id.restoreWhen).asInstanceOf[Button]
   lazy val restoreInfo = findViewById(R.id.restoreInfo).asInstanceOf[View]
   lazy val dp = new WhenPicker(me, 1526817600 * 1000L)
+
+  lazy val backupFile = {
+    val dir = LocalBackup getBackupDirectory LNParams.chainHash
+    LocalBackup.getBackupFileUnsafe(dir, force = false)
+  }
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_restore)
@@ -95,8 +99,8 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
         LNParams setup seed.getSeedBytes
 
         Option {
-          val hasPerm = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable
-          if (hasPerm) LocalBackup.readAndDecrypt(backupFile, LNParams.cloudSecret) else null
+          val canRead = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable && backupFile.exists
+          if (canRead) LocalBackup.readAndDecrypt(backupFile, LNParams.cloudSecret) else null
         } map {
           case Success(localBackups) =>
             // Update ealiest key creation time to our watch timestamp

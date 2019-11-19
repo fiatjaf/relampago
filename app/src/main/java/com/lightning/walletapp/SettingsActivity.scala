@@ -40,7 +40,6 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   lazy val constrainLNFeesState = findViewById(R.id.constrainLNFeesState).asInstanceOf[TextView]
   lazy val saveLocalBackupsPath = findViewById(R.id.saveLocalBackupsPath).asInstanceOf[TextView]
 
-  lazy val backupFile = LocalBackup.getBackupFile(LocalBackup getBackupDirectory LNParams.chainHash)
   lazy val chooseBitcoinUnit = findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
   lazy val recoverFunds = findViewById(R.id.recoverChannelFunds).asInstanceOf[Button]
   lazy val setFiatCurrency = findViewById(R.id.setFiatCurrency).asInstanceOf[Button]
@@ -218,8 +217,9 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   } else me exitTo classOf[MainActivity]
 
   def updateBackupView = {
+    val dir = LocalBackup.getBackupDirectory(LNParams.chainHash)
     val canWrite = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable
-    if (canWrite) saveLocalBackupsPath.setText(backupFile.getPath)
+    if (canWrite) saveLocalBackupsPath.setText(LocalBackup.getBackupFileUnsafe(dir, force = true).getPath)
     saveLocalBackupsPath setVisibility viewMap(canWrite)
     saveLocalBackups setChecked canWrite
   }

@@ -336,15 +336,14 @@ object ChannelManager extends Broadcaster {
   def attachListener(lst: ChannelListener) = for (chan <- all) chan.listeners += lst
   def detachListener(lst: ChannelListener) = for (chan <- all) chan.listeners -= lst
 
-  val backupSaveWorker = new ThrottledWork[String, String] {
-    def work(cmd: String) = ioQueue delay 4.seconds map { _ => "OK" }
+  val backupSaveWorker = new ThrottledWork[String, Any] {
+    def work(cmd: String) = ioQueue delay 4.seconds
     def error(canNotHappen: Throwable) = none
 
-    def process(cmd: String, execResult: String) =
-      if ("OK" == execResult && LocalBackup.isExternalStorageWritable) try {
-        val backupFile = LocalBackup.getBackupFile(LocalBackup getBackupDirectory LNParams.chainHash)
-        LocalBackup.encryptAndWrite(backupFile, for (chan <- all) yield chan.data, app.kit.wallet, LNParams.cloudSecret)
-      } catch none
+    def process(cmd: String, execResult: Any) = if (LocalBackup.isExternalStorageWritable) try {
+      val backupFile = LocalBackup.getBackupFileUnsafe(LocalBackup getBackupDirectory LNParams.chainHash, force = true)
+      LocalBackup.encryptAndWrite(backupFile, for (chan <- all) yield chan.data, app.kit.wallet, LNParams.cloudSecret)
+    } catch none
   }
 
   def createHostedChannel(initListeners: Set[ChannelListener], bootstrap: ChannelData) = new HostedChannel {

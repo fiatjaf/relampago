@@ -4,16 +4,20 @@ import R.string._
 import android.widget._
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
+import java.io.{File, FileInputStream}
 import co.infinum.goldfinger.{Error => FPError}
 import org.bitcoinj.core.{BlockChain, PeerGroup}
+import com.google.common.io.{ByteStreams, Files}
 import com.lightning.walletapp.ln.Tools.{none, runAnd}
+import ln.wire.LightningMessageCodecs.walletZygoteCodec
 import org.ndeftools.util.activity.NfcReaderActivity
 import org.bitcoinj.wallet.WalletProtobufSerializer
 import com.lightning.walletapp.helper.FingerPrint
 import co.infinum.goldfinger.Goldfinger
-import java.io.FileInputStream
 import android.content.Intent
+import scodec.bits.BitVector
 import org.ndeftools.Message
+import android.app.Activity
 import android.os.Bundle
 import android.view.View
 
@@ -105,6 +109,40 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   // MISC
 
-  def goRestoreWallet(view: View) = me exitTo classOf[WalletRestoreActivity]
   def exitCreateWallet(view: View) = me exitTo classOf[WalletCreateActivity]
+  def exitRestoreWallet = me exitTo classOf[WalletRestoreActivity]
+
+  override def onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent) =
+    if (requestCode == 101 & resultCode == Activity.RESULT_OK) restoreFromZygote(resultData)
+
+  def restoreFromZygote(intent: Intent) = {
+    val databaseFile = new File(app.getDatabasePath(dbFileName).getPath)
+    val inputStream = getContentResolver.openInputStream(intent.getData)
+    val bitVector = BitVector.view(ByteStreams toByteArray inputStream)
+    val zygote = walletZygoteCodec.decode(bitVector).require.value
+    if (!databaseFile.exists) databaseFile.getParentFile.mkdirs
+    Files.write(zygote.wallet.toArray, app.walletFile)
+    Files.write(zygote.chain.toArray, app.chainFile)
+    Files.write(zygote.db.toArray, databaseFile)
+    next
+  }
+
+  def goRestoreWallet(view: View) = {
+    val restoreOptions = getResources getStringArray R.array.restore_options
+    val lst = getLayoutInflater.inflate(R.layout.frag_center_list, null).asInstanceOf[ListView]
+    lst setAdapter new ArrayAdapter(me, R.layout.frag_top_tip, R.id.titleTip, restoreOptions)
+    val alert = showForm(negBuilder(dialog_cancel, me getString wallet_restore, lst).create)
+    lst setDividerHeight 0
+    lst setDivider null
+
+    lst setOnItemClickListener onTap {
+      case 0 => rm(alert)(exitRestoreWallet)
+      case 1 => proceedWithMigrationFile
+    }
+
+    def proceedWithMigrationFile = rm(alert) {
+      val intent = new Intent(Intent.ACTION_OPEN_DOCUMENT) setType "text/plain"
+      startActivityForResult(intent addCategory Intent.CATEGORY_OPENABLE, 101)
+    }
+  }
 }
