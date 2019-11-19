@@ -589,7 +589,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       def displayPaymentForm = mkCheckForm(sendAttempt, none, baseBuilder(getTitle, baseContent), dialog_pay, dialog_cancel)
 
       def getTitle = {
-        val content = s"<strong>$domain</strong><br><br>${payReq.metaDataTextPlain take 72}"
+        val content = s"<strong><big>$domain</big></strong><br><br>${payReq.metaDataTextPlain take 72}"
         host.updateView2Blue(oldView = str2View(new String), app.getString(ln_send_title) format content)
       }
 
