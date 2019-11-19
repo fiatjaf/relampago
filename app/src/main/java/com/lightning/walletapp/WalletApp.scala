@@ -486,8 +486,8 @@ object ChannelManager extends Broadcaster {
     case Right(rd) =>
       all.filter(isOperational) find { chan =>
         val matchesHostedOnlyPolicy = if (rd.fromHostedOnly) chan.isHosted else true // User may desire to only spend from hosted channels
-      val correctTargetPeerNodeId = chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) // Onion does not care about specific chan but peer nodeId must match
-      val notLoop = chan.getCommits.flatMap(_.updateOpt).map(_.shortChannelId) != rd.usedRoute.lastOption.map(_.shortChannelId) // Not chans like A -> B -> A
+        val correctTargetPeerNodeId = chan.data.announce.nodeId == rd.nextNodeId(rd.usedRoute) // Onion does not care about specific chan but peer nodeId must match
+        val notLoop = chan.getCommits.flatMap(_.updateOpt).map(_.shortChannelId) != rd.usedRoute.lastOption.map(_.shortChannelId) // Not chans like A -> B -> A
         notLoop && matchesHostedOnlyPolicy && correctTargetPeerNodeId && chan.estCanSendMsat >= rd.firstMsat // Balance may change in a meantime
       } match {
         case None => sendEither(useFirstRoute(rd.routes, rd), noRoutes)

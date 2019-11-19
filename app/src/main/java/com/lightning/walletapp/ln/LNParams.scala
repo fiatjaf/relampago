@@ -37,7 +37,7 @@ object LNParams {
   final val dust = Satoshi(546)
   final val maxToSelfDelay = 2016
   final val minFeeratePerKw = 253
-  final val maxCltvDelta = blocksPerDay * 7L
+  final val maxCltvDelta = blocksPerDay * 14L
   final val maxCapacity = MilliSatoshi(16777215000L)
 
   var db: LNOpenHelper = _
