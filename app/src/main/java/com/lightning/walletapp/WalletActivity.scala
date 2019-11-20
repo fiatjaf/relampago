@@ -237,7 +237,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   // LNURL
 
   def fetch1stLevelUrl(lnUrl: LNUrl) = {
-    val awaitRequest = get(lnUrl.uri.toString, true).connectTimeout(15000)
+    val awaitRequest = get(lnUrl.uri.toString, false).connectTimeout(15000)
     val sslAwareRequest = awaitRequest.trustAllCerts.trustAllHosts
     app quickToast ln_url_resolving
 
@@ -302,7 +302,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     def doLogin(alert: AlertDialog) = rm(alert) {
       val sig = Tools.sign(dataToSign, linkingPrivKey)
       val secondLevelRequestUri = lnUrl.uri.buildUpon.appendQueryParameter("sig", sig.toHex).appendQueryParameter("key", linkingPubKey)
-      val sslAwareSecondRequest = get(secondLevelRequestUri.build.toString, true).connectTimeout(15000).trustAllCerts.trustAllHosts
+      val sslAwareSecondRequest = get(secondLevelRequestUri.build.toString, false).connectTimeout(15000).trustAllCerts.trustAllHosts
       queue.map(_ => sslAwareSecondRequest.body).map(LNUrl.guardResponse).foreach(_ => onLoginSuccess.run, onFail)
       app quickToast ln_url_resolving
     }

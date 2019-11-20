@@ -176,7 +176,7 @@ case class LNUrl(request: String) {
 
 trait LNUrlData {
   def unsafe(request: String): HttpRequest =
-    get(request, true).trustAllCerts.trustAllHosts
+    get(request, false).trustAllCerts.trustAllHosts
 }
 
 case class WithdrawRequest(callback: String, k1: String,
