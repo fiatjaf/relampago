@@ -157,9 +157,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
         case norm: NormalData if isOperational(chan) =>
           doNormalOperationalStateChecks(channel = chan)
           if (lostFunding) setExtraInfo(resource = ln_info_funding_lost)
-          // Relevant for Turbo channels: show funding depth until it reaches threshold
-          val fundingDepthCondition = if (fundingDepth < threshold) -1 else R.id.fundingDepth
-          visibleExcept(gone = fundingDepthCondition, R.id.closedAt, R.id.hostedWarningHeader)
+          visibleExcept(gone = R.id.fundingDepth, R.id.closedAt, R.id.hostedWarningHeader)
 
         case norm: NormalData =>
           setExtraInfo(resource = ln_info_coop_attempt)
