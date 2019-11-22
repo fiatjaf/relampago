@@ -175,10 +175,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       errorLimit -= 1
     }
 
-    override def onSettled(cs: Commitments) =
-      if (cs.localSpec.fulfilledIncoming.nonEmpty)
-        host stopService host.foregroundServiceIntent
-
     override def onProcessSuccess = {
       // Hosted channel provider sent us an error, let user know
       case (chan: HostedChannel, _: HostedCommits, remoteError: wire.Error) =>

@@ -34,7 +34,6 @@ import org.bitcoinj.uri.BitcoinURI
 import java.text.SimpleDateFormat
 import android.app.AlertDialog
 import scodec.bits.ByteVector
-import android.content.Intent
 import org.ndeftools.Message
 import android.os.Bundle
 import java.util.Date
@@ -102,7 +101,6 @@ trait HumanTimeDisplay {
 }
 
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
-  lazy val foregroundServiceIntent = new Intent(me, AwaitService.classof)
   lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
   lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
     def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
@@ -359,9 +357,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         def offChain = rm(alert) {
           if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
           else FragWallet.worker.receive(withRoutes, maxCanReceive, MilliSatoshi(1L), app.getString(ln_receive_title).html, new String) { rd =>
-            foregroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
-            ContextCompat.startForegroundService(me, foregroundServiceIntent)
-            timer.schedule(me stopService foregroundServiceIntent, 1800000)
+            app.foregroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
+            ContextCompat.startForegroundService(app, app.foregroundServiceIntent)
             me PRQR rd.pr
           }
         }

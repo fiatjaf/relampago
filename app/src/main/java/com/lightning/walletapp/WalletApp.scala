@@ -23,7 +23,7 @@ import rx.lang.scala.{Observable => Obs}
 import scodec.bits.{BitVector, ByteVector}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey}
-import android.content.{ClipboardManager, Context}
+import android.content.{ClipboardManager, Context, Intent}
 import com.lightning.walletapp.lnutils.olympus.{OlympusWrap, TxUploadAct}
 import android.app.{Application, NotificationChannel, NotificationManager}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor, ThrottledWork}
@@ -47,7 +47,8 @@ import java.io.File
 
 
 class WalletApp extends Application { me =>
-  lazy val params = org.bitcoinj.params.MainNetParams.get
+  lazy val params = org.bitcoinj.params.TestNet3Params.get
+  lazy val foregroundServiceIntent = new Intent(me, AwaitService.classof)
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
   lazy val chainFile = new File(getFilesDir, chainFileName)
@@ -299,6 +300,10 @@ object ChannelManager extends Broadcaster {
     case (_: NormalChannel, wait: WaitFundingDoneData, _, _) => app.kit blockSend wait.fundingTx
     case (chan: NormalChannel, _: NormalData, SLEEPING, OPEN) => chan process CMDFeerate(perKwThreeSat)
   }
+
+  override def onSettled(cs: Commitments) =
+    if (cs.localSpec.fulfilledIncoming.nonEmpty)
+      app.stopService(app.foregroundServiceIntent)
 
   def delayedPublishes = {
     val statuses = all.map(_.data).collect { case cd: ClosingData => cd.bestClosing.getState }
