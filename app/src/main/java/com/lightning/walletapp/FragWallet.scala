@@ -15,8 +15,8 @@ import com.lightning.walletapp.R.drawable._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
-import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
+import com.lightning.walletapp.lnutils.ImplicitConversions._
 
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
@@ -163,7 +163,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   var lnItems = Vector.empty[LNWrap]
   var btcItems = Vector.empty[BTCWrap]
   var allItems = Vector.empty[ItemWrap]
-  var sentHostedPreimages = Set.empty[ByteVector]
+  var sentHostedPreimages = Map.empty[ByteVector, Long]
   val minLinesNum = 4 max IconGetter.scrHeight.ceil.toInt
   var currentCut = minLinesNum
 
@@ -235,7 +235,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val delayedWraps = ChannelManager.delayedPublishes map ShowDelayedWrap
     val tempItemWraps = if (isSearching) lnItems else delayedWraps ++ btcItems ++ lnItems
     fundTxIds = ChannelManager.all.collect { case normalChannel: NormalChannel => normalChannel.fundTxId.toHex }.toSet
-    sentHostedPreimages = ChannelManager.all.map(_.data).collect { case hc: HostedCommits => hc.sentPreimages }.flatten.toSet
+    sentHostedPreimages = ChannelManager.all.map(_.data).collect { case hc: HostedCommits => hc.sentPreimages }.flatten.toMap
     allItems = tempItemWraps.sortBy(_.getDate)(Ordering[java.util.Date].reverse) take 48
     adapter.notifyDataSetChanged
     updTitleTask.run
@@ -315,9 +315,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
-      if (sentHostedPreimages contains info.preimage) {
-        holder.view setBackgroundColor Denomination.yellowHighlight
-      }
+      val isPreimageRevealed = sentHostedPreimages.contains(info.preimage)
+      if (isPreimageRevealed) holder.view.setBackgroundColor(Denomination.yellowHighlight)
 
       val humanAmount =
         if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
@@ -341,7 +340,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       val inFiat = msatInFiatHuman(info.firstSum)
-      val retry = if (info.pr.isFresh) dialog_retry else -1
       val newRD = app.emptyRD(info.pr, info.firstMsat, useCache = false)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
@@ -378,25 +376,16 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         app.getString(ln_outgoing_title).format(humanStatus, sentHuman, inFiat, denom.coloredOut(fee, denom.sign), paidFeePercent)
       }
 
-      info.incoming -> newRD.pr.fallbackAddress -> newRD.pr.amount match {
-        case 0 \ Some(adr) \ Some(amount) if info.lastExpiry == 0 && info.status == FAILURE =>
-          // Payment was failed without even trying because wallet is offline or no suitable routes were found
-          mkCheckFormNeutral(_.dismiss, none, neutral = onChain(adr, amount), baseBuilder(app.getString(ln_outgoing_title_no_fee)
-            .format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper), dialog_ok, -1, dialog_pay_onchain)
+      info.incoming match {
+        case 0 if info.lastExpiry == 0 =>
+          // This payment has not been tried yet, could be a failure because offline or no routes found, do not allow to retry it
+          val title = app.getString(ln_outgoing_title_no_fee).format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat)
+          showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
-        case 0 \ _ \ _ if info.lastExpiry == 0 =>
-          // This is not a failure yet, don't care about on-chain
-          showForm(alertDialog = negBuilder(neg = dialog_ok, title = app.getString(ln_outgoing_title_no_fee)
-            .format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat).html, detailsWrapper).create)
-
-        case 0 \ Some(adr) \ Some(amount) if info.status == FAILURE =>
-          // Offer a fallback on-chain address along with off-chain retry
-          mkCheckFormNeutral(_.dismiss, doSendOffChain(newRD), neutral = onChain(adr, amount),
-            baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry, dialog_pay_onchain)
-
-        case 0 \ _ \ _ if info.status == FAILURE =>
-          // Allow off-chain retry only, no on-chain fallback options since no embedded address is present
-          mkCheckForm(_.dismiss, doSendOffChain(newRD), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, retry)
+        case 0 if info.status == FAILURE =>
+          // This payment has been tried and failed, allow to retry this one unless its payment request has expired already
+          val show = mkCheckForm(_.dismiss, doSendOffChain(newRD), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, _: Int)
+          if (info.pr.isFresh) show(dialog_retry) else show(-1)
 
         case _ =>
           val incomingTitle = app.getString(ln_incoming_title).format(humanStatus, denom.coloredIn(info.firstSum, denom.sign), inFiat)
@@ -558,14 +547,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       pr.fallbackAddress -> pr.amount match {
         case Some(adr) \ Some(amount) if amount > maxCanSend && amount < app.kit.conf0Balance =>
-          val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
+          def sendOnChain: Unit = sendBtcPopup(app.TransData toBitcoinUri adr) setSum Try(amount)
+          val failureMsg = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
           // We have operational channels but can't fulfill this off-chain, yet have enough funds in our on-chain wallet so offer fallback option
-          mkCheckFormNeutral(_.dismiss, none, onChain(adr, amount), baseBuilder(getTitle, failureMessage.html), dialog_ok, -1, dialog_pay_onchain)
+          mkCheckFormNeutral(_.dismiss, none, alert => rm(alert)(sendOnChain), baseBuilder(getTitle, failureMsg.html), dialog_ok, -1, dialog_pay_onchain)
 
         case _ \ Some(amount) if amount > maxCanSend =>
-          val failureMessage = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
-          // Either this payment request contains no fallback address or we don't have enough funds on-chain at all
-          showForm(negBuilder(dialog_ok, getTitle, failureMessage.html).create)
+          val failureMsg = app getString err_ln_not_enough format s"<strong>${denom parsedWithSign amount}</strong>"
+          // Either this payment request contains no fallback address or we don't have enough funds on-chain
+          showForm(negBuilder(dialog_ok, getTitle, failureMsg.html).create)
 
         case _ =>
           // We can pay this request off-chain
@@ -665,11 +655,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   // BTC SEND / BOOST
-
-  def onChain(adr: String, amount: MilliSatoshi)(alert: AlertDialog) = rm(alert) {
-    // This code only gets executed when user taps a button to pay on-chain
-    sendBtcPopup(app.TransData toBitcoinUri adr) setSum Try(amount)
-  }
 
   def sendBtcPopup(uri: BitcoinURI): RateManager = {
     val minMsatAmountTry = Try(uri.getAmount).filter(org.bitcoinj.core.Transaction.MIN_NONDUST_OUTPUT.isLessThan).map(coin2MSat)

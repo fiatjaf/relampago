@@ -310,7 +310,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             val snapshotFilePath = new File(getCacheDir, "images")
             if (!snapshotFilePath.isFile) snapshotFilePath.mkdirs
 
-            val preimages = hc.sentPreimages.map(_.toHex).mkString("\n")
+            val preimages = hc.sentPreimages.toMap.keys.mkString("\n")
             val data = hostedStateCodec.encode(hc.hostedState).require.toHex
             val text = getString(ln_hosted_state_wrap).format(hc.channelId.toHex, data, preimages)
             val savedFile = new File(snapshotFilePath, s"Hosted channel state ${new Date}.txt")
