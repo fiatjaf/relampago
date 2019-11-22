@@ -198,9 +198,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     override def onBecome = {
-      case (_, _, fromState, toState) if fromState != toState =>
-        // Update app bar info on any actual state change
-        updPaymentList.run
+      case (_, _, fromState, CLOSING) if fromState != CLOSING => updPaymentList.run
+      case (_, _, fromState, toState) if fromState != toState => updTitleTask.run
     }
 
     override def onException = {
