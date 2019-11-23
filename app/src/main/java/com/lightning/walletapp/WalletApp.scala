@@ -47,7 +47,7 @@ import java.io.File
 
 
 class WalletApp extends Application { me =>
-  lazy val params = org.bitcoinj.params.TestNet3Params.get
+  lazy val params = org.bitcoinj.params.MainNetParams.get
   lazy val foregroundServiceIntent = new Intent(me, AwaitService.classof)
   lazy val prefs = getSharedPreferences("prefs", Context.MODE_PRIVATE)
   lazy val walletFile = new File(getFilesDir, walletFileName)
