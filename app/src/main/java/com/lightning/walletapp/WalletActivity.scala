@@ -204,19 +204,11 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       else fetch1stLevelUrl(lnUrl)
       me returnToBase null
 
-    case pr: PaymentRequest if PaymentRequest.prefixes(LNParams.chainHash) != pr.prefix =>
-      // Payee has provided a payment request from some other network, can't be fulfilled
-      app quickToast err_nothing_useful
-      me returnToBase null
-
-    case pr: PaymentRequest if !pr.isFresh =>
-      // Payment request has expired by now
-      app quickToast dialog_pr_expired
-      me returnToBase null
-
     case pr: PaymentRequest =>
-      // We have operational channels at this point
-      FragWallet.worker.standardOffChainSend(pr)
+      val ourNetPrefix = PaymentRequest.prefixes(LNParams.chainHash)
+      if (ourNetPrefix != pr.prefix) app quickToast err_nothing_useful
+      else if (!pr.isFresh) app quickToast dialog_pr_expired
+      else FragWallet.worker.standardOffChainSend(pr)
       me returnToBase null
 
     case _ =>
