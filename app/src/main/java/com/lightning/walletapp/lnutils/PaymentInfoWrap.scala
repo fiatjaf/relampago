@@ -77,17 +77,18 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsOutgoingSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
     db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* outgoing payment */, WAITING, System.currentTimeMillis,
-      rd.pr.description, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
+      PaymentDescription(rd.pr.description, rd.action).toJson.toString, rd.pr.paymentHash,
+      rd.firstMsat, rd.lastMsat, rd.lastExpiry, NOCHANID)
   }
 
-  def recordRoutingDataWithPr(extraRoutes: Vector[PaymentRoute], sum: MilliSatoshi, preimage: ByteVector, description: String): RoutingData = {
-    val pr = PaymentRequest(chainHash, amount = Some(sum), Crypto sha256 preimage, nodePrivateKey, description, fallbackAddress = None, extraRoutes)
-    val rd = app.emptyRD(pr, sum.amount, useCache = true)
+  def recordRoutingDataWithPr(extraRoutes: Vector[PaymentRoute], amount: MilliSatoshi, preimage: ByteVector, description: String, action: PaymentAction): RoutingData = {
+    val pr = PaymentRequest(chainHash, amount = Some(amount), paymentHash = Crypto.sha256(preimage), nodePrivateKey, description, fallbackAddress = None, routes = extraRoutes)
+    val rd = app.emptyRD(pr, amount.toLong, useCache = true)
 
     db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
-    db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* incoming payment */,
-      WAITING, System.currentTimeMillis, pr.description, pr.paymentHash, sum.amount,
-      0L /* lastMsat */, 0L /* lastExpiry, updated for reflexive payments */, NOCHANID)
+    db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* incoming payment */, WAITING, System.currentTimeMillis,
+      PaymentDescription(description, action).toJson.toString, pr.paymentHash, amount.toLong, 0L /* lastMsat with fees */,
+      0L /* lastExpiry, later updated for reflexive payments */, NOCHANID)
 
     uiNotify
     rd

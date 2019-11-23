@@ -376,10 +376,10 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     else {
       val preimage = ByteVector(random getBytes 32)
       val largestCanSendMsat = hosted1.map(_.estCanSendMsat).sorted.last
-      val largestCanSendMinusFeesMsat = largestCanSendMsat - LNParams.maxAcceptableFee(largestCanSendMsat, hops = 3)
-      val transferSum = MilliSatoshi(normal1.map(_.estCanReceiveMsat).sorted.head min largestCanSendMinusFeesMsat)
       val normalExtraRoutes = normal1 flatMap channelAndHop collect { case _ \ normalExtraHop => normalExtraHop }
-      val rd = PaymentInfoWrap.recordRoutingDataWithPr(normalExtraRoutes, transferSum, preimage, REBALANCING)
+      val largestCanSendMinusFeesMsat = largestCanSendMsat - LNParams.maxAcceptableFee(largestCanSendMsat, hops = 3)
+      val transferSum = math.min(normal1.map(_.estCanReceiveMsat).sorted.head, largestCanSendMinusFeesMsat).millisatoshi
+      val rd = PaymentInfoWrap.recordRoutingDataWithPr(normalExtraRoutes, transferSum, preimage, REBALANCING, NoopAction)
       PaymentInfoWrap addPendingPayment rd.copy(fromHostedOnly = true)
       me toast dialog_hosted_draining
     }

@@ -316,14 +316,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
-      if (hostedLeft.isDefined) holder.view.setBackgroundColor(Denomination.yellowHighlight)
       val humanAmount = if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
         else if (info.incoming == 1) denom.coloredIn(info.firstSum, new String)
         else denom.coloredOut(info.firstSum, new String)
 
-      holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
-      holder.transactWhat setText getDescription(info.description).html
+      if (isTablet || isSearching) holder.transactWhat setText humanDesc(info.pd.text).html
+      if (hostedLeft.isDefined) holder.view.setBackgroundColor(Denomination.yellowHighlight)
+      holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactSum setText s"<img src='ln'/>$humanAmount".html
       holder.transactCircle setImageResource iconDict(info.status)
     }
@@ -340,21 +340,18 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val inFiat = msatInFiatHuman(info.firstSum)
       val newRD = app.emptyRD(info.pr, info.firstMsat, useCache = false)
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
-      val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
-      val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
       val paymentProof = detailsWrapper.findViewById(R.id.paymentProof).asInstanceOf[Button]
       val paymentDebug = detailsWrapper.findViewById(R.id.paymentDebug).asInstanceOf[Button]
-      lazy val serializedPR = PaymentRequest write info.pr
-
-      paymentRequest setOnClickListener onButtonTap(host share serializedPR)
-      paymentDetails setText getDescription(info.description).html
+      val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
+      detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView] setText humanDesc(info.pd.text).html
+      paymentRequest setOnClickListener onButtonTap(host share info.rawPr)
 
       if (info.status == SUCCESS) {
         paymentRequest setVisibility View.GONE
         paymentProof setVisibility View.VISIBLE
         paymentProof setOnClickListener onButtonTap {
           // Signed payment request along with a preimage is sufficient proof of payment
-          host share app.getString(ln_proof).format(serializedPR, info.preimage.toHex)
+          host share app.getString(ln_proof).format(info.rawPr, info.preimage.toHex)
         }
       }
 
@@ -386,7 +383,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           if (info.pr.isFresh) show(dialog_retry) else show(-1)
 
         case 0 \ _ =>
-          // This payment is SUCCESSFUL or WAITING or UNKNOWN, show blocks until expiry in a latter case
+          // This payment is SUCCESSFUL or UNKNOWN or WAITING, show blocks until expiry in a latter case
           val expiryBlocksLeft = app.plur1OrZero(lnStatusExpiry, info.lastExpiry - broadcaster.currentHeight)
           val title = if (info.status == WAITING) s"$expiryBlocksLeft<br><br>$outgoingTitle" else outgoingTitle
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
@@ -512,10 +509,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         .sortBy(chan => if (chan.isHosted) 1 else 0) // Hosted channels are pushed to the back of the queue
         .take(4) // Limit number of channels to ensure QR code is always readable
 
-      val preimage = ByteVector.view(random getBytes 32)
-      val extraRoutes = mostViableChannels map chansWithRoutes
-      val description = inputDescription.getText.toString.take(72).trim
-      PaymentInfoWrap.recordRoutingDataWithPr(extraRoutes, sum, preimage, description)
+      PaymentInfoWrap.recordRoutingDataWithPr(extraRoutes = mostViableChannels map chansWithRoutes, amount = sum,
+        preimage = ByteVector.view(random getBytes 32), inputDescription.getText.toString.take(72).trim, NoopAction)
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
@@ -555,7 +550,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def standardOffChainSend(pr: PaymentRequest) =
     new OffChainSender(maxCanSend = ChannelManager.estimateAIRCanSend.millisatoshi, minCanSend = pr.msatOrMin) {
       def displayPaymentForm = mkCheckForm(sendAttempt, none, baseBuilder(getTitle, baseContent), dialog_pay, dialog_cancel)
-      def getTitle = str2View(app.getString(ln_send_title).format(Utils getDescription pr.description).html)
+      def getTitle = str2View(app.getString(ln_send_title).format(Utils humanDesc pr.description).html)
 
       def onUserAcceptSend(ms: MilliSatoshi) = {
         val rd = app.emptyRD(pr, firstMsat = ms.amount, useCache = true)
@@ -646,13 +641,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   def startAIR(toChan: Channel, origEmptyRD: RoutingData) = {
     val rd1 = origEmptyRD.copy(airLeft = origEmptyRD.airLeft - 1)
     val deltaAmountToSend = maxAcceptableFee(rd1.firstMsat, hops = 3) + rd1.firstMsat - math.max(toChan.estCanSendMsat, 0L)
-    val amountCanRebalance = ChannelManager.airCanSendInto(targetChan = toChan).reduceOption(_ max _) getOrElse 0L
+    val amountPossibleRebalance = ChannelManager.airCanSendInto(targetChan = toChan).reduceOption(_ max _) getOrElse 0L
     require(deltaAmountToSend > 0, "Accumulator already has enough money for a final payment + fees")
-    require(amountCanRebalance > 0, "No channel is able to send funds into accumulator")
+    require(amountPossibleRebalance > 0, "No channel is able to send funds into accumulator")
 
     val Some(_ \ extraHop) = channelAndHop(toChan)
-    val finalAmount = MilliSatoshi(amount = deltaAmountToSend min amountCanRebalance)
-    val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(Vector(extraHop), finalAmount, ByteVector(random getBytes 32), REBALANCING)
+    val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(extraRoutes = Vector(extraHop),
+      amount = math.min(deltaAmountToSend, amountPossibleRebalance).millisatoshi,
+      preimage = ByteVector(random getBytes 32), REBALANCING, NoopAction)
 
     val listener = new ChannelListener {
       override def outPaymentAccepted(rd: RoutingData) =

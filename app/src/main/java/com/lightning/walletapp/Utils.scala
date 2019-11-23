@@ -50,10 +50,8 @@ object Utils {
   final val dbFileName = s"$fileName.db"
   final val walletFileName = s"$fileName.wallet"
   final val chainFileName = s"$fileName.spvchain"
-
-  lazy val app = appReference
-  lazy val noDesc = app getString ln_no_description
   lazy val denoms = List(SatDenomination, BtcDenomination)
+  lazy val app = appReference
 
   val fiatNames =
     Map("usd" -> "US Dollar", "eur" -> "Euro", "jpy" -> "Japanese Yen", "cny" -> "Chinese Yuan",
@@ -61,8 +59,8 @@ object Utils {
       "brl" -> "Real Brasileiro", "czk" -> "Česká Koruna", "gbp" -> "Pound Sterling", "aud" -> "Australian Dollar")
 
   val viewMap = Map(true -> View.VISIBLE, false -> View.GONE)
-  def getDescription(raw: String) = if (raw.isEmpty) s"<i>$noDesc</i>" else raw take 72
-  def humanSix(bitcoinAddress: String) = bitcoinAddress grouped 6 mkString "\u0020"
+  def humanSix(bitcoinAddress: String) = bitcoinAddress.grouped(size = 6).mkString(sep = "\u0020")
+  def humanDesc(raw: String) = if (raw.isEmpty) s"<i>${app getString ln_no_description}</i>" else raw take 72
 
   def clickableTextField(view: View): TextView = {
     val field: TextView = view.asInstanceOf[TextView]

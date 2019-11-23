@@ -174,7 +174,7 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */ ,
                        lastMsat: Long /* amount with off-chain fee added */ , lastExpiry: Long, callsLeft: Int,
                        useCache: Boolean, airLeft: Int, onChainFeeBlock: Boolean, onChainFeeBlockWasUsed: Boolean,
-                       fromHostedOnly: Boolean) {
+                       fromHostedOnly: Boolean, action: PaymentAction) {
 
   // Empty used route means we're sending to peer and its nodeId should be our targetId
   def nextNodeId(route: PaymentRoute) = route.headOption.map(_.nodeId) getOrElse pr.nodeId
@@ -182,15 +182,20 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
   lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
 }
 
-case class PaymentInfo(rawPr: String, preimage: ByteVector, incoming: Int,
-                       status: Int, stamp: Long, description: String, firstMsat: Long,
-                       lastMsat: Long, lastExpiry: Long) {
+case class PaymentInfo(rawPr: String, preimage: ByteVector,
+                       incoming: Int, status: Int, stamp: Long, description: String,
+                       firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
 
-  val firstSum = MilliSatoshi(firstMsat)
-  // Incoming lastExpiry is 0, updated on becoming reflexive
+  // Incoming `lastExpiry` becomes > 0 once reflexive
   val isLooper = incoming == 1 && lastExpiry != 0
-  // Keep serialized for performance reasons
+  val firstSum = MilliSatoshi(firstMsat)
+
+  // Decode on demand for performance
   lazy val pr = to[PaymentRequest](rawPr)
+  // Back compat: use default object if source is not json
+  lazy val pd = try to[PaymentDescription](description) catch {
+    case err: Throwable => PaymentDescription(description, NoopAction)
+  }
 }
 
 trait PaymentInfoBag { me =>
@@ -200,3 +205,23 @@ trait PaymentInfoBag { me =>
   def updOkOutgoing(m: UpdateFulfillHtlc)
   def updOkIncoming(m: UpdateAddHtlc)
 }
+
+// Payment actions
+
+trait PaymentAction
+case object NoopAction extends PaymentAction
+case class MessageAction(message: String) extends PaymentAction {
+  // The most basic action: just show a popup with given text to user
+  val finalMessage = message take 144
+}
+
+case class UrlAction(description: String, url: String) extends PaymentAction {
+  // Show popup with description and url, allow to visit and share a decoded url
+  val finalDescription = description take 144
+  val uri = android.net.Uri.parse(url)
+  require(url startsWith "https://")
+}
+
+// Previously `PaymentInfo.description` was just raw text
+// once actions were added it became json which encodes this class
+case class PaymentDescription(text: String, action: PaymentAction)

@@ -3,11 +3,9 @@ package org.bitcoinj.core
 import com.lightning.walletapp.ln._
 import com.lightning.walletapp.Utils._
 import scala.collection.JavaConverters._
-import com.lightning.walletapp.Denomination._
 import org.bitcoinj.wallet.WalletTransaction.Pool._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import org.bitcoinj.wallet.SendRequest
-import fr.acinq.bitcoin.Satoshi
 import scodec.bits.ByteVector
 import scala.util.Try
 
@@ -25,15 +23,6 @@ case class Batch(unsigned: SendRequest, dummyScript: ByteVector, pr: PaymentRequ
     // First remove all existing outs, then fill in updated
     for (out <- withReplacedDummy) unsigned.tx addOutput out
     unsigned
-  }
-
-  def asString(source: Int) = {
-    val base = app getString source
-    val info = getDescription(pr.description)
-    val onchainSum = denom.coloredOut(pr.amount.get, denom.sign)
-    val onchainFee = denom.coloredOut(unsigned.tx.getFee, denom.sign)
-    val channelSum = denom.coloredP2WSH(Satoshi(fundingAmountSat), denom.sign)
-    base.format(info, onchainSum, channelSum, onchainFee).html
   }
 }
 

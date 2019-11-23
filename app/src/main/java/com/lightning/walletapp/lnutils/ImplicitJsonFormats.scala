@@ -108,6 +108,27 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val milliSatoshiFmt = jsonFormat[Long, MilliSatoshi](MilliSatoshi.apply, "amount")
   implicit val satoshiFmt = jsonFormat[Long, Satoshi](Satoshi.apply, "amount")
 
+  // Payment actions
+
+  implicit object PaymentActionFmt extends JsonFormat[PaymentAction] {
+    def read(raw: JsValue): PaymentAction = raw.asJsObject fields TAG match {
+      case JsString("message") => raw.convertTo[MessageAction]
+      case JsString("url") => raw.convertTo[UrlAction]
+      case JsString("noop") => NoopAction
+      case _ => throw new Exception
+    }
+
+    def write(internal: PaymentAction) = internal match {
+      case paymentAction: MessageAction => paymentAction.toJson
+      case paymentAction: UrlAction => paymentAction.toJson
+      case NoopAction => Map("tag" -> "noop").toJson
+    }
+  }
+
+  implicit val messageActionFmt = taggedJsonFmt(jsonFormat[String, MessageAction](MessageAction.apply, "message"), tag = "message")
+  implicit val urlActionFmt = taggedJsonFmt(jsonFormat[String, String, UrlAction](UrlAction.apply, "description", "url"), tag = "url")
+  implicit val paymentDescriptionFmt = jsonFormat[String, PaymentAction, PaymentDescription](PaymentDescription.apply, "text", "action")
+
   // LNURL
 
   implicit object LNUrlDataFmt extends JsonFormat[LNUrlData] {
@@ -133,7 +154,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val payRequestFmt = taggedJsonFmt(jsonFormat[String, Long, Long, String,
     PayRequest](PayRequest.apply, "callback", "maxSendable", "minSendable", "metadata"), tag = "payRequest")
 
-  implicit val payRequestFinalFmt = jsonFormat[Vector[PayRequest.Route], String, PayRequestFinal](PayRequestFinal.apply, "routes", "pr")
+  implicit val payRequestFinalFmt = jsonFormat[Vector[PayRequest.Route], String,
+    PayRequestFinal](PayRequestFinal.apply, "routes", "pr")
 
   // Channel data
 
