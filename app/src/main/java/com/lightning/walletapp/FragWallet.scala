@@ -343,15 +343,17 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val paymentProof = detailsWrapper.findViewById(R.id.paymentProof).asInstanceOf[Button]
       val paymentDebug = detailsWrapper.findViewById(R.id.paymentDebug).asInstanceOf[Button]
       val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
+
+      lazy val serializedPR = PaymentRequest write info.pr
+      paymentRequest setOnClickListener onButtonTap(exec = host share serializedPR)
       detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView] setText humanDesc(info.pd.text).html
-      paymentRequest setOnClickListener onButtonTap(host share info.rawPr)
 
       if (info.status == SUCCESS) {
         paymentRequest setVisibility View.GONE
         paymentProof setVisibility View.VISIBLE
         paymentProof setOnClickListener onButtonTap {
           // Signed payment request along with a preimage is sufficient proof of payment
-          host share app.getString(ln_proof).format(info.rawPr, info.preimage.toHex)
+          host share app.getString(ln_proof).format(serializedPR, info.preimage.toHex)
         }
       }
 
@@ -594,8 +596,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         def convert(raw: String) = {
           val prf = to[PayRequestFinal](raw)
-          require(prf.descriptionHash == payReq.metaDataHash, s"Metadata hash mismatch, original=${payReq.metaDataHash}, provided=${prf.descriptionHash}")
-          require(prf.paymentRequest.amount.contains(ms), s"Payment amount mismatch, requested=$ms, provided=${prf.paymentRequest.amount}")
+          val descriptionHash = ByteVector.fromValidHex(prf.paymentRequest.description)
+          require(descriptionHash == payReq.metaDataHash, s"Metadata hash mismatch, original=${payReq.metaDataHash}, provided=$descriptionHash")
+          require(prf.paymentRequest.amount.contains(ms), s"Payment amount mismatch, provided=${prf.paymentRequest.amount}, requested=$ms")
           prf
         }
 

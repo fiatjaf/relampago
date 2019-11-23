@@ -154,8 +154,8 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit val payRequestFmt = taggedJsonFmt(jsonFormat[String, Long, Long, String,
     PayRequest](PayRequest.apply, "callback", "maxSendable", "minSendable", "metadata"), tag = "payRequest")
 
-  implicit val payRequestFinalFmt = jsonFormat[Vector[PayRequest.Route], String,
-    PayRequestFinal](PayRequestFinal.apply, "routes", "pr")
+  implicit val payRequestFinalFmt = jsonFormat[Vector[PayRequest.Route], String, PaymentAction,
+    PayRequestFinal](PayRequestFinal.apply, "routes", "pr", "successAction")
 
   // Channel data
 

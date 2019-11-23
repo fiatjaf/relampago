@@ -248,11 +248,8 @@ case class PayRequest(callback: String, maxSendable: Long, minSendable: Long, me
       .build.toString)
 }
 
-case class PayRequestFinal(routes: Vector[Route], pr: String) extends LNUrlData {
-  // Lnurl-pay is two-fold: this object is returned once user called a first callback
-
-  val paymentRequest: PaymentRequest = PaymentRequest.read(input = pr)
-  val descriptionHash: ByteVector = ByteVector.fromValidHex(paymentRequest.description)
-  val extraPaymentRoutes: PaymentRouteVec = for (route <- routes) yield route map { case nodeId \ chanUpdate => chanUpdate toHop nodeId }
+case class PayRequestFinal(routes: Vector[Route], pr: String, successAction: PaymentAction) extends LNUrlData {
   for (route <- routes) for (nodeId \ chanUpdate <- route) require(Announcements.checkSig(chanUpdate, nodeId), "Extra route contains an invalid update")
+  val extraPaymentRoutes: PaymentRouteVec = for (route <- routes) yield route map { case nodeId \ chanUpdate => chanUpdate toHop nodeId }
+  val paymentRequest: PaymentRequest = PaymentRequest.read(pr)
 }
