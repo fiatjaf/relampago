@@ -28,8 +28,6 @@ object LNParams {
   val blocksPerDay = 144
   val minCapacityMsat = 200000000L
   val channelReserveToFundingRatio = 200 // 0.5%
-
-  val minHostedCltvDelta = blocksPerDay * 3
   val minHostedOnChainRefundSat = 1000000L
   val minHostedLiabilityBlockdays = 1000
   val maxHostedBlockHeight = 500000L
@@ -114,7 +112,6 @@ object ChanErrorCodes {
   final val ERR_HOSTED_WRONG_BLOCKDAY = ByteVector.fromValidHex("0001")
   final val ERR_HOSTED_WRONG_LOCAL_SIG = ByteVector.fromValidHex("0002")
   final val ERR_HOSTED_WRONG_REMOTE_SIG = ByteVector.fromValidHex("0003")
-  final val ERR_HOSTED_UPDATE_CLTV_TOO_LOW = ByteVector.fromValidHex("0004")
   final val ERR_HOSTED_TOO_MANY_STATE_UPDATES = ByteVector.fromValidHex("0005")
   final val ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC = ByteVector.fromValidHex("0006")
   final val ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING = ByteVector.fromValidHex("0007")
@@ -124,7 +121,6 @@ object ChanErrorCodes {
     case ERR_HOSTED_WRONG_BLOCKDAY => new LightningException(app getString err_ln_hosted_wrong_blockday)
     case ERR_HOSTED_WRONG_LOCAL_SIG => new LightningException(app getString err_ln_hosted_wrong_local_sig)
     case ERR_HOSTED_WRONG_REMOTE_SIG => new LightningException(app getString err_ln_hosted_wrong_remote_sig)
-    case ERR_HOSTED_UPDATE_CLTV_TOO_LOW => new LightningException(app getString err_ln_hosted_update_cltv_too_low)
     case ERR_HOSTED_TOO_MANY_STATE_UPDATES => new LightningException(app getString err_ln_hosted_too_many_state_updates)
     case ERR_HOSTED_TIMED_OUT_OUTGOING_HTLC => new LightningException(app getString err_ln_hosted_timed_out_outgoing_htlc)
     case ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING => new LightningException(app getString err_ln_hosted_in_flight_htlc_while_restoring)

@@ -106,14 +106,10 @@
     <string name="fp_add_print">Register at least one fingerprint in system settings</string>
 
     <!-- trusted node -->
-    <string name="sets_trusted">Use trusted Bitcoin node</string>
     <string name="trusted_hint_none">Disabled, using random nodes</string>
     <string name="trusted_hint">format is address/host:port\ntor address is supported</string>
-
-    <string name="sets_trusted_title"><![CDATA[
-        Trusted Bitcoin node<br><br><small>Once an address is provided wallet
-        will only be using your trusted node instead of random ones.</small>
-    ]]></string>
+    <string name="sets_trusted_title"><![CDATA[Trusted Bitcoin node<br><br><small>Once an address is provided wallet will only be using your trusted node instead of random ones.</small>]]></string>
+    <string name="sets_trusted">Use trusted Bitcoin node</string>
 
     <!-- ln fee cap -->
     <string name="sets_ln_fee_cap">Limit LN fees to chain fees</string>
@@ -131,9 +127,11 @@
         <item><![CDATA[<font color=#E68A00>Sync: %1$d days behind</font>]]></item>
     </array>
 
+
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>incoming %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Lightning payment</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small><br>fee %4$s = %5$.2f%%]]></string>
+    <string name="ln_hosted_preimage_revealed"><![CDATA[<i>preimage is revealed for this payment, please contact hosted channel provider <strong>before</strong> expiration if payment keeps pending like this</i>]]></string>
 
     <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>received %2$s<br><small>%3$s at current rates</small>]]></string>
     <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Bitcoin transaction</strong></font><br>%1$s<br><br>sent %2$s<br><small>%3$s at current rates</small>]]></string>
@@ -179,14 +177,10 @@
     <string name="ln_receive_suggestion"><![CDATA[&#9888; Can\'t ask for Lightning payments because no channels are present.<br>Tap to find out more!]]></string>
     <string name="ln_receive_ok">Make a QR-code with a Lightning Payment Request, can be used to receive fast off-chain payments.</string>
 
-    <string name="btc_receive_option"><![CDATA[
-        <font color=#FF9900>Bitcoin transaction</font><small><br><br>Make a QR-code with on-chain
-        wallet address, can be used to receive regular Bitcoin transactions.</small>
-    ]]></string>
+    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Bitcoin transaction</font><small><br><br>Make a QR-code with on-chain wallet address, can be used to receive regular Bitcoin transactions.</small>]]></string>
 
     <string name="err_ln_peer_offline">Could not connect to %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s does not support data loss protection</string>
-    <string name="err_ln_chain_disconnected">Could not proceed because on-chain wallet is disconnected</string>
     <string name="err_ln_chan_exists_already">An open channel with this peer exists already, only one channel per peer is allowed for now, please try another node</string>
     <string name="err_ln_local_amount_high">Failed because payment amount becomes too high to handle for your channel when off-chain fee is added</string>
     <string name="err_ln_remote_amount_high">Failed because payment amount becomes too high to handle for your peer when off-chain fee is added</string>
@@ -208,8 +202,6 @@
         At most %1$s can be sent on-chain right now <i>with miner fees included</i> while you were trying to send %2$s with %3$s of fees on top of that.<br><br><strong>
         What can be done about it</strong>:<br><br>- Try to send a smaller amount if possible.<br><br>- Refill your on-chain wallet balance.<br><br>- Send exactly %1$s in which case fees will be subtracted from amount, not added on top of it.
     ]]></string>
-
-    <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
     <string name="ln_status_peer">Select peer</string>
     <string name="ln_share_debug">Share debug info</string>
@@ -307,6 +299,12 @@
         <item><![CDATA[<font color=#E68A00>Getting %1$s channels up</font>]]></item>
     </array>
 
+    <array name="ln_status_expiry">
+        <item><![CDATA[expired, got stuck]]></item>
+        <item><![CDATA[expires in %1$s block]]></item>
+        <item><![CDATA[expires in %1$s blocks]]></item>
+    </array>
+
     <!-- opening a new channel -->
     <array name="ln_ops_start_node_channels">
         <item><![CDATA[No public channels]]></item>
@@ -341,7 +339,6 @@
     <string name="err_ln_hosted_wrong_local_sig">Incorrect local signature</string>
     <string name="err_ln_hosted_wrong_remote_sig">Incorrect remote signature</string>
     <string name="err_ln_hosted_too_many_state_updates">Too many state updates</string>
-    <string name="err_ln_hosted_update_cltv_too_low">Incorrect channel update cltv</string>
     <string name="err_ln_hosted_in_flight_htlc_while_restoring">Remote restore failure</string>
     <string name="err_ln_hosted_timed_out_outgoing_htlc">Timed out outgoing payment</string>
     <string name="err_ln_hosted_channel_denied">Hosted channel denied</string>

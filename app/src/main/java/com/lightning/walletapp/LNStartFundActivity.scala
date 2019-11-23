@@ -72,8 +72,8 @@ class LNStartFundActivity extends TimerActivity { me =>
     val safeAddressOrAlias = Try(ann.unsafeFirstAddress.get.toString).toOption getOrElse ann.alias
     val peerOffline = new LightningException(me getString err_ln_peer_offline format safeAddressOrAlias)
     val peerIncompatible = new LightningException(me getString err_ln_peer_incompatible format ann.alias)
-    val chainNotConnectedYet = new LightningException(me getString err_ln_chain_disconnected)
     val chanExistsAlready = new LightningException(me getString err_ln_chan_exists_already)
+    val chainNotConnectedYet = new LightningException(me getString err_ln_chain_wait)
     lnStartFundCancel setOnClickListener onButtonTap(whenBackPressed.run)
     lnStartFundDetails setText asString.html
 

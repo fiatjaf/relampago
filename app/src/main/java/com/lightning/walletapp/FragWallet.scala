@@ -74,6 +74,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   val allTxsWrapper = host.getLayoutInflater.inflate(R.layout.frag_toggler, null)
   val toggler = allTxsWrapper.findViewById(R.id.toggler).asInstanceOf[ImageButton]
+  val lnStatusExpiry = app.getResources getStringArray R.array.ln_status_expiry
   val txsConfs = app.getResources getStringArray R.array.txs_confs
   val iconDict = Array(await, await, conf1, dead, unknown)
 
@@ -310,14 +311,13 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   case class LNWrap(info: PaymentInfo) extends ItemWrap {
+    // Blocks left until expiration if hosted preimage is revealed
+    def hostedLeft = sentHostedPreimages.get(info.preimage)
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
-      val isPreimageRevealed = sentHostedPreimages.contains(info.preimage)
-      if (isPreimageRevealed) holder.view.setBackgroundColor(Denomination.yellowHighlight)
-
-      val humanAmount =
-        if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
+      if (hostedLeft.isDefined) holder.view.setBackgroundColor(Denomination.yellowHighlight)
+      val humanAmount = if (info.isLooper) denom.coloredP2WSH(info.firstSum, new String)
         else if (info.incoming == 1) denom.coloredIn(info.firstSum, new String)
         else denom.coloredOut(info.firstSum, new String)
 
@@ -374,31 +374,51 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         app.getString(ln_outgoing_title).format(humanStatus, sentHuman, inFiat, denom.coloredOut(fee, denom.sign), paidFeePercent)
       }
 
-      info.incoming match {
-        case 0 if info.lastExpiry == 0 =>
+      info.incoming -> hostedLeft match {
+        case 0 \ _ if info.lastExpiry == 0 =>
           // This payment has not been tried yet, could be a failure because offline or no routes found, do not allow to retry it
           val title = app.getString(ln_outgoing_title_no_fee).format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat)
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
-        case 0 if info.status == FAILURE =>
+        case 0 \ _ if info.status == FAILURE =>
           // This payment has been tried and failed, allow to retry this one unless its payment request has expired already
           val show = mkCheckForm(_.dismiss, doSendOffChain(newRD), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, _: Int)
           if (info.pr.isFresh) show(dialog_retry) else show(-1)
 
-        case _ =>
+        case 0 \ _ =>
+          // This payment is SUCCESSFUL or WAITING or UNKNOWN, show blocks until expiry in a latter case
+          val expiryBlocksLeft = app.plur1OrZero(lnStatusExpiry, info.lastExpiry - broadcaster.currentHeight)
+          val title = if (info.status == WAITING) s"$expiryBlocksLeft<br><br>$outgoingTitle" else outgoingTitle
+          showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
+
+        case 1 \ Some(blocksUntilExpiry) if info.isLooper && info.status == WAITING =>
+          // This is a reflexive payment, we are receiving through a hosted channel and preimage is revealed
+          val expiryBlocksLeft = app.plur1OrZero(lnStatusExpiry, blocksUntilExpiry - broadcaster.currentHeight)
+          val title = s"$expiryBlocksLeft<br><br>${app getString ln_hosted_preimage_revealed}<br><br>$outgoingTitle"
+          showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
+
+        case 1 \ Some(blocksUntilExpiry) if info.status == WAITING =>
+          // This is a ordinary payment, we are receiving through a hosted channel and preimage is revealed
+          val expiryBlocksLeft = app.plur1OrZero(lnStatusExpiry, blocksUntilExpiry - broadcaster.currentHeight)
           val incomingTitle = app.getString(ln_incoming_title).format(humanStatus, denom.coloredIn(info.firstSum, denom.sign), inFiat)
-          if (info.incoming == 0 || info.isLooper) showForm(negBuilder(dialog_ok, title = outgoingTitle.html, body = detailsWrapper).create)
-          else if (info.incoming == 1 && info.status != WAITING) showForm(negBuilder(dialog_ok, incomingTitle.html, detailsWrapper).create)
+          val title = s"$expiryBlocksLeft<br><br>${app getString ln_hosted_preimage_revealed}<br><br>$incomingTitle"
+          showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
+
+        case 1 \ _ =>
+          // This payment is SUCCESSFUL or FAILED or UNKNOWN or WAITING, send user to QR page in a latter case
+          val incomingTitle = app.getString(ln_incoming_title).format(humanStatus, denom.coloredIn(info.firstSum, denom.sign), inFiat)
+          if (info.isLooper) showForm(alertDialog = negBuilder(dialog_ok, title = outgoingTitle.html, body = detailsWrapper).create)
+          else if (info.status != WAITING) showForm(negBuilder(dialog_ok, incomingTitle.html, detailsWrapper).create)
           else host PRQR info.pr
       }
     }
   }
 
   case class BTCWrap(wrap: TxWrap) extends ItemWrap {
-    private[this] def txDepth = wrap.tx.getConfidence.getDepthInBlocks
-    private[this] def txDead = DEAD == wrap.tx.getConfidence.getConfidenceType
-    private[this] val txid = wrap.tx.getHashAsString
+    def txDead = DEAD == wrap.tx.getConfidence.getConfidenceType
+    def txDepth = wrap.tx.getConfidence.getDepthInBlocks
     val getDate = wrap.tx.getUpdateTime
+    val txid = wrap.tx.getHashAsString
 
     def fillView(holder: ViewHolder) = {
       val humanAmount = if (fundTxIds contains txid) denom.coloredP2WSH(-wrap.visibleValue, new String)

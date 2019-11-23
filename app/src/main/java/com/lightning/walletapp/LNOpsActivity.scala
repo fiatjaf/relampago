@@ -276,7 +276,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
       // Always reset extra info to GONE at first
       extraInfoText setVisibility View.GONE
 
-      (hc.localError, hc.remoteError) match {
+      hc.localError -> hc.remoteError match {
         case _ \ Some(err) => setExtraInfo(s"Remote: ${ChanErrorCodes translateTag err}")
         case Some(err) \ _ => setExtraInfo(s"Local: ${ChanErrorCodes translateTag err}")
         case _ => doNormalOperationalStateChecks(chan)

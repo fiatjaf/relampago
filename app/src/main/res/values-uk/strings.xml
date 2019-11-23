@@ -106,14 +106,10 @@
     <string name="fp_add_print">Зареєструйте хоча-б один відбиток пальця в налаштуваннях</string>
 
     <!-- trusted node -->
-    <string name="sets_trusted">Свій біткоїн-вузол</string>
     <string name="trusted_hint_none">Немає, використовуємо випадкові</string>
     <string name="trusted_hint">формат виду адреса/IP:порт\nтакож можно tor-адресу</string>
-
-    <string name="sets_trusted_title"><![CDATA[
-        Свій біткоіни-вузол<br><br><small>Якщо адреса вказана, то гаманець буде
-        використовувати тільки ваш Біткоїн-вузол, а не випадкові з мережі</small>
-    ]]></string>
+    <string name="sets_trusted_title"><![CDATA[Свій біткоіни-вузол<br><br><small>Якщо адреса вказана, то гаманець буде використовувати тільки ваш Біткоїн-вузол, а не випадкові з мережі</small>]]></string>
+    <string name="sets_trusted">Свій біткоїн-вузол</string>
 
     <!-- ln fee cap -->
     <string name="sets_ln_fee_cap">Обмежити розмір LN-комісій</string>
@@ -135,6 +131,7 @@
     <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>вхiдний %2$s<br><small>%3$s за поточним курсом</small>]]></string>
     <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>вихiдний %2$s<br><small>%3$s за поточним курсом</small>]]></string>
     <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Платіж-Блискавка</strong></font><br>%1$s<br><br>вихiдний %2$s<br><small>%3$s за поточним курсом</small><br>комса %4$s = %5$.2f%%]]></string>
+    <string name="ln_hosted_preimage_revealed"><![CDATA[<i>секрет цього платежу розкритий, зв\'яжіться з провайдером hosted-каналу <strong>до скінчення</strong> блоків якщо платіж продовжить висіти</i>]]></string>
 
     <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>вхiдний %2$s<br><small>%3$s за поточним курсом</small>]]></string>
     <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Біткоїн-транзакція</strong></font><br>%1$s<br><br>вихiдний %2$s<br><small>%3$s за поточним курсом</small>]]></string>
@@ -181,14 +178,10 @@
     <string name="ln_receive_suggestion"><![CDATA[&#9888; Вхідні платежі-Блискавки неможливі: немає каналів.<br>Натисніть, щоб дізнатися більше!]]></string>
     <string name="ln_receive_ok">Створити QR-код з одноразовим запитом для отримання швидких оффчейн-платежів</string>
 
-    <string name="btc_receive_option"><![CDATA[
-        <font color=#E68A00>Біткоїн-транзакція</font><small><br><br>Створити QR-код
-        зі звичайною адресою для отримання ончейн Біткоїн-транзакцій</small>
-    ]]></string>
+    <string name="btc_receive_option"><![CDATA[<font color=#E68A00>Біткоїн-транзакція</font><small><br><br>Створити QR-код зі звичайною адресою для отримання ончейн Біткоїн-транзакцій</small>]]></string>
 
     <string name="err_ln_peer_offline">Помилка з\'єднання з %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s не підтримує захист від втрати даних</string>
-    <string name="err_ln_chain_disconnected">Створення каналу скасовано тому що он-чейн гаманець в офлайні</string>
     <string name="err_ln_chan_exists_already">Відкритий канал із цим піром вже існує, будь ласка, спробуйте інший вузол</string>
     <string name="err_ln_local_amount_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для каналу</string>
     <string name="err_ln_remote_amount_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для вашого пiра</string>
@@ -210,8 +203,6 @@
         Наразi ви можете відправити до %1$s он-чейн <i>включно з комiсiєю майнерам</i>, що менш нiж сума платежу в розмiрi %2$s разом з комiсiєю в розмiрi %3$s.
         <br><br><strong>Що можна зробити</strong>:<br><br>- Надішліть меншу суму якщо це можливо.<br><br>- Поповніть он-чейн баланс гаманця.<br><br>- Надішліть точно %1$s, в цьому випадку комісія буде вирахувана із суми, а не додана зверху.
     ]]></string>
-
-    <!-- SPECIFIC TO LIGHTNING NETWORK -->
 
     <string name="ln_status_peer">Оберіть піра</string>
     <string name="ln_share_pr">Платіжний запит</string>
@@ -311,6 +302,13 @@
         <item><![CDATA[<font color=#E68A00>Вмикається %1$s каналiв</font>]]></item>
     </array>
 
+    <array name="ln_status_expiry">
+        <item><![CDATA[застряглий платіж]]></item>
+        <item><![CDATA[залишився %1$s блок]]></item>
+        <item><![CDATA[залишилось %1$s блока]]></item>
+        <item><![CDATA[залишилось %1$s блоків]]></item>
+    </array>
+
     <!-- opening a new channel -->
     <array name="ln_ops_start_node_channels">
         <item><![CDATA[Немає відчинених каналів]]></item>
@@ -346,7 +344,6 @@
     <string name="err_ln_hosted_wrong_local_sig">Incorrect local signature</string>
     <string name="err_ln_hosted_wrong_remote_sig">Incorrect remote signature</string>
     <string name="err_ln_hosted_too_many_state_updates">Too many state updates</string>
-    <string name="err_ln_hosted_update_cltv_too_low">Incorrect channel update cltv</string>
     <string name="err_ln_hosted_in_flight_htlc_while_restoring">Remote restore failure</string>
     <string name="err_ln_hosted_timed_out_outgoing_htlc">Timed out outgoing payment</string>
     <string name="err_ln_hosted_channel_denied">Hosted channel denied</string>
