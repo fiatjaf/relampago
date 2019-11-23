@@ -153,14 +153,6 @@
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Send Lightning Payment</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Send Bitcoin Transaction</strong></font><br><br>%1$s]]></string>
 
-    <string name="ln_send_howto"><![CDATA[
-        You are trying to fulfill a Lightning payment request but there are currently no open
-        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>payment channels</a> in this wallet.<br><br>How to fix this?<br><br>
-        - Open an outgoing channel with a peer of your choice, this requires some bitcoins to be present in this wallet as they will be used for funding.<br><br>
-        - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Purchase an incoming channel</a> with an immediately spendable balance on your side.<br><br>
-        - <a href=https://lnbig.com/#/open-channel/>Get a free incoming channel</a> from LNBIG.COM service.
-    ]]></string>
-
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receive Lightning payment</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Lightning payment</font><small><br><br>%1$s</small>]]></string>
 
@@ -188,11 +180,10 @@
     <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
     <string name="err_ln_chain_wait">Waiting for on-chain wallet to become online</string>
 
-    <string name="err_ln_not_enough">None of your channels contains enough funds to send %1$s off-chain</string>
+    <string name="err_ln_not_enough">There is no open channel with enough funds to send %1$s off-chain</string>
     <string name="err_ln_drain_no_hosted">No hosted channel exists with balance large enough for withdrawal</string>
     <string name="err_ln_drain_no_normal">No normal channel exists with capacity large enough for receiving</string>
     <string name="err_ln_peer_can_not_route">Your peer can\'t route payments at this time, please try again a bit later or open another channel</string>
-    <string name="err_ln_still_opening">Failed because a payment channel is not open yet\n\nFunding transaction needs to get up to 6 confirmations before a channel can be used to send payments</string>
     <string name="err_tx_too_large">Failed because transaction is too big for Bitcoin network to process, try breaking it into a number of smaller transactions</string>
     <string name="err_empty_shrunk">Failed because an output could not be shrunken for fees, please add some funds and try again</string>
     <string name="err_nothing_useful">No useful data found</string>

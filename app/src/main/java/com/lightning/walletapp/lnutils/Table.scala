@@ -155,6 +155,7 @@ class LNOpenHelper(context: Context, name: String)
 
   val base = getWritableDatabase
   val asString: Any => String = {
+    case alreadyString: String => alreadyString
     case byteVec: ByteVector => byteVec.toHex
     case otherwise => otherwise.toString
   }

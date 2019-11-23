@@ -440,7 +440,7 @@ object ChannelManager extends Broadcaster {
       // May happen such that we had enough while were deciding whether to pay, but do not have enough funds now, also check extended options
       case Some(max) if max < rd.firstMsat && rd.airLeft > 1 && estimateAIRCanSend >= rd.firstMsat => Left(dialog_sum_big, SENDABLE_AIR)
       case Some(max) if max < rd.firstMsat => Left(dialog_sum_big, NOT_SENDABLE)
-      case None => Left(err_nothing_useful, NOT_SENDABLE)
+      case None => Left(dialog_sum_big, NOT_SENDABLE)
       case _ => Right(rd)
     }
   }

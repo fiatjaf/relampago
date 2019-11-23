@@ -155,14 +155,6 @@
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послать платеж-Молнию</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послать Биткоин-транзакцию</strong></font><br><br>%1$s]]></string>
 
-    <string name="ln_send_howto"><![CDATA[
-        Вы пытаетесь оплатить запрос-Молнию, но в кошельке сейчас нет открытых
-        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платежных каналов</a><br><br>Что с этим делать?<br><br>
-        - Откройте платежный канал с узлом на ваш выбор, для наполнения канала в кошельке должны быть биткоины.<br><br>
-        - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Купите входящий канал</a> с мгновенно доступным расходным балансом.<br><br>
-        - <a href=https://lnbig.com/#/open-channel/>Получите бесплатный входящий канал</a> от сервиса LNBIG.COM.
-    ]]></string>
-
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Создать запрос-Молнию</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запрос-Молния</font><small><br><br>%1$s</small>]]></string>
 
@@ -192,9 +184,8 @@
 
     <string name="err_ln_drain_no_hosted">Нет hosted-канала с достаточным балансом для снятия денег</string>
     <string name="err_ln_drain_no_normal">Нет обычного канала с емкостью, достаточно большой для приема денег</string>
-    <string name="err_ln_not_enough">У вас нет канала, в котором было бы достаточно денег, чтобы отправить %1$s офф-чейн</string>
+    <string name="err_ln_not_enough">У вас нет открытого канала с достаточным балансом для отправки %1$s офф-чейн</string>
     <string name="err_ln_peer_can_not_route">Пир временно не может передавать платежи, попробуйте еще раз позже или откройте другой канал</string>
-    <string name="err_ln_still_opening">Не получилось потому что платежный канал еще не открыт\n\nНаполняющая канал Биткоин-транзакция должна получить до 6 подтверждений перед тем как его можно будет использовать для отправки платежей</string>
     <string name="err_empty_shrunk">Не получилось потому что не удалось подобрать нужную сумму комиссии, вы можете добавить денег в кошелек и попробовать еше раз</string>
     <string name="err_tx_too_large">Не получилось потому что размер транзакции слишком большой, попробуйте разбить ее на несколько более мелких транзакций</string>
     <string name="err_nothing_useful">Ничего не найдено</string>

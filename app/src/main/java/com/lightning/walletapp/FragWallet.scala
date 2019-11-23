@@ -511,8 +511,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         .sortBy(chan => if (chan.isHosted) 1 else 0) // Hosted channels are pushed to the back of the queue
         .take(4) // Limit number of channels to ensure QR code is always readable
 
-      PaymentInfoWrap.recordRoutingDataWithPr(extraRoutes = mostViableChannels map chansWithRoutes, amount = sum,
-        preimage = ByteVector.view(random getBytes 32), inputDescription.getText.toString.take(72).trim, NoopAction)
+      PaymentInfoWrap
+        .recordRoutingDataWithPr(extraRoutes = mostViableChannels map chansWithRoutes, amount = sum,
+          preimage = ByteVector.view(random getBytes 32), inputDescription.getText.toString.take(72).trim)
     }
 
     def recAttempt(alert: AlertDialog) = rateManager.result match {
@@ -591,26 +592,26 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       def onUserAcceptSend(ms: MilliSatoshi) = {
-        // Issue second level call and send payment
-        host toast ln_url_payreq_processing
+        queue.map(_ => payReq.requestFinal(ms).body)
+          .map(LNUrl.guardResponse).map(convertPRF)
+          .foreach(prf => send(prf).run, onFail)
 
-        def convert(raw: String) = {
+        def convertPRF(raw: String) = {
           val prf = to[PayRequestFinal](raw)
           val descriptionHash = ByteVector.fromValidHex(prf.paymentRequest.description)
+          require(PaymentRequest.prefixes(LNParams.chainHash) == prf.paymentRequest.prefix, s"Wrong network prefix=${prf.paymentRequest.prefix}")
           require(descriptionHash == payReq.metaDataHash, s"Metadata hash mismatch, original=${payReq.metaDataHash}, provided=$descriptionHash")
           require(prf.paymentRequest.amount.contains(ms), s"Payment amount mismatch, provided=${prf.paymentRequest.amount}, requested=$ms")
+          require(prf.paymentRequest.isFresh, app getString dialog_pr_expired)
           prf
         }
 
-        def send(prf: PayRequestFinal) = {
+        def send(prf: PayRequestFinal) = UITask {
           val rd = app.emptyRD(prf.paymentRequest, firstMsat = ms.toLong, useCache = true)
-          val rd1 = rd.copy(airLeft = ChannelManager.all count isOperational)
-          UITask(me doSendOffChain rd1).run
+          val rd1 = rd.copy(airLeft = ChannelManager.all count isOperational, action = prf.successAction)
+          host toast ln_url_payreq_processing
+          me doSendOffChain rd1
         }
-
-        queue.map(_ => payReq.requestFinal(ms).body)
-          .map(LNUrl.guardResponse).map(convert)
-          .foreach(send, onFail)
       }
 
       if (maxCanSend < minCanSend) {
@@ -651,7 +652,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val Some(_ \ extraHop) = channelAndHop(toChan)
     val rbRD = PaymentInfoWrap.recordRoutingDataWithPr(extraRoutes = Vector(extraHop),
       amount = math.min(deltaAmountToSend, amountPossibleRebalance).millisatoshi,
-      preimage = ByteVector(random getBytes 32), REBALANCING, NoopAction)
+      preimage = ByteVector(random getBytes 32), REBALANCING)
 
     val listener = new ChannelListener {
       override def outPaymentAccepted(rd: RoutingData) =

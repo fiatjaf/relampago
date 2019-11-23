@@ -155,14 +155,6 @@
     <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Послати платіж-Блискавку</strong></font><small><br><br>%1$s</small>]]></string>
     <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Послати Біткоїн-транзакцію</strong></font><br><br>%1$s]]></string>
 
-    <string name="ln_send_howto"><![CDATA[
-        Ви намагаєтеся оплатити запит-Блискавку, але в цьому гаманці зараз немає відкритих
-        <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>платіжних каналів</a>.<br><br>Що з цим робити?<br><br>
-        - Відкрийте канал з вузлом на ваш вибір, для наповнення каналу в гаманці мають бути біткоіни.<br><br>
-        - <a href=https://www.bitrefill.com/buy/turbo-lightning-channel/>Купіть вхiдний канал</a> з миттєво доступним витратним балансом.<br><br>
-        - <a href=https://lnbig.com/#/open-channel/>Отримайте безкоштовний вхідний канал</a> вiд сервicу LNBIG.COM.
-    ]]></string>
-
     <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Створити запит-Блискавку</strong></font>]]></string>
     <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Запит-Блискавка</font><small><br><br>%1$s</small>]]></string>
 
@@ -192,9 +184,8 @@
 
     <string name="err_ln_drain_no_hosted">Немає hosted-каналу з достатнім балансом для зняття грошей</string>
     <string name="err_ln_drain_no_normal">Ні звичайного каналу з ємністю, досить великою для прийому грошей</string>
-    <string name="err_ln_not_enough">У вас немає каналу, в якому було б достатньо грошей, щоб відправити %1$s офф-чейн</string>
+    <string name="err_ln_not_enough">У вас немає вiдчиненого каналу з достатнiм балансом для відправки %1$s офф-чейн</string>
     <string name="err_ln_peer_can_not_route">Пiр тимчасово не може передавати платежi, спробуйте ще раз пiзнiше або відкрийте інший канал</string>
-    <string name="err_ln_still_opening">Не вийшло тому що платіжний канал ще не відкритий\n\nНаповнююча канал Біткоїн-транзакція повинна отримати до 6 підтверджень перед тим як його можна буде використовувати для платежів</string>
     <string name="err_empty_shrunk">Не вийшло тому що не вдалося підібрати потрібну суму комісії, ви можете додати грошей в гаманець та спробувати еше раз</string>
     <string name="err_tx_too_large">Не вийшло тому що розмір транзакції занадто великий, спробуйте розбити її на кілька дрібніших транзакцій</string>
     <string name="err_nothing_useful">Нічого не знайдено</string>

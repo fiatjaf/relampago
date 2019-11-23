@@ -214,16 +214,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       app quickToast dialog_pr_expired
       me returnToBase null
 
-    case pr: PaymentRequest if ChannelManager.all.exists(isOpening) && ChannelManager.mostFundedChanOpt.isEmpty =>
-      // Only opening channels are present so sending is not enabled yet, inform user about situation
-      onFail(app getString err_ln_still_opening)
-      me returnToBase null
-
-    case pr: PaymentRequest if ChannelManager.mostFundedChanOpt.isEmpty =>
-      // No channels are present at all currently, inform user about what to do
-      showForm(negTextBuilder(dialog_ok, app.getString(ln_send_howto).html).create)
-      me returnToBase null
-
     case pr: PaymentRequest =>
       // We have operational channels at this point
       FragWallet.worker.standardOffChainSend(pr)
