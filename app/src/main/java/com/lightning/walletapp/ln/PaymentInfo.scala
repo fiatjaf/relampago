@@ -207,25 +207,22 @@ trait PaymentInfoBag { me =>
 
 // Payment actions
 
-trait PaymentAction
-case object NoopAction extends PaymentAction
-trait DomainAction extends PaymentAction { val domain: String }
-
-case class MessageAction(domain: String, message: String) extends DomainAction {
-  // The most basic action: just show a popup with given text to user
+trait PaymentAction { def withDomain(domain: String): PaymentAction }
+case object NoopAction extends PaymentAction { def withDomain(domain: String) = NoopAction }
+case class MessageAction(domain: Option[String], message: String) extends PaymentAction {
+  def withDomain(domain: String) = MessageAction(Some(domain), message)
   val finalMessage = message take 144
 }
 
-case class UrlAction(domain: String, description: String, url: String) extends DomainAction {
-  // Show popup with description and url, allow to visit and share a decoded url
+case class UrlAction(domain: Option[String], description: String, url: String) extends PaymentAction {
+  def withDomain(domain: String) = UrlAction(Some(domain), description, url)
   val finalDescription = description take 144
   val uri = android.net.Uri.parse(url)
   require(url startsWith "https://")
-  require(uri.getHost == domain)
 }
 
-case class AESAction(domain: String, description: String, ciphertext: String, iv: String) extends DomainAction {
-  // First obtain ciphertext from remote json, then decode it with preimage once invoice is paid
+case class AESAction(domain: Option[String], description: String, ciphertext: String, iv: String) extends PaymentAction {
+  def withDomain(domain: String) = AESAction(Some(domain), description, ciphertext, iv)
   val ciphertextBytes = ByteVector.fromValidBase64(ciphertext).toArray
   val ivBytes = ByteVector.fromValidBase64(iv).toArray
 }

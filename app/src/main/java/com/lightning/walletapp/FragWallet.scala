@@ -4,6 +4,7 @@ import android.view._
 import android.widget._
 import org.bitcoinj.core._
 import collection.JavaConverters._
+import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln._
 import org.bitcoinj.core.listeners._
 import com.lightning.walletapp.Utils._
@@ -596,13 +597,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
         def convertPRF(raw: String) = {
           val prf = to[PayRequestFinal](raw)
+          require(prf.paymentRequest.isFresh, app getString dialog_pr_expired)
           val descriptionHash = ByteVector.fromValidHex(prf.paymentRequest.description)
-          prf.successAction match { case da: DomainAction => require(da.domain == payReq.callbackUri.getHost, "Action domain mismatch") case _ => }
           require(PaymentRequest.prefixes(LNParams.chainHash) == prf.paymentRequest.prefix, s"Wrong network prefix=${prf.paymentRequest.prefix}")
           require(descriptionHash == payReq.metaDataHash, s"Metadata hash mismatch, original=${payReq.metaDataHash}, provided=$descriptionHash")
           require(prf.paymentRequest.amount.contains(ms), s"Payment amount mismatch, provided=${prf.paymentRequest.amount}, requested=$ms")
-          require(prf.paymentRequest.isFresh, app getString dialog_pr_expired)
-          prf
+          prf.copy(successAction = prf.successAction withDomain payReq.callbackUri.getHost)
         }
 
         def send(prf: PayRequestFinal) = {

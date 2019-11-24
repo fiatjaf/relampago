@@ -127,9 +127,9 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     }
   }
 
-  implicit val messageActionFmt = taggedJsonFmt(jsonFormat[String, String, MessageAction](MessageAction.apply, "domain", "message"), tag = "message")
-  implicit val urlActionFmt = taggedJsonFmt(jsonFormat[String, String, String, UrlAction](UrlAction.apply, "domain", "description", "url"), tag = "url")
-  implicit val aesActionFmt = taggedJsonFmt(jsonFormat[String, String, String, String, AESAction](AESAction.apply, "domain", "description", "ciphertext", "iv"), tag = "aes")
+  implicit val messageActionFmt = taggedJsonFmt(jsonFormat[Option[String], String, MessageAction](MessageAction.apply, "domain", "message"), tag = "message")
+  implicit val urlActionFmt = taggedJsonFmt(jsonFormat[Option[String], String, String, UrlAction](UrlAction.apply, "domain", "description", "url"), tag = "url")
+  implicit val aesActionFmt = taggedJsonFmt(jsonFormat[Option[String], String, String, String, AESAction](AESAction.apply, "domain", "description", "ciphertext", "iv"), tag = "aes")
   implicit val paymentDescriptionFmt = jsonFormat[String, PaymentAction, PaymentDescription](PaymentDescription.apply, "text", "action")
 
   // LNURL
