@@ -168,58 +168,53 @@ object LNUrl {
 }
 
 case class LNUrl(request: String) {
-  val uri = android.net.Uri.parse(request)
-  require(uri.toString startsWith "https://")
+  require(request startsWith "https://", "Not an HTTPS request")
   lazy val isLogin: Boolean = Try(uri getQueryParameter "tag" equals "login").getOrElse(false)
   lazy val k1: Try[String] = Try(uri getQueryParameter "k1")
+  val uri = android.net.Uri.parse(request)
 }
 
 trait LNUrlData {
-  def unsafe(request: String): HttpRequest =
-    get(request, false).trustAllCerts.trustAllHosts
+  def checkAgainstParent(lnUrl: LNUrl): Boolean = true
+  def unsafe(req: String) = get(req, false).trustAllCerts.trustAllHosts
+
+  def validate(lnUrl: LNUrl) = checkAgainstParent(lnUrl) match {
+    case false => throw new Exception("Callback domain mismatch")
+    case true => this
+  }
 }
 
-case class WithdrawRequest(callback: String, k1: String,
-                           maxWithdrawable: Long, defaultDescription: String,
-                           minWithdrawable: Option[Long] = None) extends LNUrlData {
+case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, defaultDescription: String, minWithdrawable: Option[Long] = None) extends LNUrlData {
+  def requestWithdraw(lnUrl: LNUrl, pr: PaymentRequest) = unsafe(callbackUri.buildUpon.appendQueryParameter("pr", PaymentRequest write pr).appendQueryParameter("k1", k1).build.toString)
+  override def checkAgainstParent(lnUrl: LNUrl) = lnUrl.uri.getHost == callbackUri.getHost
+  require(callback startsWith "https://", "Not an HTTPS callback")
 
-  require(callback startsWith "https://")
+  val callbackUri = android.net.Uri.parse(callback)
   val minCanReceive = MilliSatoshi(minWithdrawable getOrElse 1L)
   require(minCanReceive.amount <= maxWithdrawable)
   require(minCanReceive.amount >= 1L)
-
-  def requestWithdraw(lnUrl: LNUrl, pr: PaymentRequest) =
-    unsafe(request = android.net.Uri.parse(callback).buildUpon
-      .appendQueryParameter("pr", PaymentRequest write pr)
-      .appendQueryParameter("k1", k1)
-      .build.toString)
 }
 
-case class IncomingChannelRequest(uri: String, callback: String,
-                                  k1: String) extends LNUrlData {
+case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
+  def requestChannel = unsafe(callbackUri.buildUpon.appendQueryParameter("remoteid", LNParams.nodePublicKey.toString).appendQueryParameter("private", "1").appendQueryParameter("k1", k1).build.toString)
+  override def checkAgainstParent(lnUrl: LNUrl) = lnUrl.uri.getHost == callbackUri.getHost
+  require(callback startsWith "https://", "Not an HTTPS callback")
 
   val nodeLink(nodeKey, hostAddress, portNumber) = uri
-  val remoteNodeId = PublicKey(ByteVector fromValidHex nodeKey)
+  val pubKey = PublicKey(ByteVector fromValidHex nodeKey)
   val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
-  val ann = app.mkNodeAnnouncement(remoteNodeId, address, alias = hostAddress)
-  require(callback startsWith "https://")
-
-  def requestChannel =
-    unsafe(request = android.net.Uri.parse(callback).buildUpon
-      .appendQueryParameter("remoteid", LNParams.nodePublicKey.toString)
-      .appendQueryParameter("private", "1")
-      .appendQueryParameter("k1", k1)
-      .build.toString)
+  val ann = app.mkNodeAnnouncement(pubKey, address, alias = hostAddress)
+  val callbackUri = android.net.Uri.parse(callback)
 }
 
-case class HostedChannelRequest(uri: String, alias: Option[String],
-                                k1: String) extends LNUrlData with StartNodeView {
+case class HostedChannelRequest(uri: String, alias: Option[String], k1: String) extends LNUrlData with StartNodeView {
+  def asString(base: String) = base.format(ann.alias, app getString ln_ops_start_fund_hosted_channel, ann.pretty)
 
   val secret = ByteVector fromValidHex k1
   val nodeLink(nodeKey, hostAddress, portNumber) = uri
+  val pubKey = PublicKey(ByteVector fromValidHex nodeKey)
   val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
-  val ann = app.mkNodeAnnouncement(PublicKey(ByteVector fromValidHex nodeKey), address, alias getOrElse hostAddress)
-  def asString(base: String) = base.format(ann.alias, app getString ln_ops_start_fund_hosted_channel, ann.pretty)
+  val ann = app.mkNodeAnnouncement(pubKey, address, alias getOrElse hostAddress)
 }
 
 object PayRequest {
@@ -230,22 +225,15 @@ object PayRequest {
 }
 
 case class PayRequest(callback: String, maxSendable: Long, minSendable: Long, metadata: String) extends LNUrlData {
-  val metaDataTextPlain: String = to[PayMetaData](metadata).collectFirst { case Vector("text/plain", content) => content }.get
-
-  require(callback startsWith "https://")
+  def requestFinal(amount: MilliSatoshi, fromnodes: String = new String) = unsafe(callbackUri.buildUpon.appendQueryParameter("amount", amount.toLong.toString).appendQueryParameter("fromnodes", fromnodes).build.toString)
+  override def checkAgainstParent(lnUrl: LNUrl) = lnUrl.uri.getHost == callbackUri.getHost
+  def metaDataHash: ByteVector = Crypto.sha256(ByteVector view metadata.getBytes)
+  require(callback startsWith "https://", "Not an HTTPS callback")
   require(minSendable <= maxSendable)
   require(minSendable >= 1L)
 
-  def metaDataHash: ByteVector = {
-    val bytes = metadata getBytes "UTF-8"
-    Crypto.sha256(ByteVector view bytes)
-  }
-
-  def requestFinal(amount: MilliSatoshi, fromnodes: String = new String) =
-    unsafe(request = android.net.Uri.parse(callback).buildUpon
-      .appendQueryParameter("amount", amount.toLong.toString)
-      .appendQueryParameter("fromnodes", fromnodes)
-      .build.toString)
+  val metaDataTextPlain = to[PayMetaData](metadata).collectFirst { case Vector("text/plain", content) => content }.get
+  val callbackUri = android.net.Uri.parse(callback)
 }
 
 case class PayRequestFinal(routes: Vector[Route], pr: String, successAction: PaymentAction) extends LNUrlData {

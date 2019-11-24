@@ -171,8 +171,8 @@ object PaymentInfo {
 }
 
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
-                       onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */ ,
-                       lastMsat: Long /* amount with off-chain fee added */ , lastExpiry: Long, callsLeft: Int,
+                       onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */,
+                       lastMsat: Long /* amount with off-chain fee added */, lastExpiry: Long, callsLeft: Int,
                        useCache: Boolean, airLeft: Int, onChainFeeBlock: Boolean, onChainFeeBlockWasUsed: Boolean,
                        fromHostedOnly: Boolean, action: PaymentAction) {
 
@@ -182,9 +182,8 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
   lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
 }
 
-case class PaymentInfo(rawPr: String, preimage: ByteVector,
-                       incoming: Int, status: Int, stamp: Long, description: String,
-                       firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
+case class PaymentInfo(rawPr: String, preimage: ByteVector, incoming: Int, status: Int, stamp: Long,
+                       description: String, firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
 
   // Incoming `lastExpiry` becomes > 0 once reflexive
   val isLooper = incoming == 1 && lastExpiry != 0
@@ -210,16 +209,25 @@ trait PaymentInfoBag { me =>
 
 trait PaymentAction
 case object NoopAction extends PaymentAction
-case class MessageAction(message: String) extends PaymentAction {
+trait DomainAction extends PaymentAction { val domain: String }
+
+case class MessageAction(domain: String, message: String) extends DomainAction {
   // The most basic action: just show a popup with given text to user
   val finalMessage = message take 144
 }
 
-case class UrlAction(description: String, url: String) extends PaymentAction {
+case class UrlAction(domain: String, description: String, url: String) extends DomainAction {
   // Show popup with description and url, allow to visit and share a decoded url
   val finalDescription = description take 144
   val uri = android.net.Uri.parse(url)
   require(url startsWith "https://")
+  require(uri.getHost == domain)
+}
+
+case class AESAction(domain: String, description: String, ciphertext: String, iv: String) extends DomainAction {
+  // First obtain ciphertext from remote json, then decode it with preimage once invoice is paid
+  val ciphertextBytes = ByteVector.fromValidBase64(ciphertext).toArray
+  val ivBytes = ByteVector.fromValidBase64(iv).toArray
 }
 
 // Previously `PaymentInfo.description` was just raw text

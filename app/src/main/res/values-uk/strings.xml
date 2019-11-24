@@ -315,7 +315,7 @@
     <string name="ln_ops_start_fund_hosted_channel">HOSTED-КАНАЛ</string>
 
     <string name="ln_url_resolving">Підключення до сервісу&#8230;</string>
-    <string name="ln_url_payreq_processing">Платіж відправляється&#8230;</string>
+    <string name="ln_url_payment_request_processing">Платіж відправляється&#8230;</string>
     <string name="ln_url_login_ok"><![CDATA[Успiшний логін на <i>%1$s</i>]]></string>
 
     <string name="ln_url_info_login"><![CDATA[

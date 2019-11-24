@@ -221,7 +221,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     val sslAwareRequest = awaitRequest.trustAllCerts.trustAllHosts
     app quickToast ln_url_resolving
 
-    <(to[LNUrlData](LNUrl guardResponse sslAwareRequest.body), onFail) {
+    <(to[LNUrlData](LNUrl guardResponse sslAwareRequest.body).validate(lnUrl), onFail) {
       case payReq: PayRequest => FragWallet.worker.lnurlPayOffChainSend(lnUrl.uri.getHost, payReq)
       case withdrawReq: WithdrawRequest => me doReceivePayment Some(withdrawReq, lnUrl)
       case hostedRequest: HostedChannelRequest => me goLNStartFund hostedRequest

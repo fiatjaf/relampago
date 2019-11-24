@@ -592,13 +592,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       }
 
       def onUserAcceptSend(ms: MilliSatoshi) = {
-        queue.map(_ => payReq.requestFinal(ms).body)
-          .map(LNUrl.guardResponse).map(convertPRF)
-          .foreach(prf => send(prf).run, onFail)
+        host toast ln_url_payment_request_processing
 
         def convertPRF(raw: String) = {
           val prf = to[PayRequestFinal](raw)
           val descriptionHash = ByteVector.fromValidHex(prf.paymentRequest.description)
+          prf.successAction match { case da: DomainAction => require(da.domain == payReq.callbackUri.getHost, "Action domain mismatch") case _ => }
           require(PaymentRequest.prefixes(LNParams.chainHash) == prf.paymentRequest.prefix, s"Wrong network prefix=${prf.paymentRequest.prefix}")
           require(descriptionHash == payReq.metaDataHash, s"Metadata hash mismatch, original=${payReq.metaDataHash}, provided=$descriptionHash")
           require(prf.paymentRequest.amount.contains(ms), s"Payment amount mismatch, provided=${prf.paymentRequest.amount}, requested=$ms")
@@ -606,12 +605,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           prf
         }
 
-        def send(prf: PayRequestFinal) = UITask {
+        def send(prf: PayRequestFinal) = {
           val rd = app.emptyRD(prf.paymentRequest, firstMsat = ms.toLong, useCache = true)
           val rd1 = rd.copy(airLeft = ChannelManager.all count isOperational, action = prf.successAction)
-          host toast ln_url_payreq_processing
-          me doSendOffChain rd1
+          UITask(me doSendOffChain rd1).run
         }
+
+        queue.map(_ => payReq.requestFinal(ms).body)
+          .map(LNUrl.guardResponse).map(convertPRF)
+          .foreach(send, onFail)
       }
 
       if (maxCanSend < minCanSend) {

@@ -113,6 +113,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
   implicit object PaymentActionFmt extends JsonFormat[PaymentAction] {
     def read(raw: JsValue): PaymentAction = raw.asJsObject fields TAG match {
       case JsString("message") => raw.convertTo[MessageAction]
+      case JsString("aes") => raw.convertTo[AESAction]
       case JsString("url") => raw.convertTo[UrlAction]
       case JsString("noop") => NoopAction
       case _ => throw new Exception
@@ -121,12 +122,14 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
     def write(internal: PaymentAction) = internal match {
       case paymentAction: MessageAction => paymentAction.toJson
       case paymentAction: UrlAction => paymentAction.toJson
+      case paymentAction: AESAction => paymentAction.toJson
       case NoopAction => Map("tag" -> "noop").toJson
     }
   }
 
-  implicit val messageActionFmt = taggedJsonFmt(jsonFormat[String, MessageAction](MessageAction.apply, "message"), tag = "message")
-  implicit val urlActionFmt = taggedJsonFmt(jsonFormat[String, String, UrlAction](UrlAction.apply, "description", "url"), tag = "url")
+  implicit val messageActionFmt = taggedJsonFmt(jsonFormat[String, String, MessageAction](MessageAction.apply, "domain", "message"), tag = "message")
+  implicit val urlActionFmt = taggedJsonFmt(jsonFormat[String, String, String, UrlAction](UrlAction.apply, "domain", "description", "url"), tag = "url")
+  implicit val aesActionFmt = taggedJsonFmt(jsonFormat[String, String, String, String, AESAction](AESAction.apply, "domain", "description", "ciphertext", "iv"), tag = "aes")
   implicit val paymentDescriptionFmt = jsonFormat[String, PaymentAction, PaymentDescription](PaymentDescription.apply, "text", "action")
 
   // LNURL
