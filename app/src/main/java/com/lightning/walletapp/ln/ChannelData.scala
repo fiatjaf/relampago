@@ -216,13 +216,8 @@ object CommitmentSpec {
     case None => cs
   }
 
-  def plusOutgoing(data: UpdateAddHtlc, cs: CommitmentSpec) =
-    cs.copy(htlcs = cs.htlcs + Htlc(incoming = false, add = data),
-      toLocalMsat = cs.toLocalMsat - data.amountMsat)
-
-  def plusIncoming(data: UpdateAddHtlc, cs: CommitmentSpec) =
-    cs.copy(htlcs = cs.htlcs + Htlc(incoming = true, add = data),
-      toRemoteMsat = cs.toRemoteMsat - data.amountMsat)
+  def plusOutgoing(data: UpdateAddHtlc, cs: CommitmentSpec) = cs.copy(htlcs = cs.htlcs + Htlc(incoming = false, add = data), toLocalMsat = cs.toLocalMsat - data.amountMsat)
+  def plusIncoming(data: UpdateAddHtlc, cs: CommitmentSpec) = cs.copy(htlcs = cs.htlcs + Htlc(incoming = true, add = data), toRemoteMsat = cs.toRemoteMsat - data.amountMsat)
 
   def reduce(cs: CommitmentSpec, local: LNMessageVector, remote: LNMessageVector) = {
     val spec1 = cs.copy(fulfilled = Set.empty, failed = Set.empty, malformed = Set.empty)

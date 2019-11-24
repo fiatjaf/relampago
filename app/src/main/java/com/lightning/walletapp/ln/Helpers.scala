@@ -125,9 +125,9 @@ object Helpers {
       } yield signed
 
       val allSuccessTxs = for {
-        HtlcTxAndSigs(info: HtlcSuccessTx, local, remote) <- commitments.localCommit.htlcTxsAndSigs
+        HtlcTxAndSigs(info: HtlcSuccessTx, l, r) <- commitments.localCommit.htlcTxsAndSigs
         paymentInfo <- bag.getPaymentInfo(hash = info.add.paymentHash).toOption
-        success = Scripts.addSigs(info, local, remote, paymentInfo.preimage)
+        success = Scripts.addSigs(info, l, r, paymentInfo.paymentPreimage)
         delayed <- makeClaimDelayedOutput(success.tx).toOption
       } yield success -> delayed
 
@@ -162,7 +162,7 @@ object Helpers {
           commitments.localParams.dustLimit).toOption
 
         sig = Scripts.sign(localHtlcPrivkey)(claimHtlcSuccessTx)
-        signed = Scripts.addSigs(claimHtlcSuccessTx, sig, info.preimage)
+        signed = Scripts.addSigs(claimHtlcSuccessTx, sig, info.paymentPreimage)
         success <- Scripts.checkValid(signed).toOption
       } yield success
 

@@ -69,7 +69,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   }
 
   def toPaymentInfo(rc: RichCursor) =
-    PaymentInfo(rawPr = rc string PaymentTable.pr, preimage = ByteVector.fromValidHex(rc string PaymentTable.preimage),
+    PaymentInfo(rawPr = rc string PaymentTable.pr, hash = rc string PaymentTable.hash, preimage = rc string PaymentTable.preimage,
       incoming = rc int PaymentTable.incoming, status = rc int PaymentTable.status, stamp = rc long PaymentTable.stamp,
       description = rc string PaymentTable.description, firstMsat = rc long PaymentTable.firstMsat,
       lastMsat = rc long PaymentTable.lastMsat, lastExpiry = rc long PaymentTable.lastExpiry)

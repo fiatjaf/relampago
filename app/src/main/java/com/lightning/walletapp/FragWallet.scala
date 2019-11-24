@@ -3,6 +3,7 @@ package com.lightning.walletapp
 import android.view._
 import android.widget._
 import org.bitcoinj.core._
+
 import collection.JavaConverters._
 import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln._
@@ -18,22 +19,21 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
-
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import fr.acinq.bitcoin.{MilliSatoshi, MilliSatoshiLong}
 import android.database.{ContentObserver, Cursor}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
+
 import scala.util.{Failure, Success, Try}
 import android.os.{Bundle, Handler}
-
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
-import com.lightning.walletapp.ln.wire.ChannelReestablish
+import com.lightning.walletapp.ln.wire.{ChannelReestablish, UpdateAddHtlc}
 import android.transition.TransitionManager
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
@@ -177,6 +177,11 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       errorLimit -= 1
     }
 
+    override def onSettled(cs: Commitments) = for {
+      add: UpdateAddHtlc <- cs.localSpec.fulfilledOutgoing
+      item <- lnItems if item.info.paymentHash == add.paymentHash
+    } item.info.pd.action // TODO: process this action
+
     override def onProcessSuccess = {
       // Hosted channel provider sent us an error, let user know
       case (chan: HostedChannel, _: HostedCommits, remoteError: wire.Error) =>
@@ -312,8 +317,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   case class LNWrap(info: PaymentInfo) extends ItemWrap {
-    // Blocks left until expiration if hosted preimage is revealed
-    def hostedLeft = sentHostedPreimages.get(info.preimage)
+    // Blocks until expiration if hosted preimage is revealed
+    def blocksLeft = sentHostedPreimages.get(info.paymentPreimage)
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
@@ -323,7 +328,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
       if (isTablet || isSearching) holder.transactWhat setText humanDesc(info.pd.text).html
-      if (hostedLeft.isDefined) holder.view.setBackgroundColor(Denomination.yellowHighlight)
+      if (blocksLeft.isDefined) holder.view.setBackgroundColor(Denomination.yellowHighlight)
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactSum setText s"<img src='ln'/>$humanAmount".html
       holder.transactCircle setImageResource iconDict(info.status)
@@ -353,8 +358,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         paymentRequest setVisibility View.GONE
         paymentProof setVisibility View.VISIBLE
         paymentProof setOnClickListener onButtonTap {
-          // Signed payment request along with a preimage is sufficient proof of payment
-          host share app.getString(ln_proof).format(serializedPR, info.preimage.toHex)
+          // Signed invoice along with a preimage is sufficient proof of payment
+          host share app.getString(ln_proof).format(serializedPR, info.preimage)
         }
       }
 
@@ -374,7 +379,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         app.getString(ln_outgoing_title).format(humanStatus, sentHuman, inFiat, denom.coloredOut(fee, denom.sign), paidFeePercent)
       }
 
-      info.incoming -> hostedLeft match {
+      info.incoming -> blocksLeft match {
         case 0 \ _ if info.lastExpiry == 0 =>
           // This payment has not been tried yet, could be a failure because offline or no routes found, do not allow to retry it
           val title = app.getString(ln_outgoing_title_no_fee).format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat)

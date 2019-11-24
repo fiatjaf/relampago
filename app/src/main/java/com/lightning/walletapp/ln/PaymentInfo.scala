@@ -164,7 +164,7 @@ object PaymentInfo {
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin > add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case attempt \ Success(info) if attempt.isSuccessful && info.pr.msatOrMin * 2 < add.amount => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
       case attempt \ Success(info) if LNParams.broadcaster.currentHeight + PaymentRequest.cltvExpiryTag.expiryDelta > add.expiry => failIncorrectDetails(pkt, info.pr.msatOrMin, add)
-      case attempt \ Success(info) if attempt.isSuccessful && !loop && info.incoming == 1 && info.status != PaymentInfo.SUCCESS => CMDFulfillHtlc(add, info.preimage)
+      case attempt \ Success(info) if attempt.isSuccessful && !loop && info.incoming == 1 && info.status != PaymentInfo.SUCCESS => CMDFulfillHtlc(add, info.paymentPreimage)
       case attempt \ _ if attempt.isSuccessful => failIncorrectDetails(pkt, add.amount, add)
       case _ => failHtlc(pkt, InvalidOnionPayload(UInt64(0), 0), add)
     }
@@ -182,8 +182,9 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
   lazy val isReflexive = pr.nodeId == LNParams.nodePublicKey
 }
 
-case class PaymentInfo(rawPr: String, preimage: ByteVector, incoming: Int, status: Int, stamp: Long,
-                       description: String, firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
+case class PaymentInfo(rawPr: String, hash: String, preimage: String,
+                       incoming: Int, status: Int, stamp: Long, description: String,
+                       firstMsat: Long, lastMsat: Long, lastExpiry: Long) {
 
   // Incoming `lastExpiry` becomes > 0 once reflexive
   val isLooper = incoming == 1 && lastExpiry != 0
@@ -191,9 +192,12 @@ case class PaymentInfo(rawPr: String, preimage: ByteVector, incoming: Int, statu
 
   // Decode on demand for performance
   lazy val pr = to[PaymentRequest](rawPr)
+  lazy val paymentHash = ByteVector.fromValidHex(hash)
+  lazy val paymentPreimage = ByteVector.fromValidHex(preimage)
+
   // Back compat: use default object if source is not json
   lazy val pd = try to[PaymentDescription](description) catch {
-    case err: Throwable => PaymentDescription(description, NoopAction)
+    case _: Throwable => PaymentDescription(description, NoopAction)
   }
 }
 
