@@ -227,8 +227,8 @@ case class UrlAction(domain: Option[String], description: String, url: String) e
 }
 
 case class AESAction(domain: Option[String], description: String, ciphertext: String, iv: String) extends PaymentAction {
-  val ciphertextBytes = ByteVector.fromValidBase64(ciphertext).toArray
-  val ivBytes = ByteVector.fromValidBase64(iv).toArray
+  val ciphertextBytes = ByteVector.fromValidBase64(ciphertext).take(1024 * 4).toArray // up to ~2kb of encrypted data
+  val ivBytes = ByteVector.fromValidBase64(iv).take(24).toArray // 16 bytes
   val finalMessage = s"<br>${description take 144}"
 }
 
