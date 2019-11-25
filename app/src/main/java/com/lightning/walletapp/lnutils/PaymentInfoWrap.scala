@@ -77,7 +77,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
   def insertOrUpdateOutgoingPayment(rd: RoutingData) = db txWrap {
     db.change(PaymentTable.updLastParamsOutgoingSql, rd.firstMsat, rd.lastMsat, rd.lastExpiry, rd.pr.paymentHash)
     db.change(PaymentTable.newSql, rd.pr.toJson, NOIMAGE, 0 /* outgoing payment */, WAITING, System.currentTimeMillis,
-      PaymentDescription(rd.pr.description, rd.action).toJson, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat,
+      PaymentDescription(rd.action, rd.pr.description).toJson, rd.pr.paymentHash, rd.firstMsat, rd.lastMsat,
       rd.lastExpiry, NOCHANID)
   }
 
@@ -87,7 +87,7 @@ object PaymentInfoWrap extends PaymentInfoBag with ChannelListener { me =>
 
     db.change(PaymentTable.newVirtualSql, rd.queryText, pr.paymentHash)
     db.change(PaymentTable.newSql, pr.toJson, preimage, 1 /* incoming payment */, WAITING, System.currentTimeMillis,
-      PaymentDescription(description, NoopAction).toJson, pr.paymentHash, amount.toLong, 0L /* lastMsat with fees */,
+      PaymentDescription(None, description).toJson, pr.paymentHash, amount.toLong, 0L /* lastMsat with fees */,
       0L /* lastExpiry, may later be updated for reflexive payments */, NOCHANID)
 
     uiNotify

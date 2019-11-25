@@ -81,19 +81,19 @@
     <string name="amount_hint_newchan"><![CDATA[<br><small>мінімум %1$s<br>максимум %2$s<br>баланс %3$s</small>]]></string>
     <string name="amount_hint_can_receive"><![CDATA[<br><small>can receive %1$s</small>]]></string>
     <string name="amount_hint_can_send"><![CDATA[<br><small>can send %1$s</small>]]></string>
-
     <string name="dialog_olympus_recovering">Getting Olympus backups&#8230;</string>
     <string name="dialog_hosted_draining">Draining has started&#8230;</string>
     <string name="dialog_pr_expired">Цей платіжний запит застарів</string>
     <string name="dialog_sum_small">Сума занадто мала</string>
     <string name="dialog_sum_big">Сума занадто велика</string>
     <string name="dialog_pay_onchain">On-chain</string>
-    <string name="dialog_share_key">Share key</string>
-    <string name="dialog_close">Закрити апп</string>
     <string name="dialog_cancel">Скасувати</string>
+    <string name="dialog_close">Закрити</string>
     <string name="dialog_retry">Ще раз</string>
     <string name="dialog_login">Увiйти</string>
+    <string name="dialog_share">Share</string>
     <string name="dialog_boost">CPFP</string>
+    <string name="dialog_open">Open</string>
     <string name="dialog_next">Далі</string>
     <string name="dialog_info">Iнфо</string>
     <string name="dialog_pay">Pay</string>
@@ -316,12 +316,10 @@
 
     <string name="ln_url_resolving">Підключення до сервісу&#8230;</string>
     <string name="ln_url_payment_request_processing">Платіж відправляється&#8230;</string>
-    <string name="ln_url_login_ok"><![CDATA[Успiшний логін на <i>%1$s</i>]]></string>
-
-    <string name="ln_url_info_login"><![CDATA[
-        Логiн-ключ для <i>%1$s</i> згенерований вашим гаманцем:<br><br><strong>%2$s</strong><br><br>
-        Його буде використано для анонiмної авторизації на <i>%1$s</i> без розкриття ваших особистих даних.
-    ]]></string>
+    <string name="ln_url_login_ok"><![CDATA[Успiшно здiйснено логін на <i>%1$s</i>]]></string>
+    <string name="ln_url_info_login"><![CDATA[Логiн-ключ для <i>%1$s</i> згенерований вашим гаманцем:<br><br><strong>%2$s</strong><br><br>Його буде використано для анонiмної авторизації на <i>%1$s</i> без розкриття ваших особистих даних.]]></string>
+    <string name="ln_url_pay_decrypt_fail">Не вдалося розшифрувати повідомлення, будь ласка, зв\'яжіться з продавцем для вирішення проблеми.</string>
+    <string name="ln_url_pay_message_title"><![CDATA[<strong>%1$s</strong><br><br>повідомлення від продавця]]></string>
 
     <!-- Olympus log messages and notification -->
     <string name="olympus_log_channel_backup">Збережений зашифрований бекап каналу з «%1$s»</string>

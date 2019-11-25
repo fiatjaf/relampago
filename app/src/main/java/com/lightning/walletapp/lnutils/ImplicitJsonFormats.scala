@@ -115,7 +115,6 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case JsString("message") => raw.convertTo[MessageAction]
       case JsString("aes") => raw.convertTo[AESAction]
       case JsString("url") => raw.convertTo[UrlAction]
-      case JsString("noop") => NoopAction
       case _ => throw new Exception
     }
 
@@ -123,14 +122,14 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case paymentAction: MessageAction => paymentAction.toJson
       case paymentAction: UrlAction => paymentAction.toJson
       case paymentAction: AESAction => paymentAction.toJson
-      case NoopAction => Map("tag" -> "noop").toJson
+      case _ => throw new Exception
     }
   }
 
   implicit val messageActionFmt = taggedJsonFmt(jsonFormat[Option[String], String, MessageAction](MessageAction.apply, "domain", "message"), tag = "message")
   implicit val urlActionFmt = taggedJsonFmt(jsonFormat[Option[String], String, String, UrlAction](UrlAction.apply, "domain", "description", "url"), tag = "url")
   implicit val aesActionFmt = taggedJsonFmt(jsonFormat[Option[String], String, String, String, AESAction](AESAction.apply, "domain", "description", "ciphertext", "iv"), tag = "aes")
-  implicit val paymentDescriptionFmt = jsonFormat[String, PaymentAction, PaymentDescription](PaymentDescription.apply, "text", "action")
+  implicit val paymentDescriptionFmt = jsonFormat[Option[PaymentAction], String, PaymentDescription](PaymentDescription.apply, "action", "text")
 
   // LNURL
 

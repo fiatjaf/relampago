@@ -4,7 +4,6 @@ import fr.acinq.bitcoin._
 import fr.acinq.bitcoin.Crypto._
 import fr.acinq.bitcoin.Protocol._
 import com.softwaremill.quicklens._
-
 import com.lightning.walletapp.ln.wire.UpdateAddHtlc
 import fr.acinq.bitcoin.SigVersion.SIGVERSION_WITNESS_V0
 import ScriptFlags.STANDARD_SCRIPT_VERIFY_FLAGS

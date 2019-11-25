@@ -174,7 +174,7 @@ case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: P
                        onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */,
                        lastMsat: Long /* amount with off-chain fee added */, lastExpiry: Long, callsLeft: Int,
                        useCache: Boolean, airLeft: Int, onChainFeeBlock: Boolean, onChainFeeBlockWasUsed: Boolean,
-                       fromHostedOnly: Boolean, action: PaymentAction) {
+                       action: Option[PaymentAction], fromHostedOnly: Boolean) {
 
   // Empty used route means we're sending to peer and its nodeId should be our targetId
   def nextNodeId(route: PaymentRoute) = route.headOption.map(_.nodeId) getOrElse pr.nodeId
@@ -197,7 +197,7 @@ case class PaymentInfo(rawPr: String, hash: String, preimage: String,
 
   // Back compat: use default object if source is not json
   lazy val pd = try to[PaymentDescription](description) catch {
-    case _: Throwable => PaymentDescription(description, NoopAction)
+    case _: Throwable => PaymentDescription(None, description)
   }
 }
 
@@ -211,26 +211,27 @@ trait PaymentInfoBag { me =>
 
 // Payment actions
 
-trait PaymentAction { def withDomain(domain: String): PaymentAction }
-case object NoopAction extends PaymentAction { def withDomain(domain: String) = NoopAction }
+sealed trait PaymentAction {
+  val domain: Option[String]
+  val finalMessage: String
+}
+
 case class MessageAction(domain: Option[String], message: String) extends PaymentAction {
-  def withDomain(domain: String) = MessageAction(Some(domain), message)
-  val finalMessage = message take 144
+  val finalMessage = s"<br>${message take 144}"
 }
 
 case class UrlAction(domain: Option[String], description: String, url: String) extends PaymentAction {
-  def withDomain(domain: String) = UrlAction(Some(domain), description, url)
-  val finalDescription = description take 144
-  val uri = android.net.Uri.parse(url)
-  require(url startsWith "https://")
+  val finalMessage = s"<br>${description take 144}<br><br><font color=#0000FF><tt>$url</tt></font><br>"
+  require(domain.forall(url.contains), "Action domain mismatch")
+  require(url startsWith "https://", "Action url is not HTTPS")
 }
 
 case class AESAction(domain: Option[String], description: String, ciphertext: String, iv: String) extends PaymentAction {
-  def withDomain(domain: String) = AESAction(Some(domain), description, ciphertext, iv)
   val ciphertextBytes = ByteVector.fromValidBase64(ciphertext).toArray
   val ivBytes = ByteVector.fromValidBase64(iv).toArray
+  val finalMessage = s"<br>${description take 144}"
 }
 
 // Previously `PaymentInfo.description` was just raw text
 // once actions were added it became json which encodes this class
-case class PaymentDescription(text: String, action: PaymentAction)
+case class PaymentDescription(action: Option[PaymentAction], text: String)

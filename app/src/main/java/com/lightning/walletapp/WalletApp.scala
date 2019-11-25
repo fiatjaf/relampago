@@ -103,7 +103,7 @@ class WalletApp extends Application { me =>
     val useOnChainFeeBlock = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, PacketAndSecrets(emptyOnionPacket, Vector.empty),
       firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeBlock) 8 else 4, useCache = useCache,
-      airLeft = 0, onChainFeeBlock = useOnChainFeeBlock, onChainFeeBlockWasUsed = false, fromHostedOnly = false, action = NoopAction)
+      airLeft = 0, onChainFeeBlock = useOnChainFeeBlock, onChainFeeBlockWasUsed = false, action = None, fromHostedOnly = false)
   }
 
   object TransData {

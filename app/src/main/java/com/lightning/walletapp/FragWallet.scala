@@ -3,10 +3,9 @@ package com.lightning.walletapp
 import android.view._
 import android.widget._
 import org.bitcoinj.core._
-
 import collection.JavaConverters._
-import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln._
+import com.softwaremill.quicklens._
 import org.bitcoinj.core.listeners._
 import com.lightning.walletapp.Utils._
 import com.lightning.walletapp.lnutils._
@@ -19,21 +18,21 @@ import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
+import com.lightning.walletapp.ln.wire.{ChannelReestablish, UpdateAddHtlc}
 import com.lightning.walletapp.ln.Tools.{none, random, runAnd, wrap}
+import com.lightning.walletapp.helper.{AES, ReactLoader, RichCursor}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
-import com.lightning.walletapp.helper.{ReactLoader, RichCursor}
 import fr.acinq.bitcoin.{MilliSatoshi, MilliSatoshiLong}
 import android.database.{ContentObserver, Cursor}
 import org.bitcoinj.wallet.{SendRequest, Wallet}
-
 import scala.util.{Failure, Success, Try}
 import android.os.{Bundle, Handler}
+
 import org.bitcoinj.core.TransactionConfidence.ConfidenceType.DEAD
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRoute
 import android.support.v4.app.LoaderManager.LoaderCallbacks
 import com.lightning.walletapp.lnutils.IconGetter.isTablet
 import org.bitcoinj.wallet.SendRequest.childPaysForParent
-import com.lightning.walletapp.ln.wire.{ChannelReestablish, UpdateAddHtlc}
 import android.transition.TransitionManager
 import android.support.v4.content.Loader
 import android.support.v7.widget.Toolbar
@@ -59,7 +58,7 @@ class FragWallet extends Fragment {
 
 class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar with HumanTimeDisplay { me =>
   import host.{UITask, onButtonTap, showForm, negBuilder, baseBuilder, negTextBuilder, str2View, onTap, onFail}
-  import host.{TxProcessor, mkCheckForm, <, mkCheckFormNeutral, getSupportActionBar, rm}
+  import host.{TxProcessor, mkCheckForm, <, mkCheckFormNeutral, getSupportActionBar, rm, share, browse}
 
   val lnStatus = frag.findViewById(R.id.lnStatus).asInstanceOf[TextView]
   val lnBalance = frag.findViewById(R.id.lnBalance).asInstanceOf[TextView]
@@ -179,8 +178,9 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
     override def onSettled(cs: Commitments) = for {
       add: UpdateAddHtlc <- cs.localSpec.fulfilledOutgoing
-      item <- lnItems if item.info.paymentHash == add.paymentHash
-    } item.info.pd.action // TODO: process this action
+      lnWrap <- lnItems if lnWrap.info.paymentHash == add.paymentHash
+      action: PaymentAction <- lnWrap.info.pd.action
+    } showPayAction(lnWrap.info, action).run
 
     override def onProcessSuccess = {
       // Hosted channel provider sent us an error, let user know
@@ -221,6 +221,34 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
   }
 
+  def showPayAction(info: PaymentInfo, action: PaymentAction) = UITask {
+    // Incoming payments may have various actions attached, find which one is ours
+    // actions typically result in some kind of popup so run this on UI thread
+
+    action match {
+      case act: UrlAction => mkCheckFormNeutral(_ => browse(act.url), none, _ => share(act.url), paymentActionPopup(act.finalMessage.html, act), dialog_open, dialog_cancel, dialog_share)
+      case act: MessageAction => showForm(paymentActionPopup(act.finalMessage.html, act).setNegativeButton(dialog_ok, null).create)
+      case act: AESAction => aesActionPopup(info, act)
+    }
+  }
+
+  // CHANNEL LISTENER HELPERS
+
+  val actionTitle = app getString ln_url_pay_message_title
+  def paymentActionPopup(customMessage: CharSequence, paymentAction: PaymentAction) = {
+    val titleOpt = paymentAction.domain.map(site => s"$actionTitle<br><br><strong>$site</strong>")
+    host.baseTextBuilder(customMessage).setCustomTitle(titleOpt.getOrElse(actionTitle).html)
+  }
+
+  def aesActionPopup(info: PaymentInfo, aes: AESAction) = Try {
+    val plaintext = Tools.bin2readable(AES.dec(data = aes.ciphertextBytes, key = info.paymentPreimage.toArray, initVector = aes.ivBytes).toArray)
+    val msg = if (plaintext.length > 36) s"${aes.finalMessage}<br><br><tt>$plaintext</tt><br>" else s"${aes.finalMessage}<br><br><tt><big>$plaintext</big></tt><br>"
+    plaintext -> msg.html
+  } match {
+    case Success(secret \ text) => mkCheckFormNeutral(_.dismiss, none, alert => rm(alert)(host share secret), paymentActionPopup(text, aes), dialog_ok, -1, dialog_share)
+    case _ => showForm(paymentActionPopup(s"<br>${app getString ln_url_pay_decrypt_fail}", aes).setNegativeButton(dialog_ok, null).create)
+  }
+
   def proposeOverride(cmd: CMDHostedStateOverride, chan: HostedChannel, hc: HostedCommits) = UITask {
     val currentBalance = s"<strong>${denom.parsedWithSign(chan.estCanSendMsat.toTruncatedMsat).html}</strong>"
     val proposedBalance = s"<strong>${denom.parsedWithSign(hc.newLocalBalanceMsat(cmd.so).toTruncatedMsat).html}</strong>"
@@ -234,6 +262,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     UITask(host showForm builder.create).run
     PaymentInfoWrap failOnUI rd
   }
+
+  // UPADTING PAYMENT LIST
 
   def updPaymentList = UITask {
     TransitionManager beginDelayedTransition mainWrap
@@ -589,8 +619,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   def lnurlPayOffChainSend(domain: String, payReq: PayRequest) = {
     new OffChainSender(maxCanSend = math.min(ChannelManager.estimateAIRCanSend, payReq.maxSendable).millisatoshi, minCanSend = payReq.minSendable.millisatoshi) {
-      def displayPaymentForm = mkCheckFormNeutral(sendAttempt, none, visitSite, baseBuilder(getTitle, baseContent), dialog_ok, dialog_cancel, dialog_info)
-      def visitSite(alert: AlertDialog) = host.browse(s"https://$domain")
+      def displayPaymentForm = mkCheckFormNeutral(sendAttempt, none, _ => browse(s"https://$domain"), baseBuilder(getTitle, baseContent), dialog_ok, dialog_cancel, dialog_info)
 
       def getTitle = {
         val content = s"<strong><big>$domain</big></strong><br><br>${payReq.metaDataTextPlain take 72}"
@@ -600,24 +629,24 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       def onUserAcceptSend(ms: MilliSatoshi) = {
         host toast ln_url_payment_request_processing
 
-        def convertPRF(raw: String) = {
+        def convert(raw: String) = {
           val prf = to[PayRequestFinal](raw)
           require(prf.paymentRequest.isFresh, app getString dialog_pr_expired)
           val descriptionHash = ByteVector.fromValidHex(prf.paymentRequest.description)
-          require(PaymentRequest.prefixes(LNParams.chainHash) == prf.paymentRequest.prefix, s"Wrong network prefix=${prf.paymentRequest.prefix}")
           require(descriptionHash == payReq.metaDataHash, s"Metadata hash mismatch, original=${payReq.metaDataHash}, provided=$descriptionHash")
+          require(PaymentRequest.prefixes(LNParams.chainHash) == prf.paymentRequest.prefix, s"Wrong network prefix=${prf.paymentRequest.prefix}")
           require(prf.paymentRequest.amount.contains(ms), s"Payment amount mismatch, provided=${prf.paymentRequest.amount}, requested=$ms")
-          prf.copy(successAction = prf.successAction withDomain payReq.callbackUri.getHost)
+          prf.modify(_.successAction.domain.each).setTo(payReq.callbackUri.getHost)
         }
 
         def send(prf: PayRequestFinal) = {
           val rd = app.emptyRD(prf.paymentRequest, firstMsat = ms.toLong, useCache = true)
-          val rd1 = rd.copy(airLeft = ChannelManager.all count isOperational, action = prf.successAction)
+          val rd1 = rd.copy(action = Some(prf.successAction), airLeft = ChannelManager.all count isOperational)
           UITask(me doSendOffChain rd1).run
         }
 
         queue.map(_ => payReq.requestFinal(ms).body)
-          .map(LNUrl.guardResponse).map(convertPRF)
+          .map(LNUrl.guardResponse).map(convert)
           .foreach(send, onFail)
       }
 
