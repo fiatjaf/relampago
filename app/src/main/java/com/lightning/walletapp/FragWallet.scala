@@ -245,8 +245,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val msg = if (plaintext.length > 36) s"${aes.finalMessage}<br><br><tt>$plaintext</tt><br>" else s"${aes.finalMessage}<br><br><tt><big>$plaintext</big></tt><br>"
     plaintext -> msg.html
   } match {
-    case Success(secret \ text) => mkCheckFormNeutral(_.dismiss, none, alert => rm(alert)(host share secret), paymentActionPopup(text, aes), dialog_ok, -1, dialog_share)
-    case _ => showForm(paymentActionPopup(s"<br>${app getString ln_url_pay_decrypt_fail}", aes).setNegativeButton(dialog_ok, null).create)
+    case Success(secret \ text) => mkCheckFormNeutral(_.dismiss, none, _ => share(secret), paymentActionPopup(text, aes), dialog_ok, -1, dialog_share)
+    case _ => showForm(paymentActionPopup(s"<br>${app getString ln_url_pay_decrypt_fail}".html, aes).setNegativeButton(dialog_ok, null).create)
   }
 
   def proposeOverride(cmd: CMDHostedStateOverride, chan: HostedChannel, hc: HostedCommits) = UITask {
@@ -348,7 +348,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   case class LNWrap(info: PaymentInfo) extends ItemWrap {
     // Blocks until expiration if hosted preimage is revealed
-    def blocksLeft = sentHostedPreimages.get(info.paymentPreimage)
+    def hostedBlocks = sentHostedPreimages.get(info.paymentPreimage)
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
@@ -358,7 +358,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
       if (isTablet || isSearching) holder.transactWhat setText humanDesc(info.pd.text).html
-      if (blocksLeft.isDefined) holder.view.setBackgroundColor(Denomination.yellowHighlight)
+      if (hostedBlocks.isDefined) holder.view.setBackgroundColor(Denomination.yellowHighlight)
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactSum setText s"<img src='ln'/>$humanAmount".html
       holder.transactCircle setImageResource iconDict(info.status)
@@ -373,29 +373,28 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         case _ => s"<strong>${app getString ln_state_wait}</strong>"
       }
 
-      val inFiat = msatInFiatHuman(info.firstSum)
-      val newRD = app.emptyRD(info.pr, info.firstMsat, useCache = false)
+      lazy val inFiat = msatInFiatHuman(info.firstSum)
+      lazy val serializedPR = PaymentRequest write info.pr
       val detailsWrapper = host.getLayoutInflater.inflate(R.layout.frag_tx_ln_details, null)
       val paymentProof = detailsWrapper.findViewById(R.id.paymentProof).asInstanceOf[Button]
       val paymentDebug = detailsWrapper.findViewById(R.id.paymentDebug).asInstanceOf[Button]
       val paymentRequest = detailsWrapper.findViewById(R.id.paymentRequest).asInstanceOf[Button]
-
-      lazy val serializedPR = PaymentRequest write info.pr
-      paymentRequest setOnClickListener onButtonTap(exec = host share serializedPR)
-      detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView] setText humanDesc(info.pd.text).html
+      val runPaymentAction = detailsWrapper.findViewById(R.id.runPaymentAction).asInstanceOf[Button]
+      val paymentDetails = detailsWrapper.findViewById(R.id.paymentDetails).asInstanceOf[TextView]
+      paymentRequest setOnClickListener onButtonTap(host share serializedPR)
+      paymentDetails setText humanDesc(info.pd.text).html
 
       if (info.status == SUCCESS) {
-        paymentRequest setVisibility View.GONE
+        paymentProof setOnClickListener onButtonTap(host share app.getString(ln_proof).format(serializedPR, info.preimage).trim)
+        for (act <- info.pd.action) runPaymentAction setOnClickListener onButtonTap(showPayAction(info, act).run)
+        runPaymentAction setVisibility viewMap(info.pd.action.isDefined)
         paymentProof setVisibility View.VISIBLE
-        paymentProof setOnClickListener onButtonTap {
-          // Signed invoice along with a preimage is sufficient proof of payment
-          host share app.getString(ln_proof).format(serializedPR, info.preimage)
-        }
+        paymentRequest setVisibility View.GONE
       }
 
-      PaymentInfoWrap.acceptedPayments get newRD.pr.paymentHash foreach { rd1 =>
+      PaymentInfoWrap.acceptedPayments get info.pr.paymentHash foreach { rd1 =>
         val routingPath = for (usedHop <- rd1.usedRoute) yield usedHop.humanDetails
-        val failures = PaymentInfo.errors(newRD.pr.paymentHash) map { case fail \ _ => fail.toString } mkString "\n==\n"
+        val failures = PaymentInfo.errors(info.pr.paymentHash) map { case fail \ _ => fail.toString } mkString "\n==\n"
         val receiverInfo = s"Payee node ID: ${rd1.pr.nodeId.toString}, Expiry: ${rd1.pr.adjustedMinFinalCltvExpiry} blocks"
         val debugInfo = ("Your wallet" +: routingPath :+ receiverInfo mkString "\n-->\n") + s"\n\n$failures"
         paymentDebug setOnClickListener onButtonTap(host share debugInfo)
@@ -409,13 +408,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
         app.getString(ln_outgoing_title).format(humanStatus, sentHuman, inFiat, denom.coloredOut(fee, denom.sign), paidFeePercent)
       }
 
-      info.incoming -> blocksLeft match {
+      info.incoming -> hostedBlocks match {
         case 0 \ _ if info.lastExpiry == 0 =>
           // This payment has not been tried yet, could be a failure because offline or no routes found, do not allow to retry it
           val title = app.getString(ln_outgoing_title_no_fee).format(humanStatus, denom.coloredOut(info.firstSum, denom.sign), inFiat)
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
         case 0 \ _ if info.status == FAILURE =>
+          val newRD = app.emptyRD(info.pr, info.firstMsat, useCache = false).copy(action = info.pd.action)
           // This payment has been tried and failed, allow to retry this one unless its payment request has expired already
           val show = mkCheckForm(_.dismiss, doSendOffChain(newRD), baseBuilder(outgoingTitle.html, detailsWrapper), dialog_ok, _: Int)
           if (info.pr.isFresh) show(dialog_retry) else show(-1)
@@ -433,7 +433,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           showForm(negBuilder(dialog_ok, title.html, detailsWrapper).create)
 
         case 1 \ Some(blocksUntilExpiry) if info.status == WAITING =>
-          // This is a ordinary payment, we are receiving through a hosted channel and preimage is revealed
+          // This is an ordinary payment, we are receiving through hosted channel and preimage is revealed
           val expiryBlocksLeft = app.plur1OrZero(lnStatusExpiry, blocksUntilExpiry - broadcaster.currentHeight)
           val incomingTitle = app.getString(ln_incoming_title).format(humanStatus, denom.coloredIn(info.firstSum, denom.sign), inFiat)
           val title = s"$expiryBlocksLeft<br><br>${app getString ln_hosted_preimage_revealed}<br><br>$incomingTitle"

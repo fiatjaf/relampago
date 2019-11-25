@@ -197,6 +197,7 @@
 
     <string name="ln_status_peer">Выберите пира</string>
     <string name="ln_share_pr">Платежный запрос</string>
+    <string name="ln_run_action">Run Payment Action</string>
     <string name="ln_share_node_id">ID моего LN-узла</string>
     <string name="ln_share_debug">Отладочная информация</string>
     <string name="ln_drain_hosted">Drain hosted channel</string>

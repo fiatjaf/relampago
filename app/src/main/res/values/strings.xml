@@ -195,6 +195,7 @@
 
     <string name="ln_status_peer">Select peer</string>
     <string name="ln_share_debug">Share debug info</string>
+    <string name="ln_run_action">Run Payment Action</string>
     <string name="ln_share_pr">Share Payment Request</string>
     <string name="ln_share_node_id">Share my LN Node ID</string>
     <string name="ln_drain_hosted">Drain hosted channel</string>

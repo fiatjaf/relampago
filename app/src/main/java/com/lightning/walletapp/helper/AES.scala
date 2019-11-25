@@ -24,7 +24,7 @@ object AES {
   // Used for Object -> Json -> Encrypted -> Zygote -> BitVector
 
   def encReadable(plain: String, key: Bytes): BitVector = {
-    val zygote = encBytes(plain.getBytes, key)
+    val zygote = encBytes(plain getBytes "UTF-8", key)
     aesZygoteCodec.encode(zygote).require
   }
 

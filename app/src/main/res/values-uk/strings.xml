@@ -200,6 +200,7 @@
     <string name="ln_share_proof">Доказ платежу</string>
     <string name="ln_description_hint">додайте опис</string>
     <string name="ln_no_description">Опис відсутній</string>
+    <string name="ln_run_action">Run Payment Action</string>
     <string name="ln_share_node_id">ID мого LN-вузла</string>
     <string name="ln_share_debug">Отладочна інформація</string>
     <string name="ln_drain_hosted">Drain hosted channel</string>
