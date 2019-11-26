@@ -120,7 +120,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       override def onBecome = {
-        case (_: NormalChannel, _, _, WAIT_FOR_FUNDING | WAIT_FUNDING_DONE) if ChannelManager.currentBlocksLeft.isEmpty =>
+        case (_: NormalChannel, _, _, WAIT_FOR_FUNDING | WAIT_FUNDING_DONE) if app.kit.peerGroup.numConnectedPeers < 1 =>
           // Funding with unreachable on-chain peers is problematic, just cancel the whole operation and let user know
           onException(freshChannel -> chainNotConnectedYet)
 
@@ -207,7 +207,7 @@ class LNStartFundActivity extends TimerActivity { me =>
       }
 
       override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (nodeId == ann.nodeId) {
-        if (ChannelManager.currentBlocksLeft.isEmpty) onException(freshChannel -> chainNotConnectedYet)
+        if (app.kit.peerGroup.numConnectedPeers < 1) onException(freshChannel -> chainNotConnectedYet)
         else if (ChannelManager hasHostedChanWith nodeId) onException(freshChannel -> chanExistsAlready)
         else if (!isCompat) onException(freshChannel -> peerIncompatible)
         else freshChannel.startUp

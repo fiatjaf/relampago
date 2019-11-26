@@ -28,7 +28,6 @@ import com.lightning.walletapp.lnutils.olympus.{OlympusWrap, TxUploadAct}
 import android.app.{Application, NotificationChannel, NotificationManager}
 import com.lightning.walletapp.helper.{AwaitService, RichCursor, ThrottledWork}
 import com.lightning.walletapp.lnutils.JsonHttpUtils.{ioQueue, pickInc, repeat, retry}
-import org.bitcoinj.core.listeners.PeerDisconnectedEventListener
 import concurrent.ExecutionContext.Implicits.global
 import java.util.concurrent.TimeUnit.MILLISECONDS
 import android.support.v7.app.AppCompatDelegate
@@ -164,7 +163,6 @@ class WalletApp extends Application { me =>
       wallet.autosaveToFile(walletFile, 1000, MILLISECONDS, null)
       wallet.addCoinsSentEventListener(ChannelManager.chainEventsListener)
       wallet.addCoinsReceivedEventListener(ChannelManager.chainEventsListener)
-      peerGroup.addDisconnectedEventListener(ChannelManager.chainEventsListener)
 
       Future {
         trustedNodeTry match {
@@ -236,11 +234,9 @@ object ChannelManager extends Broadcaster {
     }
   }
 
-  val chainEventsListener = new TxTracker with BlocksListener with PeerDisconnectedEventListener {
-    def onPeerDisconnected(offPeer: Peer, numPeers: Int) = if (numPeers < 1) currentBlocksLeft = None
-    def onBlocksDownloaded(peer: Peer, b: Block, fb: FilteredBlock, left: Int) = onBlock(left)
+  val chainEventsListener = new TxTracker with BlocksListener {
     override def onChainDownloadStarted(peer: Peer, left: Int) = onBlock(left)
-
+    def onBlocksDownloaded(peer: Peer, b: Block, fb: FilteredBlock, left: Int) = onBlock(left)
     def onCoinsReceived(wallet: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
     def onCoinsSent(wallet: Wallet, txj: Transaction, a: Coin, b: Coin) = onChainTx(txj)
 

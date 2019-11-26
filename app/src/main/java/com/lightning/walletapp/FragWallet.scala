@@ -139,7 +139,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     val perOneBtcRate = formatFiat.format(msatInFiat(oneBtc) getOrElse 0L)
 
     val btcSubtitleText =
-      if (ChannelManager.currentBlocksLeft.isEmpty) btcStatusConnecting
+      if (app.kit.peerGroup.numConnectedPeers < 1) btcStatusConnecting
       else if (ChannelManager.blockDaysLeft <= 1) btcStatusOperational
       else app.plur1OrZero(btcSyncInfo, ChannelManager.blockDaysLeft)
 

@@ -111,7 +111,7 @@ case class PaymentRequest(prefix: String, amount: Option[MilliSatoshi], timestam
   for (MilliSatoshi(sum) <- amount) require(sum > 0L, "Amount is not valid")
 
   lazy val msatOrMin = amount getOrElse MilliSatoshi(1L)
-  lazy val adjustedMinFinalCltvExpiry = tags.collectFirst { case MinFinalCltvExpiryTag(delta) => delta }.getOrElse(0L) + 10L
+  lazy val adjustedMinFinalCltvExpiry = tags.collectFirst { case MinFinalCltvExpiryTag(delta) => delta }.getOrElse(0L) + 18L
   lazy val paymentHash = tags.collectFirst { case PaymentHashTag(hash) => hash }.get
   lazy val features = tags.collectFirst { case fts: FeaturesTag => fts.bitmask }
   lazy val routingInfo = tags.collect { case r: RoutingInfoTag => r }
