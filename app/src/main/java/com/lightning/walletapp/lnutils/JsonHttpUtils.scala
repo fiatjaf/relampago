@@ -75,8 +75,9 @@ object TopNodes {
   var top = Try(raw) map to[TopNodes] getOrElse TopNodes(Vector.empty, 0L)
 
   private[this] val process: String => Unit = res => {
-    val nodes = res.parseJson.asJsObject.fields("results").asInstanceOf[JsArray].elements.map(_.asJsObject fields "node")
-    top = TopNodes(nodes = nodes.map(json2String).filterNot(_ contains "::"), stamp = System.currentTimeMillis)
+    val rawJson = res.parseJson.asJsObject.fields("results")
+    val nodes = rawJson.asInstanceOf[JsArray].elements.map(_.asJsObject fields "node")
+    top = TopNodes(nodes = nodes.map(json2String), stamp = System.currentTimeMillis)
     app.prefs.edit.putString(AbstractKit.TOP_NODES, top.toJson.toString).commit
   }
 
