@@ -25,11 +25,11 @@
         android:icon="@mipmap/ic_launcher"
         android:fullBackupContent="false"
         android:allowBackup="false"
-        android:label="BLW">
+        android:label="Relâmpago">
 
         <provider
             android:name="android.support.v4.content.FileProvider"
-            android:authorities="com.lightning.walletapp"
+            android:authorities="xyz.bigsun.relampago"
             android:grantUriPermissions="true"
             android:exported="false">
 

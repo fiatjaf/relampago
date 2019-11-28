@@ -67,6 +67,8 @@
 
     <string name="action_coins_send">Послать деньги</string>
     <string name="action_coins_receive">Получить деньги</string>
+    <string name="action_receive_ln">Заказать оплату Lightning</string>
+    <string name="action_receive_btc">Создать Биткоин-адрес</string>
     <string name="action_ln_details">Состояние каналов</string>
     <string name="action_ln_open">Открыть новый канал</string>
 

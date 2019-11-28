@@ -67,6 +67,8 @@
 
     <string name="action_coins_send">Послати гроші</string>
     <string name="action_coins_receive">Отримати гроші</string>
+    <string name="action_receive_ln">Попросити платіжну блискавку</string>
+    <string name="action_receive_btc">Створіть біткойн-адресу</string>
     <string name="action_ln_details">Стан каналів</string>
     <string name="action_ln_open">Відчинити канал</string>
 

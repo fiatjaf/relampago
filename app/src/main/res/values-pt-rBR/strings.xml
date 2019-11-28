@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="lang">port</string>
+    <string name="emerge_report">Mostrar relatório de erro</string>
+    <string name="emerge_mode">Modo de emergência</string>
+
+    <array name="restore_options">
+        <item>Digitar frase mnemônica</item>
+        <item>Usar arquivo de migração</item>
+    </array>
+
+    <!-- app wide -->
+    <string name="step_fees"><![CDATA[<font color=#999999>Decida a taxa de mineração</font><br><br>%1$s]]></string>
+    <string name="sets_rescan_ok">O aplicativo será fechado agora e a cadeia de blocos Bitcoin será lida automaticamente da próxima vez que for aberto</string>
+    <string name="greetings">Carteira Relâmpago\nPor favor leia este\n<a href='http://lightning-wallet.com'>breve manual</a> antes de continuar</string>
+    <string name="boost_details"><![CDATA[Você gostaria de pagar uma taxa maior para esta transação e confirmá-la mais rápido?<br><br>atual %1$s<br>aumentada %2$s<br>]]></string>
+    <string name="mnemonic_info">A frase mnemônica é importante!\n<a href="http://lightning-wallet.com/installing-lightning-wallet#mnemonic-code">Leia sobre ela (em inglês)</a> e salve-a agora\n\n\nDeslize a tela para a esquerda\npara abrir um leitor de QR</string>
+    <string name="fee_risky"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>A confirmação pode levar horas</font></small></small>]]></string>
+    <string name="fee_live"><![CDATA[<small>%1$s %2$s<br><small><font color=#999999>Confirmação mais rápida</font></small></small>]]></string>
+    <string name="search_hint_payments">Busca</string>
+    <string name="wallet_settings">Opções</string>
+    <string name="wallet_restore">Recuperar carteira</string>
+    <string name="copied_to_clipboard">Copiado</string>
+    <string name="wallet_create">Criar carteira</string>
+
+    <array name="denoms">
+        <item><![CDATA[Satoshi <font color=#999999><small>= 0.00000001 btc</small></font>]]></item>
+        <item><![CDATA[Bitcoin <font color=#999999><small>= 100 000 000 sat</small></font>]]></item>
+    </array>
+
+    <string name="restore_when">Quando sua carteira foi criada?\n(Deixe como está se não souber)</string>
+    <string name="create_wallet_creating">Criando sua carteira\n(Pode demorar alguns minutos)</string>
+    <string name="restore_wallet_restoring">Recuperando sua carteira\n(Deve demorar um pouco)</string>
+    <string name="restore_mnemonic_wrong">A frase deve ter 12 palavras</string>
+    <string name="restore_hint">Sua frase mnemônica de 12 palavras</string>
+
+    <string name="channel_recovery_info">
+        A ferramenta de recuperação faz download dos backups dos servidores Olympus e os usa para trazer os fundos dos canais para a sua carteira Bitcoin.
+        \n\nSe você tiver canais Relâmpago perdidos e usar esta ferramenta, deve aparecer uma transação Bitcoin no seu histórico, do contrário nada vai acontecer.
+        \n\nA recuperação não afeta os canais que você tem abertos no seu aparelho agora.
+    </string>
+
+    <string name="hivemind_details"><![CDATA[
+        <strong>Depósitos Hivemind estão desativados</strong><br><br>
+        Será possível fazer depósitos na Hivemind se o soft-fork <a href="http://www.drivechain.info/">Drivechain</a> for ativado na rede Bitcoin.<br><br>
+        O <a href="http://bitcoinhivemind.com/">Hivemind</a> é um protocolo de oráculo sem um servidor central que absorve dados precisos e possibilita a qualquer pessoa com bitcoins pode apostar em acontecimentos futuros.<br><br>
+        Esses mercados de previsão completamente incensuráveis têm <a href=http://bitcoinhivemind.com/papers/3_PM_Applications.pdf>potencial</a> para revolucionar a emergência e a difusão do conhecimento na sociedade.
+    ]]></string>
+
+    <!-- Olympus server -->
+    <string name="olympus_log">Histórico de uso de fichas</string>
+    <string name="olympus_add">Adicionar servidor Olympus</string>
+    <string name="olympus_edit">Editar servidor Olympus</string>
+    <string name="olympus_actions">Adicionar, remover ou reordenar</string>
+    <string name="olympus_hint">O formato é https://host:port</string>
+    <string name="olympus_backup">Backups e vigia de canais</string>
+
+    <array name="olympus_tokens_left">
+        <item><![CDATA[<small><i>nenhuma ficha</i></small>]]></item>
+        <item><![CDATA[<small><i>%1$d ficha</i></small>]]></item>
+        <item><![CDATA[<small><i>%1$d fichas</i></small>]]></item>
+        <item><![CDATA[<small><i>backup desativado</i></small>]]></item>
+    </array>
+
+    <!-- menu and fab -->
+    <string name="sets_set_fiat">Moeda estatal para comparação</string>
+    <string name="sets_choose_unit">Unidade de medida Bitcoin</string>
+    <string name="sets_manage_olympus">Servidores Olympus</string>
+    <string name="sets_chan_recover">Ferramenta de recuperação Olympus</string>
+    <string name="sets_mnemonic">Ver frase mnemônica</string>
+    <string name="sets_rescan">Reler cadeia de blocos Bitcoin</string>
+
+    <string name="action_coins_send">Colar solicitação</string>
+    <string name="action_coins_receive">Receber</string>
+    <string name="action_receive_ln">Receber por Relâmpago</string>
+    <string name="action_receive_btc">Gerar endereço Bitcoin</string>
+    <string name="action_ln_details">Ver canais</string>
+    <string name="action_ln_open">Abrir canal</string>
+
+    <!-- dialogs -->
+    <string name="amount_hint_sat"><![CDATA[Valor em Satoshi%1$s]]></string>
+    <string name="amount_hint_btc"><![CDATA[Valor em Bitcoin%1$s]]></string>
+
+    <string name="amount_hint_newchan"><![CDATA[<br><small>capacidade mínima %1$s<br>capacidade máxima %2$s<br>saldo %3$s</small>]]></string>
+    <string name="amount_hint_can_receive"><![CDATA[<br><small>você consegue receber %1$s</small>]]></string>
+    <string name="amount_hint_can_send"><![CDATA[<br><small>você consegue mandar %1$s</small>]]></string>
+    <string name="dialog_olympus_recovering">Usando backups Olympus&#8230;</string>
+    <string name="dialog_hosted_draining">Secamento iniciado&#8230;</string>
+    <string name="dialog_pr_expired">Solicitação vencida</string>
+    <string name="dialog_sum_small">Montante muito pequeno</string>
+    <string name="dialog_sum_big">Montante muito grande</string>
+    <string name="dialog_pay_onchain">Transação básica</string>
+    <string name="dialog_close">Fechar</string>
+    <string name="dialog_cancel">Cancelar</string>
+    <string name="dialog_share">Compartilhar</string>
+    <string name="dialog_retry">Tentar de novo</string>
+    <string name="dialog_login">Login</string>
+    <string name="dialog_boost">CPFP</string>
+    <string name="dialog_next">Pronto</string>
+    <string name="dialog_info">Informação</string>
+    <string name="dialog_open">Abrir</string>
+    <string name="dialog_pay">Pagar</string>
+    <string name="dialog_max">Max</string>
+    <string name="dialog_ok">OK</string>
+
+    <!-- fingerprint -->
+    <string name="sets_fp">Proteger com impressão digital</string>
+    <string name="fp_no_support">Este aparelho não entende impressões digitais</string>
+    <string name="fp_add_print">Registre uma impressão digital nas opções do aparelho</string>
+
+    <!-- trusted node -->
+    <string name="trusted_hint_none">Desligado, usando servidores aleatórios</string>
+    <string name="trusted_hint">o formato é host:port\nEndereços Tor funcionam</string>
+    <string name="sets_trusted_title"><![CDATA[Servidor Bitcoin de confiança<br><br><small>Insira um endereço para se conectar somente a esse servidor e não a servidores aleatórios da rede</small>]]></string>
+    <string name="sets_trusted">Usar servidor Bitcoin de confiança</string>
+
+    <!-- ln fee cap -->
+    <string name="sets_ln_fee_cap">Limitar taxas Relâmpago às taxas de mineração</string>
+    <string name="ln_fee_cap_disabled"><![CDATA[Desligado, a taxa Relâmpago máxima é de <strong>%1$s</strong> do pagamento]]></string>
+    <string name="ln_fee_cap_enabled"><![CDATA[Ligado, a taxa Relâmpago máxima é de <strong>%1$s</strong> do pagamento, mas não maior do que a taxa atual de mineração de <strong>%2$s</strong>]]></string>
+    <string name="ln_fee_expensive_omitted">Algumas rotas foram omitidas por serem caras demais, desligue o limite da taxa Relâmpago nas Opções se quiser tentá-las</string>
+
+    <!-- local backups -->
+    <string name="sets_backups">Salvar backups de canais no telefone</string>
+    <string name="ln_backup_detected">Arquivo de backup local encontrado</string>
+    <string name="ln_decrypt_fail">Falha ao decifrar o arquivo de backup: «%1$s».\n\nA frase mnemônica é usada para cifrar e decifrar o arquivo, verifique se você a digitou corretamente.</string>
+
+    <array name="info_progress">
+        <item>Sincronização completa</item>
+        <item><![CDATA[<font color=#E68A00>Sync: %1$d dia atrás</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Sync: %1$d dias atrás</font>]]></item>
+    </array>
+
+    <string name="ln_incoming_title"><![CDATA[<font color=#0099FE><strong>Pagamento Relâmpago</strong></font><br>%1$s<br><br>chegando %2$s<br><small>%3$s em preços atuais</small>]]></string>
+    <string name="ln_outgoing_title_no_fee"><![CDATA[<font color=#0099FE><strong>Pagamento Relâmpagot</strong></font><br>%1$s<br><br>enviado %2$s<br><small>%3$s em preços atuais</small>]]></string>
+    <string name="ln_outgoing_title"><![CDATA[<font color=#0099FE><strong>Pagamento Relâmpago</strong></font><br>%1$s<br><br>enviado %2$s<br><small>%3$s em preços atuais</small><br>taxa %4$s = %5$.2f%%]]></string>
+    <string name="ln_hosted_preimage_revealed"><![CDATA[<i>prova de pagamento revelada, entre em contato com o operador do canal <strong>antes</strong> da data de vencimento caso isto continue assim</i>]]></string>
+
+    <string name="btc_incoming_title"><![CDATA[<font color=#E68A00><strong>Transação Bitcoin</strong></font><br>%1$s<br><br>recebido %2$s<br><small>%3$s em preços atuais</small>]]></string>
+    <string name="btc_outgoing_title_no_fee"><![CDATA[<font color=#E68A00><strong>Transação Bitcoin</strong></font><br>%1$s<br><br>enviado %2$s<br><small>%3$s em preços atuais</small>]]></string>
+    <string name="btc_outgoing_title"><![CDATA[<font color=#FF9900><strong>Transação Bitcoin</strong></font><br>%1$s<br><br>enviado %2$s<br><small>%3$s em preços atuais</small><br>taxa %4$s = %5$.2f%%]]></string>
+    <string name="btc_pending_title"><![CDATA[<font color=#FF9900><strong>Transação Bitcoin</strong></font><br><small>reembolso de canal atrasado</small><br>%1$s<br><br>pendente %2$s<br><small>%3$s em preços atuai</small><br>taxa %4$s = %5$.2f%%]]></string>
+
+    <string name="txs_view_outside">Ver num explorador de transações</string>
+    <string name="txs_p2wsh">Fundação de contrato</string>
+
+    <array name="txs_confs">
+        <item><![CDATA[<strong>esperando&#160;confirmação</strong>]]></item>
+        <item><![CDATA[<strong>%1$s&#160;confirmação</strong>]]></item>
+        <item><![CDATA[<strong>%1$s&#160;confirmaçãos</strong>]]></item>
+        <item><![CDATA[<strong>CANCELADO</strong>]]></item>
+    </array>
+
+    <string name="send_scan_qr">Let código QR</string>
+    <string name="send_paste_payment_request"><![CDATA[<strong>Colar Solicitação Relâmpago<br><font color=#999999><small>ou endereço Bitcoin</small></font></strong>]]></string>
+    <string name="send_hivemind_deposit"><![CDATA[Fazer um depósito no Hivemind<br><font color=#999999><small>um mercado de previsões ligado ao Bitcoin</small></font>]]></string>
+    <string name="ln_send_title"><![CDATA[<font color=#0099FE><strong>Enviar Pagamento Relâmpago</strong></font><small><br><br>%1$s</small>]]></string>
+    <string name="btc_send_title"><![CDATA[<font color=#E68A00><strong>Enviar Transação Bitcoin</strong></font><br><br>%1$s]]></string>
+
+    <string name="ln_receive_title"><![CDATA[<font color=#0099FE><strong>Receber Pagamento Relâmpago</strong></font>]]></string>
+    <string name="ln_receive_option"><![CDATA[<font color=#0099FE>Pagamento Relâmpago</font><small><br><br>%1$s</small>]]></string>
+
+    <string name="ln_receive_howto"><![CDATA[         Para receber transações Relâmpago é necessário ter ao menos um <a href=https://lightning-wallet.com/using-lightning-wallet#payment-channel>canal de pagamento</a>. Há várias maneiras de conseguir um:<br><br>         - Abrir um canal <i>com seus bitcoins</i> com um parceiro à sua escolha e gastar alguns satoshis primeiro para <a href=https://lightning-wallet.com/using-lightning-wallet#receiving-lightning-funds>abrir espaço</a> para receber<br><br>         - <a href=https://www.bitrefill.com/thor-lightning-network-channels>Comprar</a> um canal Bitrefill.<br><br>         - <a href=https://lnbig.com/#/open-channel/>Pedir um canal gratuito</a> no LNBIG.COM.     ]]></string>
+
+    <string name="ln_receive_6conf"><![CDATA[&#9888; Não é possível receber transações Relâmpago ainda porque seu parceiro no canal ainda não autorizou, isto acontece normalmente quando a transação que criou o canal ainda não tem 6 confirmações]]></string>
+    <string name="ln_receive_reserve"><![CDATA[&#9888; Não é possível receber transações Relâmpago ainda, gaste %1$s primeiro para liberar espaço para receber.]]></string>
+    <string name="ln_receive_suggestion"><![CDATA[&#9888; Não é possível receber porque você não tem canais.<br>Clique para saber mais.]]></string>
+    <string name="ln_receive_ok">Crie uma solicitação de pagamento Relâmpago e um código QR para receber satoshis</string>
+
+    <string name="btc_receive_option"><![CDATA[<font color=#FF9900>Transação Bitcoin</font><small><br><br>Crie um código QR com um endereço Bitcoin para receber uma transação básica.</small>]]></string>
+
+    <string name="err_ln_peer_offline">Impossível estabelecer conexão a %1$s</string>
+    <string name="err_ln_peer_incompatible">%1$s não oferece data_loss_protection</string>
+    <string name="err_ln_chan_exists_already">Um canal com este parceiro já existe, por favor escolha outro</string>
+    <string name="err_ln_remote_amount_low">Falha: o valor do pagamento é inaceitavelmente baixo para os seus parceiros, o valor mínimo aceitável é %1$s</string>
+    <string name="err_ln_local_fee_high">Falha: o valor do pagamento somado à taxa é maior do que o possível para o seu canal</string>
+    <string name="err_ln_remote_fee_high">o valor do pagamento somado à taxa é maior do que o possível para o seu parceiro</string>
+    <string name="err_ln_fulfilled">Falha: este pagamento aparentemente já foi completado</string>
+    <string name="err_ln_too_many_htlc">Falha: há já muitos pagamentos em curso</string>
+    <string name="err_ln_chain_wait">Esperando a carteira básica se conectar à rede Bitcoin</string>
+
+    <string name="err_ln_not_enough">Não há nenhum canal com saldo suficiente para enviar %1$s</string>
+    <string name="err_ln_drain_no_hosted">Não há nenhum canal hospedado com saldo suficiente para este saque</string>
+    <string name="err_ln_drain_no_normal">Não há nenhum canal com capacidade suficiente</string>
+    <string name="err_ln_peer_can_not_route">Seu parceiro não está conseguindo rotear pagamentos agora, por favor tente mais tarde ou abra outro canal</string>
+    <string name="err_tx_too_large">Falha: a transação é muito grande para a rede Bitcoin, tente quebrá-la em transações menores</string>
+    <string name="err_empty_shrunk">Falha: a saída da transação é insuficiente para pagar as taxas de mineração</string>
+    <string name="err_nothing_useful">Não há nada aqui que possamos aproveitar</string>
+
+    <string name="err_not_enough_funds"><![CDATA[
+        É possível enviar apenas %1$s em transações base agora <i>incluindo as taxas de mineração</i>. Você estava tentando enviar %2$s com %3$s em taxas.<br><br><strong>
+        O que você pode fazer:</strong>:<br><br>- Tentar um valor menor.<br><br>- Depositar mais bitcoins.<br><br>- Mandar exatamente %1$s, neste caso as taxas serão subtraídas do total e não adicionadas a ele.
+    ]]></string>
+
+    <string name="ln_status_peer">Escolha o parceiro</string>
+    <string name="ln_share_debug">Detalhes arcanos</string>
+    <string name="ln_run_action">Rodar ação de pagamento</string>
+    <string name="ln_share_pr">Compartilhar solicitação de pagamento</string>
+    <string name="ln_share_node_id">Compartilhar ID Relâmpago</string>
+    <string name="ln_drain_hosted">Secar o canal hospedado</string>
+    <string name="ln_share_proof">Compartilhar prova de pagamento</string>
+    <string name="ln_description_hint">uma descrição qualquer</string>
+    <string name="ln_no_description">Nenhuma descrição</string>
+    <string name="ln_proof">Soicitação de pagamento assinada: %1$s  Prova do pagamento: %2$s</string>
+    <string name="ln_qr_disposable"><![CDATA[Solicitação válida por 1 dia<br>Não reutilizar]]></string>
+
+    <!-- see PaymentInfo.scala -->
+    <string name="ln_state_wait">ainda em curso</string>
+    <string name="ln_state_success">pago com successo</string>
+    <string name="ln_state_fail_out">falhou, satoshis devolvidos</string>
+    <string name="ln_state_fail_in">vencido e cancelado</string>
+    <string name="ln_state_unknown">estado desconhecido</string>
+
+    <string name="ln_info_total_payments">pagamentos totais</string>
+    <string name="ln_info_in_flight">montante em curso</string>
+    <string name="ln_info_can_receive">pode receber</string>
+    <string name="ln_info_refundable">reembolsável</string>
+    <string name="ln_info_depth">profundidade</string>
+    <string name="ln_info_fee">taxa para fechamento forçado</string>
+    <string name="ln_info_capacity">capacidade</string>
+    <string name="ln_info_can_send">pode enviar</string>
+    <string name="ln_info_started">começou</string>
+    <string name="ln_info_closed">fechado</string>
+
+    <string name="ln_info_close_coop">Fechado amigavelmente</string>
+    <string name="ln_info_close_local">Fechamento forçado local</string>
+    <string name="ln_info_close_remote">Fechamento forçado pelo parceiro</string>
+    <string name="ln_info_coop_attempt">Esperando assinatura do parceiro&#8230;</string>
+
+    <string name="ln_info_high_fee">Taxas para receber estão muito altas: %1$s</string>
+    <string name="ln_info_funding_lost">Canal perdido na base</string>
+    <string name="ln_info_unknown_spend">Gasto desconhecido detectado</string>
+    <string name="ln_info_stuck_htlcs">Pagamentos presos detectados</string>
+
+    <string name="ln_info_state_offline"><![CDATA[<font color=#777777><small>desconectado</small></font>]]></string>
+    <string name="ln_info_state_online"><![CDATA[<font color=#6AAB38><small>online</small></font>]]></string>
+    <string name="ln_info_nothing"><![CDATA[<i>nada</i>]]></string>
+
+    <string name="ln_info_status_open"><![CDATA[<font color=#6AAB38>ABERTO</font>]]></string>
+    <string name="ln_info_status_opening"><![CDATA[<font color=#E68A00>ABRINDO</font>]]></string>
+    <string name="ln_info_status_shutdown"><![CDATA[<font color=#E68A00>DESLIGADO</font>]]></string>
+    <string name="ln_info_status_negotiations"><![CDATA[<font color=#E68A00>NEGOCIAÇÃO</font>]]></string>
+    <string name="ln_info_status_suspended"><![CDATA[<font color=#E68A00>SUSPENSO</font>]]></string>
+    <string name="ln_info_status_other"><![CDATA[<font color=#777777>%1$s</font>]]></string>
+
+    <string name="ln_chan_close_inflight_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>Há pagamentos em curso</font>, então o fechamento amigável será atrasado até que eles terminem.<br><br>É recomendável esperar até que esses pagamentos sejam concretizados ou falhem, mas caso você queira muito é possível iniciar um fechamento forçado. Você quer isso?]]></string>
+    <string name="ln_chan_force_details"><![CDATA[<small><br></small>&#9888; Tenha em mente que o <a href=http://lightning-wallet.com/using-lightning-wallet#forced-channel-closure>fechamento forçado</a> custa mais caro e demora muito mais, você mesmo assim quer fazer isso?]]></string>
+    <string name="ln_chan_close_confirm_address"><![CDATA[<small><br></small>Deseja fechar este canal e enviar uma transação básica para o seguinte endereço?<br><br><strong>%1$s</strong><br><br>Confira bem se este é mesmo o endereço certo, esta ação não pode ser desfeita!]]></string>
+    <string name="ln_chan_close_confirm_wallet"><![CDATA[<small><br></small>Deseja fechar este canal e enviar uma transação básica de volta para a sua carteira?]]></string>
+    <string name="ln_chan_close_address"><![CDATA[Fechar para um endereço externo<br><small>%1$s</small>]]></string>
+    <string name="ln_chan_close_address_no">Neste estado é impossível fechar o canal</string>
+    <string name="ln_chan_close_address_hint">Tenha um endereço antes de prosseguir</string>
+    <string name="ln_chan_close">Fechar canal</string>
+
+    <array name="ln_normal_chan_actions">
+        <item><![CDATA[Ver transação fundante]]></item>
+        <item><![CDATA[Fechar canal para esta carteira]]></item>
+    </array>
+
+    <string name="ln_hosted_state_wrap">ID do canal hospedado:\n%1$s\n\nEstado:\n%2$s\n\nProvas de pagamento reveladas:\n%3$s</string>
+    <string name="ln_hosted_override_warn"><![CDATA[O operador remoto quer substituir o saldo do seu canal hospedado dos atuais %1$s para %2$s, isto só pode acontecer com sua permissão.<br><br><strong>Confira antes se a modificação proposta lhe parece correta antes de prosseguir!</strong><br><br>Deseja prosseguir com essa substituição?]]></string>
+    <string name="ln_hosted_remove_inflight_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>Este canal hospedado contém pagamentos em curso</font><br><br>É recomendável esperar que eles terminem antes de remover o canal. Mesmo assim Você o quer remover agora?]]></string>
+    <string name="ln_hosted_remove_non_empty_details"><![CDATA[<small><br></small>&#9888; <font color=#E68A00>Este canal hospedado não está vazio</font><br><br>É recomendável mandar os satoshis para outro lugar para esvaziá-lo primeiro. Mesmo assim você o quer remover agora?]]></string>
+
+    <array name="ln_hosted_chan_actions">
+        <item><![CDATA[Sobre canais hospedados]]></item>
+        <item><![CDATA[Salvar estado do canal]]></item>
+        <item><![CDATA[Remover este canal]]></item>
+    </array>
+
+    <string name="btc_empty"><![CDATA[<font color=#BBBBBB>Nenhum bitcoin livre</font>]]></string>
+    <string name="ln_empty"><![CDATA[<font color=#BBBBBB>Canais vazios</font>]]></string>
+
+    <string name="btc_status_operational">Carteira Bitcoin online</string>
+    <string name="btc_status_connecting"><![CDATA[<font color=#E68A00>Conectando a servidores</font>]]></string>
+    <string name="ln_status_hosted_suspended"><![CDATA[<font color=#E68A00>Canal hospedado suspenso</font>]]></string>
+    <string name="ln_status_operational_many">Todos os canais estão online</string>
+    <string name="ln_status_operational_one">Canal offline</string>
+
+    <array name="ln_chan_ops_status">
+        <item><![CDATA[Não há canais]]></item>
+        <item><![CDATA[%1$s canal apenas]]></item>
+        <item><![CDATA[%1$s canais em todo]]></item>
+    </array>
+
+    <array name="ln_chan_connecting">
+        <item><![CDATA[Nenhum canal aberto]]></item>
+        <item><![CDATA[<font color=#E68A00>Ligando %1$s canal</font>]]></item>
+        <item><![CDATA[<font color=#E68A00>Ligando %1$s canais</font>]]></item>
+    </array>
+
+    <array name="ln_status_expiry">
+        <item><![CDATA[vencido, ficou preso]]></item>
+        <item><![CDATA[vence em %1$s bloco]]></item>
+        <item><![CDATA[vence em %1$s blocos]]></item>
+    </array>
+
+    <!-- opening a new channel -->
+    <array name="ln_ops_start_node_channels">
+        <item><![CDATA[Nenhum canal público]]></item>
+        <item><![CDATA[%1$s canal público]]></item>
+        <item><![CDATA[%1$s canais públicos]]></item>
+    </array>
+
+    <string name="ln_ops_start_fund_local_title"><![CDATA[<small>Tem dúvidas? Fala inglês?<br><a href=http://lightning-wallet.com/using-lightning-wallet#using-lightning-wallet>Leia sobre a Lightning Network</a></small><br><br>fundação de canal de pagamento]]></string>
+    <string name="ln_ops_start_fund_node_view"><![CDATA[<strong>%1$s</strong><br><font color=#999999><i>abrindo um canal</i></font><br>%2$s<br><br><font color=#999999>ID Relâmpago do parceiro</font><br><small>%3$s</small>]]></string>
+    <string name="ln_ops_start_node_view"><![CDATA[<strong>%1$s</strong><br>%2$s<br><small><font color=#999999>%3$s</font></small>]]></string>
+    <string name="ln_ops_start_fund_incoming_channel">canal chegando</string>
+    <string name="ln_ops_start_fund_hosted_channel">CANAL HOSPEDADO</string>
+
+    <string name="ln_url_resolving">Estabelecendo conexão com serviço remoto&#8230;</string>
+    <string name="ln_url_payment_request_processing">Processando pagamento&#8230;</string>
+    <string name="ln_url_login_ok"><![CDATA[Login realizado em <i>%1$s</i>]]></string>
+    <string name="ln_url_info_login"><![CDATA[Chave de login gerada para <i>%1$s</i>:<br><br><strong>%2$s</strong><br><br>Será usada para autorização anônima em <i>%1$s</i>, nenhum dado pessoal será divulgado.]]></string>
+    <string name="ln_url_pay_decrypt_fail">Falha ao decifrar mensagem. Por favor entre em contato com o vendedor para resolver isto.</string>
+    <string name="ln_url_pay_message_title">mensagem do vendedor</string>
+
+    <!-- Olympus log messages and notification -->
+    <string name="olympus_log_channel_backup">Backup cifrado do canal salvo com «%1$s»</string>
+    <string name="olympus_log_watch_payments">Vigiando %1$s estados antigos de canais</string>
+    <string name="olympus_log_refunding_tx">Transação de reembolso agendada</string>
+    <string name="notify_body">Mantendo a carteira em conectada para receber %1$s</string>
+    <string name="notify_title">Esperando um pagamento</string>
+
+    <!-- hosted channels -->
+    <string name="err_ln_hosted_wrong_blockday">dia-bloco errado</string>
+    <string name="err_ln_hosted_wrong_local_sig">Assinatura local errada</string>
+    <string name="err_ln_hosted_wrong_remote_sig">Assinatura do parceiro errada</string>
+    <string name="err_ln_hosted_too_many_state_updates">Muitas atualizações de estado</string>
+    <string name="err_ln_hosted_in_flight_htlc_while_restoring">Falha do parceiro na recuperação</string>
+    <string name="err_ln_hosted_timed_out_outgoing_htlc">Tempo esgotado para o pagamento</string>
+    <string name="err_ln_hosted_channel_denied">Canal hospedado negado</string>
+</resources>

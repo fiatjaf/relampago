@@ -128,6 +128,13 @@
                 android:id="@+id/recoverChannelFunds"
                 android:text="@string/sets_chan_recover"/>
 
+            <TextView
+                style="@style/BaseText"
+                android:layout_marginBottom="15dp"
+                android:id="@+id/recoverCloudId"
+                android:layout_width="match_parent"
+                android:textIsSelectable="true"/>
+
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

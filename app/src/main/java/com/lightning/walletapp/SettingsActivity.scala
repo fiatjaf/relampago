@@ -36,6 +36,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
   lazy val useTrustedNodeState = findViewById(R.id.useTrustedNodeState).asInstanceOf[TextView]
   lazy val constrainLNFeesState = findViewById(R.id.constrainLNFeesState).asInstanceOf[TextView]
+  lazy val recoverCloudId = findViewById(R.id.recoverCloudId).asInstanceOf[TextView]
   lazy val saveLocalBackupsPath = findViewById(R.id.saveLocalBackupsPath).asInstanceOf[TextView]
 
   lazy val chooseBitcoinUnit = findViewById(R.id.chooseBitcoinUnit).asInstanceOf[Button]
@@ -117,6 +118,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
     updateTrustedView
     updateBackupView
     updateFpView
+    recoverCloudId setText cloudId.toHex
 
     setFiatCurrency setOnClickListener onButtonTap {
       val fiatCodes \ fiatHumanNames = fiatNames.toSeq.reverse.unzip

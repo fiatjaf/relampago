@@ -7,7 +7,7 @@ android {
 
     defaultConfig {
         versionName "0.4"
-        applicationId "com.lightning.walletapp"
+        applicationId "xyz.bigsun.relampago"
         multiDexEnabled true
         targetSdkVersion 28
         minSdkVersion 21

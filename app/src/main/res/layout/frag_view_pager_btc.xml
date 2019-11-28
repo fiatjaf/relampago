@@ -115,42 +115,32 @@
         android:id="@+id/fam">
 
         <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_add_white_18dp"
-            fab:fab_label="@string/action_ln_open"
-            fab:fab_colorPressed="@color/ln"
-            fab:fab_colorNormal="@color/ln"
-            fab:fab_colorRipple="@color/ln"
-            android:onClick="goAddChannel"
+            android:src="@drawable/ic_arrow_downward_white_18dp"
+            fab:fab_label="@string/action_receive_btc"
+            android:onClick="goReceiveOnChain"
+            fab:fab_colorPressed="@color/btc"
+            fab:fab_colorNormal="@color/btc"
+            fab:fab_colorRipple="@color/btc"
             style="@style/FabButton"
-            fab:fab_size="mini"/>
-
-        <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_info_outline_white_18dp"
-            fab:fab_label="@string/action_ln_details"
-            fab:fab_colorPressed="@color/ln"
-            fab:fab_colorNormal="@color/ln"
-            fab:fab_colorRipple="@color/ln"
-            style="@style/FabButton"
-            android:onClick="goOps"
             fab:fab_size="mini"/>
 
         <com.github.clans.fab.FloatingActionButton
             android:src="@drawable/ic_arrow_downward_white_18dp"
-            fab:fab_label="@string/action_coins_receive"
-            android:onClick="goReceivePayment"
-            fab:fab_colorPressed="@color/btc"
-            fab:fab_colorNormal="@color/btc"
-            fab:fab_colorRipple="@color/btc"
+            fab:fab_label="@string/action_receive_ln"
+            android:onClick="goReceiveOffChain"
+            fab:fab_colorPressed="@color/ln"
+            fab:fab_colorNormal="@color/ln"
+            fab:fab_colorRipple="@color/ln"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 
         <com.github.clans.fab.FloatingActionButton
-            android:src="@drawable/ic_arrow_upward_white_18dp"
+            android:src="@drawable/ic_paste_pay"
             fab:fab_label="@string/action_coins_send"
             android:onClick="goSendPaymentForm"
-            fab:fab_colorPressed="@color/btc"
-            fab:fab_colorNormal="@color/btc"
-            fab:fab_colorRipple="@color/btc"
+            fab:fab_colorPressed="@color/ln"
+            fab:fab_colorNormal="@color/ln"
+            fab:fab_colorRipple="@color/ln"
             style="@style/FabButton"
             fab:fab_size="mini"/>
 

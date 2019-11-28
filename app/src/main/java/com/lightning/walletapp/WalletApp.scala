@@ -56,10 +56,10 @@ class WalletApp extends Application { me =>
   var kit: WalletKit = _
 
   lazy val plur = getString(lang) match {
-    case "eng" | "esp" => (opts: Array[String], num: Long) => if (num == 1) opts(1) else opts(2)
+    case "eng" | "esp" | "port" => (opts: Array[String], num: Long) =>
+      if (num == 1) opts(1) else opts(2)
     case "chn" | "jpn" => (phraseOptions: Array[String], num: Long) => phraseOptions(1)
     case "rus" | "ukr" => (phraseOptions: Array[String], num: Long) =>
-
       val reminder100 = num % 100
       val reminder10 = reminder100 % 10
       if (reminder100 > 10 & reminder100 < 20) phraseOptions(3)
@@ -83,7 +83,7 @@ class WalletApp extends Application { me =>
 
   override def onCreate = wrap(super.onCreate) {
     // These cannot be lazy vals because values may change
-    Utils.fiatCode = prefs.getString(AbstractKit.FIAT_TYPE, "usd")
+    Utils.fiatCode = prefs.getString(AbstractKit.FIAT_TYPE, "brl")
     Utils.denom = Utils denoms prefs.getInt(AbstractKit.DENOM_TYPE, 0)
     AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM)
 

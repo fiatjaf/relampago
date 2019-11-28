@@ -424,4 +424,12 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
     else if (cd.refundRemoteCommit.nonEmpty) me getString ln_info_close_remote
     else if (cd.mutualClose.nonEmpty) me getString ln_info_close_coop
     else me getString ln_info_close_local
+
+  // FLOATING MENU CLICKS
+
+  def goAddChannel(top: View) = me goTo classOf[LNStartActivity]
+
+  def shareNodeID(top: View) = me share LNParams.nodePublicKey.toString
+
+  def doDrainHostedChannel(top: View) = drainHostedChan
 }

@@ -64,8 +64,10 @@
     <string name="sets_mnemonic">View mnemonic phrase</string>
     <string name="sets_rescan">Rescan blockchain</string>
 
-    <string name="action_coins_send">Send funds</string>
+    <string name="action_coins_send">Paste request</string>
     <string name="action_coins_receive">Receive funds</string>
+    <string name="action_receive_ln">Request Lightning payment</string>
+    <string name="action_receive_btc">Generate Bitcoin address</string>
     <string name="action_ln_details">View channel details</string>
     <string name="action_ln_open">Open new channel</string>
 

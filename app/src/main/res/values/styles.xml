@@ -150,8 +150,6 @@
 
     <!-- styles for libraries -->
 
-    <style name="simpletooltip_default" parent="@android:style/TextAppearance.Medium"/>
-
     <style name="DefaultChipSuggestionTextView">
         <item name="chipHorizontalSpacing">6dp</item>
         <item name="chipBackground">@color/chip_material_background</item>

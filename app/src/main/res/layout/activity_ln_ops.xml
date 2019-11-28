@@ -1,32 +1,80 @@
-<LinearLayout
+<RelativeLayout
     style="@style/StandardLinearLayoutPage"
-    xmlns:android="http://schemas.android.com/apk/res/android">
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:fab="http://schemas.android.com/apk/res-auto">
 
-    <android.support.v7.widget.Toolbar
-        xmlns:app="http://schemas.android.com/apk/res-auto"
-        xmlns:android="http://schemas.android.com/apk/res/android"
-        android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
-        app:subtitleTextAppearance="@style/ToolbarSubtitleAppearance"
-        app:titleTextAppearance="@style/ToolbarTitleAppearance"
-        app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
-        android:background="@android:color/black"
-        android:layout_width="match_parent"
-        android:layout_height="64sp"
-        android:id="@+id/toolbar"
+    <LinearLayout
+        style="@style/StandardLinearLayoutPage"
+        xmlns:android="http://schemas.android.com/apk/res/android">
 
-        app:contentInsetLeft="@dimen/app_padding"
-        app:contentInsetStartWithNavigation="0dp"
-        app:contentInsetStart="@dimen/app_padding"
-        app:contentInsetEnd="@dimen/app_padding"/>
+        <android.support.v7.widget.Toolbar
+            xmlns:app="http://schemas.android.com/apk/res-auto"
+            xmlns:android="http://schemas.android.com/apk/res/android"
+            android:theme="@style/ThemeOverlay.AppCompat.Dark.ActionBar"
+            app:subtitleTextAppearance="@style/ToolbarSubtitleAppearance"
+            app:titleTextAppearance="@style/ToolbarTitleAppearance"
+            app:popupTheme="@style/ThemeOverlay.AppCompat.Light"
+            android:background="@android:color/black"
+            android:layout_width="match_parent"
+            android:layout_height="64sp"
+            android:id="@+id/toolbar"
 
-    <GridView
-        android:verticalSpacing="25dp"
-        android:horizontalSpacing="@dimen/app_padding"
-        android:scrollbarStyle="outsideOverlay"
-        android:padding="@dimen/app_padding"
-        android:layout_height="match_parent"
-        android:layout_width="match_parent"
-        android:clipToPadding="false"
-        android:id="@+id/gridView"/>
+            app:contentInsetLeft="@dimen/app_padding"
+            app:contentInsetStartWithNavigation="0dp"
+            app:contentInsetStart="@dimen/app_padding"
+            app:contentInsetEnd="@dimen/app_padding"/>
 
-</LinearLayout>
+        <GridView
+            android:verticalSpacing="25dp"
+            android:horizontalSpacing="@dimen/app_padding"
+            android:scrollbarStyle="outsideOverlay"
+            android:padding="@dimen/app_padding"
+            android:layout_height="match_parent"
+            android:layout_width="match_parent"
+            android:clipToPadding="false"
+            android:id="@+id/gridView"/>
+
+    </LinearLayout>
+
+    <com.github.clans.fab.FloatingActionMenu
+        fab:menu_icon="@drawable/ic_channel"
+        fab:menu_colorPressed="@color/btc"
+        fab:menu_colorNormal="@color/btc"
+        fab:menu_colorRipple="@color/btc"
+        style="@style/FloatingMenu"
+        android:id="@+id/fam">
+
+        <com.github.clans.fab.FloatingActionButton
+            android:src="@drawable/ic_drain"
+            android:visibility="invisible"
+            fab:fab_label="@string/ln_drain_hosted"
+            fab:fab_colorPressed="@color/ln"
+            fab:fab_colorNormal="@color/ln"
+            fab:fab_colorRipple="@color/ln"
+            android:onClick="doDrainHostedChannel"
+            style="@style/FabButton"
+            fab:fab_size="mini"/>
+
+        <com.github.clans.fab.FloatingActionButton
+            android:src="@drawable/ic_node_id"
+            fab:fab_label="@string/ln_share_node_id"
+            fab:fab_colorPressed="@color/ln"
+            fab:fab_colorNormal="@color/ln"
+            fab:fab_colorRipple="@color/ln"
+            android:onClick="shareNodeID"
+            style="@style/FabButton"
+            fab:fab_size="mini"/>
+
+        <com.github.clans.fab.FloatingActionButton
+            android:src="@drawable/ic_add_white_18dp"
+            fab:fab_label="@string/action_ln_open"
+            fab:fab_colorPressed="@color/btc"
+            fab:fab_colorNormal="@color/btc"
+            fab:fab_colorRipple="@color/btc"
+            android:onClick="goAddChannel"
+            style="@style/FabButton"
+            fab:fab_size="mini"/>
+
+    </com.github.clans.fab.FloatingActionMenu>
+
+</RelativeLayout>

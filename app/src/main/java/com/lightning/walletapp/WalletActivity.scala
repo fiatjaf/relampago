@@ -19,7 +19,6 @@ import com.lightning.walletapp.lnutils.JsonHttpUtils.{queue, to}
 import com.lightning.walletapp.lnutils.IconGetter.{bigFont, scrWidth}
 import com.lightning.walletapp.lnutils.{LocalBackup, PaymentInfoWrap}
 import com.lightning.walletapp.ln.crypto.Sphinx.DecryptedFailurePacket
-import io.github.douglasjunior.androidSimpleTooltip.SimpleTooltip
 import android.support.v4.app.FragmentStatePagerAdapter
 import org.ndeftools.util.activity.NfcReaderActivity
 import com.lightning.walletapp.helper.AwaitService
@@ -101,7 +100,6 @@ trait HumanTimeDisplay {
 }
 
 class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
-  lazy val floatingActionMenu = findViewById(R.id.fam).asInstanceOf[FloatingActionMenu]
   lazy val slidingFragmentAdapter = new FragmentStatePagerAdapter(getSupportFragmentManager) {
     def getItem(currentFragmentPos: Int) = if (0 == currentFragmentPos) new FragWallet else new FragScan
     def getCount = 2
@@ -117,7 +115,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   override def onBackPressed = {
     val isExpanded = FragWallet.worker.currentCut > FragWallet.worker.minLinesNum
     if (1 == walletPager.getCurrentItem) walletPager.setCurrentItem(0, true)
-    else if (floatingActionMenu.isOpened) floatingActionMenu close true
     else if (isExpanded) FragWallet.worker.toggler.performClick
     else super.onBackPressed
   }
@@ -129,8 +126,8 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     // Worker is definitely not null
     FragWallet.worker.setupSearch(menu)
     FragWallet.worker.searchView.setQueryHint(app getString search_hint_payments)
+
     val openAutoHostedChan = app.prefs.getBoolean(AbstractKit.AUTO_HOSTED_CHAN, false)
-    val showTooltip = app.prefs.getBoolean(AbstractKit.SHOW_TOOLTIP, true)
 
     if (openAutoHostedChan) {
       var hasDefaultHosted = ChannelManager.hasHostedChanWith(FragLNStart.defaultHostedNode.ann.nodeId)
@@ -188,11 +185,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
       }
     }
 
-    if (showTooltip) try {
-      app.prefs.edit.putBoolean(AbstractKit.SHOW_TOOLTIP, false).commit
-      val tip = new SimpleTooltip.Builder(me).anchorView(floatingActionMenu.getMenuIconView)
-      tip.text("Menu").gravity(Gravity.START).transparentOverlay(false).animated(true).build.show
-    } catch none
     true
   }
 
@@ -247,7 +239,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def checkTransData = app.TransData checkAndMaybeErase {
     case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-    case FragWallet.OPEN_RECEIVE_MENU => goReceivePayment(null): Unit
+    case FragWallet.RECEIVE => doReceivePayment(None, None): Unit
     case FragWallet.REDIRECT => goOps(null): Unit
 
     case btcURI: BitcoinURI =>
@@ -356,7 +348,10 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   // BUTTONS REACTIONS
 
   type RequestAndLNUrl = (WithdrawRequest, LNUrl)
-  def doReceivePayment(extra: Option[RequestAndLNUrl] = None) = {
+  def doReceivePayment(
+    extra: Option[RequestAndLNUrl] = None,
+    force: Option[String] = None
+  ) = {
     val viableChannels = ChannelManager.all.filter(isOpeningOrOperational)
     val withRoutes = viableChannels.filter(isOperational).flatMap(channelAndHop).toMap
 
@@ -379,21 +374,27 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
         else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, wr.minCanReceive, title, wr.defaultDescription) { rd =>
           queue.map(_ => wr.requestWithdraw(lnUrl, rd.pr).body).map(LNUrl.guardResponse).foreach(none, onRequestFailed)
+
           def onRequestFailed(response: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail response)
         }
 
       case None =>
-        val alertLNHint =
-          if (viableChannels.isEmpty) getString(ln_receive_suggestion)
-          else if (withRoutes.isEmpty) getString(ln_receive_6conf)
-          else if (maxCanReceive.amount < 0L) reserveUnspentWarning
-          else getString(ln_receive_ok)
+        force match {
+          case Some("offchain") => offChain
+          case Some("onchain") => onChain
+          case _ =>
+            val alertLNHint =
+              if (viableChannels.isEmpty) getString(ln_receive_suggestion)
+              else if (withRoutes.isEmpty) getString(ln_receive_6conf)
+              else if (maxCanReceive.amount < 0L) reserveUnspentWarning
+              else getString(ln_receive_ok)
 
-        val actions = Array(getString(ln_receive_option).format(alertLNHint).html, getString(btc_receive_option).html)
-        val lst \ alert = makeChoiceList(actions, me getString action_coins_receive)
-        lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
+            val actions = Array(getString(ln_receive_option).format(alertLNHint).html, getString(btc_receive_option).html)
+            val lst \ alert = makeChoiceList(actions, me getString action_coins_receive)
+            lst setOnItemClickListener onTap { case 0 => rm(alert)(offChain) case 1 => rm(alert)(onChain) }
+        }
 
-        def offChain = rm(alert) {
+        def offChain = {
           if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
           else FragWallet.worker.receive(withRoutes, maxCanReceive, MilliSatoshi(1L), app.getString(ln_receive_title).html, new String) { rd =>
             app.foregroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
@@ -402,7 +403,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           }
         }
 
-        def onChain = rm(alert) {
+        def onChain = {
           app.TransData.value = app.kit.currentAddress
           me goTo classOf[RequestActivity]
         }
@@ -415,16 +416,22 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
   }
 
   def goSendPaymentForm(top: View) = {
-    val actions = Array(send_paste_payment_request, send_hivemind_deposit)
-    val lst \ alert = makeChoiceList(actions.map(getString).map(_.html), me getString action_coins_send)
-    lst setOnItemClickListener onTap { case 0 => pastePaymentRequest case 1 => depositHivemind }
+    pastePaymentRequest
 
-    def pastePaymentRequest = rm(alert) {
+    // val actions = Array(send_paste_payment_request, send_hivemind_deposit)
+    // val lst \ alert = makeChoiceList(actions.map(getString).map(_.html), me getString action_coins_send)
+
+    // lst setOnItemClickListener onTap {
+    //   case 0 => rm(alert)(pastePaymentRequest)
+    //   case 1 => rm(alert)(depositHivemind)
+    // }
+
+    def pastePaymentRequest = {
       def mayResolve(rawBufferString: String) = <(app.TransData recordValue rawBufferString, onFail)(_ => checkTransData)
       Try(app.getBufferUnsafe) match { case Success(rawData) => mayResolve(rawData) case _ => app quickToast err_nothing_useful }
     }
 
-    def depositHivemind = rm(alert) {
+    def depositHivemind = {
       // Show a warning for now since hivemind sidechain is not enabled yet
       val alert = showForm(negTextBuilder(dialog_ok, getString(hivemind_details).html).create)
       try Utils clickableTextField alert.findViewById(android.R.id.message) catch none
@@ -433,5 +440,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def goOps(top: View) = me goTo classOf[LNOpsActivity]
   def goAddChannel(top: View) = me goTo classOf[LNStartActivity]
-  def goReceivePayment(top: View) = doReceivePayment(extra = Option.empty)
+  def goReceiveOffChain(top: View) = doReceivePayment(force = Some("offchain"))
+  def goReceiveOnChain(top: View) = doReceivePayment(force = Some("onchain"))
 }

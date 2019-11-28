@@ -21,7 +21,7 @@ import java.io.File
 
 
 object LocalBackup {
-  final val BACKUP_DIR = "BLW"
+  final val BACKUP_DIR = "Relampago"
   final val BACKUP_FILE_NAME = "encrypted.channels.bkp"
   final val LOCAL_BACKUP_REQUEST_NUMBER = 105
 
