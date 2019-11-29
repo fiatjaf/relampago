@@ -192,9 +192,9 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
             R.id.balancesDivider, R.id.totalPayments, R.id.hostedWarningHeader)
 
         case _ =>
-          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend,
-            R.id.canReceive, R.id.refundFee, R.id.closedAt, R.id.fundingDepth,
-            R.id.paymentsInFlight, R.id.totalPayments, R.id.hostedWarningHeader)
+          visibleExcept(gone = R.id.baseBar, R.id.overBar, R.id.canSend, R.id.canReceive,
+            R.id.fundingDepth, R.id.paymentsInFlight, R.id.refundableAmount, R.id.refundFee,
+            R.id.balancesDivider, R.id.totalPayments, R.id.closedAt, R.id.hostedWarningHeader)
       }
 
       // MENU PART
