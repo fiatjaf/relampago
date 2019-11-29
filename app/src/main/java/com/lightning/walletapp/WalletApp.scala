@@ -410,7 +410,7 @@ object ChannelManager extends Broadcaster {
     }
 
     def CLOSEANDWATCH(cd: ClosingData) = {
-      cd.tier12States.map(_.txn.bin).toVector match {
+      cd.tier12States.collect { case dps: DelayedPublishStatus => dps.txn.bin }.toVector match {
         case txs if txs.isEmpty => Tools log "Closing contains no second tier txs, nothing to schedule on Olympus"
         case txs => app.olympus tellClouds TxUploadAct(txvec.encode(txs).require.toByteVector, Nil, "txs/schedule")
       }
