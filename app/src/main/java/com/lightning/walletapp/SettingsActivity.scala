@@ -186,16 +186,19 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
     recoverFunds setOnClickListener onButtonTap {
       def recover = app.olympus getBackup cloudId foreach { backups =>
-        // Decrypt channel recovery data and put it to channels list if it is not present already
-        // then try to get new NodeAnnouncement for refunding channels, otherwise use an old one
+        // Get all backups, then filter out those with existing channel ids
 
         for {
-          encryptedHexBackup <- backups
-          encryptedBackupBytes = ByteVector.fromValidHex(encryptedHexBackup).toArray
-          ref <- AES.decBytes(encryptedBackupBytes, cloudSecret.toArray) map bin2readable map to[RefundingData]
-          if !ChannelManager.all.exists(_.getCommits.map(_.channelId) contains ref.commitments.channelId)
+          ciphertext <- backups
+          cipherbytes = ByteVector.fromValidHex(ciphertext).toArray
+          ref <- AES.decBytes(cipherbytes, cloudSecret.toArray) map bin2readable map to[RefundingData]
+          if !ChannelManager.all.flatMap(_.getCommits).map(_.channelId).contains(ref.commitments.channelId)
         } ChannelManager.all +:= ChannelManager.createChannel(ChannelManager.operationalListeners, ref)
 
+        // Disconnect in case if we are already connected to target node
+        // without doing this a channel reestablish won't be happening
+        ConnectionManager.workers.values.foreach(_.disconnect)
+        
         for {
           chan <- ChannelManager.all if chan.state == REFUNDING
           // Try to connect right away and maybe use new address later

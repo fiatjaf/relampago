@@ -255,7 +255,6 @@ case class StateOverride(blockDay: Long, localBalanceMsat: Long, localUpdates: L
                          remoteUpdates: Long, localSigOfRemoteLCSS: ByteVector) extends HostedChannelMessage
 
 // Not in a spec
-case class WalletZygote(v: Int, db: ByteVector, wallet: ByteVector, chain: ByteVector)
 case class OutRequest(sat: Long, badNodes: Set[String], badChans: Set[Long], from: Set[String], to: String)
 case class LocalBackups(normal: Vector[HasNormalCommits], hosted: Vector[HostedCommits], earliestUtxoSeconds: Long, v: Int)
 case class HostedState(channelId: ByteVector, nextLocalUpdates: LNMessageVector, nextRemoteUpdates: LNMessageVector, lastCrossSignedState: LastCrossSignedState)

@@ -3,11 +3,6 @@
     <string name="emerge_report">Показати звіт</string>
     <string name="emerge_mode">Аварійний режим</string>
 
-    <array name="restore_options">
-        <item>Мнемонічна фраза</item>
-        <item>Файл-снапшот гаманця</item>
-    </array>
-
     <!-- app wide -->
     <string name="step_fees"><![CDATA[<font color=#999999>Оберіть комісію</font><br><br>%1$s]]></string>
     <string name="greetings">Bitcoin Гаманець-Блискавка\nОзнайомтесь з <a href='http://lightning-wallet.com'>інструкцією</a></string>

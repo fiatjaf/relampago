@@ -3,11 +3,6 @@
     <string name="emerge_report">Показать отчет</string>
     <string name="emerge_mode">Аварийный режим</string>
 
-    <array name="restore_options">
-        <item>Мнемонический код</item>
-        <item>Файл-снапшот кошелька</item>
-    </array>
-
     <!-- app wide -->
     <string name="step_fees"><![CDATA[<font color=#999999>Выберите комиссию</font><br><br>%1$s]]></string>
     <string name="greetings">Bitcoin Кошелек-Молния\nПрочитайте <a href='http://lightning-wallet.com'>инструкцию</a></string>
