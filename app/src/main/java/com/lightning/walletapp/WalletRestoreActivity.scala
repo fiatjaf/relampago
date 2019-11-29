@@ -138,16 +138,22 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
     case _ => restoreNotClosedNormalChannel(some)
   }
 
-  def restoreClosedNormalChannel(closing: ClosingData) = {
-    // Closing channels may have in-flight 2nd level HTLCs present
-    app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts closing)
-    restoreNotClosedNormalChannel(closing)
+  def restoreClosedNormalChannel(cd: ClosingData) = {
+    val chan = ChannelManager.createChannel(ChannelManager.operationalListeners, cd)
+    // Watch future commit spends and check if any was published while we were offline
+    app.kit.wallet.addWatchedScripts(app.kit closingPubKeyScripts cd)
+    ChannelManager.check2ndLevelSpent(chan, cd)
+    // Do not STORE because it invokes backup
+    ChannelManager.all :+= chan
+    ChannelWrap put cd
   }
 
   def restoreNotClosedNormalChannel(some: HasNormalCommits) = {
     val chan = ChannelManager.createChannel(ChannelManager.operationalListeners, some)
+    // Watch for future channel spends and check if any was published while we were offline
     app.kit.wallet.addWatchedScripts(app.kit fundingPubScript some)
-    // Do not use STORE because it invokes a backup saving
+    ChannelManager.check1stLevelSpent(chan, some)
+    // Do not STORE because it invokes backup
     ChannelManager.all :+= chan
     ChannelWrap put some
   }

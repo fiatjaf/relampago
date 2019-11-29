@@ -28,9 +28,6 @@ object JsonHttpUtils {
     Obs.just(null).delay(delayLeft.millis).flatMap(_ => next)
   }
 
-  def repeat[T](obs: Obs[T], pick: (Unit, Int) => Duration, times: Range) =
-    obs.repeatWhen(_.zipWith(Obs from times)(pick) flatMap Obs.timer)
-
   def retry[T](obs: Obs[T], pick: (Throwable, Int) => Duration, times: Range) =
     obs.retryWhen(_.zipWith(Obs from times)(pick) flatMap Obs.timer)
 
