@@ -59,16 +59,9 @@ object LNParams {
     app.olympus = new OlympusWrap
   }
 
-  def hopFee(msat: Long, base: Long, proportional: Long) = base + (proportional * msat) / 1000000L
   def maxAcceptableFee(msat: Long, hops: Int, percent: Long = 100L) = 25000 * (hops + 1) + msat / percent
-
-  def estTotalRouteFee(route: PaymentRoute) = totalRouteFee(route, 10000000L)
-  def totalRouteFee(route: PaymentRoute, msat: Long) = route.reverse.foldLeft(msat) {
-    case amount \ hop => amount + hopFee(amount, hop.feeBaseMsat, hop.feeProportionalMillionths)
-  } - msat
-
-  def isFeeBreach(route: PaymentRoute, msat: Long, percent: Long) =
-    totalRouteFee(route, msat) > maxAcceptableFee(msat, route.size, percent)
+  def totalRouteFee(route: PaymentRoute, msat: Long) = route.reverse.foldLeft(msat) { case amt \ hop => hop.fee(amt) + amt } - msat
+  def isFeeBreach(route: PaymentRoute, msat: Long, percent: Long) = totalRouteFee(route, msat) > maxAcceptableFee(msat, route.size, percent)
 
   def shouldUpdateFee(network: Long, commit: Long) = {
     val mismatch = 2.0 * (network - commit) / (commit + network)

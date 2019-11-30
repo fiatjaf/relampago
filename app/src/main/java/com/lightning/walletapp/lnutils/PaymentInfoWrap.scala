@@ -282,14 +282,14 @@ object BadEntityWrap {
   }
 
   def findRoutes(from: PublicKeyVec, targetId: PublicKey, rd: RoutingData) = {
-    // shortChannelId length is 32 so anything of length beyond 60 is definitely a nodeId
-    val cursor = db.select(BadEntityTable.selectSql, params = System.currentTimeMillis, rd.firstMsat)
+    val cursor = db.select(BadEntityTable.selectSql, System.currentTimeMillis, rd.firstMsat)
+    // Both shortChannelId and nodeId are recorded in a same table for performance reasons, discerned by length
     val badNodes \ badChans = RichCursor(cursor).set(_ string BadEntityTable.resId).partition(_.length > 60)
 
     val targetStr = targetId.toString
-    // Remove source and sink nodes from badNodes because they may have been blacklisted earlier
-    val fromAsStr = for (oneOfDirectPeerNodeKeys: PublicKey <- from.toSet) yield oneOfDirectPeerNodeKeys.toString
-    val badChanLongs = for (publicChannelDeniedByRoutingNode: String <- badChans) yield publicChannelDeniedByRoutingNode.toLong
-    app.olympus findRoutes OutRequest(rd.firstMsat / 1000L, badNodes - targetStr -- fromAsStr, badChanLongs, fromAsStr, targetStr)
+    val fromAsStr = from.map(_.toString).toSet
+    val finalBadNodes = badNodes - targetStr -- fromAsStr // Remove source and sink nodes because they may have been blacklisted earlier
+    val finalBadChans = badChans.map(_.toLong) ++ rd.expensiveScids // Add not yet blacklisted but overly expensive shortChannelIds
+    app.olympus findRoutes OutRequest(rd.firstMsat / 1000L, finalBadNodes, finalBadChans, fromAsStr, targetStr)
   }
 }

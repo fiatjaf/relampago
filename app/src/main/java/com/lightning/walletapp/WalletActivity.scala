@@ -165,7 +165,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     PaymentInfoWrap.failOnUI = rd => {
       PaymentInfoWrap.unsentPayments -= rd.pr.paymentHash
       PaymentInfoWrap.updStatus(PaymentInfo.FAILURE, rd.pr.paymentHash)
-      if (rd.onChainFeeBlockWasUsed) UITask(me toast ln_fee_expensive_omitted).run
+      if (rd.expensiveScids.nonEmpty) UITask(me toast ln_fee_expensive_omitted).run
       PaymentInfoWrap.uiNotify
     }
 

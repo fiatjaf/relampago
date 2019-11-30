@@ -99,10 +99,10 @@ class WalletApp extends Application { me =>
       timestamp = 0L, nodeId = id, (-128, -128, -128), alias take 16, addresses = na :: Nil)
 
   def emptyRD(pr: PaymentRequest, firstMsat: Long, useCache: Boolean) = {
-    val useOnChainFeeBlock = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
+    val useOnChainFeeCap = prefs.getBoolean(AbstractKit.CAP_LN_FEES, false)
     RoutingData(pr, routes = Vector.empty, usedRoute = Vector.empty, PacketAndSecrets(emptyOnionPacket, Vector.empty),
-      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeBlock) 8 else 4, useCache = useCache,
-      airLeft = 0, onChainFeeBlock = useOnChainFeeBlock, onChainFeeBlockWasUsed = false, action = None, fromHostedOnly = false)
+      firstMsat = firstMsat, lastMsat = 0L, lastExpiry = 0L, callsLeft = if (useOnChainFeeCap) 8 else 4, useCache = useCache,
+      airLeft = 0, capFeeByOnChain = useOnChainFeeCap, expensiveScids = Vector.empty, action = None, fromHostedOnly = false)
   }
 
   object TransData {
@@ -484,8 +484,8 @@ object ChannelManager extends Broadcaster {
       // Channel could have been operational when we were asking for a route but got closed later, so there always must be a default value for non-existing keys
       openMap = Tools.toDefMap[Channel, PublicKey, Int](all.filter(isOperational), _.data.announce.nodeId, chan => if (chan.state == OPEN) 0 else 1, default = 1)
       busyMap = Tools.toDefMap[Channel, PublicKey, Int](all.filter(isOperational), _.data.announce.nodeId, chan => chan.inFlightHtlcs.size, default = 1)
-      foundRoutes = rs.sortBy(estTotalRouteFee).sortBy(openMap compose rd.nextNodeId).sortBy(busyMap compose rd.nextNodeId)
-    // We may have out of band routes in RD so append them to found ones
+      foundRoutes = rs.sortBy(totalRouteFee(_, 10000000L)).sortBy(openMap compose rd.nextNodeId).sortBy(busyMap compose rd.nextNodeId)
+      // We may have out of band pre-filled routes in RD so append them to found ones
     } yield useFirstRoute(foundRoutes ++ rd.routes, rd)
   }
 

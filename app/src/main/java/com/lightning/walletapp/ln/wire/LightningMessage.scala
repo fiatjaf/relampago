@@ -124,6 +124,7 @@ case class Hop(nodeId: PublicKey, shortChannelId: Long,
 
   lazy val feeBreakdown = f"${feeProportionalMillionths / 10000D}%2f%% of payment sum + baseline $feeBaseMsat msat"
   lazy val humanDetails = s"Node ID: $nodeId, Channel ID: $shortChannelId, Expiry: $cltvExpiryDelta blocks, Routing fees: $feeBreakdown"
+  def fee(amountMsat: Long) = feeBaseMsat + (feeProportionalMillionths * amountMsat) / 1000000L
 }
 
 case class QueryChannelRange(chainHash: ByteVector, firstBlockNum: Long, numberOfBlocks: Long) extends RoutingMessage

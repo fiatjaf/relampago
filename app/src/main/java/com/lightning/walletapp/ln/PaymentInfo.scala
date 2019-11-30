@@ -1,5 +1,6 @@
 package com.lightning.walletapp.ln
 
+import com.softwaremill.quicklens._
 import com.lightning.walletapp.ln.wire._
 import com.lightning.walletapp.ln.crypto.Sphinx._
 import com.lightning.walletapp.ln.RoutingInfoTag._
@@ -43,28 +44,23 @@ object PaymentInfo {
   def useFirstRoute(rest: PaymentRouteVec, rd: RoutingData) =
     if (rest.isEmpty) Left(rd) else useRoute(rest.head, rest.tail, rd)
 
-  def onChainThreshold = Scripts.weight2fee(LNParams.broadcaster.perKwSixSat, 650)
+  def onChainThreshold = Scripts.weight2fee(LNParams.broadcaster.perKwSixSat, 750)
   def useRoute(route: PaymentRoute, rest: PaymentRouteVec, rd: RoutingData): FullOrEmptyRD = {
-    // 9 + 1 block in case if block just appeared and there is a 1-block discrepancy between peers
     val firstExpiry = LNParams.broadcaster.currentHeight + rd.pr.adjustedMinFinalCltvExpiry
     val payloadVec = RelayLegacyPayload(0L, rd.firstMsat, firstExpiry) +: Vector.empty
     val start = (payloadVec, Vector.empty[PublicKey], rd.firstMsat, firstExpiry)
 
-    val (allPayloads, nodeIds, lastMsat, lastExpiry) = route.reverse.foldLeft(start) {
-      case (loads, nodes, msat, expiry) \ Hop(nodeId, shortChannelId, delta, _, base, prop) =>
-        // Walk in reverse direction from receiver to sender and accumulate cltv deltas with fees
-
-        val nextFee = LNParams.hopFee(msat, base, prop)
-        val nextPayload = RelayLegacyPayload(shortChannelId, msat, expiry)
-        (nextPayload +: loads, nodeId +: nodes, msat + nextFee, expiry + delta)
+    // Walk in reverse direction from receiver to sender and accumulate cltv deltas + fees
+    val (allPayloads, nodeIds, lastMsat, lastExpiry) = route.reverse.foldLeft(start) { case (payloads, nodes, msat, expiry) \ hop =>
+      (RelayLegacyPayload(hop.shortChannelId, msat, expiry) +: payloads, hop.nodeId +: nodes, hop.fee(msat) + msat, hop.cltvExpiryDelta + expiry)
     }
 
     val isCltvBreach = lastExpiry - LNParams.broadcaster.currentHeight > LNParams.maxCltvDelta
-    val onChainBlocked = rd.onChainFeeBlock && MilliSatoshi(lastMsat - rd.firstMsat) > onChainThreshold
-    val isOffChainFeeBreach = LNParams.isFeeBreach(route, rd.firstMsat, percent = 100L) || onChainBlocked
-    val rd1 = if (onChainBlocked) rd.copy(onChainFeeBlockWasUsed = true) else rd
+    val isOnChainCapBreach = rd.capFeeByOnChain && MilliSatoshi(lastMsat - rd.firstMsat) > onChainThreshold
+    val rd1 = if (isOnChainCapBreach) rd.modify(_.expensiveScids).using(_ :+ route.maxBy(_ fee 10000000L).shortChannelId) else rd
+    val isUnacceptableRoute = LNParams.isFeeBreach(route, rd.firstMsat, percent = 100L) || isOnChainCapBreach || isCltvBreach
 
-    if (isOffChainFeeBreach || isCltvBreach) useFirstRoute(rest, rd1) else {
+    if (isUnacceptableRoute) useFirstRoute(rest, rd1) else {
       val onion = buildOnion(keys = nodeIds :+ rd1.pr.nodeId, payloads = allPayloads, assoc = rd1.pr.paymentHash)
       val rd2 = rd1.copy(routes = rest, usedRoute = route, onion = onion, lastMsat = lastMsat, lastExpiry = lastExpiry)
       Right(rd2)
@@ -171,9 +167,9 @@ object PaymentInfo {
 }
 
 case class RoutingData(pr: PaymentRequest, routes: PaymentRouteVec, usedRoute: PaymentRoute,
-                       onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */,
-                       lastMsat: Long /* amount with off-chain fee added */, lastExpiry: Long, callsLeft: Int,
-                       useCache: Boolean, airLeft: Int, onChainFeeBlock: Boolean, onChainFeeBlockWasUsed: Boolean,
+                       onion: PacketAndSecrets, firstMsat: Long /* amount without off-chain fee */ ,
+                       lastMsat: Long /* amount with off-chain fee added */ , lastExpiry: Long, callsLeft: Int,
+                       useCache: Boolean, airLeft: Int, capFeeByOnChain: Boolean, expensiveScids: Vector[Long],
                        action: Option[PaymentAction], fromHostedOnly: Boolean) {
 
   // Empty used route means we're sending to peer and its nodeId should be our targetId
