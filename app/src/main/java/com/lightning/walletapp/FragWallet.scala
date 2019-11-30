@@ -16,6 +16,7 @@ import com.lightning.walletapp.R.drawable._
 import com.lightning.walletapp.ln.LNParams._
 import com.lightning.walletapp.Denomination._
 import com.lightning.walletapp.ln.PaymentInfo._
+import com.lightning.walletapp.ln.ChanErrorCodes._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.ln.wire.{ChannelReestablish, UpdateAddHtlc}
@@ -210,10 +211,15 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     }
 
     override def onException = {
-      case _ \ CMDAddImpossible(rd, code) =>
-        // Route has been chosen and sent to selected channel but then exception was thrown in `sendAdd`
-        // first try to use the rest of available routes and finally inform user if no more routes left
-        ChannelManager.sendEither(useFirstRoute(rd.routes.tail, rd), me informNoRoutesMatched code)
+      // Route was chosen and sent to selected channel but then exception was thrown in `sendAdd`
+      case _ \ CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_HIGH, _) => sendToOtherChanOrFailAndInform(app getString err_ln_remote_fee_high, rd)
+      case _ \ CMDAddImpossible(rd, ERR_LOCAL_AMOUNT_HIGH, _) => sendToOtherChanOrFailAndInform(app getString err_ln_local_fee_high, rd)
+      case _ \ CMDAddImpossible(rd, ERR_TOO_MANY_HTLC, _) => sendToOtherChanOrFailAndInform(app getString err_ln_too_many_htlc, rd)
+
+      case _ \ CMDAddImpossible(rd, ERR_REMOTE_AMOUNT_LOW, min) =>
+        val minHuman = s"<strong>${denom parsedWithSign min.millisatoshi}</strong>"
+        val message = app getString err_ln_remote_amount_low format minHuman
+        sendToOtherChanOrFailAndInform(message.html, rd)
 
       case chan \ internalException =>
         val bld = negTextBuilder(dialog_ok, UncaughtHandler toText internalException)
@@ -257,10 +263,14 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
     mkCheckForm(alert => rm(alert)(chan process cmd), none, bld, dialog_ok, dialog_cancel)
   }
 
-  def informNoRoutesMatched(code: Int)(rd: RoutingData) = {
-    val builder = negTextBuilder(dialog_ok, app getString code)
-    UITask(host showForm builder.create).run
-    PaymentInfoWrap failOnUI rd
+  def sendToOtherChanOrFailAndInform(message: CharSequence, rd: RoutingData) = {
+    ChannelManager.sendEither(useFirstRoute(rd.routes.tail, rd), informNoRoutesLeft)
+
+    def informNoRoutesLeft(rd1: RoutingData) = {
+      val bld = negTextBuilder(dialog_ok, message)
+      UITask(host showForm bld.create).run
+      PaymentInfoWrap failOnUI rd1
+    }
   }
 
   // UPADTING PAYMENT LIST

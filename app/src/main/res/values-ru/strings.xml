@@ -170,11 +170,11 @@
     <string name="err_ln_peer_offline">Не удалось подключиться к %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s не поддерживает защиту от потери данных</string>
     <string name="err_ln_chan_exists_already">У вас уже есть открытый канал с этим пиром, попробуйте открыть канал с другим узлом</string>
-    <string name="err_ln_local_amount_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для канала</string>
-    <string name="err_ln_remote_amount_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для вашего пира</string>
-    <string name="err_ln_remote_amount_low">Не получилось потому что сумма платежа слишком низка для вашего пира</string>
+    <string name="err_ln_local_fee_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для канала</string>
+    <string name="err_ln_remote_fee_high">Не получилось потому что после добавления комиссии сумма платежа стает слишком высокой для вашего пира</string>
+    <string name="err_ln_remote_amount_low">Не получилось потому что сумма платежа слишком низкая, минимальный размер платежа составляет %1$s</string>
     <string name="err_ln_fulfilled">Не получилось потому что этот платежный запрос уже скорее всего оплачен</string>
-    <string name="err_ln_too_many">Не получилось потому что слишком много платежей уже в пути</string>
+    <string name="err_ln_too_many_htlc">Не получилось потому что слишком много платежей уже в пути</string>
     <string name="err_ln_chain_wait">Ждем подключения он-чейн кошелька</string>
 
     <string name="err_ln_drain_no_hosted">Нет hosted-канала с достаточным балансом для снятия денег</string>

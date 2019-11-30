@@ -168,11 +168,11 @@
     <string name="err_ln_peer_offline">Could not connect to %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s does not support data loss protection</string>
     <string name="err_ln_chan_exists_already">An open channel with this peer exists already, only one channel per peer is allowed for now, please try another node</string>
-    <string name="err_ln_local_amount_high">Failed because payment amount becomes too high to handle for your channel when off-chain fee is added</string>
-    <string name="err_ln_remote_amount_high">Failed because payment amount becomes too high to handle for your peer when off-chain fee is added</string>
-    <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peer to accept</string>
+    <string name="err_ln_remote_amount_low">Failed because payment amount is too low for your peers to handle, the minimum acceptable amount is %1$s</string>
+    <string name="err_ln_local_fee_high">Failed because payment amount becomes too high to handle for your channel when off-chain fee is added</string>
+    <string name="err_ln_remote_fee_high">Failed because payment amount becomes too high to handle for your peer when off-chain fee is added</string>
     <string name="err_ln_fulfilled">Failed because this payment has probably been fulfilled already</string>
-    <string name="err_ln_too_many">Failed because too many payments are already in-flight</string>
+    <string name="err_ln_too_many_htlc">Failed because too many payments are already in-flight</string>
     <string name="err_ln_chain_wait">Waiting for on-chain wallet to become online</string>
 
     <string name="err_ln_not_enough">There is no open channel with enough funds to send %1$s off-chain</string>

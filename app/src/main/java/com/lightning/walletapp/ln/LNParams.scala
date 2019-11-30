@@ -96,12 +96,6 @@ object LNParams {
 }
 
 object ChanErrorCodes {
-  import com.lightning.walletapp.R.string._
-  val ERR_LOCAL_AMOUNT_HIGH = err_ln_local_amount_high
-  val ERR_REMOTE_AMOUNT_HIGH = err_ln_remote_amount_high
-  val ERR_REMOTE_AMOUNT_LOW = err_ln_remote_amount_low
-  val ERR_TOO_MANY_HTLC = err_ln_too_many
-
   final val ERR_HOSTED_WRONG_BLOCKDAY = ByteVector.fromValidHex("0001")
   final val ERR_HOSTED_WRONG_LOCAL_SIG = ByteVector.fromValidHex("0002")
   final val ERR_HOSTED_WRONG_REMOTE_SIG = ByteVector.fromValidHex("0003")
@@ -110,6 +104,7 @@ object ChanErrorCodes {
   final val ERR_HOSTED_IN_FLIGHT_HTLC_WHILE_RESTORING = ByteVector.fromValidHex("0007")
   final val ERR_HOSTED_CHANNEL_DENIED = ByteVector.fromValidHex("0008")
 
+  import com.lightning.walletapp.R.string._
   def translateTag(error: wire.Error) = error.data take 2 match {
     case ERR_HOSTED_WRONG_BLOCKDAY => new LightningException(app getString err_ln_hosted_wrong_blockday)
     case ERR_HOSTED_WRONG_LOCAL_SIG => new LightningException(app getString err_ln_hosted_wrong_local_sig)
@@ -120,6 +115,11 @@ object ChanErrorCodes {
     case ERR_HOSTED_CHANNEL_DENIED => new LightningException(app getString err_ln_hosted_channel_denied)
     case _ => error.exception
   }
+
+  val ERR_LOCAL_AMOUNT_HIGH = 1
+  val ERR_REMOTE_AMOUNT_HIGH = 2
+  val ERR_REMOTE_AMOUNT_LOW = 3
+  val ERR_TOO_MANY_HTLC = 4
 }
 
 trait PublishStatus {

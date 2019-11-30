@@ -170,11 +170,11 @@
     <string name="err_ln_peer_offline">Помилка з\'єднання з %1$s</string>
     <string name="err_ln_peer_incompatible">%1$s не підтримує захист від втрати даних</string>
     <string name="err_ln_chan_exists_already">Відкритий канал із цим піром вже існує, будь ласка, спробуйте інший вузол</string>
-    <string name="err_ln_local_amount_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для каналу</string>
-    <string name="err_ln_remote_amount_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для вашого пiра</string>
-    <string name="err_ln_remote_amount_low">Не вийшло тому що сума платежу занадто низька для вашого пiра</string>
+    <string name="err_ln_local_fee_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для каналу</string>
+    <string name="err_ln_remote_fee_high">Не вийшло тому що після додавання комісії сума платежу стає занадто високою для вашого пiра</string>
+    <string name="err_ln_remote_amount_low">Не вийшло тому що сума платежу занадто низька, мінімально можливою сумою є %1$s</string>
     <string name="err_ln_fulfilled">Не вийшло тому що цей платіжний запит мабуть вже був оплачений</string>
-    <string name="err_ln_too_many">Не вийшло тому що занадто багато платежів вже в дорозі</string>
+    <string name="err_ln_too_many_htlc">Не вийшло тому що занадто багато платежів вже в дорозі</string>
     <string name="err_ln_chain_wait">Очiкуємо на пiдключення он-чейн гаманця</string>
 
     <string name="err_ln_drain_no_hosted">Немає hosted-каналу з достатнім балансом для зняття грошей</string>
