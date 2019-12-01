@@ -14,7 +14,6 @@ import javax.annotation.Nullable;
 
 
 public abstract class AbstractKit extends AbstractIdleService {
-    public static final String AUTO_HOSTED_CHAN = "autoHostedChan";
     public static final String FINGER_ENABLED = "fpEnabled";
     public static final String SHOW_TOOLTIP = "showTooltip";
     public static final String ERROR_REPORT = "errorReport";

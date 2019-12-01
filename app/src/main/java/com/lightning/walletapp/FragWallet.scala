@@ -47,7 +47,8 @@ import scodec.bits.ByteVector
 object FragWallet {
   var worker: FragWalletWorker = _
   val REDIRECT = "goToLnOpsActivity"
-  val RECEIVE = "openReceiveChooser"
+  val MAKE_HOSTED_CHAN = "makeHostedChan"
+  val OPEN_RECEIVE_MENU = "openReceiveMenu"
 }
 
 class FragWallet extends Fragment {

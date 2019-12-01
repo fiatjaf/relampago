@@ -61,8 +61,8 @@ class MainActivity extends NfcReaderActivity with TimerActivity { me =>
 
   override def onNoNfcIntentFound = {
     val processIntent = (getIntent.getFlags & Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0
-    val dataOpt = Seq(getIntent.getDataString, getIntent getStringExtra Intent.EXTRA_TEXT).find(data => null != data)
-    if (processIntent && getIntent.getAction == "android.intent.action.RECEIVE") runAnd(app.TransData.value = FragWallet.RECEIVE)(next)
+    val dataOpt = Seq(getIntent.getDataString, getIntent getStringExtra Intent.EXTRA_TEXT).find(externalData => null != externalData)
+    if (processIntent && getIntent.getAction == "android.intent.action.RECEIVE") runAnd(app.TransData.value = FragWallet.OPEN_RECEIVE_MENU)(next)
     else if (processIntent) <(dataOpt foreach app.TransData.recordValue, readFail)(_ => next)
     else next
   }

@@ -115,6 +115,7 @@
     <!-- local backups -->
     <string name="sets_backups">Локальный бекап каналов</string>
     <string name="ln_backup_detected">Есть файл с бекапом каналов</string>
+    <string name="ln_decrypt_fail">Не получилось расшифровать бекап-файл: «%1$s»\n\nСкорее всего причина в мнемонической фразе. Пожалуйста, проверьте что она введена правильно.</string>
 
     <array name="info_progress">
         <item>Синхронизация завершена</item>

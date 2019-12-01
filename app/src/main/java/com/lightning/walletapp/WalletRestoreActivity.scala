@@ -74,7 +74,7 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
 
   type GrantResults = Array[Int]
   override def onBackPressed: Unit = wrap(super.onBackPressed)(app.kit.stopAsync)
-  override def onRequestPermissionsResult(reqCode: Int, perms: Array[String], grantResults: GrantResults) =
+  override def onRequestPermissionsResult(reqCode: Int, perms: Array[String], results: GrantResults) =
     if (LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable && backupFile.exists)
       localBackupStatus setText ln_backup_detected
 
@@ -94,30 +94,33 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
       startAsync
 
       def startUp = {
-        // Make a seed from user provided mnemonic code and restore a wallet using it
         val seed = new DeterministicSeed(getMnemonic, null, "", dp.cal.getTimeInMillis / 1000)
+        val canRead = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable && backupFile.exists
         LNParams setup seed.getSeedBytes
 
-        Option {
-          val canRead = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable && backupFile.exists
-          if (canRead) LocalBackup.readAndDecrypt(backupFile, LNParams.cloudSecret) else null
-        } map {
-          case Success(localBackups) =>
-            // Update ealiest key creation time to our watch timestamp
-            seed.setCreationTimeSeconds(localBackups.earliestUtxoSeconds)
-            wallet = Wallet.fromSeed(app.params, seed)
+        def restoreUsingBackup =
+          LocalBackup.readAndDecrypt(backupFile, LNParams.cloudSecret) match {
+            // Backup file is present, decode it and restore chans if successful
 
-            // Restore channels before proceeding
-            localBackups.hosted.foreach(restoreHostedChannel)
-            localBackups.normal.foreach(restoreNormalChannel)
-            me prepareFreshWallet app.kit
+            case Success(localBackups) =>
+              // Update ealiest key creation time to our watch timestamp
+              seed.setCreationTimeSeconds(localBackups.earliestUtxoSeconds)
+              wallet = Wallet.fromSeed(app.params, seed)
 
-          case Failure(reason) =>
-            // Do not proceed here
-            UITask(throw reason).run
+              // Restore channels before proceeding
+              localBackups.hosted.foreach(restoreHostedChannel)
+              localBackups.normal.foreach(restoreNormalChannel)
+              me prepareFreshWallet app.kit
 
-        } getOrElse {
-          // No file system permission, proceed as is
+            case Failure(reason) => UITask {
+              val message = getString(ln_decrypt_fail).format(reason.getMessage)
+              showForm(negTextBuilder(dialog_ok, message).create)
+              restoreProgress setVisibility View.GONE
+              restoreInfo setVisibility View.VISIBLE
+            }.run
+          }
+
+        if (canRead) restoreUsingBackup else {
           wallet = Wallet.fromSeed(app.params, seed)
           me prepareFreshWallet app.kit
         }

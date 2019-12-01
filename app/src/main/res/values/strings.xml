@@ -114,7 +114,8 @@
 
     <!-- local backups -->
     <string name="sets_backups">Save local channel backups</string>
-    <string name="ln_backup_detected">Channel backup file is found</string>
+    <string name="ln_backup_detected">Channel backup file is present</string>
+    <string name="ln_decrypt_fail">Failed while trying to decrypt a backup file: «%1$s»\n\nOne reason could be incorrect mnemonic phrase, please check if your inout is correct.</string>
 
     <array name="info_progress">
         <item>Sync is complete</item>
