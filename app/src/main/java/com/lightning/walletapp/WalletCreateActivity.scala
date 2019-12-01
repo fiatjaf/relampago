@@ -15,13 +15,14 @@ trait FirstActivity { me: TimerActivity =>
     kit.useCheckPoints(kit.wallet.getEarliestKeyCreationTime)
     kit.blockChain = new BlockChain(app.params, kit.wallet, kit.store)
     kit.peerGroup = new PeerGroup(app.params, kit.blockChain)
-    // Open default hosted channel on creating or restoring
-    app.TransData.value = FragWallet.MAKE_HOSTED_CHAN
 
     // Make sure keys are rendered and save to disk
     kit.wallet.currentAddress(org.bitcoinj.wallet.KeyChain.KeyPurpose.RECEIVE_FUNDS)
     kit.wallet.currentAddress(org.bitcoinj.wallet.KeyChain.KeyPurpose.CHANGE)
     kit.wallet.saveToFile(app.walletFile)
+
+    // Open default hosted channel on wallet creating or restoring
+    app.prefs.edit.putBoolean(AbstractKit.AUTO_HOSTED_CHAN, true).commit
     me exitTo MainActivity.wallet
     kit.setupAndStartDownload
   }

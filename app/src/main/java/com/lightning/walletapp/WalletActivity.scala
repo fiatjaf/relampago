@@ -129,7 +129,68 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
     // Worker is definitely not null
     FragWallet.worker.setupSearch(menu)
     FragWallet.worker.searchView.setQueryHint(app getString search_hint_payments)
+    val openAutoHostedChan = app.prefs.getBoolean(AbstractKit.AUTO_HOSTED_CHAN, false)
     val showTooltip = app.prefs.getBoolean(AbstractKit.SHOW_TOOLTIP, true)
+
+    if (openAutoHostedChan) {
+      var hasDefaultHosted = ChannelManager.hasHostedChanWith(FragLNStart.defaultHostedNode.ann.nodeId)
+      if (hasDefaultHosted) app.prefs.edit.putBoolean(AbstractKit.AUTO_HOSTED_CHAN, false).commit else {
+        val refundScriptPubKey: ByteVector = ByteVector(ScriptBuilder.createOutputScript(app.kit.currentAddress).getProgram)
+        val waitData = WaitRemoteHostedReply(FragLNStart.defaultHostedNode.ann, refundScriptPubKey, FragLNStart.defaultHostedNode.secret)
+        val freshChannel = ChannelManager.createHostedChannel(Set.empty, waitData)
+
+        lazy val hostedChanOpenListener = new ConnectionListener with ChannelListener {
+          override def onDisconnect(nodeId: PublicKey) = if (nodeId == FragLNStart.defaultHostedNode.ann.nodeId) detachAll(retryOnRestart = true)
+          override def onOperational(nodeId: PublicKey, isCompat: Boolean) = if (nodeId == FragLNStart.defaultHostedNode.ann.nodeId && isCompat) freshChannel.startUp
+          override def onHostedMessage(ann: NodeAnnouncement, message: HostedChannelMessage) = if (ann.nodeId == FragLNStart.defaultHostedNode.ann.nodeId) freshChannel process message
+
+          override def onMessage(nodeId: PublicKey, remoteMessage: LightningMessage) = remoteMessage match {
+            case error: wire.Error if nodeId == FragLNStart.defaultHostedNode.ann.nodeId => translateHostedTaggedError(error)
+            case upd: ChannelUpdate if nodeId == FragLNStart.defaultHostedNode.ann.nodeId && upd.isHosted => freshChannel process upd
+            case _ => // Do nothing
+          }
+
+          override def onBecome = {
+            case (_: HostedChannel, _, WAIT_FOR_ACCEPT, OPEN) =>
+              FragWallet.worker.reg(freshChannel)
+              detachAll(retryOnRestart = false)
+          }
+
+          override def onException = {
+            case (_: HostedChannel, openingError) =>
+              UITask(app quickToast openingError.getMessage).run
+              detachAll(retryOnRestart = false)
+          }
+
+          def translateHostedTaggedError(error: wire.Error) = {
+            val errorMessage = ChanErrorCodes.translateTag(error)
+            onException(freshChannel -> errorMessage)
+          }
+        }
+
+        lazy val chainListener = new BlocksListener {
+          def onBlocksDownloaded(p: Peer, b: Block, fb: FilteredBlock, left: Int) = if (!hasDefaultHosted) {
+            // First attach listeners and then connect to remote node because connection may be there already
+            ConnectionManager.listeners += hostedChanOpenListener
+            freshChannel.listeners += hostedChanOpenListener
+
+            ConnectionManager.connectTo(FragLNStart.defaultHostedNode.ann, notify = true)
+            // Method may be called many times even if removed so guard with boolean condition
+            hasDefaultHosted = true
+          }
+        }
+
+        def detachAll(retryOnRestart: Boolean): Unit = {
+          app.prefs.edit.putBoolean(AbstractKit.AUTO_HOSTED_CHAN, retryOnRestart).commit
+          app.kit.peerGroup removeBlocksDownloadedEventListener chainListener
+          ConnectionManager.listeners -= hostedChanOpenListener
+          freshChannel.listeners -= hostedChanOpenListener
+        }
+
+        // First obtain current chain height, then try to get a channel
+        app.kit.peerGroup addBlocksDownloadedEventListener chainListener
+      }
+    }
 
     if (showTooltip) try {
       app.prefs.edit.putBoolean(AbstractKit.SHOW_TOOLTIP, false).commit
@@ -190,7 +251,6 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
 
   def checkTransData = app.TransData checkAndMaybeErase {
     case _: NodeAnnouncement => me goTo classOf[LNStartFundActivity]
-    case FragWallet.MAKE_HOSTED_CHAN => attemptDefaultHostedChan: Unit
     case FragWallet.OPEN_RECEIVE_MENU => goReceivePayment(null): Unit
     case FragWallet.REDIRECT => goOps(null): Unit
 

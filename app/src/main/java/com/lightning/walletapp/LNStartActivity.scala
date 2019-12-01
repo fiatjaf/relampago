@@ -20,7 +20,6 @@ import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
 import com.lightning.walletapp.lnutils.JsonHttpUtils.to
 import com.lightning.walletapp.helper.ThrottledWork
-import com.github.kevinsawicki.http.HttpRequest
 import fr.acinq.bitcoin.Crypto.PublicKey
 import org.bitcoinj.uri.BitcoinURI
 import scodec.bits.ByteVector
@@ -68,25 +67,22 @@ class LNStartActivity extends ScanActivity { me =>
 
 object FragLNStart {
   var fragment: FragLNStart = _
+  val defaultHostedNode = HostedChannelRequest(s"02330d13587b67a85c0a36ea001c4dba14bcd48dda8988f7303275b040bffb6abd@172.245.74.10:9935", Some("Testnet-Node"), "00")
+  val bitrefillNa = app.mkNodeAnnouncement(PublicKey.fromValidHex("030c3f19d742ca294a55c00376b3b355c3c90d61c6b6b39554dbc7ac19b141c14f"), NodeAddress.fromParts("52.50.244.44", 9735), "Bitrefill")
+  val liteGoNa = app.mkNodeAnnouncement(PublicKey.fromValidHex("029aee02904d4e419770b93c1b07aae2814a79032e23cafb4024cbea6fb71be106"), NodeAddress.fromParts("195.154.169.49", 9735), "LiteGo")
+  val acinqNa = app.mkNodeAnnouncement(PublicKey.fromValidHex("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f"), NodeAddress.fromParts("34.239.230.56", 9735), "ACINQ")
+
+  val liteGo = HardcodedNodeView(liteGoNa, "<i>litego.io</i>")
+  val acinq = HardcodedNodeView(acinqNa, "<i>strike.acinq.co</i>")
+  val bitrefill = HardcodedNodeView(bitrefillNa, "<i>bitrefill.com</i>")
+  val recommendedNodes = Vector(defaultHostedNode, acinq, bitrefill, liteGo)
 }
 
 class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
   override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_ln_start, vg, false)
-  val bitrefillKey = PublicKey.fromValidHex("030c3f19d742ca294a55c00376b3b355c3c90d61c6b6b39554dbc7ac19b141c14f")
-  val liteGoKey = PublicKey.fromValidHex("029aee02904d4e419770b93c1b07aae2814a79032e23cafb4024cbea6fb71be106")
-  val acinqKey = PublicKey.fromValidHex("03864ef025fde8fb587d989186ce6a4a186895ee44a926bfc370e2c366597a3f8f")
-
-  val bitrefillNa = app.mkNodeAnnouncement(bitrefillKey, NodeAddress.fromParts("52.50.244.44", 9735), "Bitrefill")
-  val liteGoNa = app.mkNodeAnnouncement(liteGoKey, NodeAddress.fromParts("195.154.169.49", 9735), "LiteGo")
-  val acinqNa = app.mkNodeAnnouncement(acinqKey, NodeAddress.fromParts("34.239.230.56", 9735), "ACINQ")
-
-  val bitrefill = HardcodedNodeView(bitrefillNa, "<i>bitrefill.com</i>")
-  val acinq = HardcodedNodeView(acinqNa, "<i>strike.acinq.co</i>")
-  val liteGo = HardcodedNodeView(liteGoNa, "<i>litego.io</i>")
-  val hardcodedNodes = Vector(acinq, bitrefill, liteGo)
-
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
-  private[this] var nodes = Vector.empty[StartNodeView]
+  val startNodeText = app getString ln_ops_start_node_view
+  var nodes = Vector.empty[StartNodeView]
   FragLNStart.fragment = me
 
   val worker = new ThrottledWork[String, AnnounceChansNumVec] {
@@ -94,8 +90,8 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     def error(nodeSearchError: Throwable) = host onFail nodeSearchError
 
     def process(userQuery: String, results: AnnounceChansNumVec) = {
-      val remoteNodeViewWraps = for (nodeInfo <- results) yield RemoteNodeView(nodeInfo)
-      nodes = if (userQuery.isEmpty) hardcodedNodes ++ remoteNodeViewWraps else remoteNodeViewWraps
+      val remoteNodeViewWraps = for (remoteNodeInfo <- results) yield RemoteNodeView(remoteNodeInfo)
+      nodes = if (userQuery.isEmpty) FragLNStart.recommendedNodes ++ remoteNodeViewWraps else remoteNodeViewWraps
       host.UITask(adapter.notifyDataSetChanged).run
     }
   }
@@ -104,8 +100,8 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     def getView(pos: Int, savedView: View, par: ViewGroup) = {
       val slot = host.getLayoutInflater.inflate(R.layout.frag_single_line, null)
       val textLine = slot.findViewById(R.id.textLine).asInstanceOf[TextView]
-      val txt = getItem(pos).asString(app getString ln_ops_start_node_view)
-      textLine setText txt.html
+      textLine setText getItem(pos).asString(startNodeText).html
+      slot setBackgroundColor getItem(pos).backgroundColor
       slot
     }
 
@@ -135,6 +131,7 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
 
 sealed trait StartNodeView {
   def asString(base: String): String
+  val backgroundColor = 0x00000000
 }
 
 case class IncomingChannelParams(nodeView: HardcodedNodeView, open: OpenChannel)
@@ -209,6 +206,7 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
 
 case class HostedChannelRequest(uri: String, alias: Option[String], k1: String) extends LNUrlData with StartNodeView {
   def asString(base: String) = base.format(ann.alias, app getString ln_ops_start_fund_hosted_channel, ann.pretty)
+  override val backgroundColor = Denomination.yellowHighlight
 
   val secret = ByteVector fromValidHex k1
   val nodeLink(nodeKey, hostAddress, portNumber) = uri

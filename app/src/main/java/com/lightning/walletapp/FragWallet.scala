@@ -47,7 +47,6 @@ import scodec.bits.ByteVector
 object FragWallet {
   var worker: FragWalletWorker = _
   val REDIRECT = "goToLnOpsActivity"
-  val MAKE_HOSTED_CHAN = "makeHostedChan"
   val OPEN_RECEIVE_MENU = "openReceiveMenu"
 }
 
@@ -302,8 +301,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
       val resource = if (isTablet) R.layout.frag_tx_line_tablet else R.layout.frag_tx_line
       val view = if (null == savedView) host.getLayoutInflater.inflate(resource, null) else savedView
       val holder = if (null == view.getTag) ViewHolder(view) else view.getTag.asInstanceOf[ViewHolder]
-      // Reset bg to transparent each time because LN slot may mark a revealed preimage
-      view setBackgroundColor 0x00000000
+      view setBackgroundColor getItem(position).backgroundColor
       getItem(position) fillView holder
       view
     }
@@ -318,6 +316,7 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
   }
 
   abstract class ItemWrap {
+    def backgroundColor = 0x00000000
     def fillView(v: ViewHolder): Unit
     def getDate: java.util.Date
     def generatePopup: Unit
@@ -359,7 +358,8 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
   case class LNWrap(info: PaymentInfo) extends ItemWrap {
     // Blocks until expiration if hosted preimage is revealed
-    def hostedBlocks = sentHostedPreimages.get(info.paymentPreimage)
+    def hostedBlocks: Option[Long] = sentHostedPreimages.get(info.paymentPreimage)
+    override def backgroundColor = if (hostedBlocks.isDefined) Denomination.yellowHighlight else 0x00000000
     val getDate = new java.util.Date(info.stamp)
 
     def fillView(holder: ViewHolder) = {
@@ -369,7 +369,6 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
 
       holder.transactWhat setVisibility viewMap(isTablet || isSearching)
       if (isTablet || isSearching) holder.transactWhat setText humanDesc(info.pd.text).html
-      if (hostedBlocks.isDefined) holder.view.setBackgroundColor(Denomination.yellowHighlight)
       holder.transactWhen setText when(System.currentTimeMillis, getDate).html
       holder.transactSum setText s"<img src='ln'/>$humanAmount".html
       holder.transactCircle setImageResource iconDict(info.status)

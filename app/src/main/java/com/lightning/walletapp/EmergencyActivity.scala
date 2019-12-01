@@ -19,7 +19,7 @@ class EmergencyActivity extends TimerActivity { me =>
 
   def INIT(savedInstanceState: Bundle) = {
     me setContentView R.layout.activity_emergency
-    <(prepareWallet, onFail)(none)
+    <(prepareWallet, none)(none)
   }
 
   def prepareWallet =
