@@ -115,7 +115,7 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case JsString("message") => raw.convertTo[MessageAction]
       case JsString("aes") => raw.convertTo[AESAction]
       case JsString("url") => raw.convertTo[UrlAction]
-      case _ => throw new Exception
+      case tag => throw new Exception(s"Unknown action=$tag")
     }
 
     def write(internal: PaymentAction) = internal match {
@@ -140,24 +140,18 @@ object ImplicitJsonFormats extends DefaultJsonProtocol { me =>
       case JsString("channelRequest") => serialized.convertTo[IncomingChannelRequest]
       case JsString("withdrawRequest") => serialized.convertTo[WithdrawRequest]
       case JsString("payRequest") => serialized.convertTo[PayRequest]
-      case _ => throw new RuntimeException
+      case tag => throw new Exception(s"Unknown lnurl=$tag")
     }
   }
 
-  implicit val incomingChannelRequestFmt = taggedJsonFmt(jsonFormat[String, String, String,
-    IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1"), tag = "channelRequest")
-
-  implicit val hostedChannelRequestFmt = taggedJsonFmt(jsonFormat[String, Option[String], String,
-    HostedChannelRequest](HostedChannelRequest.apply, "uri", "alias", "k1"), tag = "hostedChannelRequest")
-
   implicit val withdrawRequestFmt = taggedJsonFmt(jsonFormat[String, String, Long, String, Option[Long],
-    WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxWithdrawable", "defaultDescription", "minWithdrawable"), tag = "withdrawRequest")
+    WithdrawRequest](WithdrawRequest.apply, "callback", "k1", "maxWithdrawable", "defaultDescription", "minWithdrawable"),
+    tag = "withdrawRequest")
 
-  implicit val payRequestFmt = taggedJsonFmt(jsonFormat[String, Long, Long, String,
-    PayRequest](PayRequest.apply, "callback", "maxSendable", "minSendable", "metadata"), tag = "payRequest")
-
-  implicit val payRequestFinalFmt = jsonFormat[Vector[PayRequest.Route], String, PaymentAction,
-    PayRequestFinal](PayRequestFinal.apply, "routes", "pr", "successAction")
+  implicit val incomingChannelRequestFmt = taggedJsonFmt(jsonFormat[String, String, String, IncomingChannelRequest](IncomingChannelRequest.apply, "uri", "callback", "k1"), tag = "channelRequest")
+  implicit val hostedChannelRequestFmt = taggedJsonFmt(jsonFormat[String, Option[String], String, HostedChannelRequest](HostedChannelRequest.apply, "uri", "alias", "k1"), tag = "hostedChannelRequest")
+  implicit val payRequestFmt = taggedJsonFmt(jsonFormat[String, Long, Long, String, PayRequest](PayRequest.apply, "callback", "maxSendable", "minSendable", "metadata"), tag = "payRequest")
+  implicit val payRequestFinalFmt = jsonFormat[Option[PaymentAction], Vector[PayRequest.Route], String, PayRequestFinal](PayRequestFinal.apply, "successAction", "routes", "pr")
 
   // Channel data
 

@@ -195,7 +195,6 @@ case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, 
 }
 
 case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
-  def requestChannel = unsafe(callbackUri.buildUpon.appendQueryParameter("remoteid", LNParams.nodePublicKey.toString).appendQueryParameter("private", "1").appendQueryParameter("k1", k1).build.toString)
   override def checkAgainstParent(lnUrl: LNUrl) = lnUrl.uri.getHost == callbackUri.getHost
   require(callback startsWith "https://", "Not an HTTPS callback")
 
@@ -204,6 +203,10 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
   val address = NodeAddress.fromParts(hostAddress, portNumber.toInt)
   val ann = app.mkNodeAnnouncement(pubKey, address, alias = hostAddress)
   val callbackUri = android.net.Uri.parse(callback)
+
+  def requestChannel =
+    unsafe(callbackUri.buildUpon.appendQueryParameter("remoteid", LNParams.nodePublicKey.toString)
+      .appendQueryParameter("private", "1").appendQueryParameter("k1", k1).build.toString)
 }
 
 case class HostedChannelRequest(uri: String, alias: Option[String], k1: String) extends LNUrlData with StartNodeView {
@@ -225,18 +228,21 @@ object PayRequest {
 }
 
 case class PayRequest(callback: String, maxSendable: Long, minSendable: Long, metadata: String) extends LNUrlData {
-  def requestFinal(amount: MilliSatoshi, fromnodes: String = new String) = unsafe(callbackUri.buildUpon.appendQueryParameter("amount", amount.toLong.toString).appendQueryParameter("fromnodes", fromnodes).build.toString)
+  val metaDataTextPlain = to[PayMetaData](metadata).collectFirst { case Vector("text/plain", content) => content }.get
+  val callbackUri = android.net.Uri.parse(callback)
+
   override def checkAgainstParent(lnUrl: LNUrl) = lnUrl.uri.getHost == callbackUri.getHost
   def metaDataHash: ByteVector = Crypto.sha256(ByteVector view metadata.getBytes)
   require(callback startsWith "https://", "Not an HTTPS callback")
   require(minSendable <= maxSendable)
   require(minSendable >= 1L)
 
-  val metaDataTextPlain = to[PayMetaData](metadata).collectFirst { case Vector("text/plain", content) => content }.get
-  val callbackUri = android.net.Uri.parse(callback)
+  def requestFinal(amount: MilliSatoshi, fromnodes: String = new String) =
+    unsafe(callbackUri.buildUpon.appendQueryParameter("amount", amount.toLong.toString)
+      .appendQueryParameter("fromnodes", fromnodes).build.toString)
 }
 
-case class PayRequestFinal(routes: Vector[Route], pr: String, successAction: PaymentAction) extends LNUrlData {
+case class PayRequestFinal(successAction: Option[PaymentAction], routes: Vector[Route], pr: String) extends LNUrlData {
   for (route <- routes) for (nodeId \ chanUpdate <- route) require(Announcements.checkSig(chanUpdate, nodeId), "Extra route contains an invalid update")
   val extraPaymentRoutes: PaymentRouteVec = for (route <- routes) yield route map { case nodeId \ chanUpdate => chanUpdate toHop nodeId }
   val paymentRequest: PaymentRequest = PaymentRequest.read(pr)

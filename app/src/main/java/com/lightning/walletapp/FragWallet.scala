@@ -646,12 +646,12 @@ class FragWalletWorker(val host: WalletActivity, frag: View) extends SearchBar w
           require(descriptionHash == payReq.metaDataHash, s"Metadata hash mismatch, original=${payReq.metaDataHash}, provided=$descriptionHash")
           require(PaymentRequest.prefixes(LNParams.chainHash) == prf.paymentRequest.prefix, s"Wrong network prefix=${prf.paymentRequest.prefix}")
           require(prf.paymentRequest.amount.contains(ms), s"Payment amount mismatch, provided=${prf.paymentRequest.amount}, requested=$ms")
-          prf.modify(_.successAction.domain.each).setTo(payReq.callbackUri.getHost)
+          prf.modify(_.successAction.each.domain.each).setTo(payReq.callbackUri.getHost)
         }
 
         def send(prf: PayRequestFinal) = {
           val rd = app.emptyRD(prf.paymentRequest, firstMsat = ms.toLong, useCache = true)
-          val rd1 = rd.copy(action = Some(prf.successAction), airLeft = ChannelManager.all count isOperational)
+          val rd1 = rd.copy(action = prf.successAction, airLeft = ChannelManager.all count isOperational)
           UITask(me doSendOffChain rd1).run
         }
 
