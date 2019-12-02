@@ -10,8 +10,8 @@ import com.lightning.walletapp.lnutils.ImplicitConversions._
 import java.io.{BufferedWriter, File, FileWriter}
 import android.view.{Menu, MenuItem, View, ViewGroup}
 import org.bitcoinj.core.{Address, Block, FilteredBlock, Peer}
+import fr.acinq.bitcoin.{MilliSatoshiLong, Satoshi, SatoshiLong}
 import com.lightning.walletapp.ln.Tools.{memoize, none, random, runAnd, wrap}
-import fr.acinq.bitcoin.{MilliSatoshi, MilliSatoshiLong, Satoshi, SatoshiLong}
 import com.lightning.walletapp.lnutils.{ChannelTable, PaymentInfoWrap, PaymentTable}
 import com.lightning.walletapp.ln.wire.LightningMessageCodecs.hostedStateCodec
 import com.lightning.walletapp.lnutils.IconGetter.scrWidth
@@ -30,6 +30,7 @@ import scala.util.Try
 
 
 class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
+  def goHostedInfo(top: View) = host.browse("https://lightning-wallet.com/hosted-channels")
   lazy val hostedChanActions = getResources.getStringArray(R.array.ln_hosted_chan_actions).map(_.html)
   lazy val normalChanActions = getResources.getStringArray(R.array.ln_normal_chan_actions).map(_.html)
   lazy val barStatus = app.getResources.getStringArray(R.array.ln_chan_ops_status)
@@ -327,7 +328,7 @@ class LNOpsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
           rm(alert) {
             if (1 == pos) shareStateAsFile
-            else if (0 == pos) host.browse(s"https://lightning-wallet.com/hosted-channels")
+            else if (0 == pos) goHostedInfo(null)
             else if (2 == pos && chan.inFlightHtlcs.nonEmpty) warnAndMaybeRemove(me getString ln_hosted_remove_inflight_details)
             else if (2 == pos && chan.estCanSendMsat.fromMsatToSat > LNParams.dust) warnAndMaybeRemove(me getString ln_hosted_remove_non_empty_details)
             else if (2 == pos) removeChan

@@ -27,6 +27,7 @@
                 android:textStyle="bold"/>
 
             <ImageButton
+                android:onClick="goHostedInfo"
                 android:background="?android:selectableItemBackground"
                 android:src="@drawable/outline_help_24"
                 android:layout_height="wrap_content"
