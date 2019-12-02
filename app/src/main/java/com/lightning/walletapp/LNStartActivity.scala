@@ -79,7 +79,6 @@ object FragLNStart {
 }
 
 class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
-  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) = inf.inflate(R.layout.frag_ln_start, vg, false)
   lazy val host = me.getActivity.asInstanceOf[LNStartActivity]
   val startNodeText = app getString ln_ops_start_node_view
   var nodes = Vector.empty[StartNodeView]
@@ -115,6 +114,9 @@ class FragLNStart extends Fragment with SearchBar with HumanTimeDisplay { me =>
     app.TransData.value = adapter getItem pos
     host goTo classOf[LNStartFundActivity]
   }
+
+  override def onCreateView(inf: LayoutInflater, vg: ViewGroup, bn: Bundle) =
+    inf.inflate(R.layout.frag_ln_start, vg, false)
 
   override def onViewCreated(view: View, state: Bundle) = if (app.isAlive) {
     val lnStartNodesList = view.findViewById(R.id.lnStartNodesList).asInstanceOf[ListView]
