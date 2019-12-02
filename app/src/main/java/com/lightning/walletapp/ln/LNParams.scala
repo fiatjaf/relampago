@@ -78,20 +78,19 @@ object LNParams {
   }
 
   def makeChanKeys(fundKey: PublicKey) = {
-    val channelKeyPath: Vector[Long] = makeKeyPath(material = fundKey.hash160)
+    val channelKeyPath: Vector[Long] = makeKeyPath(fundKey.hash160)
     for (idx <- 1L to 5L) yield derivePrivateKey(extendedNodeKey, channelKeyPath :+ idx)
   }
 
   def makeLinkingKey(domain: String): PrivateKey = {
-    val material = crypto.Mac32.hmac256(key = hashingKey, message = domain)
-    derivePrivateKey(extendedNodeKey, makeKeyPath(material) :+ 0L).privateKey
+    val material: ByteVector = crypto.Mac32.hmac256(key = hashingKey, message = domain)
+    derivePrivateKey(chain = hardened(138) +: makeKeyPath(material), parent = master).privateKey
   }
 
   def makeKeyPath(material: ByteVector): Vector[Long] = {
     require(material.size > 15, "Material size must be at least 16")
     val stream = new ByteArrayInputStream(material.slice(0, 16).toArray)
-    def generateNewBranch = Protocol.uint32(stream, ByteOrder.BIG_ENDIAN)
-    Vector.fill(4)(generateNewBranch)
+    Vector.fill(4)(Protocol.uint32(stream, ByteOrder.BIG_ENDIAN))
   }
 }
 
