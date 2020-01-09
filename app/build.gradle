@@ -1,0 +1,60 @@
+apply plugin: "com.android.application"
+apply plugin: "jp.leafytree.android-scala"
+
+android {
+    compileSdkVersion 28
+    buildToolsVersion '28.0.3'
+
+    defaultConfig {
+        versionName "0.4"
+        applicationId "com.lightning.walletapp"
+        multiDexEnabled true
+        targetSdkVersion 28
+        minSdkVersion 21
+        versionCode 146
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles 'proguard-rules.txt'
+        }
+        debug {
+            minifyEnabled true
+            proguardFiles 'proguard-rules.txt'
+        }
+    }
+
+    dexOptions {
+        javaMaxHeapSize "12g"
+    }
+}
+
+dependencies {
+    compile 'com.android.support:support-v4:28.0.0'
+    compile 'com.android.support:cardview-v7:28.0.0'
+    compile 'com.android.support:appcompat-v7:28.0.0'
+    compile 'com.android.support:recyclerview-v7:28.0.0'
+    compile 'com.google.code.ndef-tools-for-android:ndeftools:1.2.4'
+    compile 'com.journeyapps:zxing-android-embedded:3.5.0@aar'
+    compile 'com.softwaremill.quicklens:quicklens_2.11:1.4.11'
+    compile 'org.scala-lang:scala-library:2.11.12'
+    compile 'org.scodec:scodec-core_2.11:1.11.3'
+    compile 'io.reactivex:rxscala_2.11:0.26.5'
+    compile 'commons-codec:commons-codec:1.9'
+    compile 'io.spray:spray-json_2.11:1.3.5'
+    compile 'com.google.zxing:core:3.3.3'
+
+    // Bitcoinj
+    compile group: 'com.google.guava', name: 'guava', version: '24.0-android'
+    compile group: 'com.madgag.spongycastle', name: 'core', version: '1.58.0.0'
+    compile group: 'com.google.protobuf', name: 'protobuf-java', version: '3.5.1'
+    compile group: 'com.squareup.okhttp3', name: 'okhttp', version: '3.9.1'
+    compile group: 'net.jcip', name: 'jcip-annotations', version: '1.0'
+    compile group: 'com.squareup.okio', name: 'okio', version: '1.13.0'
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
+
+//    compile ('eu.lp0.slf4j:slf4j-android:1.7.25-0') {
+//        exclude module: 'slf4j-api'
+//    }
+}
