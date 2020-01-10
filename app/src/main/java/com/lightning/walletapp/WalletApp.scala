@@ -360,8 +360,8 @@ object ChannelManager extends Broadcaster {
     def error(canNotHappen: Throwable) = none
 
     def process(cmd: String, executionResult: Any): Unit = if (LocalBackup.isExternalStorageWritable) try {
-      val backupFileUnsafe = LocalBackup.getBackupFileUnsafe(LocalBackup getBackupDirectory chainHash)
-      LocalBackup.encryptAndWrite(backupFileUnsafe, all, app.kit.wallet, keys.cloudSecret)
+      val backupFile = LocalBackup.getBackupFileUnsafe(LocalBackup.getBackupDirectory(chainHash), keys.cloudId)
+      LocalBackup.encryptAndWrite(backupFile, all, app.kit.wallet, keys.cloudSecret)
     } catch none
   }
 

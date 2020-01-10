@@ -78,7 +78,7 @@ class LightningNodeKeys(seed: Bytes) {
   private lazy val hashingKey = derivePrivateKey(master, hardened(138L) :: 0L :: Nil).privateKey.toBin
   // Cloud secret is used to encrypt Olympus data, cloud ID is used as identifier
   lazy val cloudSecret = sha256(extendedCloudKey.privateKey.toBin)
-  lazy val cloudId = sha256(cloudSecret)
+  lazy val cloudId = sha256(cloudSecret).toHex
 
   def makeChanKeys(fundKey: PublicKey) = {
     val channelKeyPath: Vector[Long] = makeKeyPath(fundKey.hash160)

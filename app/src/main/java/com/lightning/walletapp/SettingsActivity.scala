@@ -185,7 +185,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
 
     recoverFunds setOnClickListener onButtonTap {
       def recover = LNParams.olympusWrap getBackup LNParams.keys.cloudId foreach { backups =>
-        // Get all backups, then filter out those with existing channel ids
+        // Get all backups, then filter out those with already locally existing channel ids
 
         for {
           ciphertext <- backups
@@ -219,7 +219,7 @@ class SettingsActivity extends TimerActivity with HumanTimeDisplay { me =>
   def updateBackupView = {
     val dir = LocalBackup.getBackupDirectory(LNParams.chainHash)
     val canWrite = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable
-    if (canWrite) saveLocalBackupsPath.setText(LocalBackup.getBackupFileUnsafe(dir).getPath)
+    if (canWrite) saveLocalBackupsPath.setText(LocalBackup.getBackupFileUnsafe(dir, LNParams.keys.cloudId).getPath)
     saveLocalBackupsPath setVisibility viewMap(canWrite)
     saveLocalBackups setChecked canWrite
   }

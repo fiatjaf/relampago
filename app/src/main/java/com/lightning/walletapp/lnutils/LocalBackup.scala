@@ -41,10 +41,11 @@ object LocalBackup {
     case _ => "unknown"
   }
 
-  def getBackupFileUnsafe(channelBackupDirName: String) = {
+  def getBackupFileUnsafe(channelBackupDirName: String, suffix: String) = {
     val publicDir = new File(Environment.getExternalStorageDirectory, BACKUP_DIR)
     val chainDir = new File(publicDir, channelBackupDirName)
-    val backup = new File(chainDir, BACKUP_FILE_NAME)
+    val fullName = s"$BACKUP_FILE_NAME-$suffix"
+    val backup = new File(chainDir, fullName)
     if (!backup.isFile) chainDir.mkdirs
     backup
   }

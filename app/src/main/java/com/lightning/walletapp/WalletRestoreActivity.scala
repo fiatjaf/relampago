@@ -33,14 +33,17 @@ class WhenPicker(host: TimerActivity, start: Long) extends DatePicker(host) with
 }
 
 class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
-  lazy val backupFileUnsafe = LocalBackup.getBackupFileUnsafe(LocalBackup getBackupDirectory LNParams.chainHash)
-  lazy val localBackupStatus = findViewById(R.id.localBackupStatus).asInstanceOf[TextView]
   lazy val restoreCode = findViewById(R.id.restoreCode).asInstanceOf[NachoTextView]
   lazy val restoreProgress = findViewById(R.id.restoreProgress).asInstanceOf[View]
   lazy val restoreWallet = findViewById(R.id.restoreWallet).asInstanceOf[Button]
   lazy val restoreWhen = findViewById(R.id.restoreWhen).asInstanceOf[Button]
   lazy val restoreInfo = findViewById(R.id.restoreInfo).asInstanceOf[View]
   lazy val dp = new WhenPicker(me, 1526817600 * 1000L)
+
+  lazy val backupFileUnsafe = {
+    val dir = LocalBackup.getBackupDirectory(LNParams.chainHash)
+    LocalBackup.getBackupFileUnsafe(dir, LNParams.keys.cloudId)
+  }
 
   def INIT(state: Bundle) = {
     setContentView(R.layout.activity_restore)
@@ -58,19 +61,14 @@ class WalletRestoreActivity extends TimerActivity with FirstActivity { me =>
     restoreCode.addChipTerminator(',', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode.addChipTerminator('\n', BEHAVIOR_CHIPIFY_TO_TERMINATOR)
     restoreCode setDropDownBackgroundResource R.color.button_material_dark
-
-    val wordList = MnemonicCode.INSTANCE.getWordList
-    val wordView = android.R.layout.simple_list_item_1
-    restoreCode setAdapter new ArrayAdapter(me, wordView, wordList)
+    restoreCode setAdapter new ArrayAdapter(me, android.R.layout.simple_list_item_1, MnemonicCode.INSTANCE.getWordList)
 
     val backupAllowed = LocalBackup.isAllowed(activity = me)
     if (!backupAllowed) LocalBackup.askPermission(activity = me)
     else onRequestPermissionsResult(100, Array.empty, Array.empty)
   }
 
-  type GrantResults = Array[Int]
   override def onBackPressed: Unit = wrap(super.onBackPressed)(app.kit.stopAsync)
-  override def onRequestPermissionsResult(reqCode: Int, perms: Array[String], results: GrantResults) = if (canReadBackupFile) localBackupStatus setText ln_backup_detected
   def setWhen(btn: View) = mkCheckForm(alert => rm(alert)(restoreWhen setText dp.humanTime), none, baseBuilder(null, dp.refresh), dialog_ok, dialog_cancel)
   def canReadBackupFile: Boolean = LocalBackup.isAllowed(me) && LocalBackup.isExternalStorageWritable && backupFileUnsafe.isFile
   def getMnemonic: String = restoreCode.getText.toString.trim.toLowerCase.replaceAll("[^a-zA-Z0-9']+", " ")

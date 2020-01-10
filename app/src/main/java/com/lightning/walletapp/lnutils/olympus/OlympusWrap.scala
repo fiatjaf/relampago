@@ -84,7 +84,7 @@ class OlympusWrap extends OlympusProvider {
     if (cs.isEmpty) onRunOut else run(cs.head) onErrorResumeNext tryAgainWithNextCloud
   }
 
-  def getBackup(key: ByteVector) = {
+  def getBackup(key: String) = {
     def empty(failure: Throwable) = Vector.empty[String]
     // Special case: we need to query all the available clouds at once
     Obs.from(clouds).flatMap(_.connector getBackup key onErrorReturn empty)
@@ -99,8 +99,8 @@ class OlympusWrap extends OlympusProvider {
 trait OlympusProvider {
   def findRoutes(out: OutRequest): Obs[PaymentRouteVec]
   def findNodes(query: String): Obs[AnnounceChansNumVec]
-  def getBackup(key: ByteVector): Obs[StringVec]
   def getChildTxs(txIds: ByteVecSeq): Obs[TxSeq]
+  def getBackup(key: String): Obs[StringVec]
   def getRates: Obs[Result]
 }
 
@@ -113,7 +113,7 @@ class Connector(val url: String) extends OlympusProvider {
     }
 
   def getRates = ask[Result]("rates/get")
-  def getBackup(key: ByteVector) = ask[StringVec]("data/get", "key" -> key.toHex)
+  def getBackup(key: String) = ask[StringVec]("data/get", "key" -> key)
   def findNodes(query: String) = ask[AnnounceChansNumVec]("router/nodes", "query" -> query)
   def getChildTxs(txIds: ByteVecSeq) = ask[TxSeq]("txs/get", "txids" -> txIds.toJson.toString.s2hex)
   def findRoutes(out: OutRequest) = ask[PaymentRouteVec]("router/routesplus", "params" -> out.toJson.toString.s2hex)
