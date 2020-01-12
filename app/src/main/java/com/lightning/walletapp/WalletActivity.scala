@@ -377,7 +377,7 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
         if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_howto).html).create)
         else if (withRoutes.isEmpty) showForm(negTextBuilder(dialog_ok, getString(ln_receive_6conf).html).create)
         else if (maxCanReceive.amount < 0L) showForm(negTextBuilder(dialog_ok, reserveUnspentWarning.html).create)
-        else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, wr.minCanReceive, title, wr.defaultDescription) { rd =>
+        else FragWallet.worker.receive(withRoutes, finalMaxCanReceiveCapped, MilliSatoshi(wr.minCanReceive), title, wr.defaultDescription) { rd =>
           queue.map(_ => wr.requestWithdraw(lnUrl, rd.pr).body).map(LNUrl.guardResponse).foreach(none, onRequestFailed)
           def onRequestFailed(response: Throwable) = wrap(PaymentInfoWrap failOnUI rd)(me onFail response)
         }
@@ -389,13 +389,13 @@ class WalletActivity extends NfcReaderActivity with ScanActivity { me =>
           else if (maxCanReceive.amount < 0L) reserveUnspentWarning
           else getString(ln_receive_ok)
 
-        val actions = Array(getString(ln_receive_option).format(alertLNHint).html, getString(btc_receive_option).html)
-        val lst \ alert = makeChoiceList(actions, me getString action_coins_receive)
+        val actions = Array(me getString ln_receive_option format alertLNHint, me getString btc_receive_option)
+        val lst \ alert = makeChoiceList(actions.map(_.html), me getString action_coins_receive)
         lst setOnItemClickListener onTap { case 0 => offChain case 1 => onChain }
 
         def offChain = rm(alert) {
           if (viableChannels.isEmpty) showForm(negTextBuilder(dialog_ok, app.getString(ln_receive_howto).html).create)
-          else FragWallet.worker.receive(withRoutes, maxCanReceive, MilliSatoshi(1L), app.getString(ln_receive_title).html, new String) { rd =>
+          else FragWallet.worker.receive(withRoutes, maxCanReceive, MilliSatoshi(LNParams.minPaymentMsat), app.getString(ln_receive_title).html, new String) { rd =>
             app.foregroundServiceIntent.putExtra(AwaitService.SHOW_AMOUNT, denom asString rd.pr.amount.get).setAction(AwaitService.SHOW_AMOUNT)
             ContextCompat.startForegroundService(app, app.foregroundServiceIntent)
             me PRQR rd.pr

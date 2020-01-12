@@ -14,15 +14,16 @@ import com.github.kevinsawicki.http.HttpRequest._
 import com.lightning.walletapp.lnutils.ImplicitConversions._
 import com.lightning.walletapp.lnutils.olympus.OlympusWrap._
 import com.lightning.walletapp.lnutils.ImplicitJsonFormats._
-import fr.acinq.bitcoin.{Bech32, Crypto, MilliSatoshi}
 
+import scodec.bits.{Bases, ByteVector}
+import fr.acinq.bitcoin.{Bech32, Crypto, MilliSatoshi}
 import com.lightning.walletapp.ln.RoutingInfoTag.PaymentRouteVec
 import com.lightning.walletapp.Utils.app.TransData.nodeLink
 import com.lightning.walletapp.lnutils.JsonHttpUtils.to
 import com.lightning.walletapp.helper.ThrottledWork
 import fr.acinq.bitcoin.Crypto.PublicKey
+import android.graphics.BitmapFactory
 import org.bitcoinj.uri.BitcoinURI
-import scodec.bits.ByteVector
 import android.os.Bundle
 import scala.util.Try
 
@@ -186,12 +187,11 @@ trait LNUrlData {
 case class WithdrawRequest(callback: String, k1: String, maxWithdrawable: Long, defaultDescription: String, minWithdrawable: Option[Long] = None) extends LNUrlData {
   def requestWithdraw(lnUrl: LNUrl, pr: PaymentRequest) = unsafe(callbackUri.buildUpon.appendQueryParameter("pr", PaymentRequest write pr).appendQueryParameter("k1", k1).build.toString)
   override def checkAgainstParent(lnUrl: LNUrl) = lnUrl.uri.getHost == callbackUri.getHost
-  require(callback startsWith "https://", "Not an HTTPS callback")
 
+  require(callback startsWith "https://", "Withdraw request callback is not HTTPS")
+  val minCanReceive = minWithdrawable.getOrElse(LNParams.minPaymentMsat).max(LNParams.minPaymentMsat)
   val callbackUri = android.net.Uri.parse(callback)
-  val minCanReceive = MilliSatoshi(minWithdrawable getOrElse 1L)
-  require(minCanReceive.amount <= maxWithdrawable)
-  require(minCanReceive.amount >= 1L)
+  require(minCanReceive <= maxWithdrawable)
 }
 
 case class IncomingChannelRequest(uri: String, callback: String, k1: String) extends LNUrlData {
@@ -204,9 +204,9 @@ case class IncomingChannelRequest(uri: String, callback: String, k1: String) ext
   val ann = app.mkNodeAnnouncement(pubKey, address, alias = hostAddress)
   val callbackUri = android.net.Uri.parse(callback)
 
-  def requestChannel = unsafe(callbackUri.buildUpon
-    .appendQueryParameter("remoteid", LNParams.keys.extendedNodeKey.publicKey.toString)
-    .appendQueryParameter("private", "1").appendQueryParameter("k1", k1).build.toString)
+  def requestChannel =
+    unsafe(callbackUri.buildUpon.appendQueryParameter("private", "1").appendQueryParameter("k1", k1)
+      .appendQueryParameter("remoteid", LNParams.keys.extendedNodeKey.publicKey.toString).build.toString)
 }
 
 case class HostedChannelRequest(uri: String, alias: Option[String], k1: String) extends LNUrlData with StartNodeView {
@@ -224,19 +224,29 @@ object PayRequest {
   type TagAndContent = Vector[String]
   type PayMetaData = Vector[TagAndContent]
   type KeyAndUpdate = (PublicKey, ChannelUpdate)
-  type DescriptionAndMsat = (String, Long)
   type Route = Vector[KeyAndUpdate]
 }
 
 case class PayRequest(callback: String, maxSendable: Long, minSendable: Long, metadata: String) extends LNUrlData {
-  val metaDataTextPlain = to[PayMetaData](metadata).collectFirst { case Vector("text/plain", content) => content }.get
+  private val decodedMetadata = to[PayMetaData](metadata)
+
+  val metaDataBitmaps = for {
+    Vector("image/png;base64" | "image/jpeg;base64", content) <- decodedMetadata
+    _ = require(content.length <= 136536, s"Thumbnail is too heavy, base64 length=${content.length}")
+    imageByteArray = ByteVector.fromValidBase64(content, alphabet = Bases.Alphabets.Base64).toArray
+    decodedBitmap = BitmapFactory.decodeByteArray(imageByteArray, 0, imageByteArray.length)
+  } yield decodedBitmap
+
   val callbackUri = android.net.Uri.parse(callback)
+  val minCanSend = minSendable max LNParams.minPaymentMsat
+  private val metaDataTexts = decodedMetadata.collect { case Vector("text/plain", content) => content }
+  require(metaDataTexts.size == 1, "There must be exactly one text/plain entry in metadata")
+  val metaDataTextPlain = metaDataTexts.head
 
   override def checkAgainstParent(lnUrl: LNUrl) = lnUrl.uri.getHost == callbackUri.getHost
   def metaDataHash: ByteVector = Crypto.sha256(ByteVector view metadata.getBytes)
   require(callback startsWith "https://", "Not an HTTPS callback")
-  require(minSendable <= maxSendable)
-  require(minSendable >= 1L)
+  require(minCanSend <= maxSendable)
 
   def requestFinal(amount: MilliSatoshi, fromnodes: String = new String) =
     unsafe(callbackUri.buildUpon.appendQueryParameter("amount", amount.toLong.toString)
@@ -244,7 +254,7 @@ case class PayRequest(callback: String, maxSendable: Long, minSendable: Long, me
 }
 
 case class PayRequestFinal(successAction: Option[PaymentAction], routes: Vector[Route], pr: String) extends LNUrlData {
-  for (route <- routes) for (nodeId \ chanUpdate <- route) require(Announcements.checkSig(chanUpdate, nodeId), "Extra route contains an invalid update")
+  for (route <- routes) for (nodeId \ update <- route) require(Announcements.checkSig(update, nodeId), "Extra route contains an invalid update")
   val extraPaymentRoutes: PaymentRouteVec = for (route <- routes) yield route map { case nodeId \ chanUpdate => chanUpdate toHop nodeId }
   val paymentRequest: PaymentRequest = PaymentRequest.read(pr)
 }
