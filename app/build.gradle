@@ -12,6 +12,10 @@ android {
         targetSdkVersion 28
         minSdkVersion 21
         versionCode 146
+
+        ndk {
+            abiFilters 'x86', 'x86_64', 'armeabi-v7a', 'arm64-v8a'
+        }
     }
 
     buildTypes {
@@ -28,6 +32,12 @@ android {
     dexOptions {
         javaMaxHeapSize "12g"
     }
+
+    externalNativeBuild {
+        cmake {
+            path 'CMakeLists.txt'
+        }
+    }
 }
 
 dependencies {
@@ -35,6 +45,7 @@ dependencies {
     compile 'com.android.support:cardview-v7:28.0.0'
     compile 'com.android.support:appcompat-v7:28.0.0'
     compile 'com.android.support:recyclerview-v7:28.0.0'
+    compile 'info.guardianproject.netcipher:netcipher:2.1.0'
     compile 'com.google.code.ndef-tools-for-android:ndeftools:1.2.4'
     compile 'com.journeyapps:zxing-android-embedded:3.5.0@aar'
     compile 'com.softwaremill.quicklens:quicklens_2.11:1.4.11'

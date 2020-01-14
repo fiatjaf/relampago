@@ -139,7 +139,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
       case (InitData(announce), cmd: CMDOpenChannel, WAIT_FOR_INIT) =>
         BECOME(WaitAcceptData(announce, cmd), WAIT_FOR_ACCEPT) SEND OpenChannel(LNParams.chainHash, cmd.tempChanId,
           cmd.fundingSat, cmd.pushMsat, cmd.localParams.dustLimit.amount, cmd.localParams.maxHtlcValueInFlightMsat,
-          cmd.localParams.channelReserveSat, htlcMinimumMsat = 1L, cmd.initialFeeratePerKw, cmd.localParams.toSelfDelay,
+          cmd.localParams.channelReserveSat, LNParams.minPaymentMsat, cmd.initialFeeratePerKw, cmd.localParams.toSelfDelay,
           cmd.localParams.maxAcceptedHtlcs, cmd.localParams.fundingPrivKey.publicKey, cmd.localParams.revocationBasepoint,
           cmd.localParams.paymentBasepoint, cmd.localParams.delayedPaymentBasepoint, cmd.localParams.htlcBasepoint,
           Generators.perCommitPoint(cmd.localParams.shaSeed, index = 0L), cmd.channelFlags)
@@ -170,7 +170,7 @@ abstract class NormalChannel extends Channel(isHosted = false) { me =>
 
         val firstPerCommitPoint = Generators.perCommitPoint(localParams.shaSeed, index = 0L)
         BECOME(WaitFundingCreatedRemote(announce, localParams, remoteParams, open), WAIT_FOR_ACCEPT) SEND AcceptChannel(open.temporaryChannelId, localParams.dustLimit.amount,
-          localParams.maxHtlcValueInFlightMsat, localParams.channelReserveSat, htlcMinimumMsat = 1L, LNParams.minDepth, localParams.toSelfDelay, localParams.maxAcceptedHtlcs,
+          localParams.maxHtlcValueInFlightMsat, localParams.channelReserveSat, LNParams.minPaymentMsat, LNParams.minDepth, localParams.toSelfDelay, localParams.maxAcceptedHtlcs,
           localParams.fundingPrivKey.publicKey, localParams.revocationBasepoint, localParams.paymentBasepoint, localParams.delayedPaymentBasepoint,
           localParams.htlcBasepoint, firstPerCommitPoint)
 
